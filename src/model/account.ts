@@ -91,7 +91,7 @@ export class FusionAccount {
     private _reviewPromises: Array<Promise<string | undefined>> = []
     private _fusionMatches: FusionMatch[] = []
     private _history: string[] = []
-    private _managedAccountInfo: Map<string, { sourceName: string; accountName: string }> = new Map()
+    private _managedAccountInfo: Map<string, { sourceName: string; nativeIdentity: string }> = new Map()
 
     // Attribute management
     // Note: previous is initialized lazily only when needed to save memory for new accounts
@@ -619,8 +619,8 @@ export class FusionAccount {
     // Reverse Correlation Methods
     // ============================================================================
 
-    /** Get source and name info for a managed account by its ID. */
-    public getManagedAccountInfo(accountId: string): { sourceName: string; accountName: string } | undefined {
+    /** Get source and native identity info for a managed account by its ID. */
+    public getManagedAccountInfo(accountId: string): { sourceName: string; nativeIdentity: string } | undefined {
         return this._managedAccountInfo.get(accountId)
     }
 
@@ -1046,7 +1046,7 @@ export class FusionAccount {
         if (account.sourceName) {
             this._managedAccountInfo.set(accountId, {
                 sourceName: account.sourceName,
-                accountName: account.name ?? account.nativeIdentity ?? accountId,
+                nativeIdentity: account.nativeIdentity ?? accountId,
             })
 
             const existingSourceAccounts = this._attributeBag.sources.get(account.sourceName) || []

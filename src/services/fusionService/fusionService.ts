@@ -433,10 +433,10 @@ export class FusionService {
             if (info) {
                 fusionAccount.setReverseCorrelationAttribute(
                     sourceConfig.correlationAttribute,
-                    info.accountName
+                    info.nativeIdentity
                 )
                 this.log.info(
-                    `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.accountName}" ` +
+                    `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.nativeIdentity}" ` +
                     `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
                 )
             }

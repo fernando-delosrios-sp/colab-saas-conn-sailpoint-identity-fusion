@@ -1148,10 +1148,17 @@ export class SourceService {
     }
 
     /**
-     * Ensure the managed source's correlation config includes an accountName-to-identity-attribute rule.
+     * Ensure the managed source's correlation config includes a rule mapping the
+     * account's identity attribute (schema ID) to the reverse correlation identity attribute.
      */
     private async ensureManagedSourceCorrelation(attributeName: string, managedSourceId: string): Promise<void> {
         const { sourcesApi } = this.client
+
+        const schemas = await this.listSourceSchemas(managedSourceId)
+        const accountSchema = schemas.find((s) => s.name === 'account')
+        assert(accountSchema, `Managed source ${managedSourceId} account schema not found`)
+        const accountIdAttribute = accountSchema.identityAttribute
+        assert(accountIdAttribute, `Managed source ${managedSourceId} account schema has no identity attribute (ID) defined`)
 
         const correlationConfig = await this.client.execute(
             () => sourcesApi.getCorrelationConfig({
@@ -1163,10 +1170,10 @@ export class SourceService {
 
         const assignments = correlationConfig?.attributeAssignments ?? []
         const alreadyExists = assignments.some(
-            (a) => a.property === 'accountName' && a.value === attributeName
+            (a) => a.property === attributeName && a.value === accountIdAttribute
         )
         if (alreadyExists) {
-            this.log.debug(`Managed source ${managedSourceId} already has correlation rule for "${attributeName}"`)
+            this.log.debug(`Managed source ${managedSourceId} already has correlation rule for "${attributeName}" -> "${accountIdAttribute}"`)
             return
         }
 
@@ -1175,8 +1182,8 @@ export class SourceService {
             attributeAssignments: [
                 ...assignments,
                 {
-                    property: 'accountName',
-                    value: attributeName,
+                    property: attributeName,
+                    value: accountIdAttribute,
                     operation: 'EQ' as any,
                     complex: false,
                     ignoreCase: false,
@@ -1194,7 +1201,7 @@ export class SourceService {
             QueuePriority.HIGH,
             `SourceService>ensureManagedSourceCorrelation put ${managedSourceId}`
         )
-        this.log.info(`Added correlation rule accountName="${attributeName}" to managed source ${managedSourceId}`)
+        this.log.info(`Added correlation rule "${attributeName}" -> "${accountIdAttribute}" to managed source ${managedSourceId}`)
     }
 
     // ------------------------------------------------------------------------
