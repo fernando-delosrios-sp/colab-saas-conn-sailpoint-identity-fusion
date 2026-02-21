@@ -1,4 +1,4 @@
-import { Context, ConnectorError, ConnectorErrorType, StandardCommand } from '@sailpoint/connector-sdk'
+import { Context, ConnectorError, ConnectorErrorType, Response, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
 import { InMemoryLockService, LockService } from './lockService'
@@ -12,6 +12,7 @@ import { AttributeService } from './attributeService'
 import { EntitlementService } from './entitlementService'
 import { ScoringService } from './scoringService'
 import { MessagingService } from './messagingService'
+import { ProxyService } from './proxyService'
 
 /**
  * Central dependency injection container for all connector services.
@@ -35,6 +36,7 @@ export class ServiceRegistry {
     public entitlements: EntitlementService
     public scoring: ScoringService
     public messaging: MessagingService
+    public proxy: ProxyService
 
     /**
      * Creates a new ServiceRegistry, initializing all services in dependency order.
@@ -42,11 +44,13 @@ export class ServiceRegistry {
      *
      * @param config - The resolved fusion configuration
      * @param context - SDK context, optionally providing pre-built service overrides
+     * @param res - SDK response object for sending results back to the platform
      * @param operationContext - Optional operation name for log attribution (e.g. "accountList")
      */
     constructor(
         public config: FusionConfig,
         context: Context,
+        public res: Response<any>,
         operationContext?: string
     ) {
         // Initialize core services first
@@ -54,6 +58,7 @@ export class ServiceRegistry {
         this.log = context.logService ?? new LogService(logConfig)
         this.locks = context.lockService ?? new InMemoryLockService(this.log)
         this.client = context.connectionService ?? new ClientService(this.config, this.log)
+        this.log.setQueue(this.client.getQueue())
 
         // Initialize services that don't depend on others
         this.sources = context.sourceService ?? new SourceService(this.config, this.log, this.client)
@@ -88,6 +93,8 @@ export class ServiceRegistry {
                 this.schemas,
                 commandType
             )
+
+        this.proxy = context.proxyService ?? new ProxyService(this.config, this.log, this.res, commandType)
     }
 
     /**
@@ -114,9 +121,10 @@ export class ServiceRegistry {
     }
 
     /**
-     * Clears the active registry singleton, releasing all service references.
+     * Flushes pending logs and clears the active registry singleton, releasing all service references.
      */
     static clear() {
+        void this.current?.log?.flush()
         this.current = undefined
     }
 }

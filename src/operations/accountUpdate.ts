@@ -1,4 +1,4 @@
-import { ConnectorError, Response, StdAccountUpdateInput, StdAccountUpdateOutput } from '@sailpoint/connector-sdk'
+import { ConnectorError, StdAccountUpdateInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
@@ -22,15 +22,13 @@ import { AttributeOperations } from '../services/attributeService/types'
  *
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param input - SDK input containing the account identity and list of attribute changes
- * @param res - SDK response object for sending the updated account back to the platform
  */
 export const accountUpdate = async (
     serviceRegistry: ServiceRegistry,
     input: StdAccountUpdateInput,
-    res: Response<StdAccountUpdateOutput>
 ) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, sources, schemas, fusion } = serviceRegistry
+    const { log, sources, schemas, fusion, res } = serviceRegistry
 
     try {
         log.info(`Updating account: ${input.identity}`)

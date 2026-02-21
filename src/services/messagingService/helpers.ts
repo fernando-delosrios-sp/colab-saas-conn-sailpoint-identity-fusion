@@ -98,6 +98,16 @@ export const registerHandlebarsHelpers = (): void => {
         return attr === 'Average Score' || alg === 'average'
     })
 
+    // Render a human-readable label for source type
+    Handlebars.registerHelper('sourceTypeLabel', (sourceType: string) => {
+        const labels: Record<string, string> = {
+            identity: 'Identity',
+            record: 'Record',
+            orphan: 'Orphan',
+        }
+        return labels[sourceType] ?? sourceType
+    })
+
     // Chunk an array into rows for table rendering
     Handlebars.registerHelper('chunk', (arr: any[], size: any) => {
         const n = Math.max(1, Number.parseInt(String(size), 10) || 1)
@@ -154,9 +164,11 @@ export type FusionReportEmailData = {
     accounts: Array<{
         accountName: string
         accountSource: string
+        sourceType?: 'identity' | 'record' | 'orphan'
         accountId?: string
         accountEmail?: string
         accountAttributes?: Record<string, any>
+        error?: string
         matches: Array<{
             identityName: string
             identityId?: string
@@ -175,6 +187,18 @@ export type FusionReportEmailData = {
     totalAccounts: number
     potentialDuplicates: number
     reportDate: Date | string
+    stats?: {
+        totalFusionAccounts?: number
+        fusionReviewsCreated?: number
+        fusionReviewAssignments?: number
+        fusionReviewNewIdentities?: number
+        fusionReviewNonMatches?: number
+        identitiesFound?: number
+        managedAccountsFound?: number
+        managedAccountsProcessed?: number
+        totalProcessingTime?: string
+        usedMemory?: string
+    }
 }
 
 // ============================================================================

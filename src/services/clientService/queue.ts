@@ -44,7 +44,7 @@ export class ApiQueue {
     ): Promise<T> {
         const item: QueueItem<T> = {
             id: options.id || `req-${Date.now()}-${Math.random()}`,
-            priority: options.priority ?? QueuePriority.NORMAL,
+            priority: options.priority ?? QueuePriority.MEDIUM,
             execute,
             resolve: () => { },
             reject: () => { },
@@ -58,12 +58,15 @@ export class ApiQueue {
             item.resolve = resolve
             item.reject = reject
 
-            // Insert based on priority (higher priority first)
-            const insertIndex = this.queue.findIndex((q) => q.priority < item.priority)
-            if (insertIndex === -1) {
-                this.queue.push(item)
+            if (this.config.enablePriority) {
+                const insertIndex = this.queue.findIndex((q) => q.priority < item.priority)
+                if (insertIndex === -1) {
+                    this.queue.push(item)
+                } else {
+                    this.queue.splice(insertIndex, 0, item)
+                }
             } else {
-                this.queue.splice(insertIndex, 0, item)
+                this.queue.push(item)
             }
 
             // Handle pre-flight abort
@@ -181,12 +184,15 @@ export class ApiQueue {
 
                 await this.sleep(delay)
 
-                // Re-queue with same priority (priority is always enabled)
-                const insertIndex = this.queue.findIndex((q) => q.priority < item.priority)
-                if (insertIndex === -1) {
-                    this.queue.push(item)
+                if (this.config.enablePriority) {
+                    const insertIndex = this.queue.findIndex((q) => q.priority < item.priority)
+                    if (insertIndex === -1) {
+                        this.queue.push(item)
+                    } else {
+                        this.queue.splice(insertIndex, 0, item)
+                    }
                 } else {
-                    this.queue.splice(insertIndex, 0, item)
+                    this.queue.push(item)
                 }
                 this.stats.queueLength = this.queue.length
             } else {

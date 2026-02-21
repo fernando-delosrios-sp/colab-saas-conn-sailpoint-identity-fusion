@@ -128,13 +128,24 @@ export interface ScopeSection {
     identityScopeQuery?: string
 }
 
+export type SourceType = 'identity' | 'record' | 'orphan'
+
+export type CorrelationMode = 'correlate' | 'reverse' | 'none'
+
 /** Configuration for a single managed source that feeds into fusion. */
 export interface SourceConfig {
     name: string
     enabled?: boolean
-    forceAggregation?: boolean
+    sourceType?: SourceType
+    disableNonMatchingAccounts?: boolean
+    aggregationMode?: 'none' | 'before' | 'delayed'
+    aggregationDelay?: number
+    optimizedAggregation?: boolean
     accountFilter?: string
     accountLimit?: number
+    correlationMode?: CorrelationMode
+    correlationAttribute?: string
+    correlationDisplayName?: string
 }
 
 /** Configuration for all managed sources and aggregation behavior. */
@@ -153,7 +164,6 @@ export interface SourcesSection {
 /** Controls various processing behaviors during aggregation. */
 export interface ProcessingControlSection {
     deleteEmpty: boolean
-    correlateOnAggregation: boolean
     forceAttributeRefresh: boolean
     skipAccountsWithMissingId: boolean
     maxHistoryMessages: number

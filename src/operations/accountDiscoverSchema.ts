@@ -1,12 +1,11 @@
-import { ConnectorError, Response, StdAccountDiscoverSchemaOutput } from '@sailpoint/connector-sdk'
+import { ConnectorError } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 
 export const accountDiscoverSchema = async (
     serviceRegistry: ServiceRegistry,
-    res: Response<StdAccountDiscoverSchemaOutput>
 ) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, schemas, sources } = serviceRegistry
+    const { log, schemas, sources, res } = serviceRegistry
 
     try {
         log.info('Discovering account schema')

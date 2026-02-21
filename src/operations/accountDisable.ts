@@ -1,4 +1,4 @@
-import { ConnectorError, Response, StdAccountDisableInput, StdAccountDisableOutput } from '@sailpoint/connector-sdk'
+import { ConnectorError, StdAccountDisableInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
@@ -20,15 +20,13 @@ import { AttributeOperations } from '../services/attributeService/types'
  *
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param input - SDK input containing the account identity to disable
- * @param res - SDK response object for sending the disabled account back to the platform
  */
 export const accountDisable = async (
     serviceRegistry: ServiceRegistry,
     input: StdAccountDisableInput,
-    res: Response<StdAccountDisableOutput>
 ) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, fusion, sources, schemas } = serviceRegistry
+    const { log, fusion, sources, schemas, res } = serviceRegistry
 
     try {
         log.info(`Disabling account: ${input.identity}`)

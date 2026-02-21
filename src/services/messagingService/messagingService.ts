@@ -131,6 +131,7 @@ export class MessagingService {
         context?: {
             accountName: string
             accountSource: string
+            sourceType?: 'identity' | 'record' | 'orphan'
             accountId?: string
             accountEmail?: string
             accountAttributes: Record<string, any>
@@ -169,11 +170,13 @@ export class MessagingService {
             })) ?? []
 
         const subject = `Identity Fusion Review Required: ${accountName} [${accountSource}]`
+        const sourceType = context?.sourceType ?? (formInput as any)?.sourceType ?? undefined
         const emailData: FusionReviewEmailData = {
             accounts: [
                 {
                     accountName,
                     accountSource,
+                    sourceType,
                     accountId: accountId || undefined,
                     accountEmail,
                     accountAttributes: pickedAccountAttributes,

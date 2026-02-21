@@ -1,7 +1,7 @@
 import { AccountsApiUpdateAccountRequest, IdentityDocument, Search } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
-import { ClientService } from './clientService'
+import { ClientService, QueuePriority } from './clientService'
 import { LogService } from './logService'
 import { assert } from '../utils/assert'
 import { FusionAccount } from '../model/account'
@@ -97,7 +97,7 @@ export class IdentityService {
             try {
                 const identities = await this.client.paginateSearchApi<IdentityDocument>(
                     query,
-                    undefined,
+                    QueuePriority.HIGH,
                     'IdentityService>fetchIdentities searchPost'
                 )
                 this.identitiesById = new Map(
@@ -144,7 +144,7 @@ export class IdentityService {
             try {
                 yield* this.client.paginateSearchApiGenerator<IdentityDocument>(
                     query,
-                    undefined,
+                    QueuePriority.HIGH,
                     'IdentityService>fetchIdentitiesGenerator searchPost',
                     abortSignal
                 )
@@ -186,7 +186,7 @@ export class IdentityService {
         try {
             const identities = await this.client.paginateSearchApi<IdentityDocument>(
                 query,
-                undefined,
+                QueuePriority.HIGH,
                 'IdentityService>fetchIdentityById searchPost'
             )
             identities.forEach((identity) => this.identitiesById.set(identity.id, identity))
@@ -226,7 +226,7 @@ export class IdentityService {
         try {
             const identities = await this.client.paginateSearchApi<IdentityDocument>(
                 query,
-                undefined,
+                QueuePriority.HIGH,
                 'IdentityService>fetchIdentityByName searchPost'
             )
             identities.forEach((identity) => this.identitiesById.set(identity.id, identity))
@@ -262,15 +262,17 @@ export class IdentityService {
     // ------------------------------------------------------------------------
 
     /**
-     * Triggers asynchronous correlation of all missing accounts to the fusion account's identity.
+     * Triggers asynchronous correlation of missing accounts to the fusion account's identity.
      * Correlation promises are tracked on the fusion account and resolved later during
      * {@link FusionAccount.resolvePendingOperations}.
      *
      * @param fusionAccount - The fusion account with missing accounts to correlate
+     * @param accountIdFilter - If provided, only correlate these specific account IDs
+     *   (used for per-source correlation where only a subset should be directly correlated)
      * @returns true if correlation was initiated, false if no identity ID is available
      */
-    public async correlateAccounts(fusionAccount: FusionAccount): Promise<boolean> {
-        const { missingAccountIds, identityId } = fusionAccount
+    public async correlateAccounts(fusionAccount: FusionAccount, accountIdFilter?: string[]): Promise<boolean> {
+        const { identityId } = fusionAccount
         const { accountsApi } = this.client
 
         if (!identityId) {
@@ -278,18 +280,18 @@ export class IdentityService {
             return false
         }
 
-        if (missingAccountIds.length === 0) {
-            this.log.info(`No missing accounts to correlate for fusion account ${fusionAccount.name}`)
+        const targetIds = accountIdFilter ?? fusionAccount.missingAccountIds
+
+        if (targetIds.length === 0) {
+            this.log.info(`No accounts to correlate for fusion account ${fusionAccount.name}`)
             return true
         }
 
         this.log.info(
-            `Triggering correlation for ${missingAccountIds.length} missing account(s) for fusion account ${fusionAccount.name}`
+            `Triggering correlation for ${targetIds.length} account(s) for fusion account ${fusionAccount.name}`
         )
 
-        // Create correlation promises for all missing accounts (fire-and-forget)
-        // Store a copy of missing account IDs since we'll be modifying the set during correlation
-        const accountIdsToCorrelate = [...missingAccountIds]
+        const accountIdsToCorrelate = [...targetIds]
 
         accountIdsToCorrelate.forEach((accountId) => {
             // Optimistic: mark as correlated before the API call so the account
@@ -309,7 +311,7 @@ export class IdentityService {
             }
 
             const correlationPromise = this.client
-                .execute(() => accountsApi.updateAccount(requestParameters))
+                .execute(() => accountsApi.updateAccount(requestParameters), QueuePriority.LOW, `IdentityService>correlateAccounts ${accountId}`)
                 .then(() => {
                     this.log.debug(`Successfully correlated account ${accountId} to identity ${identityId}`)
                 })

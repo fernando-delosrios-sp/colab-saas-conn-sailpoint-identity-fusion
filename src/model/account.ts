@@ -1,5 +1,5 @@
 import { Account, IdentityDocument } from 'sailpoint-api-client'
-import { getDateFromISOString } from '../utils/date'
+import { getDateFromISOString, isNewerThan } from '../utils/date'
 import { toSetFromAttribute as attributeToSet } from '../utils/attributes'
 import { FusionDecision } from './form'
 import { FusionConfig, SourceConfig } from './config'
@@ -91,6 +91,7 @@ export class FusionAccount {
     private _reviewPromises: Array<Promise<string | undefined>> = []
     private _fusionMatches: FusionMatch[] = []
     private _history: string[] = []
+    private _managedAccountInfo: Map<string, { sourceName: string; accountName: string }> = new Map()
 
     // Attribute management
     // Note: previous is initialized lazily only when needed to save memory for new accounts
@@ -615,6 +616,40 @@ export class FusionAccount {
     }
 
     // ============================================================================
+    // Reverse Correlation Methods
+    // ============================================================================
+
+    /** Get source and name info for a managed account by its ID. */
+    public getManagedAccountInfo(accountId: string): { sourceName: string; accountName: string } | undefined {
+        return this._managedAccountInfo.get(accountId)
+    }
+
+    /**
+     * Returns missing account IDs that belong to a given source,
+     * using the managed account info map for source lookup.
+     */
+    public getMissingAccountIdsForSource(sourceName: string): string[] {
+        const result: string[] = []
+        for (const id of this._missingAccountIds) {
+            const info = this._managedAccountInfo.get(id)
+            if (info && info.sourceName === sourceName) {
+                result.push(id)
+            }
+        }
+        return result
+    }
+
+    /** Sets the dedicated reverse correlation attribute value in the attribute bag. */
+    public setReverseCorrelationAttribute(attributeName: string, value: string): void {
+        this._attributeBag.current[attributeName] = value
+    }
+
+    /** Clears the dedicated reverse correlation attribute from the attribute bag. */
+    public clearReverseCorrelationAttribute(attributeName: string): void {
+        delete this._attributeBag.current[attributeName]
+    }
+
+    // ============================================================================
     // Mutation Methods - Statuses
     // ============================================================================
 
@@ -883,6 +918,10 @@ export class FusionAccount {
         this._attributeBag.identity = identity.attributes ?? {}
         this._identityId = identity.id ?? undefined
 
+        if (!this._needsRefresh && isNewerThan(identity.modified, this._modified)) {
+            this._needsRefresh = true
+        }
+
         const sourceNames = this.sourceConfigs.map((sc) => sc.name)
         identity.accounts?.forEach((account) => {
             if (sourceNames.includes(account.source?.name ?? '')) {
@@ -998,14 +1037,18 @@ export class FusionAccount {
         }
 
         if (!this._needsRefresh) {
-            const modified = getDateFromISOString(account.modified)
             const thresholdMs = this.fusionAccountRefreshThresholdInSeconds * 1000
-            if (modified.getTime() > this._modified.getTime() + thresholdMs) {
+            if (isNewerThan(account.modified, this._modified, thresholdMs)) {
                 this._needsRefresh = true
             }
         }
 
         if (account.sourceName) {
+            this._managedAccountInfo.set(accountId, {
+                sourceName: account.sourceName,
+                accountName: account.name ?? account.nativeIdentity ?? accountId,
+            })
+
             const existingSourceAccounts = this._attributeBag.sources.get(account.sourceName) || []
             existingSourceAccounts.push(account.attributes ?? {})
             this._sources.delete('Identities')

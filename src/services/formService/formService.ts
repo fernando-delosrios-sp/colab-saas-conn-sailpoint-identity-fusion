@@ -42,6 +42,8 @@ export class FormService {
     private _pendingReviewUrlsByReviewerId: Map<string, string[]> = new Map()
     /** Candidate identity IDs from pending (unanswered) form instances, populated during fetchFormData. */
     private _pendingCandidateIdentityIds: Set<string> = new Set()
+    private _formsCreated: number = 0
+    private _formInstancesCreated: number = 0
     private readonly fusionFormNamePattern: string
     private readonly fusionFormExpirationDays: number
     private readonly fusionFormAttributes?: string[]
@@ -128,16 +130,17 @@ export class FormService {
     }
 
     /**
-     * Create a fusion form for deduplication review
+     * Create a fusion form for deduplication review.
+     * @returns true if the form was created successfully, false if creation was skipped
      */
     public async createFusionForm(
         fusionAccount: FusionAccount,
         reviewers: Set<FusionAccount> | undefined
-    ): Promise<void> {
+    ): Promise<boolean> {
         assert(fusionAccount, 'Fusion account is required')
 
         if (!this.hasValidReviewers(reviewers, fusionAccount.name || 'Unknown')) {
-            return
+            return false
         }
 
         const { candidates, formDefinition, formInput, expire, fusionSourceId } =
@@ -168,7 +171,9 @@ export class FormService {
                     this._pendingCandidateIdentityIds.add(candidate.id)
                 }
             }
+            return true
         }
+        return false
     }
 
     /**
@@ -206,7 +211,8 @@ export class FormService {
 
         const formDefinition = await this.getOrCreateFormDefinition(formName, fusionAccount, candidates)
 
-        const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes)
+        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'identity'
+        const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
         assert(formInput, 'Form input is required')
 
         const expire = calculateExpirationDate(this.fusionFormExpirationDays)
@@ -389,6 +395,7 @@ export class FormService {
             await this.messaging.sendFusionEmail(formInstance, {
                 accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
                 accountSource: fusionAccount.sourceName,
+                sourceType: this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType,
                 accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
                 accountEmail: fusionAccount.email,
                 accountAttributes: fusionAccount.attributes as any,
@@ -403,6 +410,16 @@ export class FormService {
         } catch (error) {
             this.log.warn(`Failed to send email notification for form ${formInstance.id}: ${error}`)
         }
+    }
+
+    /** Number of form definitions created during this run */
+    public get formsCreated(): number {
+        return this._formsCreated
+    }
+
+    /** Number of form instances (review assignments) created during this run */
+    public get formInstancesCreated(): number {
+        return this._formInstancesCreated
     }
 
     /**
@@ -839,7 +856,8 @@ export class FormService {
             this.log.error(`Candidates must be less than or equal to ${MAX_CANDIDATES_FOR_FORM}`)
             return
         }
-        const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes)
+        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'identity'
+        const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
         const formInputs = buildFormInputs(fusionAccount, candidates, this.fusionFormAttributes)
         const formConditions = buildFormConditions(candidates, this.fusionFormAttributes)
         const owner = getFormOwner(this.sources)
@@ -1004,6 +1022,7 @@ export class FormService {
         assert(formInstance.id, 'Form definition ID is missing')
 
         this.log.debug(`Form definition created successfully: ${formInstance.id}`)
+        this._formsCreated++
         return formInstance
     }
 
@@ -1058,6 +1077,7 @@ export class FormService {
         const response = await this.client.execute(createFormInstanceCall)
         assert(response, 'Failed to create form instance')
         this.log.debug(`Form instance created successfully: ${response.id || 'unknown'}`)
+        this._formInstancesCreated++
         return response
     }
 

@@ -38,6 +38,8 @@ export type FusionReportAccount = {
     accountName: string
     /** Name of the source the account belongs to */
     accountSource: string
+    /** Source processing type (identity, record, or orphan) */
+    sourceType?: 'identity' | 'record' | 'orphan'
     /** ISC account ID */
     accountId?: string
     /** Email address from the account attributes */
@@ -46,6 +48,32 @@ export type FusionReportAccount = {
     accountAttributes?: Record<string, any>
     /** List of identity match candidates with their scores */
     matches: FusionReportMatch[]
+    /** Error message when form creation failed (excessive candidates or runtime error) */
+    error?: string
+}
+
+/** Processing statistics included in the fusion report. */
+export type FusionReportStats = {
+    /** Total fusion accounts (existing + new) */
+    totalFusionAccounts?: number
+    /** Number of fusion review forms created */
+    fusionReviewsCreated?: number
+    /** Number of fusion review assignments (form instances, one per reviewer) */
+    fusionReviewAssignments?: number
+    /** Number of "new identity" decisions from reviews */
+    fusionReviewNewIdentities?: number
+    /** Number of non-match decisions from reviews */
+    fusionReviewNonMatches?: number
+    /** Number of ISC identities loaded */
+    identitiesFound?: number
+    /** Number of managed source accounts loaded */
+    managedAccountsFound?: number
+    /** Number of managed source accounts processed */
+    managedAccountsProcessed?: number
+    /** Formatted total processing time */
+    totalProcessingTime?: string
+    /** Formatted memory usage at report generation time */
+    usedMemory?: string
 }
 
 /**
@@ -61,4 +89,6 @@ export type FusionReport = {
     potentialDuplicates?: number
     /** Timestamp when the report was generated */
     reportDate?: Date | string
+    /** Processing statistics */
+    stats?: FusionReportStats
 }

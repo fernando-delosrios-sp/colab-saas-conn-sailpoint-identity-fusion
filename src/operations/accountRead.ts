@@ -1,4 +1,4 @@
-import { ConnectorError, Response, StdAccountReadInput, StdAccountReadOutput } from '@sailpoint/connector-sdk'
+import { ConnectorError, StdAccountReadInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
@@ -17,15 +17,13 @@ import { AttributeOperations } from '../services/attributeService/types'
  *
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param input - SDK input containing the account identity to read
- * @param res - SDK response object for sending the account back to the platform
  */
 export const accountRead = async (
     serviceRegistry: ServiceRegistry,
     input: StdAccountReadInput,
-    res: Response<StdAccountReadOutput>
 ) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, fusion, schemas, sources } = serviceRegistry
+    const { log, fusion, schemas, sources, res } = serviceRegistry
 
     try {
         log.info(`Reading account: ${input.identity}`)

@@ -7,6 +7,7 @@ describe('assert', () => {
         crash: jest.fn(),
         error: jest.fn(),
         warn: jest.fn(),
+        flush: jest.fn(),
     }
 
     beforeEach(() => {

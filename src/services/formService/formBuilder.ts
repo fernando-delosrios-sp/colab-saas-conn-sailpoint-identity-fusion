@@ -4,6 +4,7 @@ import {
 } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
+import { SourceType } from '../../model/config'
 import { capitalizeFirst } from '../../utils/attributes'
 import { ALGORITHM_LABELS } from './constants'
 import { Candidate } from './types'
@@ -18,9 +19,11 @@ import { Candidate } from './types'
 export const buildFormInput = (
     fusionAccount: FusionAccount,
     candidates: Candidate[],
-    fusionFormAttributes?: string[]
+    fusionFormAttributes?: string[],
+    sourceType: SourceType = 'identity'
 ): { [key: string]: any } => {
     const formInput: { [key: string]: any } = {}
+    formInput.sourceType = sourceType
 
     const accountIdentifier =
         String(fusionAccount.managedAccountId || '').trim() ||
@@ -105,7 +108,8 @@ export const buildFormInput = (
 export const buildFormFields = (
     fusionAccount: FusionAccount,
     candidates: Candidate[],
-    fusionFormAttributes?: string[]
+    fusionFormAttributes?: string[],
+    sourceType: SourceType = 'identity'
 ): FormElementV2025[] => {
     const formFields: FormElementV2025[] = []
 
@@ -130,14 +134,19 @@ export const buildFormFields = (
     }
 
     if (topSectionElements.length > 0) {
+        const sectionDescriptions: Record<SourceType, string> = {
+            identity: 'A potential duplicate identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
+            record: 'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
+            orphan: 'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
+        }
+
         formFields.push({
             id: 'topSection',
             key: 'topSection',
             elementType: 'SECTION',
             config: {
                 alignment: 'CENTER',
-                description:
-                    'A potential duplicate identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
+                description: sectionDescriptions[sourceType],
                 formElements: topSectionElements,
                 label: `Fusion review required for ${fusionAccount.sourceName}`,
                 labelStyle: 'h2',
@@ -172,13 +181,29 @@ export const buildFormFields = (
                                     id: 'newIdentity',
                                     key: 'newIdentity',
                                     elementType: 'TOGGLE',
-                                    config: {
-                                        label: 'New identity',
-                                        default: false,
-                                        trueLabel: 'True',
-                                        falseLabel: 'False',
-                                        helpText: 'Select this if the account is a new identity',
-                                    },
+                                    config: sourceType === 'identity'
+                                        ? {
+                                            label: 'New identity',
+                                            default: false,
+                                            trueLabel: 'True',
+                                            falseLabel: 'False',
+                                            helpText: 'Select this if the account is a new identity',
+                                        }
+                                        : sourceType === 'record'
+                                            ? {
+                                                label: 'No match',
+                                                default: false,
+                                                trueLabel: 'True',
+                                                falseLabel: 'False',
+                                                helpText: 'Select this if the record does not match any existing identity',
+                                            }
+                                            : {
+                                                label: 'No match',
+                                                default: false,
+                                                trueLabel: 'True',
+                                                falseLabel: 'False',
+                                                helpText: 'Select this if the orphan account does not match any existing identity',
+                                            },
                                     validations: [],
                                 },
                             ],

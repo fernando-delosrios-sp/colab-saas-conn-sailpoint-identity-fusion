@@ -6,6 +6,23 @@ The Account List operation is the main entry point for identity fusion. It perfo
 
 ## Process Flow
 
+```mermaid
+flowchart TD
+    Start([Account List Starts]) --> Init[1. Setup & Init]
+    Init --> Fetch[2. Fetch Data in Parallel<br>Identities, Accounts, Forms]
+    Fetch --> Exist[3. Process Existing Fusion Accounts]
+    Exist --> NewId[4. Process Identities]
+    NewId --> Reviews[5. Process New Identity Decisions]
+    Reviews --> Dedup[6. Deduplication of Remaining Managed Accounts]
+    Dedup --> Forms[7. Form & Entitlement Reconciliation]
+    Forms --> Unique[8. Global Unique Attribute Refresh]
+    Unique --> Report[9. Reporting]
+    Report --> Clean[10. Cleanup Caches]
+    Clean --> Output[11. Output Accounts to ISC]
+    Output --> State[12. Save State & Final Cleanup]
+    State --> End([End])
+```
+
 1.  **Setup & Initialization**:
     - Loads all managed sources.
     - Acquires a **process lock** to prevent concurrent aggregations.
@@ -24,16 +41,16 @@ The Account List operation is the main entry point for identity fusion. It perfo
     - If `fusionReportOnAggregation` is enabled and the fusion owner identity was not loaded in the parallel fetch, it is fetched separately.
 
 3.  **Fusion Account Processing** (attribute mapping + normal definitions):
-    - Processes all *existing* fusion accounts. This step "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
+    - Processes all _existing_ fusion accounts. This step "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
     - For each account:
         - Identity layer is applied to match collected identities with Fusion accounts.
         - Managed account layer is applied to match collected managed accounts with Fusion accounts.
         - Assignment decision layer is applied to match Fusion reviews that resulted in identity assignment.
         - Attribute mapping is applied first, then **normal** attribute definitions are evaluated. Normal attribute values feed into the Velocity context and are available for Fusion matching/scoring.
-    - **Optimistic correlation**: When `correlateOnAggregation` is enabled, missing accounts are marked as correlated *immediately* before the API call is enqueued, so the account output reflects a successful correlation without waiting for the queue to drain. Correlation API calls proceed as fire-and-forget in the background; any failures are logged and will be re-detected on the next aggregation.
+    - **Optimistic correlation**: When `correlateOnAggregation` is enabled, missing accounts are marked as correlated _immediately_ before the API call is enqueued, so the account output reflects a successful correlation without waiting for the queue to drain. Correlation API calls proceed as fire-and-forget in the background; any failures are logged and will be re-detected on the next aggregation.
 
 4.  **Identity Processing** (attribute mapping + normal definitions):
-    - Processes all *identities*. This creates new fusion identities for identities that don't yet have a fusion account but should. This step also "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
+    - Processes all _identities_. This creates new fusion identities for identities that don't yet have a fusion account but should. This step also "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
     - For each identity:
         - Managed account layer is applied to match collected managed accounts with Fusion accounts.
         - Same attribute mapping + normal definition evaluation as step 3.
@@ -44,9 +61,33 @@ The Account List operation is the main entry point for identity fusion. It perfo
 
 6.  **Managed Account Processing (Deduplication)**:
     - Processes any remaining managed accounts in the work queue.
-    - These are accounts that were *not* matched to an existing fusion account or an identity.
+    - These are accounts that were _not_ matched to an existing fusion account or an identity.
+    - **Source Type Check**: Behavior changes based on the account's Source Type:
+        - **Record**: Registers unique attributes but drops the account from ISC output.
+        - **Orphan**: Drops the account entirely (and optionally triggers a background disable operation).
+        - **Identity**: Proceeds to Deduplication pipeline.
     - **Reviewer validation**: Before scoring begins, each managed source is checked for valid reviewers. Sources without a configured reviewer are logged once as an error and their accounts bypass scoring entirely, being added as unmatched directly.
     - For sources with valid reviewers, the full deduplication pipeline runs: scoring, auto-correlation (for perfect matches when enabled), review form creation (for partial matches), or unmatched addition.
+
+<details>
+<summary><b>View Graphic: Managed Account Processing (Step 6)</b></summary>
+
+```mermaid
+flowchart TD
+    A[Unmatched Managed Account] --> B{Source Type?}
+    B -- Record --> C[Register Unique Attributes & Drop]
+    B -- Orphan --> D[Drop Account]
+    D -.-> E([Optional: Disable Action])
+    B -- Identity --> F{Valid Reviewer Setup?}
+    F -- No --> G[Skip Scoring: Add as Unmatched]
+    F -- Yes --> H[Run Matching/Scoring Engine]
+    H --> I{Score Thresholds}
+    I -- Perfect Match --> J[Auto-correlate]
+    I -- Partial Match --> K[Generate Review Form]
+    I -- No Match --> G
+```
+
+</details>
 
 7.  **Form & Entitlement Reconciliation**:
     - Updates processed Fusion accounts with review information.
@@ -55,7 +96,7 @@ The Account List operation is the main entry point for identity fusion. It perfo
 
 8.  **Unique Attribute Refresh** (unique definitions — runs after all matching):
     - Performs a batched global refresh of **unique** attributes for all fusion accounts (both existing and newly created).
-    - Unique definitions run *after* Fusion matching has completed, so they can reference normal attribute values produced in steps 3–6.
+    - Unique definitions run _after_ Fusion matching has completed, so they can reference normal attribute values produced in steps 3–6.
     - Ensures uniqueness constraints are met across the entire dataset.
 
 9.  **Reporting (Conditional)**:
@@ -72,7 +113,7 @@ The Account List operation is the main entry point for identity fusion. It perfo
 12. **State Saving & Final Cleanup**:
     - Saves attribute generation state (counters).
     - Saves batch cumulative counts.
-    - State is saved *after* output generation so that a failure during transmission prevents stale state from being persisted.
+    - State is saved _after_ output generation so that a failure during transmission prevents stale state from being persisted.
     - Clears fusion account caches from memory.
     - Releases the process lock. The lock is released in a `finally` block, so it is also released if the operation fails after acquisition.
 

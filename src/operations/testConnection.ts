@@ -1,4 +1,4 @@
-import { ConnectorError, Response, StdTestConnectionOutput } from '@sailpoint/connector-sdk'
+import { ConnectorError } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 
 /**
@@ -9,15 +9,13 @@ import { ServiceRegistry } from '../services/serviceRegistry'
  *
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param _input - Unused input parameter (required by SDK interface)
- * @param res - SDK response object for sending the test result back to the platform
  */
 export const testConnection = async (
     serviceRegistry: ServiceRegistry,
     _input: any,
-    res: Response<StdTestConnectionOutput>
 ) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, sources } = serviceRegistry
+    const { log, sources, res } = serviceRegistry
 
     try {
         log.info('Testing connection')

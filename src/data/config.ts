@@ -106,11 +106,18 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
         .map((sourceConfig: SourceConfig) => {
             assert(sourceConfig, 'Source configuration is required')
             assert(sourceConfig.name, 'Source name is required')
+            // Backward compatibility: migrate forceAggregation to aggregationMode
+            if ((sourceConfig as any).forceAggregation === true && !sourceConfig.aggregationMode) {
+                sourceConfig.aggregationMode = 'before'
+            }
             return {
                 ...sourceConfig,
                 enabled: sourceConfig.enabled ?? true,
-                forceAggregation: sourceConfig.forceAggregation ?? false,
+                aggregationMode: sourceConfig.aggregationMode ?? 'none',
+                aggregationDelay: sourceConfig.aggregationDelay ?? 5,
+                optimizedAggregation: sourceConfig.optimizedAggregation ?? true,
                 accountFilter: sourceConfig.accountFilter ?? undefined,
+                correlationMode: sourceConfig.correlationMode ?? 'none',
             }
         })
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)
@@ -121,7 +128,6 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     // taskResultWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
     const taskResultWaitSeconds = config.taskResultWait ?? 1
     config.taskResultWait = taskResultWaitSeconds * 1000
-    config.correlateOnAggregation = config.correlateOnAggregation ?? false
     config.deleteEmpty = config.deleteEmpty ?? false
     config.forceAttributeRefresh = config.forceAttributeRefresh ?? false
     config.skipAccountsWithMissingId = config.skipAccountsWithMissingId ?? false
@@ -157,7 +163,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     config.retryDelay = config.retryDelay ?? 1000 // 1 second base delay (only used as fallback, 429 responses use retry-after header)
     config.pageSize = config.batchSize ?? 250 // Paging size is 250 for all calls
     config.enableBatching = config.enableBatching ?? false
-    config.enablePriority = config.enablePriority ?? false
+    config.enablePriority = config.enablePriority ?? true
     // processingWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
     const processingWaitSeconds =
         config.processingWait !== undefined ? config.processingWait : internalConfig.processingWaitConstant / 1000

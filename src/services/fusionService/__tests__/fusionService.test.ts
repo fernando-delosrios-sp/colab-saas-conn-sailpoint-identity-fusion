@@ -36,7 +36,6 @@ describe('FusionService', () => {
         // Mock config with Type assertion
         mockConfig = {
             reset: false,
-            correlateOnAggregation: true,
             fusionOwnerIsGlobalReviewer: false,
             fusionReportOnAggregation: false,
             fusionFormAttributes: ['email', 'firstName', 'lastName'],

@@ -41,6 +41,10 @@ type Score = {
 /**
  * A reviewer's decision on a fusion (deduplication) form.
  * Captures whether to create a new identity or merge into an existing one.
+ *
+ * For record/orphan source types, the `newIdentity` field represents
+ * "no match" semantics: true means no match (do not link), false means
+ * link to an existing identity.
  */
 export type FusionDecision = {
     submitter: User
@@ -58,6 +62,8 @@ export type FusionDecision = {
      * Used to populate reviewer review links without refetching form instances.
      */
     formUrl?: string
+    /** Source type of the managed source this decision pertains to. */
+    sourceType?: 'identity' | 'record' | 'orphan'
 }
 /** Data payload for creating a new fusion review form instance. */
 export type FusionRequest = {

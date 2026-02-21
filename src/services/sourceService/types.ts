@@ -1,5 +1,5 @@
 import { OwnerDto } from 'sailpoint-api-client'
-import { SourceConfig } from '../../model/config'
+import { SourceConfig, SourceType } from '../../model/config'
 
 // ============================================================================
 // Type Definitions — Source Service
@@ -16,6 +16,8 @@ export type SourceInfo = {
     name: string
     /** Whether this source is configured as a managed (input) source for fusion */
     isManaged: boolean
+    /** Processing type for managed sources */
+    sourceType: SourceType
     /** User-provided source configuration (only present for managed sources) */
     config?: SourceConfig
     /** Source owner identity (only present for the fusion source itself) */

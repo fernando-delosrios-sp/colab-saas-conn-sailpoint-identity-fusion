@@ -1,4 +1,6 @@
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
+import { ApiQueue } from './clientService/queue'
+import { QueuePriority } from './clientService/types'
 
 type Logger = typeof logger
 
@@ -193,8 +195,13 @@ export class PhaseTimer {
         this.log[level](`${message} (total: ${PhaseTimer.formatElapsed(totalElapsed)})`)
     }
 
+    /** Returns formatted total elapsed time since timer creation. */
+    totalElapsed(): string {
+        return PhaseTimer.formatElapsed(Date.now() - this.operationStart)
+    }
+
     /** Formats milliseconds as "Xms" (<1s) or "X.Ys" (>=1s). */
-    private static formatElapsed(ms: number): string {
+    static formatElapsed(ms: number): string {
         if (ms < 1000) return `${ms}ms`
         return `${(ms / 1000).toFixed(1)}s`
     }
@@ -226,6 +233,7 @@ export class LogService {
     /** Per-request timeout for external log fetches to prevent unbounded memory growth
      *  when the endpoint is unreachable (TCP timeouts can be 30-120s+ at the OS level). */
     private static readonly EXTERNAL_LOG_TIMEOUT_MS = 5_000
+    private apiQueue: ApiQueue | null = null
 
     /**
      * @param config - Logging configuration including level, debug flag, and external logging settings
@@ -249,6 +257,14 @@ export class LogService {
 
         // Also set the underlying logger level
         logger.level = this.configuredLevel
+    }
+
+    /**
+     * Injects the API queue for routing external log calls with LOW priority.
+     * Called by ServiceRegistry after ClientService is created.
+     */
+    setQueue(queue: ApiQueue | null): void {
+        this.apiQueue = queue
     }
 
     /**
@@ -318,23 +334,21 @@ export class LogService {
             }
         }
 
-        // Track the promise so it can be flushed before the process exits.
-        // In cloud/serverless environments, fire-and-forget fetches get killed
-        // when the container is recycled after the handler returns.
-        const pending: Promise<void> = fetch(this.externalLoggingUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/plain',
-            },
-            body: logMessage,
-            signal: AbortSignal.timeout(LogService.EXTERNAL_LOG_TIMEOUT_MS),
-        }).then(() => {
-            // Discard response - we only care about delivery
-        }).catch(() => {
-            // Silently ignore errors to avoid infinite logging loops
-            // and to not disrupt the main application flow
+        const url = this.externalLoggingUrl
+        const doFetch = () =>
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: logMessage,
+                signal: AbortSignal.timeout(LogService.EXTERNAL_LOG_TIMEOUT_MS),
+            }).then(() => {})
+
+        const pending: Promise<void> = (
+            this.apiQueue
+                ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW }).then(() => {})
+                : doFetch()
+        ).catch(() => {
         }).finally(() => {
-            // O(1) removal from Set (was O(n) indexOf on array)
             this.pendingExternalLogs.delete(pending)
         })
         this.pendingExternalLogs.add(pending)

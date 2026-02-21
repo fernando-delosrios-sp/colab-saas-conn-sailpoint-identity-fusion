@@ -3,9 +3,8 @@
  */
 export enum QueuePriority {
     LOW = 0,
-    NORMAL = 1,
+    MEDIUM = 1,
     HIGH = 2,
-    URGENT = 3,
 }
 
 /**
@@ -43,4 +42,5 @@ export interface QueueConfig {
     requestsPerSecond: number
     maxConcurrentRequests: number
     maxRetries: number
+    enablePriority: boolean
 }

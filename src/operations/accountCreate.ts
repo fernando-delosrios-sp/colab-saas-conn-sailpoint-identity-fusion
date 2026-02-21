@@ -1,4 +1,4 @@
-import { AttributeChangeOp, ConnectorError, Response, StdAccountCreateInput, StdAccountCreateOutput } from '@sailpoint/connector-sdk'
+import { AttributeChangeOp, ConnectorError, StdAccountCreateInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { assert } from '../utils/assert'
 import { reportAction } from './actions/reportAction'
@@ -21,15 +21,13 @@ import { correlateAction } from './actions/correlateAction'
  *
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param input - SDK input containing the identity name and requested actions
- * @param res - SDK response object for sending the created account back to the platform
  */
 export const accountCreate = async (
     serviceRegistry: ServiceRegistry,
     input: StdAccountCreateInput,
-    res: Response<StdAccountCreateOutput>
 ) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, identities, sources, schemas, fusion, attributes } = serviceRegistry
+    const { log, identities, sources, schemas, fusion, attributes, res } = serviceRegistry
 
     let identityName = input.attributes.name ?? input.identity
     try {

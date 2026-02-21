@@ -9,6 +9,8 @@ import {
     Search,
     AccountsV2025Api,
     IdentitiesV2025Api,
+    IdentityAttributesV2025Api,
+    IdentityProfilesV2025Api,
     CustomFormsV2025Api,
     EntitlementsV2025Api,
     GovernanceGroupsV2025Api,
@@ -50,6 +52,8 @@ export class ClientService {
     private _transformsApi?: TransformsApi
     private _governanceGroupsApi?: GovernanceGroupsV2025Api
     private _taskManagementApi?: TaskManagementV2025Api
+    private _identityProfilesApi?: IdentityProfilesV2025Api
+    private _identityAttributesApi?: IdentityAttributesV2025Api
 
     constructor(
         fusionConfig: FusionConfig,
@@ -99,7 +103,7 @@ export class ClientService {
                 requestsPerSecond,
                 maxConcurrentRequests,
                 maxRetries: enableRetry ? maxRetries : 0,
-                // Retry delay is calculated from HTTP 429 retry-after header (with jitter) or exponential backoff with 1s base
+                enablePriority: fusionConfig.enablePriority ?? true,
             }
 
             this.queue = new ApiQueue(queueConfig)
@@ -188,6 +192,27 @@ export class ClientService {
         return this._taskManagementApi
     }
 
+    public get identityProfilesApi(): IdentityProfilesV2025Api {
+        if (!this._identityProfilesApi) {
+            this._identityProfilesApi = new IdentityProfilesV2025Api(this.config)
+        }
+        return this._identityProfilesApi
+    }
+
+    public get identityAttributesApi(): IdentityAttributesV2025Api {
+        if (!this._identityAttributesApi) {
+            this._identityAttributesApi = new IdentityAttributesV2025Api(this.config)
+        }
+        return this._identityAttributesApi
+    }
+
+    /**
+     * Returns the internal queue instance, or null if queue is disabled.
+     */
+    public getQueue(): ApiQueue | null {
+        return this.queue
+    }
+
     // -------------------------------------------------------------------------
     // Generic Execution Helpers
     // -------------------------------------------------------------------------
@@ -204,7 +229,7 @@ export class ClientService {
      */
     public async execute<TResponse>(
         apiFunction: () => Promise<TResponse>,
-        priority: QueuePriority = QueuePriority.NORMAL,
+        priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string,
         abortSignal?: AbortSignal
     ): Promise<TResponse | undefined> {
@@ -281,7 +306,7 @@ export class ClientService {
     public async paginate<T, TRequestParams = any>(
         callFunction: (requestParameters: TRequestParams) => Promise<{ data: T[] }>,
         baseParameters: Partial<TRequestParams> = {},
-        priority: QueuePriority = QueuePriority.NORMAL,
+        priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string
     ): Promise<T[]> {
         const pageSize = this.pageSize
@@ -415,7 +440,7 @@ export class ClientService {
      */
     public async paginateSearchApi<T>(
         search: Search,
-        priority: QueuePriority = QueuePriority.NORMAL,
+        priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string
     ): Promise<T[]> {
         const pageSize = this.pageSize
@@ -481,7 +506,7 @@ export class ClientService {
      */
     public async *paginateSearchApiGenerator<T>(
         search: Search,
-        priority: QueuePriority = QueuePriority.NORMAL,
+        priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string,
         abortSignal?: AbortSignal
     ): AsyncGenerator<T[], void, unknown> {
@@ -596,7 +621,7 @@ export class ClientService {
     public async *paginateParallel<T, TRequestParams = any>(
         callFunction: (requestParameters: TRequestParams) => Promise<{ data: T[]; headers?: any }>,
         baseParameters: Partial<TRequestParams> = {},
-        priority: QueuePriority = QueuePriority.NORMAL,
+        priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string,
         abortSignal?: AbortSignal,
         limit?: number

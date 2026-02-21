@@ -1,0 +1,3713 @@
+diff --git a/README.md b/README.md
+index 47ac01d..a3656e4 100644
+--- a/README.md
++++ b/README.md
+@@ -47,6 +47,8 @@ Authentication and connectivity to the ISC APIs.
+ 
+ > **Note:** **API request retries** and **Requests per second** also appear in **Advanced Settings → Advanced Connection Settings**. They control the same underlying settings; Connection Settings provides quick access, while Advanced Settings groups them with related queue and retry options.
+ 
++> **Tip:** Create a dedicated identity for Identity Fusion and generate a PAT for your source configuration.
++
+ ### Source Settings
+ 
+ Controls which identities and sources are in scope and how processing is managed.
+@@ -60,6 +62,8 @@ Controls which identities and sources are in scope and how processing is managed
+ | **Include identities in the scope?** | Include identities in addition to managed accounts from configured sources | No                                    | Enable for identity-only attribute generation or to define the baseline for deduplication (sources scope = managed accounts from configured sources).                                     |
+ | **Identity Scope Query**             | Search/filter query to limit which identities are evaluated                | Yes (when include identities enabled) | Uses [ISC search syntax](https://documentation.sailpoint.com/saas/help/search/building-query.html); examples: `*` (all), `attributes.cloudLifecycleState:active`, `source.name:"Workday"` |
+ 
++> **Tip:** You may or may not include identities in your scope. When not included, only those managed accounts previously processed that turned into an identity will be considered as your baseline to compare new uncorrelated managed accounts. When included, all your existing identities in the scope will be part of that baseline from the beginning, as well as managed accounts that turn into identities over time. When including identities in the scope, the Fusion attribute definition context can also access the `$identity` object.
++
+ #### Sources Section
+ 
+ ![Source Settings - Sources](docs/assets/images/config-source-sources.png)
+@@ -74,13 +78,15 @@ Controls which identities and sources are in scope and how processing is managed
+ 
+ ![Source Settings - Per-source configuration](docs/assets/images/config-source-single.png)
+ 
+-| Field                                    | Description                                                | Required | Notes                                                                                                                                                                                                                                  |
+-| ---------------------------------------- | ---------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+-| **Source name**                          | Name of the authoritative account source                   | Yes      | Must match the source name in ISC exactly (case-sensitive)                                                                                                                                                                             |
+-| **Enabled**                              | Include this source in processing                          | No       | Defaults to enabled. Disabled sources are excluded from aggregation and fusion entirely, allowing temporary removal without deleting the configuration                                                                                 |
+-| **Force aggregation before processing?** | Trigger fresh aggregation of this source before each run   | No       | Ensures current data but increases runtime. Useful for deduplication; also convenient when generating unique IDs for an authoritative source so its aggregation syncs with Fusion and new data gets identifiers as soon as it arrives. |
+-| **Account filter**                       | Filter query to limit which accounts are processed         | No       | Uses ISC search/filter syntax; example: `attributes.department:"Engineering"`                                                                                                                                                          |
+-| **Aggregation batch size**               | Maximum accounts to aggregate per run                      | No       | Leave empty for all accounts; useful for initial loading of large datasets with internal duplicates                                                                                                                                    |
++| Field                                    | Description                                              | Required | Notes                                                                                                                                                                                                                                  |
++| ---------------------------------------- | -------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
++| **Source name**                          | Name of the authoritative account source                 | Yes      | Must match the source name in ISC exactly (case-sensitive)                                                                                                                                                                             |
++| **Enabled**                              | Include this source in processing                        | No       | Defaults to enabled. Disabled sources are excluded from aggregation and fusion entirely, allowing temporary removal without deleting the configuration                                                                                 |
++| **Force aggregation before processing?** | Trigger fresh aggregation of this source before each run | No       | Ensures current data but increases runtime. Useful for deduplication; also convenient when generating unique IDs for an authoritative source so its aggregation syncs with Fusion and new data gets identifiers as soon as it arrives. |
++| **Account filter**                       | Filter query to limit which accounts are processed       | No       | Uses ISC search/filter syntax; example: `attributes.department:"Engineering"`                                                                                                                                                          |
++| **Aggregation batch size**               | Maximum accounts to aggregate per run                    | No       | Leave empty for all accounts; useful for initial loading of large datasets with internal duplicates                                                                                                                                    |
++
++> **Tip:** You can use the **Force aggregation before processing?** option to ensure a managed source has newer data than the last time Identity Fusion ran and/or synchronize aggregation schedules.
+ 
+ #### Processing Control Section
+ 
+@@ -94,6 +100,12 @@ Controls which identities and sources are in scope and how processing is managed
+ | **Force attribute refresh on each aggregation?**         | Force Normal-type attributes to refresh every run                        | No       | Applies only to Normal attributes; Unique attributes are only computed when a Fusion account is first created or when an existing account is activated. Can be expensive for large datasets. |
+ | **Skip accounts with missing unique ID?**                | Skip processing accounts without a fusion identity attribute value       | No       | Skipped accounts are logged for review; useful when some source accounts lack required identifier data                                                                                       |
+ 
++> **Tip:** When testing or onboarding large amounts of managed accounts, it is best to disable all kinds of managed account correlation. Already processed uncorrelated managed accounts are part of their associated Fusion accounts internally, so it doesn't interfere in the normal connector operation. Correlation is a heavy process and must be carefully planned. It's often a good idea to have mixed correlation strategies depending on the implementation stage or managed source.
++
++> **Tip:** Remember that managed accounts must be uncorrelated for them to be evaluated for matches. Correlated managed accounts are directly included in your baseline.
++
++> **Tip:** When failing to generate an account ID (`nativeIdentity`), the aggregation fails unless the **Skip accounts with missing unique ID?** option is enabled. All your Fusion accounts must have a valid ID, but you can deliberately generate an empty one with the skip option to prevent including that account in the final results.
++
+ ### Attribute Mapping Settings
+ 
+ Controls how source account attributes are mapped into the Fusion account and how values from multiple sources are merged.
+@@ -118,6 +130,12 @@ Controls how source account attributes are mapped into the Fusion account and ho
+ | **Default attribute merge from multiple sources** (override) | Override default merge for this specific mapping        | No                      | Same options as default, plus **Source name** (use value from specific source) |
+ | **Source name**                                              | Specific source to use for this attribute               | Yes (when merge=source) | Takes precedence when multiple sources have values                             |
+ 
++> **Tip:** You can use mapping settings to predefine an attribute and redefine the same attribute using attribute definition. The mapped value is available to the definition expression.
++
++> **Tip:** Concatenated attributes are displayed in alphabetical order and duplicate values are removed. They can sometimes be good candidates for matching.
++
++> **Tip:** You can keep all values found for a given attribute and generate a multi-valued attribute. You can get a comma-separated list of them if the schema attribute in question is not multi-valued.
++
+ ### Attribute Definition Settings
+ 
+ Controls how attributes are generated, including unique identifiers, UUIDs, counters, and Velocity-based computed attributes.
+@@ -151,6 +169,18 @@ Controls how attributes are generated, including unique identifiers, UUIDs, coun
+ 
+ **Note:** When an account is **enabled**, all attributes (including unique) are force refreshed and recalculated (internal mechanism to reset unique attributes).
+ 
++> **Tip:** If you want to change a unique attribute other than the account name or ID, you can disable the Fusion account and re-enable it. This is handy in situations where a surname change affects a username, etc.
++
++> **Tip:** When dealing with multiple managed sources, generate your own Fusion account ID (`nativeIdentity`) and name, and ensure both are unique. Two Fusion accounts with the same name correlate to the same identity. In fact, any account evaluated for correlation is automatically correlated to an identity whose name (not username) matches. An identity name is defined by the name of the account that originated it. Only the last Fusion account returned from a list of Fusion accounts with the same ID is processed.
++
++> **Tip:** Do not use a unique attribute or username that you may want to reset down the line as the Fusion account name. Use any other account attribute, and reserve your account name for an immutable unique attribute that is as human-friendly as possible.
++
++> **Tip:** Use attribute normalizers (`$Normalize`) to align different formats across different sources.
++
++> **Tip:** You can define extra attributes in your configuration and not include them in your schema. You can use them as ephemeral support attributes to create new ones. Remember that previously processed attributes are available to the next ones. All normal attributes are available to unique attributes, as these are the last ones to be processed. Don't use a unique attribute in your matching settings, as it won't be available on the managed account being processed at runtime.
++
++> **Tip:** Remember that normal attributes are automatically refreshed when new data is found. You don't need to force global or individual attribute refresh unless there's a good reason, like troubleshooting, testing, or if the attribute definition is time-sensitive.
++
+ ### Fusion Settings
+ 
+ Controls deduplication behavior, including similarity matching and manual review workflows.
+@@ -177,6 +207,10 @@ Controls deduplication behavior, including similarity matching and manual review
+ | **Similarity score [0-100]** | Minimum similarity score for this attribute                     | No       | Required when not using overall score mode. A mandatory attribute must meet or exceed this threshold or the match fails. When overall score is enabled, only the overall threshold is required (per-attribute thresholds may not all be met). When no attribute is mandatory, all attributes are treated as mandatory.                                                                 |
+ | **Mandatory match?**         | Require this attribute to match before considering as duplicate | No       | When Yes: this attribute's score must be ≥ its threshold or the match fails. When No: attribute still has a threshold; when overall score is disabled and no attribute is mandatory, every attribute is effectively mandatory (all must meet thresholds).                                                                                                                              |
+ 
++> **Tip:** Use Fusion reports to fine-tune your matching thresholds and algorithms.
++
++> **Tip:** Remember that mandatory match configurations scoring below their threshold invalidate the match. Add them to the top of the list to avoid unnecessary overhead.
++
+ #### Review Settings Section
+ 
+ ![Fusion Settings - Review](docs/assets/images/config-fusion-review.png)
+@@ -204,6 +238,8 @@ Fine-tuning for API behavior, resilience, debugging, and proxy mode.
+ | **External logging URL**      | Endpoint URL for external logs                                | No (required when external logging enabled) | HTTPS recommended                                                                                                                                                                             |
+ | **External logging level**    | Minimum log level to send externally                          | No (required when external logging enabled) | Options: **Error**, **Warn**, **Info**, **Debug**                                                                                                                                             |
+ 
++> **Tip:** You can use the built-in remote log server from the project to send your logs to your computer and save them to a file. Just use `npm run remote-log-server` from the connector's Node project folder and use the generated URL as your remote log server.
++
+ #### Advanced Connection Settings Section
+ 
+ ![Advanced Settings - Connection](docs/assets/images/config-advanced-connection.png)
+@@ -270,6 +306,20 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
+ 
+ > **Note:** In addition to these standard attributes, the discovered schema includes any attributes defined via **Attribute Mapping** and **Attribute Definition** settings.
+ 
++> **Tip:** Do not include attributes you don't need in your schema, and do not remove internal attributes.
++
++> **Tip:** You can use status entitlements in search to find identities in different situations, such as those included in a pending Fusion review, your Fusion reviewers, identities with uncorrelated managed accounts, baseline-only identities, unmatched identities, identities with manual assignments, etc.
++
++> **Tip:** Account name definition is ignored for baseline Fusion accounts to ensure the Fusion account is automatically correlated with the identity that originated it.
++
++---
++
++## Best practices and tips
++
++- Order always matters. Sources are evaluated in the configured order, attribute mappings, attribute definitions, and matching settings. Everything.
++- Account for your manager correlation when dealing with multiple managed sources. A Fusion account with managed accounts from two sources may have a manager on either source, both, or none. If you want to use source manager correlation, you must persist the original manager correlation value pair in your Fusion schema, but the manager will never change. It is best to use a correlation rule in combination with a transform to implement dynamic manager correlation.
++- When no identity matching is needed, Identity Fusion can be set as a non-authoritative source to create unique and/or derived attributes. It's usual to have Fusion create unique identifiers associated with one or more authoritative sources. One can configure those sources and the desired attribute definition, and force managed source aggregation before processing, so identifiers are created right after managed sources are aggregated under the same schedule, all controlled by Fusion.
++
+ ---
+ 
+ ## Contributing
+diff --git a/connector-spec.json b/connector-spec.json
+index 64ea559..3df1f0f 100644
+--- a/connector-spec.json
++++ b/connector-spec.json
+@@ -21,7 +21,6 @@
+         "managedAccountsBatchSize": 50,
+         "includeIdentities": true,
+         "identityScopeQuery": "*",
+-        "correlateOnAggregation": true,
+         "maxHistoryMessages": 10,
+         "attributeMerge": "first",
+         "enableQueue": true,
+@@ -115,7 +114,7 @@
+                 {
+                     "type": "section",
+                     "sectionTitle": "Sources",
+-                    "sectionHelpMessage": "<strong>Select the authoritative account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Force aggregation:</strong> Trigger fresh aggregation before processing (ensures current data but increases runtime).</li><li><strong>Account filter:</strong> Limit which accounts are processed (uses ISC search syntax).</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li></ul><br>Global settings control retries and wait times for aggregation task polling.",
++                    "sectionHelpMessage": "<strong>Select the authoritative account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Account aggregation:</strong> Choose to aggregate before processing, with a delay after returning accounts, or not at all. Optimized aggregation can be disabled for reverse correlation. Delimited text sources cannot be aggregated.</li><li><strong>Account filter:</strong> Limit which accounts are processed (uses ISC search syntax).</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li></ul><br>Global settings control retries and wait times for aggregation task polling.",
+                     "items": [
+                         {
+                             "key": "sources",
+@@ -150,11 +149,36 @@
+                                             "helpKey": "Include this source in processing. Disabled sources are excluded from aggregation and fusion entirely"
+                                         },
+                                         {
+-                                            "key": "forceAggregation",
+-                                            "label": "Force aggregation before processing?",
++                                            "key": "sourceType",
++                                            "label": "Source type",
++                                            "type": "radio",
++                                            "required": true,
++                                            "value": "identity",
++                                            "helpKey": "Determines how accounts from this source are processed. 'Identities' is the default mode where non-matching accounts create new fusion identities. 'Records' evaluates accounts like identities and registers unique attribute values, but non-matching accounts are not returned as ISC accounts. 'Orphan accounts' drops non-matching accounts immediately without registering unique values, and can optionally disable them.",
++                                            "options": [
++                                                {
++                                                    "label": "Identities",
++                                                    "value": "identity"
++                                                },
++                                                {
++                                                    "label": "Records",
++                                                    "value": "record"
++                                                },
++                                                {
++                                                    "label": "Orphan accounts",
++                                                    "value": "orphan"
++                                                }
++                                            ]
++                                        },
++                                        {
++                                            "key": "disableNonMatchingAccounts",
++                                            "label": "Disable non-matching accounts",
+                                             "type": "toggle",
+                                             "required": false,
+-                                            "helpKey": "Trigger a fresh aggregation of this source before each run. Ensures current data but increases runtime"
++                                            "value": "false",
++                                            "parentKey": "sourceType",
++                                            "parentValue": "orphan",
++                                            "helpKey": "When enabled, non-matching orphan accounts will be disabled via a low-priority background operation after a non-match is detected"
+                                         },
+                                         {
+                                             "key": "accountFilter",
+@@ -171,6 +195,93 @@
+                                             "helpKey": "Maximum accounts to aggregate per run. Leave empty for all accounts; useful for initial loading of large datasets"
+                                         }
+                                     ]
++                                },
++                                {
++                                    "label": "Account Aggregation",
++                                    "items": [
++                                        {
++                                            "key": "aggregationMode",
++                                            "label": "Account aggregation mode",
++                                            "type": "radio",
++                                            "required": true,
++                                            "helpKey": "Controls whether and when this source is aggregated. 'Aggregate before processing' runs a fresh aggregation before fusion processing begins. 'Delayed aggregation' triggers aggregation after all accounts are returned. 'Do not aggregate' skips aggregation entirely. Note: delimited text sources cannot be aggregated.",
++                                            "options": [
++                                                {
++                                                    "label": "Do not aggregate",
++                                                    "value": "none"
++                                                },
++                                                {
++                                                    "label": "Aggregate before processing",
++                                                    "value": "before"
++                                                },
++                                                {
++                                                    "label": "Delayed aggregation",
++                                                    "value": "delayed"
++                                                }
++                                            ]
++                                        },
++                                        {
++                                            "key": "aggregationDelay",
++                                            "label": "Aggregation delay (minutes)",
++                                            "type": "number",
++                                            "required": true,
++                                            "min": "1",
++                                            "parentKey": "aggregationMode",
++                                            "parentValue": "delayed",
++                                            "helpKey": "Number of minutes to wait after returning all accounts before triggering aggregation. Default: 5"
++                                        },
++                                        {
++                                            "key": "optimizedAggregation",
++                                            "label": "Optimized aggregation",
++                                            "type": "toggle",
++                                            "required": false,
++                                            "helpKey": "When enabled, only changed accounts are reprocessed during aggregation. Disable for reverse correlation compatibility, which requires reprocessing every account."
++                                        }
++                                    ]
++                                },
++                                {
++                                    "label": "Account Correlation",
++                                    "items": [
++                                        {
++                                            "key": "correlationMode",
++                                            "label": "Correlation mode",
++                                            "type": "radio",
++                                            "required": false,
++                                            "helpKey": "Controls how missing source accounts are correlated to identities. 'Correlate missing accounts on aggregation' directly patches the account's identity in ISC. 'Reverse correlation from managed source' sets a dedicated attribute that ISC's native correlation uses to match accounts by name. 'Do not correlate' skips correlation entirely.",
++                                            "options": [
++                                                {
++                                                    "label": "Correlate missing accounts on aggregation",
++                                                    "value": "correlate"
++                                                },
++                                                {
++                                                    "label": "Reverse correlation from managed source",
++                                                    "value": "reverse"
++                                                },
++                                                {
++                                                    "label": "Do not correlate",
++                                                    "value": "none"
++                                                }
++                                            ]
++                                        },
++                                        {
++                                            "key": "correlationAttribute",
++                                            "label": "Correlation attribute name",
++                                            "type": "text",
++                                            "required": true,
++                                            "parentKey": "correlationMode",
++                                            "parentValue": "reverse",
++                                            "helpKey": "Technical name for the dedicated Fusion account attribute and ISC identity attribute used for reverse correlation. Must not overlap with existing attribute mappings or definitions."
++                                        },
++                                        {
++                                            "key": "correlationDisplayName",
++                                            "label": "Correlation attribute display name",
++                                            "type": "text",
++                                            "required": true,
++                                            "parentKey": "correlationMode",
++                                            "parentValue": "reverse",
++                                            "helpKey": "Human-readable display name for the correlation attribute shown in the ISC UI."
++                                        }
++                                    ]
+                                 }
+                             ]
+                         },
+@@ -195,7 +306,7 @@
+                 {
+                     "type": "section",
+                     "sectionTitle": "Processing Control",
+-                    "sectionHelpMessage": "<strong>Control how Identity Fusion accounts are maintained.</strong><br><br><ul><li><strong>Maximum history messages:</strong> Limit history entries per account (default: 10).</li><li><strong>Delete accounts...:</strong> Remove Fusion account when all source accounts are gone.</li><li><strong>Correlate missing...:</strong> Attempt to correlate new/missing source accounts each run (default: true).</li><li><strong>Force attribute refresh...:</strong> Force Normal-type attributes to refresh every run (expensive).</li><li><strong>Skip accounts...:</strong> Skip processing if native identity attribute is missing.</li></ul>",
++                    "sectionHelpMessage": "<strong>Control how Identity Fusion accounts are maintained.</strong><br><br><ul><li><strong>Maximum history messages:</strong> Limit history entries per account (default: 10).</li><li><strong>Delete accounts...:</strong> Remove Fusion account when all source accounts are gone.</li><li><strong>Force attribute refresh...:</strong> Force Normal-type attributes to refresh every run (expensive).</li><li><strong>Skip accounts...:</strong> Skip processing if native identity attribute is missing.</li></ul>",
+                     "items": [
+                         {
+                             "key": "maxHistoryMessages",
+@@ -212,13 +323,6 @@
+                             "required": false,
+                             "helpKey": "Remove Fusion accounts when all contributing source accounts are removed. Useful for automated cleanup when users leave"
+                         },
+-                        {
+-                            "key": "correlateOnAggregation",
+-                            "label": "Correlate missing source accounts on aggregation?",
+-                            "type": "toggle",
+-                            "required": false,
+-                            "helpKey": "Attempt to correlate new or previously missing source accounts each run. Default: true; helps with incremental correlation"
+-                        },
+                         {
+                             "key": "forceAttributeRefresh",
+                             "label": "Force attribute refresh on each aggregation?",
+@@ -910,7 +1014,7 @@
+                             "label": "Enable priority processing?",
+                             "type": "toggle",
+                             "required": false,
+-                            "helpKey": "Use prioritization when processing the queue, allowing more important requests to be handled first (enabled by default when queue is enabled)"
++                            "helpKey": "Use prioritization when processing the queue with three levels: HIGH (save/fetch), MEDIUM (default), and LOW (correlation/logging). Enabled by default"
+                         }
+                     ]
+                 },
+diff --git a/package.json b/package.json
+index c505631..abe61b6 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+     "name": "identity-fusion",
+-    "version": "2.0.10",
++    "version": "2.1.0",
+     "main": "dist/index.js",
+     "scripts": {
+         "clean": "shx rm -rf ./dist",
+diff --git a/src/data/config.ts b/src/data/config.ts
+index 3c9690f..81dcc8e 100644
+--- a/src/data/config.ts
++++ b/src/data/config.ts
+@@ -106,11 +106,18 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
+         .map((sourceConfig: SourceConfig) => {
+             assert(sourceConfig, 'Source configuration is required')
+             assert(sourceConfig.name, 'Source name is required')
++            // Backward compatibility: migrate forceAggregation to aggregationMode
++            if ((sourceConfig as any).forceAggregation === true && !sourceConfig.aggregationMode) {
++                sourceConfig.aggregationMode = 'before'
++            }
+             return {
+                 ...sourceConfig,
+                 enabled: sourceConfig.enabled ?? true,
+-                forceAggregation: sourceConfig.forceAggregation ?? false,
++                aggregationMode: sourceConfig.aggregationMode ?? 'none',
++                aggregationDelay: sourceConfig.aggregationDelay ?? 5,
++                optimizedAggregation: sourceConfig.optimizedAggregation ?? true,
+                 accountFilter: sourceConfig.accountFilter ?? undefined,
++                correlationMode: sourceConfig.correlationMode ?? 'none',
+             }
+         })
+         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)
+@@ -121,7 +128,6 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
+     // taskResultWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
+     const taskResultWaitSeconds = config.taskResultWait ?? 1
+     config.taskResultWait = taskResultWaitSeconds * 1000
+-    config.correlateOnAggregation = config.correlateOnAggregation ?? false
+     config.deleteEmpty = config.deleteEmpty ?? false
+     config.forceAttributeRefresh = config.forceAttributeRefresh ?? false
+     config.skipAccountsWithMissingId = config.skipAccountsWithMissingId ?? false
+@@ -157,7 +163,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
+     config.retryDelay = config.retryDelay ?? 1000 // 1 second base delay (only used as fallback, 429 responses use retry-after header)
+     config.pageSize = config.batchSize ?? 250 // Paging size is 250 for all calls
+     config.enableBatching = config.enableBatching ?? false
+-    config.enablePriority = config.enablePriority ?? false
++    config.enablePriority = config.enablePriority ?? true
+     // processingWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
+     const processingWaitSeconds =
+         config.processingWait !== undefined ? config.processingWait : internalConfig.processingWaitConstant / 1000
+diff --git a/src/index.ts b/src/index.ts
+index 1b3433a..153c713 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -32,7 +32,6 @@ import { accountEnable } from './operations/accountEnable'
+ import { accountDisable } from './operations/accountDisable'
+ import { entitlementList } from './operations/entitlementList'
+ import { accountDiscoverSchema } from './operations/accountDiscoverSchema'
+-import { isProxyMode, isProxyService, proxy } from './utils/proxy'
+ 
+ /**
+  * Identity Fusion NG connector factory. Loads configuration and returns a configured
+@@ -48,22 +47,22 @@ export const connector = async () => {
+     const stdTest: StdTestConnectionHandler = async (context, input, res) => {
+         let serviceRegistry: ServiceRegistry | undefined
+         try {
+-            serviceRegistry = new ServiceRegistry(config, context, 'testConnection')
++            serviceRegistry = new ServiceRegistry(config, context, res, 'testConnection')
+             const isCustom = context.testConnection !== undefined
+-            const isProxy = isProxyMode(config)
++            const isProxy = serviceRegistry.proxy.isProxyMode()
+             const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+ 
+             logger.info(`Running in ${runMode} mode`)
+ 
+             switch (runMode) {
+                 case 'custom':
+-                    await context.testConnection(serviceRegistry, input, res)
++                    await context.testConnection(serviceRegistry, input)
+                     break
+                 case 'proxy':
+-                    await proxy(context, input, res)
++                    await serviceRegistry.proxy.execute(input)
+                     break
+                 default:
+-                    await testConnection(serviceRegistry, input, res)
++                    await testConnection(serviceRegistry, input)
+             }
+         } catch (error) {
+             if (error instanceof ConnectorError) throw error
+@@ -71,37 +70,37 @@ export const connector = async () => {
+             const detail = error instanceof Error ? error.message : String(error)
+             throw new ConnectorError(`Failed to test connection: ${detail}`, ConnectorErrorType.Generic)
+         } finally {
+-            void serviceRegistry?.log.flush()
+             ServiceRegistry.clear()
+         }
+     }
+ 
+     const stdAccountList: StdAccountListHandler = async (context, input, res): Promise<void> => {
+-        const isCustom = context.accountList !== undefined
+-        const isProxy = isProxyMode(config)
+-        const isProxyServer = isProxyService(config)
+-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+-
+-        const interval = isProxyServer ? undefined : setInterval(() => {
+-            const memoryUsage = process.memoryUsage()
+-            logger.info(`Memory usage - RSS: ${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB, Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB, Heap Total: ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`)
+-            res.keepAlive()
+-        }, config.processingWait)
+-
+         let serviceRegistry: ServiceRegistry | undefined
++        let interval: ReturnType<typeof setInterval> | undefined
+         try {
+-            serviceRegistry = new ServiceRegistry(config, context, 'accountList')
++            serviceRegistry = new ServiceRegistry(config, context, res, 'accountList')
++            const isCustom = context.accountList !== undefined
++            const isProxy = serviceRegistry.proxy.isProxyMode()
++            const isProxyServer = serviceRegistry.proxy.isProxyService()
++            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
++
++            interval = isProxyServer ? undefined : setInterval(() => {
++                const memoryUsage = process.memoryUsage()
++                logger.info(`Memory usage - RSS: ${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB, Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB, Heap Total: ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`)
++                res.keepAlive()
++            }, config.processingWait)
++
+             logger.info(`Running accountList in ${runMode} mode`)
+ 
+             switch (runMode) {
+                 case 'custom':
+-                    await context.accountList(serviceRegistry, input, res)
++                    await context.accountList(serviceRegistry, input)
+                     break
+                 case 'proxy':
+-                    await proxy(context, input, res)
++                    await serviceRegistry.proxy.execute(input)
+                     break
+                 default:
+-                    await accountList(serviceRegistry, input, res)
++                    await accountList(serviceRegistry, input)
+             }
+         } catch (error) {
+             if (error instanceof ConnectorError) throw error
+@@ -109,9 +108,6 @@ export const connector = async () => {
+             const detail = error instanceof Error ? error.message : String(error)
+             throw new ConnectorError(`Failed to aggregate accounts: ${detail}`, ConnectorErrorType.Generic)
+         } finally {
+-            // Fire-and-forget: do not block the response on external log delivery.
+-            // Awaiting flush can block the handler from returning, keeping the client waiting.
+-            void serviceRegistry?.log.flush()
+             ServiceRegistry.clear()
+             if (interval) {
+                 clearInterval(interval)
+@@ -120,23 +116,23 @@ export const connector = async () => {
+     }
+ 
+     const stdAccountRead: StdAccountReadHandler = async (context, input, res): Promise<void> => {
+-        const isCustom = context.accountRead !== undefined
+-        const isProxy = isProxyMode(config)
+-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+-
+         let serviceRegistry: ServiceRegistry | undefined
+         try {
+-            serviceRegistry = new ServiceRegistry(config, context, 'accountRead')
++            serviceRegistry = new ServiceRegistry(config, context, res, 'accountRead')
++            const isCustom = context.accountRead !== undefined
++            const isProxy = serviceRegistry.proxy.isProxyMode()
++            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
++
+             logger.info(`Running accountRead in ${runMode} mode`)
+             switch (runMode) {
+                 case 'custom':
+-                    await context.accountRead(serviceRegistry, input, res)
++                    await context.accountRead(serviceRegistry, input)
+                     break
+                 case 'proxy':
+-                    await proxy(context, input, res)
++                    await serviceRegistry.proxy.execute(input)
+                     break
+                 default:
+-                    await accountRead(serviceRegistry, input, res)
++                    await accountRead(serviceRegistry, input)
+             }
+         } catch (error) {
+             if (error instanceof ConnectorError) throw error
+@@ -144,30 +140,29 @@ export const connector = async () => {
+             const detail = error instanceof Error ? error.message : String(error)
+             throw new ConnectorError(`Failed to read account ${input.identity}: ${detail}`, ConnectorErrorType.Generic)
+         } finally {
+-            void serviceRegistry?.log.flush()
+             ServiceRegistry.clear()
+         }
+     }
+ 
+     const stdAccountCreate: StdAccountCreateHandler = async (context, input, res) => {
+-        const isCustom = context.accountCreate !== undefined
+-        const isProxy = isProxyMode(config)
+-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+-
+         let serviceRegistry: ServiceRegistry | undefined
+         try {
+-            serviceRegistry = new ServiceRegistry(config, context, 'accountCreate')
++            serviceRegistry = new ServiceRegistry(config, context, res, 'accountCreate')
++            const isCustom = context.accountCreate !== undefined
++            const isProxy = serviceRegistry.proxy.isProxyMode()
++            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
++
+             logger.info(`Running accountCreate in ${runMode} mode`)
+ 
+             switch (runMode) {
+                 case 'custom':
+-                    await context.accountCreate(serviceRegistry, input, res)
++                    await context.accountCreate(serviceRegistry, input)
+                     break
+                 case 'proxy':
+-                    await proxy(context, input, res)
++                    await serviceRegistry.proxy.execute(input)
+                     break
+                 default:
+-                    await accountCreate(serviceRegistry, input, res)
++                    await accountCreate(serviceRegistry, input)
+             }
+         } catch (error) {
+             if (error instanceof ConnectorError) throw error
+@@ -178,37 +173,37 @@ export const connector = async () => {
+                 ConnectorErrorType.Generic
+             )
+         } finally {
+-            void serviceRegistry?.log.flush()
+             ServiceRegistry.clear()
+         }
+     }
+ 
+     const stdAccountUpdate: StdAccountUpdateHandler = async (context, input, res) => {
+-        const isCustom = context.accountUpdate !== undefined
+-        const isProxy = isProxyMode(config)
+-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+-
+-        const interval =
+-            runMode === 'proxy'
+-                ? undefined
+-                : setInterval(() => {
+-                    res.keepAlive()
+-                }, config.processingWait)
+-
+         let serviceRegistry: ServiceRegistry | undefined
++        let interval: ReturnType<typeof setInterval> | undefined
+         try {
+-            serviceRegistry = new ServiceRegistry(config, context, 'accountUpdate')
++            serviceRegistry = new ServiceRegistry(config, context, res, 'accountUpdate')
++            const isCustom = context.accountUpdate !== undefined
++            const isProxy = serviceRegistry.proxy.isProxyMode()
++            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
++
++            interval =
++                runMode === 'proxy'
++                    ? undefined
++                    : setInterval(() => {
++                        res.keepAlive()
++                    }, config.processingWait)
++
+             logger.info(`Running accountUpdate in ${runMode} mode`)
+ 
+             switch (runMode) {
+                 case 'custom':
+-                    await context.accountUpdate(serviceRegistry, input, res)
++                    await context.accountUpdate(serviceRegistry, input)
+                     break
+                 case 'proxy':
+-                    await proxy(context, input, res)
++                    await serviceRegistry.proxy.execute(input)
+                     break
+                 default:
+-                    await accountUpdate(serviceRegistry, input, res)
++                    await accountUpdate(serviceRegistry, input)
+             }
+         } catch (error) {
+             if (error instanceof ConnectorError) throw error
+@@ -216,7 +211,6 @@ export const connector = async () => {
+             const detail = error instanceof Error ? error.message : String(error)
+             throw new ConnectorError(`Failed to update account ${input.identity}: ${detail}`, ConnectorErrorType.Generic)
+         } finally {
+-            void serviceRegistry?.log.flush()
+             ServiceRegistry.clear()
+             if (interval) {
+                 clearInterval(interval)
+@@ -225,24 +219,24 @@ export const connector = async () => {
+     }
+ 
+     const stdAccountEnable: StdAccountEnableHandler = async (context, input, res) => {
+-        const isCustom = context.accountEnable !== undefined
+-        const isProxy = isProxyMode(config)
+-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+-
+         let serviceRegistry: ServiceRegistry | undefined
+         try {
+-            serviceRegistry = new ServiceRegistry(config, context, 'accountEnable')
++            serviceRegistry = new ServiceRegistry(config, context, res, 'accountEnable')
++            const isCustom = context.accountEnable !== undefined
++            const isProxy = serviceRegistry.proxy.isProxyMode()
++            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
++
+             logger.info(`Running accountEnable in ${runMode} mode`)
+ 
+             switch (runMode) {
+                 case 'custom':
+-                    await context.accountEnable(serviceRegistry, input, res)
++                    await context.accountEnable(serviceRegistry, input)
+                     break
+                 case 'proxy':
+-                    await proxy(context, input, res)
++                    await serviceRegistry.proxy.execute(input)
+                     break
+                 default:
+-                    await accountEnable(serviceRegistry, input, res)
++                    await accountEnable(serviceRegistry, input)
+             }
+         } catch (error) {
+             if (error instanceof ConnectorError) throw error
+@@ -250,30 +244,29 @@ export const connector = async () => {
+             const detail = error instanceof Error ? error.message : String(error)
+             throw new ConnectorError(`Failed to enable account ${input.identity}: ${detail}`, ConnectorErrorType.Generic)
+         } finally {
+-            void serviceRegistry?.log.flush()
+             ServiceRegistry.clear()
+         }
+     }
+ 
+     const stdAccountDisable: StdAccountDisableHandler = async (context, input, res) => {
+-        const isCustom = context.accountDisable !== undefined
+-        const isProxy = isProxyMode(config)
+-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+-
+         let serviceRegistry: ServiceRegistry | undefined
+         try {
+-            serviceRegistry = new ServiceRegistry(config, context, 'accountDisable')
++            serviceRegistry = new ServiceRegistry(config, context, res, 'accountDisable')
++            const isCustom = context.accountDisable !== undefined
++            const isProxy = serviceRegistry.proxy.isProxyMode()
++            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
++
+             logger.info(`Running accountDisable in ${runMode} mode`)
+ 
+             switch (runMode) {
+                 case 'custom':
+-                    await context.accountDisable(serviceRegistry, input, res)
++                    await context.accountDisable(serviceRegistry, input)
+                     break
+                 case 'proxy':
+-                    await proxy(context, input, res)
++                    await serviceRegistry.proxy.execute(input)
+                     break
+                 default:
+-                    await accountDisable(serviceRegistry, input, res)
++                    await accountDisable(serviceRegistry, input)
+             }
+         } catch (error) {
+             if (error instanceof ConnectorError) throw error
+@@ -281,30 +274,29 @@ export const connector = async () => {
+             const detail = error instanceof Error ? error.message : String(error)
+             throw new ConnectorError(`Failed to disable account ${input.identity}: ${detail}`, ConnectorErrorType.Generic)
+         } finally {
+-            void serviceRegistry?.log.flush()
+             ServiceRegistry.clear()
+         }
+     }
+ 
+     const stdEntitlementList: StdEntitlementListHandler = async (context, input, res) => {
+-        const isCustom = context.entitlementList !== undefined
+-        const isProxy = isProxyMode(config)
+-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+-
+         let serviceRegistry: ServiceRegistry | undefined
+         try {
+-            serviceRegistry = new ServiceRegistry(config, context, 'entitlementList')
++            serviceRegistry = new ServiceRegistry(config, context, res, 'entitlementList')
++            const isCustom = context.entitlementList !== undefined
++            const isProxy = serviceRegistry.proxy.isProxyMode()
++            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
++
+             logger.info(`Running entitlementList in ${runMode} mode`)
+ 
+             switch (runMode) {
+                 case 'custom':
+-                    await context.entitlementList(serviceRegistry, input, res)
++                    await context.entitlementList(serviceRegistry, input)
+                     break
+                 case 'proxy':
+-                    await proxy(context, input, res)
++                    await serviceRegistry.proxy.execute(input)
+                     break
+                 default:
+-                    await entitlementList(serviceRegistry, input, res)
++                    await entitlementList(serviceRegistry, input)
+             }
+         } catch (error) {
+             if (error instanceof ConnectorError) throw error
+@@ -312,30 +304,29 @@ export const connector = async () => {
+             const detail = error instanceof Error ? error.message : String(error)
+             throw new ConnectorError(`Failed to list entitlements for type ${input.type}: ${detail}`, ConnectorErrorType.Generic)
+         } finally {
+-            void serviceRegistry?.log.flush()
+             ServiceRegistry.clear()
+         }
+     }
+ 
+     const stdAccountDiscoverSchema: StdAccountDiscoverSchemaHandler = async (context, input, res) => {
+-        const isCustom = context.accountDiscoverSchema !== undefined
+-        const isProxy = isProxyMode(config)
+-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+-
+         let serviceRegistry: ServiceRegistry | undefined
+         try {
+-            serviceRegistry = new ServiceRegistry(config, context, 'accountDiscoverSchema')
++            serviceRegistry = new ServiceRegistry(config, context, res, 'accountDiscoverSchema')
++            const isCustom = context.accountDiscoverSchema !== undefined
++            const isProxy = serviceRegistry.proxy.isProxyMode()
++            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
++
+             logger.info(`Running accountDiscoverSchema in ${runMode} mode`)
+ 
+             switch (runMode) {
+                 case 'custom':
+-                    await context.accountDiscoverSchema(serviceRegistry, res)
++                    await context.accountDiscoverSchema(serviceRegistry)
+                     break
+                 case 'proxy':
+-                    await proxy(context, input, res)
++                    await serviceRegistry.proxy.execute(input)
+                     break
+                 default:
+-                    await accountDiscoverSchema(serviceRegistry, res)
++                    await accountDiscoverSchema(serviceRegistry)
+             }
+         } catch (error) {
+             if (error instanceof ConnectorError) throw error
+@@ -343,7 +334,6 @@ export const connector = async () => {
+             const detail = error instanceof Error ? error.message : String(error)
+             throw new ConnectorError(`Failed to discover schema: ${detail}`, ConnectorErrorType.Generic)
+         } finally {
+-            void serviceRegistry?.log.flush()
+             ServiceRegistry.clear()
+         }
+     }
+diff --git a/src/model/account.ts b/src/model/account.ts
+index bf7253b..63f494d 100644
+--- a/src/model/account.ts
++++ b/src/model/account.ts
+@@ -1,5 +1,5 @@
+ import { Account, IdentityDocument } from 'sailpoint-api-client'
+-import { getDateFromISOString } from '../utils/date'
++import { getDateFromISOString, isNewerThan } from '../utils/date'
+ import { toSetFromAttribute as attributeToSet } from '../utils/attributes'
+ import { FusionDecision } from './form'
+ import { FusionConfig, SourceConfig } from './config'
+@@ -91,6 +91,7 @@ export class FusionAccount {
+     private _reviewPromises: Array<Promise<string | undefined>> = []
+     private _fusionMatches: FusionMatch[] = []
+     private _history: string[] = []
++    private _managedAccountInfo: Map<string, { sourceName: string; accountName: string }> = new Map()
+ 
+     // Attribute management
+     // Note: previous is initialized lazily only when needed to save memory for new accounts
+@@ -614,6 +615,40 @@ export class FusionAccount {
+         this.removeFromSet(this._missingAccountIds, id, message)
+     }
+ 
++    // ============================================================================
++    // Reverse Correlation Methods
++    // ============================================================================
++
++    /** Get source and name info for a managed account by its ID. */
++    public getManagedAccountInfo(accountId: string): { sourceName: string; accountName: string } | undefined {
++        return this._managedAccountInfo.get(accountId)
++    }
++
++    /**
++     * Returns missing account IDs that belong to a given source,
++     * using the managed account info map for source lookup.
++     */
++    public getMissingAccountIdsForSource(sourceName: string): string[] {
++        const result: string[] = []
++        for (const id of this._missingAccountIds) {
++            const info = this._managedAccountInfo.get(id)
++            if (info && info.sourceName === sourceName) {
++                result.push(id)
++            }
++        }
++        return result
++    }
++
++    /** Sets the dedicated reverse correlation attribute value in the attribute bag. */
++    public setReverseCorrelationAttribute(attributeName: string, value: string): void {
++        this._attributeBag.current[attributeName] = value
++    }
++
++    /** Clears the dedicated reverse correlation attribute from the attribute bag. */
++    public clearReverseCorrelationAttribute(attributeName: string): void {
++        delete this._attributeBag.current[attributeName]
++    }
++
+     // ============================================================================
+     // Mutation Methods - Statuses
+     // ============================================================================
+@@ -883,6 +918,10 @@ export class FusionAccount {
+         this._attributeBag.identity = identity.attributes ?? {}
+         this._identityId = identity.id ?? undefined
+ 
++        if (!this._needsRefresh && isNewerThan(identity.modified, this._modified)) {
++            this._needsRefresh = true
++        }
++
+         const sourceNames = this.sourceConfigs.map((sc) => sc.name)
+         identity.accounts?.forEach((account) => {
+             if (sourceNames.includes(account.source?.name ?? '')) {
+@@ -998,14 +1037,18 @@ export class FusionAccount {
+         }
+ 
+         if (!this._needsRefresh) {
+-            const modified = getDateFromISOString(account.modified)
+             const thresholdMs = this.fusionAccountRefreshThresholdInSeconds * 1000
+-            if (modified.getTime() > this._modified.getTime() + thresholdMs) {
++            if (isNewerThan(account.modified, this._modified, thresholdMs)) {
+                 this._needsRefresh = true
+             }
+         }
+ 
+         if (account.sourceName) {
++            this._managedAccountInfo.set(accountId, {
++                sourceName: account.sourceName,
++                accountName: account.name ?? account.nativeIdentity ?? accountId,
++            })
++
+             const existingSourceAccounts = this._attributeBag.sources.get(account.sourceName) || []
+             existingSourceAccounts.push(account.attributes ?? {})
+             this._sources.delete('Identities')
+diff --git a/src/model/config.ts b/src/model/config.ts
+index aab04ee..45f006c 100644
+--- a/src/model/config.ts
++++ b/src/model/config.ts
+@@ -128,13 +128,24 @@ export interface ScopeSection {
+     identityScopeQuery?: string
+ }
+ 
++export type SourceType = 'identity' | 'record' | 'orphan'
++
++export type CorrelationMode = 'correlate' | 'reverse' | 'none'
++
+ /** Configuration for a single managed source that feeds into fusion. */
+ export interface SourceConfig {
+     name: string
+     enabled?: boolean
+-    forceAggregation?: boolean
++    sourceType?: SourceType
++    disableNonMatchingAccounts?: boolean
++    aggregationMode?: 'none' | 'before' | 'delayed'
++    aggregationDelay?: number
++    optimizedAggregation?: boolean
+     accountFilter?: string
+     accountLimit?: number
++    correlationMode?: CorrelationMode
++    correlationAttribute?: string
++    correlationDisplayName?: string
+ }
+ 
+ /** Configuration for all managed sources and aggregation behavior. */
+@@ -153,7 +164,6 @@ export interface SourcesSection {
+ /** Controls various processing behaviors during aggregation. */
+ export interface ProcessingControlSection {
+     deleteEmpty: boolean
+-    correlateOnAggregation: boolean
+     forceAttributeRefresh: boolean
+     skipAccountsWithMissingId: boolean
+     maxHistoryMessages: number
+diff --git a/src/model/form.ts b/src/model/form.ts
+index a21560c..50c4018 100644
+--- a/src/model/form.ts
++++ b/src/model/form.ts
+@@ -41,6 +41,10 @@ type Score = {
+ /**
+  * A reviewer's decision on a fusion (deduplication) form.
+  * Captures whether to create a new identity or merge into an existing one.
++ *
++ * For record/orphan source types, the `newIdentity` field represents
++ * "no match" semantics: true means no match (do not link), false means
++ * link to an existing identity.
+  */
+ export type FusionDecision = {
+     submitter: User
+@@ -58,6 +62,8 @@ export type FusionDecision = {
+      * Used to populate reviewer review links without refetching form instances.
+      */
+     formUrl?: string
++    /** Source type of the managed source this decision pertains to. */
++    sourceType?: 'identity' | 'record' | 'orphan'
+ }
+ /** Data payload for creating a new fusion review form instance. */
+ export type FusionRequest = {
+diff --git a/src/model/messages.ts b/src/model/messages.ts
+index 3b60690..60ba40d 100644
+--- a/src/model/messages.ts
++++ b/src/model/messages.ts
+@@ -53,6 +53,7 @@ export const FUSION_REVIEW_TEMPLATE = `
+                                                 {{#if accountSource}}
+                                                 <div style="color:#5f6b7a; font-size:12px; margin-top:8px; font-weight:600;">
+                                                     Source: <span style="color:#0b5cab;">{{accountSource}}</span>
++                                                    {{#if sourceType}}<span style="display:inline-block; margin-left:6px; padding:1px 8px; border-radius:8px; background:#eef2f7; color:#5f6b7a; font-size:11px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}
+                                                 </div>
+                                                 {{/if}}
+                                                 {{/each}}
+@@ -79,7 +80,7 @@ export const FUSION_REVIEW_TEMPLATE = `
+                                                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+                                                                 <tr>
+                                                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Source:</td>
+-                                                                    <td style="padding:2px 8px;">{{accountSource}}</td>
++                                                                    <td style="padding:2px 8px;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:#eef2f7; color:#5f6b7a; font-size:10px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
+                                                                 </tr>
+                                                                 {{#if accountId}}
+                                                                 <tr>
+@@ -525,6 +526,94 @@ export const FUSION_REPORT_TEMPLATE = `
+             </table>
+         </div>
+ 
++        {{#if stats}}
++        <div style="margin-bottom:22px;">
++            <div style="font-size:13px; color:#0b5cab; font-weight:900; letter-spacing:0.35px; text-transform:uppercase; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #e6ebf5;">Processing Statistics</div>
++            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
++                {{#if (exists stats.totalFusionAccounts)}}
++                <tr>
++                    <td width="50%" style="width:50%; padding:4px 6px;">
++                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
++                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Total Fusion Accounts</div>
++                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.totalFusionAccounts}}</div>
++                        </div>
++                    </td>
++                    <td width="50%" style="width:50%; padding:4px 6px;">
++                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
++                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Fusion Reviews Created</div>
++                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.fusionReviewsCreated}}</div>
++                        </div>
++                    </td>
++                </tr>
++                {{/if}}
++                {{#if (exists stats.fusionReviewAssignments)}}
++                <tr>
++                    <td width="50%" style="width:50%; padding:4px 6px;">
++                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
++                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Fusion Review Assignments</div>
++                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.fusionReviewAssignments}}</div>
++                        </div>
++                    </td>
++                    <td width="50%" style="width:50%; padding:4px 6px;">
++                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
++                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Fusion Review New Identities</div>
++                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.fusionReviewNewIdentities}}</div>
++                        </div>
++                    </td>
++                </tr>
++                {{/if}}
++                {{#if (exists stats.fusionReviewNonMatches)}}
++                <tr>
++                    <td width="50%" style="width:50%; padding:4px 6px;">
++                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
++                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Fusion Review Non-Matches</div>
++                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.fusionReviewNonMatches}}</div>
++                        </div>
++                    </td>
++                    <td width="50%" style="width:50%; padding:4px 6px;">
++                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
++                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Identities Found</div>
++                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.identitiesFound}}</div>
++                        </div>
++                    </td>
++                </tr>
++                {{/if}}
++                {{#if (exists stats.managedAccountsFound)}}
++                <tr>
++                    <td width="50%" style="width:50%; padding:4px 6px;">
++                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
++                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Managed Accounts Found</div>
++                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.managedAccountsFound}}</div>
++                        </div>
++                    </td>
++                    <td width="50%" style="width:50%; padding:4px 6px;">
++                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
++                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Managed Accounts Processed</div>
++                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.managedAccountsProcessed}}</div>
++                        </div>
++                    </td>
++                </tr>
++                {{/if}}
++                {{#if (exists stats.totalProcessingTime)}}
++                <tr>
++                    <td width="50%" style="width:50%; padding:4px 6px;">
++                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
++                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Total Processing Time</div>
++                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.totalProcessingTime}}</div>
++                        </div>
++                    </td>
++                    <td width="50%" style="width:50%; padding:4px 6px;">
++                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
++                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Used Memory</div>
++                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.usedMemory}}</div>
++                        </div>
++                    </td>
++                </tr>
++                {{/if}}
++            </table>
++        </div>
++        {{/if}}
++
+         {{#each accounts}}
+         <div class="account-section" style="margin-bottom:28px; border:1px solid #e6ebf5; border-radius:14px; padding:18px; background:#ffffff; box-shadow:0 10px 24px rgba(16,24,40,0.08);">
+             <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+@@ -537,7 +626,7 @@ export const FUSION_REPORT_TEMPLATE = `
+                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+                                 <tr>
+                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Source:</td>
+-                                    <td style="padding:2px 8px;">{{accountSource}}</td>
++                                    <td style="padding:2px 8px;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:#eef2f7; color:#5f6b7a; font-size:10px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
+                                 </tr>
+                                 {{#if accountId}}
+                                 <tr>
+@@ -567,8 +656,14 @@ export const FUSION_REPORT_TEMPLATE = `
+                         {{/if}}
+                     </td>
+ 
+-                    <!-- Right: candidates horizontally -->
++                    <!-- Right: candidates or error -->
+                     <td style="vertical-align:top; padding-left:14px;">
++                        {{#if error}}
++                        <div style="padding:16px 18px; background:#fef2f2; border:1px solid #fecaca; border-left:6px solid #ef4444; border-radius:10px;">
++                            <div style="font-size:12px; color:#991b1b; font-weight:900; letter-spacing:0.35px; text-transform:uppercase; margin-bottom:6px;">Error</div>
++                            <div style="font-size:13px; color:#7f1d1d; line-height:1.5;">{{error}}</div>
++                        </div>
++                        {{else}}
+                         {{#if matches}}
+                         {{#if (gt matches.length 0)}}
+                         <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+@@ -621,6 +716,7 @@ export const FUSION_REPORT_TEMPLATE = `
+                         {{else}}
+                         <div style="color:#999; font-style:italic; padding:20px; background-color:#f8f9fa; border-radius:4px; text-align:center;">No potential matches found for this account.</div>
+                         {{/if}}
++                        {{/if}}
+                     </td>
+                     </tr>
+                 </table>
+diff --git a/src/operations/accountCreate.ts b/src/operations/accountCreate.ts
+index f136318..d2f3733 100644
+--- a/src/operations/accountCreate.ts
++++ b/src/operations/accountCreate.ts
+@@ -1,4 +1,4 @@
+-import { AttributeChangeOp, ConnectorError, Response, StdAccountCreateInput, StdAccountCreateOutput } from '@sailpoint/connector-sdk'
++import { AttributeChangeOp, ConnectorError, StdAccountCreateInput } from '@sailpoint/connector-sdk'
+ import { ServiceRegistry } from '../services/serviceRegistry'
+ import { assert } from '../utils/assert'
+ import { reportAction } from './actions/reportAction'
+@@ -21,15 +21,13 @@ import { correlateAction } from './actions/correlateAction'
+  *
+  * @param serviceRegistry - Service registry providing access to all connector services
+  * @param input - SDK input containing the identity name and requested actions
+- * @param res - SDK response object for sending the created account back to the platform
+  */
+ export const accountCreate = async (
+     serviceRegistry: ServiceRegistry,
+     input: StdAccountCreateInput,
+-    res: Response<StdAccountCreateOutput>
+ ) => {
+     ServiceRegistry.setCurrent(serviceRegistry)
+-    const { log, identities, sources, schemas, fusion, attributes } = serviceRegistry
++    const { log, identities, sources, schemas, fusion, attributes, res } = serviceRegistry
+ 
+     let identityName = input.attributes.name ?? input.identity
+     try {
+diff --git a/src/operations/accountDisable.ts b/src/operations/accountDisable.ts
+index ca9ad49..2a499a5 100644
+--- a/src/operations/accountDisable.ts
++++ b/src/operations/accountDisable.ts
+@@ -1,4 +1,4 @@
+-import { ConnectorError, Response, StdAccountDisableInput, StdAccountDisableOutput } from '@sailpoint/connector-sdk'
++import { ConnectorError, StdAccountDisableInput } from '@sailpoint/connector-sdk'
+ import { ServiceRegistry } from '../services/serviceRegistry'
+ import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
+ import { assert } from '../utils/assert'
+@@ -20,15 +20,13 @@ import { AttributeOperations } from '../services/attributeService/types'
+  *
+  * @param serviceRegistry - Service registry providing access to all connector services
+  * @param input - SDK input containing the account identity to disable
+- * @param res - SDK response object for sending the disabled account back to the platform
+  */
+ export const accountDisable = async (
+     serviceRegistry: ServiceRegistry,
+     input: StdAccountDisableInput,
+-    res: Response<StdAccountDisableOutput>
+ ) => {
+     ServiceRegistry.setCurrent(serviceRegistry)
+-    const { log, fusion, sources, schemas } = serviceRegistry
++    const { log, fusion, sources, schemas, res } = serviceRegistry
+ 
+     try {
+         log.info(`Disabling account: ${input.identity}`)
+diff --git a/src/operations/accountDiscoverSchema.ts b/src/operations/accountDiscoverSchema.ts
+index d90cfc5..c7a339e 100644
+--- a/src/operations/accountDiscoverSchema.ts
++++ b/src/operations/accountDiscoverSchema.ts
+@@ -1,12 +1,11 @@
+-import { ConnectorError, Response, StdAccountDiscoverSchemaOutput } from '@sailpoint/connector-sdk'
++import { ConnectorError } from '@sailpoint/connector-sdk'
+ import { ServiceRegistry } from '../services/serviceRegistry'
+ 
+ export const accountDiscoverSchema = async (
+     serviceRegistry: ServiceRegistry,
+-    res: Response<StdAccountDiscoverSchemaOutput>
+ ) => {
+     ServiceRegistry.setCurrent(serviceRegistry)
+-    const { log, schemas, sources } = serviceRegistry
++    const { log, schemas, sources, res } = serviceRegistry
+ 
+     try {
+         log.info('Discovering account schema')
+diff --git a/src/operations/accountEnable.ts b/src/operations/accountEnable.ts
+index 67c57cb..ca9d6f7 100644
+--- a/src/operations/accountEnable.ts
++++ b/src/operations/accountEnable.ts
+@@ -1,4 +1,4 @@
+-import { ConnectorError, Response, StdAccountEnableInput, StdAccountEnableOutput } from '@sailpoint/connector-sdk'
++import { ConnectorError, StdAccountEnableInput } from '@sailpoint/connector-sdk'
+ import { ServiceRegistry } from '../services/serviceRegistry'
+ import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
+ import { assert } from '../utils/assert'
+@@ -27,15 +27,13 @@ import { AttributeOperations } from '../services/attributeService/types'
+  *
+  * @param serviceRegistry - Service registry providing access to all connector services
+  * @param input - SDK input containing the account identity to enable
+- * @param res - SDK response object for sending the enabled account back to the platform
+  */
+ export const accountEnable = async (
+     serviceRegistry: ServiceRegistry,
+     input: StdAccountEnableInput,
+-    res: Response<StdAccountEnableOutput>
+ ) => {
+     ServiceRegistry.setCurrent(serviceRegistry)
+-    const { log, fusion, sources, schemas, attributes } = serviceRegistry
++    const { log, fusion, sources, schemas, attributes, res } = serviceRegistry
+ 
+     try {
+         log.info(`Enabling account: ${input.identity}`)
+diff --git a/src/operations/accountList.ts b/src/operations/accountList.ts
+index 44e6f58..a4e4ccf 100644
+--- a/src/operations/accountList.ts
++++ b/src/operations/accountList.ts
+@@ -1,7 +1,8 @@
+-import { ConnectorError, Response, StdAccountListInput, StdAccountListOutput } from '@sailpoint/connector-sdk'
++import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
+ import { ServiceRegistry } from '../services/serviceRegistry'
+ import { softAssert } from '../utils/assert'
+ import { generateReport } from './helpers/generateReport'
++import { FusionReportStats } from '../services/fusionService/types'
+ 
+ /**
+  * Account list operation - Main entry point for identity fusion processing.
+@@ -52,10 +53,9 @@ import { generateReport } from './helpers/generateReport'
+ export const accountList = async (
+     serviceRegistry: ServiceRegistry,
+     input: StdAccountListInput,
+-    res: Response<StdAccountListOutput>
+ ) => {
+     ServiceRegistry.setCurrent(serviceRegistry)
+-    const { log, fusion, forms, identities, schemas, sources, attributes, messaging, config } = serviceRegistry
++    const { log, fusion, forms, identities, schemas, sources, attributes, messaging, config, res } = serviceRegistry
+ 
+     let processLockAcquired = false
+ 
+@@ -86,6 +86,18 @@ export const accountList = async (
+         await schemas.setFusionAccountSchema(input.schema)
+         log.info('Fusion account schema set successfully')
+ 
++        // Set up reverse correlation for sources that use it
++        const reverseCorrelationSources = config.sources.filter((sc) => sc.correlationMode === 'reverse')
++        if (reverseCorrelationSources.length > 0) {
++            const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
++            await Promise.all(
++                reverseCorrelationSources.map((sc) =>
++                    sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
++                )
++            )
++            log.info(`Reverse correlation setup completed for ${reverseCorrelationSources.length} source(s)`)
++        }
++
+         await sources.aggregateManagedSources()
+         log.info('Managed sources aggregated')
+ 
+@@ -103,7 +115,9 @@ export const accountList = async (
+         ]
+ 
+         await Promise.all(fetchPromises)
+-        log.info(`Loaded ${sources.fusionAccountCount} fusion account(s), ${identities.identityCount} identities, ${sources.managedAccountsById.size} managed account(s)`)
++        const identitiesFound = identities.identityCount
++        const managedAccountsFound = sources.managedAccountsById.size
++        log.info(`Loaded ${sources.fusionAccountCount} fusion account(s), ${identitiesFound} identities, ${managedAccountsFound} managed account(s)`)
+         const fusionOwner = sources.fusionSourceOwner
+         if (fusion.fusionReportOnAggregation) {
+             const fusionOwnerIdentity = identities.getIdentityById(fusionOwner.id)
+@@ -151,7 +165,21 @@ export const accountList = async (
+             const fusionOwnerAccount = fusion.getFusionIdentity(fusionOwner.id!)
+             softAssert(fusionOwnerAccount, 'Fusion owner account not found')
+             if (fusionOwnerAccount) {
+-                await generateReport(fusionOwnerAccount, false, serviceRegistry)
++                const decisions = forms.fusionIdentityDecisions
++                const memoryUsage = process.memoryUsage()
++                const stats: FusionReportStats = {
++                    totalFusionAccounts: fusion.totalFusionAccountCount,
++                    fusionReviewsCreated: forms.formsCreated,
++                    fusionReviewAssignments: forms.formInstancesCreated,
++                    fusionReviewNewIdentities: decisions.filter((d) => d.newIdentity).length,
++                    fusionReviewNonMatches: decisions.filter((d) => !d.newIdentity).length,
++                    identitiesFound,
++                    managedAccountsFound,
++                    managedAccountsProcessed: fusion.newManagedAccountsCount,
++                    totalProcessingTime: timer.totalElapsed(),
++                    usedMemory: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
++                }
++                await generateReport(fusionOwnerAccount, false, serviceRegistry, stats)
+             }
+             timer.phase(`PHASE ${phase++}: Generating fusion report`)
+         }
+@@ -179,6 +207,8 @@ export const accountList = async (
+         sources.clearFusionAccounts()
+         log.info('Account caches cleared from memory')
+ 
++        sources.aggregateDelayedSources()
++
+         timer.end(`✓ Account list operation completed successfully - ${count} account(s) processed`)
+     } catch (error) {
+         if (error instanceof ConnectorError) throw error
+diff --git a/src/operations/accountRead.ts b/src/operations/accountRead.ts
+index d705dff..862af2f 100644
+--- a/src/operations/accountRead.ts
++++ b/src/operations/accountRead.ts
+@@ -1,4 +1,4 @@
+-import { ConnectorError, Response, StdAccountReadInput, StdAccountReadOutput } from '@sailpoint/connector-sdk'
++import { ConnectorError, StdAccountReadInput } from '@sailpoint/connector-sdk'
+ import { ServiceRegistry } from '../services/serviceRegistry'
+ import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
+ import { assert } from '../utils/assert'
+@@ -17,15 +17,13 @@ import { AttributeOperations } from '../services/attributeService/types'
+  *
+  * @param serviceRegistry - Service registry providing access to all connector services
+  * @param input - SDK input containing the account identity to read
+- * @param res - SDK response object for sending the account back to the platform
+  */
+ export const accountRead = async (
+     serviceRegistry: ServiceRegistry,
+     input: StdAccountReadInput,
+-    res: Response<StdAccountReadOutput>
+ ) => {
+     ServiceRegistry.setCurrent(serviceRegistry)
+-    const { log, fusion, schemas, sources } = serviceRegistry
++    const { log, fusion, schemas, sources, res } = serviceRegistry
+ 
+     try {
+         log.info(`Reading account: ${input.identity}`)
+diff --git a/src/operations/accountUpdate.ts b/src/operations/accountUpdate.ts
+index 8fb0ae3..13ac6b5 100644
+--- a/src/operations/accountUpdate.ts
++++ b/src/operations/accountUpdate.ts
+@@ -1,4 +1,4 @@
+-import { ConnectorError, Response, StdAccountUpdateInput, StdAccountUpdateOutput } from '@sailpoint/connector-sdk'
++import { ConnectorError, StdAccountUpdateInput } from '@sailpoint/connector-sdk'
+ import { ServiceRegistry } from '../services/serviceRegistry'
+ import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
+ import { assert } from '../utils/assert'
+@@ -22,15 +22,13 @@ import { AttributeOperations } from '../services/attributeService/types'
+  *
+  * @param serviceRegistry - Service registry providing access to all connector services
+  * @param input - SDK input containing the account identity and list of attribute changes
+- * @param res - SDK response object for sending the updated account back to the platform
+  */
+ export const accountUpdate = async (
+     serviceRegistry: ServiceRegistry,
+     input: StdAccountUpdateInput,
+-    res: Response<StdAccountUpdateOutput>
+ ) => {
+     ServiceRegistry.setCurrent(serviceRegistry)
+-    const { log, sources, schemas, fusion } = serviceRegistry
++    const { log, sources, schemas, fusion, res } = serviceRegistry
+ 
+     try {
+         log.info(`Updating account: ${input.identity}`)
+diff --git a/src/operations/entitlementList.ts b/src/operations/entitlementList.ts
+index f506f0f..cf5c1e3 100644
+--- a/src/operations/entitlementList.ts
++++ b/src/operations/entitlementList.ts
+@@ -1,9 +1,7 @@
+ import {
+     ConnectorError,
+     ConnectorErrorType,
+-    Response,
+     StdEntitlementListInput,
+-    StdEntitlementListOutput,
+ } from '@sailpoint/connector-sdk'
+ import { ServiceRegistry } from '../services/serviceRegistry'
+ 
+@@ -16,15 +14,13 @@ import { ServiceRegistry } from '../services/serviceRegistry'
+  *
+  * @param serviceRegistry - Service registry providing access to all connector services
+  * @param input - SDK input containing the entitlement type to list
+- * @param res - SDK response object for sending entitlements back to the platform
+  */
+ export const entitlementList = async (
+     serviceRegistry: ServiceRegistry,
+     input: StdEntitlementListInput,
+-    res: Response<StdEntitlementListOutput>
+ ) => {
+     ServiceRegistry.setCurrent(serviceRegistry)
+-    const { log, sources, entitlements } = serviceRegistry
++    const { log, sources, entitlements, res } = serviceRegistry
+ 
+     try {
+         log.info(`Listing entitlements for type: ${input.type}`)
+diff --git a/src/operations/helpers/generateReport.ts b/src/operations/helpers/generateReport.ts
+index 2dd795d..432283c 100644
+--- a/src/operations/helpers/generateReport.ts
++++ b/src/operations/helpers/generateReport.ts
+@@ -1,6 +1,7 @@
+ import { ServiceRegistry } from '../../services/serviceRegistry'
+ import { FusionAccount } from '../../model/account'
+ import { StandardCommand } from '@sailpoint/connector-sdk'
++import { FusionReportStats } from '../../services/fusionService/types'
+ 
+ /**
+  * Generates and sends a fusion report for the given account.
+@@ -9,7 +10,8 @@ import { StandardCommand } from '@sailpoint/connector-sdk'
+ export const generateReport = async (
+     fusionAccount: FusionAccount,
+     includeNonMatches: boolean = false,
+-    serviceRegistry?: ServiceRegistry
++    serviceRegistry?: ServiceRegistry,
++    stats?: FusionReportStats
+ ) => {
+     if (!serviceRegistry) {
+         serviceRegistry = ServiceRegistry.getCurrent()
+@@ -34,6 +36,6 @@ export const generateReport = async (
+         await fusion.analyzeManagedAccounts()
+     }
+ 
+-    const report = fusion.generateReport(includeNonMatches)
++    const report = fusion.generateReport(includeNonMatches, stats)
+     await messaging.sendReport(report, fusionAccount)
+ }
+diff --git a/src/operations/testConnection.ts b/src/operations/testConnection.ts
+index e831a02..66e9331 100644
+--- a/src/operations/testConnection.ts
++++ b/src/operations/testConnection.ts
+@@ -1,4 +1,4 @@
+-import { ConnectorError, Response, StdTestConnectionOutput } from '@sailpoint/connector-sdk'
++import { ConnectorError } from '@sailpoint/connector-sdk'
+ import { ServiceRegistry } from '../services/serviceRegistry'
+ 
+ /**
+@@ -9,15 +9,13 @@ import { ServiceRegistry } from '../services/serviceRegistry'
+  *
+  * @param serviceRegistry - Service registry providing access to all connector services
+  * @param _input - Unused input parameter (required by SDK interface)
+- * @param res - SDK response object for sending the test result back to the platform
+  */
+ export const testConnection = async (
+     serviceRegistry: ServiceRegistry,
+     _input: any,
+-    res: Response<StdTestConnectionOutput>
+ ) => {
+     ServiceRegistry.setCurrent(serviceRegistry)
+-    const { log, sources } = serviceRegistry
++    const { log, sources, res } = serviceRegistry
+ 
+     try {
+         log.info('Testing connection')
+diff --git a/src/services/clientService/clientService.ts b/src/services/clientService/clientService.ts
+index ecd078d..578063c 100644
+--- a/src/services/clientService/clientService.ts
++++ b/src/services/clientService/clientService.ts
+@@ -9,6 +9,8 @@ import {
+     Search,
+     AccountsV2025Api,
+     IdentitiesV2025Api,
++    IdentityAttributesV2025Api,
++    IdentityProfilesV2025Api,
+     CustomFormsV2025Api,
+     EntitlementsV2025Api,
+     GovernanceGroupsV2025Api,
+@@ -50,6 +52,8 @@ export class ClientService {
+     private _transformsApi?: TransformsApi
+     private _governanceGroupsApi?: GovernanceGroupsV2025Api
+     private _taskManagementApi?: TaskManagementV2025Api
++    private _identityProfilesApi?: IdentityProfilesV2025Api
++    private _identityAttributesApi?: IdentityAttributesV2025Api
+ 
+     constructor(
+         fusionConfig: FusionConfig,
+@@ -99,7 +103,7 @@ export class ClientService {
+                 requestsPerSecond,
+                 maxConcurrentRequests,
+                 maxRetries: enableRetry ? maxRetries : 0,
+-                // Retry delay is calculated from HTTP 429 retry-after header (with jitter) or exponential backoff with 1s base
++                enablePriority: fusionConfig.enablePriority ?? true,
+             }
+ 
+             this.queue = new ApiQueue(queueConfig)
+@@ -188,6 +192,27 @@ export class ClientService {
+         return this._taskManagementApi
+     }
+ 
++    public get identityProfilesApi(): IdentityProfilesV2025Api {
++        if (!this._identityProfilesApi) {
++            this._identityProfilesApi = new IdentityProfilesV2025Api(this.config)
++        }
++        return this._identityProfilesApi
++    }
++
++    public get identityAttributesApi(): IdentityAttributesV2025Api {
++        if (!this._identityAttributesApi) {
++            this._identityAttributesApi = new IdentityAttributesV2025Api(this.config)
++        }
++        return this._identityAttributesApi
++    }
++
++    /**
++     * Returns the internal queue instance, or null if queue is disabled.
++     */
++    public getQueue(): ApiQueue | null {
++        return this.queue
++    }
++
+     // -------------------------------------------------------------------------
+     // Generic Execution Helpers
+     // -------------------------------------------------------------------------
+@@ -204,7 +229,7 @@ export class ClientService {
+      */
+     public async execute<TResponse>(
+         apiFunction: () => Promise<TResponse>,
+-        priority: QueuePriority = QueuePriority.NORMAL,
++        priority: QueuePriority = QueuePriority.MEDIUM,
+         context?: string,
+         abortSignal?: AbortSignal
+     ): Promise<TResponse | undefined> {
+@@ -281,7 +306,7 @@ export class ClientService {
+     public async paginate<T, TRequestParams = any>(
+         callFunction: (requestParameters: TRequestParams) => Promise<{ data: T[] }>,
+         baseParameters: Partial<TRequestParams> = {},
+-        priority: QueuePriority = QueuePriority.NORMAL,
++        priority: QueuePriority = QueuePriority.MEDIUM,
+         context?: string
+     ): Promise<T[]> {
+         const pageSize = this.pageSize
+@@ -415,7 +440,7 @@ export class ClientService {
+      */
+     public async paginateSearchApi<T>(
+         search: Search,
+-        priority: QueuePriority = QueuePriority.NORMAL,
++        priority: QueuePriority = QueuePriority.MEDIUM,
+         context?: string
+     ): Promise<T[]> {
+         const pageSize = this.pageSize
+@@ -481,7 +506,7 @@ export class ClientService {
+      */
+     public async *paginateSearchApiGenerator<T>(
+         search: Search,
+-        priority: QueuePriority = QueuePriority.NORMAL,
++        priority: QueuePriority = QueuePriority.MEDIUM,
+         context?: string,
+         abortSignal?: AbortSignal
+     ): AsyncGenerator<T[], void, unknown> {
+@@ -596,7 +621,7 @@ export class ClientService {
+     public async *paginateParallel<T, TRequestParams = any>(
+         callFunction: (requestParameters: TRequestParams) => Promise<{ data: T[]; headers?: any }>,
+         baseParameters: Partial<TRequestParams> = {},
+-        priority: QueuePriority = QueuePriority.NORMAL,
++        priority: QueuePriority = QueuePriority.MEDIUM,
+         context?: string,
+         abortSignal?: AbortSignal,
+         limit?: number
+diff --git a/src/services/clientService/queue.ts b/src/services/clientService/queue.ts
+index add2f10..b142b9a 100644
+--- a/src/services/clientService/queue.ts
++++ b/src/services/clientService/queue.ts
+@@ -44,7 +44,7 @@ export class ApiQueue {
+     ): Promise<T> {
+         const item: QueueItem<T> = {
+             id: options.id || `req-${Date.now()}-${Math.random()}`,
+-            priority: options.priority ?? QueuePriority.NORMAL,
++            priority: options.priority ?? QueuePriority.MEDIUM,
+             execute,
+             resolve: () => { },
+             reject: () => { },
+@@ -58,12 +58,15 @@ export class ApiQueue {
+             item.resolve = resolve
+             item.reject = reject
+ 
+-            // Insert based on priority (higher priority first)
+-            const insertIndex = this.queue.findIndex((q) => q.priority < item.priority)
+-            if (insertIndex === -1) {
+-                this.queue.push(item)
++            if (this.config.enablePriority) {
++                const insertIndex = this.queue.findIndex((q) => q.priority < item.priority)
++                if (insertIndex === -1) {
++                    this.queue.push(item)
++                } else {
++                    this.queue.splice(insertIndex, 0, item)
++                }
+             } else {
+-                this.queue.splice(insertIndex, 0, item)
++                this.queue.push(item)
+             }
+ 
+             // Handle pre-flight abort
+@@ -181,12 +184,15 @@ export class ApiQueue {
+ 
+                 await this.sleep(delay)
+ 
+-                // Re-queue with same priority (priority is always enabled)
+-                const insertIndex = this.queue.findIndex((q) => q.priority < item.priority)
+-                if (insertIndex === -1) {
+-                    this.queue.push(item)
++                if (this.config.enablePriority) {
++                    const insertIndex = this.queue.findIndex((q) => q.priority < item.priority)
++                    if (insertIndex === -1) {
++                        this.queue.push(item)
++                    } else {
++                        this.queue.splice(insertIndex, 0, item)
++                    }
+                 } else {
+-                    this.queue.splice(insertIndex, 0, item)
++                    this.queue.push(item)
+                 }
+                 this.stats.queueLength = this.queue.length
+             } else {
+diff --git a/src/services/clientService/types.ts b/src/services/clientService/types.ts
+index d9edfd2..5e76a17 100644
+--- a/src/services/clientService/types.ts
++++ b/src/services/clientService/types.ts
+@@ -3,9 +3,8 @@
+  */
+ export enum QueuePriority {
+     LOW = 0,
+-    NORMAL = 1,
++    MEDIUM = 1,
+     HIGH = 2,
+-    URGENT = 3,
+ }
+ 
+ /**
+@@ -43,4 +42,5 @@ export interface QueueConfig {
+     requestsPerSecond: number
+     maxConcurrentRequests: number
+     maxRetries: number
++    enablePriority: boolean
+ }
+diff --git a/src/services/formService/formBuilder.ts b/src/services/formService/formBuilder.ts
+index d3cc72f..04a4709 100644
+--- a/src/services/formService/formBuilder.ts
++++ b/src/services/formService/formBuilder.ts
+@@ -4,6 +4,7 @@ import {
+ } from 'sailpoint-api-client'
+ import { logger } from '@sailpoint/connector-sdk'
+ import { FusionAccount } from '../../model/account'
++import { SourceType } from '../../model/config'
+ import { capitalizeFirst } from '../../utils/attributes'
+ import { ALGORITHM_LABELS } from './constants'
+ import { Candidate } from './types'
+@@ -18,9 +19,11 @@ import { Candidate } from './types'
+ export const buildFormInput = (
+     fusionAccount: FusionAccount,
+     candidates: Candidate[],
+-    fusionFormAttributes?: string[]
++    fusionFormAttributes?: string[],
++    sourceType: SourceType = 'identity'
+ ): { [key: string]: any } => {
+     const formInput: { [key: string]: any } = {}
++    formInput.sourceType = sourceType
+ 
+     const accountIdentifier =
+         String(fusionAccount.managedAccountId || '').trim() ||
+@@ -105,7 +108,8 @@ export const buildFormInput = (
+ export const buildFormFields = (
+     fusionAccount: FusionAccount,
+     candidates: Candidate[],
+-    fusionFormAttributes?: string[]
++    fusionFormAttributes?: string[],
++    sourceType: SourceType = 'identity'
+ ): FormElementV2025[] => {
+     const formFields: FormElementV2025[] = []
+ 
+@@ -130,14 +134,19 @@ export const buildFormFields = (
+     }
+ 
+     if (topSectionElements.length > 0) {
++        const sectionDescriptions: Record<SourceType, string> = {
++            identity: 'A potential duplicate identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
++            record: 'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
++            orphan: 'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
++        }
++
+         formFields.push({
+             id: 'topSection',
+             key: 'topSection',
+             elementType: 'SECTION',
+             config: {
+                 alignment: 'CENTER',
+-                description:
+-                    'A potential duplicate identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
++                description: sectionDescriptions[sourceType],
+                 formElements: topSectionElements,
+                 label: `Fusion review required for ${fusionAccount.sourceName}`,
+                 labelStyle: 'h2',
+@@ -172,13 +181,29 @@ export const buildFormFields = (
+                                     id: 'newIdentity',
+                                     key: 'newIdentity',
+                                     elementType: 'TOGGLE',
+-                                    config: {
+-                                        label: 'New identity',
+-                                        default: false,
+-                                        trueLabel: 'True',
+-                                        falseLabel: 'False',
+-                                        helpText: 'Select this if the account is a new identity',
+-                                    },
++                                    config: sourceType === 'identity'
++                                        ? {
++                                            label: 'New identity',
++                                            default: false,
++                                            trueLabel: 'True',
++                                            falseLabel: 'False',
++                                            helpText: 'Select this if the account is a new identity',
++                                        }
++                                        : sourceType === 'record'
++                                            ? {
++                                                label: 'No match',
++                                                default: false,
++                                                trueLabel: 'True',
++                                                falseLabel: 'False',
++                                                helpText: 'Select this if the record does not match any existing identity',
++                                            }
++                                            : {
++                                                label: 'No match',
++                                                default: false,
++                                                trueLabel: 'True',
++                                                falseLabel: 'False',
++                                                helpText: 'Select this if the orphan account does not match any existing identity',
++                                            },
+                                     validations: [],
+                                 },
+                             ],
+diff --git a/src/services/formService/formProcessor.ts b/src/services/formService/formProcessor.ts
+index 43efdeb..178d7eb 100644
+--- a/src/services/formService/formProcessor.ts
++++ b/src/services/formService/formProcessor.ts
+@@ -2,6 +2,8 @@ import {
+     FormInstanceResponseV2025,
+     FormDefinitionInputV2025,
+ } from 'sailpoint-api-client'
++import { logger } from '@sailpoint/connector-sdk'
++import { SourceType } from '../../model/config'
+ import { FusionDecision } from '../../model/form'
+ import { IdentityService } from '../identityService'
+ import { assert } from '../../utils/assert'
+@@ -115,6 +117,8 @@ export const createFusionDecision = (
+         return null
+     }
+ 
++    const sourceType = extractSourceType(formInput)
++
+     const isNewIdentity = formData?.newIdentity ?? true
+     // SELECT elements with dataSource return arrays, extract the first element
+     const identitiesValue = formData?.identities
+@@ -124,6 +128,14 @@ export const createFusionDecision = (
+             ? identitiesValue[0]
+             : identitiesValue
+ 
++    if (!isNewIdentity && !existingIdentity) {
++        logger.error(
++            `[formProcessor] Form ${formInstance.id}: toggle is false but no identity selected ` +
++            `for account ${accountInfo.name} [${accountInfo.sourceName}]. Skipping decision.`
++        )
++        return null
++    }
++
+     const reviewerIdentityId = recipients[0].id
+     if (!reviewerIdentityId) {
+         return null
+@@ -142,5 +154,14 @@ export const createFusionDecision = (
+         comments: formData?.comments || '',
+         finished,
+         formUrl: formInstance.standAloneFormUrl ?? undefined,
++        sourceType,
++    }
++}
++
++const extractSourceType = (formInput: any): SourceType => {
++    if (typeof formInput?.sourceType === 'string') {
++        const value = formInput.sourceType as string
++        if (value === 'record' || value === 'orphan') return value
+     }
++    return 'identity'
+ }
+diff --git a/src/services/formService/formService.ts b/src/services/formService/formService.ts
+index 89f3d34..bec35c4 100644
+--- a/src/services/formService/formService.ts
++++ b/src/services/formService/formService.ts
+@@ -42,6 +42,8 @@ export class FormService {
+     private _pendingReviewUrlsByReviewerId: Map<string, string[]> = new Map()
+     /** Candidate identity IDs from pending (unanswered) form instances, populated during fetchFormData. */
+     private _pendingCandidateIdentityIds: Set<string> = new Set()
++    private _formsCreated: number = 0
++    private _formInstancesCreated: number = 0
+     private readonly fusionFormNamePattern: string
+     private readonly fusionFormExpirationDays: number
+     private readonly fusionFormAttributes?: string[]
+@@ -128,16 +130,17 @@ export class FormService {
+     }
+ 
+     /**
+-     * Create a fusion form for deduplication review
++     * Create a fusion form for deduplication review.
++     * @returns true if the form was created successfully, false if creation was skipped
+      */
+     public async createFusionForm(
+         fusionAccount: FusionAccount,
+         reviewers: Set<FusionAccount> | undefined
+-    ): Promise<void> {
++    ): Promise<boolean> {
+         assert(fusionAccount, 'Fusion account is required')
+ 
+         if (!this.hasValidReviewers(reviewers, fusionAccount.name || 'Unknown')) {
+-            return
++            return false
+         }
+ 
+         const { candidates, formDefinition, formInput, expire, fusionSourceId } =
+@@ -168,7 +171,9 @@ export class FormService {
+                     this._pendingCandidateIdentityIds.add(candidate.id)
+                 }
+             }
++            return true
+         }
++        return false
+     }
+ 
+     /**
+@@ -206,7 +211,8 @@ export class FormService {
+ 
+         const formDefinition = await this.getOrCreateFormDefinition(formName, fusionAccount, candidates)
+ 
+-        const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes)
++        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'identity'
++        const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
+         assert(formInput, 'Form input is required')
+ 
+         const expire = calculateExpirationDate(this.fusionFormExpirationDays)
+@@ -389,6 +395,7 @@ export class FormService {
+             await this.messaging.sendFusionEmail(formInstance, {
+                 accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
+                 accountSource: fusionAccount.sourceName,
++                sourceType: this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType,
+                 accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
+                 accountEmail: fusionAccount.email,
+                 accountAttributes: fusionAccount.attributes as any,
+@@ -405,6 +412,16 @@ export class FormService {
+         }
+     }
+ 
++    /** Number of form definitions created during this run */
++    public get formsCreated(): number {
++        return this._formsCreated
++    }
++
++    /** Number of form instances (review assignments) created during this run */
++    public get formInstancesCreated(): number {
++        return this._formInstancesCreated
++    }
++
+     /**
+      * Get all fusion identity decisions
+      */
+@@ -839,7 +856,8 @@ export class FormService {
+             this.log.error(`Candidates must be less than or equal to ${MAX_CANDIDATES_FOR_FORM}`)
+             return
+         }
+-        const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes)
++        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'identity'
++        const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
+         const formInputs = buildFormInputs(fusionAccount, candidates, this.fusionFormAttributes)
+         const formConditions = buildFormConditions(candidates, this.fusionFormAttributes)
+         const owner = getFormOwner(this.sources)
+@@ -1004,6 +1022,7 @@ export class FormService {
+         assert(formInstance.id, 'Form definition ID is missing')
+ 
+         this.log.debug(`Form definition created successfully: ${formInstance.id}`)
++        this._formsCreated++
+         return formInstance
+     }
+ 
+@@ -1058,6 +1077,7 @@ export class FormService {
+         const response = await this.client.execute(createFormInstanceCall)
+         assert(response, 'Failed to create form instance')
+         this.log.debug(`Form instance created successfully: ${response.id || 'unknown'}`)
++        this._formInstancesCreated++
+         return response
+     }
+ 
+diff --git a/src/services/fusionService/__tests__/fusionService.test.ts b/src/services/fusionService/__tests__/fusionService.test.ts
+index bd47ae5..9e4f934 100644
+--- a/src/services/fusionService/__tests__/fusionService.test.ts
++++ b/src/services/fusionService/__tests__/fusionService.test.ts
+@@ -36,7 +36,6 @@ describe('FusionService', () => {
+         // Mock config with Type assertion
+         mockConfig = {
+             reset: false,
+-            correlateOnAggregation: true,
+             fusionOwnerIsGlobalReviewer: false,
+             fusionReportOnAggregation: false,
+             fusionFormAttributes: ['email', 'firstName', 'lastName'],
+diff --git a/src/services/fusionService/fusionService.ts b/src/services/fusionService/fusionService.ts
+index 79ae03f..04fccee 100644
+--- a/src/services/fusionService/fusionService.ts
++++ b/src/services/fusionService/fusionService.ts
+@@ -20,8 +20,9 @@ import { FusionDecision } from '../../model/form'
+ import { FusionMatch } from '../scoringService'
+ import { ScoringService } from '../scoringService'
+ import { SchemaService } from '../schemaService'
+-import { FusionReport, FusionReportAccount } from './types'
++import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
+ import { AttributeOperations } from '../attributeService/types'
++import { MAX_CANDIDATES_FOR_FORM } from '../formService/constants'
+ 
+ // ============================================================================
+ // FusionService Class
+@@ -39,11 +40,12 @@ export class FusionService {
+     private potentialDuplicateAccounts: FusionAccount[] = []
+     // Minimal report data for non-matches (avoids holding full FusionAccount objects)
+     private analyzedNonMatchReportData: FusionReportAccount[] = []
++    // Accounts where form creation failed (excessive candidates or runtime error)
++    private failedMatchingAccounts: FusionReportAccount[] = []
+     private _reviewersBySourceId: Map<string, Set<FusionAccount>> = new Map()
+     private _sourcesWithoutReviewers: Set<string> = new Set()
+     private readonly sourcesByName: Map<string, SourceInfo> = new Map()
+     private readonly reset: boolean
+-    private readonly correlateOnAggregation: boolean
+     private readonly reportAttributes: string[]
+     private readonly urlContext: UrlContext
+     private readonly deleteEmpty: boolean
+@@ -81,7 +83,6 @@ export class FusionService {
+     ) {
+         FusionAccount.configure(config)
+         this.reset = config.reset
+-        this.correlateOnAggregation = config.correlateOnAggregation
+         this.fusionOwnerIsGlobalReviewer = config.fusionOwnerIsGlobalReviewer ?? false
+         this.fusionReportOnAggregation = config.fusionReportOnAggregation ?? false
+         this.reportAttributes = config.fusionFormAttributes ?? []
+@@ -307,6 +308,7 @@ export class FusionService {
+             this.populateReviewerFusionReviewsFromPending(fusionAccount)
+         }
+ 
++        let hasDecisionAssignment = false
+         const isIdentity = !account.uncorrelated && account.identityId
+         if (isIdentity) {
+             const identityId = account.identityId!
+@@ -318,6 +320,7 @@ export class FusionService {
+             const fusionDecision = this.forms.getFusionAssignmentDecision(identityId)
+             if (fusionDecision) {
+                 fusionAccount.addFusionDecisionLayer(fusionDecision)
++                hasDecisionAssignment = true
+             }
+             this.log.debug(`Applied identity layer for ${fusionAccount.name}: identityId=${identityId}`)
+         }
+@@ -340,11 +343,9 @@ export class FusionService {
+         this.attributes.mapAttributes(fusionAccount)
+         await this.attributes.refreshNormalAttributes(fusionAccount)
+ 
+-        // Correlate missing accounts if correlateOnAggregation is enabled and there are missing accounts
+-        // Status/action will be updated after correlation promises resolve in getISCAccount
+-        const correlate = this.correlateOnAggregation && this.commandType === StandardCommand.StdAccountList
+-        if (correlate && fusionAccount.missingAccountIds.length > 0) {
+-            await this.identities.correlateAccounts(fusionAccount)
++        // Per-source correlation for missing accounts during aggregation
++        if (this.commandType === StandardCommand.StdAccountList && fusionAccount.missingAccountIds.length > 0) {
++            await this.correlatePerSource(fusionAccount, hasDecisionAssignment)
+         }
+ 
+         this.log.debug(
+@@ -357,6 +358,101 @@ export class FusionService {
+         return fusionAccount
+     }
+ 
++    // ------------------------------------------------------------------------
++    // Per-Source Correlation
++    // ------------------------------------------------------------------------
++
++    /**
++     * Apply per-source correlation logic for missing accounts on a fusion account.
++     *
++     * Groups missing accounts by source and applies the correlation strategy
++     * configured for each source:
++     * - `correlate`: Direct API correlation (PATCH /identityId)
++     * - `reverse`: Set the dedicated Fusion attribute to the first missing account name
++     * - `none`: Skip correlation
++     *
++     * Decision-assigned accounts always use direct correlation regardless of mode.
++     */
++    private async correlatePerSource(fusionAccount: FusionAccount, hasDecisionAssignment: boolean): Promise<void> {
++        const missingIds = fusionAccount.missingAccountIds
++
++        // Separate decision-assigned accounts (always use direct correlation)
++        const directCorrelateIds: string[] = []
++        const bySource = new Map<string, string[]>()
++
++        for (const accountId of missingIds) {
++            const info = fusionAccount.getManagedAccountInfo(accountId)
++            if (!info) {
++                // No source info available; if there's a decision, correlate directly
++                if (hasDecisionAssignment) {
++                    directCorrelateIds.push(accountId)
++                }
++                continue
++            }
++
++            const sourceConfig = this.sources.getSourceConfig(info.sourceName)
++            const mode = sourceConfig?.correlationMode ?? 'none'
++
++            if (mode === 'correlate') {
++                directCorrelateIds.push(accountId)
++            } else if (mode === 'reverse') {
++                let ids = bySource.get(info.sourceName)
++                if (!ids) {
++                    ids = []
++                    bySource.set(info.sourceName, ids)
++                }
++                ids.push(accountId)
++            }
++            // mode === 'none': skip
++        }
++
++        // If there's a decision assignment, ensure ALL missing accounts are directly correlated
++        if (hasDecisionAssignment) {
++            for (const accountId of missingIds) {
++                if (!directCorrelateIds.includes(accountId)) {
++                    directCorrelateIds.push(accountId)
++                }
++            }
++        }
++
++        // Direct correlation
++        if (directCorrelateIds.length > 0) {
++            await this.identities.correlateAccounts(fusionAccount, directCorrelateIds)
++        }
++
++        // Reverse correlation: set attribute to first missing account name per source
++        for (const [sourceName, accountIds] of bySource) {
++            // Skip reverse correlation for decision-assigned accounts (already handled above)
++            if (hasDecisionAssignment) continue
++
++            const sourceConfig = this.sources.getSourceConfig(sourceName)
++            if (!sourceConfig?.correlationAttribute) continue
++
++            const firstAccountId = accountIds[0]
++            const info = fusionAccount.getManagedAccountInfo(firstAccountId)
++            if (info) {
++                fusionAccount.setReverseCorrelationAttribute(
++                    sourceConfig.correlationAttribute,
++                    info.accountName
++                )
++                this.log.info(
++                    `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.accountName}" ` +
++                    `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
++                )
++            }
++        }
++
++        // Clear reverse correlation attributes for sources with no missing accounts
++        for (const sc of this.config.sources) {
++            if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
++                const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
++                if (missingForSource.length === 0) {
++                    fusionAccount.clearReverseCorrelationAttribute(sc.correlationAttribute)
++                }
++            }
++        }
++    }
++
+     // ------------------------------------------------------------------------
+     // Public Identity Processing Methods
+     // ------------------------------------------------------------------------
+@@ -461,25 +557,46 @@ export class FusionService {
+      * Creates a new fusion identity for "new identity" decisions, or merges
+      * into an existing one for "authorized" decisions.
+      *
++     * For record/orphan source types, "new identity" (toggle true) means "no match":
++     * - record: registers unique attributes but does not output as ISC account
++     * - orphan: drops the account; optionally fires a disable operation
++     *
+      * @param fusionDecision - The reviewer's decision from the review form
+      * @returns The fusion account produced or updated, or undefined if the decision was skipped
+      */
+     public async processFusionIdentityDecision(fusionDecision: FusionDecision): Promise<FusionAccount | undefined> {
++        const sourceType = fusionDecision.sourceType ?? 'identity'
+ 
+         const fusionAccount = FusionAccount.fromFusionDecision(fusionDecision)
+         this.log.debug(
+-            `Created fusion account from decision: ${fusionDecision.account.name} [${fusionDecision.account.sourceName}], newIdentity=true`
++            `Created fusion account from decision: ${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
++            `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
+         )
+ 
+         fusionAccount.setNeedsReset(true)
+         fusionAccount.addFusionDecisionLayer(fusionDecision)
+-        // Use direct reference - deletions will remove processed accounts from the working queue
+         fusionAccount.addManagedAccountLayer(this.sources.managedAccountsById, this.sources.managedAccountsByIdentityId)
+         this.attributes.mapAttributes(fusionAccount)
+         await this.attributes.refreshNormalAttributes(fusionAccount)
+ 
+         if (fusionDecision.newIdentity) {
+-            // Key generation deferred until getISCAccount
++            if (sourceType === 'record') {
++                this.log.debug(`Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`)
++                await this.attributes.registerUniqueAttributes(fusionAccount)
++                return undefined
++            }
++            if (sourceType === 'orphan') {
++                this.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
++                const sourceInfo = this.sourcesByName.get(fusionDecision.account.sourceName)
++                if (sourceInfo?.config?.disableNonMatchingAccounts) {
++                    const managedAccount = this.sources.managedAccountsById.get(fusionDecision.account.id)
++                    if (managedAccount) {
++                        this.fireDisableOperation(managedAccount)
++                    }
++                }
++                return undefined
++            }
++            // identity (default): register as new fusion account
+             this.setFusionAccount(fusionAccount)
+         }
+         return fusionAccount
+@@ -543,14 +660,29 @@ export class FusionService {
+     /**
+      * Processes a single uncorrelated managed account through the deduplication workflow.
+      * After scoring, the account is either auto-correlated (perfect match), sent for
+-     * manual review (partial match), or added as an unmatched new identity.
++     * manual review (partial match), or handled based on the source type:
++     * - identity: added as unmatched new identity (output as ISC account)
++     * - record: unique attributes registered but not output as ISC account
++     * - orphan: dropped immediately; optionally fires a disable operation
+      *
+      * @param account - The uncorrelated ISC account from a managed source
+      * @returns The fusion account produced or updated, or undefined if skipped or sent for manual review
+      */
+     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
++        const sourceInfo = this.sourcesByName.get(account.sourceName ?? '')
++        const sourceType = sourceInfo?.sourceType ?? 'identity'
++
+         if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
+             const fusionAccount = await this.preProcessManagedAccount(account)
++            if (sourceType !== 'identity') {
++                this.log.debug(`Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`)
++                if (sourceType === 'record') {
++                    await this.attributes.registerUniqueAttributes(fusionAccount)
++                } else if (sourceType === 'orphan' && sourceInfo?.config?.disableNonMatchingAccounts) {
++                    this.fireDisableOperation(account)
++                }
++                return undefined
++            }
+             fusionAccount.setUnmatched()
+             this.setFusionAccount(fusionAccount)
+             return fusionAccount
+@@ -564,7 +696,6 @@ export class FusionService {
+             )
+             const identityId = perfectMatch?.identityId
+             if (this.config.fusionMergingIdentical && identityId) {
+-                // Perfect match
+                 this.log.debug(
+                     `Account ${account.name} [${fusionAccount.sourceName}] has all scores 100, auto-correlating to identity ${identityId}`
+                 )
+@@ -575,24 +706,44 @@ export class FusionService {
+                 )
+                 return await this.processFusionIdentityDecision(syntheticDecision)
+             } else {
+-                // Match - sent for manual review
+-                const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
+                 assert(sourceInfo, 'Source info not found')
+                 const reviewers = this.reviewersBySourceId.get(sourceInfo.id!)
+-                await this.forms.createFusionForm(fusionAccount, reviewers)
+-                // Flag candidate identities with the 'candidate' status
++                try {
++                    const formCreated = await this.forms.createFusionForm(fusionAccount, reviewers)
++                    if (!formCreated) {
++                        const candidateCount = fusionAccount.fusionMatches.length
++                        this.trackFailedMatching(
++                            fusionAccount,
++                            `Too many candidates (${candidateCount}) - maximum is ${MAX_CANDIDATES_FOR_FORM}`
++                        )
++                    }
++                } catch (error) {
++                    const message = error instanceof Error ? error.message : String(error)
++                    this.trackFailedMatching(fusionAccount, `Form creation failed: ${message}`)
++                }
+                 this.flagCandidatesWithStatus(fusionAccount)
+-                // Release fusionIdentity references to reduce memory (identityId/identityName retained for report)
+                 fusionAccount.clearFusionIdentityReferences()
+                 return undefined
+             }
+         } else {
+-            // Non-match
++            // Non-match handling varies by source type
++            if (sourceType === 'record') {
++                this.log.debug(`Record account ${account.name} is not a match, registering unique attributes only`)
++                await this.attributes.registerUniqueAttributes(fusionAccount)
++                return undefined
++            }
++
++            if (sourceType === 'orphan') {
++                this.log.debug(`Orphan account ${account.name} is not a match, dropping`)
++                if (sourceInfo?.config?.disableNonMatchingAccounts) {
++                    this.fireDisableOperation(account)
++                }
++                return undefined
++            }
++
++            // identity (default)
+             this.log.debug(`Account ${account.name} is not a duplicate, adding to fusion accounts`)
+-            // await this.attributes.refreshUniqueAttributes(fusionAccount)
+             fusionAccount.setUnmatched()
+-
+-            // Use setter method to add to appropriate map
+             this.setFusionAccount(fusionAccount)
+             return fusionAccount
+         }
+@@ -692,9 +843,11 @@ export class FusionService {
+      * Avoids retaining the full FusionAccount object in memory.
+      */
+     private buildNonMatchReportEntry(fusionAccount: FusionAccount): FusionReportAccount {
++        const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
+         return {
+             accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
+             accountSource: fusionAccount.sourceName,
++            sourceType: sourceInfo?.sourceType ?? 'identity',
+             accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
+             accountEmail: fusionAccount.email,
+             accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
+@@ -702,6 +855,27 @@ export class FusionService {
+         }
+     }
+ 
++    /**
++     * Records a failed matching for inclusion in the fusion report.
++     * Called when form creation fails (excessive candidates or runtime error).
++     */
++    private trackFailedMatching(fusionAccount: FusionAccount, error: string): void {
++        this.log.error(`Failed matching for account ${fusionAccount.name} [${fusionAccount.sourceName}]: ${error}`)
++        if (this.fusionReportOnAggregation || this.commandType !== StandardCommand.StdAccountList) {
++            const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
++            this.failedMatchingAccounts.push({
++                accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
++                accountSource: fusionAccount.sourceName,
++                sourceType: sourceInfo?.sourceType ?? 'identity',
++                accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
++                accountEmail: fusionAccount.email,
++                accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
++                matches: [],
++                error,
++            })
++        }
++    }
++
+     // ------------------------------------------------------------------------
+     // Public Cleanup Methods
+     // ------------------------------------------------------------------------
+@@ -719,10 +893,11 @@ export class FusionService {
+      * Safe to call multiple times (idempotent).
+      */
+     public clearAnalyzedAccounts(): void {
+-        if (this.analyzedNonMatchReportData.length > 0 || this.potentialDuplicateAccounts.length > 0) {
++        if (this.analyzedNonMatchReportData.length > 0 || this.potentialDuplicateAccounts.length > 0 || this.failedMatchingAccounts.length > 0) {
+             this.log.debug('Clearing analyzed managed accounts from memory')
+             this.analyzedNonMatchReportData = []
+             this.potentialDuplicateAccounts = []
++            this.failedMatchingAccounts = []
+         }
+     }
+ 
+@@ -852,6 +1027,19 @@ export class FusionService {
+     // Private Helper Methods
+     // ------------------------------------------------------------------------
+ 
++    /**
++     * Fire a low-priority, non-awaited disable operation for a managed account.
++     * Used by the orphan source type when disableNonMatchingAccounts is enabled.
++     */
++    private fireDisableOperation(account: Account): void {
++        const accountId = account.id
++        if (!accountId) {
++            this.log.warn(`Cannot disable account without ID: ${account.name}`)
++            return
++        }
++        this.sources.fireDisableAccount(accountId)
++    }
++
+     /**
+      * Flag candidate identities with the 'candidate' status.
+      * Called when a fusion form is created to mark matching identities as candidates
+@@ -934,6 +1122,11 @@ export class FusionService {
+         return mapValuesToArray(this.fusionAccountMap)
+     }
+ 
++    /** Total number of fusion accounts (correlated identities + uncorrelated accounts) */
++    public get totalFusionAccountCount(): number {
++        return this.fusionIdentityMap.size + this.fusionAccountMap.size
++    }
++
+     /**
+      * Get reviewers by source ID map
+      */
+@@ -992,9 +1185,10 @@ export class FusionService {
+      * generated significantly reduces memory footprint.
+      * 
+      * @param includeNonMatches - Whether to include non-matching accounts in the report
++     * @param stats - Optional processing statistics to include in the report
+      * @returns Complete fusion report with match/non-match accounts
+      */
+-    public generateReport(includeNonMatches: boolean = false): FusionReport {
++    public generateReport(includeNonMatches: boolean = false, stats?: FusionReportStats): FusionReport {
+         const accounts: FusionReportAccount[] = []
+ 
+         // Report on the managed accounts that were flagged as potential duplicates (forms created)
+@@ -1018,9 +1212,11 @@ export class FusionService {
+                 // Release fusionIdentity refs after extracting report data (on-demand report path)
+                 fusionAccount.clearFusionIdentityReferences()
+ 
++                const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
+                 accounts.push({
+                     accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
+                     accountSource: fusionAccount.sourceName,
++                    sourceType: sourceInfo?.sourceType ?? 'identity',
+                     accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
+                     accountEmail: fusionAccount.email,
+                     accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
+@@ -1029,6 +1225,10 @@ export class FusionService {
+             }
+         }
+ 
++        // Include failed matchings (excessive candidates or runtime errors)
++        const failedAccounts = [...this.failedMatchingAccounts]
++        failedAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
++
+         // Include non-matches if requested
+         const nonMatchAccounts: FusionReportAccount[] = includeNonMatches
+             ? this.generateNonMatchAccounts()
+@@ -1037,8 +1237,8 @@ export class FusionService {
+         // Sort matches alphabetically by account name
+         accounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
+ 
+-        // Combine: matches first, then non-matches
+-        const allAccounts = [...accounts, ...nonMatchAccounts]
++        // Combine: matches first, then failed matchings, then non-matches
++        const allAccounts = [...accounts, ...failedAccounts, ...nonMatchAccounts]
+ 
+         const potentialDuplicates = accounts.length
+ 
+@@ -1047,12 +1247,14 @@ export class FusionService {
+             totalAccounts: this.newManagedAccountsCount,
+             potentialDuplicates,
+             reportDate: new Date(),
++            stats,
+         }
+ 
+         // Release memory from analyzed accounts after report generation
+         this.log.debug('Clearing analyzed managed accounts from memory')
+         this.analyzedNonMatchReportData = []
+         this.potentialDuplicateAccounts = []
++        this.failedMatchingAccounts = []
+ 
+         return report
+     }
+diff --git a/src/services/fusionService/types.ts b/src/services/fusionService/types.ts
+index e8e2acd..196ca87 100644
+--- a/src/services/fusionService/types.ts
++++ b/src/services/fusionService/types.ts
+@@ -38,6 +38,8 @@ export type FusionReportAccount = {
+     accountName: string
+     /** Name of the source the account belongs to */
+     accountSource: string
++    /** Source processing type (identity, record, or orphan) */
++    sourceType?: 'identity' | 'record' | 'orphan'
+     /** ISC account ID */
+     accountId?: string
+     /** Email address from the account attributes */
+@@ -46,6 +48,32 @@ export type FusionReportAccount = {
+     accountAttributes?: Record<string, any>
+     /** List of identity match candidates with their scores */
+     matches: FusionReportMatch[]
++    /** Error message when form creation failed (excessive candidates or runtime error) */
++    error?: string
++}
++
++/** Processing statistics included in the fusion report. */
++export type FusionReportStats = {
++    /** Total fusion accounts (existing + new) */
++    totalFusionAccounts?: number
++    /** Number of fusion review forms created */
++    fusionReviewsCreated?: number
++    /** Number of fusion review assignments (form instances, one per reviewer) */
++    fusionReviewAssignments?: number
++    /** Number of "new identity" decisions from reviews */
++    fusionReviewNewIdentities?: number
++    /** Number of non-match decisions from reviews */
++    fusionReviewNonMatches?: number
++    /** Number of ISC identities loaded */
++    identitiesFound?: number
++    /** Number of managed source accounts loaded */
++    managedAccountsFound?: number
++    /** Number of managed source accounts processed */
++    managedAccountsProcessed?: number
++    /** Formatted total processing time */
++    totalProcessingTime?: string
++    /** Formatted memory usage at report generation time */
++    usedMemory?: string
+ }
+ 
+ /**
+@@ -61,4 +89,6 @@ export type FusionReport = {
+     potentialDuplicates?: number
+     /** Timestamp when the report was generated */
+     reportDate?: Date | string
++    /** Processing statistics */
++    stats?: FusionReportStats
+ }
+diff --git a/src/services/identityService.ts b/src/services/identityService.ts
+index fe8d82c..142dc77 100644
+--- a/src/services/identityService.ts
++++ b/src/services/identityService.ts
+@@ -1,7 +1,7 @@
+ import { AccountsApiUpdateAccountRequest, IdentityDocument, Search } from 'sailpoint-api-client'
+ import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
+ import { FusionConfig } from '../model/config'
+-import { ClientService } from './clientService'
++import { ClientService, QueuePriority } from './clientService'
+ import { LogService } from './logService'
+ import { assert } from '../utils/assert'
+ import { FusionAccount } from '../model/account'
+@@ -97,7 +97,7 @@ export class IdentityService {
+             try {
+                 const identities = await this.client.paginateSearchApi<IdentityDocument>(
+                     query,
+-                    undefined,
++                    QueuePriority.HIGH,
+                     'IdentityService>fetchIdentities searchPost'
+                 )
+                 this.identitiesById = new Map(
+@@ -144,7 +144,7 @@ export class IdentityService {
+             try {
+                 yield* this.client.paginateSearchApiGenerator<IdentityDocument>(
+                     query,
+-                    undefined,
++                    QueuePriority.HIGH,
+                     'IdentityService>fetchIdentitiesGenerator searchPost',
+                     abortSignal
+                 )
+@@ -186,7 +186,7 @@ export class IdentityService {
+         try {
+             const identities = await this.client.paginateSearchApi<IdentityDocument>(
+                 query,
+-                undefined,
++                QueuePriority.HIGH,
+                 'IdentityService>fetchIdentityById searchPost'
+             )
+             identities.forEach((identity) => this.identitiesById.set(identity.id, identity))
+@@ -226,7 +226,7 @@ export class IdentityService {
+         try {
+             const identities = await this.client.paginateSearchApi<IdentityDocument>(
+                 query,
+-                undefined,
++                QueuePriority.HIGH,
+                 'IdentityService>fetchIdentityByName searchPost'
+             )
+             identities.forEach((identity) => this.identitiesById.set(identity.id, identity))
+@@ -262,15 +262,17 @@ export class IdentityService {
+     // ------------------------------------------------------------------------
+ 
+     /**
+-     * Triggers asynchronous correlation of all missing accounts to the fusion account's identity.
++     * Triggers asynchronous correlation of missing accounts to the fusion account's identity.
+      * Correlation promises are tracked on the fusion account and resolved later during
+      * {@link FusionAccount.resolvePendingOperations}.
+      *
+      * @param fusionAccount - The fusion account with missing accounts to correlate
++     * @param accountIdFilter - If provided, only correlate these specific account IDs
++     *   (used for per-source correlation where only a subset should be directly correlated)
+      * @returns true if correlation was initiated, false if no identity ID is available
+      */
+-    public async correlateAccounts(fusionAccount: FusionAccount): Promise<boolean> {
+-        const { missingAccountIds, identityId } = fusionAccount
++    public async correlateAccounts(fusionAccount: FusionAccount, accountIdFilter?: string[]): Promise<boolean> {
++        const { identityId } = fusionAccount
+         const { accountsApi } = this.client
+ 
+         if (!identityId) {
+@@ -278,18 +280,18 @@ export class IdentityService {
+             return false
+         }
+ 
+-        if (missingAccountIds.length === 0) {
+-            this.log.info(`No missing accounts to correlate for fusion account ${fusionAccount.name}`)
++        const targetIds = accountIdFilter ?? fusionAccount.missingAccountIds
++
++        if (targetIds.length === 0) {
++            this.log.info(`No accounts to correlate for fusion account ${fusionAccount.name}`)
+             return true
+         }
+ 
+         this.log.info(
+-            `Triggering correlation for ${missingAccountIds.length} missing account(s) for fusion account ${fusionAccount.name}`
++            `Triggering correlation for ${targetIds.length} account(s) for fusion account ${fusionAccount.name}`
+         )
+ 
+-        // Create correlation promises for all missing accounts (fire-and-forget)
+-        // Store a copy of missing account IDs since we'll be modifying the set during correlation
+-        const accountIdsToCorrelate = [...missingAccountIds]
++        const accountIdsToCorrelate = [...targetIds]
+ 
+         accountIdsToCorrelate.forEach((accountId) => {
+             // Optimistic: mark as correlated before the API call so the account
+@@ -309,7 +311,7 @@ export class IdentityService {
+             }
+ 
+             const correlationPromise = this.client
+-                .execute(() => accountsApi.updateAccount(requestParameters))
++                .execute(() => accountsApi.updateAccount(requestParameters), QueuePriority.LOW, `IdentityService>correlateAccounts ${accountId}`)
+                 .then(() => {
+                     this.log.debug(`Successfully correlated account ${accountId} to identity ${identityId}`)
+                 })
+diff --git a/src/services/logService.ts b/src/services/logService.ts
+index e67f2c6..ac062ef 100644
+--- a/src/services/logService.ts
++++ b/src/services/logService.ts
+@@ -1,4 +1,6 @@
+ import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
++import { ApiQueue } from './clientService/queue'
++import { QueuePriority } from './clientService/types'
+ 
+ type Logger = typeof logger
+ 
+@@ -193,8 +195,13 @@ export class PhaseTimer {
+         this.log[level](`${message} (total: ${PhaseTimer.formatElapsed(totalElapsed)})`)
+     }
+ 
++    /** Returns formatted total elapsed time since timer creation. */
++    totalElapsed(): string {
++        return PhaseTimer.formatElapsed(Date.now() - this.operationStart)
++    }
++
+     /** Formats milliseconds as "Xms" (<1s) or "X.Ys" (>=1s). */
+-    private static formatElapsed(ms: number): string {
++    static formatElapsed(ms: number): string {
+         if (ms < 1000) return `${ms}ms`
+         return `${(ms / 1000).toFixed(1)}s`
+     }
+@@ -226,6 +233,7 @@ export class LogService {
+     /** Per-request timeout for external log fetches to prevent unbounded memory growth
+      *  when the endpoint is unreachable (TCP timeouts can be 30-120s+ at the OS level). */
+     private static readonly EXTERNAL_LOG_TIMEOUT_MS = 5_000
++    private apiQueue: ApiQueue | null = null
+ 
+     /**
+      * @param config - Logging configuration including level, debug flag, and external logging settings
+@@ -251,6 +259,14 @@ export class LogService {
+         logger.level = this.configuredLevel
+     }
+ 
++    /**
++     * Injects the API queue for routing external log calls with LOW priority.
++     * Called by ServiceRegistry after ClientService is created.
++     */
++    setQueue(queue: ApiQueue | null): void {
++        this.apiQueue = queue
++    }
++
+     /**
+      * Checks if a message at the given level should be sent to the external service.
+      * Returns true if external logging is enabled and the message level is
+@@ -318,23 +334,21 @@ export class LogService {
+             }
+         }
+ 
+-        // Track the promise so it can be flushed before the process exits.
+-        // In cloud/serverless environments, fire-and-forget fetches get killed
+-        // when the container is recycled after the handler returns.
+-        const pending: Promise<void> = fetch(this.externalLoggingUrl, {
+-            method: 'POST',
+-            headers: {
+-                'Content-Type': 'text/plain',
+-            },
+-            body: logMessage,
+-            signal: AbortSignal.timeout(LogService.EXTERNAL_LOG_TIMEOUT_MS),
+-        }).then(() => {
+-            // Discard response - we only care about delivery
+-        }).catch(() => {
+-            // Silently ignore errors to avoid infinite logging loops
+-            // and to not disrupt the main application flow
++        const url = this.externalLoggingUrl
++        const doFetch = () =>
++            fetch(url, {
++                method: 'POST',
++                headers: { 'Content-Type': 'text/plain' },
++                body: logMessage,
++                signal: AbortSignal.timeout(LogService.EXTERNAL_LOG_TIMEOUT_MS),
++            }).then(() => {})
++
++        const pending: Promise<void> = (
++            this.apiQueue
++                ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW }).then(() => {})
++                : doFetch()
++        ).catch(() => {
+         }).finally(() => {
+-            // O(1) removal from Set (was O(n) indexOf on array)
+             this.pendingExternalLogs.delete(pending)
+         })
+         this.pendingExternalLogs.add(pending)
+diff --git a/src/services/messagingService/helpers.ts b/src/services/messagingService/helpers.ts
+index b678916..86b2cf0 100644
+--- a/src/services/messagingService/helpers.ts
++++ b/src/services/messagingService/helpers.ts
+@@ -98,6 +98,16 @@ export const registerHandlebarsHelpers = (): void => {
+         return attr === 'Average Score' || alg === 'average'
+     })
+ 
++    // Render a human-readable label for source type
++    Handlebars.registerHelper('sourceTypeLabel', (sourceType: string) => {
++        const labels: Record<string, string> = {
++            identity: 'Identity',
++            record: 'Record',
++            orphan: 'Orphan',
++        }
++        return labels[sourceType] ?? sourceType
++    })
++
+     // Chunk an array into rows for table rendering
+     Handlebars.registerHelper('chunk', (arr: any[], size: any) => {
+         const n = Math.max(1, Number.parseInt(String(size), 10) || 1)
+@@ -154,9 +164,11 @@ export type FusionReportEmailData = {
+     accounts: Array<{
+         accountName: string
+         accountSource: string
++        sourceType?: 'identity' | 'record' | 'orphan'
+         accountId?: string
+         accountEmail?: string
+         accountAttributes?: Record<string, any>
++        error?: string
+         matches: Array<{
+             identityName: string
+             identityId?: string
+@@ -175,6 +187,18 @@ export type FusionReportEmailData = {
+     totalAccounts: number
+     potentialDuplicates: number
+     reportDate: Date | string
++    stats?: {
++        totalFusionAccounts?: number
++        fusionReviewsCreated?: number
++        fusionReviewAssignments?: number
++        fusionReviewNewIdentities?: number
++        fusionReviewNonMatches?: number
++        identitiesFound?: number
++        managedAccountsFound?: number
++        managedAccountsProcessed?: number
++        totalProcessingTime?: string
++        usedMemory?: string
++    }
+ }
+ 
+ // ============================================================================
+diff --git a/src/services/messagingService/messagingService.ts b/src/services/messagingService/messagingService.ts
+index f2547ef..a48845c 100644
+--- a/src/services/messagingService/messagingService.ts
++++ b/src/services/messagingService/messagingService.ts
+@@ -131,6 +131,7 @@ export class MessagingService {
+         context?: {
+             accountName: string
+             accountSource: string
++            sourceType?: 'identity' | 'record' | 'orphan'
+             accountId?: string
+             accountEmail?: string
+             accountAttributes: Record<string, any>
+@@ -169,11 +170,13 @@ export class MessagingService {
+             })) ?? []
+ 
+         const subject = `Identity Fusion Review Required: ${accountName} [${accountSource}]`
++        const sourceType = context?.sourceType ?? (formInput as any)?.sourceType ?? undefined
+         const emailData: FusionReviewEmailData = {
+             accounts: [
+                 {
+                     accountName,
+                     accountSource,
++                    sourceType,
+                     accountId: accountId || undefined,
+                     accountEmail,
+                     accountAttributes: pickedAccountAttributes,
+diff --git a/src/services/schemaService/schemaService.ts b/src/services/schemaService/schemaService.ts
+index 11244c6..667ce11 100644
+--- a/src/services/schemaService/schemaService.ts
++++ b/src/services/schemaService/schemaService.ts
+@@ -1,5 +1,5 @@
+ import { AccountSchema, Attributes, SchemaAttribute } from '@sailpoint/connector-sdk'
+-import { AttributeMap, FusionConfig, NormalAttributeDefinition, UniqueAttributeDefinition } from '../../model/config'
++import { AttributeMap, FusionConfig, NormalAttributeDefinition, SourceConfig, UniqueAttributeDefinition } from '../../model/config'
+ import { LogService } from '../logService'
+ import { SourceService } from '../sourceService'
+ import { assert } from '../../utils/assert'
+@@ -17,6 +17,7 @@ export class SchemaService {
+     private readonly attributeMerge: 'first' | 'list' | 'concatenate'
+     private readonly normalAttributeDefinitions: NormalAttributeDefinition[]
+     private readonly uniqueAttributeDefinitions: UniqueAttributeDefinition[]
++    private readonly sourceConfigs: SourceConfig[]
+ 
+     /**
+      * @param config - Fusion configuration containing attribute merge strategy and definitions
+@@ -31,6 +32,7 @@ export class SchemaService {
+         this.attributeMerge = config.attributeMerge
+         this.normalAttributeDefinitions = config.normalAttributeDefinitions ?? []
+         this.uniqueAttributeDefinitions = config.uniqueAttributeDefinitions ?? []
++        this.sourceConfigs = config.sources ?? []
+         this.attributeMap = new Map(config.attributeMaps?.map((x) => [x.newAttribute, x]) ?? [])
+     }
+ 
+@@ -275,6 +277,32 @@ export class SchemaService {
+         return this.fusionAccountSchema.attributes
+     }
+ 
++    /**
++     * Collects all attribute names from managed source account schemas.
++     * Used for reverse correlation overlap validation.
++     */
++    public async getManagedSourceSchemaAttributeNames(): Promise<Set<string>> {
++        const names = new Set<string>()
++        const { managedSources } = this.sources
++        const schemas = await Promise.all(
++            managedSources.map(async (source) => {
++                try {
++                    return await this.fetchAccountSchema(source.id)
++                } catch {
++                    return undefined
++                }
++            })
++        )
++        for (const schema of schemas) {
++            if (schema) {
++                for (const attr of schema.attributes) {
++                    if (attr.name) names.add(attr.name.toLowerCase())
++                }
++            }
++        }
++        return names
++    }
++
+     /**
+      * Builds the fusion account schema from managed sources, attribute mappings,
+      * and attribute definitions. Used for schema discovery.
+@@ -329,6 +357,19 @@ export class SchemaService {
+             attributeMap.set(String(attribute.name!).toLowerCase(), attribute)
+         })
+ 
++        // Add reverse correlation attributes from sources configured with correlationMode 'reverse'
++        for (const sc of this.sourceConfigs) {
++            if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
++                const attr: SchemaAttribute = {
++                    name: sc.correlationAttribute,
++                    description: sc.correlationDisplayName ?? sc.correlationAttribute,
++                    type: 'string',
++                    multi: false,
++                }
++                attributeMap.set(sc.correlationAttribute.toLowerCase(), attr)
++            }
++        }
++
+         attributes.push(...Array.from(attributeMap.values()))
+ 
+         return schema
+diff --git a/src/services/serviceRegistry.ts b/src/services/serviceRegistry.ts
+index 7123df7..02c5e14 100644
+--- a/src/services/serviceRegistry.ts
++++ b/src/services/serviceRegistry.ts
+@@ -1,4 +1,4 @@
+-import { Context, ConnectorError, ConnectorErrorType, StandardCommand } from '@sailpoint/connector-sdk'
++import { Context, ConnectorError, ConnectorErrorType, Response, StandardCommand } from '@sailpoint/connector-sdk'
+ import { FusionConfig } from '../model/config'
+ import { LogService } from './logService'
+ import { InMemoryLockService, LockService } from './lockService'
+@@ -12,6 +12,7 @@ import { AttributeService } from './attributeService'
+ import { EntitlementService } from './entitlementService'
+ import { ScoringService } from './scoringService'
+ import { MessagingService } from './messagingService'
++import { ProxyService } from './proxyService'
+ 
+ /**
+  * Central dependency injection container for all connector services.
+@@ -35,6 +36,7 @@ export class ServiceRegistry {
+     public entitlements: EntitlementService
+     public scoring: ScoringService
+     public messaging: MessagingService
++    public proxy: ProxyService
+ 
+     /**
+      * Creates a new ServiceRegistry, initializing all services in dependency order.
+@@ -42,11 +44,13 @@ export class ServiceRegistry {
+      *
+      * @param config - The resolved fusion configuration
+      * @param context - SDK context, optionally providing pre-built service overrides
++     * @param res - SDK response object for sending results back to the platform
+      * @param operationContext - Optional operation name for log attribution (e.g. "accountList")
+      */
+     constructor(
+         public config: FusionConfig,
+         context: Context,
++        public res: Response<any>,
+         operationContext?: string
+     ) {
+         // Initialize core services first
+@@ -54,6 +58,7 @@ export class ServiceRegistry {
+         this.log = context.logService ?? new LogService(logConfig)
+         this.locks = context.lockService ?? new InMemoryLockService(this.log)
+         this.client = context.connectionService ?? new ClientService(this.config, this.log)
++        this.log.setQueue(this.client.getQueue())
+ 
+         // Initialize services that don't depend on others
+         this.sources = context.sourceService ?? new SourceService(this.config, this.log, this.client)
+@@ -88,6 +93,8 @@ export class ServiceRegistry {
+                 this.schemas,
+                 commandType
+             )
++
++        this.proxy = context.proxyService ?? new ProxyService(this.config, this.log, this.res, commandType)
+     }
+ 
+     /**
+@@ -114,9 +121,10 @@ export class ServiceRegistry {
+     }
+ 
+     /**
+-     * Clears the active registry singleton, releasing all service references.
++     * Flushes pending logs and clears the active registry singleton, releasing all service references.
+      */
+     static clear() {
++        void this.current?.log?.flush()
+         this.current = undefined
+     }
+ }
+diff --git a/src/services/sourceService/sourceService.ts b/src/services/sourceService/sourceService.ts
+index 59201ba..c3b06c3 100644
+--- a/src/services/sourceService/sourceService.ts
++++ b/src/services/sourceService/sourceService.ts
+@@ -10,9 +10,16 @@ import {
+     SourcesV2025ApiUpdateSourceRequest,
+     SchemaV2025,
+     SourcesV2025ApiGetSourceSchemasRequest,
++    SourcesV2025ApiPutSourceSchemaRequest,
++    SourcesV2025ApiGetCorrelationConfigRequest,
++    SourcesV2025ApiPutCorrelationConfigRequest,
++    IdentityProfilesV2025ApiListIdentityProfilesRequest,
+     OwnerDto,
+     SourcesV2025ApiListSourcesRequest,
+     JsonPatchOperationV2025OpV2025,
++    CorrelationConfigV2025,
++    AttributeDefinitionV2025,
++    AttributeDefinitionTypeV2025,
+ } from 'sailpoint-api-client'
+ import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
+ import { BaseConfig, FusionConfig, SourceConfig } from '../../model/config'
+@@ -83,6 +90,7 @@ export class SourceService {
+     }
+ 
+     // Config settings
++    private readonly config: FusionConfig
+     private readonly sources: SourceConfig[]
+     private readonly spConnectorInstanceId: string
+     private readonly taskResultRetries: number
+@@ -106,6 +114,7 @@ export class SourceService {
+         private log: LogService,
+         private client: ClientService
+     ) {
++        this.config = config
+         this.sources = config.sources
+         this.spConnectorInstanceId = config.spConnectorInstanceId
+         this.taskResultRetries = config.taskResultRetries
+@@ -209,7 +218,7 @@ export class SourceService {
+             const listSources = async (requestParameters?: SourcesV2025ApiListSourcesRequest) => {
+                 return await sourcesApi.listSources(requestParameters)
+             }
+-            apiSources = await this.client.paginate(listSources, {}, undefined, 'SourceService>fetchAllSources listSources')
++            apiSources = await this.client.paginate(listSources, {}, QueuePriority.HIGH, 'SourceService>fetchAllSources listSources')
+         } catch (error) {
+             if (error instanceof ConnectorError) throw error
+             const detail = error instanceof Error ? error.message : String(error)
+@@ -234,6 +243,7 @@ export class SourceService {
+                 id: apiSource.id!,
+                 name: apiSource.name!,
+                 isManaged: true,
++                sourceType: sourceConfig.sourceType ?? 'identity',
+                 config: sourceConfig,
+             })
+         }
+@@ -254,7 +264,8 @@ export class SourceService {
+             id: fusionSource.id!,
+             name: fusionSource.name!,
+             isManaged: false,
+-            config: undefined, // Fusion source has no SourceConfig
++            sourceType: 'identity',
++            config: undefined,
+             owner: this._fusionSourceOwner,
+         })
+ 
+@@ -318,6 +329,25 @@ export class SourceService {
+         return this.getSourceConfig(sourceName)?.accountFilter
+     }
+ 
++    /**
++     * Fire-and-forget ISC API call to disable an account by its ID.
++     * Uses low priority and does not await the result.
++     */
++    public fireDisableAccount(accountId: string): void {
++        const { accountsApi } = this.client
++        this.log.info(`Firing low-priority disable for account ${accountId}`)
++        this.client.execute(
++            () => accountsApi.disableAccount({
++                id: accountId,
++                accountToggleRequestV2025: { externalVerificationId: undefined, forceProvisioning: false },
++            }),
++            QueuePriority.LOW,
++            'SourceService>fireDisableAccount'
++        ).catch((err) => {
++            this.log.warn(`Failed to disable account ${accountId}: ${err?.message ?? err}`)
++        })
++    }
++
+     // ------------------------------------------------------------------------
+     // Public Account Fetch Methods (Bulk)
+     // ------------------------------------------------------------------------
+@@ -348,7 +378,7 @@ export class SourceService {
+             return await accountsApi.listAccounts(params)
+         }
+         const ctx = `SourceService>fetchAccountsBySourceId ${sourceInfo.name}`
+-        return await this.client.paginate(listAccounts, requestParameters, undefined, ctx)
++        return await this.client.paginate(listAccounts, requestParameters, QueuePriority.HIGH, ctx)
+     }
+ 
+     /**
+@@ -381,7 +411,7 @@ export class SourceService {
+         }
+         const ctx = `SourceService>fetchAccountsBySourceIdGenerator ${sourceInfo.name}`
+ 
+-        yield* this.client.paginateParallel(listAccounts, requestParameters, undefined, ctx, abortSignal, limit)
++        yield* this.client.paginateParallel(listAccounts, requestParameters, QueuePriority.HIGH, ctx, abortSignal, limit)
+     }
+ 
+ 
+@@ -560,7 +590,7 @@ export class SourceService {
+             return response.data ?? []
+         }
+ 
+-        const accounts = await this.client.execute(listAccounts)
++        const accounts = await this.client.execute(listAccounts, QueuePriority.HIGH, 'SourceService>fetchSourceAccountByNativeIdentity')
+         return accounts?.[0]
+     }
+ 
+@@ -569,20 +599,19 @@ export class SourceService {
+     // ------------------------------------------------------------------------
+ 
+     /**
+-     * Aggregate all managed sources that need aggregation
++     * Aggregate managed sources configured with `aggregationMode: 'before'`.
++     * Sources with `'delayed'` or `'none'` modes are skipped here.
+      */
+     public async aggregateManagedSources(): Promise<void> {
+         const managedSources = this.managedSources
+         this.log.debug(`Checking aggregation control for ${managedSources.length} managed source(s)`)
+ 
+-        // Parallelize aggregation checks for better performance
+         const aggregationChecks = await Promise.all(
+             managedSources.map(async (source) => {
+-                const sourceConfig = source.config
+-                const forceAggregation = sourceConfig?.forceAggregation ?? false
++                const mode = source.config?.aggregationMode ?? 'none'
+ 
+-                if (!forceAggregation) {
+-                    this.log.debug(`Force aggregation is disabled for source ${source.name}, skipping`)
++                if (mode !== 'before') {
++                    this.log.debug(`Source ${source.name}: aggregationMode=${mode}, skipping pre-processing aggregation`)
+                     return { source, shouldAggregate: false }
+                 }
+ 
+@@ -591,16 +620,52 @@ export class SourceService {
+             })
+         )
+ 
+-        // Parallelize aggregation of sources that need aggregation
++        const disableOptimization = (source: SourceInfo) =>
++            source.config?.optimizedAggregation === false
++
+         await Promise.all(
+             aggregationChecks
+                 .filter(({ shouldAggregate }) => shouldAggregate)
+                 .map(async ({ source }) => {
+-                    this.log.info(`Aggregating source: ${source.name}`)
+-                    await this.aggregateManagedSource(source.id)
++                    this.log.info(`Aggregating source before processing: ${source.name}`)
++                    await this.aggregateManagedSource(source.id, disableOptimization(source))
+                 })
+         )
+-        this.log.debug('Source aggregation completed')
++        this.log.debug('Pre-processing source aggregation completed')
++    }
++
++    /**
++     * Fire-and-forget aggregation for sources configured with `aggregationMode: 'delayed'`.
++     * Each source waits its configured `aggregationDelay` (minutes) before triggering.
++     * This method is intentionally NOT awaited by the caller.
++     */
++    public aggregateDelayedSources(): void {
++        const delayedSources = this.managedSources.filter(
++            (s) => s.config?.aggregationMode === 'delayed'
++        )
++
++        if (delayedSources.length === 0) {
++            return
++        }
++
++        this.log.info(`Scheduling delayed aggregation for ${delayedSources.length} source(s)`)
++
++        for (const source of delayedSources) {
++            const delayMinutes = source.config?.aggregationDelay ?? 5
++            const delayMs = delayMinutes * 60 * 1000
++            const disableOpt = source.config?.optimizedAggregation === false
++
++            this.log.info(`Source ${source.name}: delayed aggregation in ${delayMinutes} minute(s)`)
++
++            setTimeout(() => {
++                this.log.info(`Triggering delayed aggregation for source: ${source.name}`)
++                this.aggregateManagedSource(source.id, disableOpt).catch((err) => {
++                    this.log.error(
++                        `Delayed aggregation failed for source ${source.name}: ${err instanceof Error ? err.message : String(err)}`
++                    )
++                })
++            }, delayMs)
++        }
+     }
+ 
+     /**
+@@ -625,7 +690,7 @@ export class SourceService {
+             const response = await searchApi.searchPost(requestParameters)
+             return response.data ?? []
+         }
+-        const aggregations = await this.client.execute(searchPost)
++        const aggregations = await this.client.execute(searchPost, QueuePriority.HIGH, 'SourceService>getLatestAggregationDate')
+ 
+         const latestAggregation = getDateFromISOString(aggregations?.[0]?.created)
+ 
+@@ -648,7 +713,7 @@ export class SourceService {
+             const response = await sourcesApi.getSourceSchemas(requestParameters)
+             return response.data ?? []
+         }
+-        const schemas = await this.client.execute(getSourceSchemas)
++        const schemas = await this.client.execute(getSourceSchemas, QueuePriority.HIGH, 'SourceService>listSourceSchemas')
+         if (!schemas) {
+             throw new ConnectorError(
+                 `Failed to fetch schemas for source "${sourceId}". The API call returned no data.`,
+@@ -677,7 +742,7 @@ export class SourceService {
+             return response.data
+         }
+         const ctx = context ?? 'SourceService>patchSourceConfig'
+-        return await this.client.execute(updateSource, QueuePriority.URGENT, ctx)
++        return await this.client.execute(updateSource, QueuePriority.HIGH, ctx)
+     }
+ 
+     // ------------------------------------------------------------------------
+@@ -713,7 +778,7 @@ export class SourceService {
+             const response = await sourcesApi.getSource({ id: fusionSourceId })
+             return response.data
+         }
+-        const source = await this.client.execute(getSource)
++        const source = await this.client.execute(getSource, QueuePriority.HIGH, 'SourceService>setProcessLock')
+         assert(source, 'Failed to fetch fusion source to check processing lock. The API call returned no data.')
+ 
+         const processing = (source!.connectorAttributes as any)?.processing
+@@ -837,6 +902,299 @@ export class SourceService {
+         await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>resetBatchCumulativeCount')
+     }
+ 
++    // ------------------------------------------------------------------------
++    // Public Reverse Correlation Setup Methods
++    // ------------------------------------------------------------------------
++
++    /**
++     * Validate that a reverse correlation attribute name does not overlap with
++     * existing attribute mappings, normal/unique definitions, or source schema attributes.
++     */
++    public validateNoAttributeOverlap(attributeName: string, schemaAttributeNames: Set<string>): void {
++        const lowerName = attributeName.toLowerCase()
++
++        for (const attrMap of this.config.attributeMaps ?? []) {
++            if (attrMap.newAttribute.toLowerCase() === lowerName) {
++                throw new ConnectorError(
++                    `Reverse correlation attribute "${attributeName}" conflicts with attribute mapping "${attrMap.newAttribute}".`,
++                    ConnectorErrorType.Generic
++                )
++            }
++        }
++
++        for (const def of this.config.normalAttributeDefinitions ?? []) {
++            if (def.name.toLowerCase() === lowerName) {
++                throw new ConnectorError(
++                    `Reverse correlation attribute "${attributeName}" conflicts with normal attribute definition "${def.name}".`,
++                    ConnectorErrorType.Generic
++                )
++            }
++        }
++
++        for (const def of this.config.uniqueAttributeDefinitions ?? []) {
++            if (def.name.toLowerCase() === lowerName) {
++                throw new ConnectorError(
++                    `Reverse correlation attribute "${attributeName}" conflicts with unique attribute definition "${def.name}".`,
++                    ConnectorErrorType.Generic
++                )
++            }
++        }
++
++        if (schemaAttributeNames.has(lowerName)) {
++            throw new ConnectorError(
++                `Reverse correlation attribute "${attributeName}" conflicts with an existing source account schema attribute.`,
++                ConnectorErrorType.Generic
++            )
++        }
++    }
++
++    /**
++     * Ensure all ISC entities for reverse correlation are properly configured.
++     * Called once per source with `correlationMode === 'reverse'` during aggregation setup.
++     */
++    public async ensureReverseCorrelationSetup(
++        sourceConfig: SourceConfig,
++        schemaAttributeNames: Set<string>
++    ): Promise<void> {
++        const { correlationAttribute, correlationDisplayName, name: sourceName } = sourceConfig
++        assert(correlationAttribute, `Reverse correlation attribute name is required for source "${sourceName}"`)
++        assert(correlationDisplayName, `Reverse correlation display name is required for source "${sourceName}"`)
++
++        this.validateNoAttributeOverlap(correlationAttribute, schemaAttributeNames)
++
++        const sourceInfo = this.sourcesByName.get(sourceName)
++        assert(sourceInfo, `Source "${sourceName}" not found`)
++
++        this.log.info(`Setting up reverse correlation for source "${sourceName}": attribute="${correlationAttribute}", displayName="${correlationDisplayName}"`)
++
++        await this.ensureFusionSchemaAttribute(correlationAttribute, correlationDisplayName)
++        await this.ensureIdentityAttribute(correlationAttribute, correlationDisplayName)
++        await this.ensureIdentityProfileMapping(correlationAttribute)
++        await this.ensureManagedSourceCorrelation(correlationAttribute, sourceInfo.id)
++    }
++
++    /**
++     * Ensure the dedicated reverse correlation attribute exists in the Fusion source's account schema.
++     */
++    private async ensureFusionSchemaAttribute(attributeName: string, displayName: string): Promise<void> {
++        const fusionSourceId = this.fusionSourceId
++        const schemas = await this.listSourceSchemas(fusionSourceId)
++        const accountSchema = schemas.find((s) => s.name === 'account')
++        assert(accountSchema, 'Fusion source account schema not found')
++
++        const existingAttr = accountSchema.attributes?.find(
++            (a) => a.name?.toLowerCase() === attributeName.toLowerCase()
++        )
++        if (existingAttr) {
++            this.log.debug(`Fusion schema attribute "${attributeName}" already exists`)
++            return
++        }
++
++        const newAttr: AttributeDefinitionV2025 = {
++            name: attributeName,
++            description: displayName,
++            type: AttributeDefinitionTypeV2025.String,
++            isMulti: false,
++            isEntitlement: false,
++            isGroup: false,
++        }
++
++        const updatedAttributes: AttributeDefinitionV2025[] = [
++            ...(accountSchema.attributes ?? []),
++            newAttr,
++        ]
++
++        const updatedSchema: SchemaV2025 = {
++            ...accountSchema,
++            attributes: updatedAttributes,
++        }
++
++        const requestParameters: SourcesV2025ApiPutSourceSchemaRequest = {
++            sourceId: fusionSourceId,
++            schemaId: accountSchema.id!,
++            schemaV2025: updatedSchema,
++        }
++
++        const { sourcesApi } = this.client
++        await this.client.execute(
++            () => sourcesApi.putSourceSchema(requestParameters).then((r) => r.data),
++            QueuePriority.HIGH,
++            `SourceService>ensureFusionSchemaAttribute ${attributeName}`
++        )
++
++        this.log.info(`Added reverse correlation attribute "${attributeName}" to Fusion source schema`)
++    }
++
++    /**
++     * Ensure the ISC identity attribute exists and is searchable.
++     */
++    private async ensureIdentityAttribute(attributeName: string, displayName: string): Promise<void> {
++        const { identityAttributesApi } = this.client
++
++        const existing = await this.client.execute(
++            () => identityAttributesApi.getIdentityAttribute({ name: attributeName }).then((r) => r.data),
++            QueuePriority.HIGH,
++            `SourceService>ensureIdentityAttribute get ${attributeName}`
++        )
++
++        if (existing) {
++            if (existing.searchable) {
++                this.log.debug(`Identity attribute "${attributeName}" already exists and is searchable`)
++                return
++            }
++            await this.client.execute(
++                () => identityAttributesApi.putIdentityAttribute({
++                    name: attributeName,
++                    identityAttributeV2025: {
++                        name: attributeName,
++                        displayName,
++                        searchable: true,
++                        type: 'string',
++                        multi: false,
++                        standard: false,
++                        system: false,
++                    },
++                }).then((r) => r.data),
++                QueuePriority.HIGH,
++                `SourceService>ensureIdentityAttribute update ${attributeName}`
++            )
++            this.log.info(`Updated identity attribute "${attributeName}" to be searchable`)
++            return
++        }
++
++        await this.client.execute(
++            () => identityAttributesApi.createIdentityAttribute({
++                identityAttributeV2025: {
++                    name: attributeName,
++                    displayName,
++                    searchable: true,
++                    type: 'string',
++                    multi: false,
++                    standard: false,
++                    system: false,
++                },
++            }).then((r) => r.data),
++            QueuePriority.HIGH,
++            `SourceService>ensureIdentityAttribute create ${attributeName}`
++        )
++        this.log.info(`Created searchable identity attribute "${attributeName}"`)
++    }
++
++    /**
++     * Ensure the Fusion source's identity profile has a mapping from the Fusion
++     * account attribute to the identity attribute.
++     */
++    private async ensureIdentityProfileMapping(attributeName: string): Promise<void> {
++        const fusionSourceId = this.fusionSourceId
++        const { identityProfilesApi } = this.client
++
++        const profiles = await this.client.execute(
++            () => identityProfilesApi.listIdentityProfiles({
++                filters: `authoritativeSource.id eq "${fusionSourceId}"`,
++            } as IdentityProfilesV2025ApiListIdentityProfilesRequest).then((r) => r.data),
++            QueuePriority.HIGH,
++            'SourceService>ensureIdentityProfileMapping listProfiles'
++        )
++
++        assert(
++            profiles && profiles.length > 0,
++            `No identity profile found for the Fusion source. An identity profile with the Fusion source as authoritative source is required for reverse correlation.`
++        )
++
++        const profile = profiles![0]
++        const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
++
++        const alreadyMapped = transforms.some(
++            (t) => t.identityAttributeName === attributeName
++        )
++        if (alreadyMapped) {
++            this.log.debug(`Identity profile already maps attribute "${attributeName}"`)
++            return
++        }
++
++        const fusionSource = this.getFusionSource()
++        assert(fusionSource, 'Fusion source not found')
++
++        const newTransform = {
++            identityAttributeName: attributeName,
++            transformDefinition: {
++                type: 'accountAttribute',
++                attributes: {
++                    sourceName: fusionSource.name,
++                    attributeName,
++                },
++            },
++        }
++
++        const patchIndex = transforms.length
++
++        await this.client.execute(
++            () => identityProfilesApi.updateIdentityProfile({
++                identityProfileId: profile.id!,
++                jsonPatchOperationV2025: [
++                    {
++                        op: 'add' as JsonPatchOperationV2025OpV2025,
++                        path: `/identityAttributeConfig/attributeTransforms/${patchIndex}`,
++                        value: newTransform,
++                    },
++                ],
++            }).then((r) => r.data),
++            QueuePriority.HIGH,
++            `SourceService>ensureIdentityProfileMapping add ${attributeName}`
++        )
++        this.log.info(`Added identity profile mapping for attribute "${attributeName}"`)
++    }
++
++    /**
++     * Ensure the managed source's correlation config includes an accountName-to-identity-attribute rule.
++     */
++    private async ensureManagedSourceCorrelation(attributeName: string, managedSourceId: string): Promise<void> {
++        const { sourcesApi } = this.client
++
++        const correlationConfig = await this.client.execute(
++            () => sourcesApi.getCorrelationConfig({
++                id: managedSourceId,
++            } as SourcesV2025ApiGetCorrelationConfigRequest).then((r) => r.data),
++            QueuePriority.HIGH,
++            `SourceService>ensureManagedSourceCorrelation get ${managedSourceId}`
++        )
++
++        const assignments = correlationConfig?.attributeAssignments ?? []
++        const alreadyExists = assignments.some(
++            (a) => a.property === 'accountName' && a.value === attributeName
++        )
++        if (alreadyExists) {
++            this.log.debug(`Managed source ${managedSourceId} already has correlation rule for "${attributeName}"`)
++            return
++        }
++
++        const updatedConfig: CorrelationConfigV2025 = {
++            ...correlationConfig,
++            attributeAssignments: [
++                ...assignments,
++                {
++                    property: 'accountName',
++                    value: attributeName,
++                    operation: 'EQ' as any,
++                    complex: false,
++                    ignoreCase: false,
++                    matchMode: undefined,
++                    filterString: undefined,
++                },
++            ],
++        }
++
++        await this.client.execute(
++            () => sourcesApi.putCorrelationConfig({
++                id: managedSourceId,
++                correlationConfigV2025: updatedConfig,
++            } as SourcesV2025ApiPutCorrelationConfigRequest).then((r) => r.data),
++            QueuePriority.HIGH,
++            `SourceService>ensureManagedSourceCorrelation put ${managedSourceId}`
++        )
++        this.log.info(`Added correlation rule accountName="${attributeName}" to managed source ${managedSourceId}`)
++    }
++
+     // ------------------------------------------------------------------------
+     // Private Helper Methods
+     // ------------------------------------------------------------------------
+@@ -853,7 +1211,7 @@ export class SourceService {
+             const response = await accountsApi.getAccount(requestParameters)
+             return response.data ?? undefined
+         }
+-        const account = await this.client.execute(getAccount)
++        const account = await this.client.execute(getAccount, QueuePriority.HIGH, 'SourceService>fetchAccountById')
+         return account
+     }
+ 
+@@ -879,17 +1237,18 @@ export class SourceService {
+     /**
+      * Aggregate managed source
+      */
+-    private async aggregateManagedSource(id: string): Promise<void> {
++    private async aggregateManagedSource(id: string, disableOptimization?: boolean): Promise<void> {
+         let completed = false
+         const { sourcesApi, taskManagementApi } = this.client
+         const requestParameters: SourcesV2025ApiImportAccountsRequest = {
+             id,
++            disableOptimization: disableOptimization ? 'true' : undefined,
+         }
+         const importAccounts = async () => {
+             const response = await sourcesApi.importAccounts(requestParameters)
+             return response.data
+         }
+-        const loadAccountsTask = await this.client.execute(importAccounts)
++        const loadAccountsTask = await this.client.execute(importAccounts, QueuePriority.HIGH, 'SourceService>aggregateManagedSource importAccounts')
+         if (!loadAccountsTask) {
+             this.log.warn(`Failed to trigger account aggregation for source ${id}. The API call returned no data.`)
+             return
+@@ -913,7 +1272,7 @@ export class SourceService {
+                 const response = await taskManagementApi.getTaskStatus(requestParameters)
+                 return response.data
+             }
+-            const taskStatus = await this.client.execute(getTaskStatus)
++            const taskStatus = await this.client.execute(getTaskStatus, QueuePriority.HIGH, 'SourceService>aggregateManagedSource getTaskStatus')
+ 
+             if (taskStatus?.completed) {
+                 completed = true
+diff --git a/src/services/sourceService/types.ts b/src/services/sourceService/types.ts
+index 2602510..77e4f93 100644
+--- a/src/services/sourceService/types.ts
++++ b/src/services/sourceService/types.ts
+@@ -1,5 +1,5 @@
+ import { OwnerDto } from 'sailpoint-api-client'
+-import { SourceConfig } from '../../model/config'
++import { SourceConfig, SourceType } from '../../model/config'
+ 
+ // ============================================================================
+ // Type Definitions — Source Service
+@@ -16,6 +16,8 @@ export type SourceInfo = {
+     name: string
+     /** Whether this source is configured as a managed (input) source for fusion */
+     isManaged: boolean
++    /** Processing type for managed sources */
++    sourceType: SourceType
+     /** User-provided source configuration (only present for managed sources) */
+     config?: SourceConfig
+     /** Source owner identity (only present for the fusion source itself) */
+diff --git a/src/utils/__tests__/assert.test.ts b/src/utils/__tests__/assert.test.ts
+index df17988..d3331e9 100644
+--- a/src/utils/__tests__/assert.test.ts
++++ b/src/utils/__tests__/assert.test.ts
+@@ -7,6 +7,7 @@ describe('assert', () => {
+         crash: jest.fn(),
+         error: jest.fn(),
+         warn: jest.fn(),
++        flush: jest.fn(),
+     }
+ 
+     beforeEach(() => {
+diff --git a/src/utils/__tests__/proxy.test.ts b/src/utils/__tests__/proxy.test.ts
+deleted file mode 100644
+index e067fee..0000000
+--- a/src/utils/__tests__/proxy.test.ts
++++ /dev/null
+@@ -1,71 +0,0 @@
+-import { isProxyMode, isProxyService } from '../proxy'
+-
+-describe('proxy utils', () => {
+-    const originalEnv = process.env
+-
+-    beforeEach(() => {
+-        jest.resetModules()
+-        process.env = { ...originalEnv }
+-    })
+-
+-    afterAll(() => {
+-        process.env = originalEnv
+-    })
+-
+-    describe('isProxyMode', () => {
+-        it('should return true when proxy enabled, has URL, and not server', () => {
+-            delete process.env.PROXY_PASSWORD
+-            const config = { proxyEnabled: true, proxyUrl: 'http://proxy:3000' } as any
+-            expect(isProxyMode(config)).toBe(true)
+-        })
+-
+-        it('should return false when PROXY_PASSWORD is set (server mode)', () => {
+-            process.env.PROXY_PASSWORD = 'secret'
+-            const config = { proxyEnabled: true, proxyUrl: 'http://proxy:3000' } as any
+-            expect(isProxyMode(config)).toBe(false)
+-        })
+-
+-        it('should return false when proxy not enabled', () => {
+-            delete process.env.PROXY_PASSWORD
+-            const config = { proxyEnabled: false, proxyUrl: 'http://proxy:3000' } as any
+-            expect(isProxyMode(config)).toBe(false)
+-        })
+-
+-        it('should return false when proxy URL is empty', () => {
+-            delete process.env.PROXY_PASSWORD
+-            const config = { proxyEnabled: true, proxyUrl: '' } as any
+-            expect(isProxyMode(config)).toBe(false)
+-        })
+-
+-        it('should return false when proxy URL is undefined', () => {
+-            delete process.env.PROXY_PASSWORD
+-            const config = { proxyEnabled: true, proxyUrl: undefined } as any
+-            expect(isProxyMode(config)).toBe(false)
+-        })
+-
+-        it('should return true when isProxy is true in config', () => {
+-            const config = { isProxy: true } as any
+-            expect(isProxyMode(config)).toBe(true)
+-        })
+-    })
+-
+-    describe('isProxyService', () => {
+-        it('should return true when proxy enabled and PROXY_PASSWORD set', () => {
+-            process.env.PROXY_PASSWORD = 'secret'
+-            const config = { proxyEnabled: true } as any
+-            expect(isProxyService(config)).toBe(true)
+-        })
+-
+-        it('should return false when proxy not enabled', () => {
+-            process.env.PROXY_PASSWORD = 'secret'
+-            const config = { proxyEnabled: false } as any
+-            expect(isProxyService(config)).toBe(false)
+-        })
+-
+-        it('should return false when PROXY_PASSWORD not set', () => {
+-            delete process.env.PROXY_PASSWORD
+-            const config = { proxyEnabled: true } as any
+-            expect(isProxyService(config)).toBe(false)
+-        })
+-    })
+-})
+diff --git a/src/utils/date.ts b/src/utils/date.ts
+index 95a7031..69592fb 100644
+--- a/src/utils/date.ts
++++ b/src/utils/date.ts
+@@ -2,3 +2,18 @@ export const getDateFromISOString = (isoString?: string | undefined | null): Dat
+     if (!isoString || isoString === '') return new Date(0)
+     return new Date(Date.parse(isoString))
+ }
++
++/**
++ * Returns true when `isoString` parses to a date strictly after `reference`
++ * (plus an optional threshold in milliseconds).
++ *
++ * Null / undefined / empty `isoString` values are treated as epoch-0, so they
++ * will never be considered "newer" than a real reference date.
++ */
++export const isNewerThan = (
++    isoString: string | undefined | null,
++    reference: Date,
++    thresholdMs = 0,
++): boolean => {
++    return getDateFromISOString(isoString).getTime() > reference.getTime() + thresholdMs
++}
+diff --git a/src/utils/proxy.ts b/src/utils/proxy.ts
+deleted file mode 100644
+index cfc7db6..0000000
+--- a/src/utils/proxy.ts
++++ /dev/null
+@@ -1,228 +0,0 @@
+-// Replace index.ts with this file to run the connector on a proxy server
+-// Add a proxy_url configuration parameter to your ISC source
+-
+-import { CommandHandler, ConnectorError, logger } from '@sailpoint/connector-sdk'
+-import { safeReadConfig } from '../data/config'
+-import { FusionConfig } from '../model/config'
+-import { assert } from 'console'
+-const KEEPALIVE = 2.5 * 60 * 1000
+-
+-// Helper function to unwrap {data:{}} structures
+-const unwrapData = (obj: any): any => {
+-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+-        return obj
+-    }
+-
+-    // If object has 'data' key, extract and unwrap it
+-    if ('data' in obj && typeof obj.data === 'object' && obj.data !== null) {
+-        logger.debug(`Unwrapping data field. Object keys: ${Object.keys(obj).join(', ')}`)
+-        const unwrapped = obj.data
+-        // Recursively unwrap in case of nested wrapping
+-        return unwrapData(unwrapped)
+-    }
+-
+-    return obj
+-}
+-
+-// Helper function to check if object is valid (not empty)
+-const isValidObject = (obj: any): boolean => {
+-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+-        return false
+-    }
+-    // Check if object has any keys
+-    const keys = Object.keys(obj)
+-    if (keys.length === 0) {
+-        return false
+-    }
+-    return true
+-}
+-
+-// Proxy Client Mode: Forward requests to external connector
+-export const isProxyMode = (config: FusionConfig): boolean => {
+-    const proxyEnabled = config.proxyEnabled ?? false
+-    const hasProxyUrl = config.proxyUrl !== undefined && config.proxyUrl !== ''
+-    const isServer = process.env.PROXY_PASSWORD !== undefined
+-
+-    // Client mode: has proxyUrl and is NOT the server (unless explicitly flagged as proxy via internal config)
+-    return (proxyEnabled && hasProxyUrl && !isServer) || (config.isProxy === true)
+-}
+-
+-// Proxy Server Mode: Receive and process requests from internal connector
+-export const isProxyService = (config: FusionConfig): boolean => {
+-    const proxyEnabled = config.proxyEnabled ?? false
+-    const hasProxyPassword = process.env.PROXY_PASSWORD !== undefined
+-
+-    if (proxyEnabled && hasProxyPassword) {
+-        logger.info('Running as proxy server')
+-        // Validate password if provided in config
+-        if (config.proxyPassword) {
+-            const serverPassword = process.env.PROXY_PASSWORD
+-            const clientPassword = config.proxyPassword
+-            assert(serverPassword === clientPassword, 'Proxy password mismatch')
+-        }
+-        return true
+-    } else {
+-        return false
+-    }
+-}
+-
+-export const proxy: CommandHandler = async (context, input, res) => {
+-    const config: FusionConfig = await safeReadConfig()
+-    const interval = setInterval(() => {
+-        res.keepAlive()
+-    }, KEEPALIVE)
+-    try {
+-        if (!config.proxyEnabled || !config.proxyUrl) {
+-            throw new ConnectorError('Proxy mode is not enabled or proxy URL is missing')
+-        }
+-        const { proxyUrl } = config
+-        // Inject internal isProxy flag to config sent to external connector
+-        // We keep proxyEnabled=true so the proxy knows it's a proxy, but the isProxy flag
+-        // prevents infinite recursion in isProxyMode check
+-        const externalConfig = { ...config, isProxy: true }
+-        const body = {
+-            type: context.commandType,
+-            input,
+-            config: externalConfig,
+-        }
+-        let response: Response
+-        try {
+-            response = await fetch(proxyUrl, {
+-                method: 'POST',
+-                headers: {
+-                    'Content-Type': 'application/json',
+-                },
+-                body: JSON.stringify(body),
+-            })
+-        } catch (fetchError) {
+-            logger.error(`Proxy fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown fetch error'}`)
+-            throw new ConnectorError(
+-                `Failed to connect to proxy server at ${proxyUrl}: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`
+-            )
+-        }
+-
+-        // Check if response is successful
+-        if (!response.ok) {
+-            const errorText = await response.text()
+-            throw new ConnectorError(
+-                `Proxy server returned error status ${response.status}: ${errorText || response.statusText}`
+-            )
+-        }
+-
+-        const data = await response.text()
+-
+-        // Handle empty response
+-        if (!data || data.trim().length === 0) {
+-            logger.debug('Proxy received empty response')
+-            return
+-        }
+-
+-        logger.debug(`Proxy received response (${data.length} chars): ${data.substring(0, 500)}${data.length > 500 ? '...' : ''}`)
+-
+-        // Try to parse as NDJSON first (newline-delimited JSON)
+-        const lines = data.split('\n').filter(line => line.trim().length > 0)
+-        logger.debug(`Processing ${lines.length} non-empty lines from proxy response`)
+-
+-        // Handle case with no non-empty lines
+-        if (lines.length === 0) {
+-            logger.debug('Proxy received response with no valid content')
+-            return
+-        }
+-
+-        // Check if response is a single JSON array instead of NDJSON
+-        if (lines.length === 1) {
+-            try {
+-                let parsed = JSON.parse(lines[0])
+-
+-                // Handle null/undefined responses
+-                if (parsed === null || parsed === undefined) {
+-                    logger.debug('Proxy received null/undefined response')
+-                    return
+-                }
+-
+-                // Unwrap any {data:{}} structure
+-                if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+-                    logger.debug(`Before unwrap - parsed keys: ${Object.keys(parsed).join(', ')}`)
+-                }
+-                parsed = unwrapData(parsed)
+-                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+-                    logger.debug(`After unwrap - parsed keys: ${Object.keys(parsed).join(', ')}`)
+-                }
+-
+-                // If it's an array, send each item
+-                if (Array.isArray(parsed)) {
+-                    // Handle empty array
+-                    if (parsed.length === 0) {
+-                        logger.debug('Proxy received empty array')
+-                        return
+-                    }
+-                    logger.info(`Proxy received JSON array with ${parsed.length} items`)
+-                    let sentCount = 0
+-                    for (const item of parsed) {
+-                        const unwrappedItem = unwrapData(item)
+-
+-                        // Skip empty objects
+-                        if (!isValidObject(unwrappedItem)) {
+-                            logger.debug(`Skipping empty object in array`)
+-                            continue
+-                        }
+-
+-                        logger.debug(`Sending item: ${JSON.stringify(unwrappedItem).substring(0, 200)}`)
+-                        res.send(unwrappedItem)
+-                        sentCount++
+-                    }
+-                    logger.info(`Proxy sent ${sentCount} valid objects from array`)
+-                    return
+-                } else {
+-                    // Single object - send even if empty (e.g. test connection returns {})
+-                    if (parsed === null || parsed === undefined) {
+-                        logger.debug(`Skipping null/undefined single object`)
+-                        return
+-                    }
+-
+-                    logger.debug(`Sending single object: ${JSON.stringify(parsed).substring(0, 200)}`)
+-                    res.send(parsed)
+-                    return
+-                }
+-            } catch {
+-                logger.warn('Failed to parse response as JSON array, trying NDJSON')
+-            }
+-        }
+-
+-        // Process as NDJSON
+-        let validObjectCount = 0
+-        for (const line of lines) {
+-            try {
+-                let parsed = JSON.parse(line)
+-
+-                // Unwrap any {data:{}} structure
+-                parsed = unwrapData(parsed)
+-
+-                // Skip empty objects
+-                if (!isValidObject(parsed)) {
+-                    logger.debug(`Skipping empty NDJSON object`)
+-                    continue
+-                }
+-
+-                logger.debug(`Sending object: ${JSON.stringify(parsed).substring(0, 200)}`)
+-                res.send(parsed)
+-                validObjectCount++
+-            } catch (parseError) {
+-                logger.error(`Failed to parse line: ${line.substring(0, 200)}`)
+-                throw new ConnectorError(
+-                    `Failed to parse JSON line from proxy response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. Line: ${line.substring(0, 100)}`
+-                )
+-            }
+-        }
+-
+-        logger.info(`Proxy sent ${validObjectCount} valid objects to ISC`)
+-    } catch (error) {
+-        if (error instanceof ConnectorError) throw error
+-        const detail = error instanceof Error ? error.message : String(error)
+-        throw new ConnectorError(`Proxy operation failed: ${detail}`)
+-    } finally {
+-        clearInterval(interval)
+-    }
+-}
+-
+-

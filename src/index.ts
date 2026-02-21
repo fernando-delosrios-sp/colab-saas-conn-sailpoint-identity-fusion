@@ -32,7 +32,6 @@ import { accountEnable } from './operations/accountEnable'
 import { accountDisable } from './operations/accountDisable'
 import { entitlementList } from './operations/entitlementList'
 import { accountDiscoverSchema } from './operations/accountDiscoverSchema'
-import { isProxyMode, isProxyService, proxy } from './utils/proxy'
 
 /**
  * Identity Fusion NG connector factory. Loads configuration and returns a configured
@@ -48,22 +47,22 @@ export const connector = async () => {
     const stdTest: StdTestConnectionHandler = async (context, input, res) => {
         let serviceRegistry: ServiceRegistry | undefined
         try {
-            serviceRegistry = new ServiceRegistry(config, context, 'testConnection')
+            serviceRegistry = new ServiceRegistry(config, context, res, 'testConnection')
             const isCustom = context.testConnection !== undefined
-            const isProxy = isProxyMode(config)
+            const isProxy = serviceRegistry.proxy.isProxyMode()
             const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
 
             logger.info(`Running in ${runMode} mode`)
 
             switch (runMode) {
                 case 'custom':
-                    await context.testConnection(serviceRegistry, input, res)
+                    await context.testConnection(serviceRegistry, input)
                     break
                 case 'proxy':
-                    await proxy(context, input, res)
+                    await serviceRegistry.proxy.execute(input)
                     break
                 default:
-                    await testConnection(serviceRegistry, input, res)
+                    await testConnection(serviceRegistry, input)
             }
         } catch (error) {
             if (error instanceof ConnectorError) throw error
@@ -71,37 +70,37 @@ export const connector = async () => {
             const detail = error instanceof Error ? error.message : String(error)
             throw new ConnectorError(`Failed to test connection: ${detail}`, ConnectorErrorType.Generic)
         } finally {
-            void serviceRegistry?.log.flush()
             ServiceRegistry.clear()
         }
     }
 
     const stdAccountList: StdAccountListHandler = async (context, input, res): Promise<void> => {
-        const isCustom = context.accountList !== undefined
-        const isProxy = isProxyMode(config)
-        const isProxyServer = isProxyService(config)
-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
-
-        const interval = isProxyServer ? undefined : setInterval(() => {
-            const memoryUsage = process.memoryUsage()
-            logger.info(`Memory usage - RSS: ${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB, Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB, Heap Total: ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`)
-            res.keepAlive()
-        }, config.processingWait)
-
         let serviceRegistry: ServiceRegistry | undefined
+        let interval: ReturnType<typeof setInterval> | undefined
         try {
-            serviceRegistry = new ServiceRegistry(config, context, 'accountList')
+            serviceRegistry = new ServiceRegistry(config, context, res, 'accountList')
+            const isCustom = context.accountList !== undefined
+            const isProxy = serviceRegistry.proxy.isProxyMode()
+            const isProxyServer = serviceRegistry.proxy.isProxyService()
+            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+
+            interval = isProxyServer ? undefined : setInterval(() => {
+                const memoryUsage = process.memoryUsage()
+                logger.info(`Memory usage - RSS: ${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB, Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB, Heap Total: ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`)
+                res.keepAlive()
+            }, config.processingWait)
+
             logger.info(`Running accountList in ${runMode} mode`)
 
             switch (runMode) {
                 case 'custom':
-                    await context.accountList(serviceRegistry, input, res)
+                    await context.accountList(serviceRegistry, input)
                     break
                 case 'proxy':
-                    await proxy(context, input, res)
+                    await serviceRegistry.proxy.execute(input)
                     break
                 default:
-                    await accountList(serviceRegistry, input, res)
+                    await accountList(serviceRegistry, input)
             }
         } catch (error) {
             if (error instanceof ConnectorError) throw error
@@ -109,9 +108,6 @@ export const connector = async () => {
             const detail = error instanceof Error ? error.message : String(error)
             throw new ConnectorError(`Failed to aggregate accounts: ${detail}`, ConnectorErrorType.Generic)
         } finally {
-            // Fire-and-forget: do not block the response on external log delivery.
-            // Awaiting flush can block the handler from returning, keeping the client waiting.
-            void serviceRegistry?.log.flush()
             ServiceRegistry.clear()
             if (interval) {
                 clearInterval(interval)
@@ -120,23 +116,23 @@ export const connector = async () => {
     }
 
     const stdAccountRead: StdAccountReadHandler = async (context, input, res): Promise<void> => {
-        const isCustom = context.accountRead !== undefined
-        const isProxy = isProxyMode(config)
-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
-
         let serviceRegistry: ServiceRegistry | undefined
         try {
-            serviceRegistry = new ServiceRegistry(config, context, 'accountRead')
+            serviceRegistry = new ServiceRegistry(config, context, res, 'accountRead')
+            const isCustom = context.accountRead !== undefined
+            const isProxy = serviceRegistry.proxy.isProxyMode()
+            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+
             logger.info(`Running accountRead in ${runMode} mode`)
             switch (runMode) {
                 case 'custom':
-                    await context.accountRead(serviceRegistry, input, res)
+                    await context.accountRead(serviceRegistry, input)
                     break
                 case 'proxy':
-                    await proxy(context, input, res)
+                    await serviceRegistry.proxy.execute(input)
                     break
                 default:
-                    await accountRead(serviceRegistry, input, res)
+                    await accountRead(serviceRegistry, input)
             }
         } catch (error) {
             if (error instanceof ConnectorError) throw error
@@ -144,30 +140,29 @@ export const connector = async () => {
             const detail = error instanceof Error ? error.message : String(error)
             throw new ConnectorError(`Failed to read account ${input.identity}: ${detail}`, ConnectorErrorType.Generic)
         } finally {
-            void serviceRegistry?.log.flush()
             ServiceRegistry.clear()
         }
     }
 
     const stdAccountCreate: StdAccountCreateHandler = async (context, input, res) => {
-        const isCustom = context.accountCreate !== undefined
-        const isProxy = isProxyMode(config)
-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
-
         let serviceRegistry: ServiceRegistry | undefined
         try {
-            serviceRegistry = new ServiceRegistry(config, context, 'accountCreate')
+            serviceRegistry = new ServiceRegistry(config, context, res, 'accountCreate')
+            const isCustom = context.accountCreate !== undefined
+            const isProxy = serviceRegistry.proxy.isProxyMode()
+            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+
             logger.info(`Running accountCreate in ${runMode} mode`)
 
             switch (runMode) {
                 case 'custom':
-                    await context.accountCreate(serviceRegistry, input, res)
+                    await context.accountCreate(serviceRegistry, input)
                     break
                 case 'proxy':
-                    await proxy(context, input, res)
+                    await serviceRegistry.proxy.execute(input)
                     break
                 default:
-                    await accountCreate(serviceRegistry, input, res)
+                    await accountCreate(serviceRegistry, input)
             }
         } catch (error) {
             if (error instanceof ConnectorError) throw error
@@ -178,37 +173,37 @@ export const connector = async () => {
                 ConnectorErrorType.Generic
             )
         } finally {
-            void serviceRegistry?.log.flush()
             ServiceRegistry.clear()
         }
     }
 
     const stdAccountUpdate: StdAccountUpdateHandler = async (context, input, res) => {
-        const isCustom = context.accountUpdate !== undefined
-        const isProxy = isProxyMode(config)
-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
-
-        const interval =
-            runMode === 'proxy'
-                ? undefined
-                : setInterval(() => {
-                    res.keepAlive()
-                }, config.processingWait)
-
         let serviceRegistry: ServiceRegistry | undefined
+        let interval: ReturnType<typeof setInterval> | undefined
         try {
-            serviceRegistry = new ServiceRegistry(config, context, 'accountUpdate')
+            serviceRegistry = new ServiceRegistry(config, context, res, 'accountUpdate')
+            const isCustom = context.accountUpdate !== undefined
+            const isProxy = serviceRegistry.proxy.isProxyMode()
+            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+
+            interval =
+                runMode === 'proxy'
+                    ? undefined
+                    : setInterval(() => {
+                        res.keepAlive()
+                    }, config.processingWait)
+
             logger.info(`Running accountUpdate in ${runMode} mode`)
 
             switch (runMode) {
                 case 'custom':
-                    await context.accountUpdate(serviceRegistry, input, res)
+                    await context.accountUpdate(serviceRegistry, input)
                     break
                 case 'proxy':
-                    await proxy(context, input, res)
+                    await serviceRegistry.proxy.execute(input)
                     break
                 default:
-                    await accountUpdate(serviceRegistry, input, res)
+                    await accountUpdate(serviceRegistry, input)
             }
         } catch (error) {
             if (error instanceof ConnectorError) throw error
@@ -216,7 +211,6 @@ export const connector = async () => {
             const detail = error instanceof Error ? error.message : String(error)
             throw new ConnectorError(`Failed to update account ${input.identity}: ${detail}`, ConnectorErrorType.Generic)
         } finally {
-            void serviceRegistry?.log.flush()
             ServiceRegistry.clear()
             if (interval) {
                 clearInterval(interval)
@@ -225,24 +219,24 @@ export const connector = async () => {
     }
 
     const stdAccountEnable: StdAccountEnableHandler = async (context, input, res) => {
-        const isCustom = context.accountEnable !== undefined
-        const isProxy = isProxyMode(config)
-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
-
         let serviceRegistry: ServiceRegistry | undefined
         try {
-            serviceRegistry = new ServiceRegistry(config, context, 'accountEnable')
+            serviceRegistry = new ServiceRegistry(config, context, res, 'accountEnable')
+            const isCustom = context.accountEnable !== undefined
+            const isProxy = serviceRegistry.proxy.isProxyMode()
+            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+
             logger.info(`Running accountEnable in ${runMode} mode`)
 
             switch (runMode) {
                 case 'custom':
-                    await context.accountEnable(serviceRegistry, input, res)
+                    await context.accountEnable(serviceRegistry, input)
                     break
                 case 'proxy':
-                    await proxy(context, input, res)
+                    await serviceRegistry.proxy.execute(input)
                     break
                 default:
-                    await accountEnable(serviceRegistry, input, res)
+                    await accountEnable(serviceRegistry, input)
             }
         } catch (error) {
             if (error instanceof ConnectorError) throw error
@@ -250,30 +244,29 @@ export const connector = async () => {
             const detail = error instanceof Error ? error.message : String(error)
             throw new ConnectorError(`Failed to enable account ${input.identity}: ${detail}`, ConnectorErrorType.Generic)
         } finally {
-            void serviceRegistry?.log.flush()
             ServiceRegistry.clear()
         }
     }
 
     const stdAccountDisable: StdAccountDisableHandler = async (context, input, res) => {
-        const isCustom = context.accountDisable !== undefined
-        const isProxy = isProxyMode(config)
-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
-
         let serviceRegistry: ServiceRegistry | undefined
         try {
-            serviceRegistry = new ServiceRegistry(config, context, 'accountDisable')
+            serviceRegistry = new ServiceRegistry(config, context, res, 'accountDisable')
+            const isCustom = context.accountDisable !== undefined
+            const isProxy = serviceRegistry.proxy.isProxyMode()
+            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+
             logger.info(`Running accountDisable in ${runMode} mode`)
 
             switch (runMode) {
                 case 'custom':
-                    await context.accountDisable(serviceRegistry, input, res)
+                    await context.accountDisable(serviceRegistry, input)
                     break
                 case 'proxy':
-                    await proxy(context, input, res)
+                    await serviceRegistry.proxy.execute(input)
                     break
                 default:
-                    await accountDisable(serviceRegistry, input, res)
+                    await accountDisable(serviceRegistry, input)
             }
         } catch (error) {
             if (error instanceof ConnectorError) throw error
@@ -281,30 +274,29 @@ export const connector = async () => {
             const detail = error instanceof Error ? error.message : String(error)
             throw new ConnectorError(`Failed to disable account ${input.identity}: ${detail}`, ConnectorErrorType.Generic)
         } finally {
-            void serviceRegistry?.log.flush()
             ServiceRegistry.clear()
         }
     }
 
     const stdEntitlementList: StdEntitlementListHandler = async (context, input, res) => {
-        const isCustom = context.entitlementList !== undefined
-        const isProxy = isProxyMode(config)
-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
-
         let serviceRegistry: ServiceRegistry | undefined
         try {
-            serviceRegistry = new ServiceRegistry(config, context, 'entitlementList')
+            serviceRegistry = new ServiceRegistry(config, context, res, 'entitlementList')
+            const isCustom = context.entitlementList !== undefined
+            const isProxy = serviceRegistry.proxy.isProxyMode()
+            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+
             logger.info(`Running entitlementList in ${runMode} mode`)
 
             switch (runMode) {
                 case 'custom':
-                    await context.entitlementList(serviceRegistry, input, res)
+                    await context.entitlementList(serviceRegistry, input)
                     break
                 case 'proxy':
-                    await proxy(context, input, res)
+                    await serviceRegistry.proxy.execute(input)
                     break
                 default:
-                    await entitlementList(serviceRegistry, input, res)
+                    await entitlementList(serviceRegistry, input)
             }
         } catch (error) {
             if (error instanceof ConnectorError) throw error
@@ -312,30 +304,29 @@ export const connector = async () => {
             const detail = error instanceof Error ? error.message : String(error)
             throw new ConnectorError(`Failed to list entitlements for type ${input.type}: ${detail}`, ConnectorErrorType.Generic)
         } finally {
-            void serviceRegistry?.log.flush()
             ServiceRegistry.clear()
         }
     }
 
     const stdAccountDiscoverSchema: StdAccountDiscoverSchemaHandler = async (context, input, res) => {
-        const isCustom = context.accountDiscoverSchema !== undefined
-        const isProxy = isProxyMode(config)
-        const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
-
         let serviceRegistry: ServiceRegistry | undefined
         try {
-            serviceRegistry = new ServiceRegistry(config, context, 'accountDiscoverSchema')
+            serviceRegistry = new ServiceRegistry(config, context, res, 'accountDiscoverSchema')
+            const isCustom = context.accountDiscoverSchema !== undefined
+            const isProxy = serviceRegistry.proxy.isProxyMode()
+            const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
+
             logger.info(`Running accountDiscoverSchema in ${runMode} mode`)
 
             switch (runMode) {
                 case 'custom':
-                    await context.accountDiscoverSchema(serviceRegistry, res)
+                    await context.accountDiscoverSchema(serviceRegistry)
                     break
                 case 'proxy':
-                    await proxy(context, input, res)
+                    await serviceRegistry.proxy.execute(input)
                     break
                 default:
-                    await accountDiscoverSchema(serviceRegistry, res)
+                    await accountDiscoverSchema(serviceRegistry)
             }
         } catch (error) {
             if (error instanceof ConnectorError) throw error
@@ -343,7 +334,6 @@ export const connector = async () => {
             const detail = error instanceof Error ? error.message : String(error)
             throw new ConnectorError(`Failed to discover schema: ${detail}`, ConnectorErrorType.Generic)
         } finally {
-            void serviceRegistry?.log.flush()
             ServiceRegistry.clear()
         }
     }

@@ -1,4 +1,4 @@
-import { ConnectorError, Response, StdAccountEnableInput, StdAccountEnableOutput } from '@sailpoint/connector-sdk'
+import { ConnectorError, StdAccountEnableInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
@@ -27,15 +27,13 @@ import { AttributeOperations } from '../services/attributeService/types'
  *
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param input - SDK input containing the account identity to enable
- * @param res - SDK response object for sending the enabled account back to the platform
  */
 export const accountEnable = async (
     serviceRegistry: ServiceRegistry,
     input: StdAccountEnableInput,
-    res: Response<StdAccountEnableOutput>
 ) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, fusion, sources, schemas, attributes } = serviceRegistry
+    const { log, fusion, sources, schemas, attributes, res } = serviceRegistry
 
     try {
         log.info(`Enabling account: ${input.identity}`)

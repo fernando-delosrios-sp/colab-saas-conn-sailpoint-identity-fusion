@@ -20,8 +20,9 @@ import { FusionDecision } from '../../model/form'
 import { FusionMatch } from '../scoringService'
 import { ScoringService } from '../scoringService'
 import { SchemaService } from '../schemaService'
-import { FusionReport, FusionReportAccount } from './types'
+import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
 import { AttributeOperations } from '../attributeService/types'
+import { MAX_CANDIDATES_FOR_FORM } from '../formService/constants'
 
 // ============================================================================
 // FusionService Class
@@ -39,11 +40,12 @@ export class FusionService {
     private potentialDuplicateAccounts: FusionAccount[] = []
     // Minimal report data for non-matches (avoids holding full FusionAccount objects)
     private analyzedNonMatchReportData: FusionReportAccount[] = []
+    // Accounts where form creation failed (excessive candidates or runtime error)
+    private failedMatchingAccounts: FusionReportAccount[] = []
     private _reviewersBySourceId: Map<string, Set<FusionAccount>> = new Map()
     private _sourcesWithoutReviewers: Set<string> = new Set()
     private readonly sourcesByName: Map<string, SourceInfo> = new Map()
     private readonly reset: boolean
-    private readonly correlateOnAggregation: boolean
     private readonly reportAttributes: string[]
     private readonly urlContext: UrlContext
     private readonly deleteEmpty: boolean
@@ -81,7 +83,6 @@ export class FusionService {
     ) {
         FusionAccount.configure(config)
         this.reset = config.reset
-        this.correlateOnAggregation = config.correlateOnAggregation
         this.fusionOwnerIsGlobalReviewer = config.fusionOwnerIsGlobalReviewer ?? false
         this.fusionReportOnAggregation = config.fusionReportOnAggregation ?? false
         this.reportAttributes = config.fusionFormAttributes ?? []
@@ -307,6 +308,7 @@ export class FusionService {
             this.populateReviewerFusionReviewsFromPending(fusionAccount)
         }
 
+        let hasDecisionAssignment = false
         const isIdentity = !account.uncorrelated && account.identityId
         if (isIdentity) {
             const identityId = account.identityId!
@@ -318,6 +320,7 @@ export class FusionService {
             const fusionDecision = this.forms.getFusionAssignmentDecision(identityId)
             if (fusionDecision) {
                 fusionAccount.addFusionDecisionLayer(fusionDecision)
+                hasDecisionAssignment = true
             }
             this.log.debug(`Applied identity layer for ${fusionAccount.name}: identityId=${identityId}`)
         }
@@ -340,11 +343,9 @@ export class FusionService {
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)
 
-        // Correlate missing accounts if correlateOnAggregation is enabled and there are missing accounts
-        // Status/action will be updated after correlation promises resolve in getISCAccount
-        const correlate = this.correlateOnAggregation && this.commandType === StandardCommand.StdAccountList
-        if (correlate && fusionAccount.missingAccountIds.length > 0) {
-            await this.identities.correlateAccounts(fusionAccount)
+        // Per-source correlation for missing accounts during aggregation
+        if (this.commandType === StandardCommand.StdAccountList && fusionAccount.missingAccountIds.length > 0) {
+            await this.correlatePerSource(fusionAccount, hasDecisionAssignment)
         }
 
         this.log.debug(
@@ -355,6 +356,101 @@ export class FusionService {
         this.setFusionAccount(fusionAccount)
 
         return fusionAccount
+    }
+
+    // ------------------------------------------------------------------------
+    // Per-Source Correlation
+    // ------------------------------------------------------------------------
+
+    /**
+     * Apply per-source correlation logic for missing accounts on a fusion account.
+     *
+     * Groups missing accounts by source and applies the correlation strategy
+     * configured for each source:
+     * - `correlate`: Direct API correlation (PATCH /identityId)
+     * - `reverse`: Set the dedicated Fusion attribute to the first missing account name
+     * - `none`: Skip correlation
+     *
+     * Decision-assigned accounts always use direct correlation regardless of mode.
+     */
+    private async correlatePerSource(fusionAccount: FusionAccount, hasDecisionAssignment: boolean): Promise<void> {
+        const missingIds = fusionAccount.missingAccountIds
+
+        // Separate decision-assigned accounts (always use direct correlation)
+        const directCorrelateIds: string[] = []
+        const bySource = new Map<string, string[]>()
+
+        for (const accountId of missingIds) {
+            const info = fusionAccount.getManagedAccountInfo(accountId)
+            if (!info) {
+                // No source info available; if there's a decision, correlate directly
+                if (hasDecisionAssignment) {
+                    directCorrelateIds.push(accountId)
+                }
+                continue
+            }
+
+            const sourceConfig = this.sources.getSourceConfig(info.sourceName)
+            const mode = sourceConfig?.correlationMode ?? 'none'
+
+            if (mode === 'correlate') {
+                directCorrelateIds.push(accountId)
+            } else if (mode === 'reverse') {
+                let ids = bySource.get(info.sourceName)
+                if (!ids) {
+                    ids = []
+                    bySource.set(info.sourceName, ids)
+                }
+                ids.push(accountId)
+            }
+            // mode === 'none': skip
+        }
+
+        // If there's a decision assignment, ensure ALL missing accounts are directly correlated
+        if (hasDecisionAssignment) {
+            for (const accountId of missingIds) {
+                if (!directCorrelateIds.includes(accountId)) {
+                    directCorrelateIds.push(accountId)
+                }
+            }
+        }
+
+        // Direct correlation
+        if (directCorrelateIds.length > 0) {
+            await this.identities.correlateAccounts(fusionAccount, directCorrelateIds)
+        }
+
+        // Reverse correlation: set attribute to first missing account name per source
+        for (const [sourceName, accountIds] of bySource) {
+            // Skip reverse correlation for decision-assigned accounts (already handled above)
+            if (hasDecisionAssignment) continue
+
+            const sourceConfig = this.sources.getSourceConfig(sourceName)
+            if (!sourceConfig?.correlationAttribute) continue
+
+            const firstAccountId = accountIds[0]
+            const info = fusionAccount.getManagedAccountInfo(firstAccountId)
+            if (info) {
+                fusionAccount.setReverseCorrelationAttribute(
+                    sourceConfig.correlationAttribute,
+                    info.accountName
+                )
+                this.log.info(
+                    `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.accountName}" ` +
+                    `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
+                )
+            }
+        }
+
+        // Clear reverse correlation attributes for sources with no missing accounts
+        for (const sc of this.config.sources) {
+            if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
+                const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
+                if (missingForSource.length === 0) {
+                    fusionAccount.clearReverseCorrelationAttribute(sc.correlationAttribute)
+                }
+            }
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -461,25 +557,46 @@ export class FusionService {
      * Creates a new fusion identity for "new identity" decisions, or merges
      * into an existing one for "authorized" decisions.
      *
+     * For record/orphan source types, "new identity" (toggle true) means "no match":
+     * - record: registers unique attributes but does not output as ISC account
+     * - orphan: drops the account; optionally fires a disable operation
+     *
      * @param fusionDecision - The reviewer's decision from the review form
      * @returns The fusion account produced or updated, or undefined if the decision was skipped
      */
     public async processFusionIdentityDecision(fusionDecision: FusionDecision): Promise<FusionAccount | undefined> {
+        const sourceType = fusionDecision.sourceType ?? 'identity'
 
         const fusionAccount = FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
-            `Created fusion account from decision: ${fusionDecision.account.name} [${fusionDecision.account.sourceName}], newIdentity=true`
+            `Created fusion account from decision: ${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
+            `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
         )
 
         fusionAccount.setNeedsReset(true)
         fusionAccount.addFusionDecisionLayer(fusionDecision)
-        // Use direct reference - deletions will remove processed accounts from the working queue
         fusionAccount.addManagedAccountLayer(this.sources.managedAccountsById, this.sources.managedAccountsByIdentityId)
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)
 
         if (fusionDecision.newIdentity) {
-            // Key generation deferred until getISCAccount
+            if (sourceType === 'record') {
+                this.log.debug(`Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`)
+                await this.attributes.registerUniqueAttributes(fusionAccount)
+                return undefined
+            }
+            if (sourceType === 'orphan') {
+                this.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
+                const sourceInfo = this.sourcesByName.get(fusionDecision.account.sourceName)
+                if (sourceInfo?.config?.disableNonMatchingAccounts) {
+                    const managedAccount = this.sources.managedAccountsById.get(fusionDecision.account.id)
+                    if (managedAccount) {
+                        this.fireDisableOperation(managedAccount)
+                    }
+                }
+                return undefined
+            }
+            // identity (default): register as new fusion account
             this.setFusionAccount(fusionAccount)
         }
         return fusionAccount
@@ -543,14 +660,29 @@ export class FusionService {
     /**
      * Processes a single uncorrelated managed account through the deduplication workflow.
      * After scoring, the account is either auto-correlated (perfect match), sent for
-     * manual review (partial match), or added as an unmatched new identity.
+     * manual review (partial match), or handled based on the source type:
+     * - identity: added as unmatched new identity (output as ISC account)
+     * - record: unique attributes registered but not output as ISC account
+     * - orphan: dropped immediately; optionally fires a disable operation
      *
      * @param account - The uncorrelated ISC account from a managed source
      * @returns The fusion account produced or updated, or undefined if skipped or sent for manual review
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
+        const sourceInfo = this.sourcesByName.get(account.sourceName ?? '')
+        const sourceType = sourceInfo?.sourceType ?? 'identity'
+
         if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
             const fusionAccount = await this.preProcessManagedAccount(account)
+            if (sourceType !== 'identity') {
+                this.log.debug(`Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`)
+                if (sourceType === 'record') {
+                    await this.attributes.registerUniqueAttributes(fusionAccount)
+                } else if (sourceType === 'orphan' && sourceInfo?.config?.disableNonMatchingAccounts) {
+                    this.fireDisableOperation(account)
+                }
+                return undefined
+            }
             fusionAccount.setUnmatched()
             this.setFusionAccount(fusionAccount)
             return fusionAccount
@@ -564,7 +696,6 @@ export class FusionService {
             )
             const identityId = perfectMatch?.identityId
             if (this.config.fusionMergingIdentical && identityId) {
-                // Perfect match
                 this.log.debug(
                     `Account ${account.name} [${fusionAccount.sourceName}] has all scores 100, auto-correlating to identity ${identityId}`
                 )
@@ -575,24 +706,44 @@ export class FusionService {
                 )
                 return await this.processFusionIdentityDecision(syntheticDecision)
             } else {
-                // Match - sent for manual review
-                const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
                 assert(sourceInfo, 'Source info not found')
                 const reviewers = this.reviewersBySourceId.get(sourceInfo.id!)
-                await this.forms.createFusionForm(fusionAccount, reviewers)
-                // Flag candidate identities with the 'candidate' status
+                try {
+                    const formCreated = await this.forms.createFusionForm(fusionAccount, reviewers)
+                    if (!formCreated) {
+                        const candidateCount = fusionAccount.fusionMatches.length
+                        this.trackFailedMatching(
+                            fusionAccount,
+                            `Too many candidates (${candidateCount}) - maximum is ${MAX_CANDIDATES_FOR_FORM}`
+                        )
+                    }
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error)
+                    this.trackFailedMatching(fusionAccount, `Form creation failed: ${message}`)
+                }
                 this.flagCandidatesWithStatus(fusionAccount)
-                // Release fusionIdentity references to reduce memory (identityId/identityName retained for report)
                 fusionAccount.clearFusionIdentityReferences()
                 return undefined
             }
         } else {
-            // Non-match
-            this.log.debug(`Account ${account.name} is not a duplicate, adding to fusion accounts`)
-            // await this.attributes.refreshUniqueAttributes(fusionAccount)
-            fusionAccount.setUnmatched()
+            // Non-match handling varies by source type
+            if (sourceType === 'record') {
+                this.log.debug(`Record account ${account.name} is not a match, registering unique attributes only`)
+                await this.attributes.registerUniqueAttributes(fusionAccount)
+                return undefined
+            }
 
-            // Use setter method to add to appropriate map
+            if (sourceType === 'orphan') {
+                this.log.debug(`Orphan account ${account.name} is not a match, dropping`)
+                if (sourceInfo?.config?.disableNonMatchingAccounts) {
+                    this.fireDisableOperation(account)
+                }
+                return undefined
+            }
+
+            // identity (default)
+            this.log.debug(`Account ${account.name} is not a duplicate, adding to fusion accounts`)
+            fusionAccount.setUnmatched()
             this.setFusionAccount(fusionAccount)
             return fusionAccount
         }
@@ -692,13 +843,36 @@ export class FusionService {
      * Avoids retaining the full FusionAccount object in memory.
      */
     private buildNonMatchReportEntry(fusionAccount: FusionAccount): FusionReportAccount {
+        const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
         return {
             accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
             accountSource: fusionAccount.sourceName,
+            sourceType: sourceInfo?.sourceType ?? 'identity',
             accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
             accountEmail: fusionAccount.email,
             accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
             matches: [],
+        }
+    }
+
+    /**
+     * Records a failed matching for inclusion in the fusion report.
+     * Called when form creation fails (excessive candidates or runtime error).
+     */
+    private trackFailedMatching(fusionAccount: FusionAccount, error: string): void {
+        this.log.error(`Failed matching for account ${fusionAccount.name} [${fusionAccount.sourceName}]: ${error}`)
+        if (this.fusionReportOnAggregation || this.commandType !== StandardCommand.StdAccountList) {
+            const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
+            this.failedMatchingAccounts.push({
+                accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
+                accountSource: fusionAccount.sourceName,
+                sourceType: sourceInfo?.sourceType ?? 'identity',
+                accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
+                accountEmail: fusionAccount.email,
+                accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
+                matches: [],
+                error,
+            })
         }
     }
 
@@ -719,10 +893,11 @@ export class FusionService {
      * Safe to call multiple times (idempotent).
      */
     public clearAnalyzedAccounts(): void {
-        if (this.analyzedNonMatchReportData.length > 0 || this.potentialDuplicateAccounts.length > 0) {
+        if (this.analyzedNonMatchReportData.length > 0 || this.potentialDuplicateAccounts.length > 0 || this.failedMatchingAccounts.length > 0) {
             this.log.debug('Clearing analyzed managed accounts from memory')
             this.analyzedNonMatchReportData = []
             this.potentialDuplicateAccounts = []
+            this.failedMatchingAccounts = []
         }
     }
 
@@ -853,6 +1028,19 @@ export class FusionService {
     // ------------------------------------------------------------------------
 
     /**
+     * Fire a low-priority, non-awaited disable operation for a managed account.
+     * Used by the orphan source type when disableNonMatchingAccounts is enabled.
+     */
+    private fireDisableOperation(account: Account): void {
+        const accountId = account.id
+        if (!accountId) {
+            this.log.warn(`Cannot disable account without ID: ${account.name}`)
+            return
+        }
+        this.sources.fireDisableAccount(accountId)
+    }
+
+    /**
      * Flag candidate identities with the 'candidate' status.
      * Called when a fusion form is created to mark matching identities as candidates
      * of a pending Fusion review. The authoritative candidate set is maintained by
@@ -934,6 +1122,11 @@ export class FusionService {
         return mapValuesToArray(this.fusionAccountMap)
     }
 
+    /** Total number of fusion accounts (correlated identities + uncorrelated accounts) */
+    public get totalFusionAccountCount(): number {
+        return this.fusionIdentityMap.size + this.fusionAccountMap.size
+    }
+
     /**
      * Get reviewers by source ID map
      */
@@ -992,9 +1185,10 @@ export class FusionService {
      * generated significantly reduces memory footprint.
      * 
      * @param includeNonMatches - Whether to include non-matching accounts in the report
+     * @param stats - Optional processing statistics to include in the report
      * @returns Complete fusion report with match/non-match accounts
      */
-    public generateReport(includeNonMatches: boolean = false): FusionReport {
+    public generateReport(includeNonMatches: boolean = false, stats?: FusionReportStats): FusionReport {
         const accounts: FusionReportAccount[] = []
 
         // Report on the managed accounts that were flagged as potential duplicates (forms created)
@@ -1018,9 +1212,11 @@ export class FusionService {
                 // Release fusionIdentity refs after extracting report data (on-demand report path)
                 fusionAccount.clearFusionIdentityReferences()
 
+                const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
                 accounts.push({
                     accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
                     accountSource: fusionAccount.sourceName,
+                    sourceType: sourceInfo?.sourceType ?? 'identity',
                     accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
                     accountEmail: fusionAccount.email,
                     accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
@@ -1028,6 +1224,10 @@ export class FusionService {
                 })
             }
         }
+
+        // Include failed matchings (excessive candidates or runtime errors)
+        const failedAccounts = [...this.failedMatchingAccounts]
+        failedAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
 
         // Include non-matches if requested
         const nonMatchAccounts: FusionReportAccount[] = includeNonMatches
@@ -1037,8 +1237,8 @@ export class FusionService {
         // Sort matches alphabetically by account name
         accounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
 
-        // Combine: matches first, then non-matches
-        const allAccounts = [...accounts, ...nonMatchAccounts]
+        // Combine: matches first, then failed matchings, then non-matches
+        const allAccounts = [...accounts, ...failedAccounts, ...nonMatchAccounts]
 
         const potentialDuplicates = accounts.length
 
@@ -1047,12 +1247,14 @@ export class FusionService {
             totalAccounts: this.newManagedAccountsCount,
             potentialDuplicates,
             reportDate: new Date(),
+            stats,
         }
 
         // Release memory from analyzed accounts after report generation
         this.log.debug('Clearing analyzed managed accounts from memory')
         this.analyzedNonMatchReportData = []
         this.potentialDuplicateAccounts = []
+        this.failedMatchingAccounts = []
 
         return report
     }

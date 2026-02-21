@@ -2,6 +2,8 @@ import {
     FormInstanceResponseV2025,
     FormDefinitionInputV2025,
 } from 'sailpoint-api-client'
+import { logger } from '@sailpoint/connector-sdk'
+import { SourceType } from '../../model/config'
 import { FusionDecision } from '../../model/form'
 import { IdentityService } from '../identityService'
 import { assert } from '../../utils/assert'
@@ -115,6 +117,8 @@ export const createFusionDecision = (
         return null
     }
 
+    const sourceType = extractSourceType(formInput)
+
     const isNewIdentity = formData?.newIdentity ?? true
     // SELECT elements with dataSource return arrays, extract the first element
     const identitiesValue = formData?.identities
@@ -123,6 +127,14 @@ export const createFusionDecision = (
         : Array.isArray(identitiesValue)
             ? identitiesValue[0]
             : identitiesValue
+
+    if (!isNewIdentity && !existingIdentity) {
+        logger.error(
+            `[formProcessor] Form ${formInstance.id}: toggle is false but no identity selected ` +
+            `for account ${accountInfo.name} [${accountInfo.sourceName}]. Skipping decision.`
+        )
+        return null
+    }
 
     const reviewerIdentityId = recipients[0].id
     if (!reviewerIdentityId) {
@@ -142,5 +154,14 @@ export const createFusionDecision = (
         comments: formData?.comments || '',
         finished,
         formUrl: formInstance.standAloneFormUrl ?? undefined,
+        sourceType,
     }
+}
+
+const extractSourceType = (formInput: any): SourceType => {
+    if (typeof formInput?.sourceType === 'string') {
+        const value = formInput.sourceType as string
+        if (value === 'record' || value === 'orphan') return value
+    }
+    return 'identity'
 }

@@ -1,5 +1,5 @@
 import { AccountSchema, Attributes, SchemaAttribute } from '@sailpoint/connector-sdk'
-import { AttributeMap, FusionConfig, NormalAttributeDefinition, UniqueAttributeDefinition } from '../../model/config'
+import { AttributeMap, FusionConfig, NormalAttributeDefinition, SourceConfig, UniqueAttributeDefinition } from '../../model/config'
 import { LogService } from '../logService'
 import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
@@ -17,6 +17,7 @@ export class SchemaService {
     private readonly attributeMerge: 'first' | 'list' | 'concatenate'
     private readonly normalAttributeDefinitions: NormalAttributeDefinition[]
     private readonly uniqueAttributeDefinitions: UniqueAttributeDefinition[]
+    private readonly sourceConfigs: SourceConfig[]
 
     /**
      * @param config - Fusion configuration containing attribute merge strategy and definitions
@@ -31,6 +32,7 @@ export class SchemaService {
         this.attributeMerge = config.attributeMerge
         this.normalAttributeDefinitions = config.normalAttributeDefinitions ?? []
         this.uniqueAttributeDefinitions = config.uniqueAttributeDefinitions ?? []
+        this.sourceConfigs = config.sources ?? []
         this.attributeMap = new Map(config.attributeMaps?.map((x) => [x.newAttribute, x]) ?? [])
     }
 
@@ -276,6 +278,32 @@ export class SchemaService {
     }
 
     /**
+     * Collects all attribute names from managed source account schemas.
+     * Used for reverse correlation overlap validation.
+     */
+    public async getManagedSourceSchemaAttributeNames(): Promise<Set<string>> {
+        const names = new Set<string>()
+        const { managedSources } = this.sources
+        const schemas = await Promise.all(
+            managedSources.map(async (source) => {
+                try {
+                    return await this.fetchAccountSchema(source.id)
+                } catch {
+                    return undefined
+                }
+            })
+        )
+        for (const schema of schemas) {
+            if (schema) {
+                for (const attr of schema.attributes) {
+                    if (attr.name) names.add(attr.name.toLowerCase())
+                }
+            }
+        }
+        return names
+    }
+
+    /**
      * Builds the fusion account schema from managed sources, attribute mappings,
      * and attribute definitions. Used for schema discovery.
      *
@@ -328,6 +356,19 @@ export class SchemaService {
         attributeDefinitionAttributes.forEach((attribute) => {
             attributeMap.set(String(attribute.name!).toLowerCase(), attribute)
         })
+
+        // Add reverse correlation attributes from sources configured with correlationMode 'reverse'
+        for (const sc of this.sourceConfigs) {
+            if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
+                const attr: SchemaAttribute = {
+                    name: sc.correlationAttribute,
+                    description: sc.correlationDisplayName ?? sc.correlationAttribute,
+                    type: 'string',
+                    multi: false,
+                }
+                attributeMap.set(sc.correlationAttribute.toLowerCase(), attr)
+            }
+        }
 
         attributes.push(...Array.from(attributeMap.values()))
 

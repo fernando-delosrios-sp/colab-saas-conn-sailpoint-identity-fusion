@@ -1,7 +1,8 @@
-import { ConnectorError, Response, StdAccountListInput, StdAccountListOutput } from '@sailpoint/connector-sdk'
+import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { softAssert } from '../utils/assert'
 import { generateReport } from './helpers/generateReport'
+import { FusionReportStats } from '../services/fusionService/types'
 
 /**
  * Account list operation - Main entry point for identity fusion processing.
@@ -52,10 +53,9 @@ import { generateReport } from './helpers/generateReport'
 export const accountList = async (
     serviceRegistry: ServiceRegistry,
     input: StdAccountListInput,
-    res: Response<StdAccountListOutput>
 ) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, fusion, forms, identities, schemas, sources, attributes, messaging, config } = serviceRegistry
+    const { log, fusion, forms, identities, schemas, sources, attributes, messaging, config, res } = serviceRegistry
 
     let processLockAcquired = false
 
@@ -86,6 +86,18 @@ export const accountList = async (
         await schemas.setFusionAccountSchema(input.schema)
         log.info('Fusion account schema set successfully')
 
+        // Set up reverse correlation for sources that use it
+        const reverseCorrelationSources = config.sources.filter((sc) => sc.correlationMode === 'reverse')
+        if (reverseCorrelationSources.length > 0) {
+            const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
+            await Promise.all(
+                reverseCorrelationSources.map((sc) =>
+                    sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
+                )
+            )
+            log.info(`Reverse correlation setup completed for ${reverseCorrelationSources.length} source(s)`)
+        }
+
         await sources.aggregateManagedSources()
         log.info('Managed sources aggregated')
 
@@ -103,7 +115,9 @@ export const accountList = async (
         ]
 
         await Promise.all(fetchPromises)
-        log.info(`Loaded ${sources.fusionAccountCount} fusion account(s), ${identities.identityCount} identities, ${sources.managedAccountsById.size} managed account(s)`)
+        const identitiesFound = identities.identityCount
+        const managedAccountsFound = sources.managedAccountsById.size
+        log.info(`Loaded ${sources.fusionAccountCount} fusion account(s), ${identitiesFound} identities, ${managedAccountsFound} managed account(s)`)
         const fusionOwner = sources.fusionSourceOwner
         if (fusion.fusionReportOnAggregation) {
             const fusionOwnerIdentity = identities.getIdentityById(fusionOwner.id)
@@ -151,7 +165,21 @@ export const accountList = async (
             const fusionOwnerAccount = fusion.getFusionIdentity(fusionOwner.id!)
             softAssert(fusionOwnerAccount, 'Fusion owner account not found')
             if (fusionOwnerAccount) {
-                await generateReport(fusionOwnerAccount, false, serviceRegistry)
+                const decisions = forms.fusionIdentityDecisions
+                const memoryUsage = process.memoryUsage()
+                const stats: FusionReportStats = {
+                    totalFusionAccounts: fusion.totalFusionAccountCount,
+                    fusionReviewsCreated: forms.formsCreated,
+                    fusionReviewAssignments: forms.formInstancesCreated,
+                    fusionReviewNewIdentities: decisions.filter((d) => d.newIdentity).length,
+                    fusionReviewNonMatches: decisions.filter((d) => !d.newIdentity).length,
+                    identitiesFound,
+                    managedAccountsFound,
+                    managedAccountsProcessed: fusion.newManagedAccountsCount,
+                    totalProcessingTime: timer.totalElapsed(),
+                    usedMemory: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
+                }
+                await generateReport(fusionOwnerAccount, false, serviceRegistry, stats)
             }
             timer.phase(`PHASE ${phase++}: Generating fusion report`)
         }
@@ -178,6 +206,8 @@ export const accountList = async (
 
         sources.clearFusionAccounts()
         log.info('Account caches cleared from memory')
+
+        sources.aggregateDelayedSources()
 
         timer.end(`✓ Account list operation completed successfully - ${count} account(s) processed`)
     } catch (error) {

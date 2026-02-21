@@ -53,6 +53,7 @@ export const FUSION_REVIEW_TEMPLATE = `
                                                 {{#if accountSource}}
                                                 <div style="color:#5f6b7a; font-size:12px; margin-top:8px; font-weight:600;">
                                                     Source: <span style="color:#0b5cab;">{{accountSource}}</span>
+                                                    {{#if sourceType}}<span style="display:inline-block; margin-left:6px; padding:1px 8px; border-radius:8px; background:#eef2f7; color:#5f6b7a; font-size:11px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}
                                                 </div>
                                                 {{/if}}
                                                 {{/each}}
@@ -79,7 +80,7 @@ export const FUSION_REVIEW_TEMPLATE = `
                                                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                                                                 <tr>
                                                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Source:</td>
-                                                                    <td style="padding:2px 8px;">{{accountSource}}</td>
+                                                                    <td style="padding:2px 8px;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:#eef2f7; color:#5f6b7a; font-size:10px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
                                                                 </tr>
                                                                 {{#if accountId}}
                                                                 <tr>
@@ -525,6 +526,94 @@ export const FUSION_REPORT_TEMPLATE = `
             </table>
         </div>
 
+        {{#if stats}}
+        <div style="margin-bottom:22px;">
+            <div style="font-size:13px; color:#0b5cab; font-weight:900; letter-spacing:0.35px; text-transform:uppercase; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid #e6ebf5;">Processing Statistics</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+                {{#if (exists stats.totalFusionAccounts)}}
+                <tr>
+                    <td width="50%" style="width:50%; padding:4px 6px;">
+                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
+                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Total Fusion Accounts</div>
+                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.totalFusionAccounts}}</div>
+                        </div>
+                    </td>
+                    <td width="50%" style="width:50%; padding:4px 6px;">
+                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
+                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Fusion Reviews Created</div>
+                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.fusionReviewsCreated}}</div>
+                        </div>
+                    </td>
+                </tr>
+                {{/if}}
+                {{#if (exists stats.fusionReviewAssignments)}}
+                <tr>
+                    <td width="50%" style="width:50%; padding:4px 6px;">
+                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
+                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Fusion Review Assignments</div>
+                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.fusionReviewAssignments}}</div>
+                        </div>
+                    </td>
+                    <td width="50%" style="width:50%; padding:4px 6px;">
+                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
+                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Fusion Review New Identities</div>
+                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.fusionReviewNewIdentities}}</div>
+                        </div>
+                    </td>
+                </tr>
+                {{/if}}
+                {{#if (exists stats.fusionReviewNonMatches)}}
+                <tr>
+                    <td width="50%" style="width:50%; padding:4px 6px;">
+                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
+                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Fusion Review Non-Matches</div>
+                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.fusionReviewNonMatches}}</div>
+                        </div>
+                    </td>
+                    <td width="50%" style="width:50%; padding:4px 6px;">
+                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
+                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Identities Found</div>
+                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.identitiesFound}}</div>
+                        </div>
+                    </td>
+                </tr>
+                {{/if}}
+                {{#if (exists stats.managedAccountsFound)}}
+                <tr>
+                    <td width="50%" style="width:50%; padding:4px 6px;">
+                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
+                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Managed Accounts Found</div>
+                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.managedAccountsFound}}</div>
+                        </div>
+                    </td>
+                    <td width="50%" style="width:50%; padding:4px 6px;">
+                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
+                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Managed Accounts Processed</div>
+                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.managedAccountsProcessed}}</div>
+                        </div>
+                    </td>
+                </tr>
+                {{/if}}
+                {{#if (exists stats.totalProcessingTime)}}
+                <tr>
+                    <td width="50%" style="width:50%; padding:4px 6px;">
+                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
+                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Total Processing Time</div>
+                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.totalProcessingTime}}</div>
+                        </div>
+                    </td>
+                    <td width="50%" style="width:50%; padding:4px 6px;">
+                        <div style="border:1px solid #e6ebf5; border-radius:10px; padding:10px 12px; background:#fbfcff;">
+                            <div style="font-size:11px; color:#5f6b7a; font-weight:700; text-transform:uppercase; margin-bottom:4px;">Used Memory</div>
+                            <div style="color:#0f172a; font-size:15px; font-weight:900;">{{stats.usedMemory}}</div>
+                        </div>
+                    </td>
+                </tr>
+                {{/if}}
+            </table>
+        </div>
+        {{/if}}
+
         {{#each accounts}}
         <div class="account-section" style="margin-bottom:28px; border:1px solid #e6ebf5; border-radius:14px; padding:18px; background:#ffffff; box-shadow:0 10px 24px rgba(16,24,40,0.08);">
             <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
@@ -537,7 +626,7 @@ export const FUSION_REPORT_TEMPLATE = `
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                                 <tr>
                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Source:</td>
-                                    <td style="padding:2px 8px;">{{accountSource}}</td>
+                                    <td style="padding:2px 8px;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:#eef2f7; color:#5f6b7a; font-size:10px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
                                 </tr>
                                 {{#if accountId}}
                                 <tr>
@@ -567,8 +656,14 @@ export const FUSION_REPORT_TEMPLATE = `
                         {{/if}}
                     </td>
 
-                    <!-- Right: candidates horizontally -->
+                    <!-- Right: candidates or error -->
                     <td style="vertical-align:top; padding-left:14px;">
+                        {{#if error}}
+                        <div style="padding:16px 18px; background:#fef2f2; border:1px solid #fecaca; border-left:6px solid #ef4444; border-radius:10px;">
+                            <div style="font-size:12px; color:#991b1b; font-weight:900; letter-spacing:0.35px; text-transform:uppercase; margin-bottom:6px;">Error</div>
+                            <div style="font-size:13px; color:#7f1d1d; line-height:1.5;">{{error}}</div>
+                        </div>
+                        {{else}}
                         {{#if matches}}
                         {{#if (gt matches.length 0)}}
                         <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
@@ -620,6 +715,7 @@ export const FUSION_REPORT_TEMPLATE = `
                         {{/if}}
                         {{else}}
                         <div style="color:#999; font-style:italic; padding:20px; background-color:#f8f9fa; border-radius:4px; text-align:center;">No potential matches found for this account.</div>
+                        {{/if}}
                         {{/if}}
                     </td>
                     </tr>
