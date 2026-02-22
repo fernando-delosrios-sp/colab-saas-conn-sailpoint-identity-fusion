@@ -1201,41 +1201,17 @@ export class FusionAccount {
      * Remove a source account and update orphan status if needed
      */
     public removeSourceAccount(id: string): void {
-        const accounts = this._attributeBag.current.accounts as any
+        this._accountIds.delete(id)
 
-        if (accounts instanceof Set) {
-            accounts.delete(id)
-
-            if (accounts.size === 0) {
-                this.markAsOrphan()
-                this.addHistory(`Account became orphan after removing source account: ${id}`)
-            }
+        if (this._accountIds.size === 0) {
+            this.markAsOrphan()
+            this.addHistory(`Account became orphan after removing source account: ${id}`)
         }
 
         this.addHistory(`Source account removed: ${id}`)
     }
 
-    /**
-     * Mark account as orphan by updating statuses
-     */
     private markAsOrphan(): void {
-        if (!this._attributeBag.current.statuses) {
-            this._attributeBag.current.statuses = new Set<string>() as any
-        }
-
-        const statuses = this._attributeBag.current.statuses as any
-        if (statuses instanceof Set) {
-            statuses.add('orphan')
-        }
-    }
-
-    /** Placeholder for future attribute generation logic. */
-    public generateAttributes(): void {
-        // Placeholder for future implementation
-    }
-
-    /** Placeholder for future account editing logic. */
-    public async editAccount(): Promise<void> {
-        // TODO: Edit the account
+        this._statuses.add('orphan')
     }
 }

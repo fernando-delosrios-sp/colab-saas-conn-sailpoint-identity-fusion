@@ -1,15 +1,10 @@
-import {
-    Account,
-    IdentityDocument,
-    JsonPatchOperationV2025OpV2025,
-    SourcesV2025ApiUpdateSourceRequest,
-} from 'sailpoint-api-client'
+import { Account, IdentityDocument } from 'sailpoint-api-client'
 import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../../model/config'
 import { LogService } from '../logService'
 import { FormService } from '../formService'
 import { IdentityService } from '../identityService'
-import { SourceInfo, SourceService } from '../sourceService'
+import { SourceInfo, SourceService, buildSourceConfigPatch } from '../sourceService'
 import { FusionAccount } from '../../model/account'
 import { attrConcat, AttributeService } from '../attributeService'
 import { assert } from '../../utils/assert'
@@ -120,34 +115,14 @@ export class FusionService {
      */
     public async disableReset(): Promise<void> {
         const fusionSourceId = this.sources.fusionSourceId
-        const requestParameters: SourcesV2025ApiUpdateSourceRequest = {
-            id: fusionSourceId,
-            jsonPatchOperationV2025: [
-                {
-                    // Use 'add' for upsert: path may not exist on first run; replace would fail with 400
-                    op: 'add' as JsonPatchOperationV2025OpV2025,
-                    path: '/connectorAttributes/reset',
-                    value: false,
-                },
-            ],
-        }
+        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/reset', false)
         await this.sources.patchSourceConfig(fusionSourceId, requestParameters, 'FusionService>disableReset')
     }
 
     /** Clears the persisted fusion state in the source configuration. */
     public async resetState(): Promise<void> {
         const fusionSourceId = this.sources.fusionSourceId
-        const requestParameters: SourcesV2025ApiUpdateSourceRequest = {
-            id: fusionSourceId,
-            jsonPatchOperationV2025: [
-                {
-                    // Use 'add' for upsert: path may not exist on first run; replace would fail with 400
-                    op: 'add' as JsonPatchOperationV2025OpV2025,
-                    path: '/connectorAttributes/fusionState',
-                    value: false,
-                },
-            ],
-        }
+        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/fusionState', false)
         await this.sources.patchSourceConfig(fusionSourceId, requestParameters, 'FusionService>resetState')
     }
 
@@ -259,6 +234,19 @@ export class FusionService {
         }
         for (const identity of this.fusionIdentityMap.values()) {
             identity.syncCollectionAttributesToBag()
+        }
+    }
+
+    /**
+     * Refresh unique attributes for all fusion accounts and identities in batches.
+     */
+    public async refreshUniqueAttributes(): Promise<void> {
+        this.log.info('Refreshing unique attributes for all fusion accounts')
+        const batchSize = this.managedAccountsBatchSize
+        const allAccounts = [...this.fusionAccounts, ...this.fusionIdentities]
+        while (allAccounts.length > 0) {
+            const batch = allAccounts.splice(0, batchSize)
+            await Promise.all(batch.map((account) => this.attributes.refreshUniqueAttributes(account)))
         }
     }
 

@@ -4,7 +4,23 @@ import { FusionConfig } from '../model/config'
 import { ClientService, QueuePriority } from './clientService'
 import { LogService } from './logService'
 import { assert } from '../utils/assert'
+import { wrapConnectorError } from '../utils/error'
 import { FusionAccount } from '../model/account'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const IDENTITY_SEARCH_INCLUDES = ['id', 'name', 'displayName', 'email', 'attributes', 'accounts', 'disabled', 'protected']
+
+function buildIdentityQuery(queryString: string): Search {
+    return {
+        indices: ['identities'],
+        query: { query: queryString },
+        queryResultFilter: { includes: IDENTITY_SEARCH_INCLUDES },
+        includeNested: true,
+    }
+}
 
 // ============================================================================
 // IdentityService Class
@@ -81,20 +97,9 @@ export class IdentityService {
         if (this.identityScopeQuery) {
             this.log.info('Fetching identities.')
 
-            //TODO: only fetch relevant attributes
+            const query = buildIdentityQuery(this.identityScopeQuery)
 
-            const query: Search = {
-                indices: ['identities'],
-                query: {
-                    query: this.identityScopeQuery,
-                },
-                queryResultFilter: {
-                    includes: ['id', 'name', 'displayName', 'email', 'attributes', 'accounts', 'disabled', 'protected'],
-                },
-                includeNested: true,
-            }
-
-            try {
+            await wrapConnectorError(async () => {
                 const identities = await this.client.paginateSearchApi<IdentityDocument>(
                     query,
                     QueuePriority.HIGH,
@@ -104,14 +109,7 @@ export class IdentityService {
                     identities.map((identity) => [identity.protected ? '-' : identity.id, identity])
                 )
                 this.identitiesById.delete('-')
-            } catch (error) {
-                if (error instanceof ConnectorError) throw error
-                const detail = error instanceof Error ? error.message : String(error)
-                throw new ConnectorError(
-                    `Failed to fetch identities using scope query "${this.identityScopeQuery}": ${detail}`,
-                    ConnectorErrorType.Generic
-                )
-            }
+            }, `Failed to fetch identities using scope query "${this.identityScopeQuery}"`)
         } else {
             this.log.info('No identity scope query defined, skipping identity fetch.')
             this.identitiesById = new Map()
@@ -130,16 +128,7 @@ export class IdentityService {
         if (this.identityScopeQuery) {
             this.log.info('Fetching identities (streaming).')
 
-            const query: Search = {
-                indices: ['identities'],
-                query: {
-                    query: this.identityScopeQuery,
-                },
-                queryResultFilter: {
-                    includes: ['id', 'name', 'displayName', 'email', 'attributes', 'accounts', 'disabled', 'protected'],
-                },
-                includeNested: true,
-            }
+            const query = buildIdentityQuery(this.identityScopeQuery)
 
             try {
                 yield* this.client.paginateSearchApiGenerator<IdentityDocument>(
@@ -153,7 +142,7 @@ export class IdentityService {
                 const detail = error instanceof Error ? error.message : String(error)
                 throw new ConnectorError(
                     `Failed to fetch identities using scope query "${this.identityScopeQuery}": ${detail}`,
-                    ConnectorErrorType.Generic
+                    ConnectorErrorType.Generic,
                 )
             }
         } else {
@@ -170,20 +159,9 @@ export class IdentityService {
     public async fetchIdentityById(id: string): Promise<IdentityDocument> {
         this.log.info(`Fetching identity ${id}.`)
 
-        //TODO: only fetch relevant attributes
+        const query = buildIdentityQuery(`id:"${id}"`)
 
-        const query: Search = {
-            indices: ['identities'],
-            query: {
-                query: `id:"${id}"`,
-            },
-            queryResultFilter: {
-                includes: ['id', 'name', 'displayName', 'email', 'attributes', 'accounts', 'disabled', 'protected'],
-            },
-            includeNested: true,
-        }
-
-        try {
+        return wrapConnectorError(async () => {
             const identities = await this.client.paginateSearchApi<IdentityDocument>(
                 query,
                 QueuePriority.HIGH,
@@ -191,14 +169,7 @@ export class IdentityService {
             )
             identities.forEach((identity) => this.identitiesById.set(identity.id, identity))
             return identities[0]
-        } catch (error) {
-            if (error instanceof ConnectorError) throw error
-            const detail = error instanceof Error ? error.message : String(error)
-            throw new ConnectorError(
-                `Failed to fetch identity by ID "${id}": ${detail}`,
-                ConnectorErrorType.Generic
-            )
-        }
+        }, `Failed to fetch identity by ID "${id}"`)
     }
 
     /**
@@ -210,20 +181,9 @@ export class IdentityService {
     public async fetchIdentityByName(name: string): Promise<IdentityDocument> {
         this.log.info(`Fetching identity ${name}.`)
 
-        //TODO: only fetch relevant attributes
+        const query = buildIdentityQuery(`name.exact:"${name}"`)
 
-        const query: Search = {
-            indices: ['identities'],
-            query: {
-                query: `name.exact:"${name}"`,
-            },
-            queryResultFilter: {
-                includes: ['id', 'name', 'displayName', 'email', 'attributes', 'accounts', 'disabled', 'protected'],
-            },
-            includeNested: true,
-        }
-
-        try {
+        return wrapConnectorError(async () => {
             const identities = await this.client.paginateSearchApi<IdentityDocument>(
                 query,
                 QueuePriority.HIGH,
@@ -231,14 +191,7 @@ export class IdentityService {
             )
             identities.forEach((identity) => this.identitiesById.set(identity.id, identity))
             return identities[0]
-        } catch (error) {
-            if (error instanceof ConnectorError) throw error
-            const detail = error instanceof Error ? error.message : String(error)
-            throw new ConnectorError(
-                `Failed to fetch identity by name "${name}": ${detail}`,
-                ConnectorErrorType.Generic
-            )
-        }
+        }, `Failed to fetch identity by name "${name}"`)
     }
 
     // ------------------------------------------------------------------------

@@ -26,7 +26,9 @@ import { BaseConfig, FusionConfig, SourceConfig } from '../../model/config'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
 import { assert, softAssert } from '../../utils/assert'
+import { wrapConnectorError } from '../../utils/error'
 import { getDateFromISOString } from '../../utils/date'
+import { buildSourceConfigPatch } from './helpers'
 import { SourceInfo } from './types'
 
 // ============================================================================
@@ -213,20 +215,13 @@ export class SourceService {
         this.log.debug('Fetching all sources')
         const { sourcesApi } = this.client
 
-        let apiSources: any[]
-        try {
-            const listSources = async (requestParameters?: SourcesV2025ApiListSourcesRequest) => {
-                return await sourcesApi.listSources(requestParameters)
-            }
-            apiSources = await this.client.paginate(listSources, {}, QueuePriority.HIGH, 'SourceService>fetchAllSources listSources')
-        } catch (error) {
-            if (error instanceof ConnectorError) throw error
-            const detail = error instanceof Error ? error.message : String(error)
-            throw new ConnectorError(
-                `Failed to fetch sources from ISC. Please verify your connector configuration and API credentials: ${detail}`,
-                ConnectorErrorType.Generic
-            )
+        const listSources = async (requestParameters?: SourcesV2025ApiListSourcesRequest) => {
+            return await sourcesApi.listSources(requestParameters)
         }
+        const apiSources = await wrapConnectorError(
+            () => this.client.paginate(listSources, {}, QueuePriority.HIGH, 'SourceService>fetchAllSources listSources'),
+            'Failed to fetch sources from ISC. Please verify your connector configuration and API credentials'
+        )
         assert(apiSources.length > 0, 'No sources found in ISC. Please verify that the configured sources exist and the connector has access to them.')
 
         // Build a Map for O(1) lookups instead of O(n) find() operations
@@ -360,12 +355,7 @@ export class SourceService {
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
-        // Build filter using array join for better performance
-        const filterParts: string[] = [`sourceId eq "${sourceId}"`]
-        if (sourceInfo.isManaged && sourceInfo.config?.accountFilter) {
-            filterParts.push(`(${sourceInfo.config.accountFilter})`)
-        }
-        const filters = filterParts.join(' and ')
+        const filters = this.buildSourceFilter(sourceInfo)
         const sorters = 'created'
 
         const requestParameters: AccountsApiListAccountsRequest = {
@@ -394,11 +384,7 @@ export class SourceService {
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
-        const filterParts: string[] = [`sourceId eq "${sourceId}"`]
-        if (sourceInfo.isManaged && sourceInfo.config?.accountFilter) {
-            filterParts.push(`(${sourceInfo.config.accountFilter})`)
-        }
-        const filters = filterParts.join(' and ')
+        const filters = this.buildSourceFilter(sourceInfo)
         const sorters = 'created'
 
         const requestParameters: AccountsApiListAccountsRequest = {
@@ -420,18 +406,11 @@ export class SourceService {
      */
     public async fetchFusionAccounts(): Promise<void> {
         this.log.debug('Fetching fusion accounts')
-        try {
+        await wrapConnectorError(async () => {
             const accounts = await this.fetchAccountsBySourceId(this.fusionSourceId)
             this.fusionAccountsByNativeIdentity = new Map(accounts.map((account) => [account.nativeIdentity!, account]))
             this.log.debug(`Fetched ${this.fusionAccountsByNativeIdentity.size} fusion account(s)`)
-        } catch (error) {
-            if (error instanceof ConnectorError) throw error
-            const detail = error instanceof Error ? error.message : String(error)
-            throw new ConnectorError(
-                `Failed to fetch fusion accounts from the fusion source: ${detail}`,
-                ConnectorErrorType.Generic
-            )
-        }
+        }, 'Failed to fetch fusion accounts from the fusion source')
     }
 
     /**
@@ -461,8 +440,7 @@ export class SourceService {
             return { source: s, effectiveLimit }
         })
 
-        try {
-            // Fetch from all sources in parallel
+        await wrapConnectorError(async () => {
             await Promise.all(
                 sourcesWithLimits.map(async ({ source, effectiveLimit }) => {
                     this.log.info(`Fetching accounts from source: ${source.name}`)
@@ -501,14 +479,7 @@ export class SourceService {
                 })
             )
             this.log.debug(`Total managed accounts loaded: ${this.managedAccountsById.size}`)
-        } catch (error) {
-            if (error instanceof ConnectorError) throw error
-            const detail = error instanceof Error ? error.message : String(error)
-            throw new ConnectorError(
-                `Failed to fetch managed accounts: ${detail}`,
-                ConnectorErrorType.Generic
-            )
-        }
+        }, 'Failed to fetch managed accounts')
     }
 
     // ------------------------------------------------------------------------
@@ -571,15 +542,7 @@ export class SourceService {
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
-        // Build filter using array join for better performance
-        const filterParts: string[] = [
-            `sourceId eq "${sourceId}"`,
-            `nativeIdentity eq "${nativeIdentity}"`
-        ]
-        if (sourceInfo.isManaged && sourceInfo.config?.accountFilter) {
-            filterParts.push(`(${sourceInfo.config.accountFilter})`)
-        }
-        const filters = filterParts.join(' and ')
+        const filters = this.buildSourceFilter(sourceInfo, `nativeIdentity eq "${nativeIdentity}"`)
 
         const requestParameters: AccountsApiListAccountsRequest = {
             filters,
@@ -794,16 +757,7 @@ export class SourceService {
         }
 
         this.log.info('Setting processing lock to true.')
-        const requestParameters: SourcesV2025ApiUpdateSourceRequest = {
-            id: fusionSourceId,
-            jsonPatchOperationV2025: [
-                {
-                    op: 'add' as JsonPatchOperationV2025OpV2025,
-                    path: '/connectorAttributes/processing',
-                    value: true,
-                },
-            ],
-        }
+        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/processing', true)
         await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>setProcessLock')
     }
 
@@ -825,16 +779,7 @@ export class SourceService {
         try {
             const fusionSourceId = this.fusionSourceId
             this.log.info('Releasing processing lock.')
-            const requestParameters: SourcesV2025ApiUpdateSourceRequest = {
-                id: fusionSourceId,
-                jsonPatchOperationV2025: [
-                    {
-                        op: 'add' as JsonPatchOperationV2025OpV2025,
-                        path: '/connectorAttributes/processing',
-                        value: false,
-                    },
-                ],
-            }
+            const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/processing', false)
             await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>releaseProcessLock')
         } catch (error) {
             this.log.error(`Failed to release processing lock: ${error instanceof Error ? error.message : String(error)}`)
@@ -860,16 +805,7 @@ export class SourceService {
 
         const fusionSourceId = this.fusionSourceId
         this.log.info(`Saving batch cumulative count: ${JSON.stringify(this.batchCumulativeCount)}`)
-        const requestParameters: SourcesV2025ApiUpdateSourceRequest = {
-            id: fusionSourceId,
-            jsonPatchOperationV2025: [
-                {
-                    op: 'add' as JsonPatchOperationV2025OpV2025,
-                    path: '/connectorAttributes/batchCumulativeCount',
-                    value: this.batchCumulativeCount,
-                },
-            ],
-        }
+        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/batchCumulativeCount', this.batchCumulativeCount)
         await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>saveBatchCumulativeCount')
     }
 
@@ -889,16 +825,7 @@ export class SourceService {
         this.batchCumulativeCount = {}
         const fusionSourceId = this.fusionSourceId
         this.log.info('Resetting batch cumulative count')
-        const requestParameters: SourcesV2025ApiUpdateSourceRequest = {
-            id: fusionSourceId,
-            jsonPatchOperationV2025: [
-                {
-                    op: 'add' as JsonPatchOperationV2025OpV2025,
-                    path: '/connectorAttributes/batchCumulativeCount',
-                    value: {},
-                },
-            ],
-        }
+        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/batchCumulativeCount', {})
         await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>resetBatchCumulativeCount')
     }
 
@@ -1207,6 +1134,18 @@ export class SourceService {
     // ------------------------------------------------------------------------
     // Private Helper Methods
     // ------------------------------------------------------------------------
+
+    /**
+     * Builds an ISC account filter string for a source, optionally appending
+     * the source's configured accountFilter and any extra filter clauses.
+     */
+    private buildSourceFilter(sourceInfo: SourceInfo, ...extraFilters: string[]): string {
+        const filterParts: string[] = [`sourceId eq "${sourceInfo.id}"`, ...extraFilters]
+        if (sourceInfo.isManaged && sourceInfo.config?.accountFilter) {
+            filterParts.push(`(${sourceInfo.config.accountFilter})`)
+        }
+        return filterParts.join(' and ')
+    }
 
     /**
      * Fetch a single account by ID

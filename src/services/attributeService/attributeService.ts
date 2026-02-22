@@ -9,8 +9,7 @@ import { LockService } from '../lockService'
 import { RenderContext } from 'velocityjs/dist/src/type'
 import { v4 as uuidv4 } from 'uuid'
 import { assert } from '../../utils/assert'
-import { JsonPatchOperationV2025OpV2025, SourcesV2025ApiUpdateSourceRequest } from 'sailpoint-api-client'
-import { SourceService } from '../sourceService'
+import { SourceService, buildSourceConfigPatch } from '../sourceService'
 import { COMPOUND_KEY_UNIQUE_ID_ATTRIBUTE, FUSION_STATE_CONFIG_PATH } from './constants'
 import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
@@ -92,18 +91,7 @@ export class AttributeService {
         const stateObject = await this.getStateObject()
 
         this.log.info(`Saving state object: ${JSON.stringify(stateObject)}`)
-        const requestParameters: SourcesV2025ApiUpdateSourceRequest = {
-            id: fusionSourceId,
-            jsonPatchOperationV2025: [
-                {
-                    // Use 'add' for upsert semantics: creates path if missing, replaces if present (RFC 6902).
-                    // 'replace' requires the path to exist and fails with 400 on first run.
-                    op: 'add' as JsonPatchOperationV2025OpV2025,
-                    path: FUSION_STATE_CONFIG_PATH,
-                    value: stateObject,
-                },
-            ],
-        }
+        const requestParameters = buildSourceConfigPatch(fusionSourceId, FUSION_STATE_CONFIG_PATH, stateObject)
         await this.sourceService.patchSourceConfig(fusionSourceId, requestParameters, 'AttributeService>saveState')
     }
 

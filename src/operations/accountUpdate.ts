@@ -2,10 +2,8 @@ import { ConnectorError, StdAccountUpdateInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
-import { reportAction } from './actions/reportAction'
-import { fusionAction } from './actions/fusionAction'
-import { correlateAction } from './actions/correlateAction'
-import { AttributeOperations } from '../services/attributeService/types'
+import { executeAction } from './actions'
+import { ATTR_OPS_NONE } from '../services/attributeService/types'
 
 /**
  * Account update operation - Applies entitlement changes (actions) to a fusion account.
@@ -41,12 +39,7 @@ export const accountUpdate = async (
         await schemas.setFusionAccountSchema(input.schema)
         timer.phase('Step 1: Loading sources and schema')
 
-        const attributeOperations: AttributeOperations = {
-            refreshMapping: false,
-            refreshDefinition: false,
-            resetDefinition: false,
-        }
-        const fusionAccount = await rebuildFusionAccount(input.identity, attributeOperations, serviceRegistry)
+        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_NONE, serviceRegistry)
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
         timer.phase('Step 2: Rebuilding fusion account with fresh attributes')
@@ -56,24 +49,7 @@ export const accountUpdate = async (
             assert(change.attribute, 'Change attribute is required')
 
             if (change.attribute === 'actions') {
-                log.debug(`Executing action: ${change.value} (operation: ${change.op})`)
-                switch (change.value) {
-                    case 'report':
-                        await reportAction(fusionAccount, change.op, serviceRegistry)
-                        log.debug('Report action completed')
-                        break
-                    case 'fusion':
-                        await fusionAction(fusionAccount, change.op, serviceRegistry)
-                        log.debug('Fusion action completed')
-                        break
-                    case 'correlated':
-                        await correlateAction(fusionAccount, change.op, serviceRegistry)
-                        log.debug('Correlate action completed')
-                        // Status/action will be updated after correlation promises resolve in getISCAccount
-                        break
-                    default:
-                        log.crash(`Unsupported action: ${change.value}`)
-                }
+                await executeAction(change.value, fusionAccount, change.op, serviceRegistry)
             } else {
                 log.crash(`Unsupported entitlement change: ${change.attribute}`)
             }

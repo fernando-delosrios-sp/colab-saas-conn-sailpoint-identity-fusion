@@ -2,7 +2,7 @@ import { ConnectorError, StdAccountEnableInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
-import { AttributeOperations } from '../services/attributeService/types'
+import { ATTR_OPS_RESET } from '../services/attributeService/types'
 
 /**
  * Account enable operation - Re-enables a previously disabled fusion account.
@@ -52,12 +52,7 @@ export const accountEnable = async (
         await fusion.preProcessFusionAccounts()
         timer.phase('Step 2: Pre-processing all fusion accounts to collect unique values')
 
-        const attributeOperations: AttributeOperations = {
-            refreshMapping: true,
-            refreshDefinition: true,
-            resetDefinition: true,
-        }
-        const fusionAccount = await rebuildFusionAccount(input.identity, attributeOperations, serviceRegistry)
+        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_RESET, serviceRegistry)
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
 

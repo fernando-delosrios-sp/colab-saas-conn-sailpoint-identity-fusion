@@ -29,3 +29,12 @@ export type AttributeOperations = {
     /** Whether to fully reset generated attributes (re-register unique values) */
     resetDefinition: boolean
 }
+
+/** Refresh mappings and definitions without resetting (read, disable). */
+export const ATTR_OPS_REFRESH: AttributeOperations = { refreshMapping: true, refreshDefinition: true, resetDefinition: false }
+
+/** Full reset: refresh and regenerate unique values (enable). */
+export const ATTR_OPS_RESET: AttributeOperations = { refreshMapping: true, refreshDefinition: true, resetDefinition: true }
+
+/** No attribute processing (update -- only actions are applied). */
+export const ATTR_OPS_NONE: AttributeOperations = { refreshMapping: false, refreshDefinition: false, resetDefinition: false }

@@ -2,7 +2,7 @@ import { ConnectorError, StdAccountDisableInput } from '@sailpoint/connector-sdk
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
-import { AttributeOperations } from '../services/attributeService/types'
+import { ATTR_OPS_REFRESH } from '../services/attributeService/types'
 
 /**
  * Account disable operation - Disables a fusion account.
@@ -37,12 +37,7 @@ export const accountDisable = async (
         await schemas.setFusionAccountSchema(input.schema)
         timer.phase('Step 1: Loading sources and schema')
 
-        const attributeOperations: AttributeOperations = {
-            refreshMapping: true,
-            refreshDefinition: true,
-            resetDefinition: false,
-        }
-        const fusionAccount = await rebuildFusionAccount(input.identity, attributeOperations, serviceRegistry)
+        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_REFRESH, serviceRegistry)
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
         timer.phase('Step 2: Rebuilding fusion account with fresh attributes')

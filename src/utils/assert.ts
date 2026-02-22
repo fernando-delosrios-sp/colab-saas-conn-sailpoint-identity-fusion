@@ -1,10 +1,22 @@
-import { ServiceRegistry } from '../services/serviceRegistry'
-import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
-import { getCallerFunctionName } from '../services/logService'
+import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
 
 /**
- * Hard assertion - throws an error if condition is false or value is null/undefined
- * Automatically detects the caller function name for logging context
+ * Tries to access the ServiceRegistry for rich logging (crash/warn/error).
+ * Returns undefined if not yet initialized (e.g. during config loading).
+ * Lazy-imported to avoid circular dependency with ServiceRegistry -> LogService -> assert.
+ */
+function tryGetServiceRegistry(): any {
+    try {
+        const { ServiceRegistry } = require('../services/serviceRegistry')
+        return ServiceRegistry.getCurrent?.()
+    } catch {
+        return undefined
+    }
+}
+
+/**
+ * Hard assertion - throws an error if condition is false or value is null/undefined.
+ * Uses ServiceRegistry logger when available, falls back to SDK logger.
  *
  * Supports two patterns:
  * 1. Direct value: assert(value, 'message') - narrows value to non-null/non-undefined
@@ -16,27 +28,23 @@ export function assert<T>(
     valueOrCondition: T | null | undefined | boolean,
     message: string
 ): asserts valueOrCondition is T {
-    // Check for null/undefined (for direct value pattern)
     const isNullish = valueOrCondition === null || valueOrCondition === undefined
-    // Check for false (for boolean expression pattern)
     const isFalse = valueOrCondition === false
 
     if (isNullish || isFalse) {
-        const serviceRegistry = ServiceRegistry.getCurrent()
-
-        if (serviceRegistry?.log) {
-            serviceRegistry.log.crash(message)
+        const registry = tryGetServiceRegistry()
+        if (registry?.log) {
+            registry.log.crash(message)
         } else {
-            // Fallback if service registry not available
-            const functionName = getCallerFunctionName(2) || 'unknown'
-            throw new ConnectorError(`${functionName}: ${message}`, ConnectorErrorType.Generic)
+            logger.error(message)
+            throw new ConnectorError(message, ConnectorErrorType.Generic)
         }
     }
 }
 
 /**
- * Soft assertion - logs a warning/error but doesn't throw
- * Automatically detects the caller function name for logging context
+ * Soft assertion - logs a warning/error but doesn't throw.
+ * Uses ServiceRegistry logger when available, falls back to SDK logger.
  * @returns true if assertion passed, false if it failed
  */
 export function softAssert<T>(
@@ -48,18 +56,19 @@ export function softAssert<T>(
     const isFalse = valueOrCondition === false
 
     if (isNullish || isFalse) {
-        const serviceRegistry = ServiceRegistry.getCurrent()
-
-        if (serviceRegistry?.log) {
+        const registry = tryGetServiceRegistry()
+        if (registry?.log) {
             if (level === 'error') {
-                serviceRegistry.log.error(message)
+                registry.log.error(message)
             } else {
-                serviceRegistry.log.warn(message)
+                registry.log.warn(message)
             }
         } else {
-            // Fallback if service registry not available
-            const functionName = getCallerFunctionName(2) || 'unknown'
-            console.warn(`${functionName}: ${message}`)
+            if (level === 'error') {
+                logger.error(message)
+            } else {
+                logger.warn(message)
+            }
         }
     }
     return !(isNullish || isFalse)

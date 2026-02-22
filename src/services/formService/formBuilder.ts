@@ -10,6 +10,62 @@ import { ALGORITHM_LABELS } from './constants'
 import { Candidate } from './types'
 
 // ============================================================================
+// Shared Helpers
+// ============================================================================
+
+/**
+ * Builds a best-effort identifier for a fusion account, trying several fields
+ * in priority order before falling back to 'unknown'.
+ */
+function getAccountIdentifier(fusionAccount: FusionAccount): string {
+    return (
+        String(fusionAccount.managedAccountId || '').trim() ||
+        String(fusionAccount.nativeIdentityOrUndefined || '').trim() ||
+        String((fusionAccount.attributes as any)?.id || '').trim() ||
+        String((fusionAccount.attributes as any)?.uuid || '').trim() ||
+        String(fusionAccount.identityId || '').trim() ||
+        'unknown'
+    )
+}
+
+/**
+ * Formats a score/threshold pair as "Score: X [Y]" or "Score: X".
+ */
+function formatScoreDisplay(scoreValue: number, thresholdValue?: number | null): string {
+    const trimmedScore = Number.isFinite(scoreValue) ? parseFloat(scoreValue.toFixed(2)) : undefined
+    const scoreStr = trimmedScore !== undefined ? String(trimmedScore) : 'N/A'
+    if (thresholdValue !== undefined && thresholdValue !== null) {
+        return `Score: ${scoreStr} [${thresholdValue}]`
+    }
+    return `Score: ${scoreStr}`
+}
+
+/**
+ * Returns the TOGGLE element config for the "New identity" / "No match" decision,
+ * which varies by source type.
+ */
+function getToggleConfig(sourceType: SourceType): Record<string, any> {
+    if (sourceType === 'identity') {
+        return {
+            label: 'New identity',
+            default: false,
+            trueLabel: 'True',
+            falseLabel: 'False',
+            helpText: 'Select this if the account is a new identity',
+        }
+    }
+    return {
+        label: 'No match',
+        default: false,
+        trueLabel: 'True',
+        falseLabel: 'False',
+        helpText: sourceType === 'record'
+            ? 'Select this if the record does not match any existing identity'
+            : 'Select this if the orphan account does not match any existing identity',
+    }
+}
+
+// ============================================================================
 // Form Building Functions
 // ============================================================================
 
@@ -25,13 +81,7 @@ export const buildFormInput = (
     const formInput: { [key: string]: any } = {}
     formInput.sourceType = sourceType
 
-    const accountIdentifier =
-        String(fusionAccount.managedAccountId || '').trim() ||
-        String(fusionAccount.nativeIdentityOrUndefined || '').trim() ||
-        String((fusionAccount.attributes as any)?.id || '').trim() ||
-        String((fusionAccount.attributes as any)?.uuid || '').trim() ||
-        String(fusionAccount.identityId || '').trim() ||
-        'unknown'
+    const accountIdentifier = getAccountIdentifier(fusionAccount)
 
     // NOTE: formInput must match the form definition input types.
     // Keep values primitive (STRING/BOOLEAN/NUMBER) to avoid Custom Forms payload issues.
@@ -76,24 +126,13 @@ export const buildFormInput = (
             })
         }
 
-        // Add score inputs with combined display format
         if (candidate.scores && Array.isArray(candidate.scores) && candidate.scores.length > 0) {
             candidate.scores.forEach((score: any) => {
                 if (!score || typeof score !== 'object') return
-                // ScoreReport structure: { attribute, algorithm, fusionScore, score, isMatch }
                 if (score.attribute && score.score !== undefined) {
                     const attrKey = String(score.attribute).charAt(0).toLowerCase() + String(score.attribute).slice(1)
                     const algorithmKey = String(score.algorithm ?? 'unknown')
-                    const scoreValue = Number(score.score)
-                    const thresholdValue = score.fusionScore
-                    const trimmedScore = Number.isFinite(scoreValue) ? parseFloat(scoreValue.toFixed(2)) : undefined
-
-                    // Format: "Score: X [Y]" where X is the score and Y is the threshold
-                    const displayValue = thresholdValue !== undefined && thresholdValue !== null
-                        ? `Score: ${trimmedScore !== undefined ? trimmedScore : 'N/A'} [${thresholdValue}]`
-                        : `Score: ${trimmedScore !== undefined ? trimmedScore : 'N/A'}`
-
-                    formInput[`${candidateId}.${attrKey}.${algorithmKey}.score`] = displayValue
+                    formInput[`${candidateId}.${attrKey}.${algorithmKey}.score`] = formatScoreDisplay(Number(score.score), score.fusionScore)
                 }
             })
         }
@@ -181,29 +220,7 @@ export const buildFormFields = (
                                     id: 'newIdentity',
                                     key: 'newIdentity',
                                     elementType: 'TOGGLE',
-                                    config: sourceType === 'identity'
-                                        ? {
-                                            label: 'New identity',
-                                            default: false,
-                                            trueLabel: 'True',
-                                            falseLabel: 'False',
-                                            helpText: 'Select this if the account is a new identity',
-                                        }
-                                        : sourceType === 'record'
-                                            ? {
-                                                label: 'No match',
-                                                default: false,
-                                                trueLabel: 'True',
-                                                falseLabel: 'False',
-                                                helpText: 'Select this if the record does not match any existing identity',
-                                            }
-                                            : {
-                                                label: 'No match',
-                                                default: false,
-                                                trueLabel: 'True',
-                                                falseLabel: 'False',
-                                                helpText: 'Select this if the orphan account does not match any existing identity',
-                                            },
+                                    config: getToggleConfig(sourceType),
                                     validations: [],
                                 },
                             ],
@@ -296,20 +313,11 @@ export const buildFormFields = (
 
             candidate.scores.forEach((score: any) => {
                 if (!score || typeof score !== 'object') return
-                // ScoreReport structure: { attribute, algorithm, fusionScore, score, isMatch }
                 if (score.attribute && score.score !== undefined) {
                     const attrName = String(score.attribute)
                     const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
                     const algorithmKey = String(score.algorithm ?? 'unknown')
                     const algorithm = ALGORITHM_LABELS[algorithmKey] ?? algorithmKey
-                    const scoreValue = Number(score.score)
-                    const thresholdValue = score.fusionScore
-                    const trimmedScore = Number.isFinite(scoreValue) ? parseFloat(scoreValue.toFixed(2)) : undefined
-
-                    // Format: "Score: X [Y]" where X is the score and Y is the threshold
-                    const displayValue = thresholdValue !== undefined && thresholdValue !== null
-                        ? `Score: ${trimmedScore !== undefined ? trimmedScore : 'N/A'} [${thresholdValue}]`
-                        : `Score: ${trimmedScore !== undefined ? trimmedScore : 'N/A'}`
 
                     candidateElements.push({
                         id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
@@ -318,7 +326,7 @@ export const buildFormFields = (
                         config: {
                             label: capitalizeFirst(attrName),
                             helpText: algorithm,
-                            default: displayValue,
+                            default: formatScoreDisplay(Number(score.score), score.fusionScore),
                         },
                         validations: [],
                     })
@@ -491,13 +499,7 @@ export const buildFormInputs = (
 ): FormDefinitionInputV2025[] => {
     const formInputs: FormDefinitionInputV2025[] = []
 
-    const accountIdentifier =
-        String(fusionAccount.managedAccountId || '').trim() ||
-        String(fusionAccount.nativeIdentityOrUndefined || '').trim() ||
-        String((fusionAccount.attributes as any)?.id || '').trim() ||
-        String((fusionAccount.attributes as any)?.uuid || '').trim() ||
-        String(fusionAccount.identityId || '').trim() ||
-        'unknown'
+    const accountIdentifier = getAccountIdentifier(fusionAccount)
 
     // Account info
     // IMPORTANT: Use displayName consistently with form conditions
@@ -568,28 +570,18 @@ export const buildFormInputs = (
             })
         }
 
-        // Add score inputs with combined display format
         if (candidate.scores && Array.isArray(candidate.scores) && candidate.scores.length > 0) {
             candidate.scores.forEach((score: any) => {
                 if (!score || typeof score !== 'object') return
-                // ScoreReport structure: { attribute, algorithm, fusionScore, score, isMatch }
                 if (score.attribute && score.score !== undefined) {
                     const attrKey = String(score.attribute).charAt(0).toLowerCase() + String(score.attribute).slice(1)
                     const algorithmKey = String(score.algorithm ?? 'unknown')
-                    const scoreValue = Number(score.score)
-                    const thresholdValue = score.fusionScore
-                    const trimmedScore = Number.isFinite(scoreValue) ? parseFloat(scoreValue.toFixed(2)) : undefined
-
-                    // Format: "Score: X [Y]" where X is the score and Y is the threshold
-                    const displayValue = thresholdValue !== undefined && thresholdValue !== null
-                        ? `Score: ${trimmedScore !== undefined ? trimmedScore : 'N/A'} [${thresholdValue}]`
-                        : `Score: ${trimmedScore !== undefined ? trimmedScore : 'N/A'}`
 
                     formInputs.push({
                         id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
                         type: 'STRING',
                         label: `${candidateId}.${attrKey}.${algorithmKey}.score`,
-                        description: displayValue,
+                        description: formatScoreDisplay(Number(score.score), score.fusionScore),
                     })
                 }
             })

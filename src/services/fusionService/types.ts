@@ -53,6 +53,16 @@ export type FusionReportAccount = {
 }
 
 /** Processing statistics included in the fusion report. */
+/**
+ * Snapshot values only available from the aggregation orchestrator.
+ * Passed to generateReport so it can build the full FusionReportStats.
+ */
+export type AggregationStats = {
+    identitiesFound: number
+    managedAccountsFound: number
+    totalProcessingTime: string
+}
+
 export type FusionReportStats = {
     /** Total fusion accounts (existing + new) */
     totalFusionAccounts?: number

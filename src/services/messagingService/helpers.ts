@@ -1,7 +1,8 @@
+import fs from 'fs'
+import path from 'path'
 import Handlebars from 'handlebars'
 import type { TemplateDelegate as HandlebarsTemplateDelegate } from 'handlebars'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
-import { FUSION_REVIEW_TEMPLATE, FUSION_REPORT_TEMPLATE } from '../../model/messages'
 
 // ============================================================================
 // Handlebars Helpers
@@ -129,10 +130,13 @@ export const registerHandlebarsHelpers = (): void => {
 /**
  * Compile all email templates
  */
+const loadTemplate = (filename: string): string =>
+    fs.readFileSync(path.join(__dirname, 'templates', filename), 'utf8')
+
 export const compileEmailTemplates = (): Map<string, HandlebarsTemplateDelegate> => {
     const templates = new Map<string, HandlebarsTemplateDelegate>()
-    templates.set('fusion-review', Handlebars.compile(FUSION_REVIEW_TEMPLATE))
-    templates.set('fusion-report', Handlebars.compile(FUSION_REPORT_TEMPLATE))
+    templates.set('fusion-review', Handlebars.compile(loadTemplate('fusion-review.hbs')))
+    templates.set('fusion-report', Handlebars.compile(loadTemplate('fusion-report.hbs')))
     return templates
 }
 

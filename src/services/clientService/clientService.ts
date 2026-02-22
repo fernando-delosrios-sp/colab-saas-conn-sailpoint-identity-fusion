@@ -443,53 +443,10 @@ export class ClientService {
         priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string
     ): Promise<T[]> {
-        const pageSize = this.pageSize
         const allItems: T[] = []
-
-        // Ensure sort by id as required for searchAfter paging
-        const baseSearch: Search = {
-            ...search,
-            sort: ['id'],
+        for await (const page of this.paginateSearchApiGenerator<T>(search, priority, context)) {
+            allItems.push(...page)
         }
-
-        let searchAfter: any[] | undefined
-        let isFirstPage = true
-        let hasMore = true
-        let pageNum = 1
-
-        while (hasMore) {
-            const pageContext = context ? `${context} [page ${pageNum}]` : `search [page ${pageNum}]`
-            const response = await this.execute<any>(
-                () =>
-                    this.searchApi.searchPost({
-                        search: searchAfter ? { ...baseSearch, searchAfter } : baseSearch,
-                        limit: pageSize,
-                        // Use count=true only on the first request to populate X-Total-Count
-                        count: isFirstPage ? true : undefined,
-                    }),
-                priority,
-                pageContext
-            )
-            const items = ((response?.data as T[]) || []) as T[]
-            allItems.push(...items)
-
-            if (items.length < pageSize) {
-                hasMore = false
-            } else {
-                // Prepare searchAfter for the next page using the last item's id
-                const lastItem: any = items[items.length - 1]
-                const lastId = lastItem?.id
-                if (!lastId) {
-                    hasMore = false
-                } else {
-                    searchAfter = [lastId]
-                }
-            }
-
-            isFirstPage = false
-            pageNum += 1
-        }
-
         return allItems
     }
 

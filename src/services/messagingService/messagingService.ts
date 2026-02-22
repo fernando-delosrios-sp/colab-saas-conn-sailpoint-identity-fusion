@@ -12,6 +12,7 @@ import { LogService } from '../logService'
 import { EmailWorkflow } from '../../model/emailWorkflow'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { assert, softAssert } from '../../utils/assert'
+import { wrapConnectorError } from '../../utils/error'
 import { pickAttributes } from '../../utils/attributes'
 import { createUrlContext, UrlContext } from '../../utils/url'
 import { normalizeEmailValue, sanitizeRecipients } from './email'
@@ -100,7 +101,7 @@ export class MessagingService {
         }
 
         // Workflow doesn't exist, create it
-        try {
+        await wrapConnectorError(async () => {
             const emailWorkflow = new EmailWorkflow(workflowName, owner)
             assert(emailWorkflow, 'Failed to create email workflow object')
 
@@ -112,15 +113,7 @@ export class MessagingService {
             assert(this.workflow.id, 'Workflow ID is required')
 
             this.log.info(`Created workflow: ${workflowName} (ID: ${this.workflow.id})`)
-        } catch (error) {
-            if (error instanceof ConnectorError) throw error
-            this.log.error(`Failed to create workflow: ${error}`)
-            const detail = error instanceof Error ? error.message : String(error)
-            throw new ConnectorError(
-                `Workflow preparation failed. Unable to create email workflow "${workflowName}": ${detail}`,
-                ConnectorErrorType.Generic
-            )
-        }
+        }, `Workflow preparation failed. Unable to create email workflow "${workflowName}"`)
     }
 
     /**

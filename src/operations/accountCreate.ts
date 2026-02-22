@@ -1,9 +1,7 @@
 import { AttributeChangeOp, ConnectorError, StdAccountCreateInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { assert } from '../utils/assert'
-import { reportAction } from './actions/reportAction'
-import { fusionAction } from './actions/fusionAction'
-import { correlateAction } from './actions/correlateAction'
+import { executeAction } from './actions'
 
 /**
  * Account create operation - Creates a new fusion account for an identity.
@@ -74,23 +72,7 @@ export const accountCreate = async (
         log.info(`Processing ${actions.length} action(s)`)
 
         for (const action of actions) {
-            log.debug(`Executing action: ${action}`)
-            switch (action) {
-                case 'report':
-                    await reportAction(fusionIdentity, AttributeChangeOp.Add, serviceRegistry)
-                    log.debug('Report action completed')
-                    break
-                case 'fusion':
-                    await fusionAction(fusionIdentity, AttributeChangeOp.Add, serviceRegistry)
-                    log.debug('Fusion action completed')
-                    break
-                case 'correlate':
-                    await correlateAction(fusionIdentity, AttributeChangeOp.Add, serviceRegistry)
-                    log.debug('Correlate action completed')
-                    break
-                default:
-                    log.crash(`Unsupported action: ${action}`)
-            }
+            await executeAction(action, fusionIdentity, AttributeChangeOp.Add, serviceRegistry)
         }
         timer.phase(`Step 3: Processing ${actions.length} action(s)`)
 

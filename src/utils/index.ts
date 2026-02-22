@@ -14,3 +14,6 @@ export * from './date'
 
 // Assert utilities
 export * from './assert'
+
+// Error utilities
+export * from './error'
