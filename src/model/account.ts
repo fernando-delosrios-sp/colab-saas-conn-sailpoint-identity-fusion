@@ -1001,13 +1001,19 @@ export class FusionAccount {
      * Applies a reviewer's fusion decision to this account, setting it as either
      * "manual" (new identity) or "authorized" (merge into existing).
      *
+     * Record and orphan no-match decisions are skipped: those source types never
+     * yield a persisted Fusion account on no-match, so status/history is not set.
+     *
      * @param decision - The fusion decision from the review form
      */
     public addFusionDecisionLayer(decision: FusionDecision): void {
         this.setUncorrelatedAccount(decision.account.id!)
+        const sourceType = decision.sourceType ?? 'authoritative'
 
         if (decision.newIdentity) {
-            this.setManual(decision)
+            if (sourceType === 'authoritative') {
+                this.setManual(decision)
+            }
         } else {
             this.setAuthorized(decision)
         }
@@ -1110,27 +1116,41 @@ export class FusionAccount {
     }
 
     /**
-     * Helper to create history message for decision actions
+     * Builds a history message for decision actions, varying wording by source type.
+     * - authoritative manual: "new account"
+     * - authoritative authorized: "authorized"
+     * - record authorized: "assigned record"
+     * - orphan authorized: "assigned orphan account"
+     *
+     * Record/orphan manual (no-match) decisions never reach here because
+     * addFusionDecisionLayer skips setManual for those source types.
      */
     private createDecisionHistoryMessage(decision: FusionDecision, action: string): string {
         const submitterName = decision.submitter.name || decision.submitter.email
         const accountInfo = `${decision.account.name} [${decision.account.sourceName}]`
+        const sourceType = decision.sourceType ?? 'authoritative'
 
         if (action === 'manual') {
             return `Set ${accountInfo} as new account by ${submitterName}`
-        } else {
-            return `Set ${accountInfo} as authorized by ${submitterName}`
         }
+
+        if (sourceType === 'record') {
+            return `Assigned record ${accountInfo} to existing identity by ${submitterName}`
+        }
+        if (sourceType === 'orphan') {
+            return `Assigned orphan account ${accountInfo} to existing identity by ${submitterName}`
+        }
+        return `Set ${accountInfo} as authorized by ${submitterName}`
     }
 
-    /** Marks this account as "manual" (reviewer decided to create a new identity). */
+    /** Marks this account as "manual" (reviewer decided to create a new identity or confirmed no match). */
     private setManual(decision: FusionDecision): void {
         this._statuses.add('manual')
         const message = this.createDecisionHistoryMessage(decision, 'manual')
         this.addHistory(message)
     }
 
-    /** Marks this account as "authorized" (reviewer approved merging into an existing identity). */
+    /** Marks this account as "authorized" (reviewer approved merging/assignment into an existing identity). */
     private setAuthorized(decision: FusionDecision): void {
         this._statuses.add('authorized')
         const message = this.createDecisionHistoryMessage(decision, 'authorized')

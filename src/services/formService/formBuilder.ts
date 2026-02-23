@@ -45,7 +45,7 @@ function formatScoreDisplay(scoreValue: number, thresholdValue?: number | null):
  * which varies by source type.
  */
 function getToggleConfig(sourceType: SourceType): Record<string, any> {
-    if (sourceType === 'identity') {
+    if (sourceType === 'authoritative') {
         return {
             label: 'New identity',
             default: false,
@@ -76,7 +76,7 @@ export const buildFormInput = (
     fusionAccount: FusionAccount,
     candidates: Candidate[],
     fusionFormAttributes?: string[],
-    sourceType: SourceType = 'identity'
+    sourceType: SourceType = 'authoritative'
 ): { [key: string]: any } => {
     const formInput: { [key: string]: any } = {}
     formInput.sourceType = sourceType
@@ -148,7 +148,7 @@ export const buildFormFields = (
     fusionAccount: FusionAccount,
     candidates: Candidate[],
     fusionFormAttributes?: string[],
-    sourceType: SourceType = 'identity'
+    sourceType: SourceType = 'authoritative'
 ): FormElementV2025[] => {
     const formFields: FormElementV2025[] = []
 
@@ -174,7 +174,7 @@ export const buildFormFields = (
 
     if (topSectionElements.length > 0) {
         const sectionDescriptions: Record<SourceType, string> = {
-            identity: 'A potential duplicate identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
+            authoritative: 'A potential duplicate identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
             record: 'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
             orphan: 'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
         }

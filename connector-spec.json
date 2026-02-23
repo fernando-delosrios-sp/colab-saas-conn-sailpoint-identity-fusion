@@ -153,12 +153,12 @@
                                             "label": "Source type",
                                             "type": "radio",
                                             "required": true,
-                                            "value": "identity",
-                                            "helpKey": "Choose how accounts from this source are handled. 'Identities' creates new Fusion accounts for unmatched entries (default). 'Records' processes accounts for attribute generation but does not create Fusion accounts for unmatched ones. 'Orphan accounts' skips unmatched accounts entirely, with an option to disable them",
+                                            "value": "authoritative",
+                                            "helpKey": "Choose how accounts from this source are handled. 'Authoritative accounts' creates new Fusion accounts for unmatched entries (default). 'Records' processes accounts for attribute generation but does not create Fusion accounts for unmatched ones. 'Orphan accounts' skips unmatched accounts entirely, with an option to disable them",
                                             "options": [
                                                 {
-                                                    "label": "Identities",
-                                                    "value": "identity"
+                                                    "label": "Authoritative accounts",
+                                                    "value": "authoritative"
                                                 },
                                                 {
                                                     "label": "Records",

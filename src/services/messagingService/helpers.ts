@@ -102,7 +102,7 @@ export const registerHandlebarsHelpers = (): void => {
     // Render a human-readable label for source type
     Handlebars.registerHelper('sourceTypeLabel', (sourceType: string) => {
         const labels: Record<string, string> = {
-            identity: 'Identity',
+            authoritative: 'Authoritative',
             record: 'Record',
             orphan: 'Orphan',
         }
@@ -168,7 +168,7 @@ export type FusionReportEmailData = {
     accounts: Array<{
         accountName: string
         accountSource: string
-        sourceType?: 'identity' | 'record' | 'orphan'
+        sourceType?: 'authoritative' | 'record' | 'orphan'
         accountId?: string
         accountEmail?: string
         accountAttributes?: Record<string, any>

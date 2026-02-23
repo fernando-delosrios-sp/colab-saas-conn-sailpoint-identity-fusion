@@ -553,7 +553,7 @@ export class FusionService {
      * @returns The fusion account produced or updated, or undefined if the decision was skipped
      */
     public async processFusionIdentityDecision(fusionDecision: FusionDecision): Promise<FusionAccount | undefined> {
-        const sourceType = fusionDecision.sourceType ?? 'identity'
+        const sourceType = fusionDecision.sourceType ?? 'authoritative'
 
         const fusionAccount = FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
@@ -584,7 +584,7 @@ export class FusionService {
                 }
                 return undefined
             }
-            // identity (default): register as new fusion account
+            // authoritative (default): register as new fusion account
             this.setFusionAccount(fusionAccount)
         }
         return fusionAccount
@@ -649,7 +649,7 @@ export class FusionService {
      * Processes a single uncorrelated managed account through the deduplication workflow.
      * After scoring, the account is either auto-correlated (perfect match), sent for
      * manual review (partial match), or handled based on the source type:
-     * - identity: added as unmatched new identity (output as ISC account)
+     * - authoritative: added as unmatched new identity (output as ISC account)
      * - record: unique attributes registered but not output as ISC account
      * - orphan: dropped immediately; optionally fires a disable operation
      *
@@ -658,11 +658,11 @@ export class FusionService {
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
         const sourceInfo = this.sourcesByName.get(account.sourceName ?? '')
-        const sourceType = sourceInfo?.sourceType ?? 'identity'
+        const sourceType = sourceInfo?.sourceType ?? 'authoritative'
 
         if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
             const fusionAccount = await this.preProcessManagedAccount(account)
-            if (sourceType !== 'identity') {
+            if (sourceType !== 'authoritative') {
                 this.log.debug(`Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`)
                 if (sourceType === 'record') {
                     await this.attributes.registerUniqueAttributes(fusionAccount)
@@ -729,7 +729,7 @@ export class FusionService {
                 return undefined
             }
 
-            // identity (default)
+            // authoritative (default)
             this.log.debug(`Account ${account.name} is not a duplicate, adding to fusion accounts`)
             fusionAccount.setUnmatched()
             this.setFusionAccount(fusionAccount)
@@ -835,7 +835,7 @@ export class FusionService {
         return {
             accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
             accountSource: fusionAccount.sourceName,
-            sourceType: sourceInfo?.sourceType ?? 'identity',
+            sourceType: sourceInfo?.sourceType ?? 'authoritative',
             accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
             accountEmail: fusionAccount.email,
             accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
@@ -854,7 +854,7 @@ export class FusionService {
             this.failedMatchingAccounts.push({
                 accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
                 accountSource: fusionAccount.sourceName,
-                sourceType: sourceInfo?.sourceType ?? 'identity',
+                sourceType: sourceInfo?.sourceType ?? 'authoritative',
                 accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
                 accountEmail: fusionAccount.email,
                 accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
@@ -1204,7 +1204,7 @@ export class FusionService {
                 accounts.push({
                     accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
                     accountSource: fusionAccount.sourceName,
-                    sourceType: sourceInfo?.sourceType ?? 'identity',
+                    sourceType: sourceInfo?.sourceType ?? 'authoritative',
                     accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
                     accountEmail: fusionAccount.email,
                     accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),

@@ -211,7 +211,7 @@ export class FormService {
 
         const formDefinition = await this.getOrCreateFormDefinition(formName, fusionAccount, candidates)
 
-        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'identity'
+        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'authoritative'
         const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
         assert(formInput, 'Form input is required')
 
@@ -856,7 +856,7 @@ export class FormService {
             this.log.error(`Candidates must be less than or equal to ${MAX_CANDIDATES_FOR_FORM}`)
             return
         }
-        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'identity'
+        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'authoritative'
         const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
         const formInputs = buildFormInputs(fusionAccount, candidates, this.fusionFormAttributes)
         const formConditions = buildFormConditions(candidates, this.fusionFormAttributes)

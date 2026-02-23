@@ -38,8 +38,8 @@ export type FusionReportAccount = {
     accountName: string
     /** Name of the source the account belongs to */
     accountSource: string
-    /** Source processing type (identity, record, or orphan) */
-    sourceType?: 'identity' | 'record' | 'orphan'
+    /** Source processing type (authoritative, record, or orphan) */
+    sourceType?: 'authoritative' | 'record' | 'orphan'
     /** ISC account ID */
     accountId?: string
     /** Email address from the account attributes */

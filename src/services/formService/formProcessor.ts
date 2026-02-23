@@ -161,7 +161,7 @@ export const createFusionDecision = (
 const extractSourceType = (formInput: any): SourceType => {
     if (typeof formInput?.sourceType === 'string') {
         const value = formInput.sourceType as string
-        if (value === 'record' || value === 'orphan') return value
+        if (value === 'authoritative' || value === 'record' || value === 'orphan') return value
     }
-    return 'identity'
+    return 'authoritative'
 }

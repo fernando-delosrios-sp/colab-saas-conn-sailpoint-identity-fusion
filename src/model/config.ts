@@ -128,7 +128,7 @@ export interface ScopeSection {
     identityScopeQuery?: string
 }
 
-export type SourceType = 'identity' | 'record' | 'orphan'
+export type SourceType = 'authoritative' | 'record' | 'orphan'
 
 export type CorrelationMode = 'correlate' | 'reverse' | 'none'
 

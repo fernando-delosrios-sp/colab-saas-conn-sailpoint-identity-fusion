@@ -124,7 +124,7 @@ export class MessagingService {
         context?: {
             accountName: string
             accountSource: string
-            sourceType?: 'identity' | 'record' | 'orphan'
+            sourceType?: 'authoritative' | 'record' | 'orphan'
             accountId?: string
             accountEmail?: string
             accountAttributes: Record<string, any>

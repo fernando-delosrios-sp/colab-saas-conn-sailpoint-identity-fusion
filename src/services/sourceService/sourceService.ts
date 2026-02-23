@@ -238,7 +238,7 @@ export class SourceService {
                 id: apiSource.id!,
                 name: apiSource.name!,
                 isManaged: true,
-                sourceType: sourceConfig.sourceType ?? 'identity',
+                sourceType: sourceConfig.sourceType ?? 'authoritative',
                 config: sourceConfig,
             })
         }
@@ -259,7 +259,7 @@ export class SourceService {
             id: fusionSource.id!,
             name: fusionSource.name!,
             isManaged: false,
-            sourceType: 'identity',
+            sourceType: 'authoritative',
             config: undefined,
             owner: this._fusionSourceOwner,
         })
