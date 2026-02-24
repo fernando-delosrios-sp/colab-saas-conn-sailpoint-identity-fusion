@@ -161,12 +161,12 @@
                                                     "value": "authoritative"
                                                 },
                                                 {
-                                                    "label": "Records",
-                                                    "value": "record"
-                                                },
-                                                {
                                                     "label": "Orphan accounts",
                                                     "value": "orphan"
+                                                },
+                                                {
+                                                    "label": "Records",
+                                                    "value": "record"
                                                 }
                                             ]
                                         },
@@ -279,15 +279,6 @@
                                             ]
                                         },
                                         {
-                                            "key": "correlationAttribute",
-                                            "label": "Correlation attribute name",
-                                            "type": "text",
-                                            "required": true,
-                                            "parentKey": "correlationMode",
-                                            "parentValue": "reverse",
-                                            "helpKey": "Internal name for the attribute used to link accounts via reverse correlation. This must be unique and cannot overlap mapped/generated attributes or existing source schema attributes"
-                                        },
-                                        {
                                             "key": "correlationDisplayName",
                                             "label": "Correlation attribute display name",
                                             "type": "text",
@@ -295,6 +286,15 @@
                                             "parentKey": "correlationMode",
                                             "parentValue": "reverse",
                                             "helpKey": "Friendly display label for the reverse-correlation attribute shown in Identity Security Cloud"
+                                        },
+                                        {
+                                            "key": "correlationAttribute",
+                                            "label": "Correlation attribute name",
+                                            "type": "text",
+                                            "required": true,
+                                            "parentKey": "correlationMode",
+                                            "parentValue": "reverse",
+                                            "helpKey": "Internal name for the attribute used to link accounts via reverse correlation. This must be unique and cannot overlap mapped/generated attributes or existing source schema attributes"
                                         }
                                     ]
                                 }

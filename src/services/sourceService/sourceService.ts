@@ -1013,9 +1013,10 @@ export class SourceService {
      */
     private async ensureIdentityProfileMapping(attributeName: string): Promise<void> {
         const fusionSourceId = this.fusionSourceId
+        const fusionSource = this.getFusionSource()
         const { identityProfilesApi } = this.client
 
-        const allProfiles = await this.client.paginate(
+        const profiles = await this.client.paginate(
             (params: IdentityProfilesV2025ApiListIdentityProfilesRequest) =>
                 identityProfilesApi.listIdentityProfiles(params),
             {},
@@ -1023,14 +1024,14 @@ export class SourceService {
             'SourceService>ensureIdentityProfileMapping listProfiles'
         )
 
-        const profile = allProfiles.find(
-            (p: any) => p.authoritativeSource?.id === fusionSourceId
-        )
-
-        assert(
-            profile,
-            `No identity profile found for the Identity Fusion NG source. An identity profile with the Identity Fusion NG source as authoritative source is required for reverse correlation.`
-        )
+        let profile = profiles.find((p: any) => p.authoritativeSource?.id === fusionSourceId)
+        if (!profile) {
+            this.log.warn(
+                `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}". ` +
+                `Skipping identity profile mapping for reverse correlation attribute "${attributeName}".`
+            )
+            return
+        }
         const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
 
         const alreadyMapped = transforms.some(
@@ -1041,7 +1042,6 @@ export class SourceService {
             return
         }
 
-        const fusionSource = this.getFusionSource()
         assert(fusionSource, 'Fusion source not found')
 
         const newTransform = {

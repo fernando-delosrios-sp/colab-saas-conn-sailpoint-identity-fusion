@@ -5,6 +5,7 @@
 
 # IDE settings
 .vscode/
+.cursor/
 .history/
 .idea/
 *.iml
