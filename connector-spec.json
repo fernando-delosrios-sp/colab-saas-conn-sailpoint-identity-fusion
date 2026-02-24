@@ -114,7 +114,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Sources",
-                    "sectionHelpMessage": "<strong>Select the authoritative account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Account aggregation:</strong> Choose to aggregate before processing, with a delay after returning accounts, or not at all. Optimized aggregation can be disabled for reverse correlation. Delimited text sources cannot be aggregated.</li><li><strong>Account filter:</strong> Limit which accounts are processed (uses ISC search syntax).</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li></ul><br>Global settings control retries and wait times for aggregation task polling.",
+                    "sectionHelpMessage": "<strong>Select the account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Source type:</strong> Choose Authoritative, Record, or Orphan behavior for unmatched accounts.</li><li><strong>Account aggregation:</strong> Choose to aggregate before processing, after a delay, or not at all. Optimized aggregation can be disabled for reverse correlation. Delimited text sources cannot be aggregated.</li><li><strong>Correlation mode:</strong> Choose whether to correlate during processing, set up reverse correlation, or leave accounts uncorrelated.</li><li><strong>Account filter:</strong> Limit which accounts are processed (uses ISC search syntax).</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li></ul><br>Global settings control retries and wait times for aggregation task polling.",
                     "items": [
                         {
                             "key": "sources",
@@ -262,8 +262,12 @@
                                             "label": "Correlation mode",
                                             "type": "radio",
                                             "required": false,
-                                            "helpKey": "Choose how uncorrelated source accounts are linked to identities. 'Correlate missing accounts on aggregation' links them automatically during processing. 'Reverse correlation from managed source' uses a dedicated attribute so ISC's built-in correlation can match them. 'Do not correlate' leaves them unlinked",
+                                            "helpKey": "Choose how uncorrelated source accounts are linked to identities. 'Correlate missing accounts on aggregation' links them automatically during processing. 'Reverse correlation from managed source' creates/uses a dedicated identity attribute and correlation rule so ISC can match them. 'Do not correlate' leaves them unlinked",
                                             "options": [
+                                                {
+                                                    "label": "Do not correlate",
+                                                    "value": "none"
+                                                },
                                                 {
                                                     "label": "Correlate missing accounts on aggregation",
                                                     "value": "correlate"
@@ -271,10 +275,6 @@
                                                 {
                                                     "label": "Reverse correlation from managed source",
                                                     "value": "reverse"
-                                                },
-                                                {
-                                                    "label": "Do not correlate",
-                                                    "value": "none"
                                                 }
                                             ]
                                         },
@@ -285,7 +285,7 @@
                                             "required": true,
                                             "parentKey": "correlationMode",
                                             "parentValue": "reverse",
-                                            "helpKey": "Internal name for the attribute used to link accounts via reverse correlation. Choose a name that does not conflict with your existing attributes"
+                                            "helpKey": "Internal name for the attribute used to link accounts via reverse correlation. This must be unique and cannot overlap mapped/generated attributes or existing source schema attributes"
                                         },
                                         {
                                             "key": "correlationDisplayName",
@@ -294,7 +294,7 @@
                                             "required": true,
                                             "parentKey": "correlationMode",
                                             "parentValue": "reverse",
-                                            "helpKey": "A friendly label for the correlation attribute, shown in the Identity Security Cloud interface"
+                                            "helpKey": "Friendly display label for the reverse-correlation attribute shown in Identity Security Cloud"
                                         }
                                     ]
                                 }
@@ -582,7 +582,7 @@
                             "type": "number",
                             "required": false,
                             "min": "1",
-                            "helpKey": "Maximum number of tries to find a value that is not already taken. Increase if you have a very large number of existing accounts. Default: 100"
+                            "helpKey": "Maximum number of tries to find a value that is not already taken. Increase if you have a very large number of existing accounts. Default: 20"
                         },
                         {
                             "key": "uniqueAttributeDefinitions",
@@ -850,7 +850,7 @@
                             "label": "Send report to owner on aggregation?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Send a summary report to the source owner after each run, including any potential duplicates found and processing results"
+                            "helpKey": "Send a summary report to the source owner after each run, including potential duplicates, processing outcomes, and source-type breakdown metrics"
                         }
                     ]
                 }
@@ -863,7 +863,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting.</strong><br><br><ul><li><strong>Reset accounts:</strong> Force rebuild from scratch (Caution in production).</li><li><strong>Concurrency check:</strong> Prevent concurrent aggregations (Default: true).</li><li><strong>External logging:</strong> Send logs to external service (Splunk, etc.) for monitoring.</li></ul>",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br><ul><li><strong>Reset accounts:</strong> Force rebuild from scratch (caution in production).</li><li><strong>Managed accounts batch size:</strong> Controls how many uncorrelated managed accounts are processed per duplicate-detection batch. Lower values reduce peak memory usage; higher values can improve throughput.</li><li><strong>Concurrency check:</strong> Prevent concurrent aggregations (default: enabled).</li><li><strong>External logging:</strong> Send logs to an external service (Splunk, etc.) for monitoring and incident analysis.</li></ul><br>Start with the default batch size and tune only if needed: reduce it when runs are memory-constrained, increase it when memory headroom is available and you want faster processing.",
                     "items": [
                         {
                             "key": "reset",
@@ -877,7 +877,7 @@
                             "label": "Managed accounts batch size",
                             "type": "number",
                             "required": false,
-                            "helpKey": "How many accounts to process at once during duplicate detection. Lower values use less memory; higher values may be faster. Default: 50"
+                            "helpKey": "Number of uncorrelated managed accounts processed in each duplicate-detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100. Default: 50"
                         },
                         {
                             "key": "concurrencyCheckEnabled",
@@ -959,7 +959,7 @@
                             "max": "10",
                             "parentKey": "enableQueue",
                             "parentValue": "true",
-                            "helpKey": "How many requests can run at the same time. Lower values are safer for rate-limited APIs. Default: 10"
+                            "helpKey": "How many requests can run at the same time. Lower values are safer for rate-limited APIs. Default: 8"
                         },
                         {
                             "key": "requestsPerSecond",
@@ -970,7 +970,7 @@
                             "max": "12",
                             "parentKey": "enableQueue",
                             "parentValue": "true",
-                            "helpKey": "Maximum number of requests sent per second. Reduce this if you are getting rate-limit errors. Default: 10"
+                            "helpKey": "Maximum number of requests sent per second. Reduce this if you are getting rate-limit errors. Default: 8"
                         },
                         {
                             "key": "enableRetry",

@@ -128,15 +128,95 @@ export const registerHandlebarsHelpers = (): void => {
 // ============================================================================
 
 /**
- * Compile all email templates
+ * Resolve template files across local dev and packaged runtime layouts.
  */
-const loadTemplate = (filename: string): string =>
-    fs.readFileSync(path.join(__dirname, 'templates', filename), 'utf8')
+const TEMPLATE_SEARCH_DIRECTORIES = [
+    path.join(__dirname, 'templates'),
+    path.join(process.cwd(), 'templates'),
+    path.join(process.cwd(), 'src', 'services', 'messagingService', 'templates'),
+]
+
+const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
+<html lang="en">
+<body style="font-family: Arial, sans-serif; color: #333;">
+  <h2>Identity Fusion Report</h2>
+  <p><strong>Report Date:</strong> {{formatDate reportDate}}</p>
+  <p><strong>Total Accounts:</strong> {{totalAccounts}}</p>
+  <p><strong>Potential Duplicates:</strong> {{potentialDuplicates}}</p>
+  {{#if accounts}}
+    <hr />
+    {{#each accounts}}
+      <div style="margin-bottom: 16px;">
+        <p><strong>Account:</strong> {{accountName}}</p>
+        <p><strong>Source:</strong> {{accountSource}}</p>
+        {{#if matches}}
+          <ul>
+            {{#each matches}}
+              <li>{{identityName}}</li>
+            {{/each}}
+          </ul>
+        {{else}}
+          <p>No potential matches found.</p>
+        {{/if}}
+      </div>
+    {{/each}}
+  {{else}}
+    <p>No accounts included in this report.</p>
+  {{/if}}
+</body>
+</html>`
+
+const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
+<html lang="en">
+<body style="font-family: Arial, sans-serif; color: #333;">
+  <h2>Identity Fusion Review Required</h2>
+  <p>Please review the potential duplicate account match.</p>
+  {{#if formUrl}}
+    <p><a href="{{formUrl}}">Open Review Form</a></p>
+  {{/if}}
+  {{#each accounts}}
+    <hr />
+    <p><strong>Account:</strong> {{accountName}}</p>
+    <p><strong>Source:</strong> {{accountSource}}</p>
+    {{#if matches}}
+      <ul>
+        {{#each matches}}
+          <li>{{identityName}}</li>
+        {{/each}}
+      </ul>
+    {{else}}
+      <p>No potential matches found.</p>
+    {{/if}}
+  {{/each}}
+</body>
+</html>`
+
+const loadTemplate = (filename: string, required = true): string | undefined => {
+    for (const directory of TEMPLATE_SEARCH_DIRECTORIES) {
+        const filePath = path.join(directory, filename)
+        if (fs.existsSync(filePath)) {
+            return fs.readFileSync(filePath, 'utf8')
+        }
+    }
+
+    if (!required) {
+        return undefined
+    }
+
+    throw new ConnectorError(
+        `Email template "${filename}" not found. Searched: ${TEMPLATE_SEARCH_DIRECTORIES.join(', ')}`,
+        ConnectorErrorType.Generic
+    )
+}
 
 export const compileEmailTemplates = (): Map<string, HandlebarsTemplateDelegate> => {
     const templates = new Map<string, HandlebarsTemplateDelegate>()
-    templates.set('fusion-review', Handlebars.compile(loadTemplate('fusion-review.hbs')))
-    templates.set('fusion-report', Handlebars.compile(loadTemplate('fusion-report.hbs')))
+    const fusionReportTemplate = loadTemplate('fusion-report.hbs', false) ?? DEFAULT_FUSION_REPORT_TEMPLATE
+    templates.set('fusion-report', Handlebars.compile(fusionReportTemplate))
+
+    // Some packaged builds may not ship fusion-review.hbs.
+    const fusionReviewTemplate = loadTemplate('fusion-review.hbs', false) ?? DEFAULT_FUSION_REVIEW_TEMPLATE
+    templates.set('fusion-review', Handlebars.compile(fusionReviewTemplate))
     return templates
 }
 
@@ -197,9 +277,21 @@ export type FusionReportEmailData = {
         fusionReviewAssignments?: number
         fusionReviewNewIdentities?: number
         fusionReviewNonMatches?: number
+        fusionReviewDecisionsAuthoritative?: number
+        fusionReviewDecisionsRecord?: number
+        fusionReviewDecisionsOrphan?: number
+        fusionReviewNewIdentitiesAuthoritative?: number
+        fusionReviewNoMatchesRecord?: number
+        fusionReviewNoMatchesOrphan?: number
         identitiesFound?: number
         managedAccountsFound?: number
+        managedAccountsFoundAuthoritative?: number
+        managedAccountsFoundRecord?: number
+        managedAccountsFoundOrphan?: number
         managedAccountsProcessed?: number
+        managedAccountsProcessedAuthoritative?: number
+        managedAccountsProcessedRecord?: number
+        managedAccountsProcessedOrphan?: number
         totalProcessingTime?: string
         usedMemory?: string
     }

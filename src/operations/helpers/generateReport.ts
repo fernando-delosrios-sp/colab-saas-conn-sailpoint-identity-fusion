@@ -41,14 +41,44 @@ export const generateReport = async (
     let stats: FusionReportStats | undefined
     if (aggregationStats) {
         const decisions = forms.fusionIdentityDecisions
+        const decisionSourceType = (d: { sourceType?: 'authoritative' | 'record' | 'orphan' }): 'authoritative' | 'record' | 'orphan' =>
+            d.sourceType ?? 'authoritative'
+        const decisionCountByType = decisions.reduce(
+            (acc, d) => {
+                const sourceType = decisionSourceType(d)
+                if (sourceType === 'record') acc.record += 1
+                else if (sourceType === 'orphan') acc.orphan += 1
+                else acc.authoritative += 1
+                return acc
+            },
+            { authoritative: 0, record: 0, orphan: 0 }
+        )
+        const authoritativeNewIdentities = decisions.filter(
+            (d) => decisionSourceType(d) === 'authoritative' && d.newIdentity
+        ).length
+        const recordNoMatches = decisions.filter(
+            (d) => decisionSourceType(d) === 'record' && d.newIdentity
+        ).length
+        const orphanNoMatches = decisions.filter(
+            (d) => decisionSourceType(d) === 'orphan' && d.newIdentity
+        ).length
         const memoryUsage = process.memoryUsage()
         stats = {
             totalFusionAccounts: fusion.totalFusionAccountCount,
             fusionReviewsCreated: forms.formsCreated,
             fusionReviewAssignments: forms.formInstancesCreated,
-            fusionReviewNewIdentities: decisions.filter((d) => d.newIdentity).length,
-            fusionReviewNonMatches: decisions.filter((d) => !d.newIdentity).length,
+            fusionReviewNewIdentities: authoritativeNewIdentities,
+            fusionReviewNonMatches: recordNoMatches + orphanNoMatches,
+            fusionReviewDecisionsAuthoritative: decisionCountByType.authoritative,
+            fusionReviewDecisionsRecord: decisionCountByType.record,
+            fusionReviewDecisionsOrphan: decisionCountByType.orphan,
+            fusionReviewNewIdentitiesAuthoritative: authoritativeNewIdentities,
+            fusionReviewNoMatchesRecord: recordNoMatches,
+            fusionReviewNoMatchesOrphan: orphanNoMatches,
             managedAccountsProcessed: fusion.newManagedAccountsCount,
+            managedAccountsProcessedAuthoritative: aggregationStats.managedAccountsFoundAuthoritative,
+            managedAccountsProcessedRecord: aggregationStats.managedAccountsFoundRecord,
+            managedAccountsProcessedOrphan: aggregationStats.managedAccountsFoundOrphan,
             usedMemory: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
             ...aggregationStats,
         }

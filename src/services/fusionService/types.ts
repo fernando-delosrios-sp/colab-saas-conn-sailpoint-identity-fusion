@@ -60,6 +60,9 @@ export type FusionReportAccount = {
 export type AggregationStats = {
     identitiesFound: number
     managedAccountsFound: number
+    managedAccountsFoundAuthoritative?: number
+    managedAccountsFoundRecord?: number
+    managedAccountsFoundOrphan?: number
     totalProcessingTime: string
 }
 
@@ -78,8 +81,28 @@ export type FusionReportStats = {
     identitiesFound?: number
     /** Number of managed source accounts loaded */
     managedAccountsFound?: number
+    /** Number of managed source accounts loaded from authoritative sources */
+    managedAccountsFoundAuthoritative?: number
+    /** Number of managed source accounts loaded from record sources */
+    managedAccountsFoundRecord?: number
+    /** Number of managed source accounts loaded from orphan sources */
+    managedAccountsFoundOrphan?: number
     /** Number of managed source accounts processed */
     managedAccountsProcessed?: number
+    /** Number of managed source accounts processed from authoritative sources */
+    managedAccountsProcessedAuthoritative?: number
+    /** Number of managed source accounts processed from record sources */
+    managedAccountsProcessedRecord?: number
+    /** Number of managed source accounts processed from orphan sources */
+    managedAccountsProcessedOrphan?: number
+    /** Number of fusion review decisions by source type */
+    fusionReviewDecisionsAuthoritative?: number
+    fusionReviewDecisionsRecord?: number
+    fusionReviewDecisionsOrphan?: number
+    /** Source-type-specific decision outcomes */
+    fusionReviewNewIdentitiesAuthoritative?: number
+    fusionReviewNoMatchesRecord?: number
+    fusionReviewNoMatchesOrphan?: number
     /** Formatted total processing time */
     totalProcessingTime?: string
     /** Formatted memory usage at report generation time */

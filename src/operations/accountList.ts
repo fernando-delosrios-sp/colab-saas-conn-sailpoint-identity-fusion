@@ -54,6 +54,9 @@ async function setupPhase(serviceRegistry: ServiceRegistry, schema: any): Promis
 interface FetchResult {
     identitiesFound: number
     managedAccountsFound: number
+    managedAccountsFoundAuthoritative: number
+    managedAccountsFoundRecord: number
+    managedAccountsFoundOrphan: number
 }
 
 /** Phase 2: Fetch all data in parallel. */
@@ -71,6 +74,20 @@ async function fetchPhase(serviceRegistry: ServiceRegistry): Promise<FetchResult
 
     const identitiesFound = identities.identityCount
     const managedAccountsFound = sources.managedAccountsById.size
+    let managedAccountsFoundAuthoritative = 0
+    let managedAccountsFoundRecord = 0
+    let managedAccountsFoundOrphan = 0
+
+    for (const account of sources.managedAccountsById.values()) {
+        const sourceType = sources.getSourceByName(account.sourceName ?? '')?.sourceType ?? 'authoritative'
+        if (sourceType === 'record') {
+            managedAccountsFoundRecord++
+        } else if (sourceType === 'orphan') {
+            managedAccountsFoundOrphan++
+        } else {
+            managedAccountsFoundAuthoritative++
+        }
+    }
     log.info(`Loaded ${sources.fusionAccountCount} fusion account(s), ${identitiesFound} identities, ${managedAccountsFound} managed account(s)`)
 
     const fusionOwner = sources.fusionSourceOwner
@@ -82,7 +99,13 @@ async function fetchPhase(serviceRegistry: ServiceRegistry): Promise<FetchResult
         }
     }
 
-    return { identitiesFound, managedAccountsFound }
+    return {
+        identitiesFound,
+        managedAccountsFound,
+        managedAccountsFoundAuthoritative,
+        managedAccountsFoundRecord,
+        managedAccountsFoundOrphan,
+    }
 }
 
 /** Phase 3: Work queue depletion -- process and remove accounts from the queue. */
@@ -129,6 +152,9 @@ async function reportPhase(
         await generateReport(fusionOwnerAccount, false, serviceRegistry, {
             identitiesFound: fetchResult.identitiesFound,
             managedAccountsFound: fetchResult.managedAccountsFound,
+            managedAccountsFoundAuthoritative: fetchResult.managedAccountsFoundAuthoritative,
+            managedAccountsFoundRecord: fetchResult.managedAccountsFoundRecord,
+            managedAccountsFoundOrphan: fetchResult.managedAccountsFoundOrphan,
             totalProcessingTime: timer.totalElapsed(),
         })
     }
