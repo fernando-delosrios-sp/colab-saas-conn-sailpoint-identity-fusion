@@ -315,7 +315,11 @@ export class FusionService {
 
         // Pass direct reference to work queue - deletions will remove processed accounts
         // No snapshot or copy needed: JavaScript's event loop ensures atomic operations
-        fusionAccount.addManagedAccountLayer(this.sources.managedAccountsById, this.sources.managedAccountsByIdentityId)
+        fusionAccount.addManagedAccountLayer(
+            this.sources.managedAccountsById,
+            this.sources.managedAccountsByIdentityId,
+            this.sources.managedAccountsAllById
+        )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
             `${fusionAccount.accountIds.length} account(s), ${fusionAccount.missingAccountIds.length} missing`
@@ -332,9 +336,7 @@ export class FusionService {
         await this.attributes.refreshNormalAttributes(fusionAccount)
 
         // Per-source correlation for missing accounts during aggregation
-        if (this.commandType === StandardCommand.StdAccountList && fusionAccount.missingAccountIds.length > 0) {
-            await this.correlatePerSource(fusionAccount, hasDecisionAssignment)
-        }
+        await this.applyPerSourceCorrelationIfNeeded(fusionAccount, hasDecisionAssignment)
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
@@ -441,6 +443,18 @@ export class FusionService {
         }
     }
 
+    /**
+     * Apply per-source correlation only during account-list aggregation when there are missing accounts.
+     */
+    private async applyPerSourceCorrelationIfNeeded(
+        fusionAccount: FusionAccount,
+        hasDecisionAssignment: boolean = false
+    ): Promise<void> {
+        if (this.commandType !== StandardCommand.StdAccountList) return
+        if (fusionAccount.missingAccountIds.length === 0) return
+        await this.correlatePerSource(fusionAccount, hasDecisionAssignment)
+    }
+
     // ------------------------------------------------------------------------
     // Public Identity Processing Methods
     // ------------------------------------------------------------------------
@@ -508,7 +522,11 @@ export class FusionService {
 
             assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
             // Pass direct reference to work queue - deletions will remove processed accounts
-            fusionAccount.addManagedAccountLayer(this.sources.managedAccountsById, this.sources.managedAccountsByIdentityId)
+            fusionAccount.addManagedAccountLayer(
+                this.sources.managedAccountsById,
+                this.sources.managedAccountsByIdentityId,
+                this.sources.managedAccountsAllById
+            )
 
             this.attributes.mapAttributes(fusionAccount)
             await this.attributes.refreshNormalAttributes(fusionAccount)
@@ -563,7 +581,11 @@ export class FusionService {
 
         fusionAccount.setNeedsReset(true)
         fusionAccount.addFusionDecisionLayer(fusionDecision)
-        fusionAccount.addManagedAccountLayer(this.sources.managedAccountsById, this.sources.managedAccountsByIdentityId)
+        fusionAccount.addManagedAccountLayer(
+            this.sources.managedAccountsById,
+            this.sources.managedAccountsByIdentityId,
+            this.sources.managedAccountsAllById
+        )
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)
 
@@ -672,6 +694,7 @@ export class FusionService {
                 return undefined
             }
             fusionAccount.setUnmatched()
+            await this.applyPerSourceCorrelationIfNeeded(fusionAccount)
             this.setFusionAccount(fusionAccount)
             return fusionAccount
         }
@@ -732,6 +755,7 @@ export class FusionService {
             // authoritative (default)
             this.log.debug(`Account ${account.name} is not a duplicate, adding to fusion accounts`)
             fusionAccount.setUnmatched()
+            await this.applyPerSourceCorrelationIfNeeded(fusionAccount)
             this.setFusionAccount(fusionAccount)
             return fusionAccount
         }

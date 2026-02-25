@@ -25,7 +25,7 @@ import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { BaseConfig, FusionConfig, SourceConfig } from '../../model/config'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
-import { assert, softAssert } from '../../utils/assert'
+import { assert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
 import { getDateFromISOString } from '../../utils/date'
 import { buildSourceConfigPatch } from './helpers'
@@ -56,6 +56,8 @@ export class SourceService {
     // 2. Work Queue: Gets depleted as accounts are processed (deleted) in order:
     //    fetchFormData → processFusionAccounts → processIdentities → processManagedAccounts
     public managedAccountsById: Map<string, Account> = new Map()
+    // Snapshot of managed accounts loaded for this run (never depleted by work-queue processing)
+    public managedAccountsAllById: Map<string, Account> = new Map()
     // Secondary index: identityId → Set of account IDs for O(1) identity-based lookups
     // in addManagedAccountLayer. Kept in sync with managedAccountsById.
     public managedAccountsByIdentityId: Map<string, Set<string>> = new Map()
@@ -72,6 +74,7 @@ export class SourceService {
      */
     public clearManagedAccounts(): void {
         this.managedAccountsById.clear()
+        this.managedAccountsAllById.clear()
         this.managedAccountsByIdentityId.clear()
         this.log.debug('Managed accounts cache cleared from memory')
     }
@@ -451,6 +454,7 @@ export class SourceService {
                             if (effectiveLimit && collectedCount >= effectiveLimit) break
                             if (account.id) {
                                 this.managedAccountsById.set(account.id, account)
+                                this.managedAccountsAllById.set(account.id, account)
                                 if (account.identityId) {
                                     let idSet = this.managedAccountsByIdentityId.get(account.identityId)
                                     if (!idSet) {
@@ -521,6 +525,7 @@ export class SourceService {
         }
 
         this.managedAccountsById.set(managedAccount.id!, managedAccount)
+        this.managedAccountsAllById.set(managedAccount.id!, managedAccount)
         if (managedAccount.identityId) {
             let idSet = this.managedAccountsByIdentityId.get(managedAccount.identityId)
             if (!idSet) {
@@ -598,11 +603,10 @@ export class SourceService {
     }
 
     /**
-     * Fire-and-forget aggregation for sources configured with `aggregationMode: 'delayed'`.
+     * Aggregate sources configured with `aggregationMode: 'delayed'`.
      * Each source waits its configured `aggregationDelay` (minutes) before triggering.
-     * This method is intentionally NOT awaited by the caller.
      */
-    public aggregateDelayedSources(): void {
+    public async aggregateDelayedSources(): Promise<void> {
         const delayedSources = this.managedSources.filter(
             (s) => s.config?.aggregationMode === 'delayed'
         )
@@ -613,22 +617,25 @@ export class SourceService {
 
         this.log.info(`Scheduling delayed aggregation for ${delayedSources.length} source(s)`)
 
-        for (const source of delayedSources) {
-            const delayMinutes = source.config?.aggregationDelay ?? 5
-            const delayMs = delayMinutes * 60 * 1000
-            const disableOpt = source.config?.optimizedAggregation === false
+        await Promise.all(
+            delayedSources.map(async (source) => {
+                const delayMinutes = source.config?.aggregationDelay ?? 5
+                const delayMs = delayMinutes * 60 * 1000
+                const disableOpt = source.config?.optimizedAggregation === false
 
-            this.log.info(`Source ${source.name}: delayed aggregation in ${delayMinutes} minute(s)`)
-
-            setTimeout(() => {
+                this.log.info(`Source ${source.name}: delayed aggregation in ${delayMinutes} minute(s)`)
+                await new Promise((resolve) => setTimeout(resolve, delayMs))
                 this.log.info(`Triggering delayed aggregation for source: ${source.name}`)
-                this.aggregateManagedSource(source.id, disableOpt).catch((err) => {
+
+                try {
+                    await this.aggregateManagedSource(source.id, disableOpt)
+                } catch (err) {
                     this.log.error(
                         `Delayed aggregation failed for source ${source.name}: ${err instanceof Error ? err.message : String(err)}`
                     )
-                })
-            }, delayMs)
-        }
+                }
+            })
+        )
     }
 
     /**
@@ -1024,7 +1031,7 @@ export class SourceService {
             'SourceService>ensureIdentityProfileMapping listProfiles'
         )
 
-        let profile = profiles.find((p: any) => p.authoritativeSource?.id === fusionSourceId)
+        const profile = profiles.find((p: any) => p.authoritativeSource?.id === fusionSourceId)
         if (!profile) {
             this.log.warn(
                 `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}". ` +
@@ -1187,6 +1194,7 @@ export class SourceService {
      */
     private async aggregateManagedSource(id: string, disableOptimization?: boolean): Promise<void> {
         let completed = false
+        const sourceName = this.sourcesById.get(id)?.name ?? id
         const { sourcesApi, taskManagementApi } = this.client
         const requestParameters: SourcesV2025ApiImportAccountsRequest = {
             id,
@@ -1198,29 +1206,33 @@ export class SourceService {
         }
         const loadAccountsTask = await this.client.execute(importAccounts, QueuePriority.HIGH, 'SourceService>aggregateManagedSource importAccounts')
         if (!loadAccountsTask) {
-            this.log.warn(`Failed to trigger account aggregation for source ${id}. The API call returned no data.`)
+            this.log.warn(`Failed to trigger account aggregation for source ${sourceName} (${id}). The API call returned no data.`)
             return
         }
 
         // Use global retry settings for aggregation task polling
         const taskResultRetries = this.taskResultRetries
         const taskResultWait = this.taskResultWait
+        const taskId = loadAccountsTask?.task?.id
+        let pollsExecuted = 0
+        let lastTaskStatus: any = undefined
 
         let count = taskResultRetries
         while (--count > 0) {
-            const id = loadAccountsTask?.task?.id
-            if (!id) {
-                this.log.warn('Aggregation task ID not found')
+            if (!taskId) {
+                this.log.warn(`Aggregation task ID not found for source ${sourceName} (${id})`)
                 break
             }
             const requestParameters: TaskManagementV2025ApiGetTaskStatusRequest = {
-                id,
+                id: taskId,
             }
             const getTaskStatus = async () => {
                 const response = await taskManagementApi.getTaskStatus(requestParameters)
                 return response.data
             }
             const taskStatus = await this.client.execute(getTaskStatus, QueuePriority.HIGH, 'SourceService>aggregateManagedSource getTaskStatus')
+            pollsExecuted++
+            lastTaskStatus = taskStatus
 
             if (taskStatus?.completed) {
                 completed = true
@@ -1229,6 +1241,19 @@ export class SourceService {
                 await new Promise((resolve) => setTimeout(resolve, taskResultWait))
             }
         }
-        softAssert(completed, 'Failed to aggregate managed accounts')
+        if (!completed) {
+            const lastStatusSummary = lastTaskStatus
+                ? JSON.stringify({
+                    completed: lastTaskStatus.completed,
+                    completionStatus: lastTaskStatus.completionStatus,
+                    type: lastTaskStatus.type,
+                    description: lastTaskStatus.description,
+                    messages: lastTaskStatus.messages,
+                })
+                : 'none'
+            this.log.warn(
+                `Failed to aggregate managed accounts for source ${sourceName} (${id}). taskId=${taskId ?? 'unknown'}, pollsExecuted=${pollsExecuted}, maxPolls=${Math.max(taskResultRetries - 1, 0)}, pollWaitMs=${taskResultWait}, lastTaskStatus=${lastStatusSummary}`
+            )
+        }
     }
 }

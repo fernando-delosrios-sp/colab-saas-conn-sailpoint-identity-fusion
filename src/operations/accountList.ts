@@ -39,6 +39,8 @@ async function setupPhase(serviceRegistry: ServiceRegistry, schema: any): Promis
                 sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
             )
         )
+        await schemas.setFusionAccountSchema(undefined)
+        log.info('Fusion account schema refreshed after reverse correlation setup')
         log.info(`Reverse correlation setup completed for ${reverseCorrelationSources.length} source(s)`)
     }
 
@@ -181,7 +183,7 @@ async function outputPhase(serviceRegistry: ServiceRegistry): Promise<number> {
     sources.clearFusionAccounts()
     log.info('Account caches cleared from memory')
 
-    sources.aggregateDelayedSources()
+    await sources.aggregateDelayedSources()
 
     return count
 }

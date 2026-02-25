@@ -624,6 +624,14 @@ export class FusionAccount {
         return this._managedAccountInfo.get(accountId)
     }
 
+    /** Store source and native identity info for a managed account ID. */
+    public setManagedAccountInfo(accountId: string, sourceName: string, nativeIdentity: string): void {
+        this._managedAccountInfo.set(accountId, {
+            sourceName,
+            nativeIdentity,
+        })
+    }
+
     /**
      * Returns missing account IDs that belong to a given source,
      * using the managed account info map for source lookup.
@@ -949,7 +957,8 @@ export class FusionAccount {
      */
     public addManagedAccountLayer(
         accountsById: Map<string, Account>,
-        accountsByIdentityId: Map<string, Set<string>>
+        accountsByIdentityId: Map<string, Set<string>>,
+        allAccountsById?: Map<string, Account>
     ): void {
         // Phase 1: Identity-based matching via index (O(1) lookup)
         if (this._identityId !== undefined) {
@@ -984,6 +993,20 @@ export class FusionAccount {
                         }
                     }
                 }
+            }
+        }
+
+        // Preserve source/nativeIdentity context for missing accounts even if they were
+        // not claimed from the current work queue (e.g. still missing from previous runs).
+        if (allAccountsById) {
+            for (const accountId of this._missingAccountIds) {
+                if (this._managedAccountInfo.has(accountId)) continue
+                const account = allAccountsById.get(accountId)
+                if (!account?.sourceName) continue
+                this._managedAccountInfo.set(accountId, {
+                    sourceName: account.sourceName,
+                    nativeIdentity: account.nativeIdentity ?? account.id ?? accountId,
+                })
             }
         }
 

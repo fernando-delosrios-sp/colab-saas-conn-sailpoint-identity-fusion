@@ -66,6 +66,10 @@ describe('FusionService', () => {
             get: jest.fn(() => new Map()),
             configurable: true
         })
+        Object.defineProperty(mockSources, 'managedAccountsAllById', {
+            get: jest.fn(() => new Map()),
+            configurable: true
+        })
         Object.defineProperty(mockSources, 'fusionAccounts', {
             get: jest.fn(() => []),
             configurable: true
@@ -203,6 +207,83 @@ describe('FusionService', () => {
 
             // Verify log called or side effects
             expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('Processing 1 managed account'))
+        })
+
+        it('should set reverse correlation attribute for first-run unmatched authoritative accounts', async () => {
+            const mockManagedAccount = {
+                id: 'acct-1',
+                nativeIdentity: 'native-1',
+                name: 'Managed Account 1',
+                sourceName: 'Source A',
+                attributes: {}
+            } as Account
+
+            const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
+            ;(fusionService as any).sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: {}
+            })
+            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            mockSources.getSourceConfig.mockReturnValue({
+                name: 'Source A',
+                correlationMode: 'reverse',
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity'
+            } as any)
+
+            const result = await fusionService.processManagedAccount(mockManagedAccount)
+
+            expect(result).toBeDefined()
+            expect(result?.attributes.reverseNativeIdentity).toBe('native-1')
+        })
+
+        it('should hydrate missing account info during managed-account layer for historical missing accounts', async () => {
+            const historicalAccount = {
+                nativeIdentity: 'fusion-1',
+                identityId: 'identity-1',
+                name: 'Fusion Account',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {
+                    accounts: ['acct-missing-1']
+                }
+            } as unknown as Account
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+                new Map([
+                    [
+                        'acct-missing-1',
+                        {
+                            id: 'acct-missing-1',
+                            nativeIdentity: 'native-missing-1',
+                            sourceName: 'Source A',
+                            attributes: {}
+                        } as unknown as Account
+                    ]
+                ])
+            )
+            mockSources.getSourceConfig.mockImplementation((sourceName: string) => {
+                if (sourceName === 'Source A') {
+                    return {
+                        name: 'Source A',
+                        correlationMode: 'reverse',
+                        correlationAttribute: 'reverseNativeIdentity',
+                        correlationDisplayName: 'Reverse Native Identity'
+                    } as any
+                }
+                return undefined
+            })
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockAttributes.registerUniqueAttributes.mockResolvedValue()
+
+            const result = await fusionService.processFusionAccount(historicalAccount)
+
+            expect(result.attributes.reverseNativeIdentity).toBe('native-missing-1')
         })
     })
 })

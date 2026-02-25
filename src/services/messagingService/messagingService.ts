@@ -208,6 +208,10 @@ export class MessagingService {
      * Send report email with potential duplicate accounts
      */
     public async sendReport(report: FusionReport, fusionAccount?: FusionAccount): Promise<void> {
+        const totalAccounts = report.totalAccounts ?? report.accounts.length
+        const potentialDuplicates =
+            report.potentialDuplicates ?? report.accounts.filter((a) => a.matches.length > 0).length
+
         // Recipients:
         // - the initiating fusion account (if we can resolve an email)
         // - the fusion source owner (always)
@@ -240,12 +244,11 @@ export class MessagingService {
             return
         }
 
-        const subject = `Identity Fusion Report - ${report.potentialDuplicates || 0} Potential Duplicate(s) Found`
+        const subject = `Identity Fusion Report - ${potentialDuplicates} Potential Duplicate(s) Found`
         const emailData: FusionReportEmailData = {
             ...report,
-            totalAccounts: report.totalAccounts || report.accounts.length,
-            potentialDuplicates:
-                report.potentialDuplicates || report.accounts.filter((a) => a.matches.length > 0).length,
+            totalAccounts,
+            potentialDuplicates,
             reportDate: report.reportDate || new Date(),
         }
         const body = renderFusionReport(this.templates, emailData)
