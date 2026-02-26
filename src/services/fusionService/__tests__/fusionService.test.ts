@@ -285,5 +285,31 @@ describe('FusionService', () => {
 
             expect(result.attributes.reverseNativeIdentity).toBe('native-missing-1')
         })
+
+        it('should not clear reverse attribute when missing account source info is unresolved', async () => {
+            ;(fusionService as any).config.sources = [
+                {
+                    name: 'Source A',
+                    correlationMode: 'reverse',
+                    correlationAttribute: 'reverseNativeIdentity',
+                    correlationDisplayName: 'Reverse Native Identity'
+                }
+            ]
+
+            const fusionAccount = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                identityId: 'identity-1',
+                name: 'Fusion Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    accounts: ['missing-1'],
+                    reverseNativeIdentity: 'existing-value'
+                }
+            } as unknown as Account)
+
+            await (fusionService as any).correlatePerSource(fusionAccount, false)
+
+            expect(fusionAccount.attributes.reverseNativeIdentity).toBe('existing-value')
+        })
     })
 })

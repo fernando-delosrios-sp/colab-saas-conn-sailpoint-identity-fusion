@@ -433,8 +433,14 @@ export class FusionService {
         }
 
         // Clear reverse correlation attributes for sources with no missing accounts
+        const hasUnknownMissingSourceInfo = missingIds.some(
+            (accountId) => !fusionAccount.getManagedAccountInfo(accountId)
+        )
         for (const sc of this.config.sources) {
             if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
+                if (hasUnknownMissingSourceInfo) {
+                    continue
+                }
                 const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
                 if (missingForSource.length === 0) {
                     fusionAccount.clearReverseCorrelationAttribute(sc.correlationAttribute)

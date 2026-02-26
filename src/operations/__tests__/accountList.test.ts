@@ -141,4 +141,37 @@ describe('accountList setup phase', () => {
         expect(schemas.setFusionAccountSchema).toHaveBeenCalledTimes(1)
         expect(schemas.setFusionAccountSchema).toHaveBeenCalledWith(input.schema)
     })
+
+    it('runs reverse-correlation setup sequentially across multiple sources', async () => {
+        const reverseSources = [
+            {
+                name: 'Source A',
+                correlationMode: 'reverse' as const,
+                correlationAttribute: 'attrA',
+                correlationDisplayName: 'Attr A',
+            },
+            {
+                name: 'Source B',
+                correlationMode: 'reverse' as const,
+                correlationAttribute: 'attrB',
+                correlationDisplayName: 'Attr B',
+            },
+        ]
+        const { registry, sources } = createMockRegistry(reverseSources)
+        const input = { schema: { attributes: [] } } as any
+
+        let inFlight = 0
+        let maxInFlight = 0
+        sources.ensureReverseCorrelationSetup.mockImplementation(async () => {
+            inFlight++
+            maxInFlight = Math.max(maxInFlight, inFlight)
+            await new Promise((resolve) => setTimeout(resolve, 5))
+            inFlight--
+        })
+
+        await accountList(registry, input)
+
+        expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledTimes(2)
+        expect(maxInFlight).toBe(1)
+    })
 })

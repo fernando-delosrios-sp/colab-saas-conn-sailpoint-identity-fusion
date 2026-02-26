@@ -15,7 +15,7 @@ export const testConnection = async (
     _input: any,
 ) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, sources, res } = serviceRegistry
+    const { log, sources, schemas, config, res } = serviceRegistry
 
     try {
         log.info('Testing connection')
@@ -24,6 +24,16 @@ export const testConnection = async (
         // Verify access to the Fusion source and that configured managed sources exist
         await sources.fetchAllSources()
         timer.phase('Verified Fusion source and managed sources')
+
+        const reverseCorrelationSources = config.sources.filter((sc) => sc.correlationMode === 'reverse')
+        if (reverseCorrelationSources.length > 0) {
+            const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
+            for (const sc of reverseCorrelationSources) {
+                await sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
+            }
+            log.info(`Reverse correlation setup validated for ${reverseCorrelationSources.length} source(s)`)
+            timer.phase('Validated reverse correlation setup')
+        }
 
         res.send({})
         timer.end('✓ Test connection completed')

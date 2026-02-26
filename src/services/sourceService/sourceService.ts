@@ -628,7 +628,7 @@ export class SourceService {
                 this.log.info(`Triggering delayed aggregation for source: ${source.name}`)
 
                 try {
-                    await this.aggregateManagedSource(source.id, disableOpt)
+                    await this.aggregateManagedSource(source.id, disableOpt, false)
                 } catch (err) {
                     this.log.error(
                         `Delayed aggregation failed for source ${source.name}: ${err instanceof Error ? err.message : String(err)}`
@@ -1031,23 +1031,21 @@ export class SourceService {
             'SourceService>ensureIdentityProfileMapping listProfiles'
         )
 
-        const profile = profiles.find((p: any) => p.authoritativeSource?.id === fusionSourceId)
-        if (!profile) {
+        const matchingProfiles = profiles.filter(
+            (p: any) =>
+                p.authoritativeSource?.id === fusionSourceId ||
+                p.source?.id === fusionSourceId
+        )
+        if (matchingProfiles.length === 0) {
             this.log.warn(
                 `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}". ` +
                 `Skipping identity profile mapping for reverse correlation attribute "${attributeName}".`
             )
             return
         }
-        const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
-
-        const alreadyMapped = transforms.some(
-            (t) => t.identityAttributeName === attributeName
+        this.log.info(
+            `Found ${matchingProfiles.length} identity profile(s) for fusion source "${fusionSource?.name ?? fusionSourceId}": ${matchingProfiles.map((p: any) => p.id).join(', ')}`
         )
-        if (alreadyMapped) {
-            this.log.debug(`Identity profile already maps attribute "${attributeName}"`)
-            return
-        }
 
         assert(fusionSource, 'Fusion source not found')
 
@@ -1061,24 +1059,91 @@ export class SourceService {
                 },
             },
         }
+        for (const profile of matchingProfiles) {
+            const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
+            const existingIndex = transforms.findIndex((t) => t.identityAttributeName === attributeName)
+            const existing = existingIndex >= 0 ? transforms[existingIndex] : undefined
+            const existingSourceName = existing?.transformDefinition?.attributes?.sourceName
+            const existingAttributeName = existing?.transformDefinition?.attributes?.attributeName
+            const isAlreadyDesired =
+                !!existing &&
+                existing.transformDefinition?.type === 'accountAttribute' &&
+                existingSourceName === fusionSource.name &&
+                existingAttributeName === attributeName
 
-        const patchIndex = transforms.length
+            if (isAlreadyDesired) {
+                this.log.info(
+                    `Identity profile ${profile.id} already maps "${attributeName}" from source "${fusionSource.name}"`
+                )
+                continue
+            }
 
-        await this.client.execute(
-            () => identityProfilesApi.updateIdentityProfile({
-                identityProfileId: profile.id!,
-                jsonPatchOperationV2025: [
+            const nextTransforms =
+                existingIndex >= 0
+                    ? transforms.map((t, idx) => (idx === existingIndex ? newTransform : t))
+                    : [...transforms, newTransform]
+
+            const hasIdentityAttributeConfig = !!profile.identityAttributeConfig
+            const jsonPatchOperationV2025 = hasIdentityAttributeConfig
+                ? [
+                    {
+                        op: 'replace' as JsonPatchOperationV2025OpV2025,
+                        path: '/identityAttributeConfig/attributeTransforms',
+                        value: nextTransforms,
+                    },
+                ]
+                : [
                     {
                         op: 'add' as JsonPatchOperationV2025OpV2025,
-                        path: `/identityAttributeConfig/attributeTransforms/${patchIndex}`,
-                        value: newTransform,
+                        path: '/identityAttributeConfig',
+                        value: {
+                            attributeTransforms: nextTransforms,
+                        },
                     },
-                ],
-            }).then((r) => r.data),
-            QueuePriority.HIGH,
-            `SourceService>ensureIdentityProfileMapping add ${attributeName}`
-        )
-        this.log.info(`Added identity profile mapping for attribute "${attributeName}"`)
+                ]
+
+            await this.client.execute(
+                () =>
+                    identityProfilesApi
+                        .updateIdentityProfile({
+                            identityProfileId: profile.id!,
+                            jsonPatchOperationV2025,
+                        })
+                        .then((r) => r.data),
+                QueuePriority.HIGH,
+                `SourceService>ensureIdentityProfileMapping upsert ${attributeName} profile=${profile.id}`
+            )
+            this.log.info(
+                `${existingIndex >= 0 ? 'Updated' : 'Added'} identity profile mapping for attribute "${attributeName}" on profile ${profile.id}`
+            )
+
+            const refreshedProfiles = await this.client.paginate(
+                (params: IdentityProfilesV2025ApiListIdentityProfilesRequest) =>
+                    identityProfilesApi.listIdentityProfiles(params),
+                {},
+                QueuePriority.HIGH,
+                `SourceService>ensureIdentityProfileMapping verify ${attributeName} profile=${profile.id}`
+            )
+            const refreshedProfile = refreshedProfiles.find((p: any) => p.id === profile.id)
+            const refreshedTransforms = refreshedProfile?.identityAttributeConfig?.attributeTransforms ?? []
+            const verified = refreshedTransforms.some(
+                (t: any) =>
+                    t.identityAttributeName === attributeName &&
+                    t.transformDefinition?.type === 'accountAttribute' &&
+                    t.transformDefinition?.attributes?.sourceName === fusionSource.name &&
+                    t.transformDefinition?.attributes?.attributeName === attributeName
+            )
+            if (!verified) {
+                this.log.warn(
+                    `Identity profile mapping verification failed for profile ${profile.id} and attribute "${attributeName}". ` +
+                    `Existing transform keys: ${refreshedTransforms.map((t: any) => t.identityAttributeName).join(', ')}`
+                )
+            } else {
+                this.log.info(
+                    `Verified identity profile mapping for profile ${profile.id} and attribute "${attributeName}"`
+                )
+            }
+        }
     }
 
     /**
@@ -1192,7 +1257,11 @@ export class SourceService {
     /**
      * Aggregate managed source
      */
-    private async aggregateManagedSource(id: string, disableOptimization?: boolean): Promise<void> {
+    private async aggregateManagedSource(
+        id: string,
+        disableOptimization?: boolean,
+        awaitTaskStatus: boolean = true
+    ): Promise<void> {
         let completed = false
         const sourceName = this.sourcesById.get(id)?.name ?? id
         const { sourcesApi, taskManagementApi } = this.client
@@ -1207,6 +1276,14 @@ export class SourceService {
         const loadAccountsTask = await this.client.execute(importAccounts, QueuePriority.HIGH, 'SourceService>aggregateManagedSource importAccounts')
         if (!loadAccountsTask) {
             this.log.warn(`Failed to trigger account aggregation for source ${sourceName} (${id}). The API call returned no data.`)
+            return
+        }
+
+        if (!awaitTaskStatus) {
+            const taskId = loadAccountsTask?.task?.id ?? 'unknown'
+            this.log.info(
+                `Triggered managed source aggregation for ${sourceName} (${id}) with taskId=${taskId} (status polling skipped)`
+            )
             return
         }
 

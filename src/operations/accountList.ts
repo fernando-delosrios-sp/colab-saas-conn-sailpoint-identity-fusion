@@ -34,11 +34,11 @@ async function setupPhase(serviceRegistry: ServiceRegistry, schema: any): Promis
     const reverseCorrelationSources = config.sources.filter((sc) => sc.correlationMode === 'reverse')
     if (reverseCorrelationSources.length > 0) {
         const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
-        await Promise.all(
-            reverseCorrelationSources.map((sc) =>
-                sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
-            )
-        )
+        // Run reverse setup sequentially to avoid concurrent updates on the same
+        // Fusion identity profile transforms, which can cause non-deterministic misses.
+        for (const sc of reverseCorrelationSources) {
+            await sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
+        }
         await schemas.setFusionAccountSchema(undefined)
         log.info('Fusion account schema refreshed after reverse correlation setup')
         log.info(`Reverse correlation setup completed for ${reverseCorrelationSources.length} source(s)`)
