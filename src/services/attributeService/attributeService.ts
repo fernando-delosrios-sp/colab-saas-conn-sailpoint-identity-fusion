@@ -477,9 +477,10 @@ export class AttributeService {
      */
     private buildVelocityContext(fusionAccount: FusionAccount): { [key: string]: any } {
         const context: { [key: string]: any } = { ...fusionAccount.attributeBag.current }
+        const orderedAccounts = this.getOrderedAccountsForContext(fusionAccount)
 
         context.identity = fusionAccount.attributeBag.identity
-        context.accounts = fusionAccount.attributeBag.accounts
+        context.accounts = orderedAccounts
         context.previous = fusionAccount.attributeBag.previous
         context.sources = fusionAccount.attributeBag.sources
 
@@ -488,6 +489,36 @@ export class AttributeService {
         }
 
         return context
+    }
+
+    /**
+     * Build a deterministic accounts array for attribute-definition context.
+     *
+     * Ordering rules:
+     * 1) Sources are ordered by config.sources.
+     * 2) Accounts within a source keep insertion order.
+     * 3) Any non-configured sources are appended in map insertion order.
+     */
+    private getOrderedAccountsForContext(fusionAccount: FusionAccount): Attributes[] {
+        const { sources } = fusionAccount.attributeBag
+        if (sources.size === 0) return fusionAccount.attributeBag.accounts
+
+        const ordered: Attributes[] = []
+        const seenSources = new Set<string>()
+
+        for (const sc of this.sourceConfigs) {
+            const sourceAccounts = sources.get(sc.name)
+            if (!sourceAccounts || sourceAccounts.length === 0) continue
+            ordered.push(...sourceAccounts)
+            seenSources.add(sc.name)
+        }
+
+        for (const [sourceName, sourceAccounts] of sources.entries()) {
+            if (seenSources.has(sourceName) || sourceAccounts.length === 0) continue
+            ordered.push(...sourceAccounts)
+        }
+
+        return ordered
     }
 
     // ------------------------------------------------------------------------

@@ -1097,12 +1097,19 @@ export class FusionAccount {
                 nativeIdentity: account.nativeIdentity ?? accountId,
             })
 
+            const contextAttributes: Attributes = {
+                ...(account.attributes ?? {}),
+                _source: account.sourceName,
+                // IdentityIQ-style compatibility: true means account is disabled.
+                IIQDisabled: Boolean(account.disabled),
+            }
+
             const existingSourceAccounts = this._attributeBag.sources.get(account.sourceName) || []
-            existingSourceAccounts.push(account.attributes ?? {})
+            existingSourceAccounts.push(contextAttributes)
             this._sources.delete('Identities')
             this._sources.add(account.sourceName)
             this._attributeBag.sources.set(account.sourceName, existingSourceAccounts)
-            this._attributeBag.accounts.push(account.attributes ?? {})
+            this._attributeBag.accounts.push(contextAttributes)
             // Invalidate cached sourceAttributeMap since sources changed
             this._sourceAttributeMapCache = undefined
             this._type = 'managed'
