@@ -65,9 +65,7 @@ describe('testConnection', () => {
     })
 
     it('skips reverse correlation setup when no reverse sources are configured', async () => {
-        const { registry, sources, schemas } = createMockRegistry([
-            { name: 'AD', correlationMode: 'none' },
-        ])
+        const { registry, sources, schemas } = createMockRegistry([{ name: 'AD', correlationMode: 'none' }])
 
         await testConnection(registry, {})
 

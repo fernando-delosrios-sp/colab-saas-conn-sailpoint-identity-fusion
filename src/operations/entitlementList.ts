@@ -1,8 +1,4 @@
-import {
-    ConnectorError,
-    ConnectorErrorType,
-    StdEntitlementListInput,
-} from '@sailpoint/connector-sdk'
+import { ConnectorError, ConnectorErrorType, StdEntitlementListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 
 /**
@@ -15,10 +11,7 @@ import { ServiceRegistry } from '../services/serviceRegistry'
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param input - SDK input containing the entitlement type to list
  */
-export const entitlementList = async (
-    serviceRegistry: ServiceRegistry,
-    input: StdEntitlementListInput,
-) => {
+export const entitlementList = async (serviceRegistry: ServiceRegistry, input: StdEntitlementListInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, sources, entitlements, res } = serviceRegistry
 

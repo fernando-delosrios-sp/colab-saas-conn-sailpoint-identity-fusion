@@ -39,6 +39,6 @@ The Account Create operation creates a new fusion account for a specific identit
 
 ## Behavior Notes
 
--   **nativeIdentity immutability**: The `nativeIdentity` (account identifier) is determined at creation time and is never changed afterwards. This prevents disconnection between the existing Fusion account and the platform during subsequent updates, reads, or enable/disable cycles.
--   **Account name immutability**: The account `name` (display attribute) is also locked at creation. It always reflects the hosting identity's name. This prevents destruction of the identity linkage if an attribute definition would otherwise overwrite it.
--   **Unique attributes**: Unique attribute values (e.g. generated usernames) are freshly calculated during creation with collision detection against all existing Fusion accounts. These values remain stable unless the account is disabled and re-enabled (which triggers a unique attribute reset).
+- **nativeIdentity immutability**: The `nativeIdentity` (account identifier) is determined at creation time and is never changed afterwards. This prevents disconnection between the existing Fusion account and the platform during subsequent updates, reads, or enable/disable cycles.
+- **Account name immutability**: The account `name` (display attribute) is also locked at creation. It always reflects the hosting identity's name. This prevents destruction of the identity linkage if an attribute definition would otherwise overwrite it.
+- **Unique attributes**: Unique attribute values (e.g. generated usernames) are freshly calculated during creation with collision detection against all existing Fusion accounts. These values remain stable unless the account is disabled and re-enabled (which triggers a unique attribute reset).

@@ -1,8 +1,4 @@
-import {
-    isAccountSchema,
-    attributeDefinitionToSchemaAttribute,
-    apiSchemaToAccountSchema,
-} from '../helpers'
+import { isAccountSchema, attributeDefinitionToSchemaAttribute, apiSchemaToAccountSchema } from '../helpers'
 
 describe('schemaService helpers', () => {
     describe('isAccountSchema', () => {
@@ -54,9 +50,7 @@ describe('schemaService helpers', () => {
             const apiSchema = {
                 displayAttribute: 'displayName',
                 identityAttribute: 'id',
-                attributes: [
-                    { name: 'displayName', type: 'STRING', isMulti: false, isEntitlement: false },
-                ],
+                attributes: [{ name: 'displayName', type: 'STRING', isMulti: false, isEntitlement: false }],
             }
             const result = apiSchemaToAccountSchema(apiSchema as any)
             expect(result.displayAttribute).toBe('displayName')

@@ -1,7 +1,7 @@
 /**
  * Native name matching implementation
  * Replaces the heavy 'name-match' library (which pulls in 48MB of NLP dependencies)
- * 
+ *
  * This implementation uses a combination of techniques optimized for name matching:
  * - Token-based comparison (handles different name orderings)
  * - Phonetic matching (handles spelling variations)
@@ -13,13 +13,13 @@ import { doubleMetaphone } from 'double-metaphone'
 
 /**
  * Match two names and return a similarity score between 0 and 1
- * 
+ *
  * This algorithm:
  * 1. Normalizes names (lowercase, trim, remove extra spaces)
  * 2. Compares individual name tokens
  * 3. Uses Jaro-Winkler for string similarity
  * 4. Applies phonetic matching for common misspellings
- * 
+ *
  * @param name1 - First name to compare
  * @param name2 - Second name to compare
  * @returns Similarity score from 0 (no match) to 1 (perfect match)
@@ -41,8 +41,8 @@ export function match(name1: string, name2: string): number {
     if (normalized1 === normalized2) return 1.0
 
     // Split names into tokens and filter empty tokens
-    const tokens1 = normalized1.split(/\s+/).filter(t => t.length > 0)
-    const tokens2 = normalized2.split(/\s+/).filter(t => t.length > 0)
+    const tokens1 = normalized1.split(/\s+/).filter((t) => t.length > 0)
+    const tokens2 = normalized2.split(/\s+/).filter((t) => t.length > 0)
 
     // No valid tokens to compare
     if (tokens1.length === 0 || tokens2.length === 0) return 0
@@ -150,8 +150,8 @@ function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): numb
     if (tokens1.length === 0 || tokens2.length === 0) return 0
 
     // Filter out single-character tokens (initials) first
-    const validTokens1 = tokens1.filter(t => t.length > 1)
-    const validTokens2 = tokens2.filter(t => t.length > 1)
+    const validTokens1 = tokens1.filter((t) => t.length > 1)
+    const validTokens2 = tokens2.filter((t) => t.length > 1)
 
     if (validTokens1.length === 0 || validTokens2.length === 0) return 0
 
@@ -165,10 +165,12 @@ function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): numb
             const codes2 = doubleMetaphone(token2)
 
             // Check if any phonetic codes match
-            if (codes1[0] === codes2[0] ||
+            if (
+                codes1[0] === codes2[0] ||
                 codes1[0] === codes2[1] ||
                 codes1[1] === codes2[0] ||
-                codes1[1] === codes2[1]) {
+                codes1[1] === codes2[1]
+            ) {
                 phoneticMatches++
                 break // Found a match for this token1, move to next
             }

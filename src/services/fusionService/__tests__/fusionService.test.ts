@@ -43,7 +43,7 @@ describe('FusionService', () => {
             k8sCluster: false,
             managedAccountsBatchSize: 50,
             deleteEmpty: false,
-            sources: []
+            sources: [],
         } as unknown as FusionConfig
 
         // Reset mocks
@@ -51,40 +51,52 @@ describe('FusionService', () => {
         const mockClient = {} as any
         mockIdentities = new IdentityService(mockConfig, mockLog, mockClient) as jest.Mocked<IdentityService>
         mockSources = new SourceService(mockConfig, mockLog, mockClient) as jest.Mocked<SourceService>
-        mockForms = new FormService(mockConfig, mockLog, mockClient, mockSources, mockIdentities) as jest.Mocked<FormService>
+        mockForms = new FormService(
+            mockConfig,
+            mockLog,
+            mockClient,
+            mockSources,
+            mockIdentities
+        ) as jest.Mocked<FormService>
         const mockLocks = {} as any
         mockSchemas = new SchemaService(mockConfig, mockLog, mockSources) as jest.Mocked<SchemaService>
-        mockAttributes = new AttributeService(mockConfig, mockSchemas, mockSources, mockLog, mockLocks) as jest.Mocked<AttributeService>
+        mockAttributes = new AttributeService(
+            mockConfig,
+            mockSchemas,
+            mockSources,
+            mockLog,
+            mockLocks
+        ) as jest.Mocked<AttributeService>
         mockScoring = new ScoringService(mockConfig, mockLog) as jest.Mocked<ScoringService>
 
         // Mock specific properties/methods needed for initialization
         Object.defineProperty(mockSources, 'managedAccountsById', {
             get: jest.fn(() => new Map()),
-            configurable: true
+            configurable: true,
         })
         Object.defineProperty(mockSources, 'managedAccountsByIdentityId', {
             get: jest.fn(() => new Map()),
-            configurable: true
+            configurable: true,
         })
         Object.defineProperty(mockSources, 'managedAccountsAllById', {
             get: jest.fn(() => new Map()),
-            configurable: true
+            configurable: true,
         })
         Object.defineProperty(mockSources, 'fusionAccounts', {
             get: jest.fn(() => []),
-            configurable: true
+            configurable: true,
         })
         Object.defineProperty(mockSources, 'managedSources', {
             get: jest.fn(() => []),
-            configurable: true
+            configurable: true,
         })
         Object.defineProperty(mockIdentities, 'identities', {
             get: jest.fn(() => []),
-            configurable: true
+            configurable: true,
         })
         Object.defineProperty(mockSchemas, 'fusionDisplayAttribute', {
             get: jest.fn(() => 'displayName'),
-            configurable: true
+            configurable: true,
         })
 
         fusionService = new FusionService(
@@ -108,7 +120,7 @@ describe('FusionService', () => {
             attributes: mockAttributes,
             forms: mockForms,
             scoring: mockScoring,
-            log: mockLog
+            log: mockLog,
         } as unknown as ServiceRegistry)
     })
 
@@ -125,17 +137,17 @@ describe('FusionService', () => {
                 nativeIdentity: 'fusion-1',
                 attributes: {
                     id: 'fusion-1',
-                    name: 'Existing Fusion Account'
-                }
+                    name: 'Existing Fusion Account',
+                },
             } as unknown as Account
 
             jest.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
 
-            // Mock FusionAccount.fromFusionAccount static method if possible, 
+            // Mock FusionAccount.fromFusionAccount static method if possible,
             // but since it's a class method we might depend on its implementation or mock the return of processFusionAccount
             // For unit testing FusionService, we want to see if it calls processFusionAccount.
 
-            // Since processFusionAccounts calls processFusionAccount internally, let's spy on that if we can, 
+            // Since processFusionAccounts calls processFusionAccount internally, let's spy on that if we can,
             // or verify side effects.
 
             const result = await fusionService.processFusionAccounts()
@@ -149,7 +161,7 @@ describe('FusionService', () => {
         it('should process new identities', async () => {
             const mockIdentity = {
                 id: 'identity-1',
-                name: 'New Identity'
+                name: 'New Identity',
             } as IdentityDocument
 
             jest.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
@@ -169,13 +181,13 @@ describe('FusionService', () => {
         it('should skip existing identities', async () => {
             const mockIdentity = {
                 id: 'identity-1',
-                name: 'New Identity'
+                name: 'New Identity',
             } as IdentityDocument
             jest.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
 
             // Pre-register the identity
             const fusionAccount = FusionAccount.fromIdentity(mockIdentity)
-            // We need to access private map or use a public method to set it. 
+            // We need to access private map or use a public method to set it.
             // setFusionAccount is private in the class but logically we can simulate it by running processIdentity once
 
             await fusionService.processIdentity(mockIdentity)
@@ -190,7 +202,7 @@ describe('FusionService', () => {
             const mockManagedAccount = {
                 nativeIdentity: 'mgmt-1',
                 name: 'Managed Account 1',
-                sourceName: 'Source A'
+                sourceName: 'Source A',
             } as Account
 
             const managedAccountsMap = new Map<string, Account>()
@@ -215,7 +227,7 @@ describe('FusionService', () => {
                 nativeIdentity: 'native-1',
                 name: 'Managed Account 1',
                 sourceName: 'Source A',
-                attributes: {}
+                attributes: {},
             } as Account
 
             const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
@@ -223,14 +235,14 @@ describe('FusionService', () => {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
-                config: {}
+                config: {},
             })
             jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
             mockSources.getSourceConfig.mockReturnValue({
                 name: 'Source A',
                 correlationMode: 'reverse',
                 correlationAttribute: 'reverseNativeIdentity',
-                correlationDisplayName: 'Reverse Native Identity'
+                correlationDisplayName: 'Reverse Native Identity',
             } as any)
 
             const result = await fusionService.processManagedAccount(mockManagedAccount)
@@ -247,8 +259,8 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {
-                    accounts: ['acct-missing-1']
-                }
+                    accounts: ['acct-missing-1'],
+                },
             } as unknown as Account
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
@@ -261,9 +273,9 @@ describe('FusionService', () => {
                             id: 'acct-missing-1',
                             nativeIdentity: 'native-missing-1',
                             sourceName: 'Source A',
-                            attributes: {}
-                        } as unknown as Account
-                    ]
+                            attributes: {},
+                        } as unknown as Account,
+                    ],
                 ])
             )
             mockSources.getSourceConfig.mockImplementation((sourceName: string) => {
@@ -272,7 +284,7 @@ describe('FusionService', () => {
                         name: 'Source A',
                         correlationMode: 'reverse',
                         correlationAttribute: 'reverseNativeIdentity',
-                        correlationDisplayName: 'Reverse Native Identity'
+                        correlationDisplayName: 'Reverse Native Identity',
                     } as any
                 }
                 return undefined
@@ -292,8 +304,8 @@ describe('FusionService', () => {
                     name: 'Source A',
                     correlationMode: 'reverse',
                     correlationAttribute: 'reverseNativeIdentity',
-                    correlationDisplayName: 'Reverse Native Identity'
-                }
+                    correlationDisplayName: 'Reverse Native Identity',
+                },
             ]
 
             const fusionAccount = FusionAccount.fromFusionAccount({
@@ -303,8 +315,8 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 attributes: {
                     accounts: ['missing-1'],
-                    reverseNativeIdentity: 'existing-value'
-                }
+                    reverseNativeIdentity: 'existing-value',
+                },
             } as unknown as Account)
 
             await (fusionService as any).correlatePerSource(fusionAccount, false)

@@ -1,11 +1,11 @@
 /**
  * Lightweight UK geographic data
  * Part of the replacement for the heavy 'country-state-city' library (17MB)
- * 
+ *
  * Coverage:
  * - UK: Major regions across England, Scotland, Wales, Northern Ireland
  * - 70+ major cities covering all major metropolitan areas
- * 
+ *
  * This lightweight implementation is ~12KB for UK data alone
  */
 
@@ -221,7 +221,7 @@ export function getAllUKRegions(): UKRegion[] {
 export const UKCity = {
     getCitiesOfCountry: (countryCode: string) => {
         if (countryCode !== 'GB' && countryCode !== 'UK') return undefined
-        return getAllUKCities().map(city => ({
+        return getAllUKCities().map((city) => ({
             name: city.name,
             stateCode: city.regionCode,
             country: city.country,

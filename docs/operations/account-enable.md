@@ -30,6 +30,6 @@ The Account Enable operation re-enables a previously disabled fusion account. Th
 
 ## Behavior Notes
 
--   **Unique attribute reset**: Enabling a Fusion account sets `resetDefinition: true`, which unregisters the account's existing unique attribute values and regenerates them. This guarantees that the re-enabled account receives collision-free values even if its previous values were reassigned to other accounts while it was disabled.
--   **Changeable unique attributes**: Use regular unique attribute schemas (e.g. usernames, email aliases) to define attributes you want refreshed on enable/disable cycles. Disabling and then re-enabling a Fusion account is the mechanism that triggers this regeneration.
--   **nativeIdentity and name are preserved**: Even though unique attributes are reset, the `nativeIdentity` and account `name` are never changed. The attribute definition engine skips them for identity-linked accounts to prevent disconnection and identity destruction.
+- **Unique attribute reset**: Enabling a Fusion account sets `resetDefinition: true`, which unregisters the account's existing unique attribute values and regenerates them. This guarantees that the re-enabled account receives collision-free values even if its previous values were reassigned to other accounts while it was disabled.
+- **Changeable unique attributes**: Use regular unique attribute schemas (e.g. usernames, email aliases) to define attributes you want refreshed on enable/disable cycles. Disabling and then re-enabling a Fusion account is the mechanism that triggers this regeneration.
+- **nativeIdentity and name are preserved**: Even though unique attributes are reset, the `nativeIdentity` and account `name` are never changed. The attribute definition engine skips them for identity-linked accounts to prevent disconnection and identity destruction.

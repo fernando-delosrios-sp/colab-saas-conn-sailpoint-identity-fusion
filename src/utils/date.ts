@@ -10,10 +10,6 @@ export const getDateFromISOString = (isoString?: string | undefined | null): Dat
  * Null / undefined / empty `isoString` values are treated as epoch-0, so they
  * will never be considered "newer" than a real reference date.
  */
-export const isNewerThan = (
-    isoString: string | undefined | null,
-    reference: Date,
-    thresholdMs = 0,
-): boolean => {
+export const isNewerThan = (isoString: string | undefined | null, reference: Date, thresholdMs = 0): boolean => {
     return getDateFromISOString(isoString).getTime() > reference.getTime() + thresholdMs
 }

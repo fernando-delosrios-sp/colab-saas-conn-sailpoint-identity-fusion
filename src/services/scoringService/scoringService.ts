@@ -66,10 +66,7 @@ export class ScoringService {
      * @param fusionAccount - The candidate account being evaluated
      * @param fusionIdentity - The existing identity to compare against
      */
-    private compareFusionAccounts(
-        fusionAccount: FusionAccount,
-        fusionIdentity: FusionAccount
-    ): void {
+    private compareFusionAccounts(fusionAccount: FusionAccount, fusionIdentity: FusionAccount): void {
         const fullRun = this.reportMode || this.fusionUseAverageScore
         const scores: ScoreReport[] = []
         let isMatch = false
@@ -130,10 +127,7 @@ export class ScoringService {
 
         const identityId = fusionIdentity.identityId ?? ''
         const identityName = String(
-            fusionIdentity.attributes?.displayName ||
-            fusionIdentity.displayName ||
-            fusionIdentity.name ||
-            'Unknown'
+            fusionIdentity.attributes?.displayName || fusionIdentity.displayName || fusionIdentity.name || 'Unknown'
         )
         const fusionMatch: FusionMatch = {
             fusionIdentity,

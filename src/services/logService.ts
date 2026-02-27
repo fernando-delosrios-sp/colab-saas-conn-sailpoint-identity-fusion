@@ -28,13 +28,12 @@ type LogConfig = {
     operationContext?: string
 }
 
-
 /**
  * Known operation function names
  */
 const OPERATION_NAMES = new Set([
     'accountList',
-    'accountCreate', 
+    'accountCreate',
     'accountRead',
     'accountUpdate',
     'accountDelete',
@@ -73,19 +72,13 @@ export function getCallerInfo(skipFrames: number = 2): { origin: string; isOpera
         // Infrastructure class names to skip when walking the stack.
         // These are utility/framework classes that wrap business logic - we want
         // to attribute the log to the actual business caller, not the wrapper.
-        const INFRASTRUCTURE_CLASSES = new Set([
-            'Object', 'Module', 'Promise',
-            'InMemoryLockService', 'ApiQueue',
-        ])
+        const INFRASTRUCTURE_CLASSES = new Set(['Object', 'Module', 'Promise', 'InMemoryLockService', 'ApiQueue'])
 
         // Node.js runtime internals - skip entirely (do not use as fallback).
         // When log calls run inside async callbacks, the stack often shows
         // process.processTicksAndRejections etc.; we must walk past these
         // to find the actual service/method (e.g. accountCreate, FusionService.processFusionAccount).
-        const RUNTIME_INTERNALS = new Set([
-            'process', 'internal', 'node',
-            'AsyncLocalStorage', 'AsyncResource',
-        ])
+        const RUNTIME_INTERNALS = new Set(['process', 'internal', 'node', 'AsyncLocalStorage', 'AsyncResource'])
 
         // --- Pass 1: find the first ClassName.methodName (most specific) ---
         // Skip infrastructure and runtime internals to find the real business caller.
@@ -299,12 +292,7 @@ export class LogService {
      * Sends plain text: HH:MM:SS [LEVEL] origin: message
      * The log server will handle colorization for console display.
      */
-    private sendToExternalService(
-        level: LogLevel, 
-        message: string, 
-        data?: any, 
-        origin?: string
-    ): void {
+    private sendToExternalService(level: LogLevel, message: string, data?: any, origin?: string): void {
         if (!this.externalLoggingUrl) return
 
         // Format timestamp as HH:MM:SS
@@ -344,13 +332,12 @@ export class LogService {
             }).then(() => {})
 
         const pending: Promise<void> = (
-            this.apiQueue
-                ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW }).then(() => {})
-                : doFetch()
-        ).catch(() => {
-        }).finally(() => {
-            this.pendingExternalLogs.delete(pending)
-        })
+            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW }).then(() => {}) : doFetch()
+        )
+            .catch(() => {})
+            .finally(() => {
+                this.pendingExternalLogs.delete(pending)
+            })
         this.pendingExternalLogs.add(pending)
     }
 
@@ -363,11 +350,7 @@ export class LogService {
      * @param origin - The caller origin string (e.g. "FusionService>processFusionAccount")
      * @returns The formatted log string
      */
-    private formatMessage(
-        message: string, 
-        data?: any, 
-        origin?: string
-    ): string {
+    private formatMessage(message: string, data?: any, origin?: string): string {
         const fn = origin || 'unknown'
         const prefix = this.operationContext ? `[${this.operationContext}] ` : ''
         // When run from an operation, operation tag is sufficient; omit origin to avoid redundancy

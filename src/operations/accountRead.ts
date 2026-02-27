@@ -18,10 +18,7 @@ import { ATTR_OPS_REFRESH } from '../services/attributeService/types'
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param input - SDK input containing the account identity to read
  */
-export const accountRead = async (
-    serviceRegistry: ServiceRegistry,
-    input: StdAccountReadInput,
-) => {
+export const accountRead = async (serviceRegistry: ServiceRegistry, input: StdAccountReadInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, fusion, schemas, sources, res } = serviceRegistry
 

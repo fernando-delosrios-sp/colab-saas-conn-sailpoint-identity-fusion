@@ -4,6 +4,7 @@ import { LogService } from './logService'
 import { assert } from 'console'
 
 const KEEPALIVE = 2.5 * 60 * 1000
+const DEFAULT_PROXY_REQUEST_TIMEOUT_MS = 5 * 60 * 1000
 
 const unwrapData = (obj: any, log: LogService): any => {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
@@ -46,8 +47,9 @@ export class ProxyService {
         const proxyEnabled = this.config.proxyEnabled ?? false
         const hasProxyUrl = this.config.proxyUrl !== undefined && this.config.proxyUrl !== ''
         const isServer = process.env.PROXY_PASSWORD !== undefined
+        const isAlreadyProxyRequest = this.config.isProxy === true
 
-        return (proxyEnabled && hasProxyUrl && !isServer) || (this.config.isProxy === true)
+        return proxyEnabled && hasProxyUrl && !isServer && !isAlreadyProxyRequest
     }
 
     /**
@@ -92,6 +94,11 @@ export class ProxyService {
                 input,
                 config: externalConfig,
             }
+            const proxyRequestTimeoutMs = this.config.proxyRequestTimeoutMs ?? DEFAULT_PROXY_REQUEST_TIMEOUT_MS
+            const controller = new AbortController()
+            const timeout = setTimeout(() => {
+                controller.abort()
+            }, proxyRequestTimeoutMs)
             let response: globalThis.Response
             try {
                 response = await fetch(proxyUrl, {
@@ -100,12 +107,20 @@ export class ProxyService {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(body),
+                    signal: controller.signal,
                 })
             } catch (fetchError) {
-                this.log.error(`Proxy fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown fetch error'}`)
+                if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+                    throw new ConnectorError(`Proxy request to ${proxyUrl} timed out after ${proxyRequestTimeoutMs} ms`)
+                }
+                this.log.error(
+                    `Proxy fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown fetch error'}`
+                )
                 throw new ConnectorError(
                     `Failed to connect to proxy server at ${proxyUrl}: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`
                 )
+            } finally {
+                clearTimeout(timeout)
             }
 
             if (!response.ok) {
@@ -122,9 +137,11 @@ export class ProxyService {
                 return
             }
 
-            this.log.debug(`Proxy received response (${data.length} chars): ${data.substring(0, 500)}${data.length > 500 ? '...' : ''}`)
+            this.log.debug(
+                `Proxy received response (${data.length} chars): ${data.substring(0, 500)}${data.length > 500 ? '...' : ''}`
+            )
 
-            const lines = data.split('\n').filter(line => line.trim().length > 0)
+            const lines = data.split('\n').filter((line) => line.trim().length > 0)
             this.log.debug(`Processing ${lines.length} non-empty lines from proxy response`)
 
             if (lines.length === 0) {

@@ -1,7 +1,4 @@
-import {
-    FormInstanceResponseV2025,
-    FormDefinitionInputV2025,
-} from 'sailpoint-api-client'
+import { FormInstanceResponseV2025, FormDefinitionInputV2025 } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import { SourceType } from '../../model/config'
 import { FusionDecision } from '../../model/form'
@@ -42,7 +39,6 @@ export const getReviewerInfo = (
         name: identity.name || identity.attributes?.displayName || identityId,
     }
 }
-
 
 /**
  * Extract account information from form input
@@ -125,13 +121,13 @@ export const createFusionDecision = (
     const existingIdentity = isNewIdentity
         ? undefined
         : Array.isArray(identitiesValue)
-            ? identitiesValue[0]
-            : identitiesValue
+          ? identitiesValue[0]
+          : identitiesValue
 
     if (!isNewIdentity && !existingIdentity) {
         logger.error(
             `[formProcessor] Form ${formInstance.id}: toggle is false but no identity selected ` +
-            `for account ${accountInfo.name} [${accountInfo.sourceName}]. Skipping decision.`
+                `for account ${accountInfo.name} [${accountInfo.sourceName}]. Skipping decision.`
         )
         return null
     }

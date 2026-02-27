@@ -64,7 +64,7 @@ const ensureUsCitiesCached = (): void => {
             const state = State.getStateByCodeAndCountry(city.stateCode, 'US')
             usCityCache.set(key, {
                 stateName: state?.name,
-                stateCode: city.stateCode
+                stateCode: city.stateCode,
             })
         }
     }
@@ -236,9 +236,7 @@ const normalizeAddress = (address: string): string | undefined => {
         const state = State.getStateByCodeAndCountry(stateInput.trim().toUpperCase(), 'US')
         const stateCode = state?.isoCode
         if (stateCode) {
-            return zip
-                ? `${city.trim()}, ${stateCode} ${zip.trim()}`
-                : `${city.trim()}, ${stateCode}`
+            return zip ? `${city.trim()}, ${stateCode} ${zip.trim()}` : `${city.trim()}, ${stateCode}`
         }
     }
 
@@ -248,7 +246,7 @@ const normalizeAddress = (address: string): string | undefined => {
 const AddressParse = {
     getCityState,
     getCityStateCode,
-    parse: parseAddressSync
+    parse: parseAddressSync,
 }
 
 const Normalize = {
@@ -257,7 +255,7 @@ const Normalize = {
     name: withNormalizeFallback('name', properCaseName),
     fullName: withNormalizeFallback('fullName', normalizeFullName),
     ssn: withNormalizeFallback('ssn', normalizeSSN),
-    address: withNormalizeFallback('address', normalizeAddress)
+    address: withNormalizeFallback('address', normalizeAddress),
 }
 
 export const contextHelpers = { Datefns, Math, AddressParse, Normalize }

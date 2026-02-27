@@ -155,10 +155,7 @@ export function mergeAttributes(...sources: (Record<string, any> | undefined)[])
 /**
  * Creates a shallow copy of attributes, optionally excluding specific keys.
  */
-export function copyAttributes(
-    attributes: Record<string, any>,
-    exclude?: string[]
-): Record<string, any> {
+export function copyAttributes(attributes: Record<string, any>, exclude?: string[]): Record<string, any> {
     if (!exclude || exclude.length === 0) {
         return { ...attributes }
     }
@@ -190,11 +187,7 @@ export function extractString(attributes: Record<string, any>, key: string): str
 /**
  * Extracts a string value from attributes with a fallback to a default value.
  */
-export function extractStringOrDefault(
-    attributes: Record<string, any>,
-    key: string,
-    defaultValue: string
-): string {
+export function extractStringOrDefault(attributes: Record<string, any>, key: string, defaultValue: string): string {
     return extractString(attributes, key) ?? defaultValue
 }
 
@@ -245,10 +238,7 @@ export function extractArray<T = any>(attributes: Record<string, any>, key: stri
  * toSetFromAttribute(null, 'tags')
  * // Returns: Set()
  */
-export function toSetFromAttribute(
-    attributes: Record<string, any> | null | undefined,
-    key: string
-): Set<string> {
+export function toSetFromAttribute(attributes: Record<string, any> | null | undefined, key: string): Set<string> {
     const raw = attributes?.[key]
     const arr = Array.isArray(raw) ? raw : []
 

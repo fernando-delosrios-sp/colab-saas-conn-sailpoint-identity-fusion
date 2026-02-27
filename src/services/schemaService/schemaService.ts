@@ -1,5 +1,11 @@
 import { AccountSchema, Attributes, SchemaAttribute } from '@sailpoint/connector-sdk'
-import { AttributeMap, FusionConfig, NormalAttributeDefinition, SourceConfig, UniqueAttributeDefinition } from '../../model/config'
+import {
+    AttributeMap,
+    FusionConfig,
+    NormalAttributeDefinition,
+    SourceConfig,
+    UniqueAttributeDefinition,
+} from '../../model/config'
 import { LogService } from '../logService'
 import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
@@ -118,7 +124,9 @@ export class SchemaService {
     }
 
     /** Base fusion attribute names that must always be included in the subset (e.g. reviews for reviewers). */
-    private static readonly BASE_FUSION_ATTRIBUTE_NAMES = fusionAccountSchemaAttributes.map((a) => a.name!).filter(Boolean)
+    private static readonly BASE_FUSION_ATTRIBUTE_NAMES = fusionAccountSchemaAttributes
+        .map((a) => a.name!)
+        .filter(Boolean)
 
     /**
      * Sets the fusion account schema, either from a provided schema object or by
@@ -237,10 +245,7 @@ export class SchemaService {
 
     /** Builds schema attributes for configured attribute definitions (normal + unique). */
     private getAttributeDefinitionAttributes(): SchemaAttribute[] {
-        const allDefinitions = [
-            ...this.normalAttributeDefinitions,
-            ...this.uniqueAttributeDefinitions,
-        ]
+        const allDefinitions = [...this.normalAttributeDefinitions, ...this.uniqueAttributeDefinitions]
 
         return allDefinitions
             .filter((x) => x.name)

@@ -2,7 +2,7 @@ import { ConnectorError, StdAccountUpdateInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
-import { executeAction } from './actions'
+import { executeActions } from './actions'
 import { ATTR_OPS_NONE } from '../services/attributeService/types'
 
 /**
@@ -21,10 +21,7 @@ import { ATTR_OPS_NONE } from '../services/attributeService/types'
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param input - SDK input containing the account identity and list of attribute changes
  */
-export const accountUpdate = async (
-    serviceRegistry: ServiceRegistry,
-    input: StdAccountUpdateInput,
-) => {
+export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: StdAccountUpdateInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, sources, schemas, fusion, res } = serviceRegistry
 
@@ -49,7 +46,7 @@ export const accountUpdate = async (
             assert(change.attribute, 'Change attribute is required')
 
             if (change.attribute === 'actions') {
-                await executeAction(change.value, fusionAccount, change.op, serviceRegistry)
+                await executeActions(fusionAccount, change, serviceRegistry)
             } else {
                 log.crash(`Unsupported entitlement change: ${change.attribute}`)
             }

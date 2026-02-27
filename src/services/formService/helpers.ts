@@ -25,7 +25,9 @@ export const buildCandidateList = (fusionAccount: FusionAccount): Candidate[] =>
         // Form conditions compare against this value, so it must be in sync.
         const displayName = String(attrs.displayName || '')
         if (!displayName) {
-            logger.error(`[formBuilder] Candidate identity ${match.fusionIdentity.identityId} is missing attributes.displayName. Form conditions may not work correctly.`)
+            logger.error(
+                `[formBuilder] Candidate identity ${match.fusionIdentity.identityId} is missing attributes.displayName. Form conditions may not work correctly.`
+            )
         }
         return {
             id: match.fusionIdentity.identityId,

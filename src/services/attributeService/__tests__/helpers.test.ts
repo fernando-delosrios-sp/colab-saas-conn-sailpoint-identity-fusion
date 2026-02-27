@@ -1,9 +1,4 @@
-import {
-    attrSplit,
-    attrConcat,
-    processAttributeMapping,
-    buildAttributeMappingConfig,
-} from '../helpers'
+import { attrSplit, attrConcat, processAttributeMapping, buildAttributeMappingConfig } from '../helpers'
 import { Attributes } from '@sailpoint/connector-sdk'
 
 describe('attributeService helpers', () => {
@@ -118,7 +113,11 @@ describe('attributeService helpers', () => {
     describe('buildAttributeMappingConfig', () => {
         it('should use attributeMap when found', () => {
             const maps = [
-                { newAttribute: 'email', existingAttributes: ['mail', 'emailAddress'], attributeMerge: 'first' as const },
+                {
+                    newAttribute: 'email',
+                    existingAttributes: ['mail', 'emailAddress'],
+                    attributeMerge: 'first' as const,
+                },
             ]
             const result = buildAttributeMappingConfig('email', maps, 'list')
             expect(result).toEqual({
@@ -139,7 +138,12 @@ describe('attributeService helpers', () => {
 
         it('should use source from attributeMap when specified', () => {
             const maps = [
-                { newAttribute: 'manager', existingAttributes: ['manager'], attributeMerge: 'source' as const, source: 'HR' },
+                {
+                    newAttribute: 'manager',
+                    existingAttributes: ['manager'],
+                    attributeMerge: 'source' as const,
+                    source: 'HR',
+                },
             ]
             const result = buildAttributeMappingConfig('manager', maps, 'first')
             expect(result.source).toBe('HR')

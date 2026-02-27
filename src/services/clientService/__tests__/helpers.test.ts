@@ -1,9 +1,4 @@
-import {
-    createRetriesConfig,
-    createThrottleConfig,
-    shouldRetry,
-    calculateRetryDelay,
-} from '../helpers'
+import { createRetriesConfig, createThrottleConfig, shouldRetry, calculateRetryDelay } from '../helpers'
 import axiosRetry from 'axios-retry'
 
 jest.mock('axios-retry', () => ({

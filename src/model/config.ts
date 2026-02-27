@@ -170,7 +170,7 @@ export interface ProcessingControlSection {
 }
 
 /** Combined source settings: scope, sources, and processing controls. */
-export interface SourceSettingsMenu extends ScopeSection, SourcesSection, ProcessingControlSection { }
+export interface SourceSettingsMenu extends ScopeSection, SourcesSection, ProcessingControlSection {}
 
 // ============================================================================
 // Attribute Mapping Settings Menu
@@ -232,7 +232,7 @@ export interface ReviewSettingsSection {
 }
 
 /** Combined fusion settings: matching rules and review workflow. */
-export interface FusionSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection { }
+export interface FusionSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection {}
 
 // ============================================================================
 // Advanced Settings Menu
@@ -343,13 +343,18 @@ export interface ProxySettingsSection {
      * Password or secret used by the external endpoint when proxy mode is enabled.
      */
     proxyPassword?: string
+
+    /**
+     * Timeout in milliseconds for requests sent to the external proxy endpoint.
+     */
+    proxyRequestTimeoutMs?: number
 }
 
 /** Combined advanced settings: developer, connection tuning, and proxy. */
 export interface AdvancedSettingsMenu
     extends DeveloperSettingsSection,
-    AdvancedConnectionSettingsSection,
-    ProxySettingsSection { }
+        AdvancedConnectionSettingsSection,
+        ProxySettingsSection {}
 
 // ============================================================================
 // Internal/Computed fields
@@ -399,11 +404,11 @@ export interface InternalConfig {
  */
 export interface FusionConfig
     extends BaseConfig,
-    ConnectionSettingsMenu,
-    SourceSettingsMenu,
-    AttributeMappingSettingsMenu,
-    NormalAttributeDefinitionSettingsMenu,
-    UniqueAttributeDefinitionSettingsMenu,
-    FusionSettingsMenu,
-    AdvancedSettingsMenu,
-    InternalConfig { }
+        ConnectionSettingsMenu,
+        SourceSettingsMenu,
+        AttributeMappingSettingsMenu,
+        NormalAttributeDefinitionSettingsMenu,
+        UniqueAttributeDefinitionSettingsMenu,
+        FusionSettingsMenu,
+        AdvancedSettingsMenu,
+        InternalConfig {}

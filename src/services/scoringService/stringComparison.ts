@@ -21,7 +21,7 @@ export function jaroWinklerSimilarity(s1: string, s2: string): number {
     // Calculate common prefix up to 4 characters
     let prefixLength = 0
     const maxPrefix = Math.min(4, Math.min(s1.length, s2.length))
-    
+
     for (let i = 0; i < maxPrefix; i++) {
         if (s1[i] === s2[i]) {
             prefixLength++
@@ -79,9 +79,7 @@ function jaroSimilarity(s1: string, s2: string): number {
     }
 
     // Calculate Jaro similarity
-    return (
-        (matches / len1 + matches / len2 + (matches - transpositions / 2) / matches) / 3.0
-    )
+    return (matches / len1 + matches / len2 + (matches - transpositions / 2) / matches) / 3.0
 }
 
 /**
@@ -117,11 +115,11 @@ export function diceCoefficientSimilarity(s1: string, s2: string): number {
  */
 function getBigrams(str: string): Set<string> {
     const bigrams = new Set<string>()
-    
+
     for (let i = 0; i < str.length - 1; i++) {
         bigrams.add(str.slice(i, i + 2))
     }
-    
+
     return bigrams
 }
 
@@ -129,9 +127,9 @@ function getBigrams(str: string): Set<string> {
  * Export with same interface as string-comparison library for easy migration
  */
 export const jaroWinkler = {
-    similarity: jaroWinklerSimilarity
+    similarity: jaroWinklerSimilarity,
 }
 
 export const diceCoefficient = {
-    similarity: diceCoefficientSimilarity
+    similarity: diceCoefficientSimilarity,
 }

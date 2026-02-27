@@ -228,8 +228,8 @@ export class FusionAccount {
             modified: getDateFromISOString(account.modified),
         })
         // Restore persisted originSource; fallback for legacy accounts without it
-        fusionAccount._originSource = account.attributes?.originSource
-            ?? (statuses.has('baseline') ? 'Identities' : undefined)
+        fusionAccount._originSource =
+            account.attributes?.originSource ?? (statuses.has('baseline') ? 'Identities' : undefined)
         // Capture the previously stored account IDs so we can later rebuild
         // the current and missing account sets based on which managed accounts
         // still exist in configured sources.
@@ -441,7 +441,7 @@ export class FusionAccount {
             uuid: this.nativeIdentity,
             attributes: this.attributes,
             disabled: this.disabled,
-            key: this.key
+            key: this.key,
         }
     }
 
@@ -696,6 +696,14 @@ export class FusionAccount {
         this.addStatus('reviewer')
     }
 
+    /** Removes reviewer assignment for the given source and updates reviewer status when needed. */
+    public removeSourceReviewer(sourceId: string): void {
+        this._actions.delete(`reviewer:${sourceId}`)
+        if (!this._actionsHasReviewerScope()) {
+            this._statuses.delete('reviewer')
+        }
+    }
+
     /** Returns the source IDs this account's identity is configured to review. */
     public listReviewerSources(): string[] {
         const prefix = 'reviewer:'
@@ -707,6 +715,17 @@ export class FusionAccount {
             }
         }
         return sourceIds
+    }
+
+    /** True when at least one source-scoped reviewer action remains on the account. */
+    private _actionsHasReviewerScope(): boolean {
+        const prefix = 'reviewer:'
+        for (const action of this._actions) {
+            if (action.startsWith(prefix)) {
+                return true
+            }
+        }
+        return false
     }
 
     // ============================================================================
@@ -858,7 +877,7 @@ export class FusionAccount {
      */
     public clearFusionIdentityReferences(): void {
         for (const match of this._fusionMatches) {
-            ; (match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
+            ;(match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
         }
     }
 

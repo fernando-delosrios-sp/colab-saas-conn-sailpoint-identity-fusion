@@ -90,7 +90,9 @@ async function fetchPhase(serviceRegistry: ServiceRegistry): Promise<FetchResult
             managedAccountsFoundAuthoritative++
         }
     }
-    log.info(`Loaded ${sources.fusionAccountCount} fusion account(s), ${identitiesFound} identities, ${managedAccountsFound} managed account(s)`)
+    log.info(
+        `Loaded ${sources.fusionAccountCount} fusion account(s), ${identitiesFound} identities, ${managedAccountsFound} managed account(s)`
+    )
 
     const fusionOwner = sources.fusionSourceOwner
     if (fusion.fusionReportOnAggregation) {
@@ -202,10 +204,7 @@ async function outputPhase(serviceRegistry: ServiceRegistry): Promise<number> {
  * 4. REPORT: Generate fusion report (conditional)
  * 5. OUTPUT: Cleanup, send accounts to platform, save state
  */
-export const accountList = async (
-    serviceRegistry: ServiceRegistry,
-    input: StdAccountListInput,
-) => {
+export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, sources } = serviceRegistry
 

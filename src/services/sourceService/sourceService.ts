@@ -65,7 +65,7 @@ export class SourceService {
 
     /**
      * Clear managed accounts cache to free memory after processing.
-     * 
+     *
      * Memory Optimization:
      * Called at the end of accountList operation after all accounts have been
      * sent to the platform. This releases potentially thousands of account objects
@@ -81,7 +81,7 @@ export class SourceService {
 
     /**
      * Clear fusion accounts cache to free memory after processing.
-     * 
+     *
      * Memory Optimization:
      * Called at the end of accountList operation after all accounts have been
      * sent to the platform. Fusion accounts are loaded once and referenced throughout
@@ -128,9 +128,7 @@ export class SourceService {
 
         // Read persisted batch cumulative count (may be undefined, false, or an object)
         const raw = config.batchCumulativeCount
-        this.batchCumulativeCount = (raw && typeof raw === 'object' && !Array.isArray(raw))
-            ? { ...raw }
-            : {}
+        this.batchCumulativeCount = raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {}
     }
 
     // ------------------------------------------------------------------------
@@ -163,20 +161,20 @@ export class SourceService {
 
     /**
      * Get all managed accounts as an array.
-     * 
+     *
      * Work Queue Pattern:
      * This getter returns the current state of the work queue. As processing phases
      * complete (fetchFormData → processFusionAccounts → processIdentities), accounts
      * are deleted from managedAccountsById. By the time processManagedAccounts calls
      * this getter, it returns ONLY the uncorrelated accounts that remain in the queue.
-     * 
+     *
      * This is intentional and critical for correct operation:
      * - No snapshot or copy is made
      * - Returns live view of the depleted queue
      * - Ensures no duplicate processing
-     * 
+     *
      * Note: Creates a new array on each access. Use managedAccountCount for size checks.
-     * 
+     *
      * @returns Array of accounts currently in the work queue
      */
     public get managedAccounts(): Account[] {
@@ -222,10 +220,14 @@ export class SourceService {
             return await sourcesApi.listSources(requestParameters)
         }
         const apiSources = await wrapConnectorError(
-            () => this.client.paginate(listSources, {}, QueuePriority.HIGH, 'SourceService>fetchAllSources listSources'),
+            () =>
+                this.client.paginate(listSources, {}, QueuePriority.HIGH, 'SourceService>fetchAllSources listSources'),
             'Failed to fetch sources from ISC. Please verify your connector configuration and API credentials'
         )
-        assert(apiSources.length > 0, 'No sources found in ISC. Please verify that the configured sources exist and the connector has access to them.')
+        assert(
+            apiSources.length > 0,
+            'No sources found in ISC. Please verify that the configured sources exist and the connector has access to them.'
+        )
 
         // Build a Map for O(1) lookups instead of O(n) find() operations
         const apiSourcesByName = new Map(apiSources.map((s) => [s.name!, s]))
@@ -236,7 +238,10 @@ export class SourceService {
         // Add managed sources (from config.sources)
         for (const sourceConfig of this.sources) {
             const apiSource = apiSourcesByName.get(sourceConfig.name)
-            assert(apiSource, `Unable to find managed source "${sourceConfig.name}" in ISC. Please verify the source name is correct in the connector configuration.`)
+            assert(
+                apiSource,
+                `Unable to find managed source "${sourceConfig.name}" in ISC. Please verify the source name is correct in the connector configuration.`
+            )
             resolvedSources.push({
                 id: apiSource.id!,
                 name: apiSource.name!,
@@ -250,8 +255,14 @@ export class SourceService {
         const fusionSource = apiSources.find(
             (x) => (x.connectorAttributes as BaseConfig).spConnectorInstanceId === this.spConnectorInstanceId
         )
-        assert(fusionSource, 'Fusion source not found. The connector instance could not locate its own source in ISC. Verify the connector is properly deployed.')
-        assert(fusionSource.owner, 'Fusion source owner not found. The fusion source must have an owner configured in ISC.')
+        assert(
+            fusionSource,
+            'Fusion source not found. The connector instance could not locate its own source in ISC. Verify the connector is properly deployed.'
+        )
+        assert(
+            fusionSource.owner,
+            'Fusion source owner not found. The fusion source must have an owner configured in ISC.'
+        )
         this._fusionSourceId = fusionSource.id!
         this._fusionSourceOwner = {
             id: fusionSource.owner.id!,
@@ -334,16 +345,19 @@ export class SourceService {
     public fireDisableAccount(accountId: string): void {
         const { accountsApi } = this.client
         this.log.info(`Firing low-priority disable for account ${accountId}`)
-        this.client.execute(
-            () => accountsApi.disableAccount({
-                id: accountId,
-                accountToggleRequestV2025: { externalVerificationId: undefined, forceProvisioning: false },
-            }),
-            QueuePriority.LOW,
-            'SourceService>fireDisableAccount'
-        ).catch((err) => {
-            this.log.warn(`Failed to disable account ${accountId}: ${err?.message ?? err}`)
-        })
+        this.client
+            .execute(
+                () =>
+                    accountsApi.disableAccount({
+                        id: accountId,
+                        accountToggleRequestV2025: { externalVerificationId: undefined, forceProvisioning: false },
+                    }),
+                QueuePriority.LOW,
+                'SourceService>fireDisableAccount'
+            )
+            .catch((err) => {
+                this.log.warn(`Failed to disable account ${accountId}: ${err?.message ?? err}`)
+            })
     }
 
     // ------------------------------------------------------------------------
@@ -400,9 +414,15 @@ export class SourceService {
         }
         const ctx = `SourceService>fetchAccountsBySourceIdGenerator ${sourceInfo.name}`
 
-        yield* this.client.paginateParallel(listAccounts, requestParameters, QueuePriority.HIGH, ctx, abortSignal, limit)
+        yield* this.client.paginateParallel(
+            listAccounts,
+            requestParameters,
+            QueuePriority.HIGH,
+            ctx,
+            abortSignal,
+            limit
+        )
     }
-
 
     /**
      * Fetch and cache fusion accounts
@@ -436,9 +456,7 @@ export class SourceService {
             if (baseLimit) {
                 const cumulativeCount = this.batchCumulativeCount[s.name] ?? 0
                 effectiveLimit = cumulativeCount + baseLimit
-                this.log.debug(
-                    `Source ${s.name}: effectiveLimit=${effectiveLimit}`
-                )
+                this.log.debug(`Source ${s.name}: effectiveLimit=${effectiveLimit}`)
             }
             return { source: s, effectiveLimit }
         })
@@ -449,7 +467,11 @@ export class SourceService {
                     this.log.info(`Fetching accounts from source: ${source.name}`)
                     let collectedCount = 0
 
-                    for await (const batch of this.fetchAccountsBySourceIdGenerator(source.id, abortSignal, effectiveLimit)) {
+                    for await (const batch of this.fetchAccountsBySourceIdGenerator(
+                        source.id,
+                        abortSignal,
+                        effectiveLimit
+                    )) {
                         for (const account of batch) {
                             if (effectiveLimit && collectedCount >= effectiveLimit) break
                             if (account.id) {
@@ -467,7 +489,9 @@ export class SourceService {
                             }
                         }
                         if (effectiveLimit && collectedCount >= effectiveLimit) {
-                            this.log.info(`Source ${source.name}: reached effectiveLimit of ${effectiveLimit}, stopping`)
+                            this.log.info(
+                                `Source ${source.name}: reached effectiveLimit of ${effectiveLimit}, stopping`
+                            )
                             break
                         }
                     }
@@ -476,9 +500,7 @@ export class SourceService {
 
                     if (source.config?.accountLimit !== undefined) {
                         this.batchCumulativeCount[source.name] = collectedCount
-                        this.log.debug(
-                            `Source ${source.name}: updated cumulative count to ${collectedCount}`
-                        )
+                        this.log.debug(`Source ${source.name}: updated cumulative count to ${collectedCount}`)
                     }
                 })
             )
@@ -558,7 +580,11 @@ export class SourceService {
             return response.data ?? []
         }
 
-        const accounts = await this.client.execute(listAccounts, QueuePriority.HIGH, 'SourceService>fetchSourceAccountByNativeIdentity')
+        const accounts = await this.client.execute(
+            listAccounts,
+            QueuePriority.HIGH,
+            'SourceService>fetchSourceAccountByNativeIdentity'
+        )
         return accounts?.[0]
     }
 
@@ -579,7 +605,9 @@ export class SourceService {
                 const mode = source.config?.aggregationMode ?? 'none'
 
                 if (mode !== 'before') {
-                    this.log.debug(`Source ${source.name}: aggregationMode=${mode}, skipping pre-processing aggregation`)
+                    this.log.debug(
+                        `Source ${source.name}: aggregationMode=${mode}, skipping pre-processing aggregation`
+                    )
                     return { source, shouldAggregate: false }
                 }
 
@@ -588,8 +616,7 @@ export class SourceService {
             })
         )
 
-        const disableOptimization = (source: SourceInfo) =>
-            source.config?.optimizedAggregation === false
+        const disableOptimization = (source: SourceInfo) => source.config?.optimizedAggregation === false
 
         await Promise.all(
             aggregationChecks
@@ -607,9 +634,7 @@ export class SourceService {
      * Each source waits its configured `aggregationDelay` (minutes) before triggering.
      */
     public async aggregateDelayedSources(): Promise<void> {
-        const delayedSources = this.managedSources.filter(
-            (s) => s.config?.aggregationMode === 'delayed'
-        )
+        const delayedSources = this.managedSources.filter((s) => s.config?.aggregationMode === 'delayed')
 
         if (delayedSources.length === 0) {
             return
@@ -660,7 +685,11 @@ export class SourceService {
             const response = await searchApi.searchPost(requestParameters)
             return response.data ?? []
         }
-        const aggregations = await this.client.execute(searchPost, QueuePriority.HIGH, 'SourceService>getLatestAggregationDate')
+        const aggregations = await this.client.execute(
+            searchPost,
+            QueuePriority.HIGH,
+            'SourceService>getLatestAggregationDate'
+        )
 
         const latestAggregation = getDateFromISOString(aggregations?.[0]?.created)
 
@@ -683,7 +712,11 @@ export class SourceService {
             const response = await sourcesApi.getSourceSchemas(requestParameters)
             return response.data ?? []
         }
-        const schemas = await this.client.execute(getSourceSchemas, QueuePriority.HIGH, 'SourceService>listSourceSchemas')
+        const schemas = await this.client.execute(
+            getSourceSchemas,
+            QueuePriority.HIGH,
+            'SourceService>listSourceSchemas'
+        )
         if (!schemas) {
             throw new ConnectorError(
                 `Failed to fetch schemas for source "${sourceId}". The API call returned no data.`,
@@ -758,7 +791,7 @@ export class SourceService {
             // await this.releaseProcessLock()
             throw new ConnectorError(
                 'An account aggregation is already in progress or the previous one did not finish cleanly. ' +
-                'Please verify no other aggregation is running and try again.',
+                    'Please verify no other aggregation is running and try again.',
                 ConnectorErrorType.Generic
             )
         }
@@ -789,7 +822,9 @@ export class SourceService {
             const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/processing', false)
             await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>releaseProcessLock')
         } catch (error) {
-            this.log.error(`Failed to release processing lock: ${error instanceof Error ? error.message : String(error)}`)
+            this.log.error(
+                `Failed to release processing lock: ${error instanceof Error ? error.message : String(error)}`
+            )
             // Don't throw here as this is typically called in cleanup
         }
     }
@@ -812,7 +847,11 @@ export class SourceService {
 
         const fusionSourceId = this.fusionSourceId
         this.log.info(`Saving batch cumulative count: ${JSON.stringify(this.batchCumulativeCount)}`)
-        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/batchCumulativeCount', this.batchCumulativeCount)
+        const requestParameters = buildSourceConfigPatch(
+            fusionSourceId,
+            '/connectorAttributes/batchCumulativeCount',
+            this.batchCumulativeCount
+        )
         await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>saveBatchCumulativeCount')
     }
 
@@ -832,7 +871,11 @@ export class SourceService {
         this.batchCumulativeCount = {}
         const fusionSourceId = this.fusionSourceId
         this.log.info('Resetting batch cumulative count')
-        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/batchCumulativeCount', {})
+        const requestParameters = buildSourceConfigPatch(
+            fusionSourceId,
+            '/connectorAttributes/batchCumulativeCount',
+            {}
+        )
         await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>resetBatchCumulativeCount')
     }
 
@@ -899,7 +942,9 @@ export class SourceService {
         const sourceInfo = this.sourcesByName.get(sourceName)
         assert(sourceInfo, `Source "${sourceName}" not found`)
 
-        this.log.info(`Setting up reverse correlation for source "${sourceName}": attribute="${correlationAttribute}", displayName="${correlationDisplayName}"`)
+        this.log.info(
+            `Setting up reverse correlation for source "${sourceName}": attribute="${correlationAttribute}", displayName="${correlationDisplayName}"`
+        )
 
         await this.ensureFusionSchemaAttribute(correlationAttribute, correlationDisplayName)
         await this.ensureIdentityAttribute(correlationAttribute, correlationDisplayName)
@@ -933,10 +978,7 @@ export class SourceService {
             isGroup: false,
         }
 
-        const updatedAttributes: AttributeDefinitionV2025[] = [
-            ...(accountSchema.attributes ?? []),
-            newAttr,
-        ]
+        const updatedAttributes: AttributeDefinitionV2025[] = [...(accountSchema.attributes ?? []), newAttr]
 
         const updatedSchema: SchemaV2025 = {
             ...accountSchema,
@@ -977,18 +1019,21 @@ export class SourceService {
                 return
             }
             await this.client.execute(
-                () => identityAttributesApi.putIdentityAttribute({
-                    name: attributeName,
-                    identityAttributeV2025: {
-                        name: attributeName,
-                        displayName,
-                        searchable: true,
-                        type: 'string',
-                        multi: false,
-                        standard: false,
-                        system: false,
-                    },
-                }).then((r) => r.data),
+                () =>
+                    identityAttributesApi
+                        .putIdentityAttribute({
+                            name: attributeName,
+                            identityAttributeV2025: {
+                                name: attributeName,
+                                displayName,
+                                searchable: true,
+                                type: 'string',
+                                multi: false,
+                                standard: false,
+                                system: false,
+                            },
+                        })
+                        .then((r) => r.data),
                 QueuePriority.HIGH,
                 `SourceService>ensureIdentityAttribute update ${attributeName}`
             )
@@ -997,17 +1042,20 @@ export class SourceService {
         }
 
         await this.client.execute(
-            () => identityAttributesApi.createIdentityAttribute({
-                identityAttributeV2025: {
-                    name: attributeName,
-                    displayName,
-                    searchable: true,
-                    type: 'string',
-                    multi: false,
-                    standard: false,
-                    system: false,
-                },
-            }).then((r) => r.data),
+            () =>
+                identityAttributesApi
+                    .createIdentityAttribute({
+                        identityAttributeV2025: {
+                            name: attributeName,
+                            displayName,
+                            searchable: true,
+                            type: 'string',
+                            multi: false,
+                            standard: false,
+                            system: false,
+                        },
+                    })
+                    .then((r) => r.data),
             QueuePriority.HIGH,
             `SourceService>ensureIdentityAttribute create ${attributeName}`
         )
@@ -1032,14 +1080,12 @@ export class SourceService {
         )
 
         const matchingProfiles = profiles.filter(
-            (p: any) =>
-                p.authoritativeSource?.id === fusionSourceId ||
-                p.source?.id === fusionSourceId
+            (p: any) => p.authoritativeSource?.id === fusionSourceId || p.source?.id === fusionSourceId
         )
         if (matchingProfiles.length === 0) {
             this.log.warn(
                 `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}". ` +
-                `Skipping identity profile mapping for reverse correlation attribute "${attributeName}".`
+                    `Skipping identity profile mapping for reverse correlation attribute "${attributeName}".`
             )
             return
         }
@@ -1086,21 +1132,21 @@ export class SourceService {
             const hasIdentityAttributeConfig = !!profile.identityAttributeConfig
             const jsonPatchOperationV2025 = hasIdentityAttributeConfig
                 ? [
-                    {
-                        op: 'replace' as JsonPatchOperationV2025OpV2025,
-                        path: '/identityAttributeConfig/attributeTransforms',
-                        value: nextTransforms,
-                    },
-                ]
+                      {
+                          op: 'replace' as JsonPatchOperationV2025OpV2025,
+                          path: '/identityAttributeConfig/attributeTransforms',
+                          value: nextTransforms,
+                      },
+                  ]
                 : [
-                    {
-                        op: 'add' as JsonPatchOperationV2025OpV2025,
-                        path: '/identityAttributeConfig',
-                        value: {
-                            attributeTransforms: nextTransforms,
-                        },
-                    },
-                ]
+                      {
+                          op: 'add' as JsonPatchOperationV2025OpV2025,
+                          path: '/identityAttributeConfig',
+                          value: {
+                              attributeTransforms: nextTransforms,
+                          },
+                      },
+                  ]
 
             await this.client.execute(
                 () =>
@@ -1136,7 +1182,7 @@ export class SourceService {
             if (!verified) {
                 this.log.warn(
                     `Identity profile mapping verification failed for profile ${profile.id} and attribute "${attributeName}". ` +
-                    `Existing transform keys: ${refreshedTransforms.map((t: any) => t.identityAttributeName).join(', ')}`
+                        `Existing transform keys: ${refreshedTransforms.map((t: any) => t.identityAttributeName).join(', ')}`
                 )
             } else {
                 this.log.info(
@@ -1157,22 +1203,28 @@ export class SourceService {
         const accountSchema = schemas.find((s) => s.name === 'account')
         assert(accountSchema, `Managed source ${managedSourceId} account schema not found`)
         const accountIdAttribute = accountSchema.identityAttribute
-        assert(accountIdAttribute, `Managed source ${managedSourceId} account schema has no identity attribute (ID) defined`)
+        assert(
+            accountIdAttribute,
+            `Managed source ${managedSourceId} account schema has no identity attribute (ID) defined`
+        )
 
         const correlationConfig = await this.client.execute(
-            () => sourcesApi.getCorrelationConfig({
-                id: managedSourceId,
-            } as SourcesV2025ApiGetCorrelationConfigRequest).then((r) => r.data),
+            () =>
+                sourcesApi
+                    .getCorrelationConfig({
+                        id: managedSourceId,
+                    } as SourcesV2025ApiGetCorrelationConfigRequest)
+                    .then((r) => r.data),
             QueuePriority.HIGH,
             `SourceService>ensureManagedSourceCorrelation get ${managedSourceId}`
         )
 
         const assignments = correlationConfig?.attributeAssignments ?? []
-        const alreadyExists = assignments.some(
-            (a) => a.property === attributeName && a.value === accountIdAttribute
-        )
+        const alreadyExists = assignments.some((a) => a.property === attributeName && a.value === accountIdAttribute)
         if (alreadyExists) {
-            this.log.debug(`Managed source ${managedSourceId} already has correlation rule for "${attributeName}" -> "${accountIdAttribute}"`)
+            this.log.debug(
+                `Managed source ${managedSourceId} already has correlation rule for "${attributeName}" -> "${accountIdAttribute}"`
+            )
             return
         }
 
@@ -1193,14 +1245,19 @@ export class SourceService {
         }
 
         await this.client.execute(
-            () => sourcesApi.putCorrelationConfig({
-                id: managedSourceId,
-                correlationConfigV2025: updatedConfig,
-            } as SourcesV2025ApiPutCorrelationConfigRequest).then((r) => r.data),
+            () =>
+                sourcesApi
+                    .putCorrelationConfig({
+                        id: managedSourceId,
+                        correlationConfigV2025: updatedConfig,
+                    } as SourcesV2025ApiPutCorrelationConfigRequest)
+                    .then((r) => r.data),
             QueuePriority.HIGH,
             `SourceService>ensureManagedSourceCorrelation put ${managedSourceId}`
         )
-        this.log.info(`Added correlation rule "${attributeName}" -> "${accountIdAttribute}" to managed source ${managedSourceId}`)
+        this.log.info(
+            `Added correlation rule "${attributeName}" -> "${accountIdAttribute}" to managed source ${managedSourceId}`
+        )
     }
 
     // ------------------------------------------------------------------------
@@ -1273,9 +1330,15 @@ export class SourceService {
             const response = await sourcesApi.importAccounts(requestParameters)
             return response.data
         }
-        const loadAccountsTask = await this.client.execute(importAccounts, QueuePriority.HIGH, 'SourceService>aggregateManagedSource importAccounts')
+        const loadAccountsTask = await this.client.execute(
+            importAccounts,
+            QueuePriority.HIGH,
+            'SourceService>aggregateManagedSource importAccounts'
+        )
         if (!loadAccountsTask) {
-            this.log.warn(`Failed to trigger account aggregation for source ${sourceName} (${id}). The API call returned no data.`)
+            this.log.warn(
+                `Failed to trigger account aggregation for source ${sourceName} (${id}). The API call returned no data.`
+            )
             return
         }
 
@@ -1307,7 +1370,11 @@ export class SourceService {
                 const response = await taskManagementApi.getTaskStatus(requestParameters)
                 return response.data
             }
-            const taskStatus = await this.client.execute(getTaskStatus, QueuePriority.HIGH, 'SourceService>aggregateManagedSource getTaskStatus')
+            const taskStatus = await this.client.execute(
+                getTaskStatus,
+                QueuePriority.HIGH,
+                'SourceService>aggregateManagedSource getTaskStatus'
+            )
             pollsExecuted++
             lastTaskStatus = taskStatus
 
@@ -1321,12 +1388,12 @@ export class SourceService {
         if (!completed) {
             const lastStatusSummary = lastTaskStatus
                 ? JSON.stringify({
-                    completed: lastTaskStatus.completed,
-                    completionStatus: lastTaskStatus.completionStatus,
-                    type: lastTaskStatus.type,
-                    description: lastTaskStatus.description,
-                    messages: lastTaskStatus.messages,
-                })
+                      completed: lastTaskStatus.completed,
+                      completionStatus: lastTaskStatus.completionStatus,
+                      type: lastTaskStatus.type,
+                      description: lastTaskStatus.description,
+                      messages: lastTaskStatus.messages,
+                  })
                 : 'none'
             this.log.warn(
                 `Failed to aggregate managed accounts for source ${sourceName} (${id}). taskId=${taskId ?? 'unknown'}, pollsExecuted=${pollsExecuted}, maxPolls=${Math.max(taskResultRetries - 1, 0)}, pollWaitMs=${taskResultWait}, lastTaskStatus=${lastStatusSummary}`

@@ -1,10 +1,4 @@
-import {
-    scoreDice,
-    scoreJaroWinkler,
-    scoreDoubleMetaphone,
-    scoreNameMatcher,
-    scoreLIG3,
-} from '../helpers'
+import { scoreDice, scoreJaroWinkler, scoreDoubleMetaphone, scoreNameMatcher, scoreLIG3 } from '../helpers'
 
 const baseMatching = {
     attribute: 'displayName',

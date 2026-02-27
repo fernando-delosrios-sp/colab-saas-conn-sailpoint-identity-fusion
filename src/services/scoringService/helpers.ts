@@ -8,7 +8,11 @@ import { match as nameMatch } from './nameMatching'
 // Helper Functions
 // ============================================================================
 
-export const scoreDice = (accountAttribute: string, identityAttribute: string, matching: MatchingConfig): ScoreReport => {
+export const scoreDice = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => {
     const similarity = diceCoefficient.similarity(accountAttribute, identityAttribute)
     const score = Math.round(similarity * 100)
 
@@ -200,12 +204,7 @@ function calculateLIG3Similarity(s1: string, s2: string): number {
             const deletion = matrix[i - 1][j] + 0.9
             matrix[i][j] = Math.min(substitution, insertion, deletion)
 
-            if (
-                i > 1 &&
-                j > 1 &&
-                s1[i - 1] === s2[j - 2] &&
-                s1[i - 2] === s2[j - 1]
-            ) {
+            if (i > 1 && j > 1 && s1[i - 1] === s2[j - 2] && s1[i - 2] === s2[j - 1]) {
                 matrix[i][j] = Math.min(matrix[i][j], matrix[i - 2][j - 2] + 0.5)
             }
         }

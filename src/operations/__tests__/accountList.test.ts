@@ -119,10 +119,7 @@ describe('accountList setup phase', () => {
         await accountList(registry, input)
 
         expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledTimes(1)
-        expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledWith(
-            reverseSource,
-            expect.any(Set)
-        )
+        expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledWith(reverseSource, expect.any(Set))
         expect(schemas.setFusionAccountSchema).toHaveBeenNthCalledWith(1, input.schema)
         expect(schemas.setFusionAccountSchema).toHaveBeenNthCalledWith(2, undefined)
     })

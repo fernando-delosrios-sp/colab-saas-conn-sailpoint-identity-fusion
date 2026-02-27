@@ -1,6 +1,7 @@
 import { AttributeChangeOp } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { ServiceRegistry } from '../../services/serviceRegistry'
+import { ActionChange } from './types'
 
 /**
  * Correlate action handler - correlates missing source accounts.
@@ -8,17 +9,17 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
  */
 export const correlateAction = async (
     fusionAccount: FusionAccount,
-    op: AttributeChangeOp,
+    change: ActionChange,
     serviceRegistry: ServiceRegistry
 ): Promise<void> => {
     const { log, identities } = serviceRegistry
 
-    log.debug(`Correlate action called for account ${fusionAccount.name} with operation ${op}`)
+    log.debug(`Correlate action called for account ${fusionAccount.name} with operation ${change.op}`)
 
-    if (op === AttributeChangeOp.Add) {
+    if (change.op === AttributeChangeOp.Add) {
         // Trigger correlation for all missing accounts
         await identities.correlateAccounts(fusionAccount)
-    } else if (op === AttributeChangeOp.Remove) {
+    } else if (change.op === AttributeChangeOp.Remove) {
         // Removing the correlate action doesn't undo correlations, just removes the action
         log.debug(`Correlate action removed for account ${fusionAccount.name}`)
     }

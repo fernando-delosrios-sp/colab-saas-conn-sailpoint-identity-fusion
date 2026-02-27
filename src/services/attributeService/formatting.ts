@@ -73,7 +73,9 @@ export const evaluateVelocityTemplate = (
     }
 
     if (result === '') {
-        logger.debug('Velocity template evaluated to empty string (e.g. Normalize helper returned undefined), returning undefined')
+        logger.debug(
+            'Velocity template evaluated to empty string (e.g. Normalize helper returned undefined), returning undefined'
+        )
         return undefined
     }
 

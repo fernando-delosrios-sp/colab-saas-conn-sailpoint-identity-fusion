@@ -1,7 +1,7 @@
 import { AttributeChangeOp, ConnectorError, StdAccountCreateInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { assert } from '../utils/assert'
-import { executeAction } from './actions'
+import { executeActions } from './actions'
 
 /**
  * Account create operation - Creates a new fusion account for an identity.
@@ -20,10 +20,7 @@ import { executeAction } from './actions'
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param input - SDK input containing the identity name and requested actions
  */
-export const accountCreate = async (
-    serviceRegistry: ServiceRegistry,
-    input: StdAccountCreateInput,
-) => {
+export const accountCreate = async (serviceRegistry: ServiceRegistry, input: StdAccountCreateInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, identities, sources, schemas, fusion, attributes, res } = serviceRegistry
 
@@ -72,7 +69,11 @@ export const accountCreate = async (
         log.info(`Processing ${actions.length} action(s)`)
 
         for (const action of actions) {
-            await executeAction(action, fusionIdentity, AttributeChangeOp.Add, serviceRegistry)
+            await executeActions(
+                fusionIdentity,
+                { op: AttributeChangeOp.Add, attribute: 'actions', value: action },
+                serviceRegistry
+            )
         }
         timer.phase(`Step 3: Processing ${actions.length} action(s)`)
 

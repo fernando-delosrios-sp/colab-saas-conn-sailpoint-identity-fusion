@@ -31,7 +31,7 @@ export class InMemoryLockService implements LockService {
         // Since JavaScript is single-threaded, synchronous operations are atomic,
         // but we must ensure the queue is updated BEFORE we start waiting.
         const prev = this.queues.get(key) ?? Promise.resolve()
-        
+
         // Register our promise as the new tail BEFORE awaiting
         // This ensures any concurrent caller will wait for us
         this.queues.set(key, next)

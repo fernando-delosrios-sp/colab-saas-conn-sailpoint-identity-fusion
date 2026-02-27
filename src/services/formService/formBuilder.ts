@@ -1,7 +1,4 @@
-import {
-    FormElementV2025,
-    FormDefinitionInputV2025,
-} from 'sailpoint-api-client'
+import { FormElementV2025, FormDefinitionInputV2025 } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { SourceType } from '../../model/config'
@@ -59,9 +56,10 @@ function getToggleConfig(sourceType: SourceType): Record<string, any> {
         default: false,
         trueLabel: 'True',
         falseLabel: 'False',
-        helpText: sourceType === 'record'
-            ? 'Select this if the record does not match any existing identity'
-            : 'Select this if the orphan account does not match any existing identity',
+        helpText:
+            sourceType === 'record'
+                ? 'Select this if the record does not match any existing identity'
+                : 'Select this if the orphan account does not match any existing identity',
     }
 }
 
@@ -85,15 +83,12 @@ export const buildFormInput = (
 
     // NOTE: formInput must match the form definition input types.
     // Keep values primitive (STRING/BOOLEAN/NUMBER) to avoid Custom Forms payload issues.
-    // IMPORTANT: Form values must be consistent with form conditions. 
+    // IMPORTANT: Form values must be consistent with form conditions.
     // For identities SELECT, we use displayName as the label and id as the value.
     if (!fusionAccount.displayName) {
         logger.error(`[formBuilder] Missing displayName for fusion account. Using fallback value: ${accountIdentifier}`)
     }
-    formInput.name =
-        fusionAccount.displayName ||
-        fusionAccount.name ||
-        accountIdentifier
+    formInput.name = fusionAccount.displayName || fusionAccount.name || accountIdentifier
     formInput.account = accountIdentifier
     formInput.source = fusionAccount.sourceName
     // Defaults for interactive decision fields
@@ -132,7 +127,10 @@ export const buildFormInput = (
                 if (score.attribute && score.score !== undefined) {
                     const attrKey = String(score.attribute).charAt(0).toLowerCase() + String(score.attribute).slice(1)
                     const algorithmKey = String(score.algorithm ?? 'unknown')
-                    formInput[`${candidateId}.${attrKey}.${algorithmKey}.score`] = formatScoreDisplay(Number(score.score), score.fusionScore)
+                    formInput[`${candidateId}.${attrKey}.${algorithmKey}.score`] = formatScoreDisplay(
+                        Number(score.score),
+                        score.fusionScore
+                    )
                 }
             })
         }
@@ -174,7 +172,8 @@ export const buildFormFields = (
 
     if (topSectionElements.length > 0) {
         const sectionDescriptions: Record<SourceType, string> = {
-            authoritative: 'A potential duplicate identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
+            authoritative:
+                'A potential duplicate identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
             record: 'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
             orphan: 'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
         }
@@ -270,12 +269,14 @@ export const buildFormFields = (
     candidates.forEach((candidate) => {
         if (!candidate || !candidate.id || !candidate.name) return
         const candidateId = candidate.id
-        
+
         // Validate that candidate has displayName for form conditions
         if (!candidate.name) {
-            logger.error(`[formBuilder] Candidate ${candidateId} is missing name/displayName. This may cause form condition issues.`)
+            logger.error(
+                `[formBuilder] Candidate ${candidateId} is missing name/displayName. This may cause form condition issues.`
+            )
         }
-        
+
         const candidateElements: FormElementV2025[] = []
 
         if (fusionFormAttributes && fusionFormAttributes.length > 0) {
@@ -429,7 +430,7 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
     // Disable every element (except newIdentity and identities) if it is not empty.
     // Each element gets a self-referencing condition: if element X is NOT_EM → disable element X.
     const allAttributeElements: string[] = []
-    
+
     // Collect new identity attribute fields
     if (fusionFormAttributes && fusionFormAttributes.length > 0) {
         fusionFormAttributes.forEach((attrName) => {
@@ -437,19 +438,19 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
             allAttributeElements.push(`newidentity.${attrKey}`)
         })
     }
-    
+
     // Collect candidate attribute and score fields
     candidates.forEach((candidate) => {
         if (!candidate || !candidate.id) return
         const candidateId = candidate.id
-        
+
         if (fusionFormAttributes && fusionFormAttributes.length > 0) {
             fusionFormAttributes.forEach((attrName) => {
                 const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
                 allAttributeElements.push(`${candidateId}.${attrKey}`)
             })
         }
-        
+
         // Score fields
         if (candidate.scores && Array.isArray(candidate.scores)) {
             candidate.scores.forEach((score: any) => {
@@ -461,7 +462,7 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
             })
         }
     })
-    
+
     // For each element: if it has a value, disable it
     allAttributeElements.forEach((elementId) => {
         formConditions.push({
@@ -504,16 +505,15 @@ export const buildFormInputs = (
     // Account info
     // IMPORTANT: Use displayName consistently with form conditions
     if (!fusionAccount.displayName) {
-        logger.error(`[formBuilder] Missing displayName for fusion account in form inputs. Using fallback value: ${accountIdentifier}`)
+        logger.error(
+            `[formBuilder] Missing displayName for fusion account in form inputs. Using fallback value: ${accountIdentifier}`
+        )
     }
     formInputs.push({
         id: 'name',
         type: 'STRING',
         label: 'name',
-        description:
-            fusionAccount.displayName ||
-            fusionAccount.name ||
-            accountIdentifier,
+        description: fusionAccount.displayName || fusionAccount.name || accountIdentifier,
     })
     formInputs.push({
         id: 'account',

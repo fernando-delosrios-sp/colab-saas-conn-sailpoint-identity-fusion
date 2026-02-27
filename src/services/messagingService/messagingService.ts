@@ -105,8 +105,8 @@ export class MessagingService {
             const emailWorkflow = new EmailWorkflow(workflowName, owner)
             assert(emailWorkflow, 'Failed to create email workflow object')
 
-                // Ensure the workflow is disabled so we can call testWorkflow safely.
-                ; (emailWorkflow as any).enabled = false
+            // Ensure the workflow is disabled so we can call testWorkflow safely.
+            ;(emailWorkflow as any).enabled = false
 
             this.workflow = await this.createWorkflow(emailWorkflow)
             assert(this.workflow, 'Failed to create workflow')

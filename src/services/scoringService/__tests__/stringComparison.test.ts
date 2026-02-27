@@ -1,9 +1,4 @@
-import {
-    jaroWinklerSimilarity,
-    diceCoefficientSimilarity,
-    jaroWinkler,
-    diceCoefficient,
-} from '../stringComparison'
+import { jaroWinklerSimilarity, diceCoefficientSimilarity, jaroWinkler, diceCoefficient } from '../stringComparison'
 
 describe('stringComparison', () => {
     describe('jaroWinklerSimilarity', () => {

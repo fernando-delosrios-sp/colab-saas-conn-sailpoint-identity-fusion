@@ -10,10 +10,7 @@ import { ServiceRegistry } from '../services/serviceRegistry'
  * @param serviceRegistry - Service registry providing access to all connector services
  * @param _input - Unused input parameter (required by SDK interface)
  */
-export const testConnection = async (
-    serviceRegistry: ServiceRegistry,
-    _input: any,
-) => {
+export const testConnection = async (serviceRegistry: ServiceRegistry, _input: any) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, sources, schemas, config, res } = serviceRegistry
 

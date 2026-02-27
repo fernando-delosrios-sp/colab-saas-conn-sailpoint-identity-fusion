@@ -41,11 +41,11 @@ function createHandler(
         try {
             const serviceRegistry = new ServiceRegistry(config, context, res, operationName)
             const isCustom = context[operationName] !== undefined
-            const isProxy = serviceRegistry.proxy.isProxyMode()
+            const isProxyServer = serviceRegistry.proxy.isProxyService()
+            const isProxy = !isProxyServer && serviceRegistry.proxy.isProxyMode()
             const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
 
             if (options.keepAlive === 'memory') {
-                const isProxyServer = serviceRegistry.proxy.isProxyService()
                 if (!isProxyServer) {
                     interval = setInterval(() => {
                         const memoryUsage = process.memoryUsage()

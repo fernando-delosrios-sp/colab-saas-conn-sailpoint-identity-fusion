@@ -110,7 +110,7 @@ export class ClientService {
             this.startStatsLogging()
             this.log.info(
                 `API client ready: queue ${queueConfig.requestsPerSecond} req/s, ` +
-                `max concurrent: ${queueConfig.maxConcurrentRequests}, retries: ${queueConfig.maxRetries}, keep-alive: true`
+                    `max concurrent: ${queueConfig.maxConcurrentRequests}, retries: ${queueConfig.maxRetries}, keep-alive: true`
             )
         } else {
             this.queue = null
@@ -367,9 +367,7 @@ export class ClientService {
             // Calculate how many items we still need
             const remainingLimit = hasExplicitLimit ? baseLimit - allItems.length : undefined
             const requestLimit =
-                remainingLimit !== undefined && remainingLimit < effectivePageSize
-                    ? remainingLimit
-                    : effectivePageSize
+                remainingLimit !== undefined && remainingLimit < effectivePageSize ? remainingLimit : effectivePageSize
 
             // Build page params - always pass explicit limit for consistent pagination
             const pageParams = {
@@ -387,7 +385,7 @@ export class ClientService {
                 const ctx = context ?? 'paginate'
                 throw new Error(
                     `Pagination failed at offset ${offset} (${ctx}). ` +
-                    `${allItems.length} item(s) collected before failure.`
+                        `${allItems.length} item(s) collected before failure.`
                 )
             }
             const pageData = pageResponse.data || []
@@ -547,9 +545,9 @@ export class ClientService {
             if (stats.queueLength > 0 || stats.activeRequests > 0) {
                 this.log.info(
                     `Queue Stats: ${stats.activeRequests} active, ${stats.queueLength} queued, ` +
-                    `${stats.totalProcessed} processed, ${stats.totalFailed} failed, ` +
-                    `avg wait: ${stats.averageWaitTime.toFixed(0)}ms, ` +
-                    `avg process: ${stats.averageProcessingTime.toFixed(0)}ms`
+                        `${stats.totalProcessed} processed, ${stats.totalFailed} failed, ` +
+                        `avg wait: ${stats.averageWaitTime.toFixed(0)}ms, ` +
+                        `avg process: ${stats.averageProcessingTime.toFixed(0)}ms`
                 )
             }
         }, STATS_LOGGING_INTERVAL_MS)
@@ -641,12 +639,7 @@ export class ClientService {
                     offset,
                 } as TRequestParams
                 const ctx = context ? `${context} [offset ${offset}]` : `list [offset ${offset}]`
-                return this.execute<{ data: T[] }>(
-                    () => callFunction(params),
-                    priority,
-                    ctx,
-                    abortSignal
-                )
+                return this.execute<{ data: T[] }>(() => callFunction(params), priority, ctx, abortSignal)
             })
 
             const responses = await Promise.all(promises)
@@ -657,6 +650,4 @@ export class ClientService {
             }
         }
     }
-
-
 }

@@ -1,9 +1,7 @@
 import { ConnectorError } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 
-export const accountDiscoverSchema = async (
-    serviceRegistry: ServiceRegistry,
-) => {
+export const accountDiscoverSchema = async (serviceRegistry: ServiceRegistry) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, schemas, sources, res } = serviceRegistry
 

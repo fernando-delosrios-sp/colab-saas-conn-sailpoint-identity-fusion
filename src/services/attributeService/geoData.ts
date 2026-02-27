@@ -1,11 +1,11 @@
 /**
  * Unified geographic data interface for US and UK
  * Replaces the heavy 'country-state-city' library (17MB)
- * 
+ *
  * This module provides a compatibility layer that combines:
  * - US data from usGeoData.ts
  * - UK data from ukGeoData.ts
- * 
+ *
  * Total size: ~28KB vs 17MB for the full library (~600x reduction)
  */
 

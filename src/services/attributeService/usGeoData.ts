@@ -1,10 +1,10 @@
 /**
  * Lightweight US geographic data
  * Part of the replacement for the heavy 'country-state-city' library (17MB)
- * 
+ *
  * Coverage:
  * - US: All 50 states + DC, 300+ major cities (~80% of population)
- * 
+ *
  * This lightweight implementation is ~12KB for US data alone
  */
 
@@ -442,7 +442,7 @@ export function getAllStates(): USState[] {
 export const USCity = {
     getCitiesOfCountry: (countryCode: string) => {
         if (countryCode !== 'US') return undefined
-        return getAllCities().map(city => ({
+        return getAllCities().map((city) => ({
             name: city.name,
             stateCode: city.stateCode,
         }))

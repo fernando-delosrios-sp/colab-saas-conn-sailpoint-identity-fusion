@@ -31,4 +31,4 @@ The Account Update operation applies changes to a fusion account. Currently, it 
 
 ## Behavior Notes
 
--   **No attribute refresh on update**: The account is rebuilt with `refreshMapping: false` and `refreshDefinition: false`, preserving all existing attribute values including `nativeIdentity` and account `name`. The update operation only processes entitlement changes (actions), it does not regenerate attributes.
+- **No attribute refresh on update**: The account is rebuilt with `refreshMapping: false` and `refreshDefinition: false`, preserving all existing attribute values including `nativeIdentity` and account `name`. The update operation only processes entitlement changes (actions), it does not regenerate attributes.

@@ -11,7 +11,16 @@ import { FusionAccount } from '../model/account'
 // Constants
 // ============================================================================
 
-const IDENTITY_SEARCH_INCLUDES = ['id', 'name', 'displayName', 'email', 'attributes', 'accounts', 'disabled', 'protected']
+const IDENTITY_SEARCH_INCLUDES = [
+    'id',
+    'name',
+    'displayName',
+    'email',
+    'attributes',
+    'accounts',
+    'disabled',
+    'protected',
+]
 
 function buildIdentityQuery(queryString: string): Search {
     return {
@@ -142,7 +151,7 @@ export class IdentityService {
                 const detail = error instanceof Error ? error.message : String(error)
                 throw new ConnectorError(
                     `Failed to fetch identities using scope query "${this.identityScopeQuery}": ${detail}`,
-                    ConnectorErrorType.Generic,
+                    ConnectorErrorType.Generic
                 )
             }
         } else {
@@ -264,7 +273,11 @@ export class IdentityService {
             }
 
             const correlationPromise = this.client
-                .execute(() => accountsApi.updateAccount(requestParameters), QueuePriority.LOW, `IdentityService>correlateAccounts ${accountId}`)
+                .execute(
+                    () => accountsApi.updateAccount(requestParameters),
+                    QueuePriority.LOW,
+                    `IdentityService>correlateAccounts ${accountId}`
+                )
                 .then(() => {
                     this.log.debug(`Successfully correlated account ${accountId} to identity ${identityId}`)
                 })

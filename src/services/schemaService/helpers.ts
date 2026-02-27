@@ -9,7 +9,9 @@ export const isAccountSchema = (schema: SchemaV2025): boolean => {
     return schema.nativeObjectType === 'User' || schema.nativeObjectType === 'account' || schema.name === 'account'
 }
 
-export const attributeDefinitionToSchemaAttribute = (attributeDefinition: AttributeDefinitionV2025): SchemaAttribute => {
+export const attributeDefinitionToSchemaAttribute = (
+    attributeDefinition: AttributeDefinitionV2025
+): SchemaAttribute => {
     return {
         name: attributeDefinition.name ?? '',
         description: attributeDefinition.description ?? '',

@@ -1,4 +1,10 @@
-import { FusionConfig, AttributeMap, NormalAttributeDefinition, UniqueAttributeDefinition, SourceConfig } from '../../model/config'
+import {
+    FusionConfig,
+    AttributeMap,
+    NormalAttributeDefinition,
+    UniqueAttributeDefinition,
+    SourceConfig,
+} from '../../model/config'
 import { LogService } from '../logService'
 import { FusionAccount } from '../../model/account'
 import { SchemaService } from '../schemaService'
@@ -237,9 +243,7 @@ export class AttributeService {
      */
     public async refreshNormalAttributes(fusionAccount: FusionAccount): Promise<void> {
         if (!fusionAccount.needsRefresh && !this.forceAttributeRefresh) return
-        this.log.debug(
-            `Refreshing normal attributes for account: ${fusionAccount.name} (${fusionAccount.sourceName})`
-        )
+        this.log.debug(`Refreshing normal attributes for account: ${fusionAccount.name} (${fusionAccount.sourceName})`)
         await this.applyNormalDefinitions(fusionAccount)
     }
 
@@ -346,7 +350,7 @@ export class AttributeService {
         if (this.skipAccountsWithMissingId && !uniqueId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} (${fusionAccount.nativeIdentity}): ` +
-                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -454,10 +458,9 @@ export class AttributeService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} raw account(s) ` +
-            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
-
 
     private getStateWrapper(): StateWrapper {
         assert(this.stateWrapper, 'State wrapper is not set')
@@ -494,7 +497,11 @@ export class AttributeService {
     /**
      * Evaluate template expression and apply transformations
      */
-    private evaluateTemplate(definition: AnyDefinition, context: RenderContext, accountName?: string): string | undefined {
+    private evaluateTemplate(
+        definition: AnyDefinition,
+        context: RenderContext,
+        accountName?: string
+    ): string | undefined {
         if (!definition.expression) {
             this.log.error(`Expression is required for attribute ${definition.name}`)
             return undefined
@@ -551,12 +558,20 @@ export class AttributeService {
 
             if (definition.useIncrementalCounter) {
                 return await this.generateWithIncrementalCounter(
-                    definition, fusionAccount, context, registeredValues, maxAttempts
+                    definition,
+                    fusionAccount,
+                    context,
+                    registeredValues,
+                    maxAttempts
                 )
             }
 
             return await this.generateWithCollisionDisambiguation(
-                definition, fusionAccount, context, registeredValues, maxAttempts
+                definition,
+                fusionAccount,
+                context,
+                registeredValues,
+                maxAttempts
             )
         })
     }
@@ -612,7 +627,11 @@ export class AttributeService {
         const digits = definition.digits ?? 1
 
         // Ensure expression has $counter for disambiguation fallback
-        if (definition.expression && !definition.expression.includes('$counter') && !definition.expression.includes('${counter}')) {
+        if (
+            definition.expression &&
+            !definition.expression.includes('$counter') &&
+            !definition.expression.includes('${counter}')
+        ) {
             definition.expression = `${definition.expression}$counter`
         }
         context.counter = ''
@@ -643,7 +662,10 @@ export class AttributeService {
      * and inject it into the Velocity context.
      */
     private injectUUIDIfNeeded(definition: UniqueAttributeDefinition, context: { [key: string]: any }): void {
-        if (definition.expression && (definition.expression.includes('$UUID') || definition.expression.includes('${UUID}'))) {
+        if (
+            definition.expression &&
+            (definition.expression.includes('$UUID') || definition.expression.includes('${UUID}'))
+        ) {
             context.UUID = uuidv4()
         }
     }

@@ -1,24 +1,24 @@
 /**
  * Lightweight date utility functions
  * Replaces date-fns (38MB) with native Date methods
- * 
+ *
  * Provides common date functions for use in Velocity templates
  */
 
 // Compile RegExp patterns once at module level for better performance
 const TOKEN_PATTERNS: Record<string, RegExp> = {
-    'yyyy': /yyyy/g,
-    'yy': /yy/g,
-    'MM': /MM/g,
-    'M': /M/g,
-    'dd': /dd/g,
-    'd': /d/g,
-    'HH': /HH/g,
-    'H': /H/g,
-    'mm': /mm/g,
-    'm': /m/g,
-    'ss': /ss/g,
-    's': /s/g,
+    yyyy: /yyyy/g,
+    yy: /yy/g,
+    MM: /MM/g,
+    M: /M/g,
+    dd: /dd/g,
+    d: /d/g,
+    HH: /HH/g,
+    H: /H/g,
+    mm: /mm/g,
+    m: /m/g,
+    ss: /ss/g,
+    s: /s/g,
 }
 
 /**
@@ -26,7 +26,7 @@ const TOKEN_PATTERNS: Record<string, RegExp> = {
  */
 export function format(date: Date | string | number, formatStr?: string): string {
     const d = new Date(date)
-    
+
     if (isNaN(d.getTime())) {
         throw new Error('Invalid date')
     }
@@ -38,18 +38,18 @@ export function format(date: Date | string | number, formatStr?: string): string
 
     // Simple format string support (common patterns only)
     const tokens: Record<string, string> = {
-        'yyyy': d.getFullYear().toString(),
-        'yy': d.getFullYear().toString().slice(-2),
-        'MM': String(d.getMonth() + 1).padStart(2, '0'),
-        'M': String(d.getMonth() + 1),
-        'dd': String(d.getDate()).padStart(2, '0'),
-        'd': String(d.getDate()),
-        'HH': String(d.getHours()).padStart(2, '0'),
-        'H': String(d.getHours()),
-        'mm': String(d.getMinutes()).padStart(2, '0'),
-        'm': String(d.getMinutes()),
-        'ss': String(d.getSeconds()).padStart(2, '0'),
-        's': String(d.getSeconds()),
+        yyyy: d.getFullYear().toString(),
+        yy: d.getFullYear().toString().slice(-2),
+        MM: String(d.getMonth() + 1).padStart(2, '0'),
+        M: String(d.getMonth() + 1),
+        dd: String(d.getDate()).padStart(2, '0'),
+        d: String(d.getDate()),
+        HH: String(d.getHours()).padStart(2, '0'),
+        H: String(d.getHours()),
+        mm: String(d.getMinutes()).padStart(2, '0'),
+        m: String(d.getMinutes()),
+        ss: String(d.getSeconds()).padStart(2, '0'),
+        s: String(d.getSeconds()),
     }
 
     let result = formatStr
@@ -66,11 +66,11 @@ export function format(date: Date | string | number, formatStr?: string): string
  */
 export function parse(dateStr: string | Date | number): Date {
     const d = new Date(dateStr)
-    
+
     if (isNaN(d.getTime())) {
         throw new Error('Invalid date')
     }
-    
+
     return d
 }
 

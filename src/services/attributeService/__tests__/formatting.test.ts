@@ -34,13 +34,13 @@ describe('evaluateVelocityTemplate', () => {
     // ========================================================================
 
     describe('Normalize.name() - proper case names', () => {
-        it('should handle apostrophe names (O\'Brien pattern)', () => {
+        it("should handle apostrophe names (O'Brien pattern)", () => {
             const context = { lastName: "o'brien" }
             const result = evaluateVelocityTemplate('$Normalize.name($lastName)', context)
             expect(result).toBe("O'Brien")
         })
 
-        it('should handle D\'Angelo pattern', () => {
+        it("should handle D'Angelo pattern", () => {
             const context = { lastName: "d'angelo" }
             const result = evaluateVelocityTemplate('$Normalize.name($lastName)', context)
             expect(result).toBe("D'Angelo")
@@ -329,25 +329,37 @@ describe('evaluateVelocityTemplate', () => {
 
         it('should add days to a date', () => {
             const context = { date: '2020-01-15' }
-            const result = evaluateVelocityTemplate('$Datefns.format($Datefns.addDays($date, 10), "yyyy-MM-dd")', context)
+            const result = evaluateVelocityTemplate(
+                '$Datefns.format($Datefns.addDays($date, 10), "yyyy-MM-dd")',
+                context
+            )
             expect(result).toBe('2020-01-25')
         })
 
         it('should subtract days from a date', () => {
             const context = { date: '2020-01-15' }
-            const result = evaluateVelocityTemplate('$Datefns.format($Datefns.subDays($date, 5), "yyyy-MM-dd")', context)
+            const result = evaluateVelocityTemplate(
+                '$Datefns.format($Datefns.subDays($date, 5), "yyyy-MM-dd")',
+                context
+            )
             expect(result).toBe('2020-01-10')
         })
 
         it('should add months to a date', () => {
             const context = { date: '2020-01-15' }
-            const result = evaluateVelocityTemplate('$Datefns.format($Datefns.addMonths($date, 3), "yyyy-MM-dd")', context)
+            const result = evaluateVelocityTemplate(
+                '$Datefns.format($Datefns.addMonths($date, 3), "yyyy-MM-dd")',
+                context
+            )
             expect(result).toBe('2020-04-15')
         })
 
         it('should add years to a date', () => {
             const context = { date: '2020-01-15' }
-            const result = evaluateVelocityTemplate('$Datefns.format($Datefns.addYears($date, 2), "yyyy-MM-dd")', context)
+            const result = evaluateVelocityTemplate(
+                '$Datefns.format($Datefns.addYears($date, 2), "yyyy-MM-dd")',
+                context
+            )
             expect(result).toBe('2022-01-15')
         })
 
@@ -470,10 +482,7 @@ describe('evaluateVelocityTemplate', () => {
 
         it('should format hire date and calculate tenure', () => {
             const context = { hireDate: '2020-01-15' }
-            const result = evaluateVelocityTemplate(
-                'Hired: $Datefns.format($hireDate, "MM/dd/yyyy")',
-                context
-            )
+            const result = evaluateVelocityTemplate('Hired: $Datefns.format($hireDate, "MM/dd/yyyy")', context)
             expect(result).toBe('Hired: 01/15/2020')
         })
     })

@@ -41,8 +41,9 @@ export const generateReport = async (
     let stats: FusionReportStats | undefined
     if (aggregationStats) {
         const decisions = forms.fusionIdentityDecisions
-        const decisionSourceType = (d: { sourceType?: 'authoritative' | 'record' | 'orphan' }): 'authoritative' | 'record' | 'orphan' =>
-            d.sourceType ?? 'authoritative'
+        const decisionSourceType = (d: {
+            sourceType?: 'authoritative' | 'record' | 'orphan'
+        }): 'authoritative' | 'record' | 'orphan' => d.sourceType ?? 'authoritative'
         const decisionCountByType = decisions.reduce(
             (acc, d) => {
                 const sourceType = decisionSourceType(d)
@@ -56,12 +57,8 @@ export const generateReport = async (
         const authoritativeNewIdentities = decisions.filter(
             (d) => decisionSourceType(d) === 'authoritative' && d.newIdentity
         ).length
-        const recordNoMatches = decisions.filter(
-            (d) => decisionSourceType(d) === 'record' && d.newIdentity
-        ).length
-        const orphanNoMatches = decisions.filter(
-            (d) => decisionSourceType(d) === 'orphan' && d.newIdentity
-        ).length
+        const recordNoMatches = decisions.filter((d) => decisionSourceType(d) === 'record' && d.newIdentity).length
+        const orphanNoMatches = decisions.filter((d) => decisionSourceType(d) === 'orphan' && d.newIdentity).length
         const memoryUsage = process.memoryUsage()
         stats = {
             totalFusionAccounts: fusion.totalFusionAccountCount,

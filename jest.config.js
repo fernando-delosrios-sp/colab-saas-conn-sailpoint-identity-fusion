@@ -9,6 +9,6 @@ module.exports = {
     transformIgnorePatterns: ['node_modules/(?!(double-metaphone)/)'],
     transform: {
         '^.+\\.(ts|tsx)$': 'ts-jest',
-        '^.+\\.js$': 'babel-jest'
-    }
+        '^.+\\.js$': 'babel-jest',
+    },
 }

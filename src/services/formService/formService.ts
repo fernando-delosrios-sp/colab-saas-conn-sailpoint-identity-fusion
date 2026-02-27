@@ -143,8 +143,10 @@ export class FormService {
             return false
         }
 
-        const { candidates, formDefinition, formInput, expire, fusionSourceId } =
-            await this.prepareFormCreationData(fusionAccount, reviewers!.size)
+        const { candidates, formDefinition, formInput, expire, fusionSourceId } = await this.prepareFormCreationData(
+            fusionAccount,
+            reviewers!.size
+        )
 
         if (formDefinition) {
             const existingInstances = await this.fetchFormInstancesByDefinitionId(formDefinition.id)
@@ -282,9 +284,7 @@ export class FormService {
                 const reviewer = Array.from(reviewers).find((r) => r.identityId === recipient.id)
                 if (reviewer) {
                     reviewer.addFusionReview(instance.standAloneFormUrl)
-                    this.log.debug(
-                        `Added existing form instance ${instance.id} to reviewer ${recipient.id} reviews`
-                    )
+                    this.log.debug(`Added existing form instance ${instance.id} to reviewer ${recipient.id} reviews`)
                 }
             }
         }
@@ -711,8 +711,8 @@ export class FormService {
 
         this.log.debug(
             `Form analysis result: shouldDeleteForm=${shouldDeleteForm}, ` +
-            `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
-            `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
+                `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
+                `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
         )
 
         return {
@@ -840,7 +840,7 @@ export class FormService {
         const decisionType = decision.newIdentity ? 'new identity' : `link to ${decision.identityId}`
         this.log.debug(
             `Processed fusion decision for account ${decision.account.id}, reviewer ${decision.submitter.id}, ` +
-            `decision: ${decisionType}`
+                `decision: ${decisionType}`
         )
     }
 
@@ -863,14 +863,15 @@ export class FormService {
         const owner = getFormOwner(this.sources)
 
         // Validate form definition components before creating
-        this.log.debug(`Form definition validation: fields=${formFields.length}, inputs=${formInputs.length}, conditions=${formConditions.length}`)
+        this.log.debug(
+            `Form definition validation: fields=${formFields.length}, inputs=${formInputs.length}, conditions=${formConditions.length}`
+        )
 
         assert(formFields && formFields.length > 0, 'Form fields must not be empty')
         assert(formInputs && formInputs.length > 0, 'Form inputs must not be empty')
         assert(owner, 'Form owner is required')
         assert(owner.id, 'Form owner ID is required')
         assert(owner.type, 'Form owner type is required')
-
 
         // Warn if form definition is very large (may cause API issues)
         if (formConditions.length > 500) {
@@ -994,7 +995,9 @@ export class FormService {
         assert(customFormsApi, 'Custom forms API is required')
 
         this.log.debug(`Creating form definition: ${form.body.name}`)
-        this.log.debug(`Form has ${form.body.formElements?.length || 0} elements, ${form.body.formInput?.length || 0} inputs, ${form.body.formConditions?.length || 0} conditions`)
+        this.log.debug(
+            `Form has ${form.body.formElements?.length || 0} elements, ${form.body.formInput?.length || 0} inputs, ${form.body.formConditions?.length || 0} conditions`
+        )
 
         const createFormDefinition = async () => {
             try {

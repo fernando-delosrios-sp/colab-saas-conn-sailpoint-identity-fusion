@@ -10,7 +10,14 @@ import { attrConcat, AttributeService } from '../attributeService'
 import { assert } from '../../utils/assert'
 import { pickAttributes } from '../../utils/attributes'
 import { createUrlContext, UrlContext } from '../../utils/url'
-import { mapValuesToArray, forEachBatched, forEachMapBatched, promiseAllBatched, promiseAllMapBatched, compact } from './collections'
+import {
+    mapValuesToArray,
+    forEachBatched,
+    forEachMapBatched,
+    promiseAllBatched,
+    promiseAllMapBatched,
+    compact,
+} from './collections'
 import { FusionDecision } from '../../model/form'
 import { FusionMatch } from '../scoringService'
 import { ScoringService } from '../scoringService'
@@ -151,17 +158,17 @@ export class FusionService {
 
     /**
      * Process all fusion accounts from sources.
-     * 
+     *
      * This is Phase 2 of the work queue depletion process:
      * - Phase 1: fetchFormData removes accounts with pending form decisions
      * - Phase 2: processFusionAccounts (this method) removes accounts belonging to existing fusion accounts
      * - Phase 3: processIdentities removes accounts belonging to identities
      * - Phase 4: processManagedAccounts processes only what remains (uncorrelated accounts)
-     * 
+     *
      * Each fusion account processes in parallel using Promise.all, but all share the same
      * work queue (this.sources.managedAccountsById). As accounts are matched, they're
      * deleted from the queue via addManagedAccountLayer.
-     * 
+     *
      * Memory Optimization:
      * - No snapshot or copy is made of managedAccountsById
      * - All parallel operations work with the direct reference
@@ -252,7 +259,7 @@ export class FusionService {
 
     /**
      * Process a single fusion account.
-     * 
+     *
      * This method builds a complete fusion account by layering data from multiple sources:
      * 1. Pre-process: Extract basic account info and set key
      * 2. Reviewer layer: Identify reviewers for this fusion account's sources
@@ -260,28 +267,35 @@ export class FusionService {
      * 4. Decision layer: Add any manual fusion decisions from forms
      * 5. Managed account layer: Find and attach managed accounts from work queue
      * 6. Attribute mapping and normal attribute definitions
-     * 
+     *
      * Attribute mapping and normal definitions are applied here, **before** the global
      * unique attribute refresh that runs after all accounts have been processed.  This
      * two-phase design means normal attributes are available for Fusion matching/scoring
      * while unique attributes are evaluated afterwards with full knowledge of every
      * account's normal attribute values.
-     * 
+     *
      * Work Queue Integration:
      * addManagedAccountLayer receives the direct reference to this.sources.managedAccountsById,
      * which is the shared work queue. As accounts are matched and processed, they're deleted
      * from the queue to prevent duplicate processing in later phases.
-     * 
+     *
      * @param account - The fusion account from the platform
      * @param attributeOperations - Flags controlling which attribute operations to perform
      * @returns Processed FusionAccount with all layers applied
      */
-    public async processFusionAccount(account: Account, attributeOperations: AttributeOperations = { refreshMapping: false, refreshDefinition: false, resetDefinition: false }): Promise<FusionAccount> {
+    public async processFusionAccount(
+        account: Account,
+        attributeOperations: AttributeOperations = {
+            refreshMapping: false,
+            refreshDefinition: false,
+            resetDefinition: false,
+        }
+    ): Promise<FusionAccount> {
         const { refreshMapping, refreshDefinition, resetDefinition } = attributeOperations
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${account.nativeIdentity}), ` +
-            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
@@ -322,7 +336,7 @@ export class FusionService {
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
-            `${fusionAccount.accountIds.length} account(s), ${fusionAccount.missingAccountIds.length} missing`
+                `${fusionAccount.accountIds.length} account(s), ${fusionAccount.missingAccountIds.length} missing`
         )
 
         if (!resetDefinition) {
@@ -340,7 +354,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.setFusionAccount(fusionAccount)
@@ -421,13 +435,10 @@ export class FusionService {
             const firstAccountId = accountIds[0]
             const info = fusionAccount.getManagedAccountInfo(firstAccountId)
             if (info) {
-                fusionAccount.setReverseCorrelationAttribute(
-                    sourceConfig.correlationAttribute,
-                    info.nativeIdentity
-                )
+                fusionAccount.setReverseCorrelationAttribute(sourceConfig.correlationAttribute, info.nativeIdentity)
                 this.log.info(
                     `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.nativeIdentity}" ` +
-                    `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
+                        `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
                 )
             }
         }
@@ -467,13 +478,13 @@ export class FusionService {
 
     /**
      * Process all identities.
-     * 
+     *
      * This is Phase 3 of the work queue depletion process:
      * - Phase 1: fetchFormData removes accounts with pending form decisions
      * - Phase 2: processFusionAccounts removes accounts belonging to existing fusion accounts
      * - Phase 3: processIdentities (this method) removes accounts belonging to identities
      * - Phase 4: processManagedAccounts processes only what remains (uncorrelated accounts)
-     * 
+     *
      * For identities that don't have a corresponding fusion account yet, this creates a
      * fusion account from the identity and attaches any managed accounts that belong to it.
      * Matched accounts are deleted from the work queue.
@@ -506,14 +517,14 @@ export class FusionService {
 
     /**
      * Process a single identity.
-     * 
+     *
      * Creates a fusion account from an identity document if one doesn't already exist.
      * This handles identities that don't have a pre-existing fusion account record.
-     * 
+     *
      * Work Queue Integration:
      * Passes direct reference to the work queue so managed accounts belonging to this
      * identity can be matched and removed from the queue, preventing duplicate processing.
-     * 
+     *
      * @param identity - Identity document from the platform
      * @returns The fusion account produced, or undefined if identity was skipped or already had one
      */
@@ -582,7 +593,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
             `Created fusion account from decision: ${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
-            `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
+                `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
         )
 
         fusionAccount.setNeedsReset(true)
@@ -597,7 +608,9 @@ export class FusionService {
 
         if (fusionDecision.newIdentity) {
             if (sourceType === 'record') {
-                this.log.debug(`Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`)
+                this.log.debug(
+                    `Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`
+                )
                 await this.attributes.registerUniqueAttributes(fusionAccount)
                 return undefined
             }
@@ -624,22 +637,22 @@ export class FusionService {
 
     /**
      * Process all managed accounts.
-     * 
+     *
      * This is Phase 4 (final phase) of the work queue depletion process:
      * - Phase 1: fetchFormData removes accounts with pending form decisions
      * - Phase 2: processFusionAccounts removes accounts belonging to existing fusion accounts
      * - Phase 3: processIdentities removes accounts belonging to identities
      * - Phase 4: processManagedAccounts (this method) processes ONLY what remains
-     * 
+     *
      * At this point, the work queue (this.sources.managedAccountsById) contains ONLY
      * uncorrelated accounts that don't belong to any existing fusion account or identity.
      * These are the truly new accounts that need deduplication review.
-     * 
+     *
      * The work queue pattern ensures:
      * - No duplicate processing (accounts are physically removed as they're claimed)
      * - Efficient filtering (no need to re-check thousands of already-processed accounts)
      * - Clear ownership (each account is processed exactly once)
-     * 
+     *
      * Memory Efficiency:
      * - Iterates Map directly (no 60k+ array allocation)
      * - Configurable batch size (managedAccountsBatchSize, default 50) limits concurrent in-flight objects
@@ -661,15 +674,19 @@ export class FusionService {
                 this._sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                    `Managed accounts from this source will be treated as unmatched.`
+                        `Managed accounts from this source will be treated as unmatched.`
                 )
             }
         }
 
         this.log.info(`Processing ${map.size} managed account(s)`)
-        await forEachMapBatched(map, async (x: Account) => {
-            await this.processManagedAccount(x)
-        }, this.managedAccountsBatchSize)
+        await forEachMapBatched(
+            map,
+            async (x: Account) => {
+                await this.processManagedAccount(x)
+            },
+            this.managedAccountsBatchSize
+        )
         this.log.info('Managed accounts processing completed')
     }
 
@@ -691,7 +708,9 @@ export class FusionService {
         if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
             const fusionAccount = await this.preProcessManagedAccount(account)
             if (sourceType !== 'authoritative') {
-                this.log.debug(`Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`)
+                this.log.debug(
+                    `Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`
+                )
                 if (sourceType === 'record') {
                     await this.attributes.registerUniqueAttributes(fusionAccount)
                 } else if (sourceType === 'orphan' && sourceInfo?.config?.disableNonMatchingAccounts) {
@@ -708,19 +727,13 @@ export class FusionService {
         const fusionAccount = await this.analyzeManagedAccount(account)
 
         if (fusionAccount.isMatch) {
-            const perfectMatch = fusionAccount.fusionMatches.find((m) =>
-                FusionService.hasAllAttributeScoresPerfect(m)
-            )
+            const perfectMatch = fusionAccount.fusionMatches.find((m) => FusionService.hasAllAttributeScoresPerfect(m))
             const identityId = perfectMatch?.identityId
             if (this.config.fusionMergingIdentical && identityId) {
                 this.log.debug(
                     `Account ${account.name} [${fusionAccount.sourceName}] has all scores 100, auto-correlating to identity ${identityId}`
                 )
-                const syntheticDecision = this.createAutoCorrelationDecision(
-                    fusionAccount,
-                    account,
-                    identityId
-                )
+                const syntheticDecision = this.createAutoCorrelationDecision(fusionAccount, account, identityId)
                 return await this.processFusionIdentityDecision(syntheticDecision)
             } else {
                 assert(sourceInfo, 'Source info not found')
@@ -837,9 +850,7 @@ export class FusionService {
 
         if (fusionAccount.isMatch) {
             const matchCount = fusionAccount.fusionMatches.length
-            this.log.info(
-                `POTENTIAL MATCH FOUND: ${name} [${sourceName}] - ${matchCount} candidate(s)`
-            )
+            this.log.info(`POTENTIAL MATCH FOUND: ${name} [${sourceName}] - ${matchCount} candidate(s)`)
 
             // Keep full FusionAccount for report when reporting is enabled (aggregation) or on-demand report
             if (this.fusionReportOnAggregation || this.commandType !== StandardCommand.StdAccountList) {
@@ -911,7 +922,11 @@ export class FusionService {
      * Safe to call multiple times (idempotent).
      */
     public clearAnalyzedAccounts(): void {
-        if (this.analyzedNonMatchReportData.length > 0 || this.potentialDuplicateAccounts.length > 0 || this.failedMatchingAccounts.length > 0) {
+        if (
+            this.analyzedNonMatchReportData.length > 0 ||
+            this.potentialDuplicateAccounts.length > 0 ||
+            this.failedMatchingAccounts.length > 0
+        ) {
             this.log.debug('Clearing analyzed managed accounts from memory')
             this.analyzedNonMatchReportData = []
             this.potentialDuplicateAccounts = []
@@ -1003,7 +1018,10 @@ export class FusionService {
      * @param fusionAccount - The fusion account to convert
      * @returns The formatted account output for the platform, or undefined if key cannot be generated
      */
-    public async getISCAccount(fusionAccount: FusionAccount, awaitCorrelations = true): Promise<StdAccountListOutput | undefined> {
+    public async getISCAccount(
+        fusionAccount: FusionAccount,
+        awaitCorrelations = true
+    ): Promise<StdAccountListOutput | undefined> {
         await fusionAccount.resolvePendingOperations(awaitCorrelations)
         // Update correlation status/action based on whatever correlations have resolved so far
         fusionAccount.updateCorrelationStatus()
@@ -1194,14 +1212,14 @@ export class FusionService {
 
     /**
      * Generate a fusion report with all accounts that have potential duplicates.
-     * 
+     *
      * Memory Optimization:
      * After generating the report, this method clears the analyzedNonMatchReportData
      * and potentialDuplicateAccounts arrays to free memory. These arrays hold
      * references to all managed accounts that were analyzed during processManagedAccounts,
      * which could be thousands of objects. Clearing them as soon as the report is
      * generated significantly reduces memory footprint.
-     * 
+     *
      * @param includeNonMatches - Whether to include non-matching accounts in the report
      * @param stats - Optional processing statistics to include in the report
      * @returns Complete fusion report with match/non-match accounts
@@ -1248,9 +1266,7 @@ export class FusionService {
         failedAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
 
         // Include non-matches if requested
-        const nonMatchAccounts: FusionReportAccount[] = includeNonMatches
-            ? this.generateNonMatchAccounts()
-            : []
+        const nonMatchAccounts: FusionReportAccount[] = includeNonMatches ? this.generateNonMatchAccounts() : []
 
         // Sort matches alphabetically by account name
         accounts.sort((a, b) => a.accountName.localeCompare(b.accountName))

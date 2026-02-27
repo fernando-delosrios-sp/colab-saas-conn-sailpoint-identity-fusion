@@ -8,13 +8,13 @@ This comprehensive guide explains how to use Identity Fusion NG to **generate or
 
 Use Identity Fusion for attribute generation when you need:
 
-| Need | Description | Example |
-|------|-------------|---------|
-| **Unique identifiers** | Template-based IDs with disambiguation counters or immutable UUIDs | Usernames like `jsmith`, `jsmith1`, `jsmith2`; stable employee IDs |
-| **Computed attributes** | Dynamic attributes from Apache Velocity expressions | Full name from first+last, formatted dates, address parsing |
-| **Multi-source consolidation** | Combine attributes from multiple sources into single attributes | Merge job titles from HR and AD; collect all roles from multiple systems |
-| **Attribute normalization** | Standardize formats (dates, phones, addresses, names) | Convert various date formats to ISO; standardize phone numbers |
-| **Counter-based sequences** | Sequential numbering for accounts or identities | Employee numbers starting from 1000, badge IDs |
+| Need                           | Description                                                        | Example                                                                  |
+| ------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| **Unique identifiers**         | Template-based IDs with disambiguation counters or immutable UUIDs | Usernames like `jsmith`, `jsmith1`, `jsmith2`; stable employee IDs       |
+| **Computed attributes**        | Dynamic attributes from Apache Velocity expressions                | Full name from first+last, formatted dates, address parsing              |
+| **Multi-source consolidation** | Combine attributes from multiple sources into single attributes    | Merge job titles from HR and AD; collect all roles from multiple systems |
+| **Attribute normalization**    | Standardize formats (dates, phones, addresses, names)              | Convert various date formats to ISO; standardize phone numbers           |
+| **Counter-based sequences**    | Sequential numbering for accounts or identities                    | Employee numbers starting from 1000, badge IDs                           |
 
 **Key advantage:** You are **not** primarily focused on duplicate detection—you want a single place to define, compute, and standardize attributes.
 
@@ -26,12 +26,12 @@ Use Identity Fusion for attribute generation when you need:
 
 Choose your configuration approach based on your data sources and goals:
 
-| Your goal | Include identities? | Add sources? | Configuration focus |
-|-----------|-------------------|--------------|---------------------|
-| **Generate unique IDs for existing identities** | Yes | No (or minimal) | Identity Scope Query; Attribute Definitions for unique/UUID types |
-| **Combine attributes from multiple source accounts** | Optional | Yes (all contributing sources) | Authoritative account sources; Attribute Mapping for merge strategies |
-| **Both: unique IDs + multi-source merge** | Yes | Yes | Identity Scope Query + sources; both Attribute Mapping and Definitions |
-| **Normalize/compute attributes from one source** | Optional | Yes (single source) | Single source; Attribute Definitions with Velocity expressions |
+| Your goal                                            | Include identities? | Add sources?                   | Configuration focus                                                    |
+| ---------------------------------------------------- | ------------------- | ------------------------------ | ---------------------------------------------------------------------- |
+| **Generate unique IDs for existing identities**      | Yes                 | No (or minimal)                | Identity Scope Query; Attribute Definitions for unique/UUID types      |
+| **Combine attributes from multiple source accounts** | Optional            | Yes (all contributing sources) | Authoritative account sources; Attribute Mapping for merge strategies  |
+| **Both: unique IDs + multi-source merge**            | Yes                 | Yes                            | Identity Scope Query + sources; both Attribute Mapping and Definitions |
+| **Normalize/compute attributes from one source**     | Optional            | Yes (single source)            | Single source; Attribute Definitions with Velocity expressions         |
 
 ---
 
@@ -41,38 +41,39 @@ Choose your configuration approach based on your data sources and goals:
 
 Configure **Source Settings → Scope** to determine which identities participate.
 
-| Field | Value | When to use | Example |
-|-------|-------|-------------|---------|
-| **Include identities in the scope?** | Yes | You want to process existing identities (for unique IDs or to provide a baseline) | Generate usernames for all active employees |
-| **Include identities in the scope?** | No | You only care about source accounts, not existing identities | Merge attributes from AD and HR accounts without identity baseline |
-| **Identity Scope Query** | `*` | Process all identities in ISC | All users across all sources |
-| **Identity Scope Query** | `attributes.cloudLifecycleState:active` | Only active identities | Skip terminated employees |
-| **Identity Scope Query** | `source.name:"Workday"` | Identities from specific source | Only HR-sourced identities |
-| **Identity Scope Query** | `attributes.department:"Engineering"` | Subset by attribute | Engineering department only |
+| Field                                | Value                                   | When to use                                                                       | Example                                                            |
+| ------------------------------------ | --------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **Include identities in the scope?** | Yes                                     | You want to process existing identities (for unique IDs or to provide a baseline) | Generate usernames for all active employees                        |
+| **Include identities in the scope?** | No                                      | You only care about source accounts, not existing identities                      | Merge attributes from AD and HR accounts without identity baseline |
+| **Identity Scope Query**             | `*`                                     | Process all identities in ISC                                                     | All users across all sources                                       |
+| **Identity Scope Query**             | `attributes.cloudLifecycleState:active` | Only active identities                                                            | Skip terminated employees                                          |
+| **Identity Scope Query**             | `source.name:"Workday"`                 | Identities from specific source                                                   | Only HR-sourced identities                                         |
+| **Identity Scope Query**             | `attributes.department:"Engineering"`   | Subset by attribute                                                               | Engineering department only                                        |
 
 **Screenshot placeholder:** Source Settings showing Identity Scope Query and identity inclusion toggle.
 
 ![Source Settings - Scope configuration](../assets/images/attribute-generation-source-settings.png)
+
 <!-- PLACEHOLDER: Screenshot of Source Settings (Scope + Sources). Save as docs/assets/images/attribute-generation-source-settings.png -->
 
 ### Sources configuration
 
 Configure **Source Settings → Sources** to specify which sources contribute account data.
 
-| Configuration | Purpose | Use case |
-|--------------|---------|----------|
-| **Empty sources list** | Identity-only attribute generation | Generate unique IDs from identity attributes only |
-| **One source** | Single-source normalization | Compute attributes from HR data (e.g. parse addresses, format names) |
-| **Multiple sources** | Multi-source consolidation | Merge job titles from Workday + Active Directory |
+| Configuration          | Purpose                            | Use case                                                             |
+| ---------------------- | ---------------------------------- | -------------------------------------------------------------------- |
+| **Empty sources list** | Identity-only attribute generation | Generate unique IDs from identity attributes only                    |
+| **One source**         | Single-source normalization        | Compute attributes from HR data (e.g. parse addresses, format names) |
+| **Multiple sources**   | Multi-source consolidation         | Merge job titles from Workday + Active Directory                     |
 
 **Per-source fields:**
 
-| Field | Description | Recommended value | Notes |
-|-------|-------------|-------------------|-------|
-| **Source name** | Exact name of ISC source | Must match ISC source name (case-sensitive) | Verify in Admin → Connections → Sources |
+| Field                                    | Description                                  | Recommended value                              | Notes                                                                                                                                                                                                                                                            |
+| ---------------------------------------- | -------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Source name**                          | Exact name of ISC source                     | Must match ISC source name (case-sensitive)    | Verify in Admin → Connections → Sources                                                                                                                                                                                                                          |
 | **Force aggregation before processing?** | Run fresh aggregation before each Fusion run | No for performance; Yes for real-time accuracy | Increases runtime. Designed for deduplication; also useful when generating unique identifiers for an **authoritative** source—Fusion’s run can be synchronized with that source’s aggregation so new authoritative data gets identifiers as soon as it comes in. |
-| **Account filter** | Limit accounts from this source | Leave empty initially | Example: `attributes.accountType:"employee"` |
-| **Aggregation batch size** | Max accounts per run | Leave empty for all accounts | Use for phased rollout (e.g. 1000 accounts initially) |
+| **Account filter**                       | Limit accounts from this source              | Leave empty initially                          | Example: `attributes.accountType:"employee"`                                                                                                                                                                                                                     |
+| **Aggregation batch size**               | Max accounts per run                         | Leave empty for all accounts                   | Use for phased rollout (e.g. 1000 accounts initially)                                                                                                                                                                                                            |
 
 **Example configurations:**
 
@@ -101,27 +102,28 @@ When you have **one or more sources**, Attribute Mapping determines how source a
 
 Choose the global **Default attribute merge from multiple sources**:
 
-| Merge strategy | Behavior | Use when | Example result |
-|---------------|----------|----------|----------------|
-| **First found** | Uses first value by source order | One source is preferred/authoritative | HR is first; if HR has value, use it; else check AD |
-| **Keep a list of values** | Array of all distinct values | You need all values for entitlements or multi-valued fields | Roles: `["Manager", "Developer", "Admin"]` |
-| **Concatenate different values** | Single string with distinct values in brackets | You want human-readable combined view | Departments: `[Engineering] [IT Operations]` |
+| Merge strategy                   | Behavior                                       | Use when                                                    | Example result                                      |
+| -------------------------------- | ---------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
+| **First found**                  | Uses first value by source order               | One source is preferred/authoritative                       | HR is first; if HR has value, use it; else check AD |
+| **Keep a list of values**        | Array of all distinct values                   | You need all values for entitlements or multi-valued fields | Roles: `["Manager", "Developer", "Admin"]`          |
+| **Concatenate different values** | Single string with distinct values in brackets | You want human-readable combined view                       | Departments: `[Engineering] [IT Operations]`        |
 
 **Screenshot placeholder:** Attribute Mapping Settings showing default merge dropdown.
 
 ![Attribute Mapping Settings - Default merge](../assets/images/attribute-generation-attribute-mapping.png)
+
 <!-- PLACEHOLDER: Screenshot of Attribute Mapping definitions. Save as docs/assets/images/attribute-generation-attribute-mapping.png -->
 
 ### Per-attribute mapping configuration
 
 For each attribute you want to expose on the Fusion account, add an **Attribute Mapping**:
 
-| Field | Purpose | Example |
-|-------|---------|---------|
-| **New attribute** | Name on Fusion account schema | `jobTitle`, `department`, `primaryEmail` |
-| **Existing attributes** | Source attribute name(s) that feed this | `[title, jobTitle]` (from different sources) |
-| **Merge override** | Override default for this attribute | Use "Source name" to prefer HR for `jobTitle` |
-| **Source name** | Specific source to use (when merge=source) | `Workday` (HR is authoritative for job title) |
+| Field                   | Purpose                                    | Example                                       |
+| ----------------------- | ------------------------------------------ | --------------------------------------------- |
+| **New attribute**       | Name on Fusion account schema              | `jobTitle`, `department`, `primaryEmail`      |
+| **Existing attributes** | Source attribute name(s) that feed this    | `[title, jobTitle]` (from different sources)  |
+| **Merge override**      | Override default for this attribute        | Use "Source name" to prefer HR for `jobTitle` |
+| **Source name**         | Specific source to use (when merge=source) | `Workday` (HR is authoritative for job title) |
 
 **Common mapping patterns:**
 
@@ -153,49 +155,50 @@ Pattern: Human-readable concatenation
 
 ### Global settings
 
-| Field | Purpose | Recommended value |
-|-------|---------|-------------------|
+| Field                                                | Purpose                               | Recommended value                                                       |
+| ---------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
 | **Maximum attempts for unique attribute generation** | Cap on retries for unique/UUID values | 100 (default); increase for large account sets with high collision risk |
 
 ### Per-attribute definition configuration
 
 For each attribute you want to generate, add an **Attribute Definition**:
 
-| Field | Description | Options / Example |
-|-------|-------------|-------------------|
-| **Attribute Name** | Name of generated attribute on Fusion account | `id`, `uuid`, `username`, `employeeNumber`, `formattedDate` |
-| **Apache Velocity expression** | Template to compute value | `#set($initial = $firstname.substring(0, 1))$initial$lastname` |
-| **Case selection** | Text case transformation | Do not change, Lower case, Upper case, Capitalize |
-| **Attribute Type** | Generation behavior | **Normal**, **Unique**, **UUID**, **Counter-based** |
-| **Counter start value** | Starting number for counter type | 1, 1000, 50000 |
-| **Minimum counter digits** | Zero-padding for counter/unique | 3 → `001`, `002`; 5 → `00001` |
-| **Maximum length** | Truncate to this length | 20 (counter/unique preserved at end) |
-| **Normalize special characters?** | Remove special chars and quotes | Yes for usernames/IDs |
-| **Remove spaces?** | Remove all whitespace | Yes for usernames/IDs |
-| **Refresh on each aggregation?** | Recalculate every run (Normal type only) | Yes if attribute is dynamic; No if stable |
+| Field                             | Description                                   | Options / Example                                              |
+| --------------------------------- | --------------------------------------------- | -------------------------------------------------------------- |
+| **Attribute Name**                | Name of generated attribute on Fusion account | `id`, `uuid`, `username`, `employeeNumber`, `formattedDate`    |
+| **Apache Velocity expression**    | Template to compute value                     | `#set($initial = $firstname.substring(0, 1))$initial$lastname` |
+| **Case selection**                | Text case transformation                      | Do not change, Lower case, Upper case, Capitalize              |
+| **Attribute Type**                | Generation behavior                           | **Normal**, **Unique**, **UUID**, **Counter-based**            |
+| **Counter start value**           | Starting number for counter type              | 1, 1000, 50000                                                 |
+| **Minimum counter digits**        | Zero-padding for counter/unique               | 3 → `001`, `002`; 5 → `00001`                                  |
+| **Maximum length**                | Truncate to this length                       | 20 (counter/unique preserved at end)                           |
+| **Normalize special characters?** | Remove special chars and quotes               | Yes for usernames/IDs                                          |
+| **Remove spaces?**                | Remove all whitespace                         | Yes for usernames/IDs                                          |
+| **Refresh on each aggregation?**  | Recalculate every run (Normal type only)      | Yes if attribute is dynamic; No if stable                      |
 
 **Screenshot placeholder:** Attribute Definition Settings with examples.
 
 ![Attribute Definition Settings - Unique ID and UUID](../assets/images/attribute-generation-attribute-definition.png)
+
 <!-- PLACEHOLDER: Screenshot of Attribute Definition with unique ID / UUID example. Save as docs/assets/images/attribute-generation-attribute-definition.png -->
 
 ### Attribute types explained
 
-| Type | Behavior | Use case | Example |
-|------|----------|----------|---------|
-| **Normal** | Computed each run (optional refresh) | Derived/computed attributes | Full name: `$firstname $lastname` |
-| **Unique** | Must be unique; adds counter on collision | Usernames | `jsmith` → `jsmith1`, `jsmith2` |
-| **UUID** | Generates immutable UUID | Stable native identity | `a3f2e8b4-...` (never changes) |
-| **Counter-based** | Sequential incrementing number | Employee IDs, badge numbers | 1000, 1001, 1002... |
+| Type              | Behavior                                  | Use case                    | Example                           |
+| ----------------- | ----------------------------------------- | --------------------------- | --------------------------------- |
+| **Normal**        | Computed each run (optional refresh)      | Derived/computed attributes | Full name: `$firstname $lastname` |
+| **Unique**        | Must be unique; adds counter on collision | Usernames                   | `jsmith` → `jsmith1`, `jsmith2`   |
+| **UUID**          | Generates immutable UUID                  | Stable native identity      | `a3f2e8b4-...` (never changes)    |
+| **Counter-based** | Sequential incrementing number            | Employee IDs, badge numbers | 1000, 1001, 1002...               |
 
 **When to use each type:**
 
-| Requirement | Type to use | Configuration |
-|-------------|-------------|---------------|
-| Stable reference that never changes | UUID | No expression needed; UUID auto-generated |
-| Human-readable unique username | Unique | Expression: `#set($initial = $firstname.substring(0,1))$initial$lastname`; case: lower; normalize: yes |
-| Sequential employee number | Counter-based | Counter start: 1000; digits: 5 |
-| Computed full name (can change) | Normal | Expression: `$firstname $lastname`; refresh: yes |
+| Requirement                         | Type to use   | Configuration                                                                                          |
+| ----------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------ |
+| Stable reference that never changes | UUID          | No expression needed; UUID auto-generated                                                              |
+| Human-readable unique username      | Unique        | Expression: `#set($initial = $firstname.substring(0,1))$initial$lastname`; case: lower; normalize: yes |
+| Sequential employee number          | Counter-based | Counter start: 1000; digits: 5                                                                         |
+| Computed full name (can change)     | Normal        | Expression: `$firstname $lastname`; refresh: yes                                                       |
 
 **Video placeholder:** Unique identifier generation with disambiguation.
 
@@ -205,13 +208,13 @@ For each attribute you want to generate, add an **Attribute Definition**:
 
 The Apache Velocity expression has access to:
 
-| Utility | Methods | Use case | Example |
-|---------|---------|----------|---------|
-| **$Math** | Standard JavaScript Math | Calculations, rounding | `$Math.round($salary / 12)` |
-| **$Datefns** | format, parse, addDays, addMonths, addYears, subDays, subMonths, subYears, isBefore, isAfter, isEqual, differenceInDays, startOfDay, endOfDay, now, isValid | Date manipulation | `$Datefns.format($hireDate, 'yyyy-MM-dd')` |
-| **$AddressParse** | getCityState(city), getCityStateCode(city), parse(addressString) | Address normalization | `$AddressParse.getCityState("San Francisco")` → `"California"` |
-| **$Normalize** | date(dateStr), phone(phoneNumber), name(name), fullName(name), ssn(ssn), address(addressString) | Data standardization | `$Normalize.phone($phoneNumber)` → `"+1-555-123-4567"` |
-| **Mapped attributes** | All attributes from Attribute Mapping or identity | Attribute access | `$firstname`, `$department`, `$email` |
+| Utility               | Methods                                                                                                                                                     | Use case               | Example                                                        |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------------------------------------------------- |
+| **$Math**             | Standard JavaScript Math                                                                                                                                    | Calculations, rounding | `$Math.round($salary / 12)`                                    |
+| **$Datefns**          | format, parse, addDays, addMonths, addYears, subDays, subMonths, subYears, isBefore, isAfter, isEqual, differenceInDays, startOfDay, endOfDay, now, isValid | Date manipulation      | `$Datefns.format($hireDate, 'yyyy-MM-dd')`                     |
+| **$AddressParse**     | getCityState(city), getCityStateCode(city), parse(addressString)                                                                                            | Address normalization  | `$AddressParse.getCityState("San Francisco")` → `"California"` |
+| **$Normalize**        | date(dateStr), phone(phoneNumber), name(name), fullName(name), ssn(ssn), address(addressString)                                                             | Data standardization   | `$Normalize.phone($phoneNumber)` → `"+1-555-123-4567"`         |
+| **Mapped attributes** | All attributes from Attribute Mapping or identity                                                                                                           | Attribute access       | `$firstname`, `$department`, `$email`                          |
 
 **Common Velocity patterns:**
 
@@ -247,12 +250,12 @@ $AddressParse.getCityState($city)
 
 Configure **Source Settings → Processing Control** for account lifecycle management:
 
-| Field | Recommended for attribute generation | Notes |
-|-------|-------------------------------------|-------|
-| **Maximum history messages** | 10 (default) | Limits history entries per Fusion account |
-| **Delete accounts with no authoritative accounts left?** | No for identity-only; Yes for source-driven | Auto-cleanup when source accounts are removed |
-| **Correlate missing source accounts on aggregation?** | Yes | Helps with incremental updates |
-| **Force attribute refresh on each aggregation?** | No | Applies only to Normal-type attributes; Unique attributes are only computed on account creation or activation. Expensive for large datasets. |
+| Field                                                    | Recommended for attribute generation        | Notes                                                                                                                                        |
+| -------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Maximum history messages**                             | 10 (default)                                | Limits history entries per Fusion account                                                                                                    |
+| **Delete accounts with no authoritative accounts left?** | No for identity-only; Yes for source-driven | Auto-cleanup when source accounts are removed                                                                                                |
+| **Correlate missing source accounts on aggregation?**    | Yes                                         | Helps with incremental updates                                                                                                               |
+| **Force attribute refresh on each aggregation?**         | No                                          | Applies only to Normal-type attributes; Unique attributes are only computed on account creation or activation. Expensive for large datasets. |
 
 ---
 
@@ -341,27 +344,28 @@ Then set Account Schema:
 
 After configuration, validate your setup:
 
-| Step | Action | What to verify |
-|------|--------|----------------|
-| 1. Discover Schema | Run **Discover Schema** in ISC | Fusion account schema includes mapped + generated attributes |
-| 2. Test aggregation | Run account aggregation | Accounts appear in Fusion source with expected attribute values |
-| 3. Check attribute values | Review a Fusion account | Unique IDs have no collisions or expected counters; merged attributes show correct values |
-| 4. Verify identity correlation | Check identity profiles | Fusion accounts correlate to identities as expected |
-| 5. Test with subset | Use **Account filter** or **Aggregation batch size** | Validate with small batch before full rollout |
+| Step                           | Action                                               | What to verify                                                                            |
+| ------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1. Discover Schema             | Run **Discover Schema** in ISC                       | Fusion account schema includes mapped + generated attributes                              |
+| 2. Test aggregation            | Run account aggregation                              | Accounts appear in Fusion source with expected attribute values                           |
+| 3. Check attribute values      | Review a Fusion account                              | Unique IDs have no collisions or expected counters; merged attributes show correct values |
+| 4. Verify identity correlation | Check identity profiles                              | Fusion accounts correlate to identities as expected                                       |
+| 5. Test with subset            | Use **Account filter** or **Aggregation batch size** | Validate with small batch before full rollout                                             |
 
 ---
 
 ## Summary
 
-| Component | Purpose | Key fields |
-|-----------|---------|------------|
-| **Source Settings (Scope)** | Which identities to process | Include identities, Identity Scope Query |
-| **Source Settings (Sources)** | Which sources contribute account data | Source name, Force aggregation, Account filter |
-| **Attribute Mapping** | How to merge source attributes | Default merge, New attribute, Existing attributes, Source name |
-| **Attribute Definition** | How to generate attributes | Attribute Name, Expression, Type (Normal/Unique/UUID/Counter), Case, Normalize |
-| **Processing Control** | Account lifecycle | Delete empty, Correlate on aggregation, Force refresh |
+| Component                     | Purpose                               | Key fields                                                                     |
+| ----------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ |
+| **Source Settings (Scope)**   | Which identities to process           | Include identities, Identity Scope Query                                       |
+| **Source Settings (Sources)** | Which sources contribute account data | Source name, Force aggregation, Account filter                                 |
+| **Attribute Mapping**         | How to merge source attributes        | Default merge, New attribute, Existing attributes, Source name                 |
+| **Attribute Definition**      | How to generate attributes            | Attribute Name, Expression, Type (Normal/Unique/UUID/Counter), Case, Normalize |
+| **Processing Control**        | Account lifecycle                     | Delete empty, Correlate on aggregation, Force refresh                          |
 
 **Next steps:**
+
 - For more on merging strategies and Velocity utilities, see [Effective use of attribute management](attribute-management.md).
 - For deduplication instead of just attribute generation, see [Identity Fusion for deduplication](deduplication.md).
 - For step-by-step ISC setup (connection, schema, identity profile), see the [main README](../../README.md#quick-start).
