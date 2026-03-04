@@ -1,6 +1,6 @@
-import { StatusSource } from '../model/status'
+import { EntitlementSource } from '../model/entitlement'
 
-export const statuses: StatusSource[] = [
+export const statuses: EntitlementSource[] = [
     {
         id: 'authorized',
         name: 'Authorized',

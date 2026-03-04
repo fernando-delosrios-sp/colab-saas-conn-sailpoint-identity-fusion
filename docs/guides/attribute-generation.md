@@ -215,6 +215,12 @@ The Apache Velocity expression has access to:
 | **$AddressParse**     | getCityState(city), getCityStateCode(city), parse(addressString)                                                                                            | Address normalization  | `$AddressParse.getCityState("San Francisco")` → `"California"` |
 | **$Normalize**        | date(dateStr), phone(phoneNumber), name(name), fullName(name), ssn(ssn), address(addressString)                                                             | Data standardization   | `$Normalize.phone($phoneNumber)` → `"+1-555-123-4567"`         |
 | **Mapped attributes** | All attributes from Attribute Mapping or identity                                                                                                           | Attribute access       | `$firstname`, `$department`, `$email`                          |
+| **$accounts**         | Managed account snapshots in deterministic order (configured source order, then account insertion order, then non-configured sources)                     | Cross-account logic    | `$accounts[0]._source`, `$accounts[0].IIQDisabled`             |
+| **$sources**          | Managed account snapshots grouped by source name                                                                                                            | Per-source logic       | `$sources.get("Workday")`                                      |
+| **$previous**         | Previously generated Fusion account values                                                                                                                  | Delta-aware logic      | `$previous.username`                                           |
+| **$originSource**     | Source that originally created the Fusion account (when available)                                                                                          | Provenance checks      | `Identities`, `Workday`                                        |
+
+> **Note:** Each managed account snapshot in `$accounts` and `$sources` includes `_source` (source name) and `IIQDisabled` (IdentityIQ-style disabled flag where `true` means disabled).
 
 **Common Velocity patterns:**
 

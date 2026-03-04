@@ -8,9 +8,10 @@ The Test Connection operation verifies that the connector is correctly configure
 
 1.  **Execution**:
     - The operation is invoked by ISC.
-    - It effectively performs a "ping" or "no-op" check.
-    - If the service registry and basic initialization succeed, the connection is considered healthy.
+    - It verifies access to the Fusion source and ensures that all configured managed sources exist.
+    - If any sources are configured for reverse correlation, it validates that the specified reverse correlation attributes exist in those managed sources' schemas.
+    - If the service registry, basic initialization, and these connectivity checks succeed, the connection is considered healthy.
 
 2.  **Output**:
     - Returns an empty success response `{}`.
-    - If any initialization step failed (e.g., API client config), an error would have been thrown during startup or execution, signaling failure.
+    - If any initialization step or connectivity check failed (e.g., missing API permissions, missing managed source), an error is thrown, signaling failure.

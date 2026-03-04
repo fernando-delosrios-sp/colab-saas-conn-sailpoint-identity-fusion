@@ -387,12 +387,18 @@ The **Apache Velocity expression** field provides a powerful templating language
 
 ### Available data
 
-| Source                        | What you can access                      | Example                                   |
-| ----------------------------- | ---------------------------------------- | ----------------------------------------- |
-| **Mapped account attributes** | All attributes from Attribute Mapping    | `$jobTitle`, `$department`, `$email`      |
-| **Source account attributes** | Direct source attributes (if no mapping) | `$firstname`, `$lastname`, `$hireDate`    |
-| **Identity attributes**       | When Include identities = Yes            | Depends on identity schema                |
-| **Special variables**         | `$counter` (Counter type only)           | `$counter` in expression for Counter type |
+| Source                        | What you can access                                                                                                                         | Example                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Mapped account attributes** | All attributes from Attribute Mapping                                                                                                       | `$jobTitle`, `$department`, `$email`                         |
+| **Source account attributes** | Direct source attributes (if no mapping)                                                                                                    | `$firstname`, `$lastname`, `$hireDate`                       |
+| **Identity attributes**       | When Include identities = Yes                                                                                                               | `$identity.firstname`, `$identity.employeeNumber`            |
+| **$accounts**                 | Managed account snapshots available to templates. Ordered by configured source order, then account insertion order, then unknown sources. | `$accounts[0]._source`, `$accounts[0].IIQDisabled`           |
+| **$sources**                  | Managed account snapshots grouped by source name                                                                                            | `$sources.get("Workday")`                                    |
+| **$previous**                 | Previous generated account state                                                                                                            | `$previous.username`                                         |
+| **$originSource**             | Source that originally created the Fusion account (when available)                                                                          | `Identities`, `Workday`                                      |
+| **Special variables**         | `$counter` (Counter type only)                                                                                                              | `$counter` in expression for Counter type                    |
+
+> **Note:** Each managed account snapshot in `$accounts` and `$sources` now includes `_source` (source name) and `IIQDisabled` (IdentityIQ-compatible disabled flag where `true` means disabled).
 
 ### Available utilities
 

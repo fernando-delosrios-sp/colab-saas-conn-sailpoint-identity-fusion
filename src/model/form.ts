@@ -1,5 +1,5 @@
-/** Generic attribute bag for form data. */
-type Attributes = { [key: string]: any }
+import { Attributes } from '@sailpoint/connector-sdk'
+
 
 /** Account representation used in fusion review forms, including optional match score. */
 type Account = {

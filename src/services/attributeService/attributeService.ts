@@ -350,7 +350,7 @@ export class AttributeService {
         if (this.skipAccountsWithMissingId && !uniqueId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} (${fusionAccount.nativeIdentity}): ` +
-                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -458,7 +458,7 @@ export class AttributeService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} raw account(s) ` +
-                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -475,7 +475,7 @@ export class AttributeService {
      * Build Velocity context from FusionAccount's attributeBag
      * The context includes current attributes plus referenceable objects from attributeBag
      */
-    private buildVelocityContext(fusionAccount: FusionAccount): { [key: string]: any } {
+    private buildVelocityContext(fusionAccount: FusionAccount): Record<string, any> {
         const context: { [key: string]: any } = { ...fusionAccount.attributeBag.current }
         const orderedAccounts = this.getOrderedAccountsForContext(fusionAccount)
 
@@ -499,11 +499,11 @@ export class AttributeService {
      * 2) Accounts within a source keep insertion order.
      * 3) Any non-configured sources are appended in map insertion order.
      */
-    private getOrderedAccountsForContext(fusionAccount: FusionAccount): Attributes[] {
+    private getOrderedAccountsForContext(fusionAccount: FusionAccount): Record<string, any>[] {
         const { sources } = fusionAccount.attributeBag
         if (sources.size === 0) return fusionAccount.attributeBag.accounts
 
-        const ordered: Attributes[] = []
+        const ordered: Record<string, any>[] = []
         const seenSources = new Set<string>()
 
         for (const sc of this.sourceConfigs) {
