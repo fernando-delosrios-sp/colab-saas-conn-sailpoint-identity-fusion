@@ -22,7 +22,13 @@ import { FusionDecision } from '../../model/form'
 import { FusionMatch } from '../scoringService'
 import { ScoringService } from '../scoringService'
 import { SchemaService } from '../schemaService'
-import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
+import {
+    FusionReport,
+    FusionReportAccount,
+    FusionReportDuplicateIdentityOccurrence,
+    FusionReportStats,
+    FusionReportWarnings,
+} from './types'
 import { AttributeOperations } from '../attributeService/types'
 import { MAX_CANDIDATES_FOR_FORM } from '../formService/constants'
 
@@ -44,6 +50,8 @@ export class FusionService {
     private analyzedNonMatchReportData: FusionReportAccount[] = []
     // Accounts where form creation failed (excessive candidates or runtime error)
     private failedMatchingAccounts: FusionReportAccount[] = []
+    // Correlated identities seen with more than one Fusion account in the same run
+    private duplicateFusionIdentityAccounts: Map<string, Map<string, string>> = new Map()
     private _reviewersBySourceId: Map<string, Set<FusionAccount>> = new Map()
     private _sourcesWithoutReviewers: Set<string> = new Set()
     private readonly sourcesByName: Map<string, SourceInfo> = new Map()
@@ -925,12 +933,14 @@ export class FusionService {
         if (
             this.analyzedNonMatchReportData.length > 0 ||
             this.potentialDuplicateAccounts.length > 0 ||
-            this.failedMatchingAccounts.length > 0
+            this.failedMatchingAccounts.length > 0 ||
+            this.duplicateFusionIdentityAccounts.size > 0
         ) {
             this.log.debug('Clearing analyzed managed accounts from memory')
             this.analyzedNonMatchReportData = []
             this.potentialDuplicateAccounts = []
             this.failedMatchingAccounts = []
+            this.duplicateFusionIdentityAccounts = new Map()
         }
     }
 
@@ -1171,6 +1181,75 @@ export class FusionService {
     }
 
     /**
+     * Builds a stable key for duplicate tracking when nativeIdentity may be missing.
+     */
+    private getDuplicateTrackingKey(fusionAccount: FusionAccount): string {
+        const nativeIdentity = fusionAccount.nativeIdentityOrUndefined
+        if (nativeIdentity && nativeIdentity.trim() !== '') {
+            return nativeIdentity
+        }
+        const name = fusionAccount.name || fusionAccount.displayName || 'unknown'
+        return `name:${name}`
+    }
+
+    /**
+     * Records duplicate correlated Fusion accounts and logs warning guidance.
+     */
+    private trackDuplicateFusionIdentity(
+        identityId: string,
+        existingAccount: FusionAccount,
+        newAccount: FusionAccount
+    ): void {
+        let accounts = this.duplicateFusionIdentityAccounts.get(identityId)
+        if (!accounts) {
+            accounts = new Map()
+            this.duplicateFusionIdentityAccounts.set(identityId, accounts)
+        }
+
+        const existingKey = this.getDuplicateTrackingKey(existingAccount)
+        const newKey = this.getDuplicateTrackingKey(newAccount)
+        accounts.set(existingKey, existingAccount.name || existingAccount.displayName || existingKey)
+        accounts.set(newKey, newAccount.name || newAccount.displayName || newKey)
+
+        const accountLabels = Array.from(accounts.entries()).map(([nativeIdentity, name]) => `${name} (${nativeIdentity})`)
+        this.log.warn(
+            `Multiple Fusion accounts detected for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
+                'This is generally caused by duplicated account names. Review the Fusion source configuration and consider using a unique attribute for the account name.'
+        )
+    }
+
+    /**
+     * Builds report warning payload for duplicate correlated Fusion accounts.
+     */
+    private buildDuplicateIdentityWarnings(): FusionReportWarnings | undefined {
+        if (this.duplicateFusionIdentityAccounts.size === 0) {
+            return undefined
+        }
+
+        const occurrences: FusionReportDuplicateIdentityOccurrence[] = []
+        for (const [identityId, accounts] of this.duplicateFusionIdentityAccounts.entries()) {
+            const nativeIdentities = Array.from(accounts.keys()).sort((a, b) => a.localeCompare(b))
+            const accountNames = Array.from(new Set(accounts.values())).sort((a, b) => a.localeCompare(b))
+            occurrences.push({
+                identityId,
+                accountCount: nativeIdentities.length,
+                accountNames,
+                nativeIdentities,
+            })
+        }
+        occurrences.sort((a, b) => a.identityId.localeCompare(b.identityId))
+
+        return {
+            duplicateFusionIdentities: {
+                message:
+                    'More than one Fusion account was found for one or more identities. This is generally caused by duplicated account names. Please review the configuration and consider using a unique attribute for the account name.',
+                affectedIdentities: occurrences.length,
+                occurrences,
+            },
+        }
+    }
+
+    /**
      * Set a fusion account, automatically determining whether to add it as a fusion account
      * or fusion identity based on whether it has an identityId and is not uncorrelated.
      *
@@ -1186,6 +1265,12 @@ export class FusionService {
         const isUncorrelated = fusionAccount.uncorrelated
 
         if (hasIdentityId && !isUncorrelated) {
+            const existingFusionAccount = this.fusionIdentityMap.get(identityId!)
+            const existingKey = existingFusionAccount ? this.getDuplicateTrackingKey(existingFusionAccount) : undefined
+            const incomingKey = this.getDuplicateTrackingKey(fusionAccount)
+            if (existingFusionAccount && existingKey !== incomingKey) {
+                this.trackDuplicateFusionIdentity(identityId!, existingFusionAccount, fusionAccount)
+            }
             // Add to fusion identity map, keyed by identityId (correlated account)
             // identityId is guaranteed to be a string here due to hasIdentityId check
             this.fusionIdentityMap.set(identityId!, fusionAccount)
@@ -1226,6 +1311,7 @@ export class FusionService {
      */
     public generateReport(includeNonMatches: boolean = false, stats?: FusionReportStats): FusionReport {
         const accounts: FusionReportAccount[] = []
+        const warnings = this.buildDuplicateIdentityWarnings()
 
         // Report on the managed accounts that were flagged as potential duplicates (forms created)
         for (const fusionAccount of this.potentialDuplicateAccounts) {
@@ -1282,6 +1368,7 @@ export class FusionService {
             potentialDuplicates,
             reportDate: new Date(),
             stats,
+            warnings,
         }
 
         // Release memory from analyzed accounts after report generation
@@ -1289,6 +1376,7 @@ export class FusionService {
         this.analyzedNonMatchReportData = []
         this.potentialDuplicateAccounts = []
         this.failedMatchingAccounts = []
+        this.duplicateFusionIdentityAccounts = new Map()
 
         return report
     }

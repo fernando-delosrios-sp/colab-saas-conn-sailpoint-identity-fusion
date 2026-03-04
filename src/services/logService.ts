@@ -10,6 +10,13 @@ type Logger = typeof logger
  */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
+export type AggregationIssueSummary = {
+    warningCount: number
+    errorCount: number
+    warningSamples: string[]
+    errorSamples: string[]
+}
+
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
     debug: 0,
     info: 1,
@@ -227,6 +234,14 @@ export class LogService {
      *  when the endpoint is unreachable (TCP timeouts can be 30-120s+ at the OS level). */
     private static readonly EXTERNAL_LOG_TIMEOUT_MS = 5_000
     private apiQueue: ApiQueue | null = null
+    private issueSummary: AggregationIssueSummary = {
+        warningCount: 0,
+        errorCount: 0,
+        warningSamples: [],
+        errorSamples: [],
+    }
+    private static readonly ISSUE_SAMPLE_LIMIT = 6
+    private static readonly ISSUE_MESSAGE_MAX_LENGTH = 180
 
     /**
      * @param config - Logging configuration including level, debug flag, and external logging settings
@@ -388,6 +403,7 @@ export class LogService {
      * is enabled for this level, or when debug-level logging is configured.
      */
     private log(level: LogLevel, message: string, data?: any): void {
+        this.trackIssue(level, message)
         const needsOrigin = this.shouldSendExternal(level) || this.configuredLevel === 'debug'
         const origin = needsOrigin ? getCallerInfo(3).origin : undefined
 
@@ -399,6 +415,44 @@ export class LogService {
         // Send to external service if enabled and level threshold is met
         if (this.shouldSendExternal(level)) {
             this.sendToExternalService(level, message, data, origin)
+        }
+    }
+
+    private trackIssue(level: LogLevel, message: string): void {
+        if (level !== 'warn' && level !== 'error') return
+
+        const normalized = message.replace(/\s+/g, ' ').trim()
+        const truncated =
+            normalized.length > LogService.ISSUE_MESSAGE_MAX_LENGTH
+                ? `${normalized.slice(0, LogService.ISSUE_MESSAGE_MAX_LENGTH - 3)}...`
+                : normalized
+
+        if (level === 'warn') {
+            this.issueSummary.warningCount += 1
+            if (
+                this.issueSummary.warningSamples.length < LogService.ISSUE_SAMPLE_LIMIT &&
+                !this.issueSummary.warningSamples.includes(truncated)
+            ) {
+                this.issueSummary.warningSamples.push(truncated)
+            }
+            return
+        }
+
+        this.issueSummary.errorCount += 1
+        if (
+            this.issueSummary.errorSamples.length < LogService.ISSUE_SAMPLE_LIMIT &&
+            !this.issueSummary.errorSamples.includes(truncated)
+        ) {
+            this.issueSummary.errorSamples.push(truncated)
+        }
+    }
+
+    getAggregationIssueSummary(): AggregationIssueSummary {
+        return {
+            warningCount: this.issueSummary.warningCount,
+            errorCount: this.issueSummary.errorCount,
+            warningSamples: [...this.issueSummary.warningSamples],
+            errorSamples: [...this.issueSummary.errorSamples],
         }
     }
 
@@ -450,6 +504,7 @@ export class LogService {
      */
     assert(condition: boolean, message: string, data?: any, level: LogLevel = 'error'): void {
         if (!condition) {
+            this.trackIssue(level, message)
             const callerInfo = getCallerInfo(2)
             const { origin } = callerInfo
             const assertMessage = `Assertion failed: ${message}`
@@ -474,6 +529,7 @@ export class LogService {
      * @throws {ConnectorError} Always thrown after logging
      */
     crash(message: string, data?: any): void {
+        this.trackIssue('error', message)
         const callerInfo = getCallerInfo(2)
         const { origin } = callerInfo
         const output = this.formatMessage(message, data, origin)

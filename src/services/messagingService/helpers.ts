@@ -201,6 +201,32 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
           </tr>
         </table>
 
+        {{#if warnings.duplicateFusionIdentities}}
+        <div style="margin-top: 14px; padding: 12px; border: 1px solid #fecaca; border-left: 6px solid #ef4444; border-radius: 10px; background: #fef2f2;">
+          <div style="font-size: 12px; color: #991b1b; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Warning</div>
+          <div style="font-size: 13px; color: #7f1d1d; line-height: 1.5; margin-bottom: 10px;">{{warnings.duplicateFusionIdentities.message}}</div>
+          {{#if (gt warnings.duplicateFusionIdentities.occurrences.length 0)}}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+            <tr>
+              <th style="text-align: left; border: 1px solid #fecaca; background: #fee2e2; color: #7f1d1d; font-size: 11px; padding: 6px 8px; text-transform: uppercase;">Identity ID</th>
+              <th style="text-align: left; border: 1px solid #fecaca; background: #fee2e2; color: #7f1d1d; font-size: 11px; padding: 6px 8px; text-transform: uppercase;">Fusion Accounts</th>
+              <th style="text-align: left; border: 1px solid #fecaca; background: #fee2e2; color: #7f1d1d; font-size: 11px; padding: 6px 8px; text-transform: uppercase;">Account Names / Native Identities</th>
+            </tr>
+            {{#each warnings.duplicateFusionIdentities.occurrences}}
+            <tr>
+              <td style="border: 1px solid #fecaca; color: #7f1d1d; font-size: 12px; padding: 6px 8px; word-break: break-all;">{{identityId}}</td>
+              <td style="border: 1px solid #fecaca; color: #7f1d1d; font-size: 12px; padding: 6px 8px; font-weight: 700;">{{accountCount}}</td>
+              <td style="border: 1px solid #fecaca; color: #7f1d1d; font-size: 12px; padding: 6px 8px;">
+                {{#each accountNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+                {{#if nativeIdentities}} ({{#each nativeIdentities}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}){{/if}}
+              </td>
+            </tr>
+            {{/each}}
+          </table>
+          {{/if}}
+        </div>
+        {{/if}}
+
         {{#if stats}}
         <div style="margin-top: 18px;">
           <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">Processing Statistics</div>
@@ -404,6 +430,30 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
               </td>
             </tr>
           </table>
+          {{#if (gt stats.aggregationWarnings 0)}}
+          <div style="margin-top: 10px; padding: 10px 12px; border: 1px solid #fde68a; border-left: 6px solid #f59e0b; border-radius: 10px; background: #fffbeb;">
+            <div style="font-size: 11px; color: #92400e; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Aggregation Warnings ({{stats.aggregationWarnings}})</div>
+            {{#if stats.warningSamples}}
+            <div style="font-size: 12px; color: #78350f; line-height: 1.4;">
+              {{#each stats.warningSamples}}
+              <div style="margin-bottom: 4px;">- {{this}}</div>
+              {{/each}}
+            </div>
+            {{/if}}
+          </div>
+          {{/if}}
+          {{#if (gt stats.aggregationErrors 0)}}
+          <div style="margin-top: 10px; padding: 10px 12px; border: 1px solid #fecaca; border-left: 6px solid #ef4444; border-radius: 10px; background: #fef2f2;">
+            <div style="font-size: 11px; color: #991b1b; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Aggregation Errors ({{stats.aggregationErrors}})</div>
+            {{#if stats.errorSamples}}
+            <div style="font-size: 12px; color: #7f1d1d; line-height: 1.4;">
+              {{#each stats.errorSamples}}
+              <div style="margin-bottom: 4px;">- {{this}}</div>
+              {{/each}}
+            </div>
+            {{/if}}
+          </div>
+          {{/if}}
         </div>
         {{/if}}
 

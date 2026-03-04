@@ -324,4 +324,96 @@ describe('FusionService', () => {
             expect(fusionAccount.attributes.reverseNativeIdentity).toBe('existing-value')
         })
     })
+
+    describe('duplicate fusion identity warnings', () => {
+        it('logs warning and includes duplicate identity details in report', () => {
+            const accountA = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-a',
+                identityId: 'identity-duplicate',
+                name: 'Fusion Account A',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {},
+            } as unknown as Account)
+            const accountB = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-b',
+                identityId: 'identity-duplicate',
+                name: 'Fusion Account B',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {},
+            } as unknown as Account)
+
+            fusionService.setFusionAccount(accountA)
+            fusionService.setFusionAccount(accountB)
+
+            expect(mockLog.warn).toHaveBeenCalledWith(
+                expect.stringContaining('Multiple Fusion accounts detected for identity identity-duplicate')
+            )
+
+            const report = fusionService.generateReport()
+            const duplicateWarnings = report.warnings?.duplicateFusionIdentities
+
+            expect(duplicateWarnings?.affectedIdentities).toBe(1)
+            expect(duplicateWarnings?.occurrences).toHaveLength(1)
+            expect(duplicateWarnings?.occurrences[0].identityId).toBe('identity-duplicate')
+            expect(duplicateWarnings?.occurrences[0].accountCount).toBe(2)
+            expect(duplicateWarnings?.occurrences[0].nativeIdentities).toEqual(['fusion-a', 'fusion-b'])
+        })
+
+        it('does not warn when the same correlated account key is updated', () => {
+            const original = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-a',
+                identityId: 'identity-1',
+                name: 'Fusion Account A',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {},
+            } as unknown as Account)
+            const refreshed = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-a',
+                identityId: 'identity-1',
+                name: 'Fusion Account A Refreshed',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {},
+            } as unknown as Account)
+
+            fusionService.setFusionAccount(original)
+            fusionService.setFusionAccount(refreshed)
+
+            expect(mockLog.warn).not.toHaveBeenCalled()
+
+            const report = fusionService.generateReport()
+            expect(report.warnings).toBeUndefined()
+        })
+
+        it('clears duplicate warning payload after report generation', () => {
+            const accountA = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-a',
+                identityId: 'identity-duplicate',
+                name: 'Fusion Account A',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {},
+            } as unknown as Account)
+            const accountB = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-b',
+                identityId: 'identity-duplicate',
+                name: 'Fusion Account B',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {},
+            } as unknown as Account)
+
+            fusionService.setFusionAccount(accountA)
+            fusionService.setFusionAccount(accountB)
+
+            const firstReport = fusionService.generateReport()
+            expect(firstReport.warnings?.duplicateFusionIdentities?.affectedIdentities).toBe(1)
+
+            const secondReport = fusionService.generateReport()
+            expect(secondReport.warnings).toBeUndefined()
+        })
+    })
 })

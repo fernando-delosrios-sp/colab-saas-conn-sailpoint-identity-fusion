@@ -107,6 +107,36 @@ export type FusionReportStats = {
     totalProcessingTime?: string
     /** Formatted memory usage at report generation time */
     usedMemory?: string
+    /** Total warnings logged during aggregation */
+    aggregationWarnings?: number
+    /** Total errors logged during aggregation */
+    aggregationErrors?: number
+    /** Concise warning samples logged during aggregation */
+    warningSamples?: string[]
+    /** Concise error samples logged during aggregation */
+    errorSamples?: string[]
+}
+
+/** Duplicate Fusion-account mapping details for a single ISC identity. */
+export type FusionReportDuplicateIdentityOccurrence = {
+    /** ISC identity ID associated to multiple Fusion accounts */
+    identityId: string
+    /** Number of Fusion accounts seen for this identity */
+    accountCount: number
+    /** Unique account names involved in the duplicate mapping */
+    accountNames: string[]
+    /** Unique native identities involved in the duplicate mapping */
+    nativeIdentities: string[]
+}
+
+/** Report warnings section payload. */
+export type FusionReportWarnings = {
+    /** Guidance + duplicate identity occurrences detected in this run */
+    duplicateFusionIdentities?: {
+        message: string
+        affectedIdentities: number
+        occurrences: FusionReportDuplicateIdentityOccurrence[]
+    }
 }
 
 /**
@@ -124,4 +154,6 @@ export type FusionReport = {
     reportDate?: Date | string
     /** Processing statistics */
     stats?: FusionReportStats
+    /** Global warnings surfaced during report generation */
+    warnings?: FusionReportWarnings
 }

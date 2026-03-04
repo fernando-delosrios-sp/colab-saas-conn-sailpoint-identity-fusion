@@ -102,6 +102,41 @@ flowchart TD
 9.  **Reporting (Conditional)**:
     - If `fusionReportOnAggregation` is enabled, generates a fusion report for the fusion owner.
 
+### Report contents (what is included)
+
+When report-on-aggregation is enabled, the generated Fusion report can include:
+
+- **Header summary**
+  - Report date
+  - Total accounts analyzed
+  - Potential duplicates count
+- **Processing statistics**
+  - Fusion totals (accounts, forms, assignments)
+  - Review decisions and outcomes
+  - Managed account found/processed metrics (including source-type breakdown)
+  - Total processing time and memory used
+- **Global warnings**
+  - Duplicate Fusion account mappings per identity (when detected)
+  - Guidance that this is generally caused by duplicated account names, with recommendation to review configuration and consider a unique account-name attribute
+- **Aggregation issues summary (compact)**
+  - Total warnings and total errors logged during aggregation
+  - Short sampled warning/error messages (not full logs)
+  - Samples are intentionally capped and truncated to reduce report size
+- **Per-account detail cards**
+  - Potential duplicate account context (source, id, email, selected attributes)
+  - Candidate identities with score breakdown by attribute/algorithm/threshold
+  - Failed matching/form creation entries with error details
+- **Optional non-match entries**
+  - Included when non-match reporting is requested
+
+### Report size safety
+
+To reduce email/report payload growth:
+
+- Aggregation issue details are summarized (counts + sampled messages only)
+- Sample lists are capped and messages are truncated
+- Full verbose log streams are not embedded in the report
+
 10. **Cleanup & Memory Reclamation**:
     - Clears analyzed account caches and managed account caches.
     - Manages form cleanup.

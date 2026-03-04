@@ -40,6 +40,7 @@ export const generateReport = async (
 
     let stats: FusionReportStats | undefined
     if (aggregationStats) {
+        const issueSummary = serviceRegistry.log.getAggregationIssueSummary()
         const decisions = forms.fusionIdentityDecisions
         const decisionSourceType = (d: {
             sourceType?: 'authoritative' | 'record' | 'orphan'
@@ -76,6 +77,10 @@ export const generateReport = async (
             managedAccountsProcessedAuthoritative: aggregationStats.managedAccountsFoundAuthoritative,
             managedAccountsProcessedRecord: aggregationStats.managedAccountsFoundRecord,
             managedAccountsProcessedOrphan: aggregationStats.managedAccountsFoundOrphan,
+            aggregationWarnings: issueSummary.warningCount,
+            aggregationErrors: issueSummary.errorCount,
+            warningSamples: issueSummary.warningSamples,
+            errorSamples: issueSummary.errorSamples,
             usedMemory: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
             ...aggregationStats,
         }

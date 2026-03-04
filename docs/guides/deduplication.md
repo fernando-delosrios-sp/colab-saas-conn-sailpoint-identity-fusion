@@ -244,6 +244,19 @@ Configure **Fusion Settings → Review Settings** for the manual review workflow
 | **Owner is global reviewer?**                      | Add Fusion source owner to all review forms | Yes (ensures at least one reviewer)                           |
 | **Send report to owner on aggregation?**           | Email report after each aggregation         | Yes (useful for monitoring)                                   |
 
+### What the aggregation report includes
+
+When **Send report to owner on aggregation?** is enabled, reports include:
+
+- High-level summary (date, total analyzed accounts, potential duplicates)
+- Processing statistics (managed/fusion/review metrics, processing time, memory usage)
+- Potential duplicate details with candidate identity score breakdowns
+- Failed matching entries (for example, form creation constraints/errors)
+- Warning block when more than one Fusion account is found for the same identity, including guidance to review configuration and consider a unique account-name attribute
+- Compact aggregation issues summary with warning/error counts and short sampled messages
+
+To avoid oversized reports, warning/error details are intentionally summarized (not full log dumps).
+
 **Choosing form attributes:**
 
 Include attributes that help reviewers decide if identities are duplicates:
