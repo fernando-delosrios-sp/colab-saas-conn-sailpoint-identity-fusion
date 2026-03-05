@@ -4,15 +4,16 @@ This folder contains the **usage guides** linked from the [main README](../READM
 
 ## Guide index
 
-| Guide                                                                               | Description                                                                                                                                                      |
-| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Migration from previous Identity Fusion](guides/migration-from-previous-fusion.md) | Migrate from an earlier Identity Fusion version using the old source as managed, schema alignment, and a higher-priority identity profile plus identity refresh. |
-| [Map](guides/map.md)                                                                | Map account attributes into a unified schema representation.                                                                                                     |
-| [Define](guides/define.md)                                                          | Define generated identifiers and Velocity computed attributes.                                                                                                   |
-| [Match](guides/match.md)                                                            | Configure sources and Fusion Settings to detect and resolve potential duplicate identities.                                                                      |
-| [Advanced connection settings](guides/advanced-connection-settings.md)              | Queue, retry, batching, timeouts, and external logging.                                                                                                          |
-| [Proxy mode](guides/proxy-mode.md)                                                  | Run connector logic on an external server and connect ISC via proxy.                                                                                             |
-| [Troubleshooting](guides/troubleshooting.md)                                        | Common issues, checks, and recovery steps.                                                                                                                       |
+| Guide                                                                               | Description                                                                                                  |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [Map](guides/map.md)                                                                | Attribute mapping, merging, and consolidation from multiple sources.                                         |
+| [Define](guides/define.md)                                                          | Attribute definitions (Velocity computed attributes, unique identifiers, UUIDs, counters).                   |
+| [Match](guides/match.md)                                                            | Detect and resolve potential duplicate identities using one or more sources.                                 |
+| [Source configuration](guides/source-configuration.md)                              | In-depth guide on source settings, scope, aggregation timing, and correlation modes.                         |
+| [Migration from previous Identity Fusion](guides/migration-from-previous-fusion.md) | Migrate from an earlier Identity Fusion version: add the old source as managed, align schemas, then migrate. |
+| [Advanced connection settings](guides/advanced-connection-settings.md)              | Queue, retry, batching, timeouts, and external logging.                                                      |
+| [Proxy mode](guides/proxy-mode.md)                                                  | Run connector logic on an external server and connect ISC via proxy.                                         |
+| [Troubleshooting](guides/troubleshooting.md)                                        | Common issues, checks, and recovery steps.                                                                   |
 
 ## Assets (screenshots and videos)
 

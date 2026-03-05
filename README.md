@@ -10,22 +10,6 @@ You can use the **map**, **define**, and **match** capabilities independently or
 
 ---
 
-## Overview
-
-| Topic                                                                                    | Description                                                                                                                                                                |
-| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Migration from previous Identity Fusion](docs/guides/migration-from-previous-fusion.md) | Migrate from an earlier Identity Fusion version: add the old source as managed, align schemas, then migrate identities via a higher-priority profile and identity refresh. |
-| [Map & Define](docs/guides/map.md)                                                       | Generate unique or combined attributes from identities, sources, or both. Fusion is rarely authoritative in this mode; managed sources are optional.                       |
-| [Match](docs/guides/match.md)                                                            | Detect and resolve potential duplicate identities using one or more sources; identities optional but recommended as a baseline.                                            |
-| ---                                                                                      | ---                                                                                                                                                                        |
-| [Attribute Mapping](docs/guides/map.md)                                                  | Attribute mapping, merging from multiple sources.                                                                                                                          |
-| [Attribute Definitions](docs/guides/define.md)                                           | Attribute definitions (Velocity, unique, UUID, counters).                                                                                                                  |
-| [Advanced connection settings](docs/guides/advanced-connection-settings.md)              | Queue, retry, batching, rate limiting, and logging.                                                                                                                        |
-| [Proxy mode](docs/guides/proxy-mode.md)                                                  | Run connector logic on an external server and connect ISC to it via proxy.                                                                                                 |
-| [Troubleshooting](docs/guides/troubleshooting.md)                                        | Common issues, logs, and recovery steps.                                                                                                                                   |
-
----
-
 ## Configuration at a glance
 
 Configuration is grouped into menus in the connector source in ISC. Each menu contains multiple sections with specific settings.
@@ -52,113 +36,13 @@ Authentication and connectivity to the ISC APIs.
 
 Controls which identities and sources are in scope and how processing is managed.
 
-#### Scope Section
+For an in-depth explanation of source types, aggregation rules, correlation modes, and account lifecycle, see the [Source configuration](docs/guides/source-configuration.md) guide.
 
-![Source Settings - Scope](docs/assets/images/config-source-scope.png)
-
-| Field                                | Description                                                                | Required                              | Notes                                                                                                                                                                                     |
-| ------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Include identities in the scope?** | Include identities in addition to managed accounts from configured sources | No                                    | Enable for identity-only Defines or to define the baseline for Match (sources scope = managed accounts from configured sources).                                                          |
-| **Identity Scope Query**             | Search/filter query to limit which identities are evaluated                | Yes (when include identities enabled) | Uses [ISC search syntax](https://documentation.sailpoint.com/saas/help/search/building-query.html); examples: `*` (all), `attributes.cloudLifecycleState:active`, `source.name:"Workday"` |
-
-> **Tip:** You may or may not include identities in your scope. When not included, only those managed accounts previously processed that turned into an identity will be considered as your baseline to compare new uncorrelated managed accounts. When included, all your existing identities in the scope will be part of that baseline from the beginning, as well as managed accounts that turn into identities over time. When including identities in the scope, the Fusion attribute definition context can also access the `$identity` object.
-
-#### Sources Section
-
-![Source Settings - Sources](docs/assets/images/config-source-sources.png)
-
-| Field                                           | Description                                                 | Required | Notes                                                                    |
-| ----------------------------------------------- | ----------------------------------------------------------- | -------- | ------------------------------------------------------------------------ |
-| **Authoritative account sources**               | List of sources whose accounts will be merged and evaluated | Yes      | Each source has sub-configuration (see below)                            |
-| **Aggregation task result retries**             | Number of times to poll aggregation task status             | No       | Default: 5; applies to all sources with force aggregation enabled        |
-| **Aggregation task result wait time (seconds)** | Wait time between aggregation task status checks            | No       | Default: 1 second; applies to all sources with force aggregation enabled |
-
-**Per-source configuration:**
-
-![Source Settings - Per-source configuration](docs/assets/images/config-source-single.png)
-
-| Field                             | Description                                            | Required               | Notes                                                                                                                                                                                                      |
-| --------------------------------- | ------------------------------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Source name**                   | Name of the authoritative account source               | Yes                    | Must match the source name in ISC exactly (case-sensitive)                                                                                                                                                 |
-| **Enabled**                       | Include this source in processing                      | No                     | Defaults to enabled. Disabled sources are excluded from aggregation and fusion entirely.                                                                                                                   |
-| **Source type**                   | How accounts from this source are processed            | Yes                    | Options: **Authoritative accounts** (default, creates new identities), **Records** (registers unique attributes but doesn't output ISC accounts), **Orphan accounts** (drops non-matching accounts).       |
-| **Disable non-matching accounts** | Disable non-matching orphan accounts via background op | No (only for Orphan)   | When enabled, triggers an account disable operation for orphans lacking a match.                                                                                                                           |
-| **Account filter**                | Filter query to limit which accounts are processed     | No                     | Uses ISC search/filter syntax; example: `attributes.department:"Engineering"`                                                                                                                              |
-| **Aggregation batch size**        | Maximum accounts to aggregate per run                  | No                     | Leave empty for all accounts; useful for initial loading of datasets.                                                                                                                                      |
-| **Account aggregation mode**      | When to trigger fresh aggregation for this source      | Yes                    | Options: **Do not aggregate** (none), **Aggregate before processing** (ensures current data but blocks processing), **Delayed aggregation** (triggers aggregation in background after returning accounts). |
-| **Aggregation delay (minutes)**   | Wait time before delayed aggregation                   | Yes (for delayed mode) | Default: 5 minutes.                                                                                                                                                                                        |
-| **Optimized aggregation**         | Only reprocess changed accounts during aggregation     | No                     | Enable for performance. Disable if using **reverse correlation** so all accounts are processed.                                                                                                            |
-| **Correlation mode**              | How to handle missing source accounts                  | Yes                    | Options: **Correlate missing accounts on aggregation** (direct API patch), **Reverse correlation from managed source** (sets an attribute for ISC native correlation), **Do not correlate** (none).        |
-| **Correlation attribute name**    | Attribute used for reverse correlation                 | Yes (for reverse mode) | Technical name for the dedicated Fusion attribute.                                                                                                                                                         |
-| **Correlation display name**      | UI display name for the correlation attribute          | Yes (for reverse mode) | Human-readable name.                                                                                                                                                                                       |
-
-> **Tip:** You can use the **Aggregate before processing** option to ensure a managed source has newer data than the last time Identity Fusion ran and/or synchronize aggregation schedules. If you don't need the absolute latest data blocking the aggregation response, consider **Delayed aggregation** to speed up the account list operation.
-
-<details>
-<summary><b>View Graphic: Source Types & Flow</b></summary>
-
-```mermaid
-flowchart TD
-    A[Evaluate Managed Account] --> B{Source Type?}
-    B -- Identities --> C[Match / Scoring]
-    B -- Records --> D[Register Unique Attributes Only]
-    B -- Orphans --> E[Check Match]
-    E -- Match --> F[Link to Identity]
-    E -- No Match --> G[Drop Account]
-    G -.-> H([Optional: Disable Account])
-    D --> I[Do Not Output as ISC Account]
-    C --> J[Output as Fusion Account]
-```
-
-</details>
-
-<details>
-<summary><b>View Graphic: Aggregation Timing</b></summary>
-
-```mermaid
-sequenceDiagram
-    participant ISC
-    participant Fusion
-    participant Source
-    ISC->>Fusion: Start Account List
-    Fusion->>Source: Aggregate 'before' sources
-    Fusion->>Fusion: Run Match & Map/Define
-    Fusion->>ISC: Return processed accounts
-    Fusion->>Source: Wait N mins, aggregate 'delayed' sources
-```
-
-</details>
-
-<details>
-<summary><b>View Graphic: Correlation Modes</b></summary>
-
-```mermaid
-flowchart TD
-    A[Missing Source Account Detected] --> B{Correlation Mode?}
-    B -- Correlate on aggregation --> C[Direct API call to PATCH identity]
-    B -- Reverse correlation --> D[Set Reverse Correlation Attribute on Fusion Account]
-    B -- Do not correlate --> E[Skip Correlation]
-    D --> F[ISC Native Correlation Uses Attribute to map account]
-```
-
-</details>
-
-#### Processing Control Section
-
-![Source Settings - Processing Control](docs/assets/images/config-source-processing.png)
-
-| Field                                                    | Description                                                              | Required | Notes                                                                                                                                                                                        |
-| -------------------------------------------------------- | ------------------------------------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Maximum history messages**                             | Maximum history entries retained per Fusion account                      | No       | Default: 10; older entries are discarded when limit exceeded                                                                                                                                 |
-| **Delete accounts with no authoritative accounts left?** | Remove Fusion accounts when all contributing source accounts are removed | No       | Useful for automated cleanup when users leave                                                                                                                                                |
-| **Force attribute refresh on each aggregation?**         | Force Normal-type attributes to refresh every run                        | No       | Applies only to Normal attributes; Unique attributes are only computed when a Fusion account is first created or when an existing account is activated. Can be expensive for large datasets. |
-| **Skip accounts with missing unique ID?**                | Skip processing accounts without a fusion identity attribute value       | No       | Skipped accounts are logged for review; useful when some source accounts lack required identifier data                                                                                       |
-
-> **Tip:** When testing or onboarding large amounts of managed accounts, it is best to disable all kinds of managed account correlation. Already processed uncorrelated managed accounts are part of their associated Fusion accounts internally, so it doesn't interfere in the normal connector operation. Correlation is a heavy process and must be carefully planned. It's often a good idea to have mixed correlation strategies depending on the implementation stage or managed source.
-
-> **Tip:** Remember that managed accounts must be uncorrelated for them to be evaluated for matches. Correlated managed accounts are directly included in your baseline.
-
-> **Tip:** When failing to generate an account ID (`nativeIdentity`), the aggregation fails unless the **Skip accounts with missing unique ID?** option is enabled. All your Fusion accounts must have a valid ID, but you can deliberately generate an empty one with the skip option to prevent including that account in the final results.
+| Section                | Description                                                                                                                            |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Scope**              | Determines if identities are included in the processing scope and defines an optional identity filter query.                           |
+| **Sources**            | Configures the authoritative account sources, their types (Authoritative, Records, Orphans), aggregation modes, and correlation modes. |
+| **Processing Control** | Manages history retention, empty account deletion, and behavior when unique identifiers are missing.                                   |
 
 ### Attribute Mapping Settings
 
@@ -328,14 +212,29 @@ For detailed field-by-field guidance and usage patterns, see the [usage guides](
 
 ---
 
+## Overview
+
+| Topic                                                                                    | Description                                                                                                  |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [Map](docs/guides/map.md)                                                                | Attribute mapping, merging, and consolidation from multiple sources.                                         |
+| [Define](docs/guides/define.md)                                                          | Attribute definitions (Velocity computed attributes, unique identifiers, UUIDs, counters).                   |
+| [Match](docs/guides/match.md)                                                            | Detect and resolve potential duplicate identities using one or more sources.                                 |
+| [Source configuration](docs/guides/source-configuration.md)                              | In-depth guide on source settings, scope, aggregation timing, and correlation modes.                         |
+| [Migration from previous Identity Fusion](docs/guides/migration-from-previous-fusion.md) | Migrate from an earlier Identity Fusion version: add the old source as managed, align schemas, then migrate. |
+| [Advanced connection settings](docs/guides/advanced-connection-settings.md)              | Queue, retry, batching, rate limiting, and logging.                                                          |
+| [Proxy mode](docs/guides/proxy-mode.md)                                                  | Run connector logic on an external server and connect ISC to it via proxy.                                   |
+| [Troubleshooting](docs/guides/troubleshooting.md)                                        | Common issues, logs, and recovery steps.                                                                     |
+
+---
+
 ## Quick start
 
 1. **Add the connector to ISC** — Upload the Identity Fusion NG connector (e.g. via SailPoint CLI or your organization's process).
 2. **Create a source** — In Admin → Connections → Sources, create a new source using the Identity Fusion NG connector. Mark it **Authoritative** when you need Match (so Fusion decides which incoming accounts create new identities vs. correlate to existing ones). For Map & Define only, Fusion is rarely authoritative.
 3. **Configure connection** — Set Identity Security Cloud API URL and Personal Access Token (ID and secret). Use **Review and Test** to verify connectivity.
 4. **Configure the connector** — Depending on your goal:
-    - **Map & Define only:** Set [Source Settings](docs/guides/map.md) (identity scope and/or sources), [Attribute Mapping Settings](docs/guides/map.md) for the **Map** step, and [Attribute Definition Settings](docs/guides/define.md) for the **Define** step.
-    - **Match:** Configure [sources and baseline](docs/guides/match.md), then [Fusion Settings](docs/guides/match.md) (matching and review) for the **Match** step.
+    - **Map & Define only:** Set [Source Settings](docs/guides/source-configuration.md) (identity scope and/or sources), [Attribute Mapping Settings](docs/guides/map.md) for the **Map** step, and [Attribute Definition Settings](docs/guides/define.md) for the **Define** step.
+    - **Match:** Configure [sources and baseline](docs/guides/source-configuration.md), then [Fusion Settings](docs/guides/match.md) (matching and review) for the **Match** step.
 5. **Discover schema** — Run **Discover Schema** so ISC has the combined account schema.
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 
