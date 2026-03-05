@@ -45,7 +45,12 @@ export const buildCandidateList = (fusionAccount: FusionAccount): Candidate[] =>
  */
 export const buildFormName = (fusionAccount: FusionAccount, fusionFormNamePattern: string): string => {
     const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
-    return `${fusionFormNamePattern} - ${accountName} [${fusionAccount.sourceName}]`
+    const accountId =
+        fusionAccount.nativeIdentityOrUndefined ||
+        (fusionAccount as unknown as { nativeIdentity?: string }).nativeIdentity ||
+        fusionAccount.managedAccountId ||
+        'UnknownId'
+    return `${fusionFormNamePattern} - ${accountName} (${accountId}) [${fusionAccount.sourceName}]`
 }
 
 /**

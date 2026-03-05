@@ -93,7 +93,7 @@ export class FusionAccount {
     private _history: string[] = []
     private _managedAccountInfo: Map<string, { sourceName: string; nativeIdentity: string }> = new Map()
 
-    // Attribute management
+    // Map & Define (Attribute management)
     // Note: previous is initialized lazily only when needed to save memory for new accounts
     private _sourceAttributeMapCache?: Map<string, { [key: string]: any }>
     private _attributeBag: AttributeBag = {
@@ -271,7 +271,7 @@ export class FusionAccount {
     /**
      * Creates a FusionAccount from an uncorrelated managed source account.
      * Used when a source account doesn't match any existing fusion identity
-     * and needs to enter the deduplication workflow.
+     * and needs to enter the Match workflow.
      *
      * @param account - The uncorrelated ISC Account from a managed source
      * @returns A new FusionAccount with uncorrelated status
@@ -479,7 +479,7 @@ export class FusionAccount {
         return Array.from(this._sources)
     }
 
-    /** Fusion match results from deduplication scoring (immutable copy). */
+    /** Fusion match results from Match scoring (immutable copy). */
     public get fusionMatches(): FusionMatch[] {
         return [...this._fusionMatches]
     }
@@ -865,7 +865,7 @@ export class FusionAccount {
     // Mutation Methods - Fusion Matches
     // ============================================================================
 
-    /** Records a deduplication match result and sets the isMatch flag. */
+    /** Records a Match match result and sets the isMatch flag. */
     public addFusionMatch(fusionMatch: FusionMatch): void {
         this._fusionMatches.push(fusionMatch)
         this._isMatch = true
@@ -877,7 +877,7 @@ export class FusionAccount {
      */
     public clearFusionIdentityReferences(): void {
         for (const match of this._fusionMatches) {
-            ;(match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
+            ; (match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
         }
     }
 
@@ -1158,7 +1158,7 @@ export class FusionAccount {
         this.addHistory(`Set ${this._name} [${this._sourceName}] as baseline`)
     }
 
-    /** Marks this account as "unmatched" (no deduplication match found, pending review). */
+    /** Marks this account as "unmatched" (no Match found, pending review). */
     public setUnmatched(): void {
         this._statuses.add('unmatched')
         this.addHistory(`Set ${this._name} [${this._sourceName}] as unmatched`)

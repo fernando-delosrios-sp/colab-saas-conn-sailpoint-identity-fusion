@@ -32,7 +32,7 @@ import { MAX_CANDIDATES_FOR_FORM } from './constants'
 
 /**
  * Service for form definition and instance management.
- * Handles creation, processing, and cleanup of fusion forms for deduplication review.
+ * Handles creation, processing, and cleanup of fusion forms for Match review.
  */
 export class FormService {
     private formsToDelete: string[] = []
@@ -130,7 +130,7 @@ export class FormService {
     }
 
     /**
-     * Create a fusion form for deduplication review.
+     * Create a fusion form for Match review.
      * @returns true if the form was created successfully, false if creation was skipped
      */
     public async createFusionForm(
@@ -711,8 +711,8 @@ export class FormService {
 
         this.log.debug(
             `Form analysis result: shouldDeleteForm=${shouldDeleteForm}, ` +
-                `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
-                `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
+            `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
+            `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
         )
 
         return {
@@ -840,7 +840,7 @@ export class FormService {
         const decisionType = decision.newIdentity ? 'new identity' : `link to ${decision.identityId}`
         this.log.debug(
             `Processed fusion decision for account ${decision.account.id}, reviewer ${decision.submitter.id}, ` +
-                `decision: ${decisionType}`
+            `decision: ${decisionType}`
         )
     }
 

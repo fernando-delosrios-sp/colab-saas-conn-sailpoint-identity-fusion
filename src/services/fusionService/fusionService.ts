@@ -76,7 +76,7 @@ export class FusionService {
      * @param sources - Source service for accessing source accounts and config
      * @param forms - Form service for creating and managing review forms
      * @param attributes - Attribute service for mapping and generating attributes
-     * @param scoring - Scoring service for deduplication similarity scoring
+     * @param scoring - Scoring service for Match similarity scoring
      * @param schemas - Schema service for attribute schema lookups
      * @param commandType - The current SDK command type (e.g. StdAccountList)
      */
@@ -303,7 +303,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${account.nativeIdentity}), ` +
-                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
@@ -344,7 +344,7 @@ export class FusionService {
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
-                `${fusionAccount.accountIds.length} account(s), ${fusionAccount.missingAccountIds.length} missing`
+            `${fusionAccount.accountIds.length} account(s), ${fusionAccount.missingAccountIds.length} missing`
         )
 
         if (!resetDefinition) {
@@ -362,7 +362,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.setFusionAccount(fusionAccount)
@@ -446,7 +446,7 @@ export class FusionService {
                 fusionAccount.setReverseCorrelationAttribute(sourceConfig.correlationAttribute, info.nativeIdentity)
                 this.log.info(
                     `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.nativeIdentity}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
+                    `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
                 )
             }
         }
@@ -601,7 +601,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
             `Created fusion account from decision: ${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
-                `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
+            `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
         )
 
         fusionAccount.setNeedsReset(true)
@@ -654,7 +654,7 @@ export class FusionService {
      *
      * At this point, the work queue (this.sources.managedAccountsById) contains ONLY
      * uncorrelated accounts that don't belong to any existing fusion account or identity.
-     * These are the truly new accounts that need deduplication review.
+     * These are the truly new accounts that need Match review.
      *
      * The work queue pattern ensures:
      * - No duplicate processing (accounts are physically removed as they're claimed)
@@ -682,7 +682,7 @@ export class FusionService {
                 this._sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                        `Managed accounts from this source will be treated as unmatched.`
+                    `Managed accounts from this source will be treated as unmatched.`
                 )
             }
         }
@@ -699,7 +699,7 @@ export class FusionService {
     }
 
     /**
-     * Processes a single uncorrelated managed account through the deduplication workflow.
+     * Processes a single uncorrelated managed account through the Match workflow.
      * After scoring, the account is either auto-correlated (perfect match), sent for
      * manual review (partial match), or handled based on the source type:
      * - authoritative: added as unmatched new identity (output as ISC account)
@@ -882,7 +882,7 @@ export class FusionService {
     private buildNonMatchReportEntry(fusionAccount: FusionAccount): FusionReportAccount {
         const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
         return {
-            accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
+            accountName: this.getReportAccountLabel(fusionAccount),
             accountSource: fusionAccount.sourceName,
             sourceType: sourceInfo?.sourceType ?? 'authoritative',
             accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
@@ -901,7 +901,7 @@ export class FusionService {
         if (this.fusionReportOnAggregation || this.commandType !== StandardCommand.StdAccountList) {
             const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
             this.failedMatchingAccounts.push({
-                accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
+                accountName: this.getReportAccountLabel(fusionAccount),
                 accountSource: fusionAccount.sourceName,
                 sourceType: sourceInfo?.sourceType ?? 'authoritative',
                 accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
@@ -1214,7 +1214,7 @@ export class FusionService {
         const accountLabels = Array.from(accounts.entries()).map(([nativeIdentity, name]) => `${name} (${nativeIdentity})`)
         this.log.warn(
             `Multiple Fusion accounts detected for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
-                'This is generally caused by duplicated account names. Review the Fusion source configuration and consider using a unique attribute for the account name.'
+            'This is generally caused by duplicated account names. Review the Fusion source configuration and consider using a unique attribute for the account name.'
         )
     }
 
@@ -1336,7 +1336,7 @@ export class FusionService {
 
                 const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
                 accounts.push({
-                    accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
+                    accountName: this.getReportAccountLabel(fusionAccount),
                     accountSource: fusionAccount.sourceName,
                     sourceType: sourceInfo?.sourceType ?? 'authoritative',
                     accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
@@ -1389,5 +1389,30 @@ export class FusionService {
         const nonMatchAccounts = [...this.analyzedNonMatchReportData]
         nonMatchAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
         return nonMatchAccounts
+    }
+
+    /**
+     * Build a stable, user-friendly account label for report rows.
+     * Prefer displayName/name, then fall back to uid-like identifiers.
+     */
+    private getReportAccountLabel(fusionAccount: FusionAccount): string {
+        const attrs = fusionAccount.attributes ?? {}
+        const displayName = String(attrs.displayName ?? fusionAccount.displayName ?? '').trim()
+        if (displayName) return displayName
+
+        const name = String(attrs.name ?? fusionAccount.name ?? '').trim()
+        const uid = String(
+            attrs.uid ??
+                attrs.id ??
+                fusionAccount.identityId ??
+                fusionAccount.managedAccountId ??
+                fusionAccount.nativeIdentityOrUndefined ??
+                ''
+        ).trim()
+
+        if (name && uid) return `${name} (${uid})`
+        if (name) return name
+        if (uid) return uid
+        return 'Unknown'
     }
 }

@@ -6,25 +6,33 @@ describe('formService helpers', () => {
             const fusionAccount = {
                 name: 'John Doe',
                 displayName: 'John Doe',
+                nativeIdentity: 'acc-123',
                 sourceName: 'HR Source',
             } as any
             const result = buildFormName(fusionAccount, 'Fusion Review')
-            expect(result).toBe('Fusion Review - John Doe [HR Source]')
+            expect(result).toBe('Fusion Review - John Doe (acc-123) [HR Source]')
         })
 
         it('should use displayName when name is missing', () => {
             const fusionAccount = {
                 displayName: 'Jane Smith',
+                nativeIdentity: 'acc-999',
                 sourceName: 'IT',
             } as any
             const result = buildFormName(fusionAccount, 'Review')
-            expect(result).toBe('Review - Jane Smith [IT]')
+            expect(result).toBe('Review - Jane Smith (acc-999) [IT]')
         })
 
         it('should use Unknown when both name and displayName missing', () => {
+            const fusionAccount = { sourceName: 'S', managedAccountId: 'managed-1' } as any
+            const result = buildFormName(fusionAccount, 'F')
+            expect(result).toBe('F - Unknown (managed-1) [S]')
+        })
+
+        it('should use UnknownId when no account identifier is present', () => {
             const fusionAccount = { sourceName: 'S' } as any
             const result = buildFormName(fusionAccount, 'F')
-            expect(result).toBe('F - Unknown [S]')
+            expect(result).toBe('F - Unknown (UnknownId) [S]')
         })
     })
 

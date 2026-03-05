@@ -16,7 +16,7 @@ export const statuses: EntitlementSource[] = [
         name: 'Edited',
         description: 'The account was manually edited and no longer gets updates from current source accounts',
     },
-    { id: 'reviewer', name: 'Reviewer', description: 'An identity deduplication reviewer of any source' },
+    { id: 'reviewer', name: 'Reviewer', description: 'An identity Match reviewer of any source' },
     { id: 'requested', name: 'Requested', description: 'Account was requested' },
     { id: 'uncorrelated', name: 'Uncorrelated', description: 'Account has sources accounts pending correlation' },
     { id: 'activeReviews', name: 'Active reviews', description: 'Account has active fusion reviews' },

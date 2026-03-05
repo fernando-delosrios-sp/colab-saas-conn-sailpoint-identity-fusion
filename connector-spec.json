@@ -27,7 +27,7 @@
         "enableRetry": true,
         "maxRetries": 20,
         "requestsPerSecond": 8,
-        "maxConcurrentRequests": 8,
+        "maxConcurrentRequests": 10,
         "taskResultRetries": 5,
         "taskResultWait": 1,
         "processingWait": 60,
@@ -47,7 +47,8 @@
         "trim": false,
         "force": false,
         "algorithm": "name-matcher",
-        "enableBatching": true
+        "enableBatching": true,
+        "enablePriority": true
     },
     "sourceConfig": [
         {
@@ -91,7 +92,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Scope",
-                    "sectionHelpMessage": "<strong>Define which identities are in scope for processing.</strong><br><br>Use <strong>Include identities in the scope?</strong> to include identities in addition to managed accounts from configured sources. This is useful for identity-only attribute generation or to define the baseline for deduplication.<br><br>Use <strong>Identity Scope Query</strong> to limit which identities are evaluated. This uses ISC search syntax (e.g. <code>attributes.cloudLifecycleState:active</code>, <code>source.name:\"Workday\"</code>). Only identities matching this query are considered.",
+                    "sectionHelpMessage": "<strong>Define which identities are in scope for processing.</strong><br><br>Use <strong>Include identities in the scope?</strong> to include identities in addition to managed accounts from configured sources. This is useful for identity-only Defines or to define the baseline for Match.<br><br>Use <strong>Identity Scope Query</strong> to limit which identities are evaluated. This uses ISC search syntax (e.g. <code>attributes.cloudLifecycleState:active</code>, <code>source.name:\"Workday\"</code>). Only identities matching this query are considered.",
                     "items": [
                         {
                             "key": "includeIdentities",
@@ -154,7 +155,7 @@
                                             "type": "radio",
                                             "required": true,
                                             "value": "authoritative",
-                                            "helpKey": "Choose how accounts from this source are handled. 'Authoritative accounts' creates new Fusion accounts for unmatched entries (default). 'Records' processes accounts for attribute generation but does not create Fusion accounts for unmatched ones. 'Orphan accounts' skips unmatched accounts entirely, with an option to disable them",
+                                            "helpKey": "Choose how accounts from this source are handled. 'Authoritative accounts' creates new Fusion accounts for unmatched entries (default). 'Records' processes accounts for Map & Define but does not create Fusion accounts for unmatched ones. 'Orphan accounts' skips unmatched accounts entirely, with an option to disable them",
                                             "options": [
                                                 {
                                                     "label": "Authoritative accounts",
@@ -578,7 +579,7 @@
                     "items": [
                         {
                             "key": "maxAttempts",
-                            "label": "Maximum attempts for unique attribute generation",
+                            "label": "Maximum attempts for unique Define generation",
                             "type": "number",
                             "required": false,
                             "min": "1",

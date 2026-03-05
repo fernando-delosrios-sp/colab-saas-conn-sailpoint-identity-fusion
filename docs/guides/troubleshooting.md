@@ -207,9 +207,9 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
 
 ## Category 3: Attribute and schema issues
 
-### Issue 3.1: Unique attribute generation fails or loops
+### Issue 3.1: Unique Defines fail or loop
 
-**Symptom:** Errors about unique attribute generation; aggregation hangs; logs show repeated collision attempts.
+**Symptom:** Errors about unique Defines; aggregation hangs; logs show repeated collision attempts.
 
 **Possible causes:**
 
@@ -727,5 +727,5 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 
 **Next steps:**
 
-- For specific feature guidance, see the other usage guides (attribute generation, deduplication, matching, attribute management, advanced settings, proxy mode).
+- For specific feature guidance, see the other usage guides (Map & Define, Match, matching algorithms, advanced settings, proxy mode).
 - For ISC general troubleshooting, see [SailPoint documentation](https://documentation.sailpoint.com/saas/).

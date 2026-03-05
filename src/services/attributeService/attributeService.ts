@@ -57,7 +57,7 @@ export class AttributeService {
      * @param schemas - Schema service for resolving attribute names and types
      * @param sourceService - Source service for persisting state to the fusion source config
      * @param log - Logger instance
-     * @param locks - Lock service for thread-safe unique attribute generation
+     * @param locks - Lock service for thread-safe unique Define generation
      * @param commandType - The current SDK command type (affects key generation behavior)
      */
     constructor(
@@ -522,7 +522,7 @@ export class AttributeService {
     }
 
     // ------------------------------------------------------------------------
-    // Private Attribute Generation Methods
+    // Private Map & Define Methods
     // ------------------------------------------------------------------------
 
     /**

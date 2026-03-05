@@ -78,7 +78,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
         })
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)
 
-    softAssert(config.sources.length > 0, 'No sources configured - no deduplication will be performed', 'warn')
+    softAssert(config.sources.length > 0, 'No sources configured - no Match will be performed', 'warn')
     // Global aggregation task polling defaults (used for all sources with force aggregation enabled)
     config.taskResultRetries = config.taskResultRetries ?? 5
     // taskResultWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use

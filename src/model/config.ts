@@ -92,7 +92,7 @@ export interface UniqueAttributeDefinition {
 }
 
 /**
- * Configuration for a single attribute matching rule used in deduplication scoring.
+ * Configuration for a single attribute matching rule used in Match scoring.
  */
 export interface MatchingConfig {
     /** The attribute name to compare between accounts */
@@ -170,7 +170,7 @@ export interface ProcessingControlSection {
 }
 
 /** Combined source settings: scope, sources, and processing controls. */
-export interface SourceSettingsMenu extends ScopeSection, SourcesSection, ProcessingControlSection {}
+export interface SourceSettingsMenu extends ScopeSection, SourcesSection, ProcessingControlSection { }
 
 // ============================================================================
 // Attribute Mapping Settings Menu
@@ -215,7 +215,7 @@ export type UniqueAttributeDefinitionSettingsMenu = UniqueAttributeDefinitionSet
 // Fusion Settings Menu
 // ============================================================================
 
-/** Configuration for deduplication matching rules and scoring strategy. */
+/** Configuration for Match rules and scoring strategy. */
 export interface MatchingSettingsSection {
     matchingConfigs?: MatchingConfig[]
     fusionUseAverageScore: boolean
@@ -232,7 +232,7 @@ export interface ReviewSettingsSection {
 }
 
 /** Combined fusion settings: matching rules and review workflow. */
-export interface FusionSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection {}
+export interface FusionSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection { }
 
 // ============================================================================
 // Advanced Settings Menu
@@ -242,7 +242,7 @@ export interface FusionSettingsMenu extends MatchingSettingsSection, ReviewSetti
 export interface DeveloperSettingsSection {
     reset: boolean
     /**
-     * Batch size for processing uncorrelated managed accounts during deduplication.
+     * Batch size for processing uncorrelated managed accounts during Match.
      * Lower values reduce peak memory usage; higher values may improve throughput.
      * Default: 50.
      */
@@ -353,8 +353,8 @@ export interface ProxySettingsSection {
 /** Combined advanced settings: developer, connection tuning, and proxy. */
 export interface AdvancedSettingsMenu
     extends DeveloperSettingsSection,
-        AdvancedConnectionSettingsSection,
-        ProxySettingsSection {}
+    AdvancedConnectionSettingsSection,
+    ProxySettingsSection { }
 
 // ============================================================================
 // Internal/Computed fields
@@ -404,11 +404,11 @@ export interface InternalConfig {
  */
 export interface FusionConfig
     extends BaseConfig,
-        ConnectionSettingsMenu,
-        SourceSettingsMenu,
-        AttributeMappingSettingsMenu,
-        NormalAttributeDefinitionSettingsMenu,
-        UniqueAttributeDefinitionSettingsMenu,
-        FusionSettingsMenu,
-        AdvancedSettingsMenu,
-        InternalConfig {}
+    ConnectionSettingsMenu,
+    SourceSettingsMenu,
+    AttributeMappingSettingsMenu,
+    NormalAttributeDefinitionSettingsMenu,
+    UniqueAttributeDefinitionSettingsMenu,
+    FusionSettingsMenu,
+    AdvancedSettingsMenu,
+    InternalConfig { }

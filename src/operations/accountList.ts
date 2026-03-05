@@ -128,7 +128,7 @@ async function processPhase(serviceRegistry: ServiceRegistry): Promise<void> {
     log.info('Processing fusion identity decisions (new identity)')
     await fusion.processFusionIdentityDecisions()
 
-    log.info('Processing managed accounts (deduplication)')
+    log.info('Processing managed accounts (Match)')
     await fusion.processManagedAccounts()
 
     log.info('Reconciling pending form state (candidates + reviewer links)')

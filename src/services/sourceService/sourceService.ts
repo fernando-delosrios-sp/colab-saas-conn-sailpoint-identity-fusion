@@ -350,13 +350,31 @@ export class SourceService {
                 () =>
                     accountsApi.disableAccount({
                         id: accountId,
-                        accountToggleRequestV2025: { externalVerificationId: undefined, forceProvisioning: false },
+                        accountToggleRequestV2025: {},
                     }),
                 QueuePriority.LOW,
                 'SourceService>fireDisableAccount'
             )
             .catch((err) => {
-                this.log.warn(`Failed to disable account ${accountId}: ${err?.message ?? err}`)
+                const message = err?.message ?? String(err)
+                this.log.warn(
+                    `Disable attempt with empty toggle request failed for account ${accountId}: ${message}. Retrying with forceProvisioning=false.`
+                )
+                this.client
+                    .execute(
+                        () =>
+                            accountsApi.disableAccount({
+                                id: accountId,
+                                accountToggleRequestV2025: { forceProvisioning: false },
+                            }),
+                        QueuePriority.LOW,
+                        'SourceService>fireDisableAccount retry'
+                    )
+                    .catch((retryErr) => {
+                        this.log.warn(
+                            `Failed to disable account ${accountId} after retry: ${retryErr?.message ?? retryErr}`
+                        )
+                    })
             })
     }
 

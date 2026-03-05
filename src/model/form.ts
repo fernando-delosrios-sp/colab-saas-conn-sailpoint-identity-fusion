@@ -39,7 +39,7 @@ type Score = {
 }
 
 /**
- * A reviewer's decision on a fusion (deduplication) form.
+ * A reviewer's decision on a fusion (Match) form.
  * Captures whether to create a new identity or merge into an existing one.
  *
  * For record/orphan source types, the `newIdentity` field represents

@@ -103,7 +103,7 @@ This guide describes how to migrate from an earlier Identity Fusion connector to
 
 With account migration complete, configure the remaining settings:
 
-1. **Configure Fusion Settings** (Matching and Review) as described in [Identity Fusion for deduplication](deduplication.md).
+1. **Configure Fusion Settings** (Matching and Review) as described in [Match](match.md).
 2. **Configure any other tweaks** you want to introduce (identity scope, review forms, automatic reports, etc.).
 3. **Optional:** If the new source should own the identity list, mark the Identity Fusion NG source as **Authoritative** and adjust the identity profile as needed.
 
@@ -139,6 +139,6 @@ With account migration complete, configure the remaining settings:
 
 **Next steps:**
 
-- For attribute generation and mapping, see [Attribute generation](attribute-generation.md) and [Attribute management](attribute-management.md).
-- For deduplication after migration, see [Identity Fusion for deduplication](deduplication.md).
+- For Map and Define capabilities, see [Map](map.md) and [Define](define.md).
+- For Match after migration, see [Match](match.md).
 - For connection and tuning, see [Advanced connection settings](advanced-connection-settings.md) and [Troubleshooting](troubleshooting.md).

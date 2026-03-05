@@ -126,9 +126,7 @@ export class ScoringService {
         }
 
         const identityId = fusionIdentity.identityId ?? ''
-        const identityName = String(
-            fusionIdentity.attributes?.displayName || fusionIdentity.displayName || fusionIdentity.name || 'Unknown'
-        )
+        const identityName = this.getIdentityDisplayLabel(fusionIdentity)
         const fusionMatch: FusionMatch = {
             fusionIdentity,
             identityId,
@@ -138,6 +136,24 @@ export class ScoringService {
         if (isMatch) {
             fusionAccount.addFusionMatch(fusionMatch)
         }
+    }
+
+    /**
+     * Build a user-friendly label for report candidates.
+     * Prefer displayName/name, then fall back to uid-like identifiers.
+     */
+    private getIdentityDisplayLabel(fusionIdentity: FusionAccount): string {
+        const attrs = fusionIdentity.attributes ?? {}
+        const displayName = String(attrs.displayName ?? fusionIdentity.displayName ?? '').trim()
+        if (displayName) return displayName
+
+        const name = String(attrs.name ?? fusionIdentity.name ?? '').trim()
+        const uid = String(attrs.uid ?? attrs.id ?? fusionIdentity.identityId ?? fusionIdentity.nativeIdentityOrUndefined ?? '').trim()
+
+        if (name && uid) return `${name} (${uid})`
+        if (name) return name
+        if (uid) return uid
+        return 'Unknown'
     }
 
     /**

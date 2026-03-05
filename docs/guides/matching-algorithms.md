@@ -577,5 +577,5 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 
 **Next steps:**
 
-- For full deduplication setup, see [Identity Fusion for deduplication](deduplication.md).
-- For attribute merging and mapping, see [Effective use of attribute management](attribute-management.md).
+- For full Match setup, see [Identity Fusion for Match](match.md).
+- For attribute merging and mapping, see [Map](map.md).
