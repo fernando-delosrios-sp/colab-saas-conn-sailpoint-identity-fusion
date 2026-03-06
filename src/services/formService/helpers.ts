@@ -20,18 +20,16 @@ export const buildCandidateList = (fusionAccount: FusionAccount): Candidate[] =>
         assert(match.fusionIdentity, 'Fusion identity is required in match')
         assert(match.fusionIdentity.identityId, 'Fusion identity ID is required')
         const attrs: Record<string, any> = match.fusionIdentity.attributes || {}
-        // IMPORTANT: Use attributes.displayName - must match the SELECT element's label path:
-        // buildFormFields() uses SEARCH_V2 with label: 'attributes.displayName'
-        // Form conditions compare against this value, so it must be in sync.
+        // Label uses attributes.displayName. Value remains identityId.
         const displayName = String(attrs.displayName || '')
         if (!displayName) {
             logger.error(
-                `[formBuilder] Candidate identity ${match.fusionIdentity.identityId} is missing attributes.displayName. Form conditions may not work correctly.`
+                `[formBuilder] Candidate identity ${match.fusionIdentity.identityId} is missing attributes.displayName. Using identityId as fallback name.`
             )
         }
         return {
             id: match.fusionIdentity.identityId,
-            name: displayName,
+            name: displayName || match.fusionIdentity.identityId,
             attributes: attrs,
             scores: match.scores || [],
         }

@@ -48,7 +48,8 @@
         "force": false,
         "algorithm": "name-matcher",
         "enableBatching": true,
-        "enablePriority": true
+        "enablePriority": true,
+        "enabled": true
     },
     "sourceConfig": [
         {

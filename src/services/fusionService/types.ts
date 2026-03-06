@@ -52,6 +52,34 @@ export type FusionReportAccount = {
     error?: string
 }
 
+/** A processed reviewer decision entry included in the fusion report. */
+export type FusionReportDecision = {
+    /** Reviewer (submitter) identity ID */
+    reviewerId: string
+    /** Reviewer display name */
+    reviewerName: string
+    /** Reviewer email (if available) */
+    reviewerEmail?: string
+    /** Source account ID tied to the review */
+    accountId: string
+    /** Source account display label */
+    accountName: string
+    /** Managed source name */
+    accountSource: string
+    /** Source processing type (authoritative, record, or orphan) */
+    sourceType?: 'authoritative' | 'record' | 'orphan'
+    /** Canonical decision identifier used by templates */
+    decision: 'assign-existing-identity' | 'create-new-identity' | 'confirm-no-match'
+    /** Human-friendly decision text */
+    decisionLabel: string
+    /** Selected identity ID for assignment decisions */
+    selectedIdentityId?: string
+    /** Optional reviewer comments */
+    comments?: string
+    /** Standalone form URL for traceability */
+    formUrl?: string
+}
+
 /** Processing statistics included in the fusion report. */
 /**
  * Snapshot values only available from the aggregation orchestrator.
@@ -67,18 +95,28 @@ export type AggregationStats = {
 }
 
 export type FusionReportStats = {
-    /** Total fusion accounts (existing + new) */
+    /** Total fusion accounts in memory after processing (existing + new) */
     totalFusionAccounts?: number
+    /** Number of fusion accounts fetched from the Fusion source */
+    fusionAccountsFound?: number
     /** Number of fusion review forms created */
     fusionReviewsCreated?: number
     /** Number of fusion review assignments (form instances, one per reviewer) */
     fusionReviewAssignments?: number
+    /** Number of fusion review form definitions found during fetch */
+    fusionReviewsFound?: number
+    /** Number of fusion review form instances found during fetch */
+    fusionReviewInstancesFound?: number
+    /** Number of answered fusion review instances processed */
+    fusionReviewsProcessed?: number
     /** Number of "new identity" decisions from reviews */
     fusionReviewNewIdentities?: number
     /** Number of non-match decisions from reviews */
     fusionReviewNonMatches?: number
     /** Number of ISC identities loaded */
     identitiesFound?: number
+    /** Number of identities processed by processIdentities() */
+    identitiesProcessed?: number
     /** Number of managed source accounts loaded */
     managedAccountsFound?: number
     /** Number of managed source accounts loaded from authoritative sources */
@@ -154,6 +192,8 @@ export type FusionReport = {
     reportDate?: Date | string
     /** Processing statistics */
     stats?: FusionReportStats
+    /** Finished reviewer decisions processed from fusion reviews */
+    fusionReviewDecisions?: FusionReportDecision[]
     /** Global warnings surfaced during report generation */
     warnings?: FusionReportWarnings
 }

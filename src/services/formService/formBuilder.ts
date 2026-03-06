@@ -38,6 +38,20 @@ function formatScoreDisplay(scoreValue: number, thresholdValue?: number | null):
 }
 
 /**
+ * Returns true when candidate detail elements are expected to be rendered.
+ * This keeps condition generation aligned with form field generation.
+ */
+function hasRenderableCandidateElements(candidate: Candidate, fusionFormAttributes?: string[]): boolean {
+    const hasAttributes = Boolean(fusionFormAttributes && fusionFormAttributes.length > 0)
+    const hasScores = Boolean(
+        candidate.scores &&
+        Array.isArray(candidate.scores) &&
+        candidate.scores.some((score: any) => score && score.attribute && score.score !== undefined)
+    )
+    return hasAttributes || hasScores
+}
+
+/**
  * Returns the TOGGLE element config for the "New identity" / "No match" decision,
  * which varies by source type.
  */
@@ -75,8 +89,8 @@ export const buildFormInput = (
     candidates: Candidate[],
     fusionFormAttributes?: string[],
     sourceType: SourceType = 'authoritative'
-): { [key: string]: any } => {
-    const formInput: { [key: string]: any } = {}
+): Record<string, any> => {
+    const formInput: Record<string, any> = {}
     formInput.sourceType = sourceType
 
     const accountIdentifier = getAccountIdentifier(fusionAccount)
@@ -372,6 +386,7 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
 
     candidates.forEach((candidate) => {
         if (!candidate || !candidate.id || !candidate.name) return
+        if (!hasRenderableCandidateElements(candidate, fusionFormAttributes)) return
         const selectionSectionId = `${candidate.id}.selectionsection`
 
         // When "New identity" is selected, disable this candidate's details section
@@ -396,8 +411,9 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
             ],
         })
 
-        // Hide this candidate's section when new identity is selected OR a different identity is chosen
-        // IMPORTANT: identities SELECT uses displayName as label, conditions must compare against displayName
+        // Hide this candidate's section when new identity is selected OR a different identity is chosen.
+        // In ISC custom forms, condition comparison for SEARCH_V2-backed SELECT behaves against the
+        // displayed label value, so compare against candidate displayName.
         formConditions.push({
             ruleOperator: 'OR',
             rules: [
@@ -441,7 +457,8 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
 
     // Collect candidate attribute and score fields
     candidates.forEach((candidate) => {
-        if (!candidate || !candidate.id) return
+        if (!candidate || !candidate.id || !candidate.name) return
+        if (!hasRenderableCandidateElements(candidate, fusionFormAttributes)) return
         const candidateId = candidate.id
 
         if (fusionFormAttributes && fusionFormAttributes.length > 0) {

@@ -10,150 +10,155 @@ import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
  * Register Handlebars helpers for common operations
  */
 export const registerHandlebarsHelpers = (): void => {
-    const algorithmLabels: Record<string, string> = {
-        'name-matcher': 'Name Matcher',
-        'jaro-winkler': 'Jaro-Winkler',
-        lig3: 'LIG3',
-        dice: 'Dice',
-        'double-metaphone': 'Double Metaphone',
-        custom: 'Custom',
-        average: 'Average Score',
+  const algorithmLabels: Record<string, string> = {
+    'name-matcher': 'Name Matcher',
+    'jaro-winkler': 'Jaro-Winkler',
+    lig3: 'LIG3',
+    dice: 'Dice',
+    'double-metaphone': 'Double Metaphone',
+    custom: 'Custom',
+    average: 'Average Score',
+  }
+
+  // Format attribute values for display
+  Handlebars.registerHelper('formatAttribute', (value: any) => {
+    if (value === null || value === undefined) {
+      return 'N/A'
     }
+    if (typeof value === 'object') {
+      return JSON.stringify(value)
+    }
+    return String(value)
+  })
 
-    // Format attribute values for display
-    Handlebars.registerHelper('formatAttribute', (value: any) => {
-        if (value === null || value === undefined) {
-            return 'N/A'
-        }
-        if (typeof value === 'object') {
-            return JSON.stringify(value)
-        }
-        return String(value)
-    })
+  // Format scores for display
+  Handlebars.registerHelper('formatScores', (scores: any[]) => {
+    if (!scores || scores.length === 0) {
+      return 'N/A'
+    }
+    return scores
+      .map((score) => {
+        const num = typeof score.score === 'number' ? score.score : Number.parseFloat(String(score.score))
+        const trimmedScore = Number.isFinite(num) ? parseFloat(num.toFixed(2)) : score.score
+        return `${score.attribute}: ${trimmedScore}% (${score.isMatch ? 'Match' : 'No Match'})`
+      })
+      .join(', ')
+  })
 
-    // Format scores for display
-    Handlebars.registerHelper('formatScores', (scores: any[]) => {
-        if (!scores || scores.length === 0) {
-            return 'N/A'
-        }
-        return scores
-            .map((score) => {
-                const num = typeof score.score === 'number' ? score.score : Number.parseFloat(String(score.score))
-                const trimmedScore = Number.isFinite(num) ? parseFloat(num.toFixed(2)) : score.score
-                return `${score.attribute}: ${trimmedScore}% (${score.isMatch ? 'Match' : 'No Match'})`
-            })
-            .join(', ')
-    })
+  // Format numeric percentages to 0 decimals
+  Handlebars.registerHelper('formatPercent', (value: any) => {
+    const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
+    if (Number.isNaN(num)) return '0'
+    return String(Math.round(num))
+  })
 
-    // Format numeric percentages to 0 decimals
-    Handlebars.registerHelper('formatPercent', (value: any) => {
-        const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
-        if (Number.isNaN(num)) return '0'
-        return String(Math.round(num))
-    })
+  // Simple numeric multiply helper (useful for width calculations)
+  Handlebars.registerHelper('multiply', (a: any, b: any) => {
+    const left = typeof a === 'number' ? a : Number.parseFloat(String(a))
+    const right = typeof b === 'number' ? b : Number.parseFloat(String(b))
+    if (Number.isNaN(left) || Number.isNaN(right)) return 0
+    return Math.round(left * right)
+  })
 
-    // Simple numeric multiply helper (useful for width calculations)
-    Handlebars.registerHelper('multiply', (a: any, b: any) => {
-        const left = typeof a === 'number' ? a : Number.parseFloat(String(a))
-        const right = typeof b === 'number' ? b : Number.parseFloat(String(b))
-        if (Number.isNaN(left) || Number.isNaN(right)) return 0
-        return Math.round(left * right)
-    })
+  // Check if value exists
+  Handlebars.registerHelper('exists', (value: any) => {
+    return value !== null && value !== undefined && value !== ''
+  })
 
-    // Check if value exists
-    Handlebars.registerHelper('exists', (value: any) => {
-        return value !== null && value !== undefined && value !== ''
-    })
+  // Check if any of the provided values exist
+  Handlebars.registerHelper('anyExists', (...args: any[]) => {
+    const values = args.slice(0, -1) // last arg is handlebars options
+    return values.some((value) => value !== null && value !== undefined && value !== '')
+  })
 
-    // Greater than helper
-    Handlebars.registerHelper('gt', (a: number, b: number) => {
-        return a > b
-    })
+  // Derive "assigned to existing identity" as total decisions minus source-specific outcome
+  Handlebars.registerHelper('decisionAssigned', (decisions: any, outcome: any) => {
+    const decisionValue = Number.parseInt(String(decisions ?? ''), 10)
+    if (!Number.isFinite(decisionValue)) return '-'
+    const outcomeValue = Number.parseInt(String(outcome ?? '0'), 10)
+    if (!Number.isFinite(outcomeValue)) return String(Math.max(decisionValue, 0))
+    return String(Math.max(decisionValue - outcomeValue, 0))
+  })
 
-    // Greater than or equal helper
-    Handlebars.registerHelper('gte', (a: number, b: number) => {
-        return a >= b
-    })
+  // Greater than helper
+  Handlebars.registerHelper('gt', (a: number, b: number) => {
+    return a > b
+  })
 
-    // Format date
-    Handlebars.registerHelper('formatDate', (date: string | Date) => {
-        if (!date) {
-            return 'N/A'
-        }
-        const d = typeof date === 'string' ? new Date(date) : date
-        return d.toLocaleDateString()
-    })
+  // Greater than or equal helper
+  Handlebars.registerHelper('gte', (a: number, b: number) => {
+    return a >= b
+  })
 
-    // Friendly algorithm names (aligned with connector-spec.json)
-    Handlebars.registerHelper('algorithmLabel', (algorithm?: string) => {
-        if (!algorithm) return 'N/A'
-        return algorithmLabels[String(algorithm)] ?? String(algorithm)
-    })
+  // Format date
+  Handlebars.registerHelper('formatDate', (date: string | Date) => {
+    if (!date) {
+      return 'N/A'
+    }
+    const d = typeof date === 'string' ? new Date(date) : date
+    return d.toLocaleDateString()
+  })
 
-    // Identify the "Average Score" rollup row
-    Handlebars.registerHelper('isAverageScoreRow', (attribute?: string, algorithm?: string) => {
-        const attr = String(attribute ?? '')
-        const alg = String(algorithm ?? '')
-        return attr === 'Average Score' || alg === 'average'
-    })
+  // Friendly algorithm names (aligned with connector-spec.json)
+  Handlebars.registerHelper('algorithmLabel', (algorithm?: string) => {
+    if (!algorithm) return 'N/A'
+    return algorithmLabels[String(algorithm)] ?? String(algorithm)
+  })
 
-    // Render a human-readable label for source type
-    Handlebars.registerHelper('sourceTypeLabel', (sourceType: string) => {
-        const labels: Record<string, string> = {
-            authoritative: 'Authoritative',
-            record: 'Record',
-            orphan: 'Orphan',
-        }
-        return labels[sourceType] ?? sourceType
-    })
+  // Identify the "Average Score" rollup row
+  Handlebars.registerHelper('isAverageScoreRow', (attribute?: string, algorithm?: string) => {
+    const attr = String(attribute ?? '')
+    const alg = String(algorithm ?? '')
+    return attr === 'Average Score' || alg === 'average'
+  })
 
-    // Chunk an array into rows for table rendering
-    Handlebars.registerHelper('chunk', (arr: any[], size: any) => {
-        const n = Math.max(1, Number.parseInt(String(size), 10) || 1)
-        if (!Array.isArray(arr) || arr.length === 0) return []
-        const out: any[] = []
-        for (let i = 0; i < arr.length; i += n) {
-            const row = arr.slice(i, i + n)
-            while (row.length < n) row.push(null)
-            out.push(row)
-        }
-        return out
-    })
+  // Render a human-readable label for source type
+  Handlebars.registerHelper('sourceTypeLabel', (sourceType: string) => {
+    const labels: Record<string, string> = {
+      authoritative: 'Authoritative',
+      record: 'Record',
+      orphan: 'Orphan',
+    }
+    return labels[sourceType] ?? sourceType
+  })
 
-    // Build report statistics cards for consistent 3-column rendering.
-    Handlebars.registerHelper('statsCards', (stats: Record<string, any>) => {
-        if (!stats || typeof stats !== 'object') return []
-        const cards: Array<{ label: string; value: string }> = []
-        const pushCard = (label: string, value: any): void => {
-            if (value === null || value === undefined || value === '') return
-            cards.push({ label, value: String(value) })
-        }
+  // Chunk an array into rows for table rendering
+  Handlebars.registerHelper('chunk', (arr: any[], size: any) => {
+    const n = Math.max(1, Number.parseInt(String(size), 10) || 1)
+    if (!Array.isArray(arr) || arr.length === 0) return []
+    const out: any[] = []
+    for (let i = 0; i < arr.length; i += n) {
+      const row = arr.slice(i, i + n)
+      while (row.length < n) row.push(null)
+      out.push(row)
+    }
+    return out
+  })
 
-        pushCard('Total Fusion Accounts', stats.totalFusionAccounts)
-        pushCard('Fusion Reviews Created', stats.fusionReviewsCreated)
-        pushCard('Fusion Review Assignments', stats.fusionReviewAssignments)
-        pushCard('Fusion Review New Identities', stats.fusionReviewNewIdentities)
-        pushCard('Fusion Review Non-Matches', stats.fusionReviewNonMatches)
-        pushCard('Identities Found', stats.identitiesFound)
-        pushCard('Managed Accounts Found', stats.managedAccountsFound)
-        pushCard('Managed Accounts Processed', stats.managedAccountsProcessed)
-        pushCard('Managed Found (A)', stats.managedAccountsFoundAuthoritative)
-        pushCard('Managed Found (O)', stats.managedAccountsFoundOrphan)
-        pushCard('Managed Found (R)', stats.managedAccountsFoundRecord)
-        pushCard('Managed Processed (A)', stats.managedAccountsProcessedAuthoritative)
-        pushCard('Managed Processed (O)', stats.managedAccountsProcessedOrphan)
-        pushCard('Managed Processed (R)', stats.managedAccountsProcessedRecord)
-        pushCard('Review Decisions (A)', stats.fusionReviewDecisionsAuthoritative)
-        pushCard('Review Decisions (O)', stats.fusionReviewDecisionsOrphan)
-        pushCard('Review Decisions (R)', stats.fusionReviewDecisionsRecord)
-        pushCard('Decision Outcome (A new)', stats.fusionReviewNewIdentitiesAuthoritative)
-        pushCard('Decision Outcome (O no-match)', stats.fusionReviewNoMatchesOrphan)
-        pushCard('Decision Outcome (R no-match)', stats.fusionReviewNoMatchesRecord)
-        pushCard('Total Processing Time', stats.totalProcessingTime)
-        pushCard('Used Memory', stats.usedMemory)
+  // Build processing statistics cards in the requested report order.
+  Handlebars.registerHelper('processingStatsCards', (reportDate: Date | string, stats: Record<string, any>) => {
+    if (!stats || typeof stats !== 'object') return []
+    const cards: Array<{ label: string; value: string }> = []
+    const pushCard = (label: string, value: any): void => {
+      if (value === null || value === undefined || value === '') return
+      cards.push({ label, value: String(value) })
+    }
+    const formattedDate = reportDate ? new Date(reportDate).toLocaleDateString() : undefined
 
-        return cards
-    })
+    pushCard('Report Date', formattedDate)
+    pushCard('Total Processing Time', stats.totalProcessingTime)
+    pushCard('Used Memory', stats.usedMemory)
+    pushCard('Fusion Accounts Found', stats.fusionAccountsFound)
+    pushCard('Identities Found', stats.identitiesFound)
+    pushCard('Managed Accounts Found', stats.managedAccountsFound)
+    pushCard('Managed Accounts Processed', stats.managedAccountsProcessed)
+    pushCard('Identities Processed', stats.identitiesProcessed)
+    pushCard('Fusion Reviews Processed', stats.fusionReviewsProcessed)
+    pushCard('Fusion Reviews Found', stats.fusionReviewsFound)
+    pushCard('Fusion Review Instances Found', stats.fusionReviewInstancesFound)
+
+    return cards
+  })
 }
 
 // ============================================================================
@@ -168,28 +173,27 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
       <td style="padding: 20px 22px;">
         <h1 style="margin: 0; color: #0b5cab; font-size: 24px;">Identity Fusion Report</h1>
 
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 18px; border-collapse: collapse;">
-          <tr>
-            <td width="33.33%" style="padding: 6px 8px 6px 0;">
-              <div style="border: 1px solid #e6ebf5; border-radius: 10px; padding: 10px;">
-                <div style="font-size: 11px; color: #5f6b7a; font-weight: 700; text-transform: uppercase;">Report Date</div>
-                <div style="font-size: 16px; color: #0f172a; font-weight: 700;">{{formatDate reportDate}}</div>
-              </div>
-            </td>
-            <td width="33.33%" style="padding: 6px 4px;">
-              <div style="border: 1px solid #e6ebf5; border-radius: 10px; padding: 10px;">
-                <div style="font-size: 11px; color: #5f6b7a; font-weight: 700; text-transform: uppercase;">Potential Duplicates</div>
-                <div style="font-size: 16px; color: #0f172a; font-weight: 700;">{{potentialDuplicates}}</div>
-              </div>
-            </td>
-            <td width="33.33%" style="padding: 6px 0 6px 8px;">
-              <div style="border: 1px solid #e6ebf5; border-radius: 10px; padding: 10px;">
-                <div style="font-size: 11px; color: #5f6b7a; font-weight: 700; text-transform: uppercase;">Total Accounts Analyzed</div>
-                <div style="font-size: 16px; color: #0f172a; font-weight: 700;">{{totalAccounts}}</div>
-              </div>
-            </td>
-          </tr>
-        </table>
+        {{#if stats}}
+        <div style="margin-top: 18px;">
+          <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">Processing Statistics</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+            {{#each (chunk (processingStatsCards reportDate stats) 3)}}
+            <tr>
+              {{#each this}}
+              <td width="33.33%" style="vertical-align:top; padding:6px 6px;">
+                {{#if this}}
+                <div style="border: 1px solid #e6ebf5; border-radius: 10px; padding: 10px; background:#fbfcff;">
+                  <div style="font-size: 11px; color: #5f6b7a; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">{{label}}</div>
+                  <div style="font-size: 16px; color: #0f172a; font-weight: 700;">{{value}}</div>
+                </div>
+                {{/if}}
+              </td>
+              {{/each}}
+            </tr>
+            {{/each}}
+          </table>
+        </div>
+        {{/if}}
 
         {{#if warnings.duplicateFusionIdentities}}
         <div style="margin-top: 14px; padding: 12px; border: 1px solid #fecaca; border-left: 6px solid #ef4444; border-radius: 10px; background: #fef2f2;">
@@ -217,53 +221,81 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
         </div>
         {{/if}}
 
-        {{#if stats}}
-        <div style="margin-top: 18px;">
-          <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">Processing Statistics</div>
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
-            {{#each (chunk (statsCards stats) 3)}}
-            <tr>
-              {{#each this}}
-              <td width="33.33%" style="vertical-align:top; padding:6px 6px;">
-                {{#if this}}
-                <div style="border: 1px solid #e6ebf5; border-radius: 10px; padding: 10px; background:#fbfcff;">
-                  <div style="font-size: 11px; color: #5f6b7a; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">{{label}}</div>
-                  <div style="font-size: 16px; color: #0f172a; font-weight: 700;">{{value}}</div>
-                </div>
-                {{/if}}
-              </td>
-              {{/each}}
-            </tr>
+        {{#if (gt stats.aggregationWarnings 0)}}
+        <div style="margin-top: 10px; padding: 10px 12px; border: 1px solid #fde68a; border-left: 6px solid #f59e0b; border-radius: 10px; background: #fffbeb;">
+          <div style="font-size: 11px; color: #92400e; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Aggregation Warnings ({{stats.aggregationWarnings}})</div>
+          {{#if stats.warningSamples}}
+          <div style="font-size: 12px; color: #78350f; line-height: 1.4;">
+            {{#each stats.warningSamples}}
+            <div style="margin-bottom: 4px;">- {{this}}</div>
             {{/each}}
-          </table>
-          {{#if (gt stats.aggregationWarnings 0)}}
-          <div style="margin-top: 10px; padding: 10px 12px; border: 1px solid #fde68a; border-left: 6px solid #f59e0b; border-radius: 10px; background: #fffbeb;">
-            <div style="font-size: 11px; color: #92400e; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Aggregation Warnings ({{stats.aggregationWarnings}})</div>
-            {{#if stats.warningSamples}}
-            <div style="font-size: 12px; color: #78350f; line-height: 1.4;">
-              {{#each stats.warningSamples}}
-              <div style="margin-bottom: 4px;">- {{this}}</div>
-              {{/each}}
-            </div>
-            {{/if}}
           </div>
           {{/if}}
-          {{#if (gt stats.aggregationErrors 0)}}
-          <div style="margin-top: 10px; padding: 10px 12px; border: 1px solid #fecaca; border-left: 6px solid #ef4444; border-radius: 10px; background: #fef2f2;">
-            <div style="font-size: 11px; color: #991b1b; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Aggregation Errors ({{stats.aggregationErrors}})</div>
-            {{#if stats.errorSamples}}
-            <div style="font-size: 12px; color: #7f1d1d; line-height: 1.4;">
-              {{#each stats.errorSamples}}
-              <div style="margin-bottom: 4px;">- {{this}}</div>
-              {{/each}}
-            </div>
-            {{/if}}
+        </div>
+        {{/if}}
+        {{#if (gt stats.aggregationErrors 0)}}
+        <div style="margin-top: 10px; padding: 10px 12px; border: 1px solid #fecaca; border-left: 6px solid #ef4444; border-radius: 10px; background: #fef2f2;">
+          <div style="font-size: 11px; color: #991b1b; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Aggregation Errors ({{stats.aggregationErrors}})</div>
+          {{#if stats.errorSamples}}
+          <div style="font-size: 12px; color: #7f1d1d; line-height: 1.4;">
+            {{#each stats.errorSamples}}
+            <div style="margin-bottom: 4px;">- {{this}}</div>
+            {{/each}}
           </div>
           {{/if}}
         </div>
         {{/if}}
 
+        <div style="margin-top: 18px;">
+          <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">Fusion Review Decisions</div>
+          {{#if fusionReviewDecisions}}
+            {{#if (gt fusionReviewDecisions.length 0)}}
+              {{#each fusionReviewDecisions}}
+              <div style="margin-top: 10px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 12px; background: #fbfcff;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                  <div style="font-size: 14px; color:#0f172a; font-weight: 700;">{{decisionLabel}}</div>
+                  <div style="font-size: 11px; color:#5f6b7a; font-weight: 700; text-transform: uppercase;">{{sourceTypeLabel sourceType}}</div>
+                </div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px; border-collapse:collapse;">
+                  <tr>
+                    <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700; width:140px;">Reviewer</td>
+                    <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{reviewerName}}{{#if reviewerEmail}} ({{reviewerEmail}}){{/if}}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Account</td>
+                    <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{accountName}} [{{accountSource}}]</td>
+                  </tr>
+                  {{#if selectedIdentityId}}
+                  <tr>
+                    <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Selected Identity</td>
+                    <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{selectedIdentityId}}</td>
+                  </tr>
+                  {{/if}}
+                  {{#if comments}}
+                  <tr>
+                    <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Comments</td>
+                    <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{comments}}</td>
+                  </tr>
+                  {{/if}}
+                  {{#if formUrl}}
+                  <tr>
+                    <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Form</td>
+                    <td style="padding:3px 0; font-size:12px; color:#0f172a;"><a href="{{formUrl}}" style="color:#0b5cab; text-decoration:underline;">Open form</a></td>
+                  </tr>
+                  {{/if}}
+                </table>
+              </div>
+              {{/each}}
+            {{else}}
+              <div style="color:#999; font-style:italic; padding:14px; background-color:#f8f9fa; border-radius:4px; text-align:center;">No processed review decisions found.</div>
+            {{/if}}
+          {{else}}
+            <div style="color:#999; font-style:italic; padding:14px; background-color:#f8f9fa; border-radius:4px; text-align:center;">No processed review decisions found.</div>
+          {{/if}}
+        </div>
+
         {{#if accounts}}
+          <div style="margin-top: 18px; font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">New Fusion Reviews</div>
           {{#each accounts}}
           <div style="margin-top: 18px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 14px;">
             <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
@@ -280,7 +312,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                         {{#if accountId}}
                         <tr>
                           <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">ID:</td>
-                          <td style="padding:2px 8px; word-break:break-word; overflow-wrap:anywhere;">{{accountId}}</td>
+                          <td style="padding:2px 8px; white-space:nowrap; word-break:keep-all;">{{accountId}}</td>
                         </tr>
                         {{/if}}
                         {{#if accountEmail}}
@@ -458,7 +490,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                                 {{#if accountId}}
                                                                 <tr>
                                                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">ID:</td>
-                                                                    <td style="padding:2px 8px; word-break:break-word; overflow-wrap:anywhere;">{{accountId}}</td>
+                                                                    <td style="padding:2px 8px; white-space:nowrap; word-break:keep-all;">{{accountId}}</td>
                                                                 </tr>
                                                                 {{/if}}
                                                                 {{#if accountEmail}}
@@ -564,12 +596,12 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
 </html>`
 
 export const compileEmailTemplates = (): Map<string, HandlebarsTemplateDelegate> => {
-    const templates = new Map<string, HandlebarsTemplateDelegate>()
+  const templates = new Map<string, HandlebarsTemplateDelegate>()
 
-    // Always use in-code templates to avoid runtime path issues in ISC packaging.
-    templates.set('fusion-report', Handlebars.compile(DEFAULT_FUSION_REPORT_TEMPLATE))
-    templates.set('fusion-review', Handlebars.compile(DEFAULT_FUSION_REVIEW_TEMPLATE))
-    return templates
+  // Always use in-code templates to avoid runtime path issues in ISC packaging.
+  templates.set('fusion-report', Handlebars.compile(DEFAULT_FUSION_REPORT_TEMPLATE))
+  templates.set('fusion-review', Handlebars.compile(DEFAULT_FUSION_REVIEW_TEMPLATE))
+  return templates
 }
 
 // ============================================================================
@@ -581,72 +613,91 @@ export const compileEmailTemplates = (): Map<string, HandlebarsTemplateDelegate>
  * plus the standalone form URL for actioning the review.
  */
 export type FusionReviewEmailData = {
-    accounts: FusionReportEmailData['accounts']
-    totalAccounts: number
-    potentialDuplicates: number
-    reportDate: Date | string
-    formInstanceId?: string
-    formUrl?: string
+  accounts: FusionReportEmailData['accounts']
+  totalAccounts: number
+  potentialDuplicates: number
+  reportDate: Date | string
+  formInstanceId?: string
+  formUrl?: string
 }
 
 export type EditRequestEmailData = {
-    accountName: string
-    accountSource: string
-    accountAttributes: Record<string, any>
-    formInstanceId?: string
+  accountName: string
+  accountSource: string
+  accountAttributes: Record<string, any>
+  formInstanceId?: string
 }
 
 export type FusionReportEmailData = {
-    accounts: Array<{
-        accountName: string
-        accountSource: string
-        sourceType?: 'authoritative' | 'record' | 'orphan'
-        accountId?: string
-        accountEmail?: string
-        accountAttributes?: Record<string, any>
-        error?: string
-        matches: Array<{
-            identityName: string
-            identityId?: string
-            identityUrl?: string
-            isMatch: boolean
-            scores?: Array<{
-                attribute: string
-                algorithm?: string
-                score: number
-                fusionScore?: number
-                isMatch: boolean
-                comment?: string
-            }>
-        }>
+  accounts: Array<{
+    accountName: string
+    accountSource: string
+    sourceType?: 'authoritative' | 'record' | 'orphan'
+    accountId?: string
+    accountEmail?: string
+    accountAttributes?: Record<string, any>
+    error?: string
+    matches: Array<{
+      identityName: string
+      identityId?: string
+      identityUrl?: string
+      isMatch: boolean
+      scores?: Array<{
+        attribute: string
+        algorithm?: string
+        score: number
+        fusionScore?: number
+        isMatch: boolean
+        comment?: string
+      }>
     }>
-    totalAccounts: number
-    potentialDuplicates: number
-    reportDate: Date | string
-    stats?: {
-        totalFusionAccounts?: number
-        fusionReviewsCreated?: number
-        fusionReviewAssignments?: number
-        fusionReviewNewIdentities?: number
-        fusionReviewNonMatches?: number
-        fusionReviewDecisionsAuthoritative?: number
-        fusionReviewDecisionsRecord?: number
-        fusionReviewDecisionsOrphan?: number
-        fusionReviewNewIdentitiesAuthoritative?: number
-        fusionReviewNoMatchesRecord?: number
-        fusionReviewNoMatchesOrphan?: number
-        identitiesFound?: number
-        managedAccountsFound?: number
-        managedAccountsFoundAuthoritative?: number
-        managedAccountsFoundRecord?: number
-        managedAccountsFoundOrphan?: number
-        managedAccountsProcessed?: number
-        managedAccountsProcessedAuthoritative?: number
-        managedAccountsProcessedRecord?: number
-        managedAccountsProcessedOrphan?: number
-        totalProcessingTime?: string
-        usedMemory?: string
-    }
+  }>
+  totalAccounts: number
+  potentialDuplicates: number
+  reportDate: Date | string
+  fusionReviewDecisions?: Array<{
+    reviewerId: string
+    reviewerName: string
+    reviewerEmail?: string
+    accountId: string
+    accountName: string
+    accountSource: string
+    sourceType?: 'authoritative' | 'record' | 'orphan'
+    decision: 'assign-existing-identity' | 'create-new-identity' | 'confirm-no-match'
+    decisionLabel: string
+    selectedIdentityId?: string
+    comments?: string
+    formUrl?: string
+  }>
+  stats?: {
+    totalFusionAccounts?: number
+    fusionAccountsFound?: number
+    fusionReviewsCreated?: number
+    fusionReviewAssignments?: number
+    fusionReviewsFound?: number
+    fusionReviewInstancesFound?: number
+    fusionReviewsProcessed?: number
+    fusionReviewNewIdentities?: number
+    fusionReviewNonMatches?: number
+    fusionReviewDecisionsAuthoritative?: number
+    fusionReviewDecisionsRecord?: number
+    fusionReviewDecisionsOrphan?: number
+    fusionReviewNewIdentitiesAuthoritative?: number
+    fusionReviewNoMatchesRecord?: number
+    fusionReviewNoMatchesOrphan?: number
+    identitiesFound?: number
+    identitiesProcessed?: number
+    managedAccountsFound?: number
+    managedAccountsFoundAuthoritative?: number
+    managedAccountsFoundRecord?: number
+    managedAccountsFoundOrphan?: number
+    managedAccountsProcessed?: number
+    managedAccountsProcessedAuthoritative?: number
+    managedAccountsProcessedRecord?: number
+    managedAccountsProcessedOrphan?: number
+    totalProcessingTime?: string
+    usedMemory?: string
+  }
 }
 
 // ============================================================================
@@ -657,49 +708,49 @@ export type FusionReportEmailData = {
  * Render fusion review email template
  */
 export const renderFusionReviewEmail = (
-    templates: Map<string, HandlebarsTemplateDelegate>,
-    data: FusionReviewEmailData
+  templates: Map<string, HandlebarsTemplateDelegate>,
+  data: FusionReviewEmailData
 ): string => {
-    const template = templates.get('fusion-review')
-    if (!template) {
-        throw new ConnectorError(
-            'Fusion review email template not found. Email templates may not have been compiled correctly.',
-            ConnectorErrorType.Generic
-        )
-    }
-    return template(data)
+  const template = templates.get('fusion-review')
+  if (!template) {
+    throw new ConnectorError(
+      'Fusion review email template not found. Email templates may not have been compiled correctly.',
+      ConnectorErrorType.Generic
+    )
+  }
+  return template(data)
 }
 
 /**
  * Render edit request email template
  */
 export const renderEditRequestEmail = (
-    templates: Map<string, HandlebarsTemplateDelegate>,
-    data: EditRequestEmailData
+  templates: Map<string, HandlebarsTemplateDelegate>,
+  data: EditRequestEmailData
 ): string => {
-    const template = templates.get('edit-request')
-    if (!template) {
-        throw new ConnectorError(
-            'Edit request email template not found. Email templates may not have been compiled correctly.',
-            ConnectorErrorType.Generic
-        )
-    }
-    return template(data)
+  const template = templates.get('edit-request')
+  if (!template) {
+    throw new ConnectorError(
+      'Edit request email template not found. Email templates may not have been compiled correctly.',
+      ConnectorErrorType.Generic
+    )
+  }
+  return template(data)
 }
 
 /**
  * Render fusion report email template
  */
 export const renderFusionReport = (
-    templates: Map<string, HandlebarsTemplateDelegate>,
-    data: FusionReportEmailData
+  templates: Map<string, HandlebarsTemplateDelegate>,
+  data: FusionReportEmailData
 ): string => {
-    const template = templates.get('fusion-report')
-    if (!template) {
-        throw new ConnectorError(
-            'Fusion report email template not found. Email templates may not have been compiled correctly.',
-            ConnectorErrorType.Generic
-        )
-    }
-    return template(data)
+  const template = templates.get('fusion-report')
+  if (!template) {
+    throw new ConnectorError(
+      'Fusion report email template not found. Email templates may not have been compiled correctly.',
+      ConnectorErrorType.Generic
+    )
+  }
+  return template(data)
 }

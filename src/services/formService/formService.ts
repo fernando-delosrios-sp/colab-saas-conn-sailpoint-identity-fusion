@@ -42,8 +42,13 @@ export class FormService {
     private _pendingReviewUrlsByReviewerId: Map<string, string[]> = new Map()
     /** Candidate identity IDs from pending (unanswered) form instances, populated during fetchFormData. */
     private _pendingCandidateIdentityIds: Set<string> = new Set()
+    /** Finished decisions processed from answered form instances (assignment + newIdentity/no-match). */
+    private _finishedFusionDecisions: FusionDecision[] = []
     private _formsCreated: number = 0
     private _formInstancesCreated: number = 0
+    private _formsFound: number = 0
+    private _formInstancesFound: number = 0
+    private _answeredFormInstancesProcessed: number = 0
     private readonly fusionFormNamePattern: string
     private readonly fusionFormExpirationDays: number
     private readonly fusionFormAttributes?: string[]
@@ -80,8 +85,13 @@ export class FormService {
         this.fusionAssignmentDecisionMap = new Map()
         this._pendingReviewUrlsByReviewerId = new Map()
         this._pendingCandidateIdentityIds = new Set()
+        this._finishedFusionDecisions = []
+        this._formsFound = 0
+        this._formInstancesFound = 0
+        this._answeredFormInstancesProcessed = 0
 
         const forms = await this.fetchFormsByName(this.fusionFormNamePattern)
+        this._formsFound = forms.length
         this.log.debug(`Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern}`)
 
         // Fetch all instances in parallel for better performance
@@ -100,6 +110,7 @@ export class FormService {
         // - queue resolved/orphaned forms for deletion
         // (fetching was done in parallel above, processing is fast so sequential is fine)
         for (const instances of formInstancesResults) {
+            this._formInstancesFound += instances.length
             if (instances.length > 0) {
                 this.processFusionFormInstances(instances)
             }
@@ -274,7 +285,8 @@ export class FormService {
             if (!instance.state || !instance.recipients || !instance.standAloneFormUrl) continue
             const state = instance.state.toUpperCase()
             // Only pending instances should show up as active reviews on reviewer accounts.
-            if (state === 'COMPLETED' || state === 'IN_PROGRESS' || state === 'CANCELLED') continue
+            if (state === 'COMPLETED' || state === 'IN_PROGRESS' || state === 'SUBMITTED' || state === 'CANCELLED')
+                continue
 
             for (const recipient of instance.recipients) {
                 if (!recipient.id) {
@@ -417,9 +429,29 @@ export class FormService {
         return this._formsCreated
     }
 
+    /** Number of form definitions found during fetchFormData for this run */
+    public get formsFound(): number {
+        return this._formsFound
+    }
+
     /** Number of form instances (review assignments) created during this run */
     public get formInstancesCreated(): number {
         return this._formInstancesCreated
+    }
+
+    /** Number of form instances found during fetchFormData for this run */
+    public get formInstancesFound(): number {
+        return this._formInstancesFound
+    }
+
+    /** Number of answered form instances processed in this run */
+    public get answeredFormInstancesProcessed(): number {
+        return this._answeredFormInstancesProcessed
+    }
+
+    /** All finished decisions processed from answered form instances in this run */
+    public get finishedFusionDecisions(): FusionDecision[] {
+        return this._finishedFusionDecisions
     }
 
     /**
@@ -458,7 +490,24 @@ export class FormService {
 
         const searchFormInstancesByTenant = async () => {
             const response = await customFormsApi.searchFormInstancesByTenant(requestParameters)
-            return response.data ?? []
+            const allInstances = response.data ?? []
+            if (!formDefinitionId) {
+                return allInstances
+            }
+
+            const matchingInstances = allInstances.filter((instance) => instance.formDefinitionId === formDefinitionId)
+            const mismatchedCount = allInstances.length - matchingInstances.length
+            if (mismatchedCount > 0) {
+                this.log.warn(
+                    `searchFormInstancesByTenant returned ${mismatchedCount} instance(s) outside requested formDefinitionId=${formDefinitionId}`
+                )
+            }
+            if (allInstances.length === 250) {
+                this.log.warn(
+                    `searchFormInstancesByTenant returned 250 instance(s) for formDefinitionId=${formDefinitionId}; results may be truncated by API page size`
+                )
+            }
+            return matchingInstances
         }
 
         const formInstances = await this.client.execute(searchFormInstancesByTenant)
@@ -520,7 +569,7 @@ export class FormService {
     /**
      * Collect pending (unanswered) form instance URLs by recipient identityId,
      * and candidate identity IDs from pending form instances.
-     * Pending = state is not COMPLETED, IN_PROGRESS, or CANCELLED.
+     * Pending = state is not COMPLETED, IN_PROGRESS, SUBMITTED, or CANCELLED.
      * Kept so we can assign current review URLs to each reviewer when we process them,
      * and so we can apply the 'candidate' status to identities in pending reviews.
      */
@@ -528,7 +577,8 @@ export class FormService {
         for (const instance of formInstances) {
             if (!instance.state || !instance.standAloneFormUrl) continue
             const state = instance.state.toUpperCase()
-            if (state === 'COMPLETED' || state === 'IN_PROGRESS' || state === 'CANCELLED') continue
+            if (state === 'COMPLETED' || state === 'IN_PROGRESS' || state === 'SUBMITTED' || state === 'CANCELLED')
+                continue
             if (!instance.recipients?.length) continue
             for (const recipient of instance.recipients) {
                 if (!recipient.id) continue
@@ -594,6 +644,7 @@ export class FormService {
             processingResult.instancesToProcess,
             accountInfoOverride
         )
+        this._answeredFormInstancesProcessed += processingResult.instancesToProcess.length
 
         // Only active (non-deleted) forms should contribute pending review URLs and candidate IDs.
         // A resolved/orphaned form may still have "pending" instances for other reviewers, but those
@@ -625,7 +676,7 @@ export class FormService {
          * managedAccountsById map to avoid further processing on next runs.
          *
          * Rules:
-         * - While there is no response instance (COMPLETED/IN_PROGRESS), the form
+         * - While there is no response instance (COMPLETED/IN_PROGRESS/SUBMITTED), the form
          *   is kept but the managed account is removed from the map so we don't
          *   try to create another form for it.
          * - When there's a response instance, the form is deleted and the managed
@@ -661,6 +712,7 @@ export class FormService {
             switch (instance.state) {
                 case 'COMPLETED':
                 case 'IN_PROGRESS':
+                case 'SUBMITTED':
                     this.log.debug(`Processing response form instance: ${instance.id}`)
                     instancesToProcess.push(instance)
                     processedCount++
@@ -819,6 +871,7 @@ export class FormService {
             }
 
             if (decision.finished) {
+                this._finishedFusionDecisions.push(decision)
                 if (decision.newIdentity) {
                     this._fusionIdentityDecisions!.push(decision)
                 } else {

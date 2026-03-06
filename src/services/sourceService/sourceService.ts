@@ -345,37 +345,15 @@ export class SourceService {
     public fireDisableAccount(accountId: string): void {
         const { accountsApi } = this.client
         this.log.info(`Firing low-priority disable for account ${accountId}`)
-        this.client
-            .execute(
-                () =>
-                    accountsApi.disableAccount({
-                        id: accountId,
-                        accountToggleRequestV2025: {},
-                    }),
-                QueuePriority.LOW,
-                'SourceService>fireDisableAccount'
-            )
-            .catch((err) => {
-                const message = err?.message ?? String(err)
-                this.log.warn(
-                    `Disable attempt with empty toggle request failed for account ${accountId}: ${message}. Retrying with forceProvisioning=false.`
-                )
-                this.client
-                    .execute(
-                        () =>
-                            accountsApi.disableAccount({
-                                id: accountId,
-                                accountToggleRequestV2025: { forceProvisioning: false },
-                            }),
-                        QueuePriority.LOW,
-                        'SourceService>fireDisableAccount retry'
-                    )
-                    .catch((retryErr) => {
-                        this.log.warn(
-                            `Failed to disable account ${accountId} after retry: ${retryErr?.message ?? retryErr}`
-                        )
-                    })
-            })
+        void this.client.execute(
+            () =>
+                accountsApi.disableAccount({
+                    id: accountId,
+                    accountToggleRequestV2025: { forceProvisioning: true },
+                }),
+            QueuePriority.LOW,
+            'SourceService>fireDisableAccount'
+        )
     }
 
     // ------------------------------------------------------------------------

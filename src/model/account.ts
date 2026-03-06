@@ -1,6 +1,6 @@
 import { Account, IdentityDocument } from 'sailpoint-api-client'
 import { getDateFromISOString, isNewerThan } from '../utils/date'
-import { toSetFromAttribute as attributeToSet } from '../utils/attributes'
+import { getDisplayName, toSetFromAttribute as attributeToSet } from '../utils/attributes'
 import { FusionDecision } from './form'
 import { FusionConfig, SourceConfig } from './config'
 import { Attributes, ConnectorError, ConnectorErrorType, SimpleKeyType } from '@sailpoint/connector-sdk'
@@ -212,6 +212,11 @@ export class FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourceSet = new Set<string>()
         const statuses = attributeToSet(account.attributes, 'statuses')
+        const displayName =
+            String(getDisplayName(account.attributes as Record<string, any>) ?? '').trim() ||
+            String(account.name ?? '').trim() ||
+            String(account.nativeIdentity ?? '').trim() ||
+            String(account.id ?? '').trim()
         if (statuses.has('baseline')) sourceSet.add('Identities')
 
         fusionAccount.initializeBasicProperties({
@@ -219,7 +224,7 @@ export class FusionAccount {
             nativeIdentity: account.nativeIdentity as string,
             name: account.name,
             sourceName: account.sourceName,
-            displayName: account.name,
+            displayName,
             disabled: account.disabled,
             sources: sourceSet,
             attributes: account.attributes ?? undefined,
@@ -252,10 +257,15 @@ export class FusionAccount {
      */
     public static fromIdentity(identity: IdentityDocument): FusionAccount {
         const fusionAccount = new FusionAccount()
+        const displayName =
+            String(getDisplayName(identity.attributes as Record<string, any>) ?? '').trim() ||
+            String(identity.name ?? '').trim() ||
+            String(identity.id ?? '').trim()
         fusionAccount.initializeBasicProperties({
             type: 'identity',
             nativeIdentity: identity.id,
-            name: identity.attributes?.displayName ?? identity.name,
+            name: displayName,
+            displayName,
             sourceName: 'Identities',
             disabled: identity.disabled,
             needsRefresh: true,
@@ -280,12 +290,18 @@ export class FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourcesAttr = account.attributes?.sources
         const sourceSet = sourcesAttr ? new Set(attrSplit(String(sourcesAttr))) : new Set<string>()
+        const displayName =
+            String(getDisplayName(account.attributes as Record<string, any>) ?? '').trim() ||
+            String(account.name ?? '').trim() ||
+            String(account.nativeIdentity ?? '').trim() ||
+            String(account.id ?? '').trim()
 
         fusionAccount.initializeBasicProperties({
             type: 'managed',
             nativeIdentity: account.id,
-            name: account.name,
+            name: displayName,
             sourceName: account.sourceName,
+            displayName,
             disabled: account.disabled,
             needsRefresh: true,
             sources: sourceSet,
@@ -312,11 +328,13 @@ export class FusionAccount {
     public static fromFusionDecision(decision: FusionDecision): FusionAccount {
         const fusionAccount = new FusionAccount()
         const { account } = decision
+        const displayName = String(account.name ?? '').trim() || String(account.id ?? '').trim()
         fusionAccount.initializeBasicProperties({
             type: 'decision',
             nativeIdentity: account.id,
-            name: account.name,
+            name: displayName,
             sourceName: account.sourceName,
+            displayName,
             needsRefresh: true,
             managedAccountId: account.id ?? undefined,
         })

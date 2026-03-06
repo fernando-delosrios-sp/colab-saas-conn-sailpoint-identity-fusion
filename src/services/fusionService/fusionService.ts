@@ -62,6 +62,7 @@ export class FusionService {
     public readonly fusionOwnerIsGlobalReviewer: boolean
     public readonly fusionReportOnAggregation: boolean
     public newManagedAccountsCount: number = 0
+    public identitiesProcessedCount: number = 0
     private readonly managedAccountsBatchSize: number
     public readonly commandType?: StandardCommand
 
@@ -501,6 +502,7 @@ export class FusionService {
      */
     public async processIdentities(): Promise<FusionAccount[]> {
         const { identities } = this.identities
+        this.identitiesProcessedCount = identities.length
         this.log.info(`Processing ${identities.length} identities`)
         const results = await promiseAllBatched(identities, (x) => this.processIdentity(x))
         const { managedSources } = this.sources

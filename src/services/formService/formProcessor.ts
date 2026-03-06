@@ -99,7 +99,10 @@ export const createFusionDecision = (
     assert(formInstance, 'Form instance is required')
     assert(formInstance.id, 'Form instance ID is required')
 
-    const finished = formInstance.state === 'COMPLETED' || formInstance.state === 'IN_PROGRESS'
+    const finished =
+        formInstance.state === 'COMPLETED' ||
+        formInstance.state === 'IN_PROGRESS' ||
+        formInstance.state === 'SUBMITTED'
 
     const { formData, formInput, recipients } = formInstance
 

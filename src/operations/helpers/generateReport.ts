@@ -1,7 +1,40 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { FusionAccount } from '../../model/account'
 import { StandardCommand } from '@sailpoint/connector-sdk'
-import { AggregationStats, FusionReportStats } from '../../services/fusionService/types'
+import { AggregationStats, FusionReportDecision, FusionReportStats } from '../../services/fusionService/types'
+import { FusionDecision } from '../../model/form'
+
+const toReportDecision = (decision: FusionDecision): FusionReportDecision => {
+    const sourceType = decision.sourceType ?? 'authoritative'
+    const isNoMatchSource = sourceType === 'record' || sourceType === 'orphan'
+    const decisionType = decision.newIdentity
+        ? isNoMatchSource
+            ? 'confirm-no-match'
+            : 'create-new-identity'
+        : 'assign-existing-identity'
+
+    const decisionLabel =
+        decisionType === 'assign-existing-identity'
+            ? 'Assigned to existing identity'
+            : decisionType === 'create-new-identity'
+              ? 'Created new identity'
+              : 'Confirmed no match'
+
+    return {
+        reviewerId: decision.submitter.id,
+        reviewerName: decision.submitter.name || decision.submitter.id,
+        reviewerEmail: decision.submitter.email || undefined,
+        accountId: decision.account.id,
+        accountName: decision.account.name || decision.account.id,
+        accountSource: decision.account.sourceName || '',
+        sourceType,
+        decision: decisionType,
+        decisionLabel,
+        selectedIdentityId: decision.identityId || undefined,
+        comments: decision.comments || undefined,
+        formUrl: decision.formUrl || undefined,
+    }
+}
 
 /**
  * Generates and sends a fusion report for the given account.
@@ -39,9 +72,11 @@ export const generateReport = async (
     }
 
     let stats: FusionReportStats | undefined
+    const finishedDecisions = forms.finishedFusionDecisions
+    const reportDecisions = finishedDecisions.map(toReportDecision)
     if (aggregationStats) {
         const issueSummary = serviceRegistry.log.getAggregationIssueSummary()
-        const decisions = forms.fusionIdentityDecisions
+        const decisions = finishedDecisions
         const decisionSourceType = (d: {
             sourceType?: 'authoritative' | 'record' | 'orphan'
         }): 'authoritative' | 'record' | 'orphan' => d.sourceType ?? 'authoritative'
@@ -63,8 +98,12 @@ export const generateReport = async (
         const memoryUsage = process.memoryUsage()
         stats = {
             totalFusionAccounts: fusion.totalFusionAccountCount,
+            fusionAccountsFound: sources.fusionAccountCount,
             fusionReviewsCreated: forms.formsCreated,
             fusionReviewAssignments: forms.formInstancesCreated,
+            fusionReviewsFound: forms.formsFound,
+            fusionReviewInstancesFound: forms.formInstancesFound,
+            fusionReviewsProcessed: forms.answeredFormInstancesProcessed,
             fusionReviewNewIdentities: authoritativeNewIdentities,
             fusionReviewNonMatches: recordNoMatches + orphanNoMatches,
             fusionReviewDecisionsAuthoritative: decisionCountByType.authoritative,
@@ -74,9 +113,7 @@ export const generateReport = async (
             fusionReviewNoMatchesRecord: recordNoMatches,
             fusionReviewNoMatchesOrphan: orphanNoMatches,
             managedAccountsProcessed: fusion.newManagedAccountsCount,
-            managedAccountsProcessedAuthoritative: aggregationStats.managedAccountsFoundAuthoritative,
-            managedAccountsProcessedRecord: aggregationStats.managedAccountsFoundRecord,
-            managedAccountsProcessedOrphan: aggregationStats.managedAccountsFoundOrphan,
+            identitiesProcessed: fusion.identitiesProcessedCount,
             aggregationWarnings: issueSummary.warningCount,
             aggregationErrors: issueSummary.errorCount,
             warningSamples: issueSummary.warningSamples,
@@ -87,5 +124,6 @@ export const generateReport = async (
     }
 
     const report = fusion.generateReport(includeNonMatches, stats)
+    report.fusionReviewDecisions = reportDecisions
     await messaging.sendReport(report, fusionAccount)
 }
