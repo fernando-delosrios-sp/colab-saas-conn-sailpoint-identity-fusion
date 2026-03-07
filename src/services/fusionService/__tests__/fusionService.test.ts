@@ -325,8 +325,8 @@ describe('FusionService', () => {
         })
     })
 
-    describe('duplicate fusion identity warnings', () => {
-        it('logs warning and includes duplicate identity details in report', () => {
+    describe('identity conflict warnings', () => {
+        it('logs warning and includes identity conflict details in report', () => {
             const accountA = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-a',
                 identityId: 'identity-duplicate',
@@ -352,13 +352,13 @@ describe('FusionService', () => {
             )
 
             const report = fusionService.generateReport()
-            const duplicateWarnings = report.warnings?.duplicateFusionIdentities
+            const conflictWarnings = report.warnings?.identityConflicts
 
-            expect(duplicateWarnings?.affectedIdentities).toBe(1)
-            expect(duplicateWarnings?.occurrences).toHaveLength(1)
-            expect(duplicateWarnings?.occurrences[0].identityId).toBe('identity-duplicate')
-            expect(duplicateWarnings?.occurrences[0].accountCount).toBe(2)
-            expect(duplicateWarnings?.occurrences[0].nativeIdentities).toEqual(['fusion-a', 'fusion-b'])
+            expect(conflictWarnings?.affectedIdentities).toBe(1)
+            expect(conflictWarnings?.occurrences).toHaveLength(1)
+            expect(conflictWarnings?.occurrences[0].identityId).toBe('identity-duplicate')
+            expect(conflictWarnings?.occurrences[0].accountCount).toBe(2)
+            expect(conflictWarnings?.occurrences[0].nativeIdentities).toEqual(['fusion-a', 'fusion-b'])
         })
 
         it('does not warn when the same correlated account key is updated', () => {
@@ -388,7 +388,7 @@ describe('FusionService', () => {
             expect(report.warnings).toBeUndefined()
         })
 
-        it('clears duplicate warning payload after report generation', () => {
+        it('clears identity conflict warning payload after report generation', () => {
             const accountA = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-a',
                 identityId: 'identity-duplicate',
@@ -410,7 +410,7 @@ describe('FusionService', () => {
             fusionService.setFusionAccount(accountB)
 
             const firstReport = fusionService.generateReport()
-            expect(firstReport.warnings?.duplicateFusionIdentities?.affectedIdentities).toBe(1)
+            expect(firstReport.warnings?.identityConflicts?.affectedIdentities).toBe(1)
 
             const secondReport = fusionService.generateReport()
             expect(secondReport.warnings).toBeUndefined()

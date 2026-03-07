@@ -1,6 +1,6 @@
 # Match (Deduplication)
 
-This comprehensive guide explains how to use Identity Fusion NG's **Match** capability to **detect and resolve potential duplicate identities**. This use case **requires one or more sources** to be configured. **Identities are optional but highly recommended** because they provide the baseline to compare mapped and defined accounts against.
+This comprehensive guide explains how to use Identity Fusion NG's **Match** capability to **detect and resolve potential matching identities**. This use case **requires one or more sources** to be configured. **Identities are optional but highly recommended** because they provide the baseline to compare mapped and defined accounts against.
 
 ---
 
@@ -41,7 +41,7 @@ Use Identity Fusion for Match when you face these challenges:
 | Option                            | Configuration                                               | Use case                                                 |
 | --------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------- |
 | **Access profiles for reviewers** | Create access profile per source with reviewer entitlement  | Assign reviewers per source for targeted notifications   |
-| **Fusion report access profile**  | Access profile with "Fusion report" entitlement             | Allow specific users to view potential duplicate reports |
+| **Fusion report access profile**  | Access profile with "Fusion report" entitlement             | Allow specific users to view potential match reports |
 | **Auto-correlate when identical** | **Fusion Settings → Automatically correlate if identical?** | Skip manual review for obvious matches                   |
 
 **Screenshot placeholder:** High-level Match flow diagram.
@@ -121,11 +121,11 @@ Configure **Source Settings → Processing Control** for account lifecycle:
 
 ## Step 2: Configure Fusion Settings for matching
 
-Fusion Settings control how potential duplicates are detected and reviewed.
+Fusion Settings control how potential matches are detected and reviewed.
 
 ### Matching configuration
 
-Configure **Fusion Settings → Matching Settings** to define duplicate detection rules:
+Configure **Fusion Settings → Matching Settings** to define match detection rules:
 
 | Field                                                       | Purpose                                     | Recommended value                                        |
 | ----------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
@@ -142,7 +142,7 @@ Configure **Fusion Settings → Matching Settings** to define duplicate detectio
 
 ### Per-attribute match configuration
 
-For each attribute you want to use in duplicate detection, add a **Fusion attribute match**:
+For each attribute you want to use in match detection, add a **Fusion attribute match**:
 
 | Field                        | Purpose                          | Options / Example                                                |
 | ---------------------------- | -------------------------------- | ---------------------------------------------------------------- |
@@ -216,14 +216,14 @@ A mandatory attribute must always meet its threshold. When no attribute is marke
 
 | Field                                     | Value | Effect                                                        |
 | ----------------------------------------- | ----- | ------------------------------------------------------------- |
-| **Automatically correlate if identical?** | No    | All potential duplicates go to manual review                  |
+| **Automatically correlate if identical?** | No    | All potential matches go to manual review                  |
 | **Automatically correlate if identical?** | Yes   | Clear matches auto-correlate; borderline cases still reviewed |
 
 **When to enable auto-correlate:**
 
 - You have tuned thresholds and are confident in the algorithm
 - False positive rate is very low
-- You want to reduce manual review burden for obvious duplicates
+- You want to reduce manual review burden for obvious matches
 
 **When to keep disabled:**
 
@@ -248,9 +248,9 @@ Configure **Fusion Settings → Review Settings** for the manual review workflow
 
 When **Send report to owner on aggregation?** is enabled, reports include:
 
-- High-level summary (date, total analyzed accounts, potential duplicates)
+- High-level summary (date, total analyzed accounts, potential matches)
 - Processing statistics (managed/fusion/review metrics, processing time, memory usage)
-- Potential duplicate details with candidate identity score breakdowns
+- Potential match details with candidate identity score breakdowns
 - Failed matching entries (for example, form creation constraints/errors)
 - Warning block when more than one Fusion account is found for the same identity, including guidance to review configuration and consider a unique account-name attribute
 - Compact aggregation issues summary with warning/error counts and short sampled messages
@@ -259,7 +259,7 @@ To avoid oversized reports, warning/error details are intentionally summarized (
 
 **Choosing form attributes:**
 
-Include attributes that help reviewers decide if identities are duplicates:
+Include attributes that help reviewers decide if identities are matches:
 
 | Attribute      | Why include              | Example                                                       |
 | -------------- | ------------------------ | ------------------------------------------------------------- |
@@ -267,15 +267,15 @@ Include attributes that help reviewers decide if identities are duplicates:
 | **email**      | Usually unique           | john.smith@company.com vs jsmith@company.com                  |
 | **department** | Context for verification | Engineering vs IT                                             |
 | **manager**    | Organizational context   | Same manager → likely same person                             |
-| **hireDate**   | Temporal context         | Hired same day → suspicious; years apart → unlikely duplicate |
-| **phone**      | Contact verification     | Same phone → likely duplicate                                 |
-| **employeeId** | Business key             | Same ID → definitely duplicate; different → investigate       |
+| **hireDate**   | Temporal context         | Hired same day → suspicious; years apart → unlikely match |
+| **phone**      | Contact verification     | Same phone → likely match                                 |
+| **employeeId** | Business key             | Same ID → definitely match; different → investigate       |
 
 **Screenshot placeholder:** Manual review form example.
 
 ![Deduplication review form - Example](../assets/images/deduplication-review-form.png)
 
-<!-- PLACEHOLDER: Screenshot of manual review form for potential duplicates. Save as docs/assets/images/deduplication-review-form.png -->
+<!-- PLACEHOLDER: Screenshot of manual review form for potential matches. Save as docs/assets/images/deduplication-review-form.png -->
 
 **Screenshot placeholder:** Email notification to reviewer.
 
@@ -309,11 +309,11 @@ While the connector supports establishing the current source owner as a **global
 
 ### Create Fusion report access profile
 
-Create an access profile for viewing deduplication reports:
+Create an access profile for viewing match reports:
 
 | Access profile    | Entitlement   | Assignment                         | Purpose                                                      |
 | ----------------- | ------------- | ---------------------------------- | ------------------------------------------------------------ |
-| **Fusion Report** | Fusion report | Identity governance team, auditors | View list of potential duplicates without review permissions |
+| **Fusion Report** | Fusion report | Identity governance team, auditors | View list of potential matches without review permissions |
 
 **Note:** The Fusion source automatically creates entitlements for each source reviewer and the Fusion report. Run **Entitlement Aggregation** to populate these entitlements.
 
@@ -352,9 +352,9 @@ An **enforced correlation role** is an automatically assigned ISC role that oper
 | 7    | **Connector** | On next aggregation, applies reviewer decision                 | Account correlated or new identity created |
 | 8    | **Connector** | Updates account history                                        | Audit trail maintained                     |
 
-**Video placeholder:** End-to-end deduplication walkthrough.
+**Video placeholder:** End-to-end matching walkthrough.
 
-<!-- PLACEHOLDER: Video walking through deduplication: aggregation, match, form, resolution. Save as docs/assets/videos/deduplication-flow.mp4 -->
+<!-- PLACEHOLDER: Video walking through matching: aggregation, match, form, resolution. Save as docs/assets/videos/deduplication-flow.mp4 -->
 
 ### Detailed step-by-step
 
@@ -383,16 +383,16 @@ For each Fusion account (new or updated):
         - Calculate similarity score using specified algorithm
     - If **Use overall fusion similarity score?**:
         - Average all per-attribute scores → overall score
-        - If overall score ≥ threshold → potential duplicate (per-attribute thresholds may not all be met)
+        - If overall score ≥ threshold → potential match (per-attribute thresholds may not all be met)
     - Else (per-attribute mode):
         - Every **mandatory** attribute must meet its threshold or the match fails
         - If no attribute is mandatory, all attributes are treated as mandatory (all must meet thresholds)
-        - If all conditions met → potential duplicate
+        - If all conditions met → potential match
 3. Sort identities by similarity score (highest first)
 
 **Step 4: Decision point**
 
-For each potential duplicate:
+For each potential match:
 
 | Condition                                                                                                              | Action                                                                                                               |
 | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -436,10 +436,10 @@ On next aggregation:
 
 | Phase                        | Action                                                                        | Goal                                              |
 | ---------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------- |
-| **1. Baseline**              | Set conservative thresholds (e.g. name: 90, email: 95)                        | Low false positive rate; may miss some duplicates |
+| **1. Baseline**              | Set conservative thresholds (e.g. name: 90, email: 95)                        | Low false positive rate; may miss some matches |
 | **2. Test run**              | Run aggregation with small **Aggregation batch size** (e.g. 100–500 accounts) | Evaluate match quality                            |
 | **3. Review results**        | Check review forms: Are matches obvious? Many false positives?                | Calibrate                                         |
-| **4. Adjust**                | Lower thresholds if missing duplicates; raise if too many false positives     | Fine-tune                                         |
+| **4. Adjust**                | Lower thresholds if missing matches; raise if too many false positives     | Fine-tune                                         |
 | **5. Full rollout**          | Remove **Aggregation batch size** limit; run on all accounts                  | Production                                        |
 | **6. Enable auto-correlate** | Once confident, enable **Automatically correlate if identical?**              | Reduce manual burden                              |
 
@@ -450,7 +450,7 @@ Track these metrics to assess Match effectiveness:
 | Metric                    | How to track                                      | Target                                             |
 | ------------------------- | ------------------------------------------------- | -------------------------------------------------- |
 | **False positive rate**   | Manual review: % of "Create new" decisions        | <10%                                               |
-| **False negative rate**   | Audits: duplicates that passed through            | <5%                                                |
+| **False negative rate**   | Audits: matches that passed through            | <5%                                                |
 | **Review response time**  | Time from form creation to decision               | <2 days (adjust **Manual review expiration days**) |
 | **Auto-correlation rate** | % of matches auto-correlated vs manually reviewed | >60% after tuning                                  |
 
@@ -458,7 +458,7 @@ Track these metrics to assess Match effectiveness:
 
 | Issue                        | Symptom                                        | Fix                                                                                      |
 | ---------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **No matches found**         | Zero review forms despite expecting duplicates | Lower **Similarity score** thresholds; check **Identity Scope Query** returns identities |
+| **No matches found**         | Zero review forms despite expecting matches | Lower **Similarity score** thresholds; check **Identity Scope Query** returns identities |
 | **Too many false positives** | Many obvious non-duplicates flagged            | Raise **Similarity score** thresholds; use **Mandatory match?** for critical attributes  |
 | **Reviewer overload**        | Hundreds of review forms                       | Enable **Automatically correlate if identical?**; raise thresholds                       |
 | **Forms expiring**           | Forms timing out before review                 | Increase **Manual review expiration days**; notify reviewers                             |

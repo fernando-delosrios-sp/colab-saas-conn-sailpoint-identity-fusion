@@ -195,18 +195,18 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
         </div>
         {{/if}}
 
-        {{#if warnings.duplicateFusionIdentities}}
+        {{#if warnings.identityConflicts}}
         <div style="margin-top: 14px; padding: 12px; border: 1px solid #fecaca; border-left: 6px solid #ef4444; border-radius: 10px; background: #fef2f2;">
           <div style="font-size: 12px; color: #991b1b; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Warning</div>
-          <div style="font-size: 13px; color: #7f1d1d; line-height: 1.5; margin-bottom: 10px;">{{warnings.duplicateFusionIdentities.message}}</div>
-          {{#if (gt warnings.duplicateFusionIdentities.occurrences.length 0)}}
+          <div style="font-size: 13px; color: #7f1d1d; line-height: 1.5; margin-bottom: 10px;">{{warnings.identityConflicts.message}}</div>
+          {{#if (gt warnings.identityConflicts.occurrences.length 0)}}
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
             <tr>
               <th style="text-align: left; border: 1px solid #fecaca; background: #fee2e2; color: #7f1d1d; font-size: 11px; padding: 6px 8px; text-transform: uppercase;">Identity ID</th>
               <th style="text-align: left; border: 1px solid #fecaca; background: #fee2e2; color: #7f1d1d; font-size: 11px; padding: 6px 8px; text-transform: uppercase;">Fusion Accounts</th>
               <th style="text-align: left; border: 1px solid #fecaca; background: #fee2e2; color: #7f1d1d; font-size: 11px; padding: 6px 8px; text-transform: uppercase;">Account Names / Native Identities</th>
             </tr>
-            {{#each warnings.duplicateFusionIdentities.occurrences}}
+            {{#each warnings.identityConflicts.occurrences}}
             <tr>
               <td style="border: 1px solid #fecaca; color: #7f1d1d; font-size: 12px; padding: 6px 8px; word-break: break-all;">{{identityId}}</td>
               <td style="border: 1px solid #fecaca; color: #7f1d1d; font-size: 12px; padding: 6px 8px; font-weight: 700;">{{accountCount}}</td>
@@ -301,7 +301,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
             <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate; border-spacing:0; width:auto; min-width:100%;">
                 <tr>
-                  <td style="width:280px; min-width:280px; max-width:280px; vertical-align:top; padding-right:14px; border-right:1px solid #eef2f7;">
+                  <td style="width:300px; min-width:300px; max-width:300px; vertical-align:top; padding-right:14px; border-right:1px solid #eef2f7;">
                     <div style="color:#0b5cab; font-size:18px; font-weight:800; margin:0 0 6px 0;">{{accountName}}</div>
                     <div style="font-size:12px; color:#5f6b7a; margin-bottom:10px;">
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
@@ -336,6 +336,11 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                     </table>
                     {{/if}}
                   </td>
+                  <td style="width:34px; min-width:34px; max-width:34px; vertical-align:middle; padding:8px 4px; border-right:1px solid #eef2f7; text-align:center;">
+                    <div style="display:inline-block; font-size:11px; line-height:1.05; color:#5f6b7a; font-weight:800; letter-spacing:0.15px; text-transform:uppercase;">
+                      P<br>O<br>T<br>E<br>N<br>T<br>I<br>A<br>L<br><br>M<br>A<br>T<br>C<br>H<br>E<br>S
+                    </div>
+                  </td>
                   <td style="vertical-align:top; padding-left:14px;">
                     {{#if error}}
                     <div style="padding:16px 18px; background:#fef2f2; border:1px solid #fecaca; border-left:6px solid #ef4444; border-radius:10px;">
@@ -351,11 +356,6 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                         {{#each matches}}
                         <td valign="top" width="280" style="width:280px; vertical-align:top; padding:6px;">
                           <table role="presentation" width="280" cellpadding="0" cellspacing="0" border="0" style="width:280px; border-collapse:collapse;">
-                            <tr>
-                              <td colspan="4" style="font-weight:900; padding:6px 8px; border-bottom:1px solid #e0e0e0; color:#0b5cab; font-size:12px; letter-spacing:0.35px; text-transform:uppercase; white-space:nowrap;">
-                                Potential Matches
-                              </td>
-                            </tr>
                             <tr>
                               <td colspan="4" style="padding:6px 8px;">
                                 <div style="font-size:14px; font-weight:800; color:#0b5cab; line-height:1.3; word-wrap:break-word;">
@@ -452,7 +452,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                             <div style="margin-bottom:12px;">
                                                 <h1 style="margin:0; color:#0b5cab; font-size:26px; letter-spacing:-0.2px;">Identity Fusion Review Required</h1>
                                                 <div style="color:#5f6b7a; font-size:13px; margin-top:6px;">
-                                                    Please review the potential duplicate and take appropriate action.
+                                                    Please review the potential match and take appropriate action.
                                                 </div>
                                                 {{#each accounts}}
                                                 {{#if accountSource}}
@@ -470,7 +470,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                 </div>
                                                 {{/if}}
                                             </div>
-                                            <!-- No "potential duplicates" count in review email -->
+                                            <!-- No "potential matches" count in review email -->
                                         </div>
 
                                         {{#each accounts}}
@@ -478,8 +478,8 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                             <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
                                                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; width:auto; min-width:100%;">
                                                     <tr>
-                                                    <!-- Left: duplicate account summary -->
-                                                    <td class="main-col" valign="top" style="width:280px; min-width:280px; max-width:280px; vertical-align:top; padding:8px; border-right:1px solid #eef2f7;">
+                                                    <!-- Left: candidate account summary -->
+                                                    <td class="main-col" valign="top" style="width:300px; min-width:300px; max-width:300px; vertical-align:top; padding:8px; border-right:1px solid #eef2f7;">
                                                         <div style="color:#0b5cab; font-size:18px; font-weight:800; margin:0 0 6px 0;">{{accountName}}</div>
                                                         <div style="font-size:12px; color:#5f6b7a; margin-bottom:10px;">
                                                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
@@ -514,6 +514,11 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                         </table>
                                                         {{/if}}
                                                     </td>
+                                                    <td valign="top" style="width:34px; min-width:34px; max-width:34px; vertical-align:middle; padding:8px 4px; border-right:1px solid #eef2f7; text-align:center;">
+                                                        <div style="display:inline-block; font-size:11px; line-height:1.05; color:#5f6b7a; font-weight:800; letter-spacing:0.15px; text-transform:uppercase;">
+                                                            P<br>O<br>T<br>E<br>N<br>T<br>I<br>A<br>L<br><br>M<br>A<br>T<br>C<br>H<br>E<br>S
+                                                        </div>
+                                                    </td>
 
                                                     <!-- Right: matches (report-style) -->
                                                     <td class="main-col" valign="top" style="vertical-align:top; padding:8px;">
@@ -525,11 +530,6 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                                 {{#each matches}}
                                                                 <td valign="top" width="280" style="width:280px; vertical-align:top; padding:4px;">
                                                                     <table role="presentation" width="280" cellpadding="0" cellspacing="0" border="0" style="width:280px; border-collapse:collapse;">
-                                                                        <tr>
-                                                                            <td colspan="4" style="font-weight:900; padding:6px 8px; border-bottom:1px solid #e0e0e0; color:#0b5cab; font-size:12px; letter-spacing:0.35px; text-transform:uppercase; white-space:nowrap;">
-                                                                                Potential Matches
-                                                                            </td>
-                                                                        </tr>
                                                                         <tr>
                                                                             <td colspan="4" style="padding:6px 8px;">
                                                                                 <div style="font-size:14px; font-weight:800; color:#0b5cab; line-height:1.3; word-wrap:break-word;">
@@ -615,7 +615,7 @@ export const compileEmailTemplates = (): Map<string, HandlebarsTemplateDelegate>
 export type FusionReviewEmailData = {
   accounts: FusionReportEmailData['accounts']
   totalAccounts: number
-  potentialDuplicates: number
+  potentialMatches: number
   reportDate: Date | string
   formInstanceId?: string
   formUrl?: string
@@ -653,7 +653,7 @@ export type FusionReportEmailData = {
     }>
   }>
   totalAccounts: number
-  potentialDuplicates: number
+  potentialMatches: number
   reportDate: Date | string
   fusionReviewDecisions?: Array<{
     reviewerId: string

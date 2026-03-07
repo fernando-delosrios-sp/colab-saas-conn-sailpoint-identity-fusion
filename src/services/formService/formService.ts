@@ -935,7 +935,7 @@ export class FormService {
             body: {
                 name: formName,
                 description:
-                    'Review potential duplicate identity and decide whether to create a new identity or link to an existing one',
+                    'Review potential matching identity and decide whether to create a new identity or link to an existing one',
                 owner,
                 formElements: formFields,
                 formInput: formInputs,

@@ -91,7 +91,7 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
 | `sp:scopes:all`                         | All operations (or use specific scopes below)  |
 | `sp:scim:read`, `sp:scim:write`         | Identity/account operations                    |
 | `sp:accounts:read`, `sp:accounts:write` | Account management                             |
-| `sp:forms:manage`                       | Create/manage review forms (for deduplication) |
+| `sp:forms:manage`                       | Create/manage review forms (for matching) |
 | `sp:workflow:execute`                   | Execute workflows (for notifications)          |
 
 **Solution:**
@@ -150,6 +150,7 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
 | **Source name mismatch**             | Check exact source names in ISC vs config     | Update source names in **Authoritative account sources** (case-sensitive)                  |
 | **Identity Scope Query too strict**  | Test query in ISC search                      | Relax query; or use `*` for all identities                                                 |
 | **Account filter excludes accounts** | Review filter logic                           | Adjust or remove **Account filter**                                                        |
+| **Machine accounts excluded**        | Check logs for `isMachine=true` discard warnings | Expected behavior. Identity Fusion NG does not support machine accounts and skips them. |
 | **Sources not aggregated**           | Check source aggregation history              | Run aggregation on source systems first                                                    |
 | **Stuck processing state**           | Check account history for "processing" status | Simply retry the aggregation; the connector auto-resets the flag and asks you to run again |
 | **Configuration error**              | Review all configuration fields               | Validate configuration                                                                     |
@@ -300,11 +301,11 @@ $firstname$lastname      ## Throws error if null
 
 ---
 
-## Category 4: Deduplication issues
+## Category 4: Matching issues
 
-### Issue 4.1: No potential duplicates found (expected some)
+### Issue 4.1: No potential matches found (expected some)
 
-**Symptom:** No review forms generated even though duplicates are expected.
+**Symptom:** No review forms generated even though matches are expected.
 
 **Possible causes:**
 

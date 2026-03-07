@@ -38,6 +38,8 @@ flowchart TD
         - Managed accounts (from configured sources).
         - Message sender workflow.
         - Current form data, including forms and associated form instances.
+    - Managed machine accounts (`isMachine=true`) are discarded after fetch and never enter the work queue.
+    - A warning is logged with discarded machine-account counts (per source and total).
     - If `fusionReportOnAggregation` is enabled and the fusion owner identity was not loaded in the parallel fetch, it is fetched separately.
 
 3.  **Fusion Account Processing** (attribute mapping + normal definitions):
@@ -59,15 +61,15 @@ flowchart TD
 5.  **New Identity Decisions**:
     - Processes Fusion reviews that resulted in new identities.
 
-6.  **Managed Account Processing (Deduplication)**:
+6.  **Managed Account Processing (Matching)**:
     - Processes any remaining managed accounts in the work queue.
     - These are accounts that were _not_ matched to an existing fusion account or an identity.
     - **Source Type Check**: Behavior changes based on the account's Source Type:
         - **Record**: Registers unique attributes but drops the account from ISC output.
         - **Orphan**: Drops the account entirely (and optionally triggers a background disable operation).
-        - **Identity**: Proceeds to Deduplication pipeline.
+        - **Identity**: Proceeds to matching pipeline.
     - **Reviewer validation**: Before scoring begins, each managed source is checked for valid reviewers. Sources without a configured reviewer are logged once as an error and their accounts bypass scoring entirely, being added as unmatched directly.
-    - For sources with valid reviewers, the full deduplication pipeline runs: scoring, auto-correlation (for perfect matches when enabled), review form creation (for partial matches), or unmatched addition.
+    - For sources with valid reviewers, the full matching pipeline runs: scoring, auto-correlation (for perfect matches when enabled), review form creation (for partial matches), or unmatched addition.
 
 <details>
 <summary><b>View Graphic: Managed Account Processing (Step 6)</b></summary>
@@ -109,7 +111,7 @@ When report-on-aggregation is enabled, the generated Fusion report can include:
 - **Header summary**
   - Report date
   - Total accounts analyzed
-  - Potential duplicates count
+  - Potential matches count
 - **Processing statistics**
   - Fusion totals (accounts, forms, assignments)
   - Review decisions and outcomes
@@ -117,13 +119,13 @@ When report-on-aggregation is enabled, the generated Fusion report can include:
   - Total processing time and memory used
 - **Global warnings**
   - Duplicate Fusion account mappings per identity (when detected)
-  - Guidance that this is generally caused by duplicated account names, with recommendation to review configuration and consider a unique account-name attribute
+  - Guidance that this is generally caused by non-unique account names, with recommendation to review configuration and consider a unique account-name attribute
 - **Aggregation issues summary (compact)**
   - Total warnings and total errors logged during aggregation
   - Short sampled warning/error messages (not full logs)
   - Samples are intentionally capped and truncated to reduce report size
 - **Per-account detail cards**
-  - Potential duplicate account context (source, id, email, selected attributes)
+  - Potential match account context (source, id, email, selected attributes)
   - Candidate identities with score breakdown by attribute/algorithm/threshold
   - Failed matching/form creation entries with error details
 - **Optional non-match entries**
@@ -169,6 +171,10 @@ When `correlateOnAggregation` is enabled, correlations are applied optimisticall
 ### Reviewer validation for managed account scoring
 
 Before the managed account scoring loop begins, each managed source is validated for reviewer availability. Sources that lack a valid reviewer cannot create review forms for partial matches, making the scoring step unnecessary. Accounts from these sources skip scoring entirely and are added as unmatched. A single error is logged per source, avoiding the per-account warning that would otherwise repeat for every managed account without a reviewer.
+
+### Machine account exclusion
+
+Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion NG. The connector fetches managed-source accounts first, then excludes machine accounts client-side (the ISC account-list API does not support filtering by `isMachine`), logs warning counts, and continues processing only non-machine accounts.
 
 ### Preventing Fusion account creation (empty nativeIdentity skip pattern)
 

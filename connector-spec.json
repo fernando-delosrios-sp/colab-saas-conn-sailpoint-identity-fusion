@@ -824,14 +824,14 @@
                 {
                     "type": "section",
                     "sectionTitle": "Review Settings",
-                    "sectionHelpMessage": "<strong>Configure manual review for potential duplicates.</strong><br><br><ul><li><strong>Form attributes:</strong> Identity attributes shown to reviewers (e.g. name, email, department).</li><li><strong>Expiration:</strong> Days before review form expires (default: 7).</li><li><strong>Global reviewer:</strong> Add source owner as reviewer to all forms (ensures assignment).</li><li><strong>Report:</strong> Email report to owner after aggregation.</li></ul>",
+                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong><br><br><ul><li><strong>Form attributes:</strong> Identity attributes shown to reviewers (e.g. name, email, department).</li><li><strong>Expiration:</strong> Days before review form expires (default: 7).</li><li><strong>Global reviewer:</strong> Add source owner as reviewer to all forms (ensures assignment).</li><li><strong>Report:</strong> Email report to owner after aggregation.</li></ul>",
                     "items": [
                         {
                             "key": "fusionFormAttributes",
                             "label": "List of Fusion account attributes to include in form",
                             "type": "list",
                             "required": false,
-                            "helpKey": "Account attributes displayed on the review form to help reviewers compare potential duplicates. For example: name, email, department"
+                            "helpKey": "Account attributes displayed on the review form to help reviewers compare potential matches. For example: name, email, department"
                         },
                         {
                             "key": "fusionFormExpirationDays",
@@ -845,14 +845,14 @@
                             "label": "Owner is global reviewer?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Always add the source owner as a reviewer on every review form, ensuring someone is always assigned to review potential duplicates"
+                            "helpKey": "Always add the source owner as a reviewer on every review form, ensuring someone is always assigned to review potential matches"
                         },
                         {
                             "key": "fusionReportOnAggregation",
                             "label": "Send report to owner on aggregation?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Send a summary report to the source owner after each run, including potential duplicates, processing outcomes, and source-type breakdown metrics"
+                            "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-type breakdown metrics"
                         }
                     ]
                 }

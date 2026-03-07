@@ -155,39 +155,39 @@ export type FusionReportStats = {
     errorSamples?: string[]
 }
 
-/** Duplicate Fusion-account mapping details for a single ISC identity. */
-export type FusionReportDuplicateIdentityOccurrence = {
+/** Conflicting Fusion-account mapping details for a single ISC identity. */
+export type FusionReportIdentityConflictOccurrence = {
     /** ISC identity ID associated to multiple Fusion accounts */
     identityId: string
     /** Number of Fusion accounts seen for this identity */
     accountCount: number
-    /** Unique account names involved in the duplicate mapping */
+    /** Unique account names involved in the conflicting mapping */
     accountNames: string[]
-    /** Unique native identities involved in the duplicate mapping */
+    /** Unique native identities involved in the conflicting mapping */
     nativeIdentities: string[]
 }
 
 /** Report warnings section payload. */
 export type FusionReportWarnings = {
-    /** Guidance + duplicate identity occurrences detected in this run */
-    duplicateFusionIdentities?: {
+    /** Guidance + conflicting identity occurrences detected in this run */
+    identityConflicts?: {
         message: string
         affectedIdentities: number
-        occurrences: FusionReportDuplicateIdentityOccurrence[]
+        occurrences: FusionReportIdentityConflictOccurrence[]
     }
 }
 
 /**
  * Complete fusion report generated during aggregation or on-demand.
- * Contains all analyzed accounts and their deduplication match results.
+ * Contains all analyzed accounts and their matching results.
  */
 export type FusionReport = {
     /** Array of accounts analyzed in this report */
     accounts: FusionReportAccount[]
     /** Total number of accounts analyzed */
     totalAccounts?: number
-    /** Number of accounts flagged as potential duplicates */
-    potentialDuplicates?: number
+    /** Number of accounts flagged as potential matches */
+    potentialMatches?: number
     /** Timestamp when the report was generated */
     reportDate?: Date | string
     /** Processing statistics */

@@ -117,7 +117,7 @@ export class MessagingService {
     }
 
     /**
-     * Send email notification for a fusion form (deduplication review)
+     * Send email notification for a fusion form (matching review)
      */
     public async sendFusionEmail(
         formInstance: FormInstanceResponseV2025,
@@ -190,7 +190,7 @@ export class MessagingService {
                 },
             ],
             totalAccounts: 1,
-            potentialDuplicates: 1,
+            potentialMatches: 1,
             reportDate: new Date(),
             formInstanceId: formInstance.id,
             formUrl: formInstance.standAloneFormUrl,
@@ -205,12 +205,11 @@ export class MessagingService {
     }
 
     /**
-     * Send report email with potential duplicate accounts
+     * Send report email with potential match accounts
      */
     public async sendReport(report: FusionReport, fusionAccount?: FusionAccount): Promise<void> {
         const totalAccounts = report.totalAccounts ?? report.accounts.length
-        const potentialDuplicates =
-            report.potentialDuplicates ?? report.accounts.filter((a) => a.matches.length > 0).length
+        const potentialMatches = report.potentialMatches ?? report.accounts.filter((a) => a.matches.length > 0).length
 
         // Recipients:
         // - the initiating fusion account (if we can resolve an email)
@@ -244,11 +243,11 @@ export class MessagingService {
             return
         }
 
-        const subject = `Identity Fusion Report - ${potentialDuplicates} Potential Duplicate(s) Found`
+        const subject = `Identity Fusion Report - ${potentialMatches} Potential Match(es) Found`
         const emailData: FusionReportEmailData = {
             ...report,
             totalAccounts,
-            potentialDuplicates,
+            potentialMatches,
             reportDate: report.reportDate || new Date(),
         }
         const body = renderFusionReport(this.templates, emailData)

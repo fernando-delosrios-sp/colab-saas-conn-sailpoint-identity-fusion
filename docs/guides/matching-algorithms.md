@@ -1,18 +1,18 @@
 # Effective Use of Matching Algorithms
 
-Identity Fusion NG uses **similarity scoring** to detect potential duplicate identities. This comprehensive guide helps you choose, configure, and tune the **matching algorithms** used in **Fusion Settings → Matching Settings** for optimal deduplication results.
+Identity Fusion NG uses **similarity scoring** to detect potential matching identities. This comprehensive guide helps you choose, configure, and tune the **matching algorithms** used in **Fusion Settings → Matching Settings** for optimal matching results.
 
 ---
 
-## Overview: Matching in deduplication
+## Overview: Matching in Identity Fusion
 
-Matching algorithms calculate **similarity scores** (0–100) between attribute values from different identities. These scores determine whether two identities are potential duplicates.
+Matching algorithms calculate **similarity scores** (0–100) between attribute values from different identities. These scores determine whether two identities are potential matches.
 
 | Component                      | Purpose                            | Configuration location                                                              |
 | ------------------------------ | ---------------------------------- | ----------------------------------------------------------------------------------- |
 | **Fusion attribute matches**   | Define which attributes to compare | Fusion Settings → Matching Settings                                                 |
 | **Matching algorithm**         | How to calculate similarity        | Per attribute (Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Custom) |
-| **Similarity score threshold** | Minimum score to flag as duplicate | Per attribute or overall                                                            |
+| **Similarity score threshold** | Minimum score to flag as a match   | Per attribute or overall                                                            |
 | **Mandatory match**            | Require attribute to participate   | Per attribute (Yes/No)                                                              |
 | **Overall vs per-attribute**   | Scoring mode                       | Use overall fusion similarity score? (Yes/No)                                       |
 
@@ -283,7 +283,7 @@ For each **Fusion attribute match**, configure:
 | Strategy                        | Configuration                                                                 | Use when                                                                     |
 | ------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | **Single attribute**            | One Fusion attribute match (e.g., name only)                                  | Simple matching; one strong identifier                                       |
-| **Multi-attribute (OR logic)**  | Multiple matches, low overall threshold                                       | Any attribute can indicate duplicate                                         |
+| **Multi-attribute (OR logic)**  | Multiple matches, low overall threshold                                       | Any attribute can indicate a match                                         |
 | **Multi-attribute (AND logic)** | Multiple matches, all with per-attribute thresholds or high overall threshold | All attributes must agree for high confidence                                |
 | **Hybrid**                      | Some mandatory, some optional                                                 | Critical attribute (email) must match; others (name, phone) support decision |
 
@@ -327,7 +327,7 @@ Configuration 4: Comprehensive (overall score)
 
 - Each attribute match has its own **Similarity score [0-100]** threshold
 - A **mandatory** attribute must always meet or exceed its threshold or the match fails
-- Identity is flagged as potential duplicate if:
+- Identity is flagged as a potential match if:
     - Every mandatory attribute meets its threshold, and
     - When no attribute is marked mandatory: **all** attributes are treated as mandatory (all must meet their thresholds)
     - When at least one attribute is mandatory: those must pass; non-mandatory attributes contribute to the match but their thresholds are also enforced for a pass
@@ -415,7 +415,7 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 
 | Attribute type | Algorithm             | Starting threshold | Adjust if...                                           |
 | -------------- | --------------------- | ------------------ | ------------------------------------------------------ |
-| Full name      | Enhanced Name Matcher | 80                 | Too many false positives → 85; missing duplicates → 75 |
+| Full name      | Enhanced Name Matcher | 80                 | Too many false positives → 85; missing matches → 75 |
 | First name     | Enhanced Name Matcher | 85                 | Too strict → 80; too loose → 90                        |
 | Last name      | Enhanced Name Matcher | 88                 | Missing matches → 85; false positives → 92             |
 | Email          | Jaro-Winkler          | 92                 | Very strict domain → 95; relaxed → 88                  |
@@ -440,7 +440,7 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 | Scenario                 | Symptom                               | Adjustment                                                                                      |
 | ------------------------ | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **High false positives** | Many forms for obvious non-duplicates | Raise thresholds; add mandatory matches for critical attributes                                 |
-| **High false negatives** | Missing obvious duplicates            | Lower thresholds; add more attributes; try different algorithms                                 |
+| **High false negatives** | Missing obvious matches            | Lower thresholds; add more attributes; try different algorithms                                 |
 | **Borderline cases**     | Many ambiguous matches                | Enable **Automatically correlate if identical?** for obvious ones; manual review for borderline |
 
 **Screenshot placeholder:** Review form showing per-attribute similarity scores.
@@ -464,7 +464,7 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 | Thresholds are well-tuned              | Initial setup / testing                 |
 | False positive rate is <5%             | High-risk merges (finance, healthcare)  |
 | Review burden is high (>50 forms/week) | You want manual approval for all merges |
-| Obvious duplicates are common          | Data quality is poor                    |
+| Obvious matches are common          | Data quality is poor                    |
 
 **When auto-correlation runs:** When **Automatically correlate if identical?** is enabled, the connector skips the review form and performs the Fusion assignment directly when **all** attribute similarity scores for the best match are **100** (perfect match). No manual review is required in that case.
 
@@ -474,7 +474,7 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 
 ### Pattern 1: Conservative (high confidence only)
 
-**Goal:** Only flag very obvious duplicates; minimize false positives.
+**Goal:** Only flag very obvious matches; minimize false positives.
 
 ```
 - Attribute: email, Algorithm: Jaro-Winkler, Score: 95, Mandatory: Yes
@@ -486,7 +486,7 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 
 ### Pattern 2: Balanced (moderate confidence)
 
-**Goal:** Balance between catching duplicates and avoiding false positives.
+**Goal:** Balance between catching matches and avoiding false positives.
 
 ```
 - Attribute: name, Algorithm: Enhanced Name Matcher, Score: 80
@@ -497,9 +497,9 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 
 **Use case:** General corporate environments; standard data quality.
 
-### Pattern 3: Aggressive (catch more duplicates)
+### Pattern 3: Aggressive (catch more matches)
 
-**Goal:** Flag potential duplicates even with lower confidence; accept some false positives.
+**Goal:** Flag potential matches even with lower confidence; accept some false positives.
 
 ```
 - Attribute: firstname, Algorithm: Enhanced Name Matcher, Score: 75
@@ -509,7 +509,7 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 → Relaxed thresholds; overall average
 ```
 
-**Use case:** Poor data quality; many known duplicates; strong review team.
+**Use case:** Poor data quality; many known matches; strong review team.
 
 ### Pattern 4: Phonetic (spelling variations)
 
@@ -572,7 +572,7 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 2. **Use appropriate algorithms** — Names (Enhanced Name Matcher), short text (Jaro-Winkler), long text (Dice), phonetic (Double Metaphone)
 3. **Test with samples** — Don't run on full dataset until thresholds are tuned
 4. **Monitor and adjust** — Track false positive/negative rates; iterate
-5. **Balance precision and recall** — Lower thresholds catch more duplicates but increase false positives
+5. **Balance precision and recall** — Lower thresholds catch more matches but increase false positives
 6. **Consider auto-correlation** — Enable after tuning to reduce manual review burden
 
 **Next steps:**

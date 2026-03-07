@@ -349,7 +349,7 @@ export class SourceService {
             () =>
                 accountsApi.disableAccount({
                     id: accountId,
-                    accountToggleRequestV2025: { forceProvisioning: true },
+                    accountToggleRequestV2025: {},
                 }),
             QueuePriority.LOW,
             'SourceService>fireDisableAccount'
@@ -381,7 +381,17 @@ export class SourceService {
             return await accountsApi.listAccounts(params)
         }
         const ctx = `SourceService>fetchAccountsBySourceId ${sourceInfo.name}`
-        return await this.client.paginate(listAccounts, requestParameters, QueuePriority.HIGH, ctx)
+        const accounts = await this.client.paginate(listAccounts, requestParameters, QueuePriority.HIGH, ctx)
+        if (!sourceInfo.isManaged) {
+            return accounts
+        }
+        const { filteredAccounts, discardedMachineCount } = this.filterManagedMachineAccounts(accounts)
+        if (discardedMachineCount > 0) {
+            this.log.warn(
+                `Source ${sourceInfo.name}: discarded ${discardedMachineCount} managed machine account(s) where isMachine=true`
+            )
+        }
+        return filteredAccounts
     }
 
     /**
@@ -409,7 +419,6 @@ export class SourceService {
             return await accountsApi.listAccounts(params)
         }
         const ctx = `SourceService>fetchAccountsBySourceIdGenerator ${sourceInfo.name}`
-
         yield* this.client.paginateParallel(
             listAccounts,
             requestParameters,
@@ -462,14 +471,19 @@ export class SourceService {
                 sourcesWithLimits.map(async ({ source, effectiveLimit }) => {
                     this.log.info(`Fetching accounts from source: ${source.name}`)
                     let collectedCount = 0
+                    let discardedMachineCount = 0
 
                     for await (const batch of this.fetchAccountsBySourceIdGenerator(
                         source.id,
                         abortSignal,
-                        effectiveLimit
+                        undefined
                     )) {
                         for (const account of batch) {
                             if (effectiveLimit && collectedCount >= effectiveLimit) break
+                            if (this.isMachineManagedAccount(account)) {
+                                discardedMachineCount++
+                                continue
+                            }
                             if (account.id) {
                                 this.managedAccountsById.set(account.id, account)
                                 this.managedAccountsAllById.set(account.id, account)
@@ -493,6 +507,11 @@ export class SourceService {
                     }
 
                     this.log.info(`Source ${source.name}: collected ${collectedCount} account(s)`)
+                    if (discardedMachineCount > 0) {
+                        this.log.warn(
+                            `Source ${source.name}: discarded ${discardedMachineCount} managed machine account(s) where isMachine=true`
+                        )
+                    }
 
                     if (source.config?.accountLimit !== undefined) {
                         this.batchCumulativeCount[source.name] = collectedCount
@@ -541,6 +560,10 @@ export class SourceService {
             this.log.warn(`Managed account not found for id: ${id}`)
             return
         }
+        if (this.isMachineManagedAccount(managedAccount)) {
+            this.log.warn(`Discarded managed machine account ${id} where isMachine=true`)
+            return
+        }
 
         this.managedAccountsById.set(managedAccount.id!, managedAccount)
         this.managedAccountsAllById.set(managedAccount.id!, managedAccount)
@@ -581,7 +604,14 @@ export class SourceService {
             QueuePriority.HIGH,
             'SourceService>fetchSourceAccountByNativeIdentity'
         )
-        return accounts?.[0]
+        const candidate = accounts?.[0]
+        if (sourceInfo.isManaged && candidate && this.isMachineManagedAccount(candidate)) {
+            this.log.warn(
+                `Discarded managed machine account for native identity "${nativeIdentity}" on source "${sourceInfo.name}" where isMachine=true`
+            )
+            return undefined
+        }
+        return candidate
     }
 
     // ------------------------------------------------------------------------
@@ -787,7 +817,7 @@ export class SourceService {
             // await this.releaseProcessLock()
             throw new ConnectorError(
                 'An account aggregation is already in progress or the previous one did not finish cleanly. ' +
-                    'Please verify no other aggregation is running and try again.',
+                'Please verify no other aggregation is running and try again.',
                 ConnectorErrorType.Generic
             )
         }
@@ -1081,7 +1111,7 @@ export class SourceService {
         if (matchingProfiles.length === 0) {
             this.log.warn(
                 `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}". ` +
-                    `Skipping identity profile mapping for reverse correlation attribute "${attributeName}".`
+                `Skipping identity profile mapping for reverse correlation attribute "${attributeName}".`
             )
             return
         }
@@ -1128,21 +1158,21 @@ export class SourceService {
             const hasIdentityAttributeConfig = !!profile.identityAttributeConfig
             const jsonPatchOperationV2025 = hasIdentityAttributeConfig
                 ? [
-                      {
-                          op: 'replace' as JsonPatchOperationV2025OpV2025,
-                          path: '/identityAttributeConfig/attributeTransforms',
-                          value: nextTransforms,
-                      },
-                  ]
+                    {
+                        op: 'replace' as JsonPatchOperationV2025OpV2025,
+                        path: '/identityAttributeConfig/attributeTransforms',
+                        value: nextTransforms,
+                    },
+                ]
                 : [
-                      {
-                          op: 'add' as JsonPatchOperationV2025OpV2025,
-                          path: '/identityAttributeConfig',
-                          value: {
-                              attributeTransforms: nextTransforms,
-                          },
-                      },
-                  ]
+                    {
+                        op: 'add' as JsonPatchOperationV2025OpV2025,
+                        path: '/identityAttributeConfig',
+                        value: {
+                            attributeTransforms: nextTransforms,
+                        },
+                    },
+                ]
 
             await this.client.execute(
                 () =>
@@ -1178,7 +1208,7 @@ export class SourceService {
             if (!verified) {
                 this.log.warn(
                     `Identity profile mapping verification failed for profile ${profile.id} and attribute "${attributeName}". ` +
-                        `Existing transform keys: ${refreshedTransforms.map((t: any) => t.identityAttributeName).join(', ')}`
+                    `Existing transform keys: ${refreshedTransforms.map((t: any) => t.identityAttributeName).join(', ')}`
                 )
             } else {
                 this.log.info(
@@ -1270,6 +1300,34 @@ export class SourceService {
             filterParts.push(`(${sourceInfo.config.accountFilter})`)
         }
         return filterParts.join(' and ')
+    }
+
+    /**
+     * Client-side machine account check. This cannot be done via ISC account filters.
+     */
+    private isMachineManagedAccount(account: Account): boolean {
+        return account.isMachine === true
+    }
+
+    /**
+     * Remove machine accounts from managed-source batches before further processing.
+     */
+    private filterManagedMachineAccounts(accounts: Account[]): {
+        filteredAccounts: Account[]
+        discardedMachineCount: number
+    } {
+        const filteredAccounts: Account[] = []
+        let discardedMachineCount = 0
+
+        for (const account of accounts) {
+            if (this.isMachineManagedAccount(account)) {
+                discardedMachineCount++
+                continue
+            }
+            filteredAccounts.push(account)
+        }
+
+        return { filteredAccounts, discardedMachineCount }
     }
 
     /**
@@ -1384,12 +1442,12 @@ export class SourceService {
         if (!completed) {
             const lastStatusSummary = lastTaskStatus
                 ? JSON.stringify({
-                      completed: lastTaskStatus.completed,
-                      completionStatus: lastTaskStatus.completionStatus,
-                      type: lastTaskStatus.type,
-                      description: lastTaskStatus.description,
-                      messages: lastTaskStatus.messages,
-                  })
+                    completed: lastTaskStatus.completed,
+                    completionStatus: lastTaskStatus.completionStatus,
+                    type: lastTaskStatus.type,
+                    description: lastTaskStatus.description,
+                    messages: lastTaskStatus.messages,
+                })
                 : 'none'
             this.log.warn(
                 `Failed to aggregate managed accounts for source ${sourceName} (${id}). taskId=${taskId ?? 'unknown'}, pollsExecuted=${pollsExecuted}, maxPolls=${Math.max(taskResultRetries - 1, 0)}, pollWaitMs=${taskResultWait}, lastTaskStatus=${lastStatusSummary}`

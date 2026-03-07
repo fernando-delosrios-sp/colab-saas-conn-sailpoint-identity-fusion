@@ -41,6 +41,8 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
 | **Correlation attribute name**    | Attribute used for reverse correlation                 | Yes (for reverse mode) | Technical name for the dedicated Fusion attribute.                                                                                                                                                         |
 | **Correlation display name**      | UI display name for the correlation attribute          | Yes (for reverse mode) | Human-readable name.                                                                                                                                                                                       |
 
+> **Note:** Machine accounts (`isMachine=true`) are not supported for managed-source processing. Because `isMachine` is not an ISC account-list API filter, the connector applies this exclusion client-side and skips those accounts after fetching.
+
 > **Tip:** You can use the **Aggregate before processing** option to ensure a managed source has newer data than the last time Identity Fusion ran and/or synchronize aggregation schedules. If you don't need the absolute latest data blocking the aggregation response, consider **Delayed aggregation** to speed up the account list operation.
 
 <details>
