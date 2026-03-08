@@ -1,100 +1,67 @@
 import { accountList } from '../accountList'
 import { ServiceRegistry } from '../../services/serviceRegistry'
-
-type SourceConfigLike = {
-    name: string
-    correlationMode: 'none' | 'correlate' | 'reverse'
-    correlationAttribute?: string
-    correlationDisplayName?: string
-}
+import { aggregationScenarios } from './fixtures/aggregationScenarios'
+import { AggregationScenario } from './fixtures/scenarioTypes'
+import { createBaseOperationRegistry, SourceConfigLike } from './harness/mockRegistry'
 
 function createMockRegistry(sourceConfigs: SourceConfigLike[]) {
-    const timer = {
-        phase: jest.fn(),
-        end: jest.fn(),
-        totalElapsed: jest.fn(() => 0),
-    }
-
-    const schemas = {
-        setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
-        getManagedSourceSchemaAttributeNames: jest.fn().mockResolvedValue(new Set<string>()),
-    }
-
-    const sources = {
-        fetchAllSources: jest.fn().mockResolvedValue(undefined),
-        setProcessLock: jest.fn().mockResolvedValue(undefined),
-        releaseProcessLock: jest.fn().mockResolvedValue(undefined),
-        resetBatchCumulativeCount: jest.fn().mockResolvedValue(undefined),
-        ensureReverseCorrelationSetup: jest.fn().mockResolvedValue(undefined),
-        aggregateManagedSources: jest.fn().mockResolvedValue(undefined),
-        aggregateDelayedSources: jest.fn().mockResolvedValue(undefined),
-        fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
-        fetchManagedAccounts: jest.fn().mockResolvedValue(undefined),
-        saveBatchCumulativeCount: jest.fn().mockResolvedValue(undefined),
-        clearManagedAccounts: jest.fn(),
-        clearFusionAccounts: jest.fn(),
-        getSourceByName: jest.fn(),
-        managedSources: [],
-        managedAccountsById: new Map(),
-        fusionAccountCount: 0,
-        fusionSourceOwner: { id: 'fusion-owner' },
-    }
-
-    const identities = {
-        fetchIdentities: jest.fn().mockResolvedValue(undefined),
-        clear: jest.fn(),
-        getIdentityById: jest.fn(),
-        fetchIdentityById: jest.fn().mockResolvedValue(undefined),
-    }
-
-    const forms = {
-        deleteExistingForms: jest.fn().mockResolvedValue(undefined),
-        fetchFormData: jest.fn().mockResolvedValue(undefined),
-        cleanUpForms: jest.fn().mockResolvedValue(undefined),
-    }
-
-    const fusion = {
-        isReset: jest.fn(() => false),
-        disableReset: jest.fn().mockResolvedValue(undefined),
-        resetState: jest.fn().mockResolvedValue(undefined),
-        processFusionAccounts: jest.fn().mockResolvedValue(undefined),
-        processIdentities: jest.fn().mockResolvedValue(undefined),
-        processFusionIdentityDecisions: jest.fn().mockResolvedValue(undefined),
-        processManagedAccounts: jest.fn().mockResolvedValue(undefined),
-        refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
-        reconcilePendingFormState: jest.fn(),
-        clearAnalyzedAccounts: jest.fn(),
-        forEachISCAccount: jest.fn().mockResolvedValue(0),
-        fusionReportOnAggregation: false,
-    }
-
-    const messaging = {
-        fetchSender: jest.fn().mockResolvedValue(undefined),
-    }
-
-    const attributes = {
-        initializeCounters: jest.fn().mockResolvedValue(undefined),
-        saveState: jest.fn().mockResolvedValue(undefined),
-    }
-
-    const registry = {
-        config: { sources: sourceConfigs },
-        log: {
-            info: jest.fn(),
-            crash: jest.fn(),
-            timer: jest.fn(() => timer),
-        },
-        res: { send: jest.fn() },
-        schemas,
-        sources,
-        identities,
-        forms,
-        fusion,
-        messaging,
-        attributes,
-    } as any
-
+    const { registry, schemas, sources } = createBaseOperationRegistry(sourceConfigs)
     return { registry, schemas, sources }
+}
+
+function createTwoPassRegistry(scenario: AggregationScenario) {
+    const currentPass = { value: 'pass1' as 'pass1' | 'pass2' }
+    const dataByPass = scenario.passData
+    const decisionHistory: string[][] = []
+
+    const { registry, sources } = createMockRegistry(scenario.sourceConfigs)
+    const forms = registry.forms
+    const identities = registry.identities
+    const fusion = registry.fusion
+    const res = registry.res
+
+    sources.getSourceByName.mockImplementation((sourceName: string) =>
+        scenario.sourceConfigs.find((sc) => sc.name === sourceName)
+    )
+
+    sources.fetchManagedAccounts.mockImplementation(async () => {
+        const passData = dataByPass[currentPass.value]
+        const map = new Map<string, { id: string; sourceName: string }>()
+        for (const account of passData.managedAccounts) {
+            map.set(account.id, account)
+        }
+        sources.managedAccountsById = map
+    })
+
+    sources.fusionAccountCount = 2
+    identities.fetchIdentities.mockImplementation(async () => {
+        identities.identityCount = dataByPass[currentPass.value].identitiesFound
+    })
+
+    forms.fetchFormData.mockImplementation(async () => {
+        decisionHistory.push([...dataByPass[currentPass.value].decisions])
+    })
+
+    fusion.forEachISCAccount.mockImplementation(async (sendFn: (account: unknown) => void) => {
+        const output = dataByPass[currentPass.value].outputAccounts
+        for (const account of output) {
+            sendFn(account)
+        }
+        return output.length
+    })
+
+    return {
+        registry,
+        sources,
+        forms,
+        identities,
+        fusion,
+        res,
+        decisionHistory,
+        setPass: (pass: 'pass1' | 'pass2') => {
+            currentPass.value = pass
+        },
+    }
 }
 
 describe('accountList setup phase', () => {
@@ -170,5 +137,38 @@ describe('accountList setup phase', () => {
 
         expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledTimes(2)
         expect(maxInFlight).toBe(1)
+    })
+})
+
+describe('accountList two-pass aggregation lifecycle', () => {
+    beforeEach(() => {
+        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation(() => undefined)
+    })
+
+    afterEach(() => {
+        jest.restoreAllMocks()
+    })
+
+    it.each(aggregationScenarios)('$name', async (scenario) => {
+        const { registry, sources, forms, fusion, res, decisionHistory, setPass } = createTwoPassRegistry(scenario)
+        const input = { schema: { attributes: [] } } as any
+
+        setPass('pass1')
+        await accountList(registry, input)
+
+        expect(forms.fetchFormData).toHaveBeenCalledTimes(1)
+        expect(fusion.processFusionIdentityDecisions).toHaveBeenCalledTimes(1)
+        expect(sources.releaseProcessLock).toHaveBeenCalledTimes(1)
+        expect(res.send).toHaveBeenCalledTimes(scenario.passData.pass1.outputAccounts.length)
+
+        ;(res.send as jest.Mock).mockClear()
+        setPass('pass2')
+        await accountList(registry, input)
+
+        expect(forms.fetchFormData).toHaveBeenCalledTimes(2)
+        expect(fusion.processFusionIdentityDecisions).toHaveBeenCalledTimes(2)
+        expect(sources.releaseProcessLock).toHaveBeenCalledTimes(2)
+        expect(decisionHistory).toEqual([scenario.passData.pass1.decisions, scenario.passData.pass2.decisions])
+        expect(res.send).toHaveBeenCalledTimes(scenario.passData.pass2.outputAccounts.length)
     })
 })

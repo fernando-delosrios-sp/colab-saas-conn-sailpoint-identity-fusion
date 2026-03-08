@@ -339,13 +339,13 @@ export class SourceService {
     }
 
     /**
-     * Fire-and-forget ISC API call to disable an account by its ID.
-     * Uses low priority and does not await the result.
+     * Disable an ISC account by its ID and wait for completion.
+     * Uses low queue priority to avoid starving higher-priority work.
      */
-    public fireDisableAccount(accountId: string): void {
+    public async fireDisableAccount(accountId: string): Promise<void> {
         const { accountsApi } = this.client
-        this.log.info(`Firing low-priority disable for account ${accountId}`)
-        void this.client.execute(
+        this.log.info(`Disabling account ${accountId} with low priority`)
+        await this.client.execute(
             () =>
                 accountsApi.disableAccount({
                     id: accountId,

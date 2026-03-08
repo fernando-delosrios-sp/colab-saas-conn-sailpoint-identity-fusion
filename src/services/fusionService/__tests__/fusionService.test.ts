@@ -416,4 +416,94 @@ describe('FusionService', () => {
             expect(secondReport.warnings).toBeUndefined()
         })
     })
+
+    describe('processFusionIdentityDecision sourceType branches', () => {
+        it('registers unique attributes and skips output for record no-match decisions', async () => {
+            const managedMap = new Map<string, Account>()
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockAttributes.registerUniqueAttributes.mockResolvedValue()
+
+            const decision = {
+                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
+                account: { id: 'acct-record-1', name: 'Record User', sourceName: 'Record Source' },
+                newIdentity: true,
+                identityId: undefined,
+                comments: 'No matching identity',
+                finished: true,
+                sourceType: 'record',
+            } as any
+
+            const result = await fusionService.processFusionIdentityDecision(decision)
+
+            expect(result).toBeUndefined()
+            expect(mockAttributes.registerUniqueAttributes).toHaveBeenCalledTimes(1)
+        })
+
+        it('safely skips orphan disable queue when account is no longer in managed map', async () => {
+            const managedAccount = {
+                id: 'acct-orphan-1',
+                name: 'Orphan User',
+                sourceName: 'Orphan Source',
+                attributes: {},
+            } as Account
+            const managedMap = new Map<string, Account>([['acct-orphan-1', managedAccount]])
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            ;(fusionService as any).sourcesByName.set('Orphan Source', {
+                id: 'src-orphan-1',
+                name: 'Orphan Source',
+                sourceType: 'orphan',
+                config: { disableNonMatchingAccounts: true },
+            })
+
+            const queueDisableSpy = jest.spyOn(fusionService as any, 'queueDisableOperation').mockImplementation(() => {})
+            const decision = {
+                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
+                account: { id: 'acct-orphan-1', name: 'Orphan User', sourceName: 'Orphan Source' },
+                newIdentity: true,
+                identityId: undefined,
+                comments: 'Reject orphan match',
+                finished: true,
+                sourceType: 'orphan',
+            } as any
+
+            const result = await fusionService.processFusionIdentityDecision(decision)
+
+            expect(result).toBeUndefined()
+            expect(queueDisableSpy).not.toHaveBeenCalled()
+        })
+
+        it('registers a new fusion account for authoritative new-identity decisions', async () => {
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const setFusionAccountSpy = jest.spyOn(fusionService, 'setFusionAccount')
+            const decision = {
+                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
+                account: { id: 'acct-auth-1', name: 'Auth User', sourceName: 'Authoritative Source' },
+                newIdentity: true,
+                identityId: undefined,
+                comments: 'Create new identity',
+                finished: true,
+                sourceType: 'authoritative',
+            } as any
+
+            const result = await fusionService.processFusionIdentityDecision(decision)
+
+            expect(result).toBeDefined()
+            expect(setFusionAccountSpy).toHaveBeenCalledTimes(1)
+        })
+    })
 })

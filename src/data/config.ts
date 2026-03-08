@@ -95,7 +95,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     config.maxAttempts = config.maxAttempts ?? 100
 
     // ============================================================================
-    // Fusion Settings defaults
+    // Attribute Matching Settings defaults
     // ============================================================================
     // Default from connector-spec.json: fusionExpirationDays: 7
     config.fusionFormExpirationDays = config.fusionFormExpirationDays ?? 7

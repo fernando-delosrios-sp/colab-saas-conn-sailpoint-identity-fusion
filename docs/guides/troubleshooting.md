@@ -337,7 +337,7 @@ $firstname$lastname      ## Throws error if null
    If still no matches: Check algorithm, attributes
 
 4. Review configuration:
-   Fusion Settings → Matching Settings
+   Attribute Matching Settings → Matching Settings
    Ensure at least one Fusion attribute match configured
 ```
 

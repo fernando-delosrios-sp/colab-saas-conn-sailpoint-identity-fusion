@@ -123,13 +123,13 @@ Controls how attributes are generated (Define step), including unique identifier
 
 > **Note:** In Velocity context, managed account snapshots (`$accounts` and `$sources`) include `_source` (source name) and `IIQDisabled` (IdentityIQ-style disabled flag where `true` means disabled). `$accounts` is deterministic: sources follow configured order, accounts keep insertion order within each source, and non-configured sources are appended.
 
-### Fusion Settings
+### Attribute Matching Settings
 
 Controls Match behavior, including similarity matching and manual review workflows.
 
 #### Matching Settings Section
 
-![Fusion Settings - Matching](docs/assets/images/config-fusion-matching.png)
+![Attribute Matching Settings - Matching](docs/assets/images/config-fusion-matching.png)
 
 | Field                                                       | Description                                                    | Required                         | Notes                                                                                                                                                                                    |
 | ----------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -140,7 +140,7 @@ Controls Match behavior, including similarity matching and manual review workflo
 
 **Per-attribute match configuration:**
 
-![Fusion Settings - Matching - Per attribute matching](docs/assets/images/config-fusion-matching-single.png)
+![Attribute Matching Settings - Matching - Per attribute matching](docs/assets/images/config-fusion-matching-single.png)
 
 | Field                        | Description                                                     | Required | Notes                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------------------------- | --------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -155,7 +155,7 @@ Controls Match behavior, including similarity matching and manual review workflo
 
 #### Review Settings Section
 
-![Fusion Settings - Review](docs/assets/images/config-fusion-review.png)
+![Attribute Matching Settings - Review](docs/assets/images/config-fusion-review.png)
 
 | Field                                              | Description                                      | Required | Notes                                                                                                                                                                                                                                                                                                                   |
 | -------------------------------------------------- | ------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -236,7 +236,7 @@ For detailed field-by-field guidance and usage patterns, see the [usage guides](
 3. **Configure connection** — Set Identity Security Cloud API URL and Personal Access Token (ID and secret). Use **Review and Test** to verify connectivity.
 4. **Configure the connector** — Depending on your goal:
     - **Map & Define only:** Set [Source Settings](docs/guides/source-configuration.md) (identity scope and/or sources), [Attribute Mapping Settings](docs/guides/map.md) for the **Map** step, and [Attribute Definition Settings](docs/guides/define.md) for the **Define** step.
-    - **Match:** Configure [sources and baseline](docs/guides/source-configuration.md), then [Fusion Settings](docs/guides/match.md) (matching and review) for the **Match** step.
+    - **Match:** Configure [sources and baseline](docs/guides/source-configuration.md), then [Attribute Matching Settings](docs/guides/match.md) (matching and review) for the **Match** step.
 5. **Discover schema** — Run **Discover Schema** so ISC has the combined account schema.
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 

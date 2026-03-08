@@ -59,6 +59,7 @@ export class FusionService {
     private readonly reportAttributes: string[]
     private readonly urlContext: UrlContext
     private readonly deleteEmpty: boolean
+    private readonly pendingDisableOperations: Set<Promise<void>> = new Set()
     public readonly fusionOwnerIsGlobalReviewer: boolean
     public readonly fusionReportOnAggregation: boolean
     public newManagedAccountsCount: number = 0
@@ -630,13 +631,17 @@ export class FusionService {
                 if (sourceInfo?.config?.disableNonMatchingAccounts) {
                     const managedAccount = this.sources.managedAccountsById.get(fusionDecision.account.id)
                     if (managedAccount) {
-                        this.fireDisableOperation(managedAccount)
+                        this.queueDisableOperation(managedAccount)
                     }
                 }
                 return undefined
             }
             // authoritative (default): register as new fusion account
             this.setFusionAccount(fusionAccount)
+            this.log.debug(
+                `Registered decision account as fusion account: ${fusionDecision.account.name} ` +
+                `[${fusionDecision.account.sourceName}] (${fusionDecision.account.id})`
+            )
         }
         return fusionAccount
     }
@@ -701,6 +706,23 @@ export class FusionService {
     }
 
     /**
+     * Wait for all pending asynchronous disable operations to complete.
+     * Safe to call multiple times; it drains the current pending set.
+     */
+    public async awaitPendingDisableOperations(): Promise<void> {
+        if (this.pendingDisableOperations.size === 0) {
+            return
+        }
+
+        this.log.info(`Waiting for ${this.pendingDisableOperations.size} pending disable operation(s)`)
+        while (this.pendingDisableOperations.size > 0) {
+            const pending = Array.from(this.pendingDisableOperations)
+            await Promise.allSettled(pending)
+        }
+        this.log.info('Pending disable operations completed')
+    }
+
+    /**
      * Processes a single uncorrelated managed account through the Match workflow.
      * After scoring, the account is either auto-correlated (perfect match), sent for
      * manual review (partial match), or handled based on the source type:
@@ -724,7 +746,7 @@ export class FusionService {
                 if (sourceType === 'record') {
                     await this.attributes.registerUniqueAttributes(fusionAccount)
                 } else if (sourceType === 'orphan' && sourceInfo?.config?.disableNonMatchingAccounts) {
-                    this.fireDisableOperation(account)
+                    this.queueDisableOperation(account)
                 }
                 return undefined
             }
@@ -768,24 +790,24 @@ export class FusionService {
         } else {
             // Non-match handling varies by source type
             if (sourceType === 'record') {
-                this.log.debug(`Record account ${account.name} is not a match, registering unique attributes only`)
                 await this.attributes.registerUniqueAttributes(fusionAccount)
                 return undefined
             }
 
             if (sourceType === 'orphan') {
-                this.log.debug(`Orphan account ${account.name} is not a match, dropping`)
                 if (sourceInfo?.config?.disableNonMatchingAccounts) {
-                    this.fireDisableOperation(account)
+                    this.queueDisableOperation(account)
                 }
                 return undefined
             }
 
             // authoritative (default)
-            this.log.debug(`Account ${account.name} is not a match, adding to fusion accounts`)
             fusionAccount.setUnmatched()
             await this.applyPerSourceCorrelationIfNeeded(fusionAccount)
             this.setFusionAccount(fusionAccount)
+            this.log.debug(
+                `Registered managed account as fusion account: ${account.name} [${account.sourceName}] (${account.id})`
+            )
             return fusionAccount
         }
     }
@@ -1076,20 +1098,38 @@ export class FusionService {
     // ------------------------------------------------------------------------
 
     /**
-     * Fire a low-priority, non-awaited disable operation for a managed account.
+     * Queue a low-priority disable operation for a managed account.
      * Used by the orphan source type when disableNonMatchingAccounts is enabled.
      */
-    private fireDisableOperation(account: Account): void {
+    private queueDisableOperation(account: Account): void {
+        const op = this.fireDisableOperation(account)
+            .catch((error) => {
+                const message = error instanceof Error ? error.message : String(error)
+                this.log.warn(
+                    `Disable operation failed for account ${account.name} [${account.sourceName}]: ${message}`
+                )
+            })
+            .finally(() => {
+                this.pendingDisableOperations.delete(op)
+            })
+        this.pendingDisableOperations.add(op)
+    }
+
+    /**
+     * Execute a low-priority disable operation for a managed account.
+     * Used by the orphan source type when disableNonMatchingAccounts is enabled.
+     */
+    private async fireDisableOperation(account: Account): Promise<void> {
         const accountId = account.id
         if (!accountId) {
-            this.log.warn(`Cannot disable account without ID: ${account.name}`)
+            this.log.warn(`Cannot disable account without ID: ${account.name} [${account.sourceName}]`)
             return
         }
         if (account.disabled) {
-            this.log.debug(`Skipping disable for account already disabled: ${account.name} (${accountId})`)
             return
         }
-        this.sources.fireDisableAccount(accountId)
+        this.log.info(`Firing low-priority disable for account: ${account.name} [${account.sourceName}] (${accountId})`)
+        await this.sources.fireDisableAccount(accountId)
     }
 
     /**
@@ -1148,9 +1188,7 @@ export class FusionService {
      */
     private async preProcessManagedAccount(account: Account): Promise<FusionAccount> {
         const fusionAccount = FusionAccount.fromManagedAccount(account)
-        this.log.debug(
-            `Pre-processing managed account: ${account.name} [${account.sourceName}], accountId=${account.id}`
-        )
+        this.log.debug(`Pre-processing managed account: ${account.name} [${account.sourceName}]`)
 
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)

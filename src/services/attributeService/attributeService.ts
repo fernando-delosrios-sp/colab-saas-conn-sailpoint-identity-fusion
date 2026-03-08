@@ -242,8 +242,8 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to refresh normal attributes for
      */
     public async refreshNormalAttributes(fusionAccount: FusionAccount): Promise<void> {
-        if (!fusionAccount.needsRefresh && !this.forceAttributeRefresh) return
-        this.log.debug(`Refreshing normal attributes for account: ${fusionAccount.name} (${fusionAccount.sourceName})`)
+        if (!fusionAccount.needsRefresh && !this.forceAttributeRefresh || this.normalDefinitions.length === 0) return
+        this.log.debug(`Refreshing normal attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`)
         await this.applyNormalDefinitions(fusionAccount)
     }
 
@@ -261,8 +261,8 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to refresh unique attributes for
      */
     public async refreshUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
-        if (!fusionAccount.needsRefresh && !fusionAccount.needsReset) return
-        this.log.debug(`Refreshing unique attributes for account: ${fusionAccount.name} (${fusionAccount.sourceName})`)
+        if (!fusionAccount.needsRefresh && !fusionAccount.needsReset || this.uniqueDefinitions.length === 0) return
+        this.log.debug(`Refreshing unique attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`)
 
         if (fusionAccount.needsReset) {
             await this.unregisterUniqueAttributes(fusionAccount)
@@ -349,7 +349,7 @@ export class AttributeService {
 
         if (this.skipAccountsWithMissingId && !uniqueId) {
             this.log.warn(
-                `Skipping account ${fusionAccount.name} (${fusionAccount.nativeIdentity}): ` +
+                `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
                 `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined

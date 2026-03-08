@@ -25,8 +25,8 @@ Use Identity Fusion for Match when you face these challenges:
 | Requirement                    | Configuration                                       | Notes                                                                                                                                                                                                                                     |
 | ------------------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **One or more sources**        | **Source Settings → Authoritative account sources** | At least one source; typically 2+ for Match value                                                                                                                                                                                         |
-| **Fusion Settings (Matching)** | **Fusion attribute matches**, algorithms, scores    | Defines similarity detection rules                                                                                                                                                                                                        |
-| **Fusion Settings (Review)**   | Form attributes, expiration, reviewers              | Configures manual review workflow                                                                                                                                                                                                         |
+| **Attribute Matching Settings (Matching)** | **Fusion attribute matches**, algorithms, scores    | Defines similarity detection rules                                                                                                                                                                                                        |
+| **Attribute Matching Settings (Review)**   | Form attributes, expiration, reviewers              | Configures manual review workflow                                                                                                                                                                                                         |
 | **Authoritative source**       | ISC source marked as **Authoritative**              | In most cases Fusion must be authoritative so it can determine which incoming managed accounts create a new identity and which correlate to an existing one. Barring edge cases, assume the source is authoritative when Match is needed. |
 
 ### Highly recommended
@@ -42,7 +42,7 @@ Use Identity Fusion for Match when you face these challenges:
 | --------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------- |
 | **Access profiles for reviewers** | Create access profile per source with reviewer entitlement  | Assign reviewers per source for targeted notifications   |
 | **Fusion report access profile**  | Access profile with "Fusion report" entitlement             | Allow specific users to view potential match reports |
-| **Auto-correlate when identical** | **Fusion Settings → Automatically correlate if identical?** | Skip manual review for obvious matches                   |
+| **Auto-correlate when identical** | **Attribute Matching Settings → Automatically correlate if identical?** | Skip manual review for obvious matches                   |
 
 **Screenshot placeholder:** High-level Match flow diagram.
 
@@ -119,13 +119,13 @@ Configure **Source Settings → Processing Control** for account lifecycle:
 
 ---
 
-## Step 2: Configure Fusion Settings for matching
+## Step 2: Configure Attribute Matching Settings for matching
 
-Fusion Settings control how potential matches are detected and reviewed.
+Attribute Matching Settings control how potential matches are detected and reviewed.
 
 ### Matching configuration
 
-Configure **Fusion Settings → Matching Settings** to define match detection rules:
+Configure **Attribute Matching Settings → Matching Settings** to define match detection rules:
 
 | Field                                                       | Purpose                                     | Recommended value                                        |
 | ----------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
@@ -134,11 +134,11 @@ Configure **Fusion Settings → Matching Settings** to define match detection ru
 | **Similarity score [0-100]**                                | Global threshold when overall score enabled | 80 (start); adjust based on false positive/negative rate |
 | **Automatically correlate if identical?**                   | Skip manual review for obvious matches      | No initially; enable after tuning                        |
 
-**Screenshot placeholder:** Fusion Settings – Matching section.
+**Screenshot placeholder:** Attribute Matching Settings - Matching section.
 
 ![Fusion matching settings - Configuration](../assets/images/deduplication-fusion-matching.png)
 
-<!-- PLACEHOLDER: Screenshot of Fusion Settings > Matching. Save as docs/assets/images/deduplication-fusion-matching.png -->
+<!-- PLACEHOLDER: Screenshot of Attribute Matching Settings > Matching. Save as docs/assets/images/deduplication-fusion-matching.png -->
 
 ### Per-attribute match configuration
 
@@ -233,9 +233,9 @@ A mandatory attribute must always meet its threshold. When no attribute is marke
 
 ---
 
-## Step 3: Configure Fusion Settings for review
+## Step 3: Configure Attribute Matching Settings for review
 
-Configure **Fusion Settings → Review Settings** for the manual review workflow:
+Configure **Attribute Matching Settings → Review Settings** for the manual review workflow:
 
 | Field                                              | Purpose                                     | Recommended value                                             |
 | -------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------- |
@@ -473,8 +473,8 @@ Track these metrics to assess Match effectiveness:
 | **Source Settings (Scope)**    | Define identity baseline                     | Include identities = Yes; Identity Scope Query               |
 | **Source Settings (Sources)**  | Sources contributing account data            | Source names (2+); Force aggregation (optional)              |
 | **Attribute Mapping**          | Merge source attributes into Fusion accounts | Merge strategies (first/list/concatenate)                    |
-| **Fusion Settings (Matching)** | Duplicate detection rules                    | Fusion attribute matches; algorithms; scores; auto-correlate |
-| **Fusion Settings (Review)**   | Manual review workflow                       | Form attributes; expiration days; global reviewer            |
+| **Attribute Matching Settings (Matching)** | Duplicate detection rules                    | Fusion attribute matches; algorithms; scores; auto-correlate |
+| **Attribute Matching Settings (Review)**   | Manual review workflow                       | Form attributes; expiration days; global reviewer            |
 | **Access Profiles**            | Reviewer permissions                         | Per-source reviewer access profiles; Fusion report           |
 
 **Deduplication requires:**

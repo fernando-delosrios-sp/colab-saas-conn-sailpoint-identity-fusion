@@ -1,40 +1,9 @@
 import { testConnection } from '../testConnection'
 import { ServiceRegistry } from '../../services/serviceRegistry'
-
-type SourceConfigLike = {
-    name: string
-    correlationMode: 'none' | 'correlate' | 'reverse'
-    correlationAttribute?: string
-    correlationDisplayName?: string
-}
+import { createBaseOperationRegistry, SourceConfigLike } from './harness/mockRegistry'
 
 function createMockRegistry(sourceConfigs: SourceConfigLike[]) {
-    const timer = {
-        phase: jest.fn(),
-        end: jest.fn(),
-    }
-
-    const sources = {
-        fetchAllSources: jest.fn().mockResolvedValue(undefined),
-        ensureReverseCorrelationSetup: jest.fn().mockResolvedValue(undefined),
-    }
-
-    const schemas = {
-        getManagedSourceSchemaAttributeNames: jest.fn().mockResolvedValue(new Set<string>()),
-    }
-
-    const registry = {
-        config: { sources: sourceConfigs },
-        log: {
-            info: jest.fn(),
-            crash: jest.fn(),
-            timer: jest.fn(() => timer),
-        },
-        res: { send: jest.fn() },
-        sources,
-        schemas,
-    } as any
-
+    const { registry, sources, schemas, timer } = createBaseOperationRegistry(sourceConfigs)
     return { registry, sources, schemas, timer }
 }
 

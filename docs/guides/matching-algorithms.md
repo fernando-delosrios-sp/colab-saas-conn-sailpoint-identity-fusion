@@ -1,6 +1,6 @@
 # Effective Use of Matching Algorithms
 
-Identity Fusion NG uses **similarity scoring** to detect potential matching identities. This comprehensive guide helps you choose, configure, and tune the **matching algorithms** used in **Fusion Settings → Matching Settings** for optimal matching results.
+Identity Fusion NG uses **similarity scoring** to detect potential matching identities. This comprehensive guide helps you choose, configure, and tune the **matching algorithms** used in **Attribute Matching Settings → Matching Settings** for optimal matching results.
 
 ---
 
@@ -10,7 +10,7 @@ Matching algorithms calculate **similarity scores** (0–100) between attribute 
 
 | Component                      | Purpose                            | Configuration location                                                              |
 | ------------------------------ | ---------------------------------- | ----------------------------------------------------------------------------------- |
-| **Fusion attribute matches**   | Define which attributes to compare | Fusion Settings → Matching Settings                                                 |
+| **Fusion attribute matches**   | Define which attributes to compare | Attribute Matching Settings → Matching Settings                                                 |
 | **Matching algorithm**         | How to calculate similarity        | Per attribute (Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Custom) |
 | **Similarity score threshold** | Minimum score to flag as a match   | Per attribute or overall                                                            |
 | **Mandatory match**            | Require attribute to participate   | Per attribute (Yes/No)                                                              |
@@ -20,7 +20,7 @@ Matching algorithms calculate **similarity scores** (0–100) between attribute 
 
 ![Fusion attribute matches - Configuration interface](../assets/images/matching-algorithms-config.png)
 
-<!-- PLACEHOLDER: Screenshot of Fusion Settings > Fusion attribute matches. Save as docs/assets/images/matching-algorithms-config.png -->
+<!-- PLACEHOLDER: Screenshot of Attribute Matching Settings > Fusion attribute matches. Save as docs/assets/images/matching-algorithms-config.png -->
 
 ---
 

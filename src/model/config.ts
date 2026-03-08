@@ -212,7 +212,7 @@ export interface UniqueAttributeDefinitionSettingsSection {
 export type UniqueAttributeDefinitionSettingsMenu = UniqueAttributeDefinitionSettingsSection
 
 // ============================================================================
-// Fusion Settings Menu
+// Attribute Matching Settings Menu
 // ============================================================================
 
 /** Configuration for Match rules and scoring strategy. */
@@ -231,8 +231,8 @@ export interface ReviewSettingsSection {
     fusionReportOnAggregation?: boolean
 }
 
-/** Combined fusion settings: matching rules and review workflow. */
-export interface FusionSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection { }
+/** Combined Attribute Matching Settings: matching rules and review workflow. */
+export interface AttributeMatchingSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection { }
 
 // ============================================================================
 // Advanced Settings Menu
@@ -409,6 +409,6 @@ export interface FusionConfig
     AttributeMappingSettingsMenu,
     NormalAttributeDefinitionSettingsMenu,
     UniqueAttributeDefinitionSettingsMenu,
-    FusionSettingsMenu,
+    AttributeMatchingSettingsMenu,
     AdvancedSettingsMenu,
     InternalConfig { }

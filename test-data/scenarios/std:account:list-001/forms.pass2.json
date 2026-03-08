@@ -1,0 +1,74 @@
+[
+    {
+        "id": "form-instance-carlos-oliveira-pass2",
+        "state": "SUBMITTED",
+        "standAloneFormUrl": "https://example.local/form/form-instance-carlos-oliveira-pass2",
+        "recipients": [
+            {
+                "id": "id-reviewer-001"
+            }
+        ],
+        "formInput": {
+            "account": "a88bc571a2174476aa8c7b53f4a478d8",
+            "name": "Carlos Oliveira",
+            "source": "Umbrella Corporation",
+            "sourceType": "authoritative",
+            "candidates": "id-carlos-oliveira-001"
+        },
+        "formData": {
+            "newIdentity": false,
+            "identities": [
+                "id-carlos-oliveira-001"
+            ],
+            "comments": "Confirmed best match for Carlos Oliveira"
+        }
+    },
+    {
+        "id": "form-instance-ada-wong-pass2",
+        "state": "SUBMITTED",
+        "standAloneFormUrl": "https://example.local/form/form-instance-ada-wong-pass2",
+        "recipients": [
+            {
+                "id": "id-reviewer-001"
+            }
+        ],
+        "formInput": {
+            "account": "9906d96b05374e869f806d22d3d47800",
+            "name": "Ada Wong",
+            "source": "Umbrella Corporation",
+            "sourceType": "authoritative",
+            "candidates": "id-ada-wong-001"
+        },
+        "formData": {
+            "newIdentity": false,
+            "identities": [
+                "id-ada-wong-001"
+            ],
+            "comments": "Confirmed best match for Ada Wong"
+        }
+    },
+    {
+        "id": "form-instance-annette-birkin-pass2",
+        "state": "SUBMITTED",
+        "standAloneFormUrl": "https://example.local/form/form-instance-annette-birkin-pass2",
+        "recipients": [
+            {
+                "id": "id-reviewer-001"
+            }
+        ],
+        "formInput": {
+            "account": "a768462973c341fab45d19e1ea591d94",
+            "name": "Annette Birkin",
+            "source": "Umbrella Corporation",
+            "sourceType": "authoritative",
+            "candidates": "id-annette-birkin-001"
+        },
+        "formData": {
+            "newIdentity": false,
+            "identities": [
+                "id-annette-birkin-001"
+            ],
+            "comments": "Confirmed best match for Annette Birkin"
+        }
+    }
+]

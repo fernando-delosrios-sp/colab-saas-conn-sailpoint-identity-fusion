@@ -131,6 +131,9 @@ async function processPhase(serviceRegistry: ServiceRegistry): Promise<void> {
     log.info('Processing managed accounts (Match)')
     await fusion.processManagedAccounts()
 
+    log.info('Waiting for pending disable operations')
+    await fusion.awaitPendingDisableOperations()
+
     log.info('Reconciling pending form state (candidates + reviewer links)')
     fusion.reconcilePendingFormState()
 

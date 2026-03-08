@@ -1,0 +1,274 @@
+{
+    "pass": "pass2",
+    "summary": {
+        "includeIdentities": true,
+        "threshold": 50,
+        "managedAccountsCount": 19,
+        "identitiesCount": 4,
+        "formDecisionsCount": 3,
+        "potentialMatchesCount": 5,
+        "correlatedCount": 3,
+        "unmatchedCount": 16,
+        "disablePlannedCount": 0
+    },
+    "potentialMatches": [
+        {
+            "accountId": "8d21e32028604862b2006c0708eb4049",
+            "accountName": "H. Unknown",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "9906d96b05374e869f806d22d3d47800",
+            "accountName": "Ada Wong",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": {
+                "identityId": "id-ada-wong-001",
+                "identityName": "Ada Wong",
+                "score": 100,
+                "reason": "email-exact"
+            },
+            "candidates": [
+                {
+                    "identityId": "id-ada-wong-001",
+                    "identityName": "Ada Wong",
+                    "score": 100,
+                    "reason": "email-exact"
+                }
+            ]
+        },
+        {
+            "accountId": "a768462973c341fab45d19e1ea591d94",
+            "accountName": "Annette Birkin",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": {
+                "identityId": "id-annette-birkin-001",
+                "identityName": "Annette Birkin",
+                "score": 100,
+                "reason": "email-exact"
+            },
+            "candidates": [
+                {
+                    "identityId": "id-annette-birkin-001",
+                    "identityName": "Annette Birkin",
+                    "score": 100,
+                    "reason": "email-exact"
+                }
+            ]
+        },
+        {
+            "accountId": "a88bc571a2174476aa8c7b53f4a478d8",
+            "accountName": "Carlos Oliveira",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": {
+                "identityId": "id-carlos-oliveira-001",
+                "identityName": "Carlos Oliveira",
+                "score": 100,
+                "reason": "email-exact"
+            },
+            "candidates": [
+                {
+                    "identityId": "id-carlos-oliveira-001",
+                    "identityName": "Carlos Oliveira",
+                    "score": 100,
+                    "reason": "email-exact"
+                }
+            ]
+        },
+        {
+            "accountId": "ac6cb813e9e74dd699a4e551a33558bf",
+            "accountName": "M. Viktor",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "b2e2f306a6e9450ea391f4c78852ed18",
+            "accountName": "Alexia Ashford",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "c3c45f3372ab4c1da4dd08609dd136c1",
+            "accountName": "Rodrigo Raval",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "cc0be0290d834ce390f8eddbc37d2b02",
+            "accountName": "B. Irons",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "cc50da7dae4b4d5ab3299c0b217b30fc",
+            "accountName": "William Birkin",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": {
+                "identityId": "id-annette-birkin-001",
+                "identityName": "Annette Birkin",
+                "score": 70,
+                "reason": "lastName-only"
+            },
+            "candidates": [
+                {
+                    "identityId": "id-annette-birkin-001",
+                    "identityName": "Annette Birkin",
+                    "score": 70,
+                    "reason": "lastName-only"
+                }
+            ]
+        },
+        {
+            "accountId": "d347230716dd428aaaad439265e9db0d",
+            "accountName": "A. Wesker",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "d36113f512474e889e0f40ae565fc7a7",
+            "accountName": "James Marcus",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "d652d3bd3da4405e91216a54315f70c4",
+            "accountName": "A. Ashford",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "dcbacbfbd20d4ac9943dee58feb8c05e",
+            "accountName": "Alex Ashford",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "e8b4dbd8960f49f0ba49a234449239ad",
+            "accountName": "Nicholai Ginovaef",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "ef189caf2f6348809d90879dee7cb8a9",
+            "accountName": "Albert Wesker",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "f4ea5997ef3f4332bfec4daf370fca64",
+            "accountName": "Sergei Vladimir",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "fb9bc4ccb36847069df7d62a8623af98",
+            "accountName": "Brian Irons",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "fe11e6f6506544d7ad53ad24332896e2",
+            "accountName": "Bill Birkin",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": {
+                "identityId": "id-annette-birkin-001",
+                "identityName": "Annette Birkin",
+                "score": 70,
+                "reason": "lastName-only"
+            },
+            "candidates": [
+                {
+                    "identityId": "id-annette-birkin-001",
+                    "identityName": "Annette Birkin",
+                    "score": 70,
+                    "reason": "lastName-only"
+                }
+            ]
+        },
+        {
+            "accountId": "ff44db34427e4f5f9a98c0c47bf4b8e4",
+            "accountName": "Lawrence Burton",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        }
+    ],
+    "correlatedAccounts": [
+        {
+            "accountId": "9906d96b05374e869f806d22d3d47800",
+            "accountName": "Ada Wong",
+            "identityId": "id-ada-wong-001",
+            "decision": "approved-by-form"
+        },
+        {
+            "accountId": "a768462973c341fab45d19e1ea591d94",
+            "accountName": "Annette Birkin",
+            "identityId": "id-annette-birkin-001",
+            "decision": "approved-by-form"
+        },
+        {
+            "accountId": "a88bc571a2174476aa8c7b53f4a478d8",
+            "accountName": "Carlos Oliveira",
+            "identityId": "id-carlos-oliveira-001",
+            "decision": "approved-by-form"
+        }
+    ],
+    "unmatchedAccountIds": [
+        "8d21e32028604862b2006c0708eb4049",
+        "ac6cb813e9e74dd699a4e551a33558bf",
+        "b2e2f306a6e9450ea391f4c78852ed18",
+        "c3c45f3372ab4c1da4dd08609dd136c1",
+        "cc0be0290d834ce390f8eddbc37d2b02",
+        "cc50da7dae4b4d5ab3299c0b217b30fc",
+        "d347230716dd428aaaad439265e9db0d",
+        "d36113f512474e889e0f40ae565fc7a7",
+        "d652d3bd3da4405e91216a54315f70c4",
+        "dcbacbfbd20d4ac9943dee58feb8c05e",
+        "e8b4dbd8960f49f0ba49a234449239ad",
+        "ef189caf2f6348809d90879dee7cb8a9",
+        "f4ea5997ef3f4332bfec4daf370fca64",
+        "fb9bc4ccb36847069df7d62a8623af98",
+        "fe11e6f6506544d7ad53ad24332896e2",
+        "ff44db34427e4f5f9a98c0c47bf4b8e4"
+    ],
+    "disablePlannedAccountIds": [],
+    "decisionsApplied": [
+        {
+            "formId": "form-instance-ada-wong-pass2",
+            "accountId": "9906d96b05374e869f806d22d3d47800",
+            "finished": true,
+            "newIdentity": false,
+            "identityId": "id-ada-wong-001",
+            "comments": "Confirmed best match for Ada Wong"
+        },
+        {
+            "formId": "form-instance-annette-birkin-pass2",
+            "accountId": "a768462973c341fab45d19e1ea591d94",
+            "finished": true,
+            "newIdentity": false,
+            "identityId": "id-annette-birkin-001",
+            "comments": "Confirmed best match for Annette Birkin"
+        },
+        {
+            "formId": "form-instance-carlos-oliveira-pass2",
+            "accountId": "a88bc571a2174476aa8c7b53f4a478d8",
+            "finished": true,
+            "newIdentity": false,
+            "identityId": "id-carlos-oliveira-001",
+            "comments": "Confirmed best match for Carlos Oliveira"
+        }
+    ]
+}
