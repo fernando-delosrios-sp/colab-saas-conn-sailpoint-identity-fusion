@@ -19,7 +19,7 @@ Manifest schema:
 ## Run a scenario
 
 ```bash
-node test-data/scenarios/scenarioRunner.js "test-data/scenarios/std:account:list-001"
+node test-data/scenarios/scenarioRunner.js "test-data/scenarios/std-account-list-001"
 ```
 
 ## Generated files

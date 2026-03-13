@@ -37,7 +37,7 @@ Expected golden artifacts:
 Run the scenario runner:
 
 ```bash
-node test-data/scenarios/scenarioRunner.js "test-data/scenarios/std:account:list-001"
+node test-data/scenarios/scenarioRunner.js "test-data/scenarios/std-account-list-001"
 ```
 
 Run tests:
