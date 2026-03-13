@@ -148,6 +148,7 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
 | Cause                                | Diagnostic                                    | Solution                                                                                   |
 | ------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | **Source name mismatch**             | Check exact source names in ISC vs config     | Update source names in **Authoritative account sources** (case-sensitive)                  |
+| **Managed sources disabled**         | Verify each source shows **Enabled = On**     | In the GUI, go to **Source Setup → Source Configuration** and enable all managed sources   |
 | **Identity Scope Query too strict**  | Test query in ISC search                      | Relax query; or use `*` for all identities                                                 |
 | **Account filter excludes accounts** | Review filter logic                           | Adjust or remove **Account filter**                                                        |
 | **Machine accounts excluded**        | Check logs for `isMachine=true` discard warnings | Expected behavior. Identity Fusion NG does not support machine accounts and skips them. |
@@ -168,16 +169,20 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
    Go to ISC → Admin → Connections → Sources
    Compare names exactly (case-sensitive) to config
 
-2. Test Identity Scope Query:
+2. Validate managed source status:
+   Go to Source Setup → Source Configuration
+   Confirm all managed sources are Enabled
+
+3. Test Identity Scope Query:
    Go to ISC → Search
    Enter same query as Identity Scope Query
    Check: Does it return expected identities?
 
-3. Check source accounts:
+4. Check source accounts:
    Go to each configured source in ISC
    Verify accounts exist and are aggregated
 
-4. Review Fusion accounts:
+5. Review Fusion accounts:
    Go to Fusion source → Accounts
    Check account attributes for clues
 ```

@@ -278,10 +278,19 @@ export class AttributeService {
         fusionAccount: FusionAccount,
         operation: 'register' | 'unregister'
     ): Promise<void> {
+        const { fusionIdentityAttribute } = this.schemas
         const logMessage = operation === 'register' ? 'Registering' : 'Unregistering'
         this.log.debug(`${logMessage} unique attributes for account: ${fusionAccount.nativeIdentity}`)
 
         for (const def of this.uniqueDefinitions) {
+            if (operation === 'unregister' && def.name === fusionIdentityAttribute) {
+                this.log.warn(
+                    `Skipping unique attribute reset for nativeIdentity attribute '${def.name}' ` +
+                    `on account: ${fusionAccount.name}`
+                )
+                continue
+            }
+
             const value = fusionAccount.attributes[def.name]
             const isEmpty = value === undefined || value === null || value === ''
             if (!isEmpty && !fusionAccount.needsReset) continue
@@ -839,6 +848,17 @@ export class AttributeService {
 
         if (hasValue && !fusionAccount.needsReset) {
             this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
+            return
+        }
+
+        if (name === fusionIdentityAttribute && fusionAccount.needsReset) {
+            this.log.warn(
+                `Skipping unique attribute reset for nativeIdentity attribute '${name}' ` +
+                `on account: ${fusionAccount.name}`
+            )
+            if (hasValue) {
+                this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
+            }
             return
         }
 
