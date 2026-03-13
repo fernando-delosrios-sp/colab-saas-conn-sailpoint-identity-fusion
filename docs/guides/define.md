@@ -74,7 +74,7 @@ $Math.floor($Datefns.differenceInDays($Datefns.now(), $hireDate) / 365)
 
 ### Unique type
 
-**Behavior:** Must be unique across all Fusion accounts; connector adds disambiguation counter on collision. Unique attributes are only computed when a Fusion account is **first created** or when an existing account is **activated** (an internal mechanism to reset unique attributes). They are not refreshed by **Force attribute refresh on each aggregation** (that setting applies only to Normal-type attributes).
+**Behavior:** Must be unique across all Fusion accounts; connector adds disambiguation counter on collision. Unique attributes are only computed when a Fusion account is **first created** or when an existing account is **activated** (an internal mechanism to reset unique attributes). They are not refreshed by **Force attribute refresh on each aggregation** (located at **Advanced Settings → Developer Settings**; applies only to Normal-type attributes).
 
 **How it works:**
 

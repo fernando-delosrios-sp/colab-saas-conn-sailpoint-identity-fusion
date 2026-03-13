@@ -164,7 +164,6 @@ export interface SourcesSection {
 /** Controls various processing behaviors during aggregation. */
 export interface ProcessingControlSection {
     deleteEmpty: boolean
-    forceAttributeRefresh: boolean
     skipAccountsWithMissingId: boolean
     maxHistoryMessages: number
 }
@@ -238,7 +237,7 @@ export interface AttributeMatchingSettingsMenu extends MatchingSettingsSection, 
 // Advanced Settings Menu
 // ============================================================================
 
-/** Developer/debug settings including reset flag, concurrency check, and external logging. */
+/** Developer/debug settings including reset flag, attribute refresh behavior, concurrency check, and external logging. */
 export interface DeveloperSettingsSection {
     reset: boolean
     /**
@@ -247,6 +246,11 @@ export interface DeveloperSettingsSection {
      * Default: 50.
      */
     managedAccountsBatchSize?: number
+    /**
+     * Force recalculation of all computed Normal-type attributes on every aggregation run,
+     * even when no changes were detected.
+     */
+    forceAttributeRefresh: boolean
     /**
      * Enable the concurrency check that prevents concurrent account aggregations.
      * When enabled, a processing lock is set on the source at the start of each

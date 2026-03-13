@@ -29,7 +29,7 @@
         "identity-fusion": "file:",
         "libphonenumber-js": "^1.12.34",
         "parse-address-string": "^0.0.3",
-        "sailpoint-api-client": "1.7.1",
+        "sailpoint-api-client": "1.7.26",
         "transliteration": "^2.3.5",
         "uuid": "^9.0.1",
         "velocityjs": "^2.0.6"

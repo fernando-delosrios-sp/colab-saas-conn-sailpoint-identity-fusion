@@ -49,7 +49,6 @@
         "algorithm": "name-matcher",
         "enableBatching": true,
         "enablePriority": true,
-        "enabled": true,
         "aggregationMode": "none",
         "correlationMode": "none"
     },
@@ -325,7 +324,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Processing Control",
-                    "sectionHelpMessage": "<strong>Control how Identity Fusion accounts are maintained.</strong><br><br><ul><li><strong>Maximum history messages:</strong> Limit history entries per account (default: 10).</li><li><strong>Delete accounts...:</strong> Remove Fusion account when all source accounts are gone.</li><li><strong>Force attribute refresh...:</strong> Force Normal-type attributes to refresh every run even if not needed.</li><li><strong>Skip accounts...:</strong> Skip processing if native identity attribute is missing.</li></ul>",
+                    "sectionHelpMessage": "<strong>Control how Identity Fusion accounts are maintained.</strong><br><br><ul><li><strong>Maximum history messages:</strong> Limit history entries per account (default: 10).</li><li><strong>Delete accounts...:</strong> Remove Fusion account when all source accounts are gone.</li><li><strong>Skip accounts...:</strong> Skip processing if native identity attribute is missing.</li></ul>",
                     "items": [
                         {
                             "key": "maxHistoryMessages",
@@ -341,13 +340,6 @@
                             "type": "toggle",
                             "required": false,
                             "helpKey": "Automatically remove a Fusion account when all of its linked source accounts have been deleted. Useful for cleaning up after users leave the organization"
-                        },
-                        {
-                            "key": "forceAttributeRefresh",
-                            "label": "Force attribute refresh on each aggregation?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Recalculate all computed attributes on every run, even if no changes were detected. This may increase processing time but ensures values stay up to date"
                         },
                         {
                             "key": "skipAccountsWithMissingId",
@@ -867,7 +859,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br><ul><li><strong>Reset accounts:</strong> Force rebuild from scratch (caution in production).</li><li><strong>Managed accounts batch size:</strong> Controls how many uncorrelated managed accounts are processed per duplicate-detection batch. Lower values reduce peak memory usage; higher values can improve throughput.</li><li><strong>Concurrency check:</strong> Prevent concurrent aggregations (default: enabled).</li><li><strong>External logging:</strong> Send logs to an external service (Splunk, etc.) for monitoring and incident analysis.</li></ul><br>Start with the default batch size and tune only if needed: reduce it when runs are memory-constrained, increase it when memory headroom is available and you want faster processing.",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br><ul><li><strong>Reset accounts:</strong> Force rebuild from scratch (caution in production).</li><li><strong>Managed accounts batch size:</strong> Controls how many uncorrelated managed accounts are processed per duplicate-detection batch. Lower values reduce peak memory usage; higher values can improve throughput.</li><li><strong>Force attribute refresh:</strong> Recalculate Normal-type attributes on every aggregation run, even when not strictly required.</li><li><strong>Concurrency check:</strong> Prevent concurrent aggregations (default: enabled).</li><li><strong>External logging:</strong> Send logs to an external service (Splunk, etc.) for monitoring and incident analysis.</li></ul><br>Start with the default batch size and tune only if needed: reduce it when runs are memory-constrained, increase it when memory headroom is available and you want faster processing.",
                     "items": [
                         {
                             "key": "reset",
@@ -882,6 +874,13 @@
                             "type": "number",
                             "required": false,
                             "helpKey": "Number of uncorrelated managed accounts processed in each duplicate-detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100. Default: 50"
+                        },
+                        {
+                            "key": "forceAttributeRefresh",
+                            "label": "Force attribute refresh on each aggregation?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "Recalculate all computed Normal-type attributes on every run, even if no changes were detected. This may increase processing time but ensures values stay up to date"
                         },
                         {
                             "key": "concurrencyCheckEnabled",

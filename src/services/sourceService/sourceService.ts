@@ -102,6 +102,8 @@ export class SourceService {
     private readonly taskResultWait: number
     private readonly concurrencyCheckEnabled: boolean
 
+    // Sources configured for batch mode (`accountLimit` defined)
+    private readonly batchLimitedSourceNames: Set<string>
     // Batch mode cumulative count per source (persisted across runs)
     private batchCumulativeCount: Record<string, number>
 
@@ -125,10 +127,19 @@ export class SourceService {
         this.taskResultRetries = config.taskResultRetries
         this.taskResultWait = config.taskResultWait
         this.concurrencyCheckEnabled = config.concurrencyCheckEnabled
+        this.batchLimitedSourceNames = new Set(
+            this.sources.filter((source) => source.accountLimit !== undefined).map((source) => source.name)
+        )
 
         // Read persisted batch cumulative count (may be undefined, false, or an object)
         const raw = config.batchCumulativeCount
-        this.batchCumulativeCount = raw && typeof raw === 'object' && !Array.isArray(raw) ? { ...raw } : {}
+        const persistedCount =
+            raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, number>) : {}
+        this.batchCumulativeCount = Object.fromEntries(
+            Object.entries(persistedCount).filter(
+                ([sourceName, count]) => this.batchLimitedSourceNames.has(sourceName) && typeof count === 'number'
+            )
+        )
     }
 
     // ------------------------------------------------------------------------
@@ -458,7 +469,7 @@ export class SourceService {
         const sourcesWithLimits = this.managedSources.map((s) => {
             const baseLimit = s.config?.accountLimit
             let effectiveLimit: number | undefined
-            if (baseLimit) {
+            if (baseLimit !== undefined) {
                 const cumulativeCount = this.batchCumulativeCount[s.name] ?? 0
                 effectiveLimit = cumulativeCount + baseLimit
                 this.log.debug(`Source ${s.name}: effectiveLimit=${effectiveLimit}`)
@@ -479,7 +490,7 @@ export class SourceService {
                         undefined
                     )) {
                         for (const account of batch) {
-                            if (effectiveLimit && collectedCount >= effectiveLimit) break
+                            if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
                             if (this.isMachineManagedAccount(account)) {
                                 discardedMachineCount++
                                 continue
@@ -498,7 +509,7 @@ export class SourceService {
                                 collectedCount++
                             }
                         }
-                        if (effectiveLimit && collectedCount >= effectiveLimit) {
+                        if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) {
                             this.log.info(
                                 `Source ${source.name}: reached effectiveLimit of ${effectiveLimit}, stopping`
                             )
@@ -513,7 +524,7 @@ export class SourceService {
                         )
                     }
 
-                    if (source.config?.accountLimit !== undefined) {
+                    if (this.batchLimitedSourceNames.has(source.name)) {
                         this.batchCumulativeCount[source.name] = collectedCount
                         this.log.debug(`Source ${source.name}: updated cumulative count to ${collectedCount}`)
                     }
