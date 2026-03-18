@@ -128,7 +128,9 @@ export class SourceService {
         this.taskResultWait = config.taskResultWait
         this.concurrencyCheckEnabled = config.concurrencyCheckEnabled
         this.batchLimitedSourceNames = new Set(
-            this.sources.filter((source) => source.accountLimit !== undefined).map((source) => source.name)
+            this.sources
+                .filter((source) => typeof source.accountLimit === 'number' && Number.isFinite(source.accountLimit))
+                .map((source) => source.name)
         )
 
         // Read persisted batch cumulative count (may be undefined, false, or an object)
@@ -469,7 +471,7 @@ export class SourceService {
         const sourcesWithLimits = this.managedSources.map((s) => {
             const baseLimit = s.config?.accountLimit
             let effectiveLimit: number | undefined
-            if (baseLimit !== undefined) {
+            if (typeof baseLimit === 'number' && Number.isFinite(baseLimit)) {
                 const cumulativeCount = this.batchCumulativeCount[s.name] ?? 0
                 effectiveLimit = cumulativeCount + baseLimit
                 this.log.debug(`Source ${s.name}: effectiveLimit=${effectiveLimit}`)

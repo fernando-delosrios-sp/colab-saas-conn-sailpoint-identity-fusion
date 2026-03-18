@@ -231,8 +231,18 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to refresh attributes for
      */
     public async refreshAllAttributes(fusionAccount: FusionAccount): Promise<void> {
-        await this.applyNormalDefinitions(fusionAccount)
-        await this.applyUniqueDefinitions(fusionAccount)
+        await this.refreshDefinitions(
+            fusionAccount,
+            this.normalDefinitions,
+            this.processNormalDefinition.bind(this),
+            'normal'
+        )
+        await this.refreshDefinitions(
+            fusionAccount,
+            this.uniqueDefinitions,
+            this.processUniqueDefinition.bind(this),
+            'unique'
+        )
     }
 
     /**
@@ -242,9 +252,15 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to refresh normal attributes for
      */
     public async refreshNormalAttributes(fusionAccount: FusionAccount): Promise<void> {
-        if (!fusionAccount.needsRefresh && !this.forceAttributeRefresh || this.normalDefinitions.length === 0) return
+        const forceRefresh = this.forceAttributeRefresh || fusionAccount.needsReset || this.normalDefinitions.some((def) => def.refresh)
+        if (!fusionAccount.needsRefresh && !forceRefresh || this.normalDefinitions.length === 0) return
         this.log.debug(`Refreshing normal attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`)
-        await this.applyNormalDefinitions(fusionAccount)
+        await this.refreshDefinitions(
+            fusionAccount,
+            this.normalDefinitions,
+            this.processNormalDefinition.bind(this),
+            'normal'
+        )
     }
 
     /**
@@ -268,7 +284,12 @@ export class AttributeService {
             await this.unregisterUniqueAttributes(fusionAccount)
         }
 
-        await this.applyUniqueDefinitions(fusionAccount)
+        await this.refreshDefinitions(
+            fusionAccount,
+            this.uniqueDefinitions,
+            this.processUniqueDefinition.bind(this),
+            'unique'
+        )
     }
 
     /**
@@ -715,65 +736,30 @@ export class AttributeService {
     // ------------------------------------------------------------------------
 
     /**
-     * Apply normal attribute definitions to a fusion account.
-     *
-     * Normal definitions are evaluated **before** Fusion matching occurs (during
-     * per-account processing in processFusionAccounts / processIdentities). This means
-     * their output is available to the scoring/matching engine.
+     * Apply a definition list to a fusion account using the provided processor.
      *
      * Builds the Velocity context once per account and reuses it across all definitions.
      * When an attribute value is generated, it is also set on the shared context so
-     * subsequent definitions can reference it. Definition order matters: later normal
-     * definitions can reference values produced by earlier ones. Unique definitions
-     * (applied separately via {@link applyUniqueDefinitions}) can reference normal
-     * attribute values, but normal definitions cannot reference unique attributes
-     * because unique evaluation happens after this phase.
+     * subsequent definitions can reference it. Definition order matters.
      */
-    private async applyNormalDefinitions(fusionAccount: FusionAccount): Promise<void> {
-        if (this.normalDefinitions.length === 0) return
+    private async refreshDefinitions<T extends AnyDefinition>(
+        fusionAccount: FusionAccount,
+        definitions: T[],
+        processor: (definition: T, fusionAccount: FusionAccount, context: { [key: string]: any }) => Promise<void>,
+        kind: 'normal' | 'unique'
+    ): Promise<void> {
+        if (definitions.length === 0) return
         const context = this.buildVelocityContext(fusionAccount)
 
-        for (const definition of this.normalDefinitions) {
+        for (const definition of definitions) {
             try {
-                await this.processNormalDefinition(definition, fusionAccount, context)
+                await processor(definition, fusionAccount, context)
             } catch (error) {
                 this.log.error(
-                    `Error generating normal attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
+                    `Error generating ${kind} attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
                     (error as any).message
                 )
-            }
-        }
-    }
-
-    /**
-     * Apply unique attribute definitions to a fusion account.
-     *
-     * Unique definitions are evaluated **after** Fusion matching occurs (in the global
-     * refreshUniqueAttributes pass that runs once all accounts have been processed and
-     * scored). This ensures that unique value generation has access to normal attribute
-     * values populated during the earlier per-account phase.
-     *
-     * Attribute mapping can be used in conjunction with unique definitions to preload
-     * attributes from existing managed accounts, identities, and Fusion accounts into
-     * the Velocity context. The unique definition then runs and sets a value guaranteed
-     * to be different from any other account or identity.
-     *
-     * Builds the Velocity context once per account and reuses it across all definitions.
-     * Re-throws errors to prevent duplicate values from being silently accepted.
-     */
-    private async applyUniqueDefinitions(fusionAccount: FusionAccount): Promise<void> {
-        if (this.uniqueDefinitions.length === 0) return
-        const context = this.buildVelocityContext(fusionAccount)
-
-        for (const definition of this.uniqueDefinitions) {
-            try {
-                await this.processUniqueDefinition(definition, fusionAccount, context)
-            } catch (error) {
-                this.log.error(
-                    `Error generating unique attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
-                    (error as any).message
-                )
-                throw error
+                if (kind === 'unique') throw error
             }
         }
     }
@@ -851,19 +837,12 @@ export class AttributeService {
             return
         }
 
-        if (name === fusionIdentityAttribute && fusionAccount.needsReset) {
+        if (hasValue && name === fusionIdentityAttribute && fusionAccount.needsReset) {
             this.log.warn(
                 `Skipping unique attribute reset for nativeIdentity attribute '${name}' ` +
                 `on account: ${fusionAccount.name}`
             )
-            if (hasValue) {
-                this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
-            }
-            return
-        }
-
-        if (fusionAccount.isIdentity && name === fusionIdentityAttribute) {
-            this.log.warn(`Skipping change of nativeIdentity for account: ${fusionAccount.name}`)
+            this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
             return
         }
 

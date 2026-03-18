@@ -75,6 +75,30 @@ export function parse(dateStr: string | Date | number): Date {
 }
 
 /**
+ * Parse an ISO-8601 date string.
+ * Kept for compatibility with date-fns style usage in Velocity templates.
+ */
+export function parseISO(dateStr: string): Date {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) {
+        throw new Error('Invalid ISO date')
+    }
+    return d
+}
+
+/**
+ * Get year from date.
+ * Uses UTC to avoid timezone shifts for midnight Z values.
+ */
+export function getYear(date: Date | string | number): number {
+    const d = new Date(date)
+    if (isNaN(d.getTime())) {
+        throw new Error('Invalid date')
+    }
+    return d.getUTCFullYear()
+}
+
+/**
  * Add days to a date
  */
 export function addDays(date: Date | string | number, days: number): Date {
@@ -193,6 +217,8 @@ export function isValid(date: any): boolean {
 export const Datefns = {
     format,
     parse,
+    parseISO,
+    getYear,
     addDays,
     addMonths,
     addYears,

@@ -238,7 +238,7 @@ export class IdentityService {
         const { accountsApi } = this.client
 
         if (!identityId) {
-            this.log.warn(`Cannot correlate accounts for fusion account ${fusionAccount.name}: no identity ID`)
+            this.log.warn(`Cannot Correlated for fusion account ${fusionAccount.name}: no identity ID`)
             return false
         }
 

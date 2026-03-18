@@ -1,6 +1,5 @@
 import { logger } from '@sailpoint/connector-sdk'
 import { Datefns } from './dateUtils'
-import parse from 'any-date-parser'
 import { CountryCode, parsePhoneNumberFromString } from 'libphonenumber-js'
 import { State, City } from './geoData'
 // @ts-expect-error - no types available
@@ -115,9 +114,181 @@ const parseAddressSync = (addressString: string): ParsedAddress | null => {
     return error ? null : result
 }
 
-const normalizeDate = (date: string): string | undefined => {
-    const parsed = parse.fromAny(date)
-    return parsed.isValid() ? parsed.toISOString() : undefined
+type AmbiguousDateOrder = 'DMY' | 'MDY' | 'YMD'
+
+const MONTH_NAME_INDEX: Record<string, number> = {
+    jan: 1,
+    january: 1,
+    feb: 2,
+    february: 2,
+    mar: 3,
+    march: 3,
+    apr: 4,
+    april: 4,
+    may: 5,
+    jun: 6,
+    june: 6,
+    jul: 7,
+    july: 7,
+    aug: 8,
+    august: 8,
+    sep: 9,
+    sept: 9,
+    september: 9,
+    oct: 10,
+    october: 10,
+    nov: 11,
+    november: 11,
+    dec: 12,
+    december: 12,
+}
+
+const DEFAULT_AMBIGUOUS_DATE_PRIORITY = 'dd-MM-yyyy,MM-dd-yyyy'
+
+const isValidDateParts = (year: number, month: number, day: number): boolean => {
+    if (year < 1000 || year > 9999) return false
+    if (month < 1 || month > 12) return false
+    if (day < 1 || day > 31) return false
+
+    const utcDate = new Date(Date.UTC(year, month - 1, day))
+    return (
+        utcDate.getUTCFullYear() === year &&
+        utcDate.getUTCMonth() === month - 1 &&
+        utcDate.getUTCDate() === day
+    )
+}
+
+const asUtcIso = (
+    year: number,
+    month: number,
+    day: number,
+    hour = 0,
+    minute = 0,
+    second = 0,
+    millisecond = 0
+): string | undefined => {
+    if (!isValidDateParts(year, month, day)) return undefined
+    if (hour < 0 || hour > 23) return undefined
+    if (minute < 0 || minute > 59) return undefined
+    if (second < 0 || second > 59) return undefined
+    if (millisecond < 0 || millisecond > 999) return undefined
+
+    return new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond)).toISOString()
+}
+
+const parsePriorityToOrders = (priority?: string): AmbiguousDateOrder[] => {
+    if (!priority || !priority.trim()) return ['DMY', 'MDY']
+
+    const tokenToOrder: Record<string, AmbiguousDateOrder> = {
+        dmy: 'DMY',
+        'dd-mm-yyyy': 'DMY',
+        'dd/mm/yyyy': 'DMY',
+        'dd.mm.yyyy': 'DMY',
+        mdy: 'MDY',
+        'mm-dd-yyyy': 'MDY',
+        'mm/dd/yyyy': 'MDY',
+        'mm.dd.yyyy': 'MDY',
+        ymd: 'YMD',
+        'yyyy-mm-dd': 'YMD',
+        'yyyy/mm/dd': 'YMD',
+        'yyyy.mm.dd': 'YMD',
+    }
+
+    const parsed = priority
+        .split(',')
+        .map((token) => token.trim().toLowerCase())
+        .map((token) => tokenToOrder[token])
+        .filter((token): token is AmbiguousDateOrder => Boolean(token))
+
+    if (parsed.length === 0) return ['DMY', 'MDY']
+    return [...new Set(parsed)]
+}
+
+const parseNumericDateAsUtc = (rawInput: string, ambiguousPriority: AmbiguousDateOrder[]): string | undefined => {
+    const trimmed = rawInput.trim()
+    const match = trimmed.match(
+        /^(\d{1,4})[/.-](\d{1,2})[/.-](\d{1,4})(?:[ T](\d{1,2})(?::(\d{1,2})(?::(\d{1,2})(?:\.(\d{1,3}))?)?)?)?$/
+    )
+    if (!match) return undefined
+
+    const first = Number(match[1])
+    const second = Number(match[2])
+    const third = Number(match[3])
+    const hour = match[4] ? Number(match[4]) : 0
+    const minute = match[5] ? Number(match[5]) : 0
+    const secondPart = match[6] ? Number(match[6]) : 0
+    const millisecond = match[7] ? Number(match[7].padEnd(3, '0')) : 0
+
+    // If the first segment is a 4-digit year, treat as Y-M-D deterministically.
+    if (match[1].length === 4) {
+        return asUtcIso(first, second, third, hour, minute, secondPart, millisecond)
+    }
+
+    // If the last segment is a 4-digit year, use configured ambiguous priority.
+    if (match[3].length === 4) {
+        for (const order of ambiguousPriority) {
+            if (order === 'DMY') {
+                const dmy = asUtcIso(third, second, first, hour, minute, secondPart, millisecond)
+                if (dmy) return dmy
+                continue
+            }
+            if (order === 'MDY') {
+                const mdy = asUtcIso(third, first, second, hour, minute, secondPart, millisecond)
+                if (mdy) return mdy
+                continue
+            }
+            if (order === 'YMD') {
+                const ymd = asUtcIso(first, second, third, hour, minute, secondPart, millisecond)
+                if (ymd) return ymd
+            }
+        }
+    }
+
+    return undefined
+}
+
+const parseMonthNameDateAsUtc = (rawInput: string): string | undefined => {
+    const trimmed = rawInput.trim()
+
+    // Month Day Year: "July 4 1995", "Jan 15, 2021"
+    const monthDayYear = trimmed.match(/^([A-Za-z]+)\s+(\d{1,2})(?:,)?\s+(\d{4})$/)
+    if (monthDayYear) {
+        const month = MONTH_NAME_INDEX[monthDayYear[1].toLowerCase()]
+        const day = Number(monthDayYear[2])
+        const year = Number(monthDayYear[3])
+        if (month) return asUtcIso(year, month, day)
+    }
+
+    // Day Month Year: "15 Jan 2021", "4 July, 1995"
+    const dayMonthYear = trimmed.match(/^(\d{1,2})\s+([A-Za-z]+)(?:,)?\s+(\d{4})$/)
+    if (dayMonthYear) {
+        const day = Number(dayMonthYear[1])
+        const month = MONTH_NAME_INDEX[dayMonthYear[2].toLowerCase()]
+        const year = Number(dayMonthYear[3])
+        if (month) return asUtcIso(year, month, day)
+    }
+
+    return undefined
+}
+
+const normalizeDate = (date: string, ambiguousPriority = DEFAULT_AMBIGUOUS_DATE_PRIORITY): string | undefined => {
+    if (!date || !date.trim()) return undefined
+    const input = date.trim()
+
+    // Preserve timezone-aware ISO inputs as-is (validated).
+    const isoWithTimezone = input.match(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/
+    )
+    if (isoWithTimezone) {
+        const parsed = new Date(input)
+        return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString()
+    }
+
+    const orders = parsePriorityToOrders(ambiguousPriority)
+    const numeric = parseNumericDateAsUtc(input, orders)
+    if (numeric) return numeric
+
+    return parseMonthNameDateAsUtc(input)
 }
 
 const normalizePhoneNumber = (phone: string, defaultCountry: CountryCode = 'US'): string | undefined => {

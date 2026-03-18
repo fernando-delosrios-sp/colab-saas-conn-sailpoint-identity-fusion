@@ -6,6 +6,7 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 
 ## When to use Attribute Definition
 
+
 | Goal                        | Use Attribute Definition                      | Example                                        |
 | --------------------------- | --------------------------------------------- | ---------------------------------------------- |
 | Generate unique usernames   | Yes (Unique type)                             | `jsmith`, `jsmith1`, `jsmith2`                 |
@@ -14,13 +15,16 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 | Computed attributes         | Yes (Normal type with expression)             | Full name from first + last; formatted dates   |
 | Normalize/format values     | Yes (Normal type with expression + utilities) | Parse address, format phone, proper case names |
 
+
 ---
 
 ## Global settings
 
+
 | Field                                             | Purpose                                     | Recommended value                                                                  |
 | ------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------- |
 | **Maximum attempts for unique Define generation** | Cap on retries for generating unique values | 100 (default); increase for large datasets with high collision risk (e.g. 200–500) |
+
 
 **Why this matters:** For **Unique** type attributes, if the generated value already exists, the connector appends a counter and retries. This setting prevents infinite loops if the expression always produces the same value.
 
@@ -29,6 +33,7 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 ## Per-attribute definition configuration
 
 For each attribute you want to generate, add an **Attribute Definition**:
+
 
 | Field                             | Type                | Purpose                                  | Options / Example                                                     |
 | --------------------------------- | ------------------- | ---------------------------------------- | --------------------------------------------------------------------- |
@@ -43,8 +48,9 @@ For each attribute you want to generate, add an **Attribute Definition**:
 | **Remove spaces?**                | Boolean             | Remove all whitespace                    | Yes for usernames/IDs                                                 |
 | **Refresh on each aggregation?**  | Boolean             | Recalculate every run (Normal type only) | Yes if dynamic; No if stable                                          |
 
+
 **Screenshot placeholder:** Attribute Definition with examples.
-![Attribute definition example](../assets/images/attribute-management-definition.png)
+Attribute definition example
 
 ---
 
@@ -54,10 +60,12 @@ For each attribute you want to generate, add an **Attribute Definition**:
 
 **Behavior:** Standard computed attribute; recalculated based on **Refresh on each aggregation?** setting.
 
+
 | Refresh setting | Behavior                       | Use case                                                            |
 | --------------- | ------------------------------ | ------------------------------------------------------------------- |
 | Yes             | Recalculated every aggregation | Dynamic values that should update (full name, age, formatted dates) |
 | No              | Calculated once; persisted     | Stable values (initial assignment, one-time calculations)           |
+
 
 **Examples:**
 
@@ -155,6 +163,7 @@ The **Apache Velocity expression** field provides a powerful templating language
 
 ### Available data
 
+
 | Source                        | What you can access                                                                                                                       | Example                                            |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | **Mapped account attributes** | All attributes from Attribute Mapping                                                                                                     | `$jobTitle`, `$department`, `$email`               |
@@ -165,6 +174,7 @@ The **Apache Velocity expression** field provides a powerful templating language
 | **$previous**                 | Previous generated account state                                                                                                          | `$previous.username`                               |
 | **$originSource**             | Source that originally created the Fusion account (when available)                                                                        | `Identities`, `Workday`                            |
 | **Special variables**         | `$counter` (Counter type only)                                                                                                            | `$counter` in expression for Counter type          |
+
 
 ### Available utilities
 
@@ -183,6 +193,9 @@ Parse and normalize US addresses (`$AddressParse.getCityState(city)`, `$AddressP
 #### $Normalize (data normalization)
 
 Standardize common data formats (`$Normalize.phone(number)`, `$Normalize.date(date)`, `$Normalize.name(name)`).
+For ambiguous numeric dates, `Normalize.date` accepts an optional priority argument:
+`$Normalize.date($birthDate, "dd-MM-yyyy,MM-dd-yyyy")` (default) or
+`$Normalize.date($birthDate, "MM-dd-yyyy,dd-MM-yyyy")`.
 
 ---
 
@@ -190,12 +203,14 @@ Standardize common data formats (`$Normalize.phone(number)`, `$Normalize.date(da
 
 Understanding the sequence helps design correct configurations:
 
+
 | Step | Phase                 | Action                                                | Example                                                                                |
 | ---- | --------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | 1    | **Attribute Mapping** | Merge per mapping rules (MAP)                         | Map `[title, jobTitle]` → `jobTitle`, merge: first found → "Engineer"                  |
 | 2    | **Normal Define**     | Generate non-unique attributes from mapped data       | Generate `fullName` from `$firstname $lastname` → "John Smith"                         |
 | 3    | **Match / Scoring**   | Compare normal attributes against existing identities | Normal attributes feed into Match scoring                                              |
 | 4    | **Unique Define**     | Generate unique attributes with collision detection   | Generate `username` from `$firstname.$lastname` → "jsmith" (or "jsmith1" on collision) |
+
 
 **Key insights:**
 
@@ -235,3 +250,4 @@ One can purposely generate an **empty** `nativeIdentity` in conjunction with the
   $email
 #end
 ```
+

@@ -210,10 +210,7 @@ describe('evaluateVelocityTemplate', () => {
         it('should normalize ISO date format', () => {
             const context = { date: '1985-03-15' }
             const result = evaluateVelocityTemplate('$Normalize.date($date)', context)
-            expect(result).toContain('1985')
-            expect(result).toContain('03')
-            // Note: Date may be adjusted based on timezone when converting to ISO
-            expect(result).toMatch(/1[45]/) // Day can be 14 or 15 depending on timezone
+            expect(result).toBe('1985-03-15T00:00:00.000Z')
         })
 
         it('should normalize US date format (MM/DD/YYYY)', () => {
@@ -232,6 +229,18 @@ describe('evaluateVelocityTemplate', () => {
             const context = { date: 'Jan 15 2021' }
             const result = evaluateVelocityTemplate('$Normalize.date($date)', context)
             expect(result).toContain('2021')
+        })
+
+        it('should prioritize DMY for ambiguous numeric dates by default', () => {
+            const context = { date: '03-04-1990' }
+            const result = evaluateVelocityTemplate('$Normalize.date($date)', context)
+            expect(result).toBe('1990-04-03T00:00:00.000Z')
+        })
+
+        it('should allow overriding ambiguous priority order', () => {
+            const context = { date: '03-04-1990' }
+            const result = evaluateVelocityTemplate('$Normalize.date($date, "MM-dd-yyyy,dd-MM-yyyy")', context)
+            expect(result).toBe('1990-03-04T00:00:00.000Z')
         })
     })
 
@@ -373,6 +382,12 @@ describe('evaluateVelocityTemplate', () => {
             const context = { date1: '2020-01-20', date2: '2020-01-15' }
             const result = evaluateVelocityTemplate('$Datefns.differenceInDays($date1, $date2)', context)
             expect(result).toBe('5')
+        })
+
+        it('should support parseISO and getYear compatibility helpers', () => {
+            const context = { birthDate: '1985-03-14T00:00:00.000Z' }
+            const result = evaluateVelocityTemplate('$Datefns.getYear($Datefns.parseISO($birthDate))', context)
+            expect(result).toBe('1985')
         })
     })
 
