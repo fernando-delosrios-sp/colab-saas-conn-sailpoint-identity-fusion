@@ -305,7 +305,7 @@ export class AttributeService {
 
         for (const def of this.uniqueDefinitions) {
             if (operation === 'unregister' && def.name === fusionIdentityAttribute) {
-                this.log.warn(
+                this.log.debug(
                     `Skipping unique attribute reset for nativeIdentity attribute '${def.name}' ` +
                     `on account: ${fusionAccount.name}`
                 )
