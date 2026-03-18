@@ -372,6 +372,7 @@ export interface InternalConfig {
     readonly processingWaitConstant: number
     readonly retriesConstant: number
     readonly workflowName: string
+    readonly delayedAggregationWorkflowName: string
     readonly padding: string
     readonly msDay: number
     readonly identityNotFoundWait: number

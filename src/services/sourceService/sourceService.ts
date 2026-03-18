@@ -670,9 +670,12 @@ export class SourceService {
 
     /**
      * Aggregate sources configured with `aggregationMode: 'delayed'`.
-     * Each source waits its configured `aggregationDelay` (minutes) before triggering.
+     * Each source is scheduled via the provided callback and runs out-of-band.
      */
-    public async aggregateDelayedSources(): Promise<void> {
+    public async aggregateDelayedSources(
+        scheduleAggregation: (args: { sourceId: string; delayMinutes: number; disableOptimization: boolean }) => Promise<void>
+    ): Promise<void> {
+        assert(scheduleAggregation, 'Delayed aggregation scheduler is required')
         const delayedSources = this.managedSources.filter((s) => s.config?.aggregationMode === 'delayed')
 
         if (delayedSources.length === 0) {
@@ -684,18 +687,23 @@ export class SourceService {
         await Promise.all(
             delayedSources.map(async (source) => {
                 const delayMinutes = source.config?.aggregationDelay ?? 5
-                const delayMs = delayMinutes * 60 * 1000
                 const disableOpt = source.config?.optimizedAggregation === false
 
-                this.log.info(`Source ${source.name}: delayed aggregation in ${delayMinutes} minute(s)`)
-                await new Promise((resolve) => setTimeout(resolve, delayMs))
-                this.log.info(`Triggering delayed aggregation for source: ${source.name}`)
+                this.log.info(
+                    `Source ${source.name}: scheduling delayed aggregation in ${delayMinutes} minute(s), disableOptimization=${disableOpt}`
+                )
 
                 try {
-                    await this.aggregateManagedSource(source.id, disableOpt, false)
+                    await scheduleAggregation({
+                        sourceId: source.id,
+                        delayMinutes,
+                        disableOptimization: disableOpt,
+                    })
                 } catch (err) {
                     this.log.error(
-                        `Delayed aggregation failed for source ${source.name}: ${err instanceof Error ? err.message : String(err)}`
+                        `Failed to schedule delayed aggregation for source ${source.name}: ${
+                            err instanceof Error ? err.message : String(err)
+                        }`
                     )
                 }
             })

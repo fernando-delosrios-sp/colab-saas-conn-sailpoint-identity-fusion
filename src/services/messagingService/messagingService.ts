@@ -10,6 +10,7 @@ import { FusionConfig } from '../../model/config'
 import { ClientService } from '../clientService'
 import { LogService } from '../logService'
 import { EmailWorkflow } from '../../model/emailWorkflow'
+import { DelayedAggregationWorkflow } from '../../model/delayedAggregationWorkflow'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { assert, softAssert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
@@ -39,9 +40,12 @@ import {
  */
 export class MessagingService {
     private workflow: WorkflowV2025 | undefined
+    private delayedAggregationWorkflow: WorkflowV2025 | undefined
     private templates: Map<string, HandlebarsTemplateDelegate> = new Map()
     private readonly workflowName: string
+    private readonly delayedAggregationWorkflowName: string
     private readonly cloudDisplayName: string
+    private readonly apiBaseUrl: string
     private readonly urlContext: UrlContext
     private readonly reportAttributes: string[]
 
@@ -57,7 +61,9 @@ export class MessagingService {
         private identities?: IdentityService
     ) {
         this.workflowName = config.workflowName
+        this.delayedAggregationWorkflowName = config.delayedAggregationWorkflowName
         this.cloudDisplayName = config.cloudDisplayName
+        this.apiBaseUrl = config.baseurl.replace(/\/$/, '')
         this.reportAttributes = config.fusionFormAttributes ?? []
         this.urlContext = createUrlContext(config.baseurl)
         registerHandlebarsHelpers()
@@ -114,6 +120,102 @@ export class MessagingService {
 
             this.log.info(`Created workflow: ${workflowName} (ID: ${this.workflow.id})`)
         }, `Workflow preparation failed. Unable to create email workflow "${workflowName}"`)
+    }
+
+    /**
+     * Prepare the delayed aggregation workflow by checking for existence and creating if needed.
+     */
+    public async fetchDelayedAggregationSender(): Promise<void> {
+        if (this.delayedAggregationWorkflow) {
+            this.log.debug('Delayed aggregation workflow already prepared')
+            return
+        }
+
+        assert(this.delayedAggregationWorkflowName, 'Delayed aggregation workflow name is required')
+        assert(this.cloudDisplayName, 'Cloud display name is required')
+
+        const workflowName = `${this.delayedAggregationWorkflowName} (${this.cloudDisplayName})`
+        this.log.debug(`Preparing delayed aggregation workflow: ${workflowName}`)
+
+        const owner = this.sources.fusionSourceOwner
+        assert(owner, 'Fusion source owner is required')
+        assert(owner.id, 'Fusion source owner ID is required')
+
+        const existingWorkflow = await this.findWorkflowByName(workflowName)
+        if (existingWorkflow) {
+            this.delayedAggregationWorkflow = existingWorkflow
+            this.log.info(
+                `Found existing delayed aggregation workflow: ${workflowName} (ID: ${this.delayedAggregationWorkflow.id})`
+            )
+            await this.disableWorkflowIfEnabled(this.delayedAggregationWorkflow)
+            return
+        }
+
+        await wrapConnectorError(async () => {
+            const delayedWorkflow = new DelayedAggregationWorkflow(workflowName, owner)
+            assert(delayedWorkflow, 'Failed to create delayed aggregation workflow object')
+
+            ;(delayedWorkflow as any).enabled = false
+
+            this.delayedAggregationWorkflow = await this.createWorkflow(delayedWorkflow)
+            assert(this.delayedAggregationWorkflow, 'Failed to create delayed aggregation workflow')
+            assert(this.delayedAggregationWorkflow.id, 'Delayed aggregation workflow ID is required')
+
+            this.log.info(
+                `Created delayed aggregation workflow: ${workflowName} (ID: ${this.delayedAggregationWorkflow.id})`
+            )
+        }, `Workflow preparation failed. Unable to create delayed aggregation workflow "${workflowName}"`)
+    }
+
+    /**
+     * Schedule a delayed source aggregation in ISC workflows (fire-and-forget).
+     */
+    public async scheduleDelayedAggregation(args: {
+        sourceId: string
+        delayMinutes: number
+        disableOptimization: boolean
+    }): Promise<void> {
+        assert(args.sourceId, 'Source ID is required to schedule delayed aggregation')
+
+        const workflow = await this.getDelayedAggregationWorkflow()
+        assert(workflow.id, 'Delayed aggregation workflow ID is required')
+
+        const accessToken = await this.resolveAccessToken()
+        assert(accessToken, 'Unable to resolve access token for delayed aggregation workflow')
+
+        const safeDelayMinutes = Math.max(1, Math.trunc(args.delayMinutes || 1))
+        const requestUrl = this.buildLoadAccountsRequestUrl(args.sourceId, args.disableOptimization)
+        const request: TestWorkflowRequestV2025 = {
+            input: {
+                delay: `${safeDelayMinutes}m`,
+                requestUrl,
+                authorizationHeader: `Bearer ${accessToken}`,
+            },
+        }
+
+        const requestParameters: WorkflowsV2025ApiTestWorkflowRequest = {
+            id: workflow.id,
+            testWorkflowRequestV2025: request,
+        }
+
+        try {
+            const response = await this.testWorkflow(requestParameters)
+            assert(response, 'Delayed workflow response is required')
+            softAssert(
+                response.status === 200,
+                `Failed to schedule delayed aggregation workflow - received status ${response.status}`,
+                'error'
+            )
+            this.log.info(
+                `Scheduled delayed aggregation workflow for source ${args.sourceId} with delay ${safeDelayMinutes} minute(s)`
+            )
+        } catch (e) {
+            this.log.error(
+                `Failed to schedule delayed aggregation for source ${args.sourceId}: ${
+                    e instanceof Error ? e.message : String(e)
+                }`
+            )
+        }
     }
 
     /**
@@ -278,6 +380,22 @@ export class MessagingService {
     }
 
     /**
+     * Get the delayed aggregation workflow, ensuring it's prepared first.
+     */
+    private async getDelayedAggregationWorkflow(): Promise<WorkflowV2025> {
+        if (!this.delayedAggregationWorkflow) {
+            await this.fetchDelayedAggregationSender()
+        }
+        if (!this.delayedAggregationWorkflow) {
+            throw new ConnectorError(
+                'Delayed aggregation workflow not available. The workflow could not be prepared.',
+                ConnectorErrorType.Generic
+            )
+        }
+        return this.delayedAggregationWorkflow
+    }
+
+    /**
      * Send an email using the workflow
      */
     private async sendEmail(recipients: string[], subject: string, body: string): Promise<void> {
@@ -385,6 +503,42 @@ export class MessagingService {
             // If we can't disable it, testWorkflow may fail with 400.
             this.log.warn(`Failed to disable workflow ${workflow.id}: ${e}`)
         }
+    }
+
+    /**
+     * Resolve the current bearer token used by the API client.
+     */
+    private async resolveAccessToken(): Promise<string> {
+        const accessToken = this.client.config.accessToken
+        assert(accessToken, 'Client access token provider is required')
+
+        const normalize = (value: unknown): string => {
+            assert(typeof value === 'string' && value.length > 0, 'Resolved access token must be a non-empty string')
+            return value as string
+        }
+
+        if (typeof accessToken === 'string') {
+            return normalize(accessToken)
+        }
+
+        if (typeof accessToken === 'function') {
+            const token = await accessToken(undefined, [])
+            return normalize(token)
+        }
+
+        const token = await accessToken
+        return normalize(token)
+    }
+
+    /**
+     * Build the source aggregation API URL used by the workflow HTTP step.
+     */
+    private buildLoadAccountsRequestUrl(sourceId: string, disableOptimization: boolean): string {
+        const url = new URL(`${this.apiBaseUrl}/sources/${sourceId}/load-accounts`)
+        if (disableOptimization) {
+            url.searchParams.set('disableOptimization', 'true')
+        }
+        return url.toString()
     }
 
     // ------------------------------------------------------------------------

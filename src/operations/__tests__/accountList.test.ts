@@ -138,6 +138,48 @@ describe('accountList setup phase', () => {
         expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledTimes(2)
         expect(maxInFlight).toBe(1)
     })
+
+    it('schedules delayed aggregation via workflow callback path', async () => {
+        const delayedSource = {
+            name: 'HR Source',
+            correlationMode: 'none' as const,
+            aggregationMode: 'delayed' as const,
+            aggregationDelay: 7,
+            optimizedAggregation: false,
+        }
+        const { registry, sources } = createMockRegistry([delayedSource])
+        const messaging = registry.messaging
+        const input = { schema: { attributes: [] } } as any
+
+        sources.managedSources = [
+            {
+                id: 'source-1',
+                name: delayedSource.name,
+                config: {
+                    aggregationMode: delayedSource.aggregationMode,
+                    aggregationDelay: delayedSource.aggregationDelay,
+                    optimizedAggregation: delayedSource.optimizedAggregation,
+                },
+            },
+        ] as any
+
+        sources.aggregateDelayedSources.mockImplementation(async (schedule: any) => {
+            await schedule({
+                sourceId: 'source-1',
+                delayMinutes: 7,
+                disableOptimization: true,
+            })
+        })
+
+        await accountList(registry, input)
+
+        expect(messaging.fetchDelayedAggregationSender).toHaveBeenCalledTimes(1)
+        expect(messaging.scheduleDelayedAggregation).toHaveBeenCalledWith({
+            sourceId: 'source-1',
+            delayMinutes: 7,
+            disableOptimization: true,
+        })
+    })
 })
 
 describe('accountList two-pass aggregation lifecycle', () => {

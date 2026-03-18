@@ -9,6 +9,7 @@ const internalConfig = {
     processingWaitConstant: 60 * 1000,
     retriesConstant: 20,
     workflowName: 'Fusion Email Sender',
+    delayedAggregationWorkflowName: 'Fusion Delayed Aggregation',
     padding: '   ',
     msDay: 86400000,
     identityNotFoundWait: 5000,

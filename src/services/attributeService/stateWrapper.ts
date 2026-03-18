@@ -79,6 +79,14 @@ export class StateWrapper {
         }
     }
 
+    private _doInit(key: string, start: number) {
+        if (!this.state.has(key)) {
+            // Set to start - 1 so first increment returns 'start'
+            this.state.set(key, start - 1)
+            logger.debug(`Initialized counter ${key} to ${start - 1} (first value will be ${start})`)
+        }
+    }
+
     /**
      * Initialize a counter with a start value if it doesn't exist
      * Sets the counter to (start - 1) so that the first increment returns 'start'
@@ -89,19 +97,11 @@ export class StateWrapper {
 
         if (this.locks) {
             await this.locks.withLock(lockKey, async () => {
-                if (!this.state.has(key)) {
-                    // Set to start - 1 so first increment returns 'start'
-                    this.state.set(key, start - 1)
-                    logger.debug(`Initialized counter ${key} to ${start - 1} (first value will be ${start})`)
-                }
+                this._doInit(key, start)
             })
         } else {
             // Fallback to non-locked operation (not thread-safe)
-            if (!this.state.has(key)) {
-                // Set to start - 1 so first increment returns 'start'
-                this.state.set(key, start - 1)
-                logger.debug(`Initialized counter ${key} to ${start - 1} (first value will be ${start})`)
-            }
+            this._doInit(key, start)
         }
     }
 

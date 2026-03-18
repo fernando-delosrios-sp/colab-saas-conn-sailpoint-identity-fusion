@@ -2,6 +2,9 @@ export type SourceConfigLike = {
     name: string
     correlationMode: 'none' | 'correlate' | 'reverse'
     sourceType?: 'authoritative' | 'record' | 'orphan'
+    aggregationMode?: 'none' | 'before' | 'delayed'
+    aggregationDelay?: number
+    optimizedAggregation?: boolean
     disableNonMatchingAccounts?: boolean
     correlationAttribute?: string
     correlationDisplayName?: string
@@ -75,6 +78,8 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
 
     const messaging = {
         fetchSender: jest.fn().mockResolvedValue(undefined),
+        fetchDelayedAggregationSender: jest.fn().mockResolvedValue(undefined),
+        scheduleDelayedAggregation: jest.fn().mockResolvedValue(undefined),
     }
 
     const attributes = {

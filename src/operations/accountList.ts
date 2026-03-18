@@ -71,6 +71,7 @@ async function fetchPhase(serviceRegistry: ServiceRegistry): Promise<FetchResult
         identities.fetchIdentities(),
         sources.fetchManagedAccounts(),
         messaging.fetchSender(),
+        messaging.fetchDelayedAggregationSender(),
         forms.fetchFormData(),
     ])
 
@@ -169,7 +170,7 @@ async function reportPhase(
 
 /** Phase 5: Cleanup, send accounts to platform, save state. */
 async function outputPhase(serviceRegistry: ServiceRegistry): Promise<number> {
-    const { log, fusion, forms, sources, attributes, res } = serviceRegistry
+    const { log, fusion, forms, sources, attributes, messaging, res } = serviceRegistry
 
     fusion.clearAnalyzedAccounts()
     sources.clearManagedAccounts()
@@ -188,7 +189,13 @@ async function outputPhase(serviceRegistry: ServiceRegistry): Promise<number> {
     sources.clearFusionAccounts()
     log.info('Account caches cleared from memory')
 
-    await sources.aggregateDelayedSources()
+    await sources.aggregateDelayedSources(async ({ sourceId, delayMinutes, disableOptimization }) => {
+        await messaging.scheduleDelayedAggregation({
+            sourceId,
+            delayMinutes,
+            disableOptimization,
+        })
+    })
 
     return count
 }
