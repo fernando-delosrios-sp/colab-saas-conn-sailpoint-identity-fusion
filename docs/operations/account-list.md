@@ -2,7 +2,7 @@
 
 ## Description
 
-The Account List operation is the main entry point for identity fusion. It performs a full aggregation of all fusion accounts, identities, and managed accounts. It uses a "Work Queue" pattern to process accounts efficiently, deduplicate data, and handle complex logic like unique attribute generation, form state reconciliation, and reporting.
+The Account List operation is the main entry point for identity fusion. It performs a full aggregation of all fusion accounts, identities, and managed accounts. It uses a "Work Queue" pattern to process accounts efficiently, match identities, and handle complex logic like unique attribute definition, form state reconciliation, and reporting.
 
 ## Process Flow
 
@@ -13,7 +13,7 @@ flowchart TD
     Fetch --> Exist[3. Process Existing Fusion Accounts]
     Exist --> NewId[4. Process Identities]
     NewId --> Reviews[5. Process New Identity Decisions]
-    Reviews --> Dedup[6. Deduplication of Remaining Managed Accounts]
+    Reviews --> Match[6. Match Remaining Managed Accounts]
     Dedup --> Forms[7. Form & Entitlement Reconciliation]
     Forms --> Unique[8. Global Unique Attribute Refresh]
     Unique --> Report[9. Reporting]
@@ -109,27 +109,27 @@ flowchart TD
 When report-on-aggregation is enabled, the generated Fusion report can include:
 
 - **Header summary**
-  - Report date
-  - Total accounts analyzed
-  - Potential matches count
+    - Report date
+    - Total accounts analyzed
+    - Potential matches count
 - **Processing statistics**
-  - Fusion totals (accounts, forms, assignments)
-  - Review decisions and outcomes
-  - Managed account found/processed metrics (including source-type breakdown)
-  - Total processing time and memory used
+    - Fusion totals (accounts, forms, assignments)
+    - Review decisions and outcomes
+    - Managed account found/processed metrics (including source-type breakdown)
+    - Total processing time and memory used
 - **Global warnings**
-  - Duplicate Fusion account mappings per identity (when detected)
-  - Guidance that this is generally caused by non-unique account names, with recommendation to review configuration and consider a unique account-name attribute
+    - Duplicate Fusion account mappings per identity (when detected)
+    - Guidance that this is generally caused by non-unique account names, with recommendation to review configuration and consider a unique account-name attribute
 - **Aggregation issues summary (compact)**
-  - Total warnings and total errors logged during aggregation
-  - Short sampled warning/error messages (not full logs)
-  - Samples are intentionally capped and truncated to reduce report size
+    - Total warnings and total errors logged during aggregation
+    - Short sampled warning/error messages (not full logs)
+    - Samples are intentionally capped and truncated to reduce report size
 - **Per-account detail cards**
-  - Potential match account context (source, id, email, selected attributes)
-  - Candidate identities with score breakdown by attribute/algorithm/threshold
-  - Failed matching/form creation entries with error details
+    - Potential match account context (source, id, email, selected attributes)
+    - Candidate identities with score breakdown by attribute/algorithm/threshold
+    - Failed matching/form creation entries with error details
 - **Optional non-match entries**
-  - Included when non-match reporting is requested
+    - Included when non-match reporting is requested
 
 ### Report size safety
 
@@ -148,7 +148,7 @@ To reduce email/report payload growth:
     - Accounts whose fusion identity attribute is empty are omitted when "Skip accounts with a missing identifier" is enabled (see Behavior Notes).
 
 12. **State Saving & Final Cleanup**:
-    - Saves attribute generation state (counters).
+    - Saves attribute definition state (counters).
     - Saves batch cumulative counts.
     - State is saved _after_ output generation so that a failure during transmission prevents stale state from being persisted.
     - Clears fusion account caches from memory.

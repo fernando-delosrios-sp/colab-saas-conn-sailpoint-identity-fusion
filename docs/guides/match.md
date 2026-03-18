@@ -1,4 +1,4 @@
-# Match (Deduplication)
+# Match
 
 This comprehensive guide explains how to use Identity Fusion NG's **Match** capability to **detect and resolve potential matching identities**. This use case **requires one or more sources** to be configured. **Identities are optional but highly recommended** because they provide the baseline to compare mapped and defined accounts against.
 
@@ -46,9 +46,9 @@ Use Identity Fusion for Match when you face these challenges:
 
 **Screenshot placeholder:** High-level Match flow diagram.
 
-![Match flow - Overview](../assets/images/deduplication-flow.png)
+![Match flow - Overview](../assets/images/match-flow.png)
 
-<!-- PLACEHOLDER: Diagram or screenshot of Match flow. Save as docs/assets/images/deduplication-flow.png -->
+<!-- PLACEHOLDER: Diagram or screenshot of Match flow. Save as docs/assets/images/match-flow.png -->
 
 ---
 
@@ -77,9 +77,9 @@ Configure **Source Settings → Scope** to define the baseline of identities to 
 
 **Screenshot placeholder:** Source Settings showing identity scope for baseline.
 
-![Deduplication source settings - Baseline](../assets/images/deduplication-source-settings.png)
+![Match source settings - Baseline](../assets/images/match-source-settings.png)
 
-<!-- PLACEHOLDER: Screenshot of Source Settings with sources and identity scope for Match. Save as docs/assets/images/deduplication-source-settings.png -->
+<!-- PLACEHOLDER: Screenshot of Source Settings with sources and identity scope for Match. Save as docs/assets/images/match-source-settings.png -->
 
 ### Sources configuration
 
@@ -136,9 +136,9 @@ Configure **Attribute Matching Settings → Matching Settings** to define match 
 
 **Screenshot placeholder:** Attribute Matching Settings - Matching section.
 
-![Fusion matching settings - Configuration](../assets/images/deduplication-fusion-matching.png)
+![Fusion matching settings - Configuration](../assets/images/match-fusion-matching.png)
 
-<!-- PLACEHOLDER: Screenshot of Attribute Matching Settings > Matching. Save as docs/assets/images/deduplication-fusion-matching.png -->
+<!-- PLACEHOLDER: Screenshot of Attribute Matching Settings > Matching. Save as docs/assets/images/match-fusion-matching.png -->
 
 ### Per-attribute match configuration
 
@@ -273,15 +273,15 @@ Include attributes that help reviewers decide if identities are matches:
 
 **Screenshot placeholder:** Manual review form example.
 
-![Deduplication review form - Example](../assets/images/deduplication-review-form.png)
+![Match review form - Example](../assets/images/match-review-form.png)
 
-<!-- PLACEHOLDER: Screenshot of manual review form for potential matches. Save as docs/assets/images/deduplication-review-form.png -->
+<!-- PLACEHOLDER: Screenshot of manual review form for potential matches. Save as docs/assets/images/match-review-form.png -->
 
 **Screenshot placeholder:** Email notification to reviewer.
 
-![Email to reviewer - Notification](../assets/images/deduplication-email-reviewer.png)
+![Email to reviewer - Notification](../assets/images/match-email-reviewer.png)
 
-<!-- PLACEHOLDER: Screenshot of email sent to reviewer. Save as docs/assets/images/deduplication-email-reviewer.png -->
+<!-- PLACEHOLDER: Screenshot of email sent to reviewer. Save as docs/assets/images/match-email-reviewer.png -->
 
 ---
 
@@ -354,7 +354,7 @@ An **enforced correlation role** is an automatically assigned ISC role that oper
 
 **Video placeholder:** End-to-end matching walkthrough.
 
-<!-- PLACEHOLDER: Video walking through matching: aggregation, match, form, resolution. Save as docs/assets/videos/deduplication-flow.mp4 -->
+<!-- PLACEHOLDER: Video walking through matching: aggregation, match, form, resolution. Save as docs/assets/videos/match-flow.mp4 -->
 
 ### Detailed step-by-step
 
@@ -477,7 +477,7 @@ Track these metrics to assess Match effectiveness:
 | **Attribute Matching Settings (Review)**   | Manual review workflow                       | Form attributes; expiration days; global reviewer            |
 | **Access Profiles**            | Reviewer permissions                         | Per-source reviewer access profiles; Fusion report           |
 
-**Deduplication requires:**
+**Match requires:**
 
 1. One or more sources (2+ recommended)
 2. Identity baseline (highly recommended)

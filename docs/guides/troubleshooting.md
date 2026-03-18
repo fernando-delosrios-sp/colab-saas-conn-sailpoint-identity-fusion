@@ -222,7 +222,7 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
 | Cause                            | Diagnostic                                                 | Solution                                                                   |
 | -------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
 | **Expression always same value** | Check Velocity expression                                  | Add variable parts (firstname, lastname) instead of fixed strings          |
-| **Max attempts too low**         | Check **Maximum attempts for unique attribute generation** | Increase to 200–500 for large datasets                                     |
+| **Max attempts too low**         | Check **Maximum attempts for unique Define generation** | Increase to 200–500 for large datasets                                     |
 | **High collision rate**          | Many accounts with same firstname+lastname                 | Use more distinguishing expression (add middle initial, employee ID, etc.) |
 
 **Example fix:**
@@ -720,7 +720,7 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 - **Connection issues:** Check PAT, URL, permissions, network
 - **Aggregation issues:** Check source names, identity scope, timeouts
 - **Attribute issues:** Check Velocity syntax, null checks, schema discovery
-- **Deduplication issues:** Check thresholds, algorithms, identity baseline
+- **Match issues:** Check thresholds, algorithms, identity baseline
 - **Proxy issues:** Check URL, passwords, response format
 - **Performance issues:** Check concurrency, batching, RPS, timeouts
 
