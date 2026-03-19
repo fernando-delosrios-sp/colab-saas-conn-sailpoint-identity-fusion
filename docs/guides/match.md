@@ -150,6 +150,7 @@ For each attribute you want to use in match detection, add a **Fusion attribute 
 | **Matching algorithm**       | Similarity calculation method    | See [Matching algorithms](matching-algorithms.md) for details    |
 | **Similarity score [0-100]** | Minimum score for this attribute | 75–85 (name); 90–100 (email); adjust per algorithm               |
 | **Mandatory match?**         | Require this attribute to match  | Yes for critical identifiers (e.g. employee ID); No for optional |
+| **Skip match if missing**    | Skip this rule when either value is missing | Default: Yes. Missing means `null`, `undefined`, or empty after trim. When enabled, the rule is ignored (neither positive nor negative). When disabled, missing values are still scored and counted. |
 
 **Algorithm selection guide:**
 
@@ -191,7 +192,12 @@ Strategy 4: Phonetic name matching
 | Mode              | Configuration                | Logic                                                         | Use when                                                              |
 | ----------------- | ---------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
 | **Per-attribute** | **Use overall score?** = No  | Each attribute must meet its own threshold AND all contribute | You want fine control; different attributes have different importance |
-| **Overall**       | **Use overall score?** = Yes | Average of attribute scores must meet global threshold        | Simplicity; all attributes weighted equally                           |
+| **Overall**       | **Use overall score?** = Yes | Average of attribute scores must meet global threshold; any failed evaluated mandatory rule invalidates the match | Simplicity; all attributes weighted equally                           |
+
+**Interaction with `Skip match if missing`:**
+- With **Skip match if missing = Yes** (default), a missing-value rule contributes nothing in either mode.
+- With **Skip match if missing = No**, that rule is always evaluated and its result contributes in both modes.
+- **Mandatory** still applies when a rule is evaluated: if a mandatory rule is scored and fails, the overall match fails.
 
 **Example with overall score:**
 
@@ -256,6 +262,19 @@ When **Send report to owner on aggregation?** is enabled, reports include:
 - Compact aggregation issues summary with warning/error counts and short sampled messages
 
 To avoid oversized reports, warning/error details are intentionally summarized (not full log dumps).
+
+### Non-persistent analysis with `custom:report`
+
+When you want report-like visibility during aggregation analysis without persisting changes, run the connector command `custom:report`.
+
+`custom:report`:
+
+- Executes fetch + matching analysis flow only (no account-list persistence/writeback phase).
+- Streams final ISC account rows with an additional `attributes.matching` object.
+- Includes matching and non-matching visibility in `matching.status` and `matching.matches`.
+- Sends a final `custom:report:summary` payload with totals and diagnostics (warnings/errors and sampled messages).
+
+Use this command while tuning matching thresholds, validating source precedence, or reviewing correlation context before enabling/adjusting production automation.
 
 **Choosing form attributes:**
 
@@ -380,10 +399,14 @@ For each Fusion account (new or updated):
     - For each configured **Fusion attribute match**:
         - Fetch attribute value from identity
         - Fetch attribute value from Fusion account
+        - Apply **Skip match if missing** for that rule:
+            - Enabled (default): skip this rule if either value is `null`, `undefined`, or empty after trim.
+            - Disabled: compare values even when one/both are missing, and include the result.
         - Calculate similarity score using specified algorithm
     - If **Use overall fusion similarity score?**:
         - Average all per-attribute scores → overall score
-        - If overall score ≥ threshold → potential match (per-attribute thresholds may not all be met)
+        - Every evaluated **mandatory** attribute must meet its threshold or the match fails
+        - If overall score ≥ threshold and all evaluated mandatory rules pass → potential match (non-mandatory thresholds may not all be met)
     - Else (per-attribute mode):
         - Every **mandatory** attribute must meet its threshold or the match fails
         - If no attribute is mandatory, all attributes are treated as mandatory (all must meet thresholds)

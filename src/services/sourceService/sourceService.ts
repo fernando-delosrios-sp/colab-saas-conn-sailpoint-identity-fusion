@@ -161,6 +161,9 @@ export class SourceService {
      */
     public get managedSources(): SourceInfo[] {
         assert(this._allSources, 'Sources have not been loaded')
+        if (!this._fusionSourceId) {
+            return this._allSources
+        }
         return this._allSources.filter((s) => s.id !== this.fusionSourceId)
     }
 
@@ -218,6 +221,13 @@ export class SourceService {
         return this.fusionAccountsByNativeIdentity?.size ?? 0
     }
 
+    /**
+     * Whether a Fusion source has been discovered for this run.
+     */
+    public get hasFusionSource(): boolean {
+        return !!this._fusionSourceId
+    }
+
     // ------------------------------------------------------------------------
     // Public Source Fetch Methods
     // ------------------------------------------------------------------------
@@ -225,7 +235,7 @@ export class SourceService {
     /**
      * Fetch all sources (managed and fusion) and cache them
      */
-    public async fetchAllSources(): Promise<void> {
+    public async fetchAllSources(requireFusionSource = true): Promise<void> {
         this.log.debug('Fetching all sources')
         const { sourcesApi } = this.client
 
@@ -268,35 +278,48 @@ export class SourceService {
         const fusionSource = apiSources.find(
             (x) => (x.connectorAttributes as BaseConfig).spConnectorInstanceId === this.spConnectorInstanceId
         )
-        assert(
-            fusionSource,
-            'Fusion source not found. The connector instance could not locate its own source in ISC. Verify the connector is properly deployed.'
-        )
-        assert(
-            fusionSource.owner,
-            'Fusion source owner not found. The fusion source must have an owner configured in ISC.'
-        )
-        this._fusionSourceId = fusionSource.id!
-        this._fusionSourceOwner = {
-            id: fusionSource.owner.id!,
-            type: 'IDENTITY',
-        }
+        if (fusionSource) {
+            assert(
+                fusionSource.owner,
+                'Fusion source owner not found. The fusion source must have an owner configured in ISC.'
+            )
+            this._fusionSourceId = fusionSource.id!
+            this._fusionSourceOwner = {
+                id: fusionSource.owner.id!,
+                type: 'IDENTITY',
+            }
 
-        resolvedSources.push({
-            id: fusionSource.id!,
-            name: fusionSource.name!,
-            isManaged: false,
-            sourceType: 'authoritative',
-            config: undefined,
-            owner: this._fusionSourceOwner,
-        })
+            resolvedSources.push({
+                id: fusionSource.id!,
+                name: fusionSource.name!,
+                isManaged: false,
+                sourceType: 'authoritative',
+                config: undefined,
+                owner: this._fusionSourceOwner,
+            })
+        } else if (requireFusionSource) {
+            assert(
+                fusionSource,
+                'Fusion source not found. The connector instance could not locate its own source in ISC. Verify the connector is properly deployed.'
+            )
+        } else {
+            this._fusionSourceId = undefined
+            this._fusionSourceOwner = undefined
+            this.log.warn(
+                'Fusion source not found for this run. Continuing with managed sources only (custom report mode).'
+            )
+        }
 
         this._allSources = resolvedSources
         this.sourcesById = new Map(resolvedSources.map((x) => [x.id, x]))
         this.sourcesByName = new Map(resolvedSources.map((x) => [x.name, x]))
 
         const managedCount = resolvedSources.filter((s) => s.isManaged).length
-        this.log.debug(`Found ${managedCount} managed source(s) and fusion source: ${fusionSource.name}`)
+        if (fusionSource) {
+            this.log.debug(`Found ${managedCount} managed source(s) and fusion source: ${fusionSource.name}`)
+        } else {
+            this.log.debug(`Found ${managedCount} managed source(s); no fusion source resolved`)
+        }
     }
 
     // ------------------------------------------------------------------------

@@ -134,7 +134,7 @@ Controls Match behavior, including similarity matching and manual review workflo
 | Field                                                       | Description                                                    | Required                         | Notes                                                                                                                                                                                    |
 | ----------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Fusion attribute matches**                                | List of identity attributes to compare for match detection     | Yes                              | At least one attribute match required; each match specifies an attribute and algorithm                                                                                                   |
-| **Use overall fusion similarity score for all attributes?** | Use single overall score instead of per-attribute thresholds   | No                               | When enabled, only the overall (average) threshold must be met; when disabled, every mandatory attribute must match, and if none are mandatory, all attributes are treated as mandatory. |
+| **Use overall fusion similarity score for all attributes?** | Use single overall score instead of per-attribute thresholds   | No                               | When enabled, the overall (average) threshold must be met and any evaluated mandatory attribute must also meet its own threshold. When disabled, every mandatory attribute must match, and if none are mandatory, all attributes are treated as mandatory. |
 | **Similarity score [0-100]**                                | Minimum overall similarity score for auto-correlation          | Yes (when overall score enabled) | Typical range: 70-90; higher = stricter; only used when "Use overall fusion similarity score" is enabled                                                                                 |
 | **Automatically correlate if identical?**                   | Auto-merge when attributes meet criteria without manual review | No                               | Use when you trust the algorithm and thresholds; skips manual review for high-confidence matches                                                                                         |
 
@@ -146,8 +146,9 @@ Controls Match behavior, including similarity matching and manual review workflo
 | ---------------------------- | --------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Attribute**                | Identity attribute name to compare                              | Yes      | Must exist on identities in scope                                                                                                                                                                                                                                                                                                                                                      |
 | **Matching algorithm**       | Algorithm for similarity calculation                            | Yes      | **Enhanced Name Matcher** (person names, handles variations), **Jaro-Winkler** (short strings with typos, emphasizes beginning), **LIG3** (Levenshtein-based with intelligent gap penalties, excellent for international names and multi-word fields), **Dice** (longer text, bigram-based), **Double Metaphone** (phonetic, similar pronunciation), **Custom** (from SaaS customizer) |
-| **Similarity score [0-100]** | Minimum similarity score for this attribute                     | No       | Required when not using overall score mode. A mandatory attribute must meet or exceed this threshold or the match fails. When overall score is enabled, only the overall threshold is required (per-attribute thresholds may not all be met). When no attribute is mandatory, all attributes are treated as mandatory.                                                                 |
+| **Similarity score [0-100]** | Minimum similarity score for this attribute                     | No       | Required when not using overall score mode. A mandatory attribute must meet or exceed this threshold or the match fails. In overall score mode, non-mandatory attributes may be below threshold, but a failed mandatory attribute still invalidates the match. When no attribute is mandatory, all attributes are treated as mandatory.                                                                 |
 | **Mandatory match?**         | Require this attribute to match before considering as a match   | No       | When Yes: this attribute's score must be ≥ its threshold or the match fails. When No: attribute still has a threshold; when overall score is disabled and no attribute is mandatory, every attribute is effectively mandatory (all must meet thresholds).                                                                                                                              |
+| **Skip match if missing**    | Ignore this rule when one side is missing                       | No       | Default: Yes. Missing means `null`, `undefined`, or empty after trim. When enabled, the rule is skipped (neither positive nor negative). When disabled, the rule is evaluated even with missing values and counts toward the final result.                                                                                                                                            |
 
 > **Tip:** Use Fusion reports to fine-tune your matching thresholds and algorithms.
 
@@ -241,6 +242,28 @@ For detailed field-by-field guidance and usage patterns, see the [usage guides](
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 
 For step-by-step instructions and UI details, see the [Map](docs/guides/map.md), [Define](docs/guides/define.md), and [Match](docs/guides/match.md) guides.
+
+---
+
+## Custom command: `custom:report`
+
+Use `custom:report` to run a **non-persistent aggregation analysis**. It evaluates managed accounts with the same matching logic used for reports, but it does not execute the persistence/writeback phase used by `std:account:list`.
+
+### What it returns
+
+- Streams final ISC account rows (`key`, `attributes`, `disabled`) like account list output.
+- Adds `attributes.matching` to every streamed row with:
+    - `status`: `matched`, `non-matched`, `review-error`, or `not-analyzed`
+    - `matches`: candidate identities and per-attribute scores when available
+    - `sourceContext`: source provenance (`originSource`, `sources`)
+    - `correlationContext`: linked and missing account context (`accounts`, `missing-accounts`, `reviews`, `statuses`)
+- Sends a final summary object with `type: custom:report:summary` containing row totals, managed-account analysis totals, diagnostics, and processing time.
+
+### Typical use cases
+
+- Tune Match thresholds and algorithms before production changes.
+- Validate source ordering and account provenance (`originSource`) behavior.
+- Inspect correlated vs non-correlated outcomes without persisting state changes.
 
 ---
 

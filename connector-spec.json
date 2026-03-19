@@ -10,7 +10,8 @@
         "std:account:create",
         "std:account:update",
         "std:account:discover-schema",
-        "std:entitlement:list"
+        "std:entitlement:list",
+        "custom:report"
     ],
     "supportsCustomSchemas": true,
     "showDebugLoggingOption": true,
@@ -47,6 +48,7 @@
         "trim": false,
         "force": false,
         "algorithm": "name-matcher",
+        "skipMatchIfMissing": true,
         "enableBatching": true,
         "enablePriority": true,
         "aggregationMode": "none",
@@ -704,7 +706,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Matching Settings",
-                    "sectionHelpMessage": "<strong>Configure duplicate identity detection.</strong><br><br><strong>Fusion attribute matches:</strong> Define attributes to compare.<br><ul><li><strong>Algorithm:</strong> Enhanced Name Matcher, Jaro-Winkler, LIG3, Dice, Double Metaphone.</li><li><strong>Score:</strong> Similarity threshold (0-100).</li><li><strong>Mandatory:</strong> Require this match?</li></ul><br><strong>Scoring mode:</strong> Use per-attribute thresholds (default) or single overall average score.<br><strong>Auto-correlate:</strong> Automatically merge precise matches without manual review.",
+                    "sectionHelpMessage": "<strong>Configure duplicate identity detection.</strong><br><br><strong>Fusion attribute matches:</strong> Define attributes to compare.<br><ul><li><strong>Algorithm:</strong> Enhanced Name Matcher, Jaro-Winkler, LIG3, Dice, Double Metaphone.</li><li><strong>Score:</strong> Similarity threshold (0-100).</li><li><strong>Mandatory:</strong> Require this match?</li><li><strong>Skip match if missing:</strong> When enabled (default), this rule is ignored if either value is missing; when disabled, missing values are still scored and counted.</li></ul><br><strong>Scoring mode:</strong> Use per-attribute thresholds (default) or single overall average score.<br><strong>Auto-correlate:</strong> Automatically merge precise matches without manual review.",
                     "items": [
                         {
                             "key": "matchingConfigs",
@@ -785,6 +787,13 @@
                                             "type": "toggle",
                                             "required": false,
                                             "helpKey": "When enabled, this attribute must meet its similarity threshold for a match to be considered. If no attributes are marked as mandatory, all are treated as required"
+                                        },
+                                        {
+                                            "key": "skipMatchIfMissing",
+                                            "label": "Skip match if missing",
+                                            "type": "toggle",
+                                            "required": false,
+                                            "helpKey": "When enabled (default), this rule is skipped if either value is missing (null, undefined, or empty after trimming). When disabled, missing values are still compared and count toward the result."
                                         }
                                     ]
                                 }

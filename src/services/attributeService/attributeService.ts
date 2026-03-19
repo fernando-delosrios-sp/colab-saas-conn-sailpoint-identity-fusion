@@ -192,8 +192,8 @@ export class AttributeService {
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
             const sourceOrder = this.sourceConfigs.map((sc) => sc.name)
-            const schemaAttributes = this.schemas.listSchemaAttributeNames()
-            for (const attribute of schemaAttributes) {
+            const mappingTargets = this.getAttributeMappingTargetNames()
+            for (const attribute of mappingTargets) {
                 if (this.uniqueAttributeNames.has(attribute) && attributeBag.current[attribute] !== undefined) {
                     continue
                 }
@@ -404,12 +404,24 @@ export class AttributeService {
     // Private Configuration Helper Methods
     // ------------------------------------------------------------------------
 
+    /**
+     * Resolve all mapping targets that should be available in attribute-definition context.
+     * Includes schema attributes plus explicit attribute-map targets.
+     */
+    private getAttributeMappingTargetNames(): string[] {
+        const schemaAttributes = this.schemas.listSchemaAttributeNames()
+        const mappedAttributes = (this.attributeMaps ?? [])
+            .map((am) => am.newAttribute)
+            .filter((name): name is string => Boolean(name))
+
+        return Array.from(new Set([...schemaAttributes, ...mappedAttributes]))
+    }
+
     private get attributeMappingConfig(): Map<string, AttributeMappingConfig> {
         if (!this._attributeMappingConfig) {
             this._attributeMappingConfig = new Map()
-            const schemaAttributes = this.schemas.getSchemaAttributes()
-            for (const schemaAttr of schemaAttributes) {
-                const attrName = schemaAttr.name!
+            const mappingTargets = this.getAttributeMappingTargetNames()
+            for (const attrName of mappingTargets) {
                 this._attributeMappingConfig.set(
                     attrName,
                     buildAttributeMappingConfig(attrName, this.attributeMaps, this.attributeMerge)
@@ -568,8 +580,16 @@ export class AttributeService {
         if (!value) {
             this.log.error(`Failed to evaluate velocity template for attribute ${definition.name}`)
             return undefined
-        } else if (value === definition.expression) {
-            this.log.error(`Velocity template for attribute ${definition.name} returned the same expression`)
+        }
+
+        // Compare to expression without trailing $counter (UniqueAttributeDefinition may auto-append it)
+        const exprWithoutCounter = definition.expression.replace(/\$counter$|\$\{counter\}$/, '')
+        const outputMatchesExpression =
+            value === definition.expression || (exprWithoutCounter !== definition.expression && value === exprWithoutCounter)
+        if (outputMatchesExpression && this.hasVelocityVariableReference(exprWithoutCounter || definition.expression)) {
+            this.log.warn(
+                `Velocity template for attribute ${definition.name} returned unresolved variable expression: ${value}`
+            )
             return undefined
         }
 
@@ -581,6 +601,14 @@ export class AttributeService {
         this.log.debug(`[${accountName}] ${definition.name} = ${value}`)
 
         return value
+    }
+
+    /**
+     * Detect whether an expression references at least one Velocity variable token.
+     * Examples: $name, ${name}. Excludes escaped tokens like \$name.
+     */
+    private hasVelocityVariableReference(expression: string): boolean {
+        return /(^|[^\\])\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)/.test(expression)
     }
 
     /**
@@ -683,11 +711,15 @@ export class AttributeService {
         const counter = StateWrapper.getCounter()
         const digits = definition.digits ?? 1
 
-        // Ensure expression has $counter for disambiguation fallback
+        // Ensure expression has $counter for disambiguation fallback.
+        // Skip auto-append for UUID-based expressions because UUID already
+        // provides uniqueness and appending counter can mutate intent.
         if (
             definition.expression &&
             !definition.expression.includes('$counter') &&
-            !definition.expression.includes('${counter}')
+            !definition.expression.includes('${counter}') &&
+            !definition.expression.includes('$UUID') &&
+            !definition.expression.includes('${UUID}')
         ) {
             definition.expression = `${definition.expression}$counter`
         }
@@ -789,7 +821,7 @@ export class AttributeService {
             return
         }
 
-        if (fusionAccount.isIdentity && name === fusionDisplayAttribute) {
+        if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
             this.log.warn(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
             fusionAccount.attributes[name] = fusionAccount.name!
             return
@@ -799,6 +831,11 @@ export class AttributeService {
         if (value !== undefined) {
             fusionAccount.attributes[name] = value
             context[name] = value
+        } else {
+            // Clear attribute when expression fails (e.g. unresolved variables), so we do not
+            // retain a literal template string that may have come from attribute mapping.
+            delete fusionAccount.attributes[name]
+            delete context[name]
         }
     }
 
@@ -842,7 +879,7 @@ export class AttributeService {
             return
         }
 
-        if (fusionAccount.isIdentity && name === fusionDisplayAttribute) {
+        if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
             this.log.warn(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
             fusionAccount.attributes[name] = fusionAccount.name!
             return
@@ -852,6 +889,10 @@ export class AttributeService {
         if (value !== undefined) {
             fusionAccount.attributes[name] = value
             context[name] = value
+        } else {
+            // Clear attribute when expression fails (e.g. unresolved variables)
+            delete fusionAccount.attributes[name]
+            delete context[name]
         }
     }
 }

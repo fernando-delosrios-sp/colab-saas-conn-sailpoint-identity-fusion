@@ -283,7 +283,7 @@ For each **Fusion attribute match**, configure:
 | Strategy                        | Configuration                                                                 | Use when                                                                     |
 | ------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | **Single attribute**            | One Fusion attribute match (e.g., name only)                                  | Simple matching; one strong identifier                                       |
-| **Multi-attribute (OR logic)**  | Multiple matches, low overall threshold                                       | Any attribute can indicate a match                                         |
+| **Multi-attribute (overall mode)** | Multiple matches with overall score enabled and tuned threshold                | Average score drives the match; failed mandatory rules still invalidate     |
 | **Multi-attribute (AND logic)** | Multiple matches, all with per-attribute thresholds or high overall threshold | All attributes must agree for high confidence                                |
 | **Hybrid**                      | Some mandatory, some optional                                                 | Critical attribute (email) must match; others (name, phone) support decision |
 
@@ -365,7 +365,7 @@ Result: Match (email passed, name optional)
 
 - Average of all attribute similarity scores → overall score
 - Identity is flagged if overall score ≥ global **Similarity score [0-100]**
-- When average is enabled, only the overall threshold must be met; individual (non-mandatory) attribute thresholds may not be met
+- When average is enabled, the overall threshold must be met and any evaluated mandatory attribute must meet its threshold; non-mandatory attribute thresholds may still be below target
 
 **Advantages:**
 
@@ -429,7 +429,7 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 | Phase                    | Action                                   | Goal                                  | Metrics                                   |
 | ------------------------ | ---------------------------------------- | ------------------------------------- | ----------------------------------------- |
 | **1. Baseline**          | Use starting thresholds from table above | Conservative; low false positive rate | Review 10–20 initial matches manually     |
-| **2. Test with sample**  | Run on 100–500 accounts                  | Assess match quality                  | False positive rate, false negative rate  |
+| **2. Test with sample**  | Run on 100–500 accounts (recommended via `custom:report`) | Assess match quality                  | False positive rate, false negative rate  |
 | **3. Analyze results**   | Review all generated forms               | Identify patterns                     | Are false positives due to one attribute? |
 | **4. Adjust thresholds** | Increase (stricter) or decrease (looser) | Balance precision vs recall           | Target: <10% false positive rate          |
 | **5. Retest**            | Run on same or different sample          | Validate improvements                 | Compare metrics to phase 2                |

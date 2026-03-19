@@ -1,5 +1,5 @@
 import { Account, IdentityDocument } from 'sailpoint-api-client'
-import { getDateFromISOString, isNewerThan } from '../utils/date'
+import { isNewerThan } from '../utils/date'
 import { getDisplayName, toSetFromAttribute as attributeToSet } from '../utils/attributes'
 import { FusionDecision } from './form'
 import { FusionConfig, SourceConfig } from './config'
@@ -105,7 +105,7 @@ export class FusionAccount {
     }
 
     // Timestamps
-    private _modified: Date = new Date()
+    private _modified: string = ''
 
     // Read-only configuration (set in constructor)
     private readonly sourceConfigs: SourceConfig[]
@@ -156,7 +156,7 @@ export class FusionAccount {
         collectionKeys?: (typeof FusionAccount.COLLECTION_KEYS)[number][]
         identityId?: string | null
         managedAccountId?: string | null
-        modified?: Date
+        modified?: string
     }): void {
         if (config.type) this._type = config.type
         if (config.name) this._name = config.name
@@ -167,7 +167,7 @@ export class FusionAccount {
         if (config.needsRefresh !== undefined) this._needsRefresh = config.needsRefresh
         if (config.identityId != null) this._identityId = config.identityId
         if (config.managedAccountId != null) this._managedAccountId = config.managedAccountId
-        if (config.modified) this._modified = config.modified
+        if (config.modified !== undefined) this._modified = config.modified
         if (config.sources) {
             this._sources = Array.isArray(config.sources) ? new Set(config.sources) : config.sources
         }
@@ -230,7 +230,7 @@ export class FusionAccount {
             attributes: account.attributes ?? undefined,
             collectionKeys: ['accounts', 'reviews', 'statuses', 'actions'],
             identityId: account.identityId ?? undefined,
-            modified: getDateFromISOString(account.modified),
+            modified: account.modified ?? '',
         })
         // Restore persisted originSource; fallback for legacy accounts without it
         fusionAccount._originSource =
@@ -430,6 +430,22 @@ export class FusionAccount {
         return this._identityId !== undefined
     }
 
+    /**
+     * Whether this fusion account originated from the Identities source.
+     *
+     * Primary source of truth is the internal originSource field. We also fall back
+     * to persisted attribute keys for backwards compatibility with older records.
+     */
+    public get fromIdentity(): boolean {
+        const originFromAttributes = this._attributeBag.current?.originSource
+        const legacyOriginFromAttributes = this._attributeBag.current?.sourceOrigin
+        return (
+            this._originSource === 'Identities' ||
+            originFromAttributes === 'Identities' ||
+            legacyOriginFromAttributes === 'Identities'
+        )
+    }
+
     /** Whether this fusion account is disabled. */
     public get disabled(): boolean {
         return this._disabled
@@ -548,7 +564,7 @@ export class FusionAccount {
     // Accessors - Internal State (for service layer use)
     // ============================================================================
 
-    public get modified(): Date {
+    public get modified(): string {
         return this._modified
     }
 

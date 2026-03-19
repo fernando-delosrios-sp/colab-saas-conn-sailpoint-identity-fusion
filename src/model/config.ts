@@ -103,6 +103,8 @@ export interface MatchingConfig {
     fusionScore?: number
     /** If true, this rule must pass for the overall match to succeed (unless average scoring is used) */
     mandatory?: boolean
+    /** If true (default), skip this rule when either side is missing (null/undefined/empty after trim). */
+    skipMatchIfMissing?: boolean
 }
 
 // ============================================================================

@@ -1,5 +1,5 @@
 import { ConnectorError, ConnectorErrorType, readConfig, logger } from '@sailpoint/connector-sdk'
-import { FusionConfig, SourceConfig } from '../model/config'
+import { FusionConfig, MatchingConfig, SourceConfig } from '../model/config'
 import { assert, softAssert } from '../utils/assert'
 
 const internalConfig = {
@@ -51,7 +51,10 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     config.uniqueAttributeDefinitions = config.uniqueAttributeDefinitions ?? []
     config.sources = config.sources ?? []
     config.fusionFormAttributes = config.fusionFormAttributes ?? []
-    config.matchingConfigs = config.matchingConfigs ?? []
+    config.matchingConfigs = (config.matchingConfigs ?? []).map((matchingConfig: MatchingConfig) => ({
+        ...matchingConfig,
+        skipMatchIfMissing: matchingConfig.skipMatchIfMissing ?? true,
+    }))
     config.trim = config.trim ?? false
 
     // ============================================================================
