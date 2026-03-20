@@ -104,6 +104,8 @@ function createRegistry() {
             processManagedAccounts: jest.fn(),
         },
         forms: {
+            fetchFormData: jest.fn().mockResolvedValue(undefined),
+            pendingReviewContextByAccountId: new Map<string, any>(),
             cleanUpForms: jest.fn(),
         },
         attributes: {
@@ -147,11 +149,105 @@ describe('customReport', () => {
         expect(summary.rows.nonMatched).toBe(1)
     })
 
+    it('applies limit option to streamed account rows', async () => {
+        const registry = createRegistry()
+
+        await customReport(registry, { schema: { attributes: [] }, limit: 1 } as any)
+
+        expect(registry.res.send).toHaveBeenCalledTimes(2)
+        const firstRow = registry.res.send.mock.calls[0][0]
+        expect(firstRow.type).toBeUndefined()
+        const summary = registry.res.send.mock.calls[1][0]
+        expect(summary.type).toBe('custom:report:summary')
+        expect(summary.rows.sent).toBe(1)
+    })
+
+    it('skips summary payload when summary option is false', async () => {
+        const registry = createRegistry()
+
+        await customReport(registry, { schema: { attributes: [] }, summary: false } as any)
+
+        expect(registry.res.send).toHaveBeenCalledTimes(2)
+        const firstRow = registry.res.send.mock.calls[0][0]
+        const secondRow = registry.res.send.mock.calls[1][0]
+        expect(firstRow.type).toBeUndefined()
+        expect(secondRow.type).toBeUndefined()
+    })
+
+    it('filters rows to matched entries when onlyMatching is true', async () => {
+        const registry = createRegistry()
+
+        await customReport(registry, { schema: { attributes: [] }, onlyMatching: true } as any)
+
+        expect(registry.res.send).toHaveBeenCalledTimes(2)
+        const firstRow = registry.res.send.mock.calls[0][0]
+        const summary = registry.res.send.mock.calls[1][0]
+        expect(firstRow.attributes.matching.status).toBe('matched')
+        expect(summary.type).toBe('custom:report:summary')
+        expect(summary.rows.sent).toBe(1)
+        expect(summary.rows.matched).toBe(1)
+        expect(summary.rows.nonMatched).toBe(0)
+    })
+
+    it('filters rows to pending review entries when onlyReview is true', async () => {
+        const registry = createRegistry()
+        registry.forms.pendingReviewContextByAccountId = new Map<string, any>([
+            [
+                'acc-1',
+                {
+                    forms: [{ formInstanceId: 'fi-1', url: 'https://review/link' }],
+                    reviewers: [{ id: 'rev-1', name: 'Reviewer One', email: 'reviewer.one@example.com' }],
+                    candidateIds: ['id-1'],
+                },
+            ],
+        ])
+
+        await customReport(registry, { schema: { attributes: [] }, onlyReview: true } as any)
+
+        expect(registry.res.send).toHaveBeenCalledTimes(2)
+        const firstRow = registry.res.send.mock.calls[0][0]
+        const summary = registry.res.send.mock.calls[1][0]
+        expect(firstRow.attributes.review.pending).toBe(true)
+        expect(firstRow.attributes.review.forms).toHaveLength(1)
+        expect(firstRow.attributes.review.reviewers).toHaveLength(1)
+        expect(summary.rows.sent).toBe(1)
+    })
+
+    it('includes matched or pending-review rows when onlyMatching and onlyReview are true', async () => {
+        const registry = createRegistry()
+        registry.forms.pendingReviewContextByAccountId = new Map<string, any>([
+            [
+                'acc-2',
+                {
+                    forms: [{ formInstanceId: 'fi-2', url: 'https://review/link/2' }],
+                    reviewers: [{ id: 'rev-2', name: 'Reviewer Two', email: 'reviewer.two@example.com' }],
+                    candidateIds: ['id-2'],
+                },
+            ],
+        ])
+
+        await customReport(registry, { schema: { attributes: [] }, onlyMatching: true, onlyReview: true } as any)
+
+        expect(registry.res.send).toHaveBeenCalledTimes(3)
+        const firstRow = registry.res.send.mock.calls[0][0]
+        const secondRow = registry.res.send.mock.calls[1][0]
+        const summary = registry.res.send.mock.calls[2][0]
+
+        expect(firstRow.attributes.matching.status).toBe('matched')
+        expect(firstRow.attributes.review.pending).toBe(false)
+        expect(secondRow.attributes.matching.status).toBe('non-matched')
+        expect(secondRow.attributes.review.pending).toBe(true)
+        expect(summary.rows.sent).toBe(2)
+        expect(summary.rows.matched).toBe(1)
+        expect(summary.rows.nonMatched).toBe(1)
+    })
+
     it('does not execute persistence paths from std:account:list', async () => {
         const registry = createRegistry()
 
         await customReport(registry, { schema: { attributes: [] } } as any)
 
+        expect(registry.forms.fetchFormData).toHaveBeenCalled()
         expect(registry.fusion.refreshUniqueAttributes).toHaveBeenCalled()
         expect(registry.forms.cleanUpForms).not.toHaveBeenCalled()
         expect(registry.attributes.saveState).not.toHaveBeenCalled()

@@ -25,6 +25,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
 
     const sources = {
         fetchAllSources: jest.fn().mockResolvedValue(undefined),
+        validateAccountJmespathFilters: jest.fn(),
         setProcessLock: jest.fn().mockResolvedValue(undefined),
         releaseProcessLock: jest.fn().mockResolvedValue(undefined),
         resetBatchCumulativeCount: jest.fn().mockResolvedValue(undefined),

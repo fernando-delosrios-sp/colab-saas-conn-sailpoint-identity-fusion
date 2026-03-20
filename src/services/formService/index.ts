@@ -12,4 +12,9 @@ export { buildCandidateList, buildFormName, calculateExpirationDate, getFormOwne
 
 export { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 
-export { createFusionDecision, getReviewerInfo } from './formProcessor'
+export {
+    createFusionDecision,
+    getReviewerInfo,
+    extractAccountInfoFromFormInput,
+    extractCandidateIdsFromFormInput,
+} from './formProcessor'

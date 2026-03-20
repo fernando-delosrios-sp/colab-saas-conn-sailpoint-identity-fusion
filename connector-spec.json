@@ -119,7 +119,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Sources",
-                    "sectionHelpMessage": "<strong>Select the account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Source type:</strong> Choose Authoritative, Record, or Orphan behavior for unmatched accounts.</li><li><strong>Account aggregation:</strong> Choose to aggregate before processing, after a delay, or not at all. Optimized aggregation can be disabled for reverse correlation. Delimited text sources cannot be aggregated.</li><li><strong>Correlation mode:</strong> Choose whether to correlate during processing, set up reverse correlation, or leave accounts uncorrelated.</li><li><strong>Account filter:</strong> Limit which accounts are processed (uses ISC search syntax).</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li><li><strong>Enabled:</strong> Turn off to temporarily exclude this source from processing without removing it.</li></ul><br>Global settings control retries and wait times for aggregation task polling.",
+                    "sectionHelpMessage": "<strong>Select the account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Source type:</strong> Choose Authoritative, Record, or Orphan behavior for unmatched accounts.</li><li><strong>Account aggregation:</strong> Choose to aggregate before processing, after a delay, or not at all. Optimized aggregation can be disabled for reverse correlation. Delimited text sources cannot be aggregated.</li><li><strong>Correlation mode:</strong> Choose whether to correlate during processing, set up reverse correlation, or leave accounts uncorrelated.</li><li><strong>Accounts API filter:</strong> Limit which accounts are fetched from ISC (server-side).</li><li><strong>Accounts JMESPath filter:</strong> Further filter fetched account pages client-side using JMESPath.</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li><li><strong>Enabled:</strong> Turn off to temporarily exclude this source from processing without removing it.</li></ul><br>Global settings control retries and wait times for aggregation task polling.",
                     "items": [
                         {
                             "key": "sources",
@@ -187,10 +187,17 @@
                                         },
                                         {
                                             "key": "accountFilter",
-                                            "label": "Account filter",
+                                            "label": "Accounts API filter",
                                             "type": "text",
                                             "required": false,
-                                            "helpKey": "Optionally limit which accounts are processed using a search query. Example: attributes.department:\"Engineering\""
+                                            "helpKey": "Server-side ISC account filter sent to the Accounts API (filters parameter). Use this to reduce records returned from ISC. Reference: https://developer.sailpoint.com/docs/api/v2025/list-accounts"
+                                        },
+                                        {
+                                            "key": "accountJmespathFilter",
+                                            "label": "Accounts JMESPath filter",
+                                            "type": "text",
+                                            "required": false,
+                                            "helpKey": "Client-side JMESPath expression applied after accounts are fetched (page-wise as { accounts: [...] }). The expression must return an array of account objects to keep. Reference: https://jmespath.org/"
                                         },
                                         {
                                             "key": "accountLimit",

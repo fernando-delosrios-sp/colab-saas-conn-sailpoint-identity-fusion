@@ -23,8 +23,30 @@ import { FusionAccount } from '../../model/account'
 import { Candidate } from './types'
 import { buildCandidateList, buildFormName, calculateExpirationDate, getFormOwner } from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
-import { createFusionDecision } from './formProcessor'
+import {
+    createFusionDecision,
+    extractAccountInfoFromFormInput,
+    extractCandidateIdsFromFormInput,
+    getReviewerInfo,
+} from './formProcessor'
 import { MAX_CANDIDATES_FOR_FORM } from './constants'
+
+export type PendingReviewFormContext = {
+    formInstanceId: string
+    url?: string
+}
+
+export type PendingReviewReviewerContext = {
+    id: string
+    name: string
+    email: string
+}
+
+export type PendingReviewAccountContext = {
+    forms: PendingReviewFormContext[]
+    reviewers: PendingReviewReviewerContext[]
+    candidateIds: string[]
+}
 
 // ============================================================================
 // FormService Class
@@ -40,6 +62,11 @@ export class FormService {
     private fusionAssignmentDecisionMap: Map<string, FusionDecision> = new Map()
     /** Pending (unanswered) form instance URLs by recipient identityId, populated during fetchFormData. */
     private _pendingReviewUrlsByReviewerId: Map<string, string[]> = new Map()
+    /** Pending review context keyed by form input account reference (managed account id). */
+    private _pendingReviewContextByAccountId: Map<
+        string,
+        { forms: Map<string, PendingReviewFormContext>; reviewerIds: Set<string>; candidateIds: Set<string> }
+    > = new Map()
     /** Candidate identity IDs from pending (unanswered) form instances, populated during fetchFormData. */
     private _pendingCandidateIdentityIds: Set<string> = new Set()
     /** Finished decisions processed from answered form instances (assignment + newIdentity/no-match). */
@@ -84,6 +111,7 @@ export class FormService {
         this._fusionIdentityDecisions = []
         this.fusionAssignmentDecisionMap = new Map()
         this._pendingReviewUrlsByReviewerId = new Map()
+        this._pendingReviewContextByAccountId = new Map()
         this._pendingCandidateIdentityIds = new Set()
         this._finishedFusionDecisions = []
         this._formsFound = 0
@@ -562,6 +590,28 @@ export class FormService {
         return this._pendingCandidateIdentityIds
     }
 
+    /**
+     * Pending review context keyed by account id referenced in form input.
+     * Includes pending form links, resolved reviewer details, and candidate identity IDs.
+     */
+    public get pendingReviewContextByAccountId(): Map<string, PendingReviewAccountContext> {
+        const output = new Map<string, PendingReviewAccountContext>()
+
+        for (const [accountId, context] of this._pendingReviewContextByAccountId.entries()) {
+            const reviewers = Array.from(context.reviewerIds)
+                .map((reviewerId) => getReviewerInfo(reviewerId, this.identities))
+                .filter(Boolean) as PendingReviewReviewerContext[]
+
+            output.set(accountId, {
+                forms: Array.from(context.forms.values()),
+                reviewers,
+                candidateIds: Array.from(context.candidateIds),
+            })
+        }
+
+        return output
+    }
+
     // ------------------------------------------------------------------------
     // Private Helper Methods
     // ------------------------------------------------------------------------
@@ -575,55 +625,60 @@ export class FormService {
      */
     private collectPendingReviewUrlsByReviewer(formInstances: FormInstanceResponseV2025[]): void {
         for (const instance of formInstances) {
-            if (!instance.state || !instance.standAloneFormUrl) continue
+            if (!instance.state) continue
             const state = instance.state.toUpperCase()
             if (state === 'COMPLETED' || state === 'IN_PROGRESS' || state === 'SUBMITTED' || state === 'CANCELLED')
                 continue
             if (!instance.recipients?.length) continue
+
+            const accountInfo = extractAccountInfoFromFormInput(instance.formInput)
+            const candidateIds = extractCandidateIdsFromFormInput(instance.formInput)
+            const accountContext = accountInfo?.id
+                ? this.getOrCreatePendingReviewAccountContext(accountInfo.id)
+                : undefined
+
             for (const recipient of instance.recipients) {
                 if (!recipient.id) continue
-                const list = this._pendingReviewUrlsByReviewerId.get(recipient.id) ?? []
-                list.push(instance.standAloneFormUrl)
-                this._pendingReviewUrlsByReviewerId.set(recipient.id, list)
+                if (instance.standAloneFormUrl) {
+                    const list = this._pendingReviewUrlsByReviewerId.get(recipient.id) ?? []
+                    list.push(instance.standAloneFormUrl)
+                    this._pendingReviewUrlsByReviewerId.set(recipient.id, list)
+                }
+                accountContext?.reviewerIds.add(recipient.id)
             }
 
             // Extract candidate identity IDs from pending form instances.
             // The 'candidates' field is a comma-separated list of identity IDs
             // stored during form creation (see buildFormInput in formBuilder.ts).
-            this.extractCandidateIdentityIds(instance.formInput)
+            for (const candidateId of candidateIds) {
+                this._pendingCandidateIdentityIds.add(candidateId)
+                accountContext?.candidateIds.add(candidateId)
+            }
+
+            if (accountContext && instance.id) {
+                accountContext.forms.set(instance.id, {
+                    formInstanceId: instance.id,
+                    url: instance.standAloneFormUrl ?? undefined,
+                })
+            }
         }
     }
 
-    /**
-     * Extract candidate identity IDs from form input.
-     * Handles both flat structure { candidates: "id1,id2" } and dictionary structure
-     * where formInput is an object with input objects keyed by id.
-     */
-    private extractCandidateIdentityIds(formInput: any): void {
-        if (!formInput || typeof formInput !== 'object') return
-
-        let candidatesStr: string | undefined
-
-        // Try flat structure first (as sent in createFormInstance)
-        if (typeof formInput.candidates === 'string') {
-            candidatesStr = formInput.candidates
-        } else {
-            // Try dictionary structure (formInput is an object with input objects)
-            const formInputs = formInput as Record<string, any>
-            const candidatesInput = Object.values(formInputs).find(
-                (x: any) => x?.id === 'candidates' && (x.value || x.description)
-            )
-            candidatesStr = candidatesInput?.value || candidatesInput?.description
-        }
-
-        if (typeof candidatesStr === 'string' && candidatesStr.length > 0) {
-            for (const id of candidatesStr.split(',')) {
-                const trimmedId = id.trim()
-                if (trimmedId) {
-                    this._pendingCandidateIdentityIds.add(trimmedId)
-                }
+    private getOrCreatePendingReviewAccountContext(accountId: string): {
+        forms: Map<string, PendingReviewFormContext>
+        reviewerIds: Set<string>
+        candidateIds: Set<string>
+    } {
+        let context = this._pendingReviewContextByAccountId.get(accountId)
+        if (!context) {
+            context = {
+                forms: new Map<string, PendingReviewFormContext>(),
+                reviewerIds: new Set<string>(),
+                candidateIds: new Set<string>(),
             }
+            this._pendingReviewContextByAccountId.set(accountId, context)
         }
+        return context
     }
 
     /**
@@ -781,24 +836,8 @@ export class FormService {
      * Extract account ID from form instance input
      */
     private extractAccountIdFromInstance(instance: FormInstanceResponseV2025): string | undefined {
-        if (typeof instance.formInput !== 'object' || instance.formInput === null) {
-            return undefined
-        }
-
-        const formInput = instance.formInput as any
-
-        // Try flat structure first (as sent in createFormInstance)
-        if (typeof formInput.account === 'string') {
-            return formInput.account
-        }
-
-        // Try dictionary structure (formInput is an object with input objects)
-        const formInputs = formInput as Record<string, any> | undefined
-        const accountInput = formInputs
-            ? Object.values(formInputs).find((x: any) => x?.id === 'account' && (x.value || x.description))
-            : undefined
-
-        return accountInput?.value || accountInput?.description
+        const accountInfo = extractAccountInfoFromFormInput(instance.formInput)
+        return accountInfo?.id
     }
 
     /**

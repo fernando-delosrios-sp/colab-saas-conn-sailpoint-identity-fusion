@@ -76,6 +76,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
                 aggregationDelay: sourceConfig.aggregationDelay ?? 5,
                 optimizedAggregation: sourceConfig.optimizedAggregation ?? true,
                 accountFilter: sourceConfig.accountFilter ?? undefined,
+                accountJmespathFilter: sourceConfig.accountJmespathFilter ?? undefined,
                 correlationMode: sourceConfig.correlationMode ?? 'none',
             }
         })

@@ -1,7 +1,12 @@
 import { StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { FusionAccount } from '../../model/account'
-import { buildReportAccountIndex, CustomReportRowCounter, enrichISCAccountWithMatching } from './buildCustomReportPayload'
+import {
+    buildReportAccountIndex,
+    CustomReportRowCounter,
+    enrichISCAccountWithMatching,
+    PendingReviewContextByAccountId,
+} from './buildCustomReportPayload'
 
 export interface FetchResult {
     identitiesFound: number
@@ -14,6 +19,13 @@ export interface FetchResult {
 export type SafeSender = {
     send: (payload: any) => void
     drain: () => Promise<void>
+}
+
+export type CustomReportRuntimeOptions = {
+    limit?: number
+    summary: boolean
+    onlyMatching: boolean
+    onlyReview: boolean
 }
 
 /**
@@ -71,16 +83,25 @@ export const buildStatsForCustomReport = (
 export const streamEnrichedOutputRows = async (
     serviceRegistry: ServiceRegistry,
     reportIndex: ReturnType<typeof buildReportAccountIndex>,
+    pendingReviewByAccountId: PendingReviewContextByAccountId,
     rowCounter: CustomReportRowCounter,
-    sender: SafeSender
+    sender: SafeSender,
+    runtimeOptions: CustomReportRuntimeOptions
 ): Promise<number> => {
     const { fusion } = serviceRegistry
+    let emittedRows = 0
 
-    return fusion.forEachISCAccount((account) => {
-        const enriched = enrichISCAccountWithMatching(account, reportIndex)
+    await fusion.forEachISCAccount((account) => {
+        const enriched = enrichISCAccountWithMatching(account, reportIndex, pendingReviewByAccountId)
+        if (!shouldEmitRow(enriched.account, enriched.status, runtimeOptions, emittedRows)) {
+            return
+        }
         rowCounter[enriched.status] += 1
         sender.send(enriched.account)
+        emittedRows += 1
     })
+
+    return emittedRows
 }
 
 
@@ -88,18 +109,29 @@ export const streamFallbackAnalyzedRows = async (
     serviceRegistry: ServiceRegistry,
     analyzedManagedAccounts: FusionAccount[],
     reportIndex: ReturnType<typeof buildReportAccountIndex>,
+    pendingReviewByAccountId: PendingReviewContextByAccountId,
     rowCounter: CustomReportRowCounter,
     sender: SafeSender,
-    sentRows: number
+    sentRows: number,
+    runtimeOptions: CustomReportRuntimeOptions
 ): Promise<number> => {
     const { log, fusion } = serviceRegistry
 
     let totalSentRows = sentRows
+    if (hasReachedLimit(runtimeOptions.limit, totalSentRows)) {
+        return totalSentRows
+    }
     for (const analyzedAccount of analyzedManagedAccounts) {
+        if (hasReachedLimit(runtimeOptions.limit, totalSentRows)) {
+            break
+        }
         const output = await fusion.getISCAccount(analyzedAccount, false)
         if (!output) continue
 
-        const enriched = enrichISCAccountWithMatching(output, reportIndex)
+        const enriched = enrichISCAccountWithMatching(output, reportIndex, pendingReviewByAccountId)
+        if (!shouldEmitRow(enriched.account, enriched.status, runtimeOptions, totalSentRows)) {
+            continue
+        }
         rowCounter[enriched.status] += 1
         sender.send(enriched.account)
         totalSentRows += 1
@@ -107,6 +139,33 @@ export const streamFallbackAnalyzedRows = async (
 
     log.info(`Fallback streaming emitted ${totalSentRows} analyzed managed account row(s)`)
     return totalSentRows
+}
+
+const hasReachedLimit = (limit: number | undefined, emittedRows: number): boolean =>
+    typeof limit === 'number' && emittedRows >= limit
+
+const shouldEmitRow = (
+    enrichedAccount: any,
+    status: keyof CustomReportRowCounter,
+    runtimeOptions: CustomReportRuntimeOptions,
+    emittedRows: number
+): boolean => {
+    if (hasReachedLimit(runtimeOptions.limit, emittedRows)) {
+        return false
+    }
+    const isMatched = status === 'matched'
+    const reviewPending = Boolean(enrichedAccount?.attributes?.review?.pending)
+
+    if (runtimeOptions.onlyMatching && runtimeOptions.onlyReview) {
+        return isMatched || reviewPending
+    }
+    if (runtimeOptions.onlyMatching && !isMatched) {
+        return false
+    }
+    if (runtimeOptions.onlyReview && !reviewPending) {
+        return false
+    }
+    return true
 }
 
 export const refreshUniqueAttributesForCustomReport = async (

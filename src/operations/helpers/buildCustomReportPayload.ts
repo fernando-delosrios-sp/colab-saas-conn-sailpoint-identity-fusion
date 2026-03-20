@@ -1,5 +1,6 @@
 import { StdAccountListOutput } from '@sailpoint/connector-sdk'
 import { FusionReportAccount, FusionReportMatch, FusionReportStats } from '../../services/fusionService/types'
+import { PendingReviewAccountContext } from '../../services/formService/formService'
 
 export type MatchingStatus = 'matched' | 'non-matched' | 'review-error' | 'not-analyzed'
 
@@ -63,11 +64,40 @@ type MatchingPayload = {
     }
 }
 
+type ReviewForm = {
+    formInstanceId: string
+    url?: string
+}
+
+type ReviewReviewer = {
+    id: string
+    name: string
+    email: string
+}
+
+type ReviewCandidate = {
+    id: string
+    name: string
+    scores: FusionReportMatch['scores']
+    attributes: Record<string, unknown>
+}
+
+type ReviewPayload = {
+    pending: boolean
+    forms: ReviewForm[]
+    reviewers: ReviewReviewer[]
+    candidates: ReviewCandidate[]
+}
+
+export type PendingReviewContextByAccountId = Map<string, PendingReviewAccountContext>
+
 const toStringArray = (value: unknown): string[] => {
     if (Array.isArray(value)) return value.map((x) => String(x))
     if (value === undefined || value === null) return []
     return [String(value)]
 }
+
+const EMPTY_REVIEW_PAYLOAD: ReviewPayload = { pending: false, forms: [], reviewers: [], candidates: [] }
 
 export const createCustomReportRowCounter = (): CustomReportRowCounter => ({
     matched: 0,
@@ -149,7 +179,8 @@ const buildMatchingPayload = (account: StdAccountListOutput, reportAccounts: Fus
 
 export const enrichISCAccountWithMatching = (
     account: StdAccountListOutput,
-    reportIndex: Map<string, FusionReportAccount[]>
+    reportIndex: Map<string, FusionReportAccount[]>,
+    pendingReviewByAccountId: PendingReviewContextByAccountId = new Map()
 ): { account: any; status: MatchingStatus } => {
     const attributes = account.attributes ?? {}
     const relatedIds = toStringArray(attributes.accounts)
@@ -162,6 +193,7 @@ export const enrichISCAccountWithMatching = (
     }
 
     const matching = buildMatchingPayload(account, relatedReportAccounts)
+    const review = buildReviewPayload(relatedIds, relatedReportAccounts, pendingReviewByAccountId)
 
     return {
         account: {
@@ -169,10 +201,87 @@ export const enrichISCAccountWithMatching = (
             attributes: {
                 ...attributes,
                 matching,
+                review,
             },
         },
         status: matching.status,
     }
+}
+
+const buildReviewPayload = (
+    relatedIds: string[],
+    relatedReportAccounts: FusionReportAccount[],
+    pendingReviewByAccountId: PendingReviewContextByAccountId
+): ReviewPayload => {
+    if (relatedIds.length === 0 || pendingReviewByAccountId.size === 0) {
+        return EMPTY_REVIEW_PAYLOAD
+    }
+
+    const forms = new Map<string, ReviewForm>()
+    const reviewers = new Map<string, ReviewReviewer>()
+    const candidateIds = new Set<string>()
+
+    for (const accountId of relatedIds) {
+        const context = pendingReviewByAccountId.get(accountId)
+        if (!context) continue
+
+        for (const form of context.forms ?? []) {
+            if (!form?.formInstanceId) continue
+            forms.set(form.formInstanceId, { formInstanceId: form.formInstanceId, url: form.url })
+        }
+        for (const reviewer of context.reviewers ?? []) {
+            if (!reviewer?.id) continue
+            reviewers.set(reviewer.id, {
+                id: reviewer.id,
+                name: reviewer.name ?? reviewer.id,
+                email: reviewer.email ?? '',
+            })
+        }
+        for (const candidateId of context.candidateIds ?? []) {
+            if (candidateId) candidateIds.add(candidateId)
+        }
+    }
+
+    const candidates = buildReviewCandidates(Array.from(candidateIds), relatedReportAccounts)
+    const formEntries = Array.from(forms.values())
+    const reviewerEntries = Array.from(reviewers.values())
+
+    return {
+        pending: formEntries.length > 0,
+        forms: formEntries,
+        reviewers: reviewerEntries,
+        candidates,
+    }
+}
+
+const buildReviewCandidates = (
+    candidateIds: string[],
+    relatedReportAccounts: FusionReportAccount[]
+): ReviewCandidate[] => {
+    if (candidateIds.length === 0) return []
+
+    const matchByIdentityId = new Map<string, FusionReportMatch[]>()
+    for (const reportAccount of relatedReportAccounts) {
+        for (const match of reportAccount.matches) {
+            if (!match.identityId) continue
+            const list = matchByIdentityId.get(match.identityId) ?? []
+            list.push(match)
+            matchByIdentityId.set(match.identityId, list)
+        }
+    }
+
+    return candidateIds.map((candidateId) => {
+        const matches = matchByIdentityId.get(candidateId) ?? []
+        const first = matches[0]
+        const scores = first?.scores ?? []
+
+        return {
+            id: candidateId,
+            name: first?.identityName ?? candidateId,
+            scores,
+            attributes: {},
+        }
+    })
 }
 
 export const buildCustomReportSummary = (params: {

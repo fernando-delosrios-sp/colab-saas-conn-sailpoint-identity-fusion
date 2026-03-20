@@ -22,6 +22,9 @@ export const testConnection = async (serviceRegistry: ServiceRegistry, _input: a
         await sources.fetchAllSources()
         timer.phase('Verified Fusion source and managed sources')
 
+        sources.validateAccountJmespathFilters()
+        timer.phase('Validated Accounts JMESPath filters')
+
         const reverseCorrelationSources = config.sources.filter((sc) => sc.correlationMode === 'reverse')
         if (reverseCorrelationSources.length > 0) {
             const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()

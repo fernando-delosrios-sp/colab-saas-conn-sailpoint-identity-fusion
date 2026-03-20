@@ -30,6 +30,7 @@ import { wrapConnectorError } from '../../utils/error'
 import { getDateFromISOString } from '../../utils/date'
 import { buildSourceConfigPatch } from './helpers'
 import { SourceInfo } from './types'
+import { CompiledAccountJmespathFilter, compileAccountJmespathFilter } from './accountJmespathFilter'
 
 // ============================================================================
 // SourceService Class
@@ -101,6 +102,7 @@ export class SourceService {
     private readonly taskResultRetries: number
     private readonly taskResultWait: number
     private readonly concurrencyCheckEnabled: boolean
+    private readonly accountJmespathFiltersBySourceName: Map<string, CompiledAccountJmespathFilter> = new Map()
 
     // Sources configured for batch mode (`accountLimit` defined)
     private readonly batchLimitedSourceNames: Set<string>
@@ -375,6 +377,16 @@ export class SourceService {
     }
 
     /**
+     * Compile/validate configured Accounts JMESPath filters for managed sources.
+     * Throws ConnectorError when any expression is invalid.
+     */
+    public validateAccountJmespathFilters(): void {
+        for (const source of this.managedSources) {
+            this.getCompiledAccountJmespathFilter(source)
+        }
+    }
+
+    /**
      * Disable an ISC account by its ID and wait for completion.
      * Uses low queue priority to avoid starving higher-priority work.
      */
@@ -514,7 +526,8 @@ export class SourceService {
                         abortSignal,
                         undefined
                     )) {
-                        for (const account of batch) {
+                        const filteredBatch = this.applyManagedJmespathFilter(source, batch)
+                        for (const account of filteredBatch) {
                             if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
                             if (this.isMachineManagedAccount(account)) {
                                 discardedMachineCount++
@@ -641,6 +654,12 @@ export class SourceService {
             'SourceService>fetchSourceAccountByNativeIdentity'
         )
         const candidate = accounts?.[0]
+        if (sourceInfo.isManaged && candidate && !this.matchesManagedJmespathFilter(sourceInfo, candidate)) {
+            this.log.warn(
+                `Discarded managed account for native identity "${nativeIdentity}" on source "${sourceInfo.name}" due to Accounts JMESPath filter`
+            )
+            return undefined
+        }
         if (sourceInfo.isManaged && candidate && this.isMachineManagedAccount(candidate)) {
             this.log.warn(
                 `Discarded managed machine account for native identity "${nativeIdentity}" on source "${sourceInfo.name}" where isMachine=true`
@@ -1336,6 +1355,53 @@ export class SourceService {
             filterParts.push(`(${sourceInfo.config.accountFilter})`)
         }
         return filterParts.join(' and ')
+    }
+
+    /**
+     * Lazily compile and cache per-source Accounts JMESPath filters.
+     */
+    private getCompiledAccountJmespathFilter(sourceInfo: SourceInfo): CompiledAccountJmespathFilter | undefined {
+        if (!sourceInfo.isManaged) {
+            return undefined
+        }
+
+        const expression = sourceInfo.config?.accountJmespathFilter
+        if (!expression || expression.trim().length === 0) {
+            this.accountJmespathFiltersBySourceName.delete(sourceInfo.name)
+            return undefined
+        }
+
+        const cached = this.accountJmespathFiltersBySourceName.get(sourceInfo.name)
+        if (cached && cached.expression === expression) {
+            return cached
+        }
+
+        const compiled = compileAccountJmespathFilter(sourceInfo.name, expression)
+        if (!compiled) {
+            this.accountJmespathFiltersBySourceName.delete(sourceInfo.name)
+            return undefined
+        }
+
+        this.accountJmespathFiltersBySourceName.set(sourceInfo.name, compiled)
+        return compiled
+    }
+
+    /**
+     * Applies Accounts JMESPath filter on a paginated batch represented as { accounts: [...] }.
+     */
+    private applyManagedJmespathFilter(sourceInfo: SourceInfo, accounts: Account[]): Account[] {
+        const compiled = this.getCompiledAccountJmespathFilter(sourceInfo)
+        if (!compiled) {
+            return accounts
+        }
+        return compiled.filterPage(accounts)
+    }
+
+    private matchesManagedJmespathFilter(sourceInfo: SourceInfo, account: Account): boolean {
+        if (!sourceInfo.isManaged) {
+            return true
+        }
+        return this.applyManagedJmespathFilter(sourceInfo, [account]).length > 0
     }
 
     /**

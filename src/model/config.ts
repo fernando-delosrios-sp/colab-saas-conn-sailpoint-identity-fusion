@@ -144,6 +144,7 @@ export interface SourceConfig {
     aggregationDelay?: number
     optimizedAggregation?: boolean
     accountFilter?: string
+    accountJmespathFilter?: string
     accountLimit?: number
     correlationMode?: CorrelationMode
     correlationAttribute?: string

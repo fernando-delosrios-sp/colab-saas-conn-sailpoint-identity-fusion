@@ -41,10 +41,12 @@ For an in-depth explanation of source types, aggregation rules, correlation mode
 | Section                | Description                                                                                                                            |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Scope**              | Determines if identities are included in the processing scope and defines an optional identity filter query.                           |
-| **Sources**            | Configures the authoritative account sources, their types (Authoritative, Records, Orphans), aggregation modes, and correlation modes. |
+| **Sources**            | Configures authoritative sources, source behavior, aggregation/correlation modes, plus dual account filters: `Accounts API filter` (server-side) and `Accounts JMESPath filter` (client-side, page-wise). |
 | **Processing Control** | Manages history retention, empty account deletion, and behavior when unique identifiers are missing.                                   |
 
 > **Note:** Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion NG. The connector skips them during managed-account ingestion and logs warning messages with discarded counts.
+>
+> Filter references: [Accounts list API](https://developer.sailpoint.com/docs/api/v2025/list-accounts), [JMESPath](https://jmespath.org/).
 
 ### Attribute Mapping Settings
 
@@ -249,6 +251,16 @@ For step-by-step instructions and UI details, see the [Map](docs/guides/map.md),
 
 Use `custom:report` to run a **non-persistent aggregation analysis**. It evaluates managed accounts with the same matching logic used for reports, but it does not execute the persistence/writeback phase used by `std:account:list`.
 
+### Input options
+
+`custom:report` supports optional runtime controls in the command input:
+
+- `limit` (number): Maximum number of account rows to stream. If omitted, all rows are eligible.
+- `summary` (boolean): Whether to emit the final `custom:report:summary` payload. Default: `true`.
+- `onlyMatching` (boolean): Stream only rows whose `attributes.matching.status` is `matched`. Default: `false`.
+- `onlyReview` (boolean): Stream only rows with `attributes.review.pending === true`. Default: `false`.
+- If both `onlyMatching` and `onlyReview` are `true`, rows matching either condition are streamed.
+
 ### What it returns
 
 - Streams final ISC account rows (`key`, `attributes`, `disabled`) like account list output.
@@ -257,6 +269,11 @@ Use `custom:report` to run a **non-persistent aggregation analysis**. It evaluat
     - `matches`: candidate identities and per-attribute scores when available
     - `sourceContext`: source provenance (`originSource`, `sources`)
     - `correlationContext`: linked and missing account context (`accounts`, `missing-accounts`, `reviews`, `statuses`)
+- Adds `attributes.review` to every streamed row:
+    - `pending`: whether there is an active pending form instance linked to any account id in `attributes.accounts`
+    - `forms`: pending form references (`formInstanceId`, `url`)
+    - `reviewers`: resolved reviewer identities (`id`, `name`, `email`)
+    - `candidates`: candidate identity details (`id`, `name`, `scores`, `attributes`)
 - Sends a final summary object with `type: custom:report:summary` containing row totals, managed-account analysis totals, diagnostics, and processing time.
 
 ### Typical use cases
