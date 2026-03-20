@@ -26,7 +26,6 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
 
     let identityName = input.attributes.name ?? input.identity
     try {
-        assert(input.identity, 'Account identity is required')
         assert(input.schema, 'Account schema is required')
 
         await sources.fetchAllSources()
