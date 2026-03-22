@@ -1,5 +1,6 @@
 import { FusionAccount } from '../../model/account'
-import { OwnerDto } from 'sailpoint-api-client'
+import { SourceType } from '../../model/config'
+import { IdentityDocument, OwnerDto } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
@@ -8,6 +9,30 @@ import { Candidate } from './types'
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Primary line of the identities SEARCH_V2 SELECT (`label: 'attributes.displayName'` in formBuilder).
+ * Form conditions must compare against this exact string so ISC show/hide rules match the dropdown.
+ */
+export const resolveIdentitiesSelectLabel = (
+    fusionAttributes: Record<string, any>,
+    identityId: string,
+    identityDocument?: IdentityDocument
+): string => {
+    const fromIndex = identityDocument?.attributes
+        ? String((identityDocument.attributes as Record<string, unknown>).displayName ?? '').trim()
+        : ''
+    if (fromIndex) return fromIndex
+
+    const fromFusion = String(fusionAttributes?.displayName ?? '').trim()
+    if (fromFusion) return fromFusion
+
+    logger.error(
+        `[formBuilder] Candidate identity ${identityId} has no attributes.displayName for identities SELECT; ` +
+            `form conditions may not match the dropdown. Using identityId as last-resort label.`
+    )
+    return identityId
+}
 
 /**
  * Build candidate list from fusion matches
@@ -20,16 +45,11 @@ export const buildCandidateList = (fusionAccount: FusionAccount): Candidate[] =>
         assert(match.fusionIdentity, 'Fusion identity is required in match')
         assert(match.fusionIdentity.identityId, 'Fusion identity ID is required')
         const attrs: Record<string, any> = match.fusionIdentity.attributes || {}
-        // Label uses attributes.displayName. Value remains identityId.
-        const displayName = String(attrs.displayName || '')
-        if (!displayName) {
-            logger.error(
-                `[formBuilder] Candidate identity ${match.fusionIdentity.identityId} is missing attributes.displayName. Using identityId as fallback name.`
-            )
-        }
+        // Label uses attributes.displayName (same as SEARCH_V2 SELECT). Value remains identityId.
+        const id = match.fusionIdentity.identityId
         return {
-            id: match.fusionIdentity.identityId,
-            name: displayName || match.fusionIdentity.identityId,
+            id,
+            name: resolveIdentitiesSelectLabel(attrs, id),
             attributes: attrs,
             scores: match.scores || [],
         }
@@ -39,16 +59,25 @@ export const buildCandidateList = (fusionAccount: FusionAccount): Candidate[] =>
 }
 
 /**
- * Build form name from fusion account
+ * Build form name from fusion account.
+ * Orphan-source reviews omit the account id segment so titles stay readable (managed id is often a long opaque value).
  */
-export const buildFormName = (fusionAccount: FusionAccount, fusionFormNamePattern: string): string => {
+export const buildFormName = (
+    fusionAccount: FusionAccount,
+    fusionFormNamePattern: string,
+    sourceType: SourceType = 'authoritative'
+): string => {
     const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
     const accountId =
         fusionAccount.nativeIdentityOrUndefined ||
         (fusionAccount as unknown as { nativeIdentity?: string }).nativeIdentity ||
         fusionAccount.managedAccountId ||
         'UnknownId'
-    return `${fusionFormNamePattern} - ${accountName} (${accountId}) [${fusionAccount.sourceName}]`
+    const source = `[${fusionAccount.sourceName}]`
+    if (sourceType === 'orphan') {
+        return `${fusionFormNamePattern} - ${accountName} ${source}`
+    }
+    return `${fusionFormNamePattern} - ${accountName} (${accountId}) ${source}`
 }
 
 /**

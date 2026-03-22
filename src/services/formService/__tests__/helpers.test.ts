@@ -1,6 +1,32 @@
-import { buildFormName, calculateExpirationDate } from '../helpers'
+import { buildFormName, calculateExpirationDate, resolveIdentitiesSelectLabel } from '../helpers'
 
 describe('formService helpers', () => {
+    describe('resolveIdentitiesSelectLabel', () => {
+        it('prefers attributes.displayName from the identity document (matches search index label)', () => {
+            const doc = {
+                attributes: { displayName: 'brenda.cooper' },
+            } as any
+            const label = resolveIdentitiesSelectLabel({}, 'id-1', doc)
+            expect(label).toBe('brenda.cooper')
+        })
+
+        it('uses fusion attributes when identity document is not provided', () => {
+            const label = resolveIdentitiesSelectLabel({ displayName: 'Jane' }, 'id-2')
+            expect(label).toBe('Jane')
+        })
+
+        it('prefers identity document displayName over stale fusion snapshot', () => {
+            const doc = { attributes: { displayName: 'From Index' } } as any
+            const label = resolveIdentitiesSelectLabel({ displayName: 'Stale' }, 'id-3', doc)
+            expect(label).toBe('From Index')
+        })
+
+        it('falls back to identity id when displayName is missing everywhere', () => {
+            const label = resolveIdentitiesSelectLabel({}, 'fallback-id')
+            expect(label).toBe('fallback-id')
+        })
+    })
+
     describe('buildFormName', () => {
         it('should build form name from fusion account', () => {
             const fusionAccount = {
@@ -33,6 +59,16 @@ describe('formService helpers', () => {
             const fusionAccount = { sourceName: 'S' } as any
             const result = buildFormName(fusionAccount, 'F')
             expect(result).toBe('F - Unknown (UnknownId) [S]')
+        })
+
+        it('should omit account id for orphan source reviews', () => {
+            const fusionAccount = {
+                name: 'fcooper',
+                nativeIdentity: 'aa7459e540f94cbdbaa859019ef5c4f1',
+                sourceName: 'Active Directory',
+            } as any
+            const result = buildFormName(fusionAccount, 'Fusion Review', 'orphan')
+            expect(result).toBe('Fusion Review - fcooper [Active Directory]')
         })
     })
 

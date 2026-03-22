@@ -20,6 +20,7 @@ import {
     CorrelationConfigV2025,
     AttributeDefinitionV2025,
     AttributeDefinitionTypeV2025,
+    AccountsV2025ApiDisableAccountRequest,
 } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { BaseConfig, FusionConfig, SourceConfig } from '../../model/config'
@@ -396,9 +397,8 @@ export class SourceService {
         await this.client.execute(
             () =>
                 accountsApi.disableAccount({
-                    id: accountId,
-                    accountToggleRequestV2025: {},
-                }),
+                    id: accountId
+                } as AccountsV2025ApiDisableAccountRequest),
             QueuePriority.LOW,
             'SourceService>fireDisableAccount'
         )

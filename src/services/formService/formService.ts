@@ -21,7 +21,7 @@ import { assert, softAssert } from '../../utils/assert'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
 import { Candidate } from './types'
-import { buildCandidateList, buildFormName, calculateExpirationDate, getFormOwner } from './helpers'
+import { buildCandidateList, buildFormName, calculateExpirationDate, getFormOwner, resolveIdentitiesSelectLabel } from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 import {
     createFusionDecision,
@@ -247,12 +247,14 @@ export class FormService {
         const candidates = buildCandidateList(fusionAccount)
         assert(candidates, 'Failed to build candidate list')
 
-        const formName = buildFormName(fusionAccount, this.fusionFormNamePattern)
+        await this.enrichCandidateIdentitiesSelectLabels(candidates)
+
+        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'authoritative'
+
+        const formName = buildFormName(fusionAccount, this.fusionFormNamePattern, sourceType)
         assert(formName, 'Form name is required')
 
         const formDefinition = await this.getOrCreateFormDefinition(formName, fusionAccount, candidates)
-
-        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'authoritative'
         const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
         assert(formInput, 'Form input is required')
 
@@ -263,6 +265,26 @@ export class FormService {
         assert(fusionSourceId, 'Fusion source ID is required')
 
         return { candidates, formName, formDefinition, formInput, expire, fusionSourceId }
+    }
+
+    /**
+     * Align `candidate.name` with the identities SELECT primary label (`attributes.displayName` from search)
+     * so form conditions match what reviewers see in the dropdown when fusion snapshots omit display names.
+     */
+    private async enrichCandidateIdentitiesSelectLabels(candidates: Candidate[]): Promise<void> {
+        if (!this.identities) return
+        for (const c of candidates) {
+            let doc = this.identities.getIdentityById(c.id)
+            if (!doc) {
+                try {
+                    doc = await this.identities.fetchIdentityById(c.id)
+                } catch (error) {
+                    const detail = error instanceof Error ? error.message : String(error)
+                    this.log.debug(`Could not load identity ${c.id} for identities SELECT label alignment: ${detail}`)
+                }
+            }
+            c.name = resolveIdentitiesSelectLabel(c.attributes, c.id, doc)
+        }
     }
 
     /**
