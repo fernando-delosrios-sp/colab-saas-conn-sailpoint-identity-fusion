@@ -9,6 +9,8 @@ const toReportDecision = (
     decision: FusionDecision,
     resolveSourceType?: (sourceName?: string) => 'authoritative' | 'record' | 'orphan' | undefined,
     resolveReviewerName?: (reviewerId?: string) => string | undefined,
+    resolveReviewerUrl?: (reviewerId?: string) => string | undefined,
+    resolveAccountUrl?: (accountId?: string) => string | undefined,
     resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string }
 ): FusionReportDecision => {
     const sourceType = decision.sourceType ?? resolveSourceType?.(decision.account.sourceName) ?? 'authoritative'
@@ -33,11 +35,11 @@ const toReportDecision = (
     return {
         reviewerId: decision.submitter.id,
         reviewerName,
-        reviewerUrl: urlContext.identity(decision.submitter.id),
+        reviewerUrl: resolveReviewerUrl?.(decision.submitter.id),
         reviewerEmail: decision.submitter.email || undefined,
         accountId: decision.account.id,
         accountName: decision.account.name || decision.account.id,
-        accountUrl: urlContext.humanAccount(decision.account.id),
+        accountUrl: resolveAccountUrl?.(decision.account.id),
         accountSource: decision.account.sourceName || '',
         sourceType,
         decision: decisionType,
@@ -95,6 +97,10 @@ export const generateReport = async (
         const reviewer = identities.getIdentityById(reviewerId)
         return reviewer?.displayName || reviewer?.name || undefined
     }
+    const resolveReviewerUrl = (reviewerId?: string): string | undefined =>
+        reviewerId ? urlContext.identity(reviewerId) : undefined
+    const resolveAccountUrl = (accountId?: string): string | undefined =>
+        accountId ? urlContext.humanAccount(accountId) : undefined
     const resolveIdentityContext = (
         identityId?: string
     ): { selectedIdentityName?: string; selectedIdentityUrl?: string } => {
@@ -107,7 +113,14 @@ export const generateReport = async (
         }
     }
     const reportDecisions = finishedDecisions.map((decision) =>
-        toReportDecision(decision, resolveSourceType, resolveReviewerName, resolveIdentityContext)
+        toReportDecision(
+            decision,
+            resolveSourceType,
+            resolveReviewerName,
+            resolveReviewerUrl,
+            resolveAccountUrl,
+            resolveIdentityContext
+        )
     )
     if (aggregationStats) {
         const issueSummary = serviceRegistry.log.getAggregationIssueSummary()
