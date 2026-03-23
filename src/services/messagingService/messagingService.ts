@@ -152,7 +152,7 @@ export class MessagingService {
         }
 
         await wrapConnectorError(async () => {
-            const delayedWorkflow = new DelayedAggregationWorkflow(workflowName, owner)
+            const delayedWorkflow = new DelayedAggregationWorkflow(workflowName, owner, this.apiBaseUrl)
             assert(delayedWorkflow, 'Failed to create delayed aggregation workflow object')
 
             ;(delayedWorkflow as any).enabled = false
@@ -184,12 +184,12 @@ export class MessagingService {
         assert(accessToken, 'Unable to resolve access token for delayed aggregation workflow')
 
         const safeDelayMinutes = Math.max(1, Math.trunc(args.delayMinutes || 1))
-        const requestUrl = this.buildLoadAccountsRequestUrl(args.sourceId, args.disableOptimization)
         const request: TestWorkflowRequestV2025 = {
             input: {
-                delay: `${safeDelayMinutes}m`,
-                requestUrl,
-                authorizationHeader: `Bearer ${accessToken}`,
+                delayMinutes: `${safeDelayMinutes}m`,
+                sourceId: args.sourceId,
+                disableOptimization: args.disableOptimization,
+                accessToken,
             },
         }
 
@@ -530,17 +530,6 @@ export class MessagingService {
 
         const token = await accessToken
         return normalize(token)
-    }
-
-    /**
-     * Build the source aggregation API URL used by the workflow HTTP step.
-     */
-    private buildLoadAccountsRequestUrl(sourceId: string, disableOptimization: boolean): string {
-        const url = new URL(`${this.apiBaseUrl}/sources/${sourceId}/load-accounts`)
-        if (disableOptimization) {
-            url.searchParams.set('disableOptimization', 'true')
-        }
-        return url.toString()
     }
 
     // ------------------------------------------------------------------------

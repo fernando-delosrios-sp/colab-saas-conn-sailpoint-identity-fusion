@@ -12,7 +12,7 @@ import { ServiceRegistry } from '../services/serviceRegistry'
  */
 export const testConnection = async (serviceRegistry: ServiceRegistry, _input: any) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, sources, schemas, config, res } = serviceRegistry
+    const { log, sources, schemas, messaging, config, res } = serviceRegistry
 
     try {
         log.info('Testing connection')
@@ -24,6 +24,13 @@ export const testConnection = async (serviceRegistry: ServiceRegistry, _input: a
 
         sources.validateAccountJmespathFilters()
         timer.phase('Validated Accounts JMESPath filters')
+
+        const delayedAggregationSources = config.sources.filter((sc) => sc.aggregationMode === 'delayed')
+        if (delayedAggregationSources.length > 0) {
+            await messaging.fetchDelayedAggregationSender()
+            log.info(`Delayed aggregation workflow validated for ${delayedAggregationSources.length} source(s)`)
+            timer.phase('Validated delayed aggregation workflow')
+        }
 
         const reverseCorrelationSources = config.sources.filter((sc) => sc.correlationMode === 'reverse')
         if (reverseCorrelationSources.length > 0) {

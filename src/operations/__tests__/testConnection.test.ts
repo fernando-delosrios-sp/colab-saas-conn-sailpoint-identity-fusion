@@ -45,6 +45,27 @@ describe('testConnection', () => {
         expect(sources.ensureReverseCorrelationSetup).not.toHaveBeenCalled()
     })
 
+    it('ensures delayed aggregation workflow when delayed sources are configured', async () => {
+        const { registry, sources } = createMockRegistry([
+            { name: 'HR', correlationMode: 'none', aggregationMode: 'delayed' },
+        ])
+
+        await testConnection(registry, {})
+
+        expect(sources.fetchAllSources).toHaveBeenCalledTimes(1)
+        expect(registry.messaging.fetchDelayedAggregationSender).toHaveBeenCalledTimes(1)
+    })
+
+    it('skips delayed aggregation workflow validation when no delayed sources are configured', async () => {
+        const { registry } = createMockRegistry([
+            { name: 'AD', correlationMode: 'none', aggregationMode: 'before' },
+        ])
+
+        await testConnection(registry, {})
+
+        expect(registry.messaging.fetchDelayedAggregationSender).not.toHaveBeenCalled()
+    })
+
     it('fails test connection when Accounts JMESPath filter validation fails', async () => {
         const { registry, sources } = createMockRegistry([{ name: 'AD', correlationMode: 'none' }])
         sources.validateAccountJmespathFilters.mockImplementation(() => {

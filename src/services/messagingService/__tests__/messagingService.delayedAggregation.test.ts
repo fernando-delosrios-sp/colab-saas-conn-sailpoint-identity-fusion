@@ -45,7 +45,7 @@ const createMessagingService = (accessToken: any) => {
 }
 
 describe('MessagingService delayed aggregation workflow', () => {
-    it('builds delayed aggregation workflow payload with bearer token and disableOptimization', async () => {
+    it('builds delayed aggregation workflow payload with delay/source/disableOptimization/token fields', async () => {
         const { service, workflowsApi } = createMessagingService('token-123')
 
         await service.scheduleDelayedAggregation({
@@ -59,9 +59,10 @@ describe('MessagingService delayed aggregation workflow', () => {
             id: 'wf-delayed-1',
             testWorkflowRequestV2025: {
                 input: {
-                    delay: '5m',
-                    requestUrl: 'https://tenant.api.identitynow.com/sources/source-abc/load-accounts?disableOptimization=true',
-                    authorizationHeader: 'Bearer token-123',
+                    delayMinutes: '5m',
+                    sourceId: 'source-abc',
+                    disableOptimization: true,
+                    accessToken: 'token-123',
                 },
             },
         })
@@ -82,9 +83,10 @@ describe('MessagingService delayed aggregation workflow', () => {
             id: 'wf-delayed-1',
             testWorkflowRequestV2025: {
                 input: {
-                    delay: '3m',
-                    requestUrl: 'https://tenant.api.identitynow.com/sources/source-xyz/load-accounts',
-                    authorizationHeader: 'Bearer token-from-provider',
+                    delayMinutes: '3m',
+                    sourceId: 'source-xyz',
+                    disableOptimization: false,
+                    accessToken: 'token-from-provider',
                 },
             },
         })

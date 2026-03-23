@@ -11,39 +11,38 @@ export class DelayedAggregationWorkflow implements CreateWorkflowRequestV2025 {
     definition: WorkflowDefinitionV2025
     trigger: WorkflowTriggerV2025
 
-    constructor(name: string, owner: WorkflowBodyOwnerV2025) {
+    constructor(name: string, owner: WorkflowBodyOwnerV2025, apiBaseUrl: string) {
         this.name = name
         this.owner = owner
         this.definition = {
-            start: 'Wait Delay',
+            start: 'Wait',
             steps: {
                 'End Step - Success': {
                     type: 'success',
                 },
-                'Wait Delay': {
-                    actionId: 'sp:wait',
+                Wait: {
+                    actionId: 'sp:sleep',
                     attributes: {
                         type: 'waitFor',
-                        'waitDuration.$': '$.trigger.delay',
+                        'duration.$': '$.trigger.delayMinutes',
                     },
                     nextStep: 'Trigger Aggregation',
                     type: 'action',
                     versionNumber: 1,
                 },
                 'Trigger Aggregation': {
-                    actionId: 'sp:http-request',
+                    actionId: 'sp:http',
                     attributes: {
-                        authenticationType: 'customAuthorization',
-                        headerName: 'X-SailPoint-Experimental',
-                        headerValue: 'true',
-                        method: 'POST',
-                        'requestUrl.$': '$.trigger.requestUrl',
-                        requestHeaders: [
-                            {
-                                key: 'Authorization',
-                                'value.$': '$.trigger.authorizationHeader',
-                            },
-                        ],
+                        authenticationType: null,
+                        jsonRequestBody: {
+                            disableOptimization: '{{$.trigger.disableOptimization}}',
+                        },
+                        method: 'post',
+                        requestContentType: 'json',
+                        requestHeaders: {
+                            Authorization: 'Bearer {{$.trigger.accessToken}}',
+                        },
+                        url: `${apiBaseUrl}/v2025/sources/{{$.trigger.sourceId}}/load-accounts`,
                     },
                     nextStep: 'End Step - Success',
                     type: 'action',
@@ -56,7 +55,7 @@ export class DelayedAggregationWorkflow implements CreateWorkflowRequestV2025 {
         this.trigger = {
             type: 'EXTERNAL',
             attributes: {
-                id: 'idn:external:id',
+                id: 'idn:external-http',
             },
         } as WorkflowTriggerV2025
     }
