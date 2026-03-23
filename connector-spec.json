@@ -349,7 +349,7 @@
                         },
                         {
                             "key": "deleteEmpty",
-                            "label": "Delete accounts with no authoritative accounts left?",
+                            "label": "Delete accounts with no managed accounts left?",
                             "type": "toggle",
                             "required": false,
                             "helpKey": "Automatically remove a Fusion account when all of its linked source accounts have been deleted. Useful for cleaning up after users leave the organization"
