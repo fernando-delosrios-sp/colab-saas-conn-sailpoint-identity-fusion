@@ -246,53 +246,51 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
         </div>
         {{/if}}
 
-        <div style="margin-top: 18px;">
-          <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">Fusion Review Decisions</div>
-          {{#if fusionReviewDecisions}}
-            {{#if (gt fusionReviewDecisions.length 0)}}
-              {{#each fusionReviewDecisions}}
-              <div style="margin-top: 10px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 12px; background: #fbfcff;">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-                  <div style="font-size: 14px; color:#0f172a; font-weight: 700;">{{decisionLabel}}</div>
-                  <div style="font-size: 11px; color:#5f6b7a; font-weight: 700; text-transform: uppercase;">{{sourceTypeLabel sourceType}}</div>
-                </div>
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px; border-collapse:collapse;">
-                  <tr>
-                    <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700; width:140px;">Reviewer</td>
-                    <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{reviewerName}}{{#if reviewerEmail}} ({{reviewerEmail}}){{/if}}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Account</td>
-                    <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{accountName}} [{{accountSource}}]</td>
-                  </tr>
-                  {{#if selectedIdentityId}}
-                  <tr>
-                    <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Selected Identity</td>
-                    <td style="padding:3px 0; font-size:12px; color:#0f172a;">
-                      {{#if selectedIdentityUrl}}
-                      <a href="{{selectedIdentityUrl}}" style="color:#0b5cab; text-decoration:underline;">{{selectedIdentityName}}</a>
-                      {{else}}
-                      {{selectedIdentityName}}
-                      {{/if}}
-                    </td>
-                  </tr>
-                  {{/if}}
-                  {{#if comments}}
-                  <tr>
-                    <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Comments</td>
-                    <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{comments}}</td>
-                  </tr>
-                  {{/if}}
-                </table>
+        {{#if fusionReviewDecisions}}
+          {{#if (gt fusionReviewDecisions.length 0)}}
+          <div style="margin-top: 18px;">
+            <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">Fusion Review Decisions</div>
+            {{#each fusionReviewDecisions}}
+            <div style="margin-top: 10px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 12px; background: #fbfcff;">
+              <div style="font-size:14px; font-weight:900; color:#0f172a; line-height:1.3;">
+                {{decisionLabel}}
+                {{#if sourceType}}
+                <span style="display:inline-block; margin-left:6px; padding:1px 8px; border-radius:8px; background:#eef2f7; color:#5f6b7a; font-size:11px; font-weight:800; text-transform:uppercase; vertical-align:middle;">{{sourceTypeLabel sourceType}}</span>
+                {{/if}}
               </div>
-              {{/each}}
-            {{else}}
-              <div style="color:#999; font-style:italic; padding:14px; background-color:#f8f9fa; border-radius:4px; text-align:center;">No processed review decisions found.</div>
-            {{/if}}
-          {{else}}
-            <div style="color:#999; font-style:italic; padding:14px; background-color:#f8f9fa; border-radius:4px; text-align:center;">No processed review decisions found.</div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px; border-collapse:collapse;">
+                <tr>
+                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700; width:140px;">Reviewer</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{reviewerName}}{{#if reviewerEmail}} ({{reviewerEmail}}){{/if}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Account</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{accountName}} [{{accountSource}}]</td>
+                </tr>
+                {{#if selectedIdentityId}}
+                <tr>
+                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Selected Identity</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">
+                    {{#if selectedIdentityUrl}}
+                    <a href="{{selectedIdentityUrl}}" style="color:#0b5cab; text-decoration:underline;">{{selectedIdentityName}}</a>
+                    {{else}}
+                    {{selectedIdentityName}}
+                    {{/if}}
+                  </td>
+                </tr>
+                {{/if}}
+                {{#if comments}}
+                <tr>
+                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Comments</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{comments}}</td>
+                </tr>
+                {{/if}}
+              </table>
+            </div>
+            {{/each}}
+          </div>
           {{/if}}
-        </div>
+        {{/if}}
 
         {{#if accounts}}
           <div style="margin-top: 18px; font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">New Fusion Reviews</div>
@@ -302,19 +300,19 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate; border-spacing:0; width:auto; min-width:100%;">
                 <tr>
                   <td style="width:270px; min-width:270px; max-width:270px; vertical-align:top; padding-right:10px; border-right:1px solid #eef2f7;">
-                    <div style="color:#0b5cab; font-size:18px; font-weight:800; margin:0 0 6px 0;">{{accountName}}</div>
+                    <div style="color:#0b5cab; font-size:18px; font-weight:800; margin:0 0 6px 0;">
+                      {{#if accountUrl}}
+                      <a href="{{accountUrl}}" style="color:#0b5cab; text-decoration:underline; word-break:break-word; overflow-wrap:anywhere;">{{accountName}}</a>
+                      {{else}}
+                      {{accountName}}
+                      {{/if}}
+                    </div>
                     <div style="font-size:12px; color:#5f6b7a; margin-bottom:10px;">
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                         <tr>
                           <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Source:</td>
                           <td style="padding:2px 8px;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:#eef2f7; color:#5f6b7a; font-size:10px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
                         </tr>
-                        {{#if accountId}}
-                        <tr>
-                          <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">ID:</td>
-                          <td style="padding:2px 8px; white-space:nowrap; word-break:keep-all;">{{accountId}}</td>
-                        </tr>
-                        {{/if}}
                         {{#if accountEmail}}
                         <tr>
                           <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Email:</td>
@@ -354,7 +352,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-bottom:12px;">
                         <tr>
                         {{#each matches}}
-                        <td valign="top" style="width:auto; min-width:240px; max-width:320px; vertical-align:top; padding:4px;">
+                        <td valign="top" style="width:auto; min-width:240px; vertical-align:top; padding:4px;">
                           <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse; table-layout:auto;">
                             <tr>
                               <td colspan="4" style="padding:6px 8px;">
@@ -480,19 +478,19 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                     <tr>
                                                     <!-- Left: candidate account summary -->
                                                     <td class="main-col" valign="top" style="width:270px; min-width:270px; max-width:270px; vertical-align:top; padding:8px 6px; border-right:1px solid #eef2f7;">
-                                                        <div style="color:#0b5cab; font-size:18px; font-weight:800; margin:0 0 6px 0;">{{accountName}}</div>
+                                                        <div style="color:#0b5cab; font-size:18px; font-weight:800; margin:0 0 6px 0;">
+                                                            {{#if accountUrl}}
+                                                            <a href="{{accountUrl}}" style="color:#0b5cab; text-decoration:underline; word-break:break-word; overflow-wrap:anywhere;">{{accountName}}</a>
+                                                            {{else}}
+                                                            {{accountName}}
+                                                            {{/if}}
+                                                        </div>
                                                         <div style="font-size:12px; color:#5f6b7a; margin-bottom:10px;">
                                                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                                                                 <tr>
                                                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Source:</td>
                                                                     <td style="padding:2px 8px;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:#eef2f7; color:#5f6b7a; font-size:10px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
                                                                 </tr>
-                                                                {{#if accountId}}
-                                                                <tr>
-                                                                    <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">ID:</td>
-                                                                    <td style="padding:2px 8px; white-space:nowrap; word-break:keep-all;">{{accountId}}</td>
-                                                                </tr>
-                                                                {{/if}}
                                                                 {{#if accountEmail}}
                                                                 <tr>
                                                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Email:</td>
@@ -528,7 +526,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-bottom:12px;">
                                                                 <tr>
                                                                 {{#each matches}}
-                                                                <td valign="top" style="width:auto; min-width:240px; max-width:320px; vertical-align:top; padding:3px;">
+                                                                <td valign="top" style="width:auto; min-width:240px; vertical-align:top; padding:3px;">
                                                                     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse; table-layout:auto;">
                                                                         <tr>
                                                                             <td colspan="4" style="padding:6px 8px;">
@@ -633,6 +631,7 @@ export type EditRequestEmailData = {
 export type FusionReportEmailData = {
   accounts: Array<{
     accountName: string
+    accountUrl?: string
     accountSource: string
     sourceType?: 'authoritative' | 'record' | 'orphan'
     accountId?: string

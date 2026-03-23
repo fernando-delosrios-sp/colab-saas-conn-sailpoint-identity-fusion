@@ -99,8 +99,6 @@ export class SourceService {
     private readonly config: FusionConfig
     private readonly sources: SourceConfig[]
     private readonly spConnectorInstanceId: string
-    private readonly taskResultRetries: number
-    private readonly taskResultWait: number
     private readonly concurrencyCheckEnabled: boolean
     private readonly accountJmespathFiltersBySourceName: Map<string, CompiledAccountJmespathFilter> = new Map()
 
@@ -126,8 +124,6 @@ export class SourceService {
         this.config = config
         this.sources = config.sources
         this.spConnectorInstanceId = config.spConnectorInstanceId
-        this.taskResultRetries = config.taskResultRetries
-        this.taskResultWait = config.taskResultWait
         this.concurrencyCheckEnabled = config.concurrencyCheckEnabled
         this.batchLimitedSourceNames = new Set(
             this.sources
@@ -640,6 +636,20 @@ export class SourceService {
         const managedAccount = await this.fetchAccountById(id)
         if (!managedAccount) {
             this.log.warn(`Managed account not found for id: ${id}`)
+            return
+        }
+        const sourceName = managedAccount.sourceName ?? ''
+        const sourceInfo = this.getSourceByName(sourceName)
+        if (!sourceInfo?.isManaged) {
+            this.log.warn(
+                `Discarded account ${id} from non-configured managed source "${sourceName || 'unknown'}" during single-account fetch`
+            )
+            return
+        }
+        if (!this.matchesManagedJmespathFilter(sourceInfo, managedAccount)) {
+            this.log.warn(
+                `Discarded managed account ${id} for source "${sourceInfo.name}" due to Accounts JMESPath filter during single-account fetch`
+            )
             return
         }
         if (this.isMachineManagedAccount(managedAccount)) {
@@ -1509,7 +1519,8 @@ export class SourceService {
         awaitTaskStatus: boolean = true
     ): Promise<void> {
         let completed = false
-        const sourceName = this.sourcesById.get(id)?.name ?? id
+        const sourceInfo = this.sourcesById.get(id)
+        const sourceName = sourceInfo?.name ?? id
         const { sourcesApi, taskManagementApi } = this.client
         const requestParameters: SourcesV2025ApiImportAccountsRequest = {
             id,
@@ -1539,9 +1550,8 @@ export class SourceService {
             return
         }
 
-        // Use global retry settings for aggregation task polling
-        const taskResultRetries = this.taskResultRetries
-        const taskResultWait = this.taskResultWait
+        const taskResultRetries = sourceInfo?.config?.taskResultRetries ?? 5
+        const taskResultWait = sourceInfo?.config?.taskResultWait ?? 60000
         const taskId = loadAccountsTask?.task?.id
         let pollsExecuted = 0
         let lastTaskStatus: any = undefined

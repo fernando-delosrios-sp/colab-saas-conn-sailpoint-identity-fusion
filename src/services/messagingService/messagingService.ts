@@ -154,6 +154,7 @@ export class MessagingService {
         const accountSource = context?.accountSource || String((formInput as any)?.source || 'Unknown')
         const pickedAccountAttributes = pickAttributes(context?.accountAttributes, this.reportAttributes)
         const accountId = context?.accountId || String((formInput as any)?.account || '')
+        const accountUrl = this.urlContext.humanAccount(accountId || undefined)
         const accountEmail = context?.accountEmail
 
         const candidates =
@@ -171,6 +172,7 @@ export class MessagingService {
                     accountSource,
                     sourceType,
                     accountId: accountId || undefined,
+                    accountUrl,
                     accountEmail,
                     accountAttributes: pickedAccountAttributes,
                     matches: candidates.map((candidate: any) => ({

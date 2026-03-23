@@ -36,7 +36,7 @@ export const getReviewerInfo = (
     return {
         id: identityId,
         email: identity.attributes?.email || '',
-        name: identity.name || identity.attributes?.displayName || identityId,
+        name: identity.attributes?.displayName || identity.name || identityId,
     }
 }
 
@@ -173,11 +173,17 @@ export const createFusionDecision = (
         return null
     }
 
+    const selectedIdentity = existingIdentity ? identities?.getIdentityById(existingIdentity) : undefined
+    const selectedIdentityName = existingIdentity
+        ? selectedIdentity?.displayName || selectedIdentity?.name || existingIdentity
+        : undefined
+
     return {
         submitter: reviewer,
         account: accountInfo,
         newIdentity: isNewIdentity,
         identityId: existingIdentity,
+        identityName: selectedIdentityName,
         comments: formData?.comments || '',
         finished,
         formUrl: formInstance.standAloneFormUrl ?? undefined,

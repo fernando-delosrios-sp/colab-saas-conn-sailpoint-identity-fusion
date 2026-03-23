@@ -16,11 +16,9 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
 
 ![Source Settings - Sources](docs/assets/images/config-source-sources.png)
 
-| Field                                           | Description                                                 | Required | Notes                                                                    |
-| ----------------------------------------------- | ----------------------------------------------------------- | -------- | ------------------------------------------------------------------------ |
-| **Authoritative account sources**               | List of sources whose accounts will be merged and evaluated | Yes      | Each source has sub-configuration (see below)                            |
-| **Aggregation task result retries**             | Number of times to poll aggregation task status             | No       | Default: 5; applies to all sources with force aggregation enabled        |
-| **Aggregation task result wait time (seconds)** | Wait time between aggregation task status checks            | No       | Default: 1 second; applies to all sources with force aggregation enabled |
+| Field                             | Description                                                 | Required | Notes                                         |
+| --------------------------------- | ----------------------------------------------------------- | -------- | --------------------------------------------- |
+| **Authoritative account sources** | List of sources whose accounts will be merged and evaluated | Yes      | Each source has sub-configuration (see below) |
 
 **Per-source configuration:**
 
@@ -36,6 +34,8 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
 | **Accounts JMESPath filter**      | Client-side JMESPath expression to further filter fetched accounts | No                     | Applied page-wise on `{ "accounts": [...] }`. Expression must return an array of account objects to keep. Example: `accounts[?attributes.department == 'Engineering']`. References: [JMESPath](https://jmespath.org/), [Accounts list API](https://developer.sailpoint.com/docs/api/v2025/list-accounts) |
 | **Aggregation batch size**        | Maximum accounts to aggregate per run                  | No                     | Leave empty for all accounts; useful for initial loading of datasets.                                                                                                                                      |
 | **Account aggregation mode**      | When to trigger fresh aggregation for this source      | Yes                    | Options: **Do not aggregate** (none), **Aggregate before processing** (ensures current data but blocks processing), **Delayed aggregation** (triggers aggregation in background after returning accounts). |
+| **Aggregation task result retries** | Number of times to poll aggregation task status for this source | No (before mode) | Default: 5. Used only when **Account aggregation mode** is **Aggregate before processing**. |
+| **Aggregation task result wait time (seconds)** | Wait time between aggregation task status checks for this source | No (before mode) | Default: 60 seconds. Used only when **Account aggregation mode** is **Aggregate before processing**. |
 | **Aggregation delay (minutes)**   | Wait time before delayed aggregation                   | Yes (for delayed mode) | Default: 5 minutes.                                                                                                                                                                                        |
 | **Optimized aggregation**         | Only reprocess changed accounts during aggregation     | No                     | Enable for performance. Disable if using **reverse correlation** so all accounts are processed.                                                                                                            |
 | **Correlation mode**              | How to handle missing source accounts                  | Yes                    | Options: **Correlate missing accounts on aggregation** (direct API patch), **Reverse correlation from managed source** (sets an attribute for ISC native correlation), **Do not correlate** (none).        |

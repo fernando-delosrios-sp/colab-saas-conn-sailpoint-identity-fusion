@@ -36,6 +36,8 @@ export type FusionReportMatch = {
 export type FusionReportAccount = {
     /** Display name of the source account */
     accountName: string
+    /** Direct URL to the human account in ISC UI */
+    accountUrl?: string
     /** Name of the source the account belongs to */
     accountSource: string
     /** Source processing type (authoritative, record, or orphan) */

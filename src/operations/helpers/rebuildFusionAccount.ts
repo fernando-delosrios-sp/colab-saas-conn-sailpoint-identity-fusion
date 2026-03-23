@@ -29,9 +29,16 @@ export const rebuildFusionAccount = async (
     assert(account, 'Fusion account not found')
     assert(account.identityId, 'Identity ID not found')
     await identities.fetchIdentityById(account.identityId)
-    const accountIds = account.attributes?.accounts ?? []
+    const accountIds = new Set<string>(account.attributes?.accounts ?? [])
+    const identity = identities.getIdentityById(account.identityId)
+    for (const identityAccount of identity?.accounts ?? []) {
+        const sourceName = identityAccount.source?.name
+        if (identityAccount.id && sourceName && sources.getSourceByName(sourceName)?.isManaged) {
+            accountIds.add(identityAccount.id)
+        }
+    }
     await Promise.all(
-        accountIds.map(async (id: string) => {
+        Array.from(accountIds).map(async (id: string) => {
             await sources.fetchManagedAccount(id)
         })
     )

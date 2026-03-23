@@ -8,6 +8,7 @@ import { createUrlContext } from '../../utils/url'
 const toReportDecision = (
     decision: FusionDecision,
     resolveSourceType?: (sourceName?: string) => 'authoritative' | 'record' | 'orphan' | undefined,
+    resolveReviewerName?: (reviewerId?: string) => string | undefined,
     resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string }
 ): FusionReportDecision => {
     const sourceType = decision.sourceType ?? resolveSourceType?.(decision.account.sourceName) ?? 'authoritative'
@@ -26,10 +27,12 @@ const toReportDecision = (
               : 'Confirmed no match'
 
     const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
+    const reviewerName = decision.submitter.name || resolveReviewerName?.(decision.submitter.id) || decision.submitter.id
+    const selectedIdentityName = decision.identityName || selectedIdentityContext.selectedIdentityName || decision.identityId
 
     return {
         reviewerId: decision.submitter.id,
-        reviewerName: decision.submitter.name || decision.submitter.id,
+        reviewerName,
         reviewerEmail: decision.submitter.email || undefined,
         accountId: decision.account.id,
         accountName: decision.account.name || decision.account.id,
@@ -38,7 +41,7 @@ const toReportDecision = (
         decision: decisionType,
         decisionLabel,
         selectedIdentityId: decision.identityId || undefined,
-        selectedIdentityName: selectedIdentityContext.selectedIdentityName,
+        selectedIdentityName,
         selectedIdentityUrl: selectedIdentityContext.selectedIdentityUrl,
         comments: decision.comments || undefined,
         formUrl: decision.formUrl || undefined,
@@ -85,6 +88,11 @@ export const generateReport = async (
     const urlContext = createUrlContext(serviceRegistry.config.baseurl)
     const resolveSourceType = (sourceName?: string): 'authoritative' | 'record' | 'orphan' | undefined =>
         sourceName ? sources.getSourceByName(sourceName)?.sourceType : undefined
+    const resolveReviewerName = (reviewerId?: string): string | undefined => {
+        if (!reviewerId) return undefined
+        const reviewer = identities.getIdentityById(reviewerId)
+        return reviewer?.displayName || reviewer?.name || undefined
+    }
     const resolveIdentityContext = (
         identityId?: string
     ): { selectedIdentityName?: string; selectedIdentityUrl?: string } => {
@@ -97,7 +105,7 @@ export const generateReport = async (
         }
     }
     const reportDecisions = finishedDecisions.map((decision) =>
-        toReportDecision(decision, resolveSourceType, resolveIdentityContext)
+        toReportDecision(decision, resolveSourceType, resolveReviewerName, resolveIdentityContext)
     )
     if (aggregationStats) {
         const issueSummary = serviceRegistry.log.getAggregationIssueSummary()

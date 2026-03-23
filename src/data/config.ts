@@ -69,10 +69,14 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
             if ((sourceConfig as any).forceAggregation === true && !sourceConfig.aggregationMode) {
                 sourceConfig.aggregationMode = 'before'
             }
+            // taskResultWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
+            const taskResultWaitSeconds = sourceConfig.taskResultWait ?? 60
             return {
                 ...sourceConfig,
                 enabled: sourceConfig.enabled ?? true,
                 aggregationMode: sourceConfig.aggregationMode ?? 'none',
+                taskResultRetries: sourceConfig.taskResultRetries ?? 5,
+                taskResultWait: taskResultWaitSeconds * 1000,
                 aggregationDelay: sourceConfig.aggregationDelay ?? 5,
                 optimizedAggregation: sourceConfig.optimizedAggregation ?? true,
                 accountFilter: sourceConfig.accountFilter ?? undefined,
@@ -83,11 +87,6 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)
 
     softAssert(config.sources.length > 0, 'No sources configured - no Match will be performed', 'warn')
-    // Global aggregation task polling defaults (used for all sources with force aggregation enabled)
-    config.taskResultRetries = config.taskResultRetries ?? 5
-    // taskResultWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
-    const taskResultWaitSeconds = config.taskResultWait ?? 1
-    config.taskResultWait = taskResultWaitSeconds * 1000
     config.deleteEmpty = config.deleteEmpty ?? false
     config.forceAttributeRefresh = config.forceAttributeRefresh ?? false
     config.skipAccountsWithMissingId = config.skipAccountsWithMissingId ?? false

@@ -1011,7 +1011,8 @@ export class FusionAccount {
     public addManagedAccountLayer(
         accountsById: Map<string, Account>,
         accountsByIdentityId: Map<string, Set<string>>,
-        allAccountsById?: Map<string, Account>
+        allAccountsById?: Map<string, Account>,
+        pruneDeletedManagedAccounts = false
     ): void {
         // Phase 1: Identity-based matching via index (O(1) lookup)
         if (this._identityId !== undefined) {
@@ -1049,6 +1050,11 @@ export class FusionAccount {
             }
         }
 
+        // Prune account references that no longer exist in the managed-account inventory.
+        if (pruneDeletedManagedAccounts && allAccountsById) {
+            this.pruneDeletedManagedAccounts(allAccountsById)
+        }
+
         // Preserve source/nativeIdentity context for missing accounts even if they were
         // not claimed from the current work queue (e.g. still missing from previous runs).
         if (allAccountsById) {
@@ -1070,6 +1076,30 @@ export class FusionAccount {
             this._needsRefresh = false
         } else {
             this._statuses.delete('orphan')
+        }
+    }
+
+    /**
+     * Remove stale managed-account references when the account no longer exists.
+     * This keeps accounts/missing-accounts accurate across runs and records cleanup in history.
+     */
+    private pruneDeletedManagedAccounts(allAccountsById: Map<string, Account>): void {
+        const trackedIds = new Set<string>([
+            ...this._accountIds,
+            ...this._missingAccountIds,
+            ...this._previousAccountIds,
+        ])
+
+        for (const accountId of trackedIds) {
+            if (allAccountsById.has(accountId)) continue
+
+            const removedFromAccounts = this._accountIds.delete(accountId)
+            const removedFromMissing = this._missingAccountIds.delete(accountId)
+            if (removedFromAccounts || removedFromMissing) {
+                this.addHistory(`Removed deleted managed account reference: ${accountId}`)
+            }
+            this._previousAccountIds.delete(accountId)
+            this._managedAccountInfo.delete(accountId)
         }
     }
 

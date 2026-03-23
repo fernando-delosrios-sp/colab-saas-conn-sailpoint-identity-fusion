@@ -113,6 +113,78 @@ describe('AttributeService mapping targets for definition context', () => {
     })
 })
 
+describe('AttributeService mainAccount stale cleanup', () => {
+    it('clears mainAccount when mapping no longer finds a supporting source value', () => {
+        const config = {
+            attributeMaps: [
+                {
+                    newAttribute: 'mainAccount',
+                    existingAttributes: ['_accountId'],
+                    attributeMerge: 'first',
+                },
+            ],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'mainAccount']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'mainAccount' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([
+                ['HR', [{ _accountId: 'acct-1', _source: 'HR' }]],
+            ]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        service.mapAttributes(fusionAccount)
+        expect(fusionAccount.attributes.mainAccount).toBe('acct-1')
+
+        attributeBag.sources.set('HR', [{ _source: 'HR' }])
+        service.mapAttributes(fusionAccount)
+        expect(fusionAccount.attributes.mainAccount).toBeUndefined()
+    })
+})
+
 describe('AttributeService template evaluation fallback behavior', () => {
     const createServiceWithExpression = (expression: string) => {
         const config = {
@@ -428,6 +500,16 @@ describe('AttributeService mainAccount override', () => {
         const config = {
             attributeMaps: [
                 {
+                    newAttribute: 'id',
+                    existingAttributes: ['employeeId'],
+                    attributeMerge: 'first',
+                },
+                {
+                    newAttribute: 'name',
+                    existingAttributes: ['preferredName'],
+                    attributeMerge: 'first',
+                },
+                {
                     newAttribute: 'nickname',
                     existingAttributes: ['preferredName'],
                     attributeMerge: 'first',
@@ -473,9 +555,9 @@ describe('AttributeService mainAccount override', () => {
         return new AttributeService(config, schemas, sourceService, log, locks)
     }
 
-    const createFusionAccount = (mainAccount?: string) => {
+    const createFusionAccount = (mainAccount?: string, needsReset = false) => {
         const attributeBag = {
-            current: mainAccount ? { mainAccount } : {},
+            current: mainAccount ? { mainAccount, id: 'fusion-id-1', name: 'immutable-name' } : { id: 'fusion-id-1', name: 'immutable-name' },
             previous: {},
             identity: {},
             accounts: [],
@@ -485,6 +567,7 @@ describe('AttributeService mainAccount override', () => {
                     [
                         {
                             preferredName: 'Neo',
+                            employeeId: 'hr-id-001',
                             _accountId: 'hr-001',
                             _source: 'HR',
                         },
@@ -495,6 +578,7 @@ describe('AttributeService mainAccount override', () => {
                     [
                         {
                             preferredName: 'Trinity',
+                            employeeId: 'erp-id-777',
                             _accountId: 'erp-777',
                             _source: 'ERP',
                         },
@@ -506,7 +590,7 @@ describe('AttributeService mainAccount override', () => {
         const fusionAccount: any = {
             type: 'managed',
             needsRefresh: true,
-            needsReset: false,
+            needsReset,
             name: 'neo-1',
             sourceName: 'HR',
             fromIdentity: false,
@@ -536,6 +620,27 @@ describe('AttributeService mainAccount override', () => {
         expect(fusionAccount.attributes.nickname).toBe('Trinity')
     })
 
+    it('does not overwrite fusionIdentityAttribute or fusionDisplayAttribute from mapping', () => {
+        const service = createService()
+        const fusionAccount = createFusionAccount('erp-777')
+
+        service.mapAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBe('fusion-id-1')
+        expect(fusionAccount.attributes.name).toBe('immutable-name')
+        expect(fusionAccount.attributes.nickname).toBe('Trinity')
+    })
+
+    it('allows fusionDisplayAttribute change on reset', () => {
+        const service = createService()
+        const fusionAccount = createFusionAccount('erp-777', true)
+
+        service.mapAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBe('fusion-id-1')
+        expect(fusionAccount.attributes.name).toBe('Trinity')
+    })
+
     it('keeps configured source order when mainAccount is missing or invalid', () => {
         const service = createService()
         const missingOverride = createFusionAccount()
@@ -555,5 +660,114 @@ describe('AttributeService mainAccount override', () => {
         await service.refreshNormalAttributes(fusionAccount)
 
         expect(fusionAccount.attributes.primaryFromAccounts).toBe('Trinity')
+    })
+})
+
+describe('AttributeService mainAccount immediate in-pass effect', () => {
+    it('uses newly mapped mainAccount only for subsequent mappings without reordering processing', () => {
+        const config = {
+            attributeMaps: [
+                {
+                    newAttribute: 'nicknameBefore',
+                    existingAttributes: ['preferredName'],
+                    attributeMerge: 'first',
+                },
+                {
+                    newAttribute: 'mainAccount',
+                    existingAttributes: ['preferredAccountId'],
+                    attributeMerge: 'first',
+                },
+                {
+                    newAttribute: 'nicknameAfter',
+                    existingAttributes: ['preferredName'],
+                    attributeMerge: 'first',
+                },
+            ],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }, { name: 'ERP' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            // Keep processing order unchanged: nicknameBefore -> mainAccount -> nicknameAfter
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nicknameBefore', 'mainAccount', 'nicknameAfter']),
+            getSchemaAttributes: jest.fn(() => [
+                { name: 'id' },
+                { name: 'name' },
+                { name: 'nicknameBefore' },
+                { name: 'mainAccount' },
+                { name: 'nicknameAfter' },
+            ]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+        const attributeBag = {
+            current: { id: 'fusion-id-1', name: 'immutable-name' },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([
+                [
+                    'HR',
+                    [
+                        {
+                            preferredName: 'Neo',
+                            _accountId: 'hr-001',
+                            _source: 'HR',
+                        },
+                    ],
+                ],
+                [
+                    'ERP',
+                    [
+                        {
+                            preferredName: 'Trinity',
+                            preferredAccountId: 'erp-777',
+                            _accountId: 'erp-777',
+                            _source: 'ERP',
+                        },
+                    ],
+                ],
+            ]),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'neo-1',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR', 'ERP'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        service.mapAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.nicknameBefore).toBe('Neo')
+        expect(fusionAccount.attributes.mainAccount).toBe('erp-777')
+        expect(fusionAccount.attributes.nicknameAfter).toBe('Trinity')
     })
 })

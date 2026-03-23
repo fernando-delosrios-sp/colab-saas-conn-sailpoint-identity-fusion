@@ -51,6 +51,8 @@ export type FusionDecision = {
     account: FusionDecisionAccount
     newIdentity: boolean
     identityId?: string
+    /** Selected identity display name at decision time (when available). */
+    identityName?: string
     comments: string
     /**
      * Indicates whether the reviewer has finished the decision.

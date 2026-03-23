@@ -11,8 +11,6 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
             },
         ],
         spConnectorInstanceId: 'fusion-id',
-        taskResultRetries: 3,
-        taskResultWait: 1000,
         concurrencyCheckEnabled: true,
         batchCumulativeCount: {},
         attributeMaps: [],
@@ -31,6 +29,12 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         paginateParallel: jest.fn(),
         accountsApi: {
             listAccounts: jest.fn(),
+        },
+        sourcesApi: {
+            importAccounts: jest.fn(),
+        },
+        taskManagementApi: {
+            getTaskStatus: jest.fn(),
         },
     }
 
@@ -78,5 +82,43 @@ describe('SourceService Accounts JMESPath filter', () => {
         expect(() => service.validateAccountJmespathFilters()).toThrow(
             'Invalid Accounts JMESPath filter for source "HR Source"'
         )
+    })
+})
+
+describe('SourceService per-source aggregation polling', () => {
+    it('uses per-source retries and wait for before aggregation polling', async () => {
+        const { service, client } = createService({
+            aggregationMode: 'before',
+            taskResultRetries: 2,
+            taskResultWait: 0,
+        })
+
+        client.sourcesApi.importAccounts.mockResolvedValue({
+            data: { task: { id: 'task-1' } },
+        })
+        client.taskManagementApi.getTaskStatus.mockResolvedValue({
+            data: { completed: false, completionStatus: 'IN_PROGRESS' },
+        })
+
+        await (service as any).aggregateManagedSource('managed-source-id', false, true)
+
+        expect(client.taskManagementApi.getTaskStatus).toHaveBeenCalledTimes(1)
+        expect((service as any).log.warn).toHaveBeenCalledWith(expect.stringContaining('pollWaitMs=0'))
+        expect((service as any).log.warn).toHaveBeenCalledWith(expect.stringContaining('maxPolls=1'))
+    })
+})
+
+describe('SourceService fetchManagedAccount source scoping', () => {
+    it('ignores account IDs that resolve to non-configured managed sources', async () => {
+        const { service } = createService()
+        jest.spyOn(service as any, 'fetchAccountById').mockResolvedValue({
+            id: 'acct-1',
+            sourceName: 'Some Other Source',
+        } as any)
+
+        await service.fetchManagedAccount('acct-1')
+
+        expect(service.managedAccountsById.size).toBe(0)
+        expect(service.managedAccountsAllById.size).toBe(0)
     })
 })

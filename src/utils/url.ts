@@ -101,6 +101,19 @@ export function buildAccountUrl(uiOrigin: string | undefined, accountId: string 
     return `${uiOrigin}/ui/a/admin/accounts/${encodedId}`
 }
 
+/**
+ * Builds a URL to a human account in Accounts Management in the ISC UI.
+ */
+export function buildHumanAccountManagementUrl(
+    uiOrigin: string | undefined,
+    accountId: string | undefined
+): string | undefined {
+    if (!uiOrigin || !accountId) return undefined
+
+    const encodedId = encodeURIComponent(accountId)
+    return `${uiOrigin}/ui/a/admin/accounts-management/human-accounts/${encodedId}`
+}
+
 // ============================================================================
 // Workflow URL Builders
 // ============================================================================
@@ -180,6 +193,7 @@ export interface UrlContext {
     source: (id: string | undefined) => string | undefined
     sourceAccounts: (id: string | undefined) => string | undefined
     account: (id: string | undefined) => string | undefined
+    humanAccount: (id: string | undefined) => string | undefined
     workflow: (id: string | undefined) => string | undefined
     form: (id: string | undefined) => string | undefined
 }
@@ -194,6 +208,7 @@ export function createUrlContext(baseUrl: string | undefined): UrlContext {
         source: (id) => buildSourceUrl(uiOrigin, id),
         sourceAccounts: (id) => buildSourceAccountsUrl(uiOrigin, id),
         account: (id) => buildAccountUrl(uiOrigin, id),
+        humanAccount: (id) => buildHumanAccountManagementUrl(uiOrigin, id),
         workflow: (id) => buildWorkflowUrl(uiOrigin, id),
         form: (id) => buildFormDefinitionUrl(uiOrigin, id),
     }
