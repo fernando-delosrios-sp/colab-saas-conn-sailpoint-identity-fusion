@@ -20,7 +20,6 @@ import {
     CorrelationConfigV2025,
     AttributeDefinitionV2025,
     AttributeDefinitionTypeV2025,
-    AccountsV2025ApiDisableAccountRequest,
 } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { BaseConfig, FusionConfig, SourceConfig } from '../../model/config'
@@ -392,16 +391,50 @@ export class SourceService {
      * Uses low queue priority to avoid starving higher-priority work.
      */
     public async fireDisableAccount(accountId: string): Promise<void> {
-        const { accountsApi } = this.client
+        const accessToken = await this.resolveApiAccessToken()
+        const tenantBaseUrl = this.config.baseurl.replace(/\/+$/, '')
+        const apiBaseUrl = tenantBaseUrl.endsWith('/v2025') ? tenantBaseUrl : `${tenantBaseUrl}/v2025`
+        const url = `${apiBaseUrl}/accounts/${encodeURIComponent(accountId)}/disable`
+
         this.log.info(`Disabling account ${accountId} with low priority`)
         await this.client.execute(
-            () =>
-                accountsApi.disableAccount({
-                    id: accountId
-                } as AccountsV2025ApiDisableAccountRequest),
+            async () => {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                })
+
+                if (!response.ok) {
+                    const responseBody = await response.text()
+                    throw new Error(`HTTP ${response.status} ${response.statusText} - ${responseBody}`)
+                }
+            },
             QueuePriority.LOW,
             'SourceService>fireDisableAccount'
         )
+    }
+
+    private async resolveApiAccessToken(): Promise<string> {
+        const accessTokenResolver = this.client.config.accessToken
+        assert(accessTokenResolver, 'Client access token resolver is not configured')
+
+        if (typeof accessTokenResolver === 'string') {
+            return accessTokenResolver
+        }
+
+        if (typeof accessTokenResolver === 'function') {
+            const token = await accessTokenResolver(undefined, [])
+            assert(token, 'Failed to resolve API access token')
+            return token
+        }
+
+        const token = await accessTokenResolver
+        assert(token, 'Failed to resolve API access token')
+        return token
     }
 
     // ------------------------------------------------------------------------

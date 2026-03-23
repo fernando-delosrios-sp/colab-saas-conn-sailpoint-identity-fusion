@@ -74,6 +74,10 @@ export type FusionReportDecision = {
     decisionLabel: string
     /** Selected identity ID for assignment decisions */
     selectedIdentityId?: string
+    /** Selected identity display name for assignment decisions */
+    selectedIdentityName?: string
+    /** Direct URL to the selected identity in the ISC UI */
+    selectedIdentityUrl?: string
     /** Optional reviewer comments */
     comments?: string
     /** Standalone form URL for traceability */

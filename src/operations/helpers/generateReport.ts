@@ -3,9 +3,14 @@ import { FusionAccount } from '../../model/account'
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { AggregationStats, FusionReportDecision, FusionReportStats } from '../../services/fusionService/types'
 import { FusionDecision } from '../../model/form'
+import { createUrlContext } from '../../utils/url'
 
-const toReportDecision = (decision: FusionDecision): FusionReportDecision => {
-    const sourceType = decision.sourceType ?? 'authoritative'
+const toReportDecision = (
+    decision: FusionDecision,
+    resolveSourceType?: (sourceName?: string) => 'authoritative' | 'record' | 'orphan' | undefined,
+    resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string }
+): FusionReportDecision => {
+    const sourceType = decision.sourceType ?? resolveSourceType?.(decision.account.sourceName) ?? 'authoritative'
     const isNoMatchSource = sourceType === 'record' || sourceType === 'orphan'
     const decisionType = decision.newIdentity
         ? isNoMatchSource
@@ -20,6 +25,8 @@ const toReportDecision = (decision: FusionDecision): FusionReportDecision => {
               ? 'Created new identity'
               : 'Confirmed no match'
 
+    const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
+
     return {
         reviewerId: decision.submitter.id,
         reviewerName: decision.submitter.name || decision.submitter.id,
@@ -31,6 +38,8 @@ const toReportDecision = (decision: FusionDecision): FusionReportDecision => {
         decision: decisionType,
         decisionLabel,
         selectedIdentityId: decision.identityId || undefined,
+        selectedIdentityName: selectedIdentityContext.selectedIdentityName,
+        selectedIdentityUrl: selectedIdentityContext.selectedIdentityUrl,
         comments: decision.comments || undefined,
         formUrl: decision.formUrl || undefined,
     }
@@ -73,7 +82,23 @@ export const generateReport = async (
 
     let stats: FusionReportStats | undefined
     const finishedDecisions = forms.finishedFusionDecisions
-    const reportDecisions = finishedDecisions.map(toReportDecision)
+    const urlContext = createUrlContext(serviceRegistry.config.baseurl)
+    const resolveSourceType = (sourceName?: string): 'authoritative' | 'record' | 'orphan' | undefined =>
+        sourceName ? sources.getSourceByName(sourceName)?.sourceType : undefined
+    const resolveIdentityContext = (
+        identityId?: string
+    ): { selectedIdentityName?: string; selectedIdentityUrl?: string } => {
+        if (!identityId) return {}
+        const identity = identities.getIdentityById(identityId)
+        const selectedIdentityName = identity?.displayName || identity?.name || identityId
+        return {
+            selectedIdentityName,
+            selectedIdentityUrl: urlContext.identity(identityId),
+        }
+    }
+    const reportDecisions = finishedDecisions.map((decision) =>
+        toReportDecision(decision, resolveSourceType, resolveIdentityContext)
+    )
     if (aggregationStats) {
         const issueSummary = serviceRegistry.log.getAggregationIssueSummary()
         const decisions = finishedDecisions

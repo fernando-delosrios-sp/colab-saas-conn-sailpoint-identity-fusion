@@ -170,7 +170,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
 <body style="font-family: Arial, sans-serif; color: #1f2937; margin: 0; padding: 20px; background: #f7f9fc;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 920px; margin: 0 auto; background: #ffffff; border: 1px solid #e6ebf5; border-radius: 12px; box-shadow: 0 8px 20px rgba(16,24,40,0.08);">
     <tr>
-      <td style="padding: 20px 22px;">
+      <td style="padding: 14px 14px;">
         <h1 style="margin: 0; color: #0b5cab; font-size: 24px;">Identity Fusion Report</h1>
 
         {{#if stats}}
@@ -268,19 +268,19 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                   {{#if selectedIdentityId}}
                   <tr>
                     <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Selected Identity</td>
-                    <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{selectedIdentityId}}</td>
+                    <td style="padding:3px 0; font-size:12px; color:#0f172a;">
+                      {{#if selectedIdentityUrl}}
+                      <a href="{{selectedIdentityUrl}}" style="color:#0b5cab; text-decoration:underline;">{{selectedIdentityName}}</a>
+                      {{else}}
+                      {{selectedIdentityName}}
+                      {{/if}}
+                    </td>
                   </tr>
                   {{/if}}
                   {{#if comments}}
                   <tr>
                     <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Comments</td>
                     <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{comments}}</td>
-                  </tr>
-                  {{/if}}
-                  {{#if formUrl}}
-                  <tr>
-                    <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Form</td>
-                    <td style="padding:3px 0; font-size:12px; color:#0f172a;"><a href="{{formUrl}}" style="color:#0b5cab; text-decoration:underline;">Open form</a></td>
                   </tr>
                   {{/if}}
                 </table>
@@ -297,11 +297,11 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
         {{#if accounts}}
           <div style="margin-top: 18px; font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">New Fusion Reviews</div>
           {{#each accounts}}
-          <div style="margin-top: 18px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 14px;">
+          <div style="margin-top: 14px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 12px;">
             <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate; border-spacing:0; width:auto; min-width:100%;">
                 <tr>
-                  <td style="width:300px; min-width:300px; max-width:300px; vertical-align:top; padding-right:14px; border-right:1px solid #eef2f7;">
+                  <td style="width:270px; min-width:270px; max-width:270px; vertical-align:top; padding-right:10px; border-right:1px solid #eef2f7;">
                     <div style="color:#0b5cab; font-size:18px; font-weight:800; margin:0 0 6px 0;">{{accountName}}</div>
                     <div style="font-size:12px; color:#5f6b7a; margin-bottom:10px;">
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
@@ -326,10 +326,10 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
 
                     {{#if accountAttributes}}
                     <div style="color:#0b5cab; font-size:12px; font-weight:900; letter-spacing:0.35px; text-transform:uppercase; margin:12px 0 8px 0;">Attributes</div>
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse; table-layout:auto;">
                       {{#each accountAttributes}}
                       <tr>
-                        <td style="padding:6px 8px; font-size:12px; color:#5f6b7a; font-weight:700; border:1px solid #eef2f7; background:#f8fbff; width:40%;">{{@key}}</td>
+                        <td style="padding:6px 8px; font-size:12px; color:#5f6b7a; font-weight:700; border:1px solid #eef2f7; background:#f8fbff; width:1%; max-width:30%; white-space:normal; word-break:break-word; overflow-wrap:anywhere;">{{@key}}</td>
                         <td style="padding:6px 8px; font-size:12px; color:#0f172a; border:1px solid #eef2f7; word-break:break-word; overflow-wrap:anywhere;">{{formatAttribute this}}</td>
                       </tr>
                       {{/each}}
@@ -354,8 +354,8 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-bottom:12px;">
                         <tr>
                         {{#each matches}}
-                        <td valign="top" width="280" style="width:280px; vertical-align:top; padding:6px;">
-                          <table role="presentation" width="280" cellpadding="0" cellspacing="0" border="0" style="width:280px; border-collapse:collapse;">
+                        <td valign="top" style="width:auto; min-width:240px; max-width:320px; vertical-align:top; padding:4px;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse; table-layout:auto;">
                             <tr>
                               <td colspan="4" style="padding:6px 8px;">
                                 <div style="font-size:14px; font-weight:800; color:#0b5cab; line-height:1.3; word-wrap:break-word;">
@@ -369,17 +369,17 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                             </tr>
                             {{#if scores}}
                             <tr>
-                              <th width="90" style="width:90px; text-align:left; padding:6px 4px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Attribute</th>
-                              <th width="110" style="width:110px; text-align:left; padding:6px 4px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Algorithm</th>
-                              <th width="40" style="width:40px; text-align:right; padding:6px 4px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Score</th>
-                              <th width="40" style="width:40px; text-align:right; padding:6px 4px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Threshold</th>
+                              <th style="text-align:left; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Attribute</th>
+                              <th style="text-align:left; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Algorithm</th>
+                              <th style="width:1%; white-space:nowrap; text-align:right; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Score</th>
+                              <th style="width:1%; white-space:nowrap; text-align:right; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Threshold</th>
                             </tr>
                             {{#each scores}}
                             <tr style="background:{{#if (isAverageScoreRow attribute algorithm)}}#e0f2fe{{else}}{{#if isMatch}}#f0fdf4{{else}}#fef2f2{{/if}}{{/if}};">
-                              <td width="90" style="width:90px; padding:6px 4px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{attribute}}</td>
-                              <td width="110" style="width:110px; padding:6px 4px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{algorithmLabel algorithm}}</td>
-                              <td width="40" style="width:40px; padding:6px 4px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-weight:900; font-size:10px;">{{formatPercent score}}%</td>
-                              <td width="40" style="width:40px; padding:6px 4px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{formatPercent fusionScore}}%</td>
+                              <td style="padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{attribute}}</td>
+                              <td style="padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{algorithmLabel algorithm}}</td>
+                              <td style="width:1%; white-space:nowrap; padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-weight:900; font-size:10px;">{{formatPercent score}}%</td>
+                              <td style="width:1%; white-space:nowrap; padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{formatPercent fusionScore}}%</td>
                             </tr>
                             {{/each}}
                             {{/if}}
@@ -447,7 +447,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                         <td style="padding:12px 0;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #e6ebf5; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.12);">
                                 <tr>
-                                    <td style="padding:20px;">
+                                    <td style="padding:14px;">
                                         <div style="padding-bottom:18px; margin-bottom:22px; border-bottom:1px solid #e6ebf5;">
                                             <div style="margin-bottom:12px;">
                                                 <h1 style="margin:0; color:#0b5cab; font-size:26px; letter-spacing:-0.2px;">Identity Fusion Review Required</h1>
@@ -474,12 +474,12 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                         </div>
 
                                         {{#each accounts}}
-                                        <div style="margin-bottom:28px; border:1px solid #e6ebf5; border-radius:14px; padding:18px; background:#ffffff; box-shadow:0 10px 24px rgba(16,24,40,0.08);">
+                                        <div style="margin-bottom:20px; border:1px solid #e6ebf5; border-radius:14px; padding:12px; background:#ffffff; box-shadow:0 10px 24px rgba(16,24,40,0.08);">
                                             <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
                                                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; width:auto; min-width:100%;">
                                                     <tr>
                                                     <!-- Left: candidate account summary -->
-                                                    <td class="main-col" valign="top" style="width:300px; min-width:300px; max-width:300px; vertical-align:top; padding:8px; border-right:1px solid #eef2f7;">
+                                                    <td class="main-col" valign="top" style="width:270px; min-width:270px; max-width:270px; vertical-align:top; padding:8px 6px; border-right:1px solid #eef2f7;">
                                                         <div style="color:#0b5cab; font-size:18px; font-weight:800; margin:0 0 6px 0;">{{accountName}}</div>
                                                         <div style="font-size:12px; color:#5f6b7a; margin-bottom:10px;">
                                                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
@@ -504,10 +504,10 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
 
                                                         {{#if accountAttributes}}
                                                         <div style="color:#0b5cab; font-size:12px; font-weight:900; letter-spacing:0.35px; text-transform:uppercase; margin:12px 0 8px 0;">Attributes</div>
-                                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
+                                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse; table-layout:auto;">
                                                             {{#each accountAttributes}}
                                                             <tr>
-                                                                <td style="padding:6px 8px; font-size:12px; color:#5f6b7a; font-weight:700; border:1px solid #eef2f7; background:#f8fbff; width:40%;">{{@key}}</td>
+                                                                <td style="padding:6px 8px; font-size:12px; color:#5f6b7a; font-weight:700; border:1px solid #eef2f7; background:#f8fbff; width:1%; max-width:30%; white-space:normal; word-break:break-word; overflow-wrap:anywhere;">{{@key}}</td>
                                                                 <td style="padding:6px 8px; font-size:12px; color:#0f172a; border:1px solid #eef2f7; word-break:break-word; overflow-wrap:anywhere;">{{formatAttribute this}}</td>
                                                             </tr>
                                                             {{/each}}
@@ -528,8 +528,8 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-bottom:12px;">
                                                                 <tr>
                                                                 {{#each matches}}
-                                                                <td valign="top" width="280" style="width:280px; vertical-align:top; padding:4px;">
-                                                                    <table role="presentation" width="280" cellpadding="0" cellspacing="0" border="0" style="width:280px; border-collapse:collapse;">
+                                                                <td valign="top" style="width:auto; min-width:240px; max-width:320px; vertical-align:top; padding:3px;">
+                                                                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse; table-layout:auto;">
                                                                         <tr>
                                                                             <td colspan="4" style="padding:6px 8px;">
                                                                                 <div style="font-size:14px; font-weight:800; color:#0b5cab; line-height:1.3; word-wrap:break-word;">
@@ -543,17 +543,17 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                                         </tr>
                                                                         {{#if scores}}
                                                                         <tr>
-                                                                            <th width="90" style="width:90px; text-align:left; padding:6px 4px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Attribute</th>
-                                                                            <th width="110" style="width:110px; text-align:left; padding:6px 4px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Algorithm</th>
-                                                                            <th width="40" style="width:40px; text-align:right; padding:6px 4px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Score</th>
-                                                                            <th width="40" style="width:40px; text-align:right; padding:6px 4px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Threshold</th>
+                                                                            <th style="text-align:left; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Attribute</th>
+                                                                            <th style="text-align:left; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Algorithm</th>
+                                                                            <th style="width:1%; white-space:nowrap; text-align:right; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Score</th>
+                                                                            <th style="width:1%; white-space:nowrap; text-align:right; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Threshold</th>
                                                                         </tr>
                                                                         {{#each scores}}
                                                                         <tr style="background:{{#if (isAverageScoreRow attribute algorithm)}}#e0f2fe{{else}}{{#if isMatch}}#f0fdf4{{else}}#fef2f2{{/if}}{{/if}};">
-                                                                            <td width="90" style="width:90px; padding:6px 4px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{attribute}}</td>
-                                                                            <td width="110" style="width:110px; padding:6px 4px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{algorithmLabel algorithm}}</td>
-                                                                            <td width="40" style="width:40px; padding:6px 4px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-weight:900; font-size:10px;">{{formatPercent score}}%</td>
-                                                                            <td width="40" style="width:40px; padding:6px 4px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{formatPercent fusionScore}}%</td>
+                                                                            <td style="padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{attribute}}</td>
+                                                                            <td style="padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{algorithmLabel algorithm}}</td>
+                                                                            <td style="width:1%; white-space:nowrap; padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-weight:900; font-size:10px;">{{formatPercent score}}%</td>
+                                                                            <td style="width:1%; white-space:nowrap; padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{formatPercent fusionScore}}%</td>
                                                                         </tr>
                                                                         {{/each}}
                                                                         {{/if}}
@@ -598,7 +598,9 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
 export const compileEmailTemplates = (): Map<string, HandlebarsTemplateDelegate> => {
   const templates = new Map<string, HandlebarsTemplateDelegate>()
 
-  // Always use in-code templates to avoid runtime path issues in ISC packaging.
+  // Runtime source of truth: always use in-code templates to avoid
+  // runtime path issues in ISC packaging. Keep src/services/messagingService/templates/*.hbs
+  // behaviorally in sync as human-readable references.
   templates.set('fusion-report', Handlebars.compile(DEFAULT_FUSION_REPORT_TEMPLATE))
   templates.set('fusion-review', Handlebars.compile(DEFAULT_FUSION_REVIEW_TEMPLATE))
   return templates
@@ -666,6 +668,8 @@ export type FusionReportEmailData = {
     decision: 'assign-existing-identity' | 'create-new-identity' | 'confirm-no-match'
     decisionLabel: string
     selectedIdentityId?: string
+    selectedIdentityName?: string
+    selectedIdentityUrl?: string
     comments?: string
     formUrl?: string
   }>
