@@ -36,6 +36,8 @@ export type FusionReportMatch = {
 export type FusionReportAccount = {
     /** Display name of the source account */
     accountName: string
+    /** Direct URL to the human account in ISC UI */
+    accountUrl?: string
     /** Name of the source the account belongs to */
     accountSource: string
     /** Source processing type (authoritative, record, or orphan) */
@@ -58,12 +60,16 @@ export type FusionReportDecision = {
     reviewerId: string
     /** Reviewer display name */
     reviewerName: string
+    /** Direct URL to reviewer identity in ISC UI */
+    reviewerUrl?: string
     /** Reviewer email (if available) */
     reviewerEmail?: string
     /** Source account ID tied to the review */
     accountId: string
     /** Source account display label */
     accountName: string
+    /** Direct URL to human account in ISC UI */
+    accountUrl?: string
     /** Managed source name */
     accountSource: string
     /** Source processing type (authoritative, record, or orphan) */
@@ -74,6 +80,10 @@ export type FusionReportDecision = {
     decisionLabel: string
     /** Selected identity ID for assignment decisions */
     selectedIdentityId?: string
+    /** Selected identity display name for assignment decisions */
+    selectedIdentityName?: string
+    /** Direct URL to the selected identity in the ISC UI */
+    selectedIdentityUrl?: string
     /** Optional reviewer comments */
     comments?: string
     /** Standalone form URL for traceability */

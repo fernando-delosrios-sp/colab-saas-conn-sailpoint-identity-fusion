@@ -10,7 +10,8 @@
         "std:account:create",
         "std:account:update",
         "std:account:discover-schema",
-        "std:entitlement:list"
+        "std:entitlement:list",
+        "custom:report"
     ],
     "supportsCustomSchemas": true,
     "showDebugLoggingOption": true,
@@ -28,8 +29,6 @@
         "maxRetries": 20,
         "requestsPerSecond": 8,
         "maxConcurrentRequests": 10,
-        "taskResultRetries": 5,
-        "taskResultWait": 1,
         "processingWait": 60,
         "retryDelay": 1000,
         "batchSize": 250,
@@ -47,6 +46,7 @@
         "trim": false,
         "force": false,
         "algorithm": "name-matcher",
+        "skipMatchIfMissing": true,
         "enableBatching": true,
         "enablePriority": true,
         "aggregationMode": "none",
@@ -117,7 +117,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Sources",
-                    "sectionHelpMessage": "<strong>Select the account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Source type:</strong> Choose Authoritative, Record, or Orphan behavior for unmatched accounts.</li><li><strong>Account aggregation:</strong> Choose to aggregate before processing, after a delay, or not at all. Optimized aggregation can be disabled for reverse correlation. Delimited text sources cannot be aggregated.</li><li><strong>Correlation mode:</strong> Choose whether to correlate during processing, set up reverse correlation, or leave accounts uncorrelated.</li><li><strong>Account filter:</strong> Limit which accounts are processed (uses ISC search syntax).</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li><li><strong>Enabled:</strong> Turn off to temporarily exclude this source from processing without removing it.</li></ul><br>Global settings control retries and wait times for aggregation task polling.",
+                    "sectionHelpMessage": "<strong>Select the account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Source type:</strong> Choose Authoritative, Record, or Orphan behavior for unmatched accounts.</li><li><strong>Account aggregation:</strong> Choose to aggregate before processing, after a delay, or not at all. Optimized aggregation can be disabled for reverse correlation. Delimited text sources cannot be aggregated.</li><li><strong>Correlation mode:</strong> Choose whether to correlate during processing, set up reverse correlation, or leave accounts uncorrelated.</li><li><strong>Accounts API filter:</strong> Limit which accounts are fetched from ISC (server-side).</li><li><strong>Accounts JMESPath filter:</strong> Further filter fetched account pages client-side using JMESPath.</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li><li><strong>Enabled:</strong> Turn off to temporarily exclude this source from processing without removing it.</li></ul>",
                     "items": [
                         {
                             "key": "sources",
@@ -185,10 +185,17 @@
                                         },
                                         {
                                             "key": "accountFilter",
-                                            "label": "Account filter",
+                                            "label": "Accounts API filter",
                                             "type": "text",
                                             "required": false,
-                                            "helpKey": "Optionally limit which accounts are processed using a search query. Example: attributes.department:\"Engineering\""
+                                            "helpKey": "Server-side ISC account filter sent to the Accounts API (filters parameter). Use this to reduce records returned from ISC. Reference: https://developer.sailpoint.com/docs/api/v2025/list-accounts"
+                                        },
+                                        {
+                                            "key": "accountJmespathFilter",
+                                            "label": "Accounts JMESPath filter",
+                                            "type": "text",
+                                            "required": false,
+                                            "helpKey": "Client-side JMESPath expression applied after accounts are fetched (page-wise as { accounts: [...] }). The expression must return an array of account objects to keep. Reference: https://jmespath.org/"
                                         },
                                         {
                                             "key": "accountLimit",
@@ -223,6 +230,28 @@
                                                     "value": "delayed"
                                                 }
                                             ]
+                                        },
+                                        {
+                                            "key": "taskResultRetries",
+                                            "label": "Aggregation task result retries",
+                                            "type": "number",
+                                            "required": false,
+                                            "min": "0",
+                                            "value": "5",
+                                            "parentKey": "aggregationMode",
+                                            "parentValue": "before",
+                                            "helpKey": "How many times to check whether an aggregation has finished for this source. Increase if this source takes longer to aggregate. Default: 5"
+                                        },
+                                        {
+                                            "key": "taskResultWait",
+                                            "label": "Aggregation task result wait time (seconds)",
+                                            "type": "number",
+                                            "required": false,
+                                            "min": "0",
+                                            "value": "60",
+                                            "parentKey": "aggregationMode",
+                                            "parentValue": "before",
+                                            "helpKey": "Seconds to wait between aggregation status checks for this source. Default: 60"
                                         },
                                         {
                                             "key": "aggregationDelay",
@@ -302,22 +331,6 @@
                                     ]
                                 }
                             ]
-                        },
-                        {
-                            "key": "taskResultRetries",
-                            "label": "Aggregation task result retries",
-                            "type": "number",
-                            "required": false,
-                            "min": "0",
-                            "helpKey": "How many times to check whether an aggregation has finished. Increase if aggregations take a long time to complete. Default: 5"
-                        },
-                        {
-                            "key": "taskResultWait",
-                            "label": "Aggregation task result wait time (seconds)",
-                            "type": "number",
-                            "required": false,
-                            "min": "0",
-                            "helpKey": "Seconds to wait between each aggregation status check. Default: 1"
                         }
                     ]
                 },
@@ -336,7 +349,7 @@
                         },
                         {
                             "key": "deleteEmpty",
-                            "label": "Delete accounts with no authoritative accounts left?",
+                            "label": "Delete accounts with no managed accounts left?",
                             "type": "toggle",
                             "required": false,
                             "helpKey": "Automatically remove a Fusion account when all of its linked source accounts have been deleted. Useful for cleaning up after users leave the organization"
@@ -704,7 +717,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Matching Settings",
-                    "sectionHelpMessage": "<strong>Configure duplicate identity detection.</strong><br><br><strong>Fusion attribute matches:</strong> Define attributes to compare.<br><ul><li><strong>Algorithm:</strong> Enhanced Name Matcher, Jaro-Winkler, LIG3, Dice, Double Metaphone.</li><li><strong>Score:</strong> Similarity threshold (0-100).</li><li><strong>Mandatory:</strong> Require this match?</li></ul><br><strong>Scoring mode:</strong> Use per-attribute thresholds (default) or single overall average score.<br><strong>Auto-correlate:</strong> Automatically merge precise matches without manual review.",
+                    "sectionHelpMessage": "<strong>Configure duplicate identity detection.</strong><br><br><strong>Fusion attribute matches:</strong> Define attributes to compare.<br><ul><li><strong>Algorithm:</strong> Enhanced Name Matcher, Jaro-Winkler, LIG3, Dice, Double Metaphone.</li><li><strong>Score:</strong> Similarity threshold (0-100).</li><li><strong>Mandatory:</strong> Require this match?</li><li><strong>Skip match if missing:</strong> When enabled (default), this rule is ignored if either value is missing; when disabled, missing values are still scored and counted.</li></ul><br><strong>Scoring mode:</strong> Use per-attribute thresholds (default) or single overall average score.<br><strong>Auto-correlate:</strong> Automatically merge precise matches without manual review.",
                     "items": [
                         {
                             "key": "matchingConfigs",
@@ -785,6 +798,13 @@
                                             "type": "toggle",
                                             "required": false,
                                             "helpKey": "When enabled, this attribute must meet its similarity threshold for a match to be considered. If no attributes are marked as mandatory, all are treated as required"
+                                        },
+                                        {
+                                            "key": "skipMatchIfMissing",
+                                            "label": "Skip match if missing",
+                                            "type": "toggle",
+                                            "required": false,
+                                            "helpKey": "When enabled (default), this rule is skipped if either value is missing (null, undefined, or empty after trimming). When disabled, missing values are still compared and count toward the result."
                                         }
                                     ]
                                 }
@@ -1135,6 +1155,13 @@
             {
                 "name": "sources",
                 "description": "sources",
+                "type": "string",
+                "multi": false,
+                "entitlement": false
+            },
+            {
+                "name": "mainAccount",
+                "description": "Managed account ID evaluated first when present",
                 "type": "string",
                 "multi": false,
                 "entitlement": false

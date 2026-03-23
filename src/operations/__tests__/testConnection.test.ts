@@ -28,6 +28,7 @@ describe('testConnection', () => {
         await testConnection(registry, {})
 
         expect(sources.fetchAllSources).toHaveBeenCalledTimes(1)
+        expect(sources.validateAccountJmespathFilters).toHaveBeenCalledTimes(1)
         expect(schemas.getManagedSourceSchemaAttributeNames).toHaveBeenCalledTimes(1)
         expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledTimes(1)
         expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledWith(reverseSource, expect.any(Set))
@@ -39,7 +40,21 @@ describe('testConnection', () => {
         await testConnection(registry, {})
 
         expect(sources.fetchAllSources).toHaveBeenCalledTimes(1)
+        expect(sources.validateAccountJmespathFilters).toHaveBeenCalledTimes(1)
         expect(schemas.getManagedSourceSchemaAttributeNames).not.toHaveBeenCalled()
         expect(sources.ensureReverseCorrelationSetup).not.toHaveBeenCalled()
+    })
+
+    it('fails test connection when Accounts JMESPath filter validation fails', async () => {
+        const { registry, sources } = createMockRegistry([{ name: 'AD', correlationMode: 'none' }])
+        sources.validateAccountJmespathFilters.mockImplementation(() => {
+            throw new Error('Invalid expression')
+        })
+
+        await testConnection(registry, {})
+        expect(sources.fetchAllSources).toHaveBeenCalledTimes(1)
+        expect(sources.validateAccountJmespathFilters).toHaveBeenCalledTimes(1)
+        expect(registry.log.crash).toHaveBeenCalledTimes(1)
+        expect(registry.log.crash).toHaveBeenCalledWith('Failed to test connection', expect.any(Error))
     })
 })

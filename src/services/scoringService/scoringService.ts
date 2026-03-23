@@ -70,12 +70,20 @@ export class ScoringService {
         const fullRun = this.reportMode || this.fusionUseAverageScore
         const scores: ScoreReport[] = []
         let isMatch = false
+        let hasFailedMandatory = false
 
         for (const matching of this.matchingConfigs) {
             const accountAttribute = fusionAccount.attributes[matching.attribute]
             const identityAttribute = fusionIdentity.attributes[matching.attribute]
-            const hasValues = accountAttribute && identityAttribute
-            if (hasValues || matching.mandatory) {
+            const skipMatchIfMissing = matching.skipMatchIfMissing ?? true
+            const hasMissingValue =
+                this.isMissingMatchValue(accountAttribute) || this.isMissingMatchValue(identityAttribute)
+
+            if (skipMatchIfMissing && hasMissingValue) {
+                continue
+            }
+
+            if (!hasMissingValue || matching.mandatory || !skipMatchIfMissing) {
                 const scoreReport: ScoreReport = this.scoreAttribute(
                     (accountAttribute ?? '').toString(),
                     (identityAttribute ?? '').toString(),
@@ -84,14 +92,18 @@ export class ScoringService {
                 if (!scoreReport.isMatch && matching.mandatory && !fullRun) {
                     return
                 }
+                if (matching.mandatory && !scoreReport.isMatch) {
+                    hasFailedMandatory = true
+                }
                 isMatch = isMatch || scoreReport.isMatch
                 scores.push(scoreReport)
             }
         }
 
         if (this.fusionUseAverageScore) {
-            const score = scores.reduce((acc, score) => acc + score.score, 0) / scores.length
-            const match = score >= this.fusionAverageScore
+            const hasScoredAttributes = scores.length > 0
+            const score = hasScoredAttributes ? scores.reduce((acc, score) => acc + score.score, 0) / scores.length : 0
+            const match = hasScoredAttributes && score >= this.fusionAverageScore && !hasFailedMandatory
 
             const scoreReport: ScoreReport = {
                 attribute: 'Average Score',
@@ -100,28 +112,39 @@ export class ScoringService {
                 mandatory: true,
                 score,
                 isMatch: match,
-                comment: match ? 'Average score is above threshold' : 'Average score is below threshold',
+                comment: match
+                    ? 'Average score is above threshold'
+                    : hasFailedMandatory
+                    ? 'Average score invalidated by failed mandatory attribute'
+                    : 'Average score is below threshold',
             }
             scores.push(scoreReport)
             isMatch = match
         } else {
-            let hasMandatory = false
-            let hasFailedMatch = false
-            for (const score of scores) {
-                if (score.mandatory) {
-                    hasMandatory = true
+            if (scores.length === 0) {
+                isMatch = false
+            } else {
+                let hasMandatory = false
+                let allScoresMatch = true
+                for (const score of scores) {
+                    if (score.mandatory) {
+                        hasMandatory = true
+                    }
+                    if (!score.isMatch) {
+                        allScoresMatch = false
+                    }
+                    if (score.mandatory && !score.isMatch) {
+                        hasFailedMandatory = true
+                        break
+                    }
                 }
-                if (!score.isMatch) {
-                    hasFailedMatch = true
+                if (hasFailedMandatory) {
+                    isMatch = false
+                } else if (hasMandatory) {
+                    isMatch = true
+                } else if (allScoresMatch) {
+                    isMatch = true
                 }
-                if (score.mandatory && !score.isMatch) {
-                    break
-                }
-            }
-            if (hasMandatory) {
-                isMatch = true
-            } else if (!hasFailedMatch) {
-                isMatch = true
             }
         }
 
@@ -186,5 +209,13 @@ export class ScoringService {
                 this.log.crash('Custom algorithm not implemented')
         }
         return { ...matchingConfig, score: 0, isMatch: false }
+    }
+
+    /**
+     * Match values are considered missing when null/undefined, or when their string
+     * representation is empty after trimming whitespace.
+     */
+    private isMissingMatchValue(value: unknown): boolean {
+        return value === null || value === undefined || String(value).trim().length === 0
     }
 }

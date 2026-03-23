@@ -30,6 +30,7 @@ import { wrapConnectorError } from '../../utils/error'
 import { getDateFromISOString } from '../../utils/date'
 import { buildSourceConfigPatch } from './helpers'
 import { SourceInfo } from './types'
+import { CompiledAccountJmespathFilter, compileAccountJmespathFilter } from './accountJmespathFilter'
 
 // ============================================================================
 // SourceService Class
@@ -98,9 +99,8 @@ export class SourceService {
     private readonly config: FusionConfig
     private readonly sources: SourceConfig[]
     private readonly spConnectorInstanceId: string
-    private readonly taskResultRetries: number
-    private readonly taskResultWait: number
     private readonly concurrencyCheckEnabled: boolean
+    private readonly accountJmespathFiltersBySourceName: Map<string, CompiledAccountJmespathFilter> = new Map()
 
     // Sources configured for batch mode (`accountLimit` defined)
     private readonly batchLimitedSourceNames: Set<string>
@@ -124,8 +124,6 @@ export class SourceService {
         this.config = config
         this.sources = config.sources
         this.spConnectorInstanceId = config.spConnectorInstanceId
-        this.taskResultRetries = config.taskResultRetries
-        this.taskResultWait = config.taskResultWait
         this.concurrencyCheckEnabled = config.concurrencyCheckEnabled
         this.batchLimitedSourceNames = new Set(
             this.sources
@@ -161,6 +159,9 @@ export class SourceService {
      */
     public get managedSources(): SourceInfo[] {
         assert(this._allSources, 'Sources have not been loaded')
+        if (!this._fusionSourceId) {
+            return this._allSources
+        }
         return this._allSources.filter((s) => s.id !== this.fusionSourceId)
     }
 
@@ -218,6 +219,13 @@ export class SourceService {
         return this.fusionAccountsByNativeIdentity?.size ?? 0
     }
 
+    /**
+     * Whether a Fusion source has been discovered for this run.
+     */
+    public get hasFusionSource(): boolean {
+        return !!this._fusionSourceId
+    }
+
     // ------------------------------------------------------------------------
     // Public Source Fetch Methods
     // ------------------------------------------------------------------------
@@ -225,7 +233,7 @@ export class SourceService {
     /**
      * Fetch all sources (managed and fusion) and cache them
      */
-    public async fetchAllSources(): Promise<void> {
+    public async fetchAllSources(requireFusionSource = true): Promise<void> {
         this.log.debug('Fetching all sources')
         const { sourcesApi } = this.client
 
@@ -268,35 +276,48 @@ export class SourceService {
         const fusionSource = apiSources.find(
             (x) => (x.connectorAttributes as BaseConfig).spConnectorInstanceId === this.spConnectorInstanceId
         )
-        assert(
-            fusionSource,
-            'Fusion source not found. The connector instance could not locate its own source in ISC. Verify the connector is properly deployed.'
-        )
-        assert(
-            fusionSource.owner,
-            'Fusion source owner not found. The fusion source must have an owner configured in ISC.'
-        )
-        this._fusionSourceId = fusionSource.id!
-        this._fusionSourceOwner = {
-            id: fusionSource.owner.id!,
-            type: 'IDENTITY',
-        }
+        if (fusionSource) {
+            assert(
+                fusionSource.owner,
+                'Fusion source owner not found. The fusion source must have an owner configured in ISC.'
+            )
+            this._fusionSourceId = fusionSource.id!
+            this._fusionSourceOwner = {
+                id: fusionSource.owner.id!,
+                type: 'IDENTITY',
+            }
 
-        resolvedSources.push({
-            id: fusionSource.id!,
-            name: fusionSource.name!,
-            isManaged: false,
-            sourceType: 'authoritative',
-            config: undefined,
-            owner: this._fusionSourceOwner,
-        })
+            resolvedSources.push({
+                id: fusionSource.id!,
+                name: fusionSource.name!,
+                isManaged: false,
+                sourceType: 'authoritative',
+                config: undefined,
+                owner: this._fusionSourceOwner,
+            })
+        } else if (requireFusionSource) {
+            assert(
+                fusionSource,
+                'Fusion source not found. The connector instance could not locate its own source in ISC. Verify the connector is properly deployed.'
+            )
+        } else {
+            this._fusionSourceId = undefined
+            this._fusionSourceOwner = undefined
+            this.log.warn(
+                'Fusion source not found for this run. Continuing with managed sources only (custom report mode).'
+            )
+        }
 
         this._allSources = resolvedSources
         this.sourcesById = new Map(resolvedSources.map((x) => [x.id, x]))
         this.sourcesByName = new Map(resolvedSources.map((x) => [x.name, x]))
 
         const managedCount = resolvedSources.filter((s) => s.isManaged).length
-        this.log.debug(`Found ${managedCount} managed source(s) and fusion source: ${fusionSource.name}`)
+        if (fusionSource) {
+            this.log.debug(`Found ${managedCount} managed source(s) and fusion source: ${fusionSource.name}`)
+        } else {
+            this.log.debug(`Found ${managedCount} managed source(s); no fusion source resolved`)
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -352,21 +373,64 @@ export class SourceService {
     }
 
     /**
+     * Compile/validate configured Accounts JMESPath filters for managed sources.
+     * Throws ConnectorError when any expression is invalid.
+     */
+    public validateAccountJmespathFilters(): void {
+        for (const source of this.managedSources) {
+            this.getCompiledAccountJmespathFilter(source)
+        }
+    }
+
+    /**
      * Disable an ISC account by its ID and wait for completion.
      * Uses low queue priority to avoid starving higher-priority work.
      */
     public async fireDisableAccount(accountId: string): Promise<void> {
-        const { accountsApi } = this.client
+        const accessToken = await this.resolveApiAccessToken()
+        const tenantBaseUrl = this.config.baseurl.replace(/\/+$/, '')
+        const apiBaseUrl = tenantBaseUrl.endsWith('/v2025') ? tenantBaseUrl : `${tenantBaseUrl}/v2025`
+        const url = `${apiBaseUrl}/accounts/${encodeURIComponent(accountId)}/disable`
+
         this.log.info(`Disabling account ${accountId} with low priority`)
         await this.client.execute(
-            () =>
-                accountsApi.disableAccount({
-                    id: accountId,
-                    accountToggleRequestV2025: {},
-                }),
+            async () => {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                })
+
+                if (!response.ok) {
+                    const responseBody = await response.text()
+                    throw new Error(`HTTP ${response.status} ${response.statusText} - ${responseBody}`)
+                }
+            },
             QueuePriority.LOW,
             'SourceService>fireDisableAccount'
         )
+    }
+
+    private async resolveApiAccessToken(): Promise<string> {
+        const accessTokenResolver = this.client.config.accessToken
+        assert(accessTokenResolver, 'Client access token resolver is not configured')
+
+        if (typeof accessTokenResolver === 'string') {
+            return accessTokenResolver
+        }
+
+        if (typeof accessTokenResolver === 'function') {
+            const token = await accessTokenResolver(undefined, [])
+            assert(token, 'Failed to resolve API access token')
+            return token
+        }
+
+        const token = await accessTokenResolver
+        assert(token, 'Failed to resolve API access token')
+        return token
     }
 
     // ------------------------------------------------------------------------
@@ -491,7 +555,8 @@ export class SourceService {
                         abortSignal,
                         undefined
                     )) {
-                        for (const account of batch) {
+                        const filteredBatch = this.applyManagedJmespathFilter(source, batch)
+                        for (const account of filteredBatch) {
                             if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
                             if (this.isMachineManagedAccount(account)) {
                                 discardedMachineCount++
@@ -573,6 +638,20 @@ export class SourceService {
             this.log.warn(`Managed account not found for id: ${id}`)
             return
         }
+        const sourceName = managedAccount.sourceName ?? ''
+        const sourceInfo = this.getSourceByName(sourceName)
+        if (!sourceInfo?.isManaged) {
+            this.log.warn(
+                `Discarded account ${id} from non-configured managed source "${sourceName || 'unknown'}" during single-account fetch`
+            )
+            return
+        }
+        if (!this.matchesManagedJmespathFilter(sourceInfo, managedAccount)) {
+            this.log.warn(
+                `Discarded managed account ${id} for source "${sourceInfo.name}" due to Accounts JMESPath filter during single-account fetch`
+            )
+            return
+        }
         if (this.isMachineManagedAccount(managedAccount)) {
             this.log.warn(`Discarded managed machine account ${id} where isMachine=true`)
             return
@@ -618,6 +697,12 @@ export class SourceService {
             'SourceService>fetchSourceAccountByNativeIdentity'
         )
         const candidate = accounts?.[0]
+        if (sourceInfo.isManaged && candidate && !this.matchesManagedJmespathFilter(sourceInfo, candidate)) {
+            this.log.warn(
+                `Discarded managed account for native identity "${nativeIdentity}" on source "${sourceInfo.name}" due to Accounts JMESPath filter`
+            )
+            return undefined
+        }
         if (sourceInfo.isManaged && candidate && this.isMachineManagedAccount(candidate)) {
             this.log.warn(
                 `Discarded managed machine account for native identity "${nativeIdentity}" on source "${sourceInfo.name}" where isMachine=true`
@@ -1324,6 +1409,53 @@ export class SourceService {
     }
 
     /**
+     * Lazily compile and cache per-source Accounts JMESPath filters.
+     */
+    private getCompiledAccountJmespathFilter(sourceInfo: SourceInfo): CompiledAccountJmespathFilter | undefined {
+        if (!sourceInfo.isManaged) {
+            return undefined
+        }
+
+        const expression = sourceInfo.config?.accountJmespathFilter
+        if (!expression || expression.trim().length === 0) {
+            this.accountJmespathFiltersBySourceName.delete(sourceInfo.name)
+            return undefined
+        }
+
+        const cached = this.accountJmespathFiltersBySourceName.get(sourceInfo.name)
+        if (cached && cached.expression === expression) {
+            return cached
+        }
+
+        const compiled = compileAccountJmespathFilter(sourceInfo.name, expression)
+        if (!compiled) {
+            this.accountJmespathFiltersBySourceName.delete(sourceInfo.name)
+            return undefined
+        }
+
+        this.accountJmespathFiltersBySourceName.set(sourceInfo.name, compiled)
+        return compiled
+    }
+
+    /**
+     * Applies Accounts JMESPath filter on a paginated batch represented as { accounts: [...] }.
+     */
+    private applyManagedJmespathFilter(sourceInfo: SourceInfo, accounts: Account[]): Account[] {
+        const compiled = this.getCompiledAccountJmespathFilter(sourceInfo)
+        if (!compiled) {
+            return accounts
+        }
+        return compiled.filterPage(accounts)
+    }
+
+    private matchesManagedJmespathFilter(sourceInfo: SourceInfo, account: Account): boolean {
+        if (!sourceInfo.isManaged) {
+            return true
+        }
+        return this.applyManagedJmespathFilter(sourceInfo, [account]).length > 0
+    }
+
+    /**
      * Client-side machine account check. This cannot be done via ISC account filters.
      */
     private isMachineManagedAccount(account: Account): boolean {
@@ -1395,7 +1527,8 @@ export class SourceService {
         awaitTaskStatus: boolean = true
     ): Promise<void> {
         let completed = false
-        const sourceName = this.sourcesById.get(id)?.name ?? id
+        const sourceInfo = this.sourcesById.get(id)
+        const sourceName = sourceInfo?.name ?? id
         const { sourcesApi, taskManagementApi } = this.client
         const requestParameters: SourcesV2025ApiImportAccountsRequest = {
             id,
@@ -1425,9 +1558,8 @@ export class SourceService {
             return
         }
 
-        // Use global retry settings for aggregation task polling
-        const taskResultRetries = this.taskResultRetries
-        const taskResultWait = this.taskResultWait
+        const taskResultRetries = sourceInfo?.config?.taskResultRetries ?? 5
+        const taskResultWait = sourceInfo?.config?.taskResultWait ?? 60000
         const taskId = loadAccountsTask?.task?.id
         let pollsExecuted = 0
         let lastTaskStatus: any = undefined

@@ -413,7 +413,7 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
 
         // Hide this candidate's section when new identity is selected OR a different identity is chosen.
         // In ISC custom forms, condition comparison for SEARCH_V2-backed SELECT behaves against the
-        // displayed label value, so compare against candidate displayName.
+        // displayed label value (`attributes.displayName`), same as `resolveIdentitiesSelectLabel` / candidate.name.
         formConditions.push({
             ruleOperator: 'OR',
             rules: [

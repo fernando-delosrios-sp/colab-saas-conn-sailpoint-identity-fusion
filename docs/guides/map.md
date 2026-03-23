@@ -29,6 +29,7 @@ The **Default attribute merge from multiple sources** setting applies globally t
 ![Attribute mapping and merge](../assets/images/attribute-management-mapping-merge.png)
 
 **Source ordering matters:** With "First found", the **order** of sources in **Source Settings → Authoritative account sources** determines precedence. The first source has highest priority.
+If the Fusion attribute `mainAccount` is populated with a valid managed account ID, that specific account is evaluated first as an override; otherwise, default source order is used.
 
 ```
 Example: Source order is [Workday, Active Directory]

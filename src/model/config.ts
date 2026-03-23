@@ -103,6 +103,8 @@ export interface MatchingConfig {
     fusionScore?: number
     /** If true, this rule must pass for the overall match to succeed (unless average scoring is used) */
     mandatory?: boolean
+    /** If true (default), skip this rule when either side is missing (null/undefined/empty after trim). */
+    skipMatchIfMissing?: boolean
 }
 
 // ============================================================================
@@ -139,9 +141,20 @@ export interface SourceConfig {
     sourceType?: SourceType
     disableNonMatchingAccounts?: boolean
     aggregationMode?: 'none' | 'before' | 'delayed'
+    /**
+     * Number of times to poll the aggregation task result for this source
+     * when `aggregationMode` is `before`.
+     */
+    taskResultRetries?: number
+    /**
+     * Wait time (in milliseconds) between aggregation task status polls for
+     * this source when `aggregationMode` is `before`.
+     */
+    taskResultWait?: number
     aggregationDelay?: number
     optimizedAggregation?: boolean
     accountFilter?: string
+    accountJmespathFilter?: string
     accountLimit?: number
     correlationMode?: CorrelationMode
     correlationAttribute?: string
@@ -151,14 +164,6 @@ export interface SourceConfig {
 /** Configuration for all managed sources and aggregation behavior. */
 export interface SourcesSection {
     sources: SourceConfig[]
-    /**
-     * Number of times to poll the aggregation task result when force aggregation is enabled.
-     */
-    taskResultRetries: number
-    /**
-     * Wait time (in milliseconds) between task status polls when force aggregation is enabled.
-     */
-    taskResultWait: number
 }
 
 /** Controls various processing behaviors during aggregation. */

@@ -342,7 +342,8 @@ export class FusionService {
         fusionAccount.addManagedAccountLayer(
             this.sources.managedAccountsById,
             this.sources.managedAccountsByIdentityId,
-            this.sources.managedAccountsAllById
+            this.sources.managedAccountsAllById,
+            this.shouldPruneDeletedManagedAccounts()
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
@@ -553,7 +554,8 @@ export class FusionService {
             fusionAccount.addManagedAccountLayer(
                 this.sources.managedAccountsById,
                 this.sources.managedAccountsByIdentityId,
-                this.sources.managedAccountsAllById
+                this.sources.managedAccountsAllById,
+                this.shouldPruneDeletedManagedAccounts()
             )
 
             this.attributes.mapAttributes(fusionAccount)
@@ -612,7 +614,8 @@ export class FusionService {
         fusionAccount.addManagedAccountLayer(
             this.sources.managedAccountsById,
             this.sources.managedAccountsByIdentityId,
-            this.sources.managedAccountsAllById
+            this.sources.managedAccountsAllById,
+            this.shouldPruneDeletedManagedAccounts()
         )
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)
@@ -907,6 +910,7 @@ export class FusionService {
         const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
         return {
             accountName: this.getReportAccountLabel(fusionAccount),
+            accountUrl: this.urlContext.humanAccount(fusionAccount.managedAccountId),
             accountSource: fusionAccount.sourceName,
             sourceType: sourceInfo?.sourceType ?? 'authoritative',
             accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
@@ -926,6 +930,7 @@ export class FusionService {
             const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
             this.failedMatchingAccounts.push({
                 accountName: this.getReportAccountLabel(fusionAccount),
+                accountUrl: this.urlContext.humanAccount(fusionAccount.managedAccountId),
                 accountSource: fusionAccount.sourceName,
                 sourceType: sourceInfo?.sourceType ?? 'authoritative',
                 accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
@@ -1130,6 +1135,21 @@ export class FusionService {
         }
         this.log.info(`Firing low-priority disable for account: ${account.name} [${account.sourceName}] (${accountId})`)
         await this.sources.fireDisableAccount(accountId)
+    }
+
+    /**
+     * Prune deleted managed-account references only when we have an account-complete view:
+     * - StdAccountList: full managed-source inventory
+     * - Single-account rebuild commands: targeted inventory for the account being rebuilt
+     */
+    private shouldPruneDeletedManagedAccounts(): boolean {
+        return (
+            this.commandType === StandardCommand.StdAccountList ||
+            this.commandType === StandardCommand.StdAccountRead ||
+            this.commandType === StandardCommand.StdAccountUpdate ||
+            this.commandType === StandardCommand.StdAccountEnable ||
+            this.commandType === StandardCommand.StdAccountDisable
+        )
     }
 
     /**
@@ -1383,6 +1403,7 @@ export class FusionService {
                 const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
                 accounts.push({
                     accountName: this.getReportAccountLabel(fusionAccount),
+                    accountUrl: this.urlContext.humanAccount(fusionAccount.managedAccountId),
                     accountSource: fusionAccount.sourceName,
                     sourceType: sourceInfo?.sourceType ?? 'authoritative',
                     accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,

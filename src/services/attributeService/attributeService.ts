@@ -23,6 +23,7 @@ import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
+const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
 
 // ============================================================================
 // AttributeService Class
@@ -180,6 +181,7 @@ export class AttributeService {
         if (fusionAccount.type === 'identity') return
 
         const { attributeBag, needsRefresh } = fusionAccount
+        const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
         const attributes = { ...attributeBag.current }
 
         // Ensure all fusionAccount sources have an entry (default to [] if missing).
@@ -192,17 +194,46 @@ export class AttributeService {
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
             const sourceOrder = this.sourceConfigs.map((sc) => sc.name)
-            const schemaAttributes = this.schemas.listSchemaAttributeNames()
-            for (const attribute of schemaAttributes) {
+            let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
+            const mappingTargets = this.getAttributeMappingTargetNames()
+            for (const attribute of mappingTargets) {
+                const hasExistingValue = isValidAttributeValue(attributeBag.current[attribute])
+                const canResetDisplay = fusionAccount.needsReset && attribute === fusionDisplayAttribute
+                const isImmutableIdentityAttribute = attribute === fusionIdentityAttribute && hasExistingValue
+                const isImmutableDisplayAttribute =
+                    attribute === fusionDisplayAttribute && hasExistingValue && !canResetDisplay
+
+                if (isImmutableIdentityAttribute || isImmutableDisplayAttribute) {
+                    continue
+                }
+
                 if (this.uniqueAttributeNames.has(attribute) && attributeBag.current[attribute] !== undefined) {
                     continue
                 }
 
                 const processingConfig = this.attributeMappingConfig.get(attribute)!
-                const processedValue = processAttributeMapping(processingConfig, sourceAttributeMap, sourceOrder)
-                if (processedValue === undefined) continue
+                const processedValue = processAttributeMapping(
+                    processingConfig,
+                    sourceAttributeMap,
+                    sourceOrder,
+                    prioritizedAccount
+                )
+                if (processedValue === undefined) {
+                    // mainAccount is used as an override context selector; when no supporting
+                    // source value exists anymore, clear stale values so account mapping can update.
+                    if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {
+                        delete attributes[attribute]
+                        prioritizedAccount = undefined
+                    }
+                    continue
+                }
 
                 attributes[attribute] = processedValue
+                if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {
+                    const mainAccountId = String(processedValue).trim()
+                    prioritizedAccount =
+                        mainAccountId.length > 0 ? this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId) : undefined
+                }
                 if (attribute === 'history') {
                     const history = processedValue as string[]
                     if (Array.isArray(history) && history.length > 0) {
@@ -404,12 +435,24 @@ export class AttributeService {
     // Private Configuration Helper Methods
     // ------------------------------------------------------------------------
 
+    /**
+     * Resolve all mapping targets that should be available in attribute-definition context.
+     * Includes schema attributes plus explicit attribute-map targets.
+     */
+    private getAttributeMappingTargetNames(): string[] {
+        const schemaAttributes = this.schemas.listSchemaAttributeNames()
+        const mappedAttributes = (this.attributeMaps ?? [])
+            .map((am) => am.newAttribute)
+            .filter((name): name is string => Boolean(name))
+
+        return Array.from(new Set([...schemaAttributes, ...mappedAttributes]))
+    }
+
     private get attributeMappingConfig(): Map<string, AttributeMappingConfig> {
         if (!this._attributeMappingConfig) {
             this._attributeMappingConfig = new Map()
-            const schemaAttributes = this.schemas.getSchemaAttributes()
-            for (const schemaAttr of schemaAttributes) {
-                const attrName = schemaAttr.name!
+            const mappingTargets = this.getAttributeMappingTargetNames()
+            for (const attrName of mappingTargets) {
                 this._attributeMappingConfig.set(
                     attrName,
                     buildAttributeMappingConfig(attrName, this.attributeMaps, this.attributeMerge)
@@ -544,7 +587,43 @@ export class AttributeService {
             ordered.push(...sourceAccounts)
         }
 
-        return ordered
+        const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
+        if (!mainAccountId) return ordered
+
+        const prioritizedIndex = ordered.findIndex((account) => String(account?._accountId ?? '').trim() === mainAccountId)
+        if (prioritizedIndex <= 0) return ordered
+
+        const prioritizedAccount = ordered[prioritizedIndex]
+        return [prioritizedAccount, ...ordered.slice(0, prioritizedIndex), ...ordered.slice(prioritizedIndex + 1)]
+    }
+
+    private getMainAccountOverrideId(fusionAccount: FusionAccount): string | undefined {
+        const rawValue = fusionAccount.attributeBag.current[MAIN_ACCOUNT_ATTRIBUTE]
+        if (!isValidAttributeValue(rawValue)) return undefined
+        const accountId = String(rawValue).trim()
+        return accountId.length > 0 ? accountId : undefined
+    }
+
+    private getMainAccountContextAccount(
+        fusionAccount: FusionAccount,
+        sourceAttributeMap: Map<string, Record<string, any>[]>
+    ): Record<string, any> | undefined {
+        const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
+        if (!mainAccountId) return undefined
+
+        return this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId)
+    }
+
+    private findAccountByIdInSourceMap(
+        sourceAttributeMap: Map<string, Record<string, any>[]>,
+        accountId: string
+    ): Record<string, any> | undefined {
+        for (const accounts of sourceAttributeMap.values()) {
+            const match = accounts.find((account) => String(account?._accountId ?? '').trim() === accountId)
+            if (match) return match
+        }
+
+        return undefined
     }
 
     // ------------------------------------------------------------------------
@@ -568,8 +647,16 @@ export class AttributeService {
         if (!value) {
             this.log.error(`Failed to evaluate velocity template for attribute ${definition.name}`)
             return undefined
-        } else if (value === definition.expression) {
-            this.log.error(`Velocity template for attribute ${definition.name} returned the same expression`)
+        }
+
+        // Compare to expression without trailing $counter (UniqueAttributeDefinition may auto-append it)
+        const exprWithoutCounter = definition.expression.replace(/\$counter$|\$\{counter\}$/, '')
+        const outputMatchesExpression =
+            value === definition.expression || (exprWithoutCounter !== definition.expression && value === exprWithoutCounter)
+        if (outputMatchesExpression && this.hasVelocityVariableReference(exprWithoutCounter || definition.expression)) {
+            this.log.warn(
+                `Velocity template for attribute ${definition.name} returned unresolved variable expression: ${value}`
+            )
             return undefined
         }
 
@@ -581,6 +668,14 @@ export class AttributeService {
         this.log.debug(`[${accountName}] ${definition.name} = ${value}`)
 
         return value
+    }
+
+    /**
+     * Detect whether an expression references at least one Velocity variable token.
+     * Examples: $name, ${name}. Excludes escaped tokens like \$name.
+     */
+    private hasVelocityVariableReference(expression: string): boolean {
+        return /(^|[^\\])\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)/.test(expression)
     }
 
     /**
@@ -683,11 +778,15 @@ export class AttributeService {
         const counter = StateWrapper.getCounter()
         const digits = definition.digits ?? 1
 
-        // Ensure expression has $counter for disambiguation fallback
+        // Ensure expression has $counter for disambiguation fallback.
+        // Skip auto-append for UUID-based expressions because UUID already
+        // provides uniqueness and appending counter can mutate intent.
         if (
             definition.expression &&
             !definition.expression.includes('$counter') &&
-            !definition.expression.includes('${counter}')
+            !definition.expression.includes('${counter}') &&
+            !definition.expression.includes('$UUID') &&
+            !definition.expression.includes('${UUID}')
         ) {
             definition.expression = `${definition.expression}$counter`
         }
@@ -781,16 +880,25 @@ export class AttributeService {
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
         const needsRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || refresh
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
+        const canResetDisplay = fusionAccount.needsReset && name === fusionDisplayAttribute
 
         if (hasValue && !needsRefresh) return
+
+        if (hasValue && name === fusionIdentityAttribute) {
+            return
+        }
+
+        if (hasValue && name === fusionDisplayAttribute && !canResetDisplay) {
+            return
+        }
 
         if (fusionAccount.isIdentity && name === fusionIdentityAttribute) {
             this.log.warn(`Skipping change of nativeIdentity for account: ${fusionAccount.name}`)
             return
         }
 
-        if (fusionAccount.isIdentity && name === fusionDisplayAttribute) {
-            this.log.warn(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
+        if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
+            this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
             fusionAccount.attributes[name] = fusionAccount.name!
             return
         }
@@ -799,6 +907,11 @@ export class AttributeService {
         if (value !== undefined) {
             fusionAccount.attributes[name] = value
             context[name] = value
+        } else {
+            // Clear attribute when expression fails (e.g. unresolved variables), so we do not
+            // retain a literal template string that may have come from attribute mapping.
+            delete fusionAccount.attributes[name]
+            delete context[name]
         }
     }
 
@@ -827,6 +940,17 @@ export class AttributeService {
         const { name } = definition
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
+        const canResetDisplay = fusionAccount.needsReset && name === fusionDisplayAttribute
+
+        if (hasValue && name === fusionIdentityAttribute) {
+            this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
+            return
+        }
+
+        if (hasValue && name === fusionDisplayAttribute && !canResetDisplay) {
+            this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
+            return
+        }
 
         if (hasValue && !fusionAccount.needsReset) {
             this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
@@ -842,8 +966,8 @@ export class AttributeService {
             return
         }
 
-        if (fusionAccount.isIdentity && name === fusionDisplayAttribute) {
-            this.log.warn(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
+        if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
+            this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
             fusionAccount.attributes[name] = fusionAccount.name!
             return
         }
@@ -852,6 +976,10 @@ export class AttributeService {
         if (value !== undefined) {
             fusionAccount.attributes[name] = value
             context[name] = value
+        } else {
+            // Clear attribute when expression fails (e.g. unresolved variables)
+            delete fusionAccount.attributes[name]
+            delete context[name]
         }
     }
 }

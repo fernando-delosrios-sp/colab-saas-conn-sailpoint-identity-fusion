@@ -56,13 +56,14 @@ export const attrConcat = (list: string[], alreadyProcessed: boolean = false): s
 export const processAttributeMapping = (
     config: AttributeMappingConfig,
     sourceAttributeMap: Map<string, Attributes[]>,
-    sourceOrder: string[]
+    sourceOrder: string[],
+    prioritizedAccount?: Attributes
 ): any => {
     const { attributeMerge } = config
 
     // Handle single-value merge strategies with early return
     if (attributeMerge === 'first' || attributeMerge === 'source') {
-        return processSingleValueMerge(config, sourceAttributeMap, sourceOrder)
+        return processSingleValueMerge(config, sourceAttributeMap, sourceOrder, prioritizedAccount)
     }
 
     // Handle multi-value merge strategies
@@ -76,10 +77,22 @@ export const processAttributeMapping = (
 const processSingleValueMerge = (
     config: AttributeMappingConfig,
     sourceAttributeMap: Map<string, Attributes[]>,
-    sourceOrder: string[]
+    sourceOrder: string[],
+    prioritizedAccount?: Attributes
 ): any => {
     const { sourceAttributes, attributeName, attributeMerge, source: specifiedSource } = config
     const attributeNames = Array.from(new Set([...sourceAttributes, attributeName]))
+    if (prioritizedAccount) {
+        const prioritizedSource = String(prioritizedAccount._source ?? '')
+        const canEvaluatePrioritized =
+            attributeMerge !== 'source' || !specifiedSource || prioritizedSource === specifiedSource
+        if (canEvaluatePrioritized) {
+            const prioritizedValue = findFirstAttributeValue([prioritizedAccount], attributeNames)
+            if (prioritizedValue !== undefined) {
+                return prioritizedValue
+            }
+        }
+    }
 
     for (const sourceName of sourceOrder) {
         // For 'source' merge strategy, only process the specified source

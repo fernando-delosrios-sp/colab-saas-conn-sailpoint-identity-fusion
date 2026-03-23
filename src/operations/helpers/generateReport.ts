@@ -3,9 +3,17 @@ import { FusionAccount } from '../../model/account'
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { AggregationStats, FusionReportDecision, FusionReportStats } from '../../services/fusionService/types'
 import { FusionDecision } from '../../model/form'
+import { createUrlContext } from '../../utils/url'
 
-const toReportDecision = (decision: FusionDecision): FusionReportDecision => {
-    const sourceType = decision.sourceType ?? 'authoritative'
+const toReportDecision = (
+    decision: FusionDecision,
+    resolveSourceType?: (sourceName?: string) => 'authoritative' | 'record' | 'orphan' | undefined,
+    resolveReviewerName?: (reviewerId?: string) => string | undefined,
+    resolveReviewerUrl?: (reviewerId?: string) => string | undefined,
+    resolveAccountUrl?: (accountId?: string) => string | undefined,
+    resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string }
+): FusionReportDecision => {
+    const sourceType = decision.sourceType ?? resolveSourceType?.(decision.account.sourceName) ?? 'authoritative'
     const isNoMatchSource = sourceType === 'record' || sourceType === 'orphan'
     const decisionType = decision.newIdentity
         ? isNoMatchSource
@@ -20,17 +28,25 @@ const toReportDecision = (decision: FusionDecision): FusionReportDecision => {
               ? 'Created new identity'
               : 'Confirmed no match'
 
+    const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
+    const reviewerName = decision.submitter.name || resolveReviewerName?.(decision.submitter.id) || decision.submitter.id
+    const selectedIdentityName = decision.identityName || selectedIdentityContext.selectedIdentityName || decision.identityId
+
     return {
         reviewerId: decision.submitter.id,
-        reviewerName: decision.submitter.name || decision.submitter.id,
+        reviewerName,
+        reviewerUrl: resolveReviewerUrl?.(decision.submitter.id),
         reviewerEmail: decision.submitter.email || undefined,
         accountId: decision.account.id,
         accountName: decision.account.name || decision.account.id,
+        accountUrl: resolveAccountUrl?.(decision.account.id),
         accountSource: decision.account.sourceName || '',
         sourceType,
         decision: decisionType,
         decisionLabel,
         selectedIdentityId: decision.identityId || undefined,
+        selectedIdentityName,
+        selectedIdentityUrl: selectedIdentityContext.selectedIdentityUrl,
         comments: decision.comments || undefined,
         formUrl: decision.formUrl || undefined,
     }
@@ -73,7 +89,39 @@ export const generateReport = async (
 
     let stats: FusionReportStats | undefined
     const finishedDecisions = forms.finishedFusionDecisions
-    const reportDecisions = finishedDecisions.map(toReportDecision)
+    const urlContext = createUrlContext(serviceRegistry.config.baseurl)
+    const resolveSourceType = (sourceName?: string): 'authoritative' | 'record' | 'orphan' | undefined =>
+        sourceName ? sources.getSourceByName(sourceName)?.sourceType : undefined
+    const resolveReviewerName = (reviewerId?: string): string | undefined => {
+        if (!reviewerId) return undefined
+        const reviewer = identities.getIdentityById(reviewerId)
+        return reviewer?.displayName || reviewer?.name || undefined
+    }
+    const resolveReviewerUrl = (reviewerId?: string): string | undefined =>
+        reviewerId ? urlContext.identity(reviewerId) : undefined
+    const resolveAccountUrl = (accountId?: string): string | undefined =>
+        accountId ? urlContext.humanAccount(accountId) : undefined
+    const resolveIdentityContext = (
+        identityId?: string
+    ): { selectedIdentityName?: string; selectedIdentityUrl?: string } => {
+        if (!identityId) return {}
+        const identity = identities.getIdentityById(identityId)
+        const selectedIdentityName = identity?.displayName || identity?.name || identityId
+        return {
+            selectedIdentityName,
+            selectedIdentityUrl: urlContext.identity(identityId),
+        }
+    }
+    const reportDecisions = finishedDecisions.map((decision) =>
+        toReportDecision(
+            decision,
+            resolveSourceType,
+            resolveReviewerName,
+            resolveReviewerUrl,
+            resolveAccountUrl,
+            resolveIdentityContext
+        )
+    )
     if (aggregationStats) {
         const issueSummary = serviceRegistry.log.getAggregationIssueSummary()
         const decisions = finishedDecisions

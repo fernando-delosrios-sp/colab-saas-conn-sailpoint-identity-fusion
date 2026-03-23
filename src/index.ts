@@ -18,6 +18,7 @@ import { accountEnable } from './operations/accountEnable'
 import { accountDisable } from './operations/accountDisable'
 import { entitlementList } from './operations/entitlementList'
 import { accountDiscoverSchema } from './operations/accountDiscoverSchema'
+import { customReport } from './operations/customReport'
 
 type KeepAliveMode = 'memory' | 'simple'
 
@@ -142,6 +143,12 @@ export const connector = async () => {
         .stdAccountDiscoverSchema(
             createHandler('accountDiscoverSchema', accountDiscoverSchema, config, {
                 errorMessage: 'Failed to discover schema',
+            })
+        )
+        .command(
+            'custom:report',
+            createHandler('custom:report', customReport, config, {
+                errorMessage: 'Failed to run custom report',
             })
         )
 }

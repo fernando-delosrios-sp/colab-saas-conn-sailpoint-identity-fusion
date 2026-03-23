@@ -1,5 +1,5 @@
 import { Account, IdentityDocument } from 'sailpoint-api-client'
-import { getDateFromISOString, isNewerThan } from '../utils/date'
+import { isNewerThan } from '../utils/date'
 import { getDisplayName, toSetFromAttribute as attributeToSet } from '../utils/attributes'
 import { FusionDecision } from './form'
 import { FusionConfig, SourceConfig } from './config'
@@ -105,7 +105,7 @@ export class FusionAccount {
     }
 
     // Timestamps
-    private _modified: Date = new Date()
+    private _modified: string = ''
 
     // Read-only configuration (set in constructor)
     private readonly sourceConfigs: SourceConfig[]
@@ -156,7 +156,7 @@ export class FusionAccount {
         collectionKeys?: (typeof FusionAccount.COLLECTION_KEYS)[number][]
         identityId?: string | null
         managedAccountId?: string | null
-        modified?: Date
+        modified?: string
     }): void {
         if (config.type) this._type = config.type
         if (config.name) this._name = config.name
@@ -167,7 +167,7 @@ export class FusionAccount {
         if (config.needsRefresh !== undefined) this._needsRefresh = config.needsRefresh
         if (config.identityId != null) this._identityId = config.identityId
         if (config.managedAccountId != null) this._managedAccountId = config.managedAccountId
-        if (config.modified) this._modified = config.modified
+        if (config.modified !== undefined) this._modified = config.modified
         if (config.sources) {
             this._sources = Array.isArray(config.sources) ? new Set(config.sources) : config.sources
         }
@@ -230,7 +230,7 @@ export class FusionAccount {
             attributes: account.attributes ?? undefined,
             collectionKeys: ['accounts', 'reviews', 'statuses', 'actions'],
             identityId: account.identityId ?? undefined,
-            modified: getDateFromISOString(account.modified),
+            modified: account.modified ?? '',
         })
         // Restore persisted originSource; fallback for legacy accounts without it
         fusionAccount._originSource =
@@ -430,6 +430,22 @@ export class FusionAccount {
         return this._identityId !== undefined
     }
 
+    /**
+     * Whether this fusion account originated from the Identities source.
+     *
+     * Primary source of truth is the internal originSource field. We also fall back
+     * to persisted attribute keys for backwards compatibility with older records.
+     */
+    public get fromIdentity(): boolean {
+        const originFromAttributes = this._attributeBag.current?.originSource
+        const legacyOriginFromAttributes = this._attributeBag.current?.sourceOrigin
+        return (
+            this._originSource === 'Identities' ||
+            originFromAttributes === 'Identities' ||
+            legacyOriginFromAttributes === 'Identities'
+        )
+    }
+
     /** Whether this fusion account is disabled. */
     public get disabled(): boolean {
         return this._disabled
@@ -548,7 +564,7 @@ export class FusionAccount {
     // Accessors - Internal State (for service layer use)
     // ============================================================================
 
-    public get modified(): Date {
+    public get modified(): string {
         return this._modified
     }
 
@@ -995,7 +1011,8 @@ export class FusionAccount {
     public addManagedAccountLayer(
         accountsById: Map<string, Account>,
         accountsByIdentityId: Map<string, Set<string>>,
-        allAccountsById?: Map<string, Account>
+        allAccountsById?: Map<string, Account>,
+        pruneDeletedManagedAccounts = false
     ): void {
         // Phase 1: Identity-based matching via index (O(1) lookup)
         if (this._identityId !== undefined) {
@@ -1033,6 +1050,11 @@ export class FusionAccount {
             }
         }
 
+        // Prune account references that no longer exist in the managed-account inventory.
+        if (pruneDeletedManagedAccounts && allAccountsById) {
+            this.pruneDeletedManagedAccounts(allAccountsById)
+        }
+
         // Preserve source/nativeIdentity context for missing accounts even if they were
         // not claimed from the current work queue (e.g. still missing from previous runs).
         if (allAccountsById) {
@@ -1054,6 +1076,30 @@ export class FusionAccount {
             this._needsRefresh = false
         } else {
             this._statuses.delete('orphan')
+        }
+    }
+
+    /**
+     * Remove stale managed-account references when the account no longer exists.
+     * This keeps accounts/missing-accounts accurate across runs and records cleanup in history.
+     */
+    private pruneDeletedManagedAccounts(allAccountsById: Map<string, Account>): void {
+        const trackedIds = new Set<string>([
+            ...this._accountIds,
+            ...this._missingAccountIds,
+            ...this._previousAccountIds,
+        ])
+
+        for (const accountId of trackedIds) {
+            if (allAccountsById.has(accountId)) continue
+
+            const removedFromAccounts = this._accountIds.delete(accountId)
+            const removedFromMissing = this._missingAccountIds.delete(accountId)
+            if (removedFromAccounts || removedFromMissing) {
+                this.addHistory(`Removed deleted managed account reference: ${accountId}`)
+            }
+            this._previousAccountIds.delete(accountId)
+            this._managedAccountInfo.delete(accountId)
         }
     }
 
@@ -1117,6 +1163,7 @@ export class FusionAccount {
 
             const contextAttributes: Attributes = {
                 ...(account.attributes ?? {}),
+                _accountId: accountId,
                 _source: account.sourceName,
                 // IdentityIQ-style compatibility: true means account is disabled.
                 IIQDisabled: Boolean(account.disabled),

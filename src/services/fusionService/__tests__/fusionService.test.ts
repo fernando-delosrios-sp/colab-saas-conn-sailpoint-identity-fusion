@@ -298,6 +298,60 @@ describe('FusionService', () => {
             expect(result.attributes.reverseNativeIdentity).toBe('native-missing-1')
         })
 
+        it('should remove deleted managed accounts from accounts and missing-accounts history', async () => {
+            const historicalAccount = {
+                nativeIdentity: 'fusion-1',
+                identityId: 'identity-1',
+                name: 'Fusion Account',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {
+                    accounts: ['acct-existing-1', 'acct-deleted-1'],
+                },
+            } as unknown as Account
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+                new Map([
+                    [
+                        'acct-existing-1',
+                        {
+                            id: 'acct-existing-1',
+                            nativeIdentity: 'native-existing-1',
+                            sourceName: 'Source A',
+                            attributes: {},
+                        } as unknown as Account,
+                    ],
+                ])
+            )
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+                new Map([
+                    [
+                        'acct-existing-1',
+                        {
+                            id: 'acct-existing-1',
+                            nativeIdentity: 'native-existing-1',
+                            sourceName: 'Source A',
+                            attributes: {},
+                        } as unknown as Account,
+                    ],
+                ])
+            )
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockAttributes.registerUniqueAttributes.mockResolvedValue()
+
+            const result = await fusionService.processFusionAccount(historicalAccount)
+
+            expect(result.accountIds).toContain('acct-existing-1')
+            expect(result.accountIds).not.toContain('acct-deleted-1')
+            expect(result.missingAccountIds).toContain('acct-existing-1')
+            expect(result.missingAccountIds).not.toContain('acct-deleted-1')
+            expect(result.history).toEqual(
+                expect.arrayContaining([expect.stringContaining('Removed deleted managed account reference: acct-deleted-1')])
+            )
+        })
+
         it('should not clear reverse attribute when missing account source info is unresolved', async () => {
             ;(fusionService as any).config.sources = [
                 {

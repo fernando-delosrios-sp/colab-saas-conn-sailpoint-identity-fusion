@@ -36,16 +36,16 @@ export const getReviewerInfo = (
     return {
         id: identityId,
         email: identity.attributes?.email || '',
-        name: identity.name || identity.attributes?.displayName || identityId,
+        name: identity.attributes?.displayName || identity.name || identityId,
     }
 }
 
 /**
- * Extract account information from form input
+ * Extract account information from form input.
  * Handles both flat structure { account: "...", name: "...", source: "..." }
- * and dictionary structure where formInput is an object with input objects keyed by id
+ * and dictionary structure where formInput is an object with input objects keyed by id.
  */
-const extractAccountInfo = (formInput: any): { id: string; name: string; sourceName: string } | null => {
+export const extractAccountInfoFromFormInput = (formInput: any): { id: string; name: string; sourceName: string } | null => {
     let accountId: string | undefined
     let accountName: string | undefined
     let accountSource: string | undefined
@@ -87,6 +87,34 @@ const extractAccountInfo = (formInput: any): { id: string; name: string; sourceN
 }
 
 /**
+ * Extract candidate identity IDs from form input.
+ * Supports both flat and dictionary input structures.
+ */
+export const extractCandidateIdsFromFormInput = (formInput: any): string[] => {
+    if (!formInput || typeof formInput !== 'object') return []
+
+    let candidatesStr: string | undefined
+    if (typeof formInput.candidates === 'string') {
+        candidatesStr = formInput.candidates
+    } else {
+        const formInputs = formInput as Record<string, any>
+        const candidatesInput = Object.values(formInputs).find(
+            (x: any) => x?.id === 'candidates' && (x.value || x.description)
+        )
+        candidatesStr = candidatesInput?.value || candidatesInput?.description
+    }
+
+    if (typeof candidatesStr !== 'string' || candidatesStr.length === 0) {
+        return []
+    }
+
+    return candidatesStr
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean)
+}
+
+/**
  * Create fusion decision from completed form instance
  * accountInfoOverride allows overriding account info from managedAccountsById before it's deleted
  * Returns null if decision cannot be created
@@ -111,7 +139,7 @@ export const createFusionDecision = (
     }
 
     // Use accountInfoOverride if provided (from managedAccountsById), otherwise extract from formInput
-    const accountInfo = accountInfoOverride || extractAccountInfo(formInput)
+    const accountInfo = accountInfoOverride || extractAccountInfoFromFormInput(formInput)
     if (!accountInfo) {
         return null
     }
@@ -145,11 +173,17 @@ export const createFusionDecision = (
         return null
     }
 
+    const selectedIdentity = existingIdentity ? identities?.getIdentityById(existingIdentity) : undefined
+    const selectedIdentityName = existingIdentity
+        ? selectedIdentity?.displayName || selectedIdentity?.name || existingIdentity
+        : undefined
+
     return {
         submitter: reviewer,
         account: accountInfo,
         newIdentity: isNewIdentity,
         identityId: existingIdentity,
+        identityName: selectedIdentityName,
         comments: formData?.comments || '',
         finished,
         formUrl: formInstance.standAloneFormUrl ?? undefined,

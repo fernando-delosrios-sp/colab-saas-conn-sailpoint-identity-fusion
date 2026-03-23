@@ -159,6 +159,7 @@ To reduce email/report payload growth:
 ### Attribute evaluation order
 
 Normal attributes are created **before** Fusion matching occurs (steps 3–6). Unique attributes are evaluated **after** all matching is complete (step 8). Attribute definitions can access previously defined attributes via the shared Velocity context, so definition order matters. Unique attributes can reference normal attribute values, but normal attributes cannot reference unique attributes because of the order in which they are calculated.
+When the Fusion schema attribute `mainAccount` is populated with a valid managed account ID, that managed account is evaluated first for mapping/definition context (including `$accounts[0]`); if not set or invalid, managed-source order is used.
 
 ### Attribute mapping and unique definition synergy
 

@@ -8,8 +8,13 @@ export { ALGORITHM_LABELS } from './constants'
 export type { Candidate } from './types'
 
 // Re-export helpers (for testing and external use if needed)
-export { buildCandidateList, buildFormName, calculateExpirationDate, getFormOwner } from './helpers'
+export { buildCandidateList, buildFormName, calculateExpirationDate, getFormOwner, resolveIdentitiesSelectLabel } from './helpers'
 
 export { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 
-export { createFusionDecision, getReviewerInfo } from './formProcessor'
+export {
+    createFusionDecision,
+    getReviewerInfo,
+    extractAccountInfoFromFormInput,
+    extractCandidateIdsFromFormInput,
+} from './formProcessor'

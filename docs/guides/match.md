@@ -22,12 +22,12 @@ Use Identity Fusion for Match when you face these challenges:
 
 ### Required
 
-| Requirement                    | Configuration                                       | Notes                                                                                                                                                                                                                                     |
-| ------------------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **One or more sources**        | **Source Settings → Authoritative account sources** | At least one source; typically 2+ for Match value                                                                                                                                                                                         |
+| Requirement                                | Configuration                                       | Notes                                                                                                                                                                                                                                     |
+| ------------------------------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **One or more sources**                    | **Source Settings → Authoritative account sources** | At least one source; typically 2+ for Match value                                                                                                                                                                                         |
 | **Attribute Matching Settings (Matching)** | **Fusion attribute matches**, algorithms, scores    | Defines similarity detection rules                                                                                                                                                                                                        |
 | **Attribute Matching Settings (Review)**   | Form attributes, expiration, reviewers              | Configures manual review workflow                                                                                                                                                                                                         |
-| **Authoritative source**       | ISC source marked as **Authoritative**              | In most cases Fusion must be authoritative so it can determine which incoming managed accounts create a new identity and which correlate to an existing one. Barring edge cases, assume the source is authoritative when Match is needed. |
+| **Authoritative source**                   | ISC source marked as **Authoritative**              | In most cases Fusion must be authoritative so it can determine which incoming managed accounts create a new identity and which correlate to an existing one. Barring edge cases, assume the source is authoritative when Match is needed. |
 
 ### Highly recommended
 
@@ -38,11 +38,11 @@ Use Identity Fusion for Match when you face these challenges:
 
 ### Optional but useful
 
-| Option                            | Configuration                                               | Use case                                                 |
-| --------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------- |
-| **Access profiles for reviewers** | Create access profile per source with reviewer entitlement  | Assign reviewers per source for targeted notifications   |
-| **Fusion report access profile**  | Access profile with "Fusion report" entitlement             | Allow specific users to view potential match reports |
-| **Auto-correlate when identical** | **Attribute Matching Settings → Automatically correlate if identical?** | Skip manual review for obvious matches                   |
+| Option                            | Configuration                                                           | Use case                                               |
+| --------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------ |
+| **Access profiles for reviewers** | Create access profile per source with reviewer entitlement              | Assign reviewers per source for targeted notifications |
+| **Fusion report access profile**  | Access profile with "Fusion report" entitlement                         | Allow specific users to view potential match reports   |
+| **Auto-correlate when identical** | **Attribute Matching Settings → Automatically correlate if identical?** | Skip manual review for obvious matches                 |
 
 **Screenshot placeholder:** High-level Match flow diagram.
 
@@ -108,12 +108,12 @@ Configure **Source Settings → Sources** to specify which sources contribute ac
 
 Configure **Source Settings → Processing Control** for account lifecycle:
 
-| Field                                                    | Recommended for Match | Rationale                                                                                                                                                                                                                                                     |
-| -------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Maximum history messages**                             | 10 (default)          | Balance between audit trail and storage                                                                                                                                                                                                                       |
-| **Delete accounts with no authoritative accounts left?** | Yes                   | Auto-cleanup when person leaves organization and all source accounts are removed                                                                                                                                                                              |
-| **Correlate missing source accounts on aggregation?**    | Yes                   | Automatically correlate new or previously missing source accounts. When this is **disabled**, a new managed account will **not** be correlated to an existing identity during aggregation unless you also configure an enforced correlation role (see below). |
-| **Force Normal-type attribute refresh on each aggregation?** | No                    | Located at **Advanced Settings → Developer Settings**. Applies only to Normal-type attributes; Unique attributes are only computed on account creation or activation. Expensive if attributes change frequently.                                                |
+| Field                                                        | Recommended for Match | Rationale                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Maximum history messages**                                 | 10 (default)          | Balance between audit trail and storage                                                                                                                                                                                                                       |
+| **Delete accounts with no managed accounts left?**           | Yes                   | Auto-cleanup when person leaves organization and all source accounts are removed                                                                                                                                                                              |
+| **Correlate missing source accounts on aggregation?**        | Yes                   | Automatically correlate new or previously missing source accounts. When this is **disabled**, a new managed account will **not** be correlated to an existing identity during aggregation unless you also configure an enforced correlation role (see below). |
+| **Force Normal-type attribute refresh on each aggregation?** | No                    | Located at **Advanced Settings → Developer Settings**. Applies only to Normal-type attributes; Unique attributes are only computed on account creation or activation. Expensive if attributes change frequently.                                              |
 
 > **Important:** When merging a new managed account with an existing identity, managed account correlation will only occur if **Correlate missing source accounts on aggregation?** is enabled **or** you have configured an **enforced correlation role** that drives that correlation. Otherwise, the connector will not correlate the new managed account automatically.
 
@@ -144,12 +144,13 @@ Configure **Attribute Matching Settings → Matching Settings** to define match 
 
 For each attribute you want to use in match detection, add a **Fusion attribute match**:
 
-| Field                        | Purpose                          | Options / Example                                                |
-| ---------------------------- | -------------------------------- | ---------------------------------------------------------------- |
-| **Attribute**                | Identity attribute name          | `name`, `email`, `displayName`, `firstname`, `lastname`          |
-| **Matching algorithm**       | Similarity calculation method    | See [Matching algorithms](matching-algorithms.md) for details    |
-| **Similarity score [0-100]** | Minimum score for this attribute | 75–85 (name); 90–100 (email); adjust per algorithm               |
-| **Mandatory match?**         | Require this attribute to match  | Yes for critical identifiers (e.g. employee ID); No for optional |
+| Field                        | Purpose                                     | Options / Example                                                                                                                                                                                    |
+| ---------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Attribute**                | Identity attribute name                     | `name`, `email`, `displayName`, `firstname`, `lastname`                                                                                                                                              |
+| **Matching algorithm**       | Similarity calculation method               | See [Matching algorithms](matching-algorithms.md) for details                                                                                                                                        |
+| **Similarity score [0-100]** | Minimum score for this attribute            | 75–85 (name); 90–100 (email); adjust per algorithm                                                                                                                                                   |
+| **Mandatory match?**         | Require this attribute to match             | Yes for critical identifiers (e.g. employee ID); No for optional                                                                                                                                     |
+| **Skip match if missing**    | Skip this rule when either value is missing | Default: Yes. Missing means `null`, `undefined`, or empty after trim. When enabled, the rule is ignored (neither positive nor negative). When disabled, missing values are still scored and counted. |
 
 **Algorithm selection guide:**
 
@@ -188,10 +189,16 @@ Strategy 4: Phonetic name matching
 
 ### Overall vs per-attribute scoring
 
-| Mode              | Configuration                | Logic                                                         | Use when                                                              |
-| ----------------- | ---------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------- |
-| **Per-attribute** | **Use overall score?** = No  | Each attribute must meet its own threshold AND all contribute | You want fine control; different attributes have different importance |
-| **Overall**       | **Use overall score?** = Yes | Average of attribute scores must meet global threshold        | Simplicity; all attributes weighted equally                           |
+| Mode              | Configuration                | Logic                                                                                                             | Use when                                                              |
+| ----------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| **Per-attribute** | **Use overall score?** = No  | Each attribute must meet its own threshold AND all contribute                                                     | You want fine control; different attributes have different importance |
+| **Overall**       | **Use overall score?** = Yes | Average of attribute scores must meet global threshold; any failed evaluated mandatory rule invalidates the match | Simplicity; all attributes weighted equally                           |
+
+**Interaction with `Skip match if missing`:**
+
+- With **Skip match if missing = Yes** (default), a missing-value rule contributes nothing in either mode.
+- With **Skip match if missing = No**, that rule is always evaluated and its result contributes in both modes.
+- **Mandatory** still applies when a rule is evaluated: if a mandatory rule is scored and fails, the overall match fails.
 
 **Example with overall score:**
 
@@ -216,7 +223,7 @@ A mandatory attribute must always meet its threshold. When no attribute is marke
 
 | Field                                     | Value | Effect                                                        |
 | ----------------------------------------- | ----- | ------------------------------------------------------------- |
-| **Automatically correlate if identical?** | No    | All potential matches go to manual review                  |
+| **Automatically correlate if identical?** | No    | All potential matches go to manual review                     |
 | **Automatically correlate if identical?** | Yes   | Clear matches auto-correlate; borderline cases still reviewed |
 
 **When to enable auto-correlate:**
@@ -257,16 +264,29 @@ When **Send report to owner on aggregation?** is enabled, reports include:
 
 To avoid oversized reports, warning/error details are intentionally summarized (not full log dumps).
 
+### Non-persistent analysis with `custom:report`
+
+When you want report-like visibility during aggregation analysis without persisting changes, run the connector command `custom:report`.
+
+`custom:report`:
+
+- Executes fetch + matching analysis flow only (no account-list persistence/writeback phase).
+- Streams final ISC account rows with an additional `attributes.matching` object.
+- Includes matching and non-matching visibility in `matching.status` and `matching.matches`.
+- Sends a final `custom:report:summary` payload with totals and diagnostics (warnings/errors and sampled messages).
+
+Use this command while tuning matching thresholds, validating source precedence, or reviewing correlation context before enabling/adjusting production automation.
+
 **Choosing form attributes:**
 
 Include attributes that help reviewers decide if identities are matches:
 
-| Attribute      | Why include              | Example                                                       |
-| -------------- | ------------------------ | ------------------------------------------------------------- |
-| **name**       | Primary identifier       | John Smith vs J. Smith                                        |
-| **email**      | Usually unique           | john.smith@company.com vs jsmith@company.com                  |
-| **department** | Context for verification | Engineering vs IT                                             |
-| **manager**    | Organizational context   | Same manager → likely same person                             |
+| Attribute      | Why include              | Example                                                   |
+| -------------- | ------------------------ | --------------------------------------------------------- |
+| **name**       | Primary identifier       | John Smith vs J. Smith                                    |
+| **email**      | Usually unique           | john.smith@company.com vs jsmith@company.com              |
+| **department** | Context for verification | Engineering vs IT                                         |
+| **manager**    | Organizational context   | Same manager → likely same person                         |
 | **hireDate**   | Temporal context         | Hired same day → suspicious; years apart → unlikely match |
 | **phone**      | Contact verification     | Same phone → likely match                                 |
 | **employeeId** | Business key             | Same ID → definitely match; different → investigate       |
@@ -311,8 +331,8 @@ While the connector supports establishing the current source owner as a **global
 
 Create an access profile for viewing match reports:
 
-| Access profile    | Entitlement   | Assignment                         | Purpose                                                      |
-| ----------------- | ------------- | ---------------------------------- | ------------------------------------------------------------ |
+| Access profile    | Entitlement   | Assignment                         | Purpose                                                   |
+| ----------------- | ------------- | ---------------------------------- | --------------------------------------------------------- |
 | **Fusion Report** | Fusion report | Identity governance team, auditors | View list of potential matches without review permissions |
 
 **Note:** The Fusion source automatically creates entitlements for each source reviewer and the Fusion report. Run **Entitlement Aggregation** to populate these entitlements.
@@ -380,10 +400,14 @@ For each Fusion account (new or updated):
     - For each configured **Fusion attribute match**:
         - Fetch attribute value from identity
         - Fetch attribute value from Fusion account
+        - Apply **Skip match if missing** for that rule:
+            - Enabled (default): skip this rule if either value is `null`, `undefined`, or empty after trim.
+            - Disabled: compare values even when one/both are missing, and include the result.
         - Calculate similarity score using specified algorithm
     - If **Use overall fusion similarity score?**:
         - Average all per-attribute scores → overall score
-        - If overall score ≥ threshold → potential match (per-attribute thresholds may not all be met)
+        - Every evaluated **mandatory** attribute must meet its threshold or the match fails
+        - If overall score ≥ threshold and all evaluated mandatory rules pass → potential match (non-mandatory thresholds may not all be met)
     - Else (per-attribute mode):
         - Every **mandatory** attribute must meet its threshold or the match fails
         - If no attribute is mandatory, all attributes are treated as mandatory (all must meet thresholds)
@@ -434,14 +458,14 @@ On next aggregation:
 
 ### Initial tuning workflow
 
-| Phase                        | Action                                                                        | Goal                                              |
-| ---------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------- |
+| Phase                        | Action                                                                        | Goal                                           |
+| ---------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------- |
 | **1. Baseline**              | Set conservative thresholds (e.g. name: 90, email: 95)                        | Low false positive rate; may miss some matches |
-| **2. Test run**              | Run aggregation with small **Aggregation batch size** (e.g. 100–500 accounts) | Evaluate match quality                            |
-| **3. Review results**        | Check review forms: Are matches obvious? Many false positives?                | Calibrate                                         |
-| **4. Adjust**                | Lower thresholds if missing matches; raise if too many false positives     | Fine-tune                                         |
-| **5. Full rollout**          | Remove **Aggregation batch size** limit; run on all accounts                  | Production                                        |
-| **6. Enable auto-correlate** | Once confident, enable **Automatically correlate if identical?**              | Reduce manual burden                              |
+| **2. Test run**              | Run aggregation with small **Aggregation batch size** (e.g. 100–500 accounts) | Evaluate match quality                         |
+| **3. Review results**        | Check review forms: Are matches obvious? Many false positives?                | Calibrate                                      |
+| **4. Adjust**                | Lower thresholds if missing matches; raise if too many false positives        | Fine-tune                                      |
+| **5. Full rollout**          | Remove **Aggregation batch size** limit; run on all accounts                  | Production                                     |
+| **6. Enable auto-correlate** | Once confident, enable **Automatically correlate if identical?**              | Reduce manual burden                           |
 
 ### Monitoring and metrics
 
@@ -450,32 +474,32 @@ Track these metrics to assess Match effectiveness:
 | Metric                    | How to track                                      | Target                                             |
 | ------------------------- | ------------------------------------------------- | -------------------------------------------------- |
 | **False positive rate**   | Manual review: % of "Create new" decisions        | <10%                                               |
-| **False negative rate**   | Audits: matches that passed through            | <5%                                                |
+| **False negative rate**   | Audits: matches that passed through               | <5%                                                |
 | **Review response time**  | Time from form creation to decision               | <2 days (adjust **Manual review expiration days**) |
 | **Auto-correlation rate** | % of matches auto-correlated vs manually reviewed | >60% after tuning                                  |
 
 ### Common issues and fixes
 
-| Issue                        | Symptom                                        | Fix                                                                                      |
-| ---------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Issue                        | Symptom                                     | Fix                                                                                      |
+| ---------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | **No matches found**         | Zero review forms despite expecting matches | Lower **Similarity score** thresholds; check **Identity Scope Query** returns identities |
-| **Too many false positives** | Many obvious non-duplicates flagged            | Raise **Similarity score** thresholds; use **Mandatory match?** for critical attributes  |
-| **Reviewer overload**        | Hundreds of review forms                       | Enable **Automatically correlate if identical?**; raise thresholds                       |
-| **Forms expiring**           | Forms timing out before review                 | Increase **Manual review expiration days**; notify reviewers                             |
-| **Incorrect algorithm**      | Matches don't make sense                       | Switch algorithm (see [Matching algorithms](matching-algorithms.md))                     |
+| **Too many false positives** | Many obvious non-duplicates flagged         | Raise **Similarity score** thresholds; use **Mandatory match?** for critical attributes  |
+| **Reviewer overload**        | Hundreds of review forms                    | Enable **Automatically correlate if identical?**; raise thresholds                       |
+| **Forms expiring**           | Forms timing out before review              | Increase **Manual review expiration days**; notify reviewers                             |
+| **Incorrect algorithm**      | Matches don't make sense                    | Switch algorithm (see [Matching algorithms](matching-algorithms.md))                     |
 
 ---
 
 ## Summary
 
-| Component                      | Purpose                                      | Key configuration                                            |
-| ------------------------------ | -------------------------------------------- | ------------------------------------------------------------ |
-| **Source Settings (Scope)**    | Define identity baseline                     | Include identities = Yes; Identity Scope Query               |
-| **Source Settings (Sources)**  | Sources contributing account data            | Source names (2+); Force aggregation (optional)              |
-| **Attribute Mapping**          | Merge source attributes into Fusion accounts | Merge strategies (first/list/concatenate)                    |
+| Component                                  | Purpose                                      | Key configuration                                            |
+| ------------------------------------------ | -------------------------------------------- | ------------------------------------------------------------ |
+| **Source Settings (Scope)**                | Define identity baseline                     | Include identities = Yes; Identity Scope Query               |
+| **Source Settings (Sources)**              | Sources contributing account data            | Source names (2+); Force aggregation (optional)              |
+| **Attribute Mapping**                      | Merge source attributes into Fusion accounts | Merge strategies (first/list/concatenate)                    |
 | **Attribute Matching Settings (Matching)** | Duplicate detection rules                    | Fusion attribute matches; algorithms; scores; auto-correlate |
 | **Attribute Matching Settings (Review)**   | Manual review workflow                       | Form attributes; expiration days; global reviewer            |
-| **Access Profiles**            | Reviewer permissions                         | Per-source reviewer access profiles; Fusion report           |
+| **Access Profiles**                        | Reviewer permissions                         | Per-source reviewer access profiles; Fusion report           |
 
 **Match requires:**
 

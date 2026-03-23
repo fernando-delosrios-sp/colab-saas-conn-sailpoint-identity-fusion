@@ -79,4 +79,19 @@ describe('accountCreate', () => {
         expect(executeActions).toHaveBeenCalledTimes(2)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-created' })
     })
+
+    it('creates account using attributes.name when identity is missing', async () => {
+        const registry = createRegistry()
+        const input = {
+            schema: { attributes: [] },
+            attributes: {
+                name: 'Alice Doe',
+            },
+        } as any
+
+        await accountCreate(registry, input)
+
+        expect(registry.identities.fetchIdentityByName).toHaveBeenCalledWith('Alice Doe')
+        expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-created' })
+    })
 })

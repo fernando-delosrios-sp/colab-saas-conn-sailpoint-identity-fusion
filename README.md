@@ -41,10 +41,12 @@ For an in-depth explanation of source types, aggregation rules, correlation mode
 | Section                | Description                                                                                                                            |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Scope**              | Determines if identities are included in the processing scope and defines an optional identity filter query.                           |
-| **Sources**            | Configures the authoritative account sources, their types (Authoritative, Records, Orphans), aggregation modes, and correlation modes. |
+| **Sources**            | Configures authoritative sources, source behavior, aggregation/correlation modes, plus dual account filters: `Accounts API filter` (server-side) and `Accounts JMESPath filter` (client-side, page-wise). |
 | **Processing Control** | Manages history retention, empty account deletion, and behavior when unique identifiers are missing.                                   |
 
 > **Note:** Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion NG. The connector skips them during managed-account ingestion and logs warning messages with discarded counts.
+>
+> Filter references: [Accounts list API](https://developer.sailpoint.com/docs/api/v2025/list-accounts), [JMESPath](https://jmespath.org/).
 
 ### Attribute Mapping Settings
 
@@ -134,7 +136,7 @@ Controls Match behavior, including similarity matching and manual review workflo
 | Field                                                       | Description                                                    | Required                         | Notes                                                                                                                                                                                    |
 | ----------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Fusion attribute matches**                                | List of identity attributes to compare for match detection     | Yes                              | At least one attribute match required; each match specifies an attribute and algorithm                                                                                                   |
-| **Use overall fusion similarity score for all attributes?** | Use single overall score instead of per-attribute thresholds   | No                               | When enabled, only the overall (average) threshold must be met; when disabled, every mandatory attribute must match, and if none are mandatory, all attributes are treated as mandatory. |
+| **Use overall fusion similarity score for all attributes?** | Use single overall score instead of per-attribute thresholds   | No                               | When enabled, the overall (average) threshold must be met and any evaluated mandatory attribute must also meet its own threshold. When disabled, every mandatory attribute must match, and if none are mandatory, all attributes are treated as mandatory. |
 | **Similarity score [0-100]**                                | Minimum overall similarity score for auto-correlation          | Yes (when overall score enabled) | Typical range: 70-90; higher = stricter; only used when "Use overall fusion similarity score" is enabled                                                                                 |
 | **Automatically correlate if identical?**                   | Auto-merge when attributes meet criteria without manual review | No                               | Use when you trust the algorithm and thresholds; skips manual review for high-confidence matches                                                                                         |
 
@@ -146,8 +148,9 @@ Controls Match behavior, including similarity matching and manual review workflo
 | ---------------------------- | --------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Attribute**                | Identity attribute name to compare                              | Yes      | Must exist on identities in scope                                                                                                                                                                                                                                                                                                                                                      |
 | **Matching algorithm**       | Algorithm for similarity calculation                            | Yes      | **Enhanced Name Matcher** (person names, handles variations), **Jaro-Winkler** (short strings with typos, emphasizes beginning), **LIG3** (Levenshtein-based with intelligent gap penalties, excellent for international names and multi-word fields), **Dice** (longer text, bigram-based), **Double Metaphone** (phonetic, similar pronunciation), **Custom** (from SaaS customizer) |
-| **Similarity score [0-100]** | Minimum similarity score for this attribute                     | No       | Required when not using overall score mode. A mandatory attribute must meet or exceed this threshold or the match fails. When overall score is enabled, only the overall threshold is required (per-attribute thresholds may not all be met). When no attribute is mandatory, all attributes are treated as mandatory.                                                                 |
+| **Similarity score [0-100]** | Minimum similarity score for this attribute                     | No       | Required when not using overall score mode. A mandatory attribute must meet or exceed this threshold or the match fails. In overall score mode, non-mandatory attributes may be below threshold, but a failed mandatory attribute still invalidates the match. When no attribute is mandatory, all attributes are treated as mandatory.                                                                 |
 | **Mandatory match?**         | Require this attribute to match before considering as a match   | No       | When Yes: this attribute's score must be ≥ its threshold or the match fails. When No: attribute still has a threshold; when overall score is disabled and no attribute is mandatory, every attribute is effectively mandatory (all must meet thresholds).                                                                                                                              |
+| **Skip match if missing**    | Ignore this rule when one side is missing                       | No       | Default: Yes. Missing means `null`, `undefined`, or empty after trim. When enabled, the rule is skipped (neither positive nor negative). When disabled, the rule is evaluated even with missing values and counts toward the final result.                                                                                                                                            |
 
 > **Tip:** Use Fusion reports to fine-tune your matching thresholds and algorithms.
 
@@ -241,6 +244,43 @@ For detailed field-by-field guidance and usage patterns, see the [usage guides](
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 
 For step-by-step instructions and UI details, see the [Map](docs/guides/map.md), [Define](docs/guides/define.md), and [Match](docs/guides/match.md) guides.
+
+---
+
+## Custom command: `custom:report`
+
+Use `custom:report` to run a **non-persistent aggregation analysis**. It evaluates managed accounts with the same matching logic used for reports, but it does not execute the persistence/writeback phase used by `std:account:list`.
+
+### Input options
+
+`custom:report` supports optional runtime controls in the command input:
+
+- `limit` (number): Maximum number of account rows to stream. If omitted, all rows are eligible.
+- `summary` (boolean): Whether to emit the final `custom:report:summary` payload. Default: `true`.
+- `onlyMatching` (boolean): Stream only rows whose `attributes.matching.status` is `matched`. Default: `false`.
+- `onlyReview` (boolean): Stream only rows with `attributes.review.pending === true`. Default: `false`.
+- If both `onlyMatching` and `onlyReview` are `true`, rows matching either condition are streamed.
+
+### What it returns
+
+- Streams final ISC account rows (`key`, `attributes`, `disabled`) like account list output.
+- Adds `attributes.matching` to every streamed row with:
+    - `status`: `matched`, `non-matched`, `review-error`, or `not-analyzed`
+    - `matches`: candidate identities and per-attribute scores when available
+    - `sourceContext`: source provenance (`originSource`, `sources`)
+    - `correlationContext`: linked and missing account context (`accounts`, `missing-accounts`, `reviews`, `statuses`)
+- Adds `attributes.review` to every streamed row:
+    - `pending`: whether there is an active pending form instance linked to any account id in `attributes.accounts`
+    - `forms`: pending form references (`formInstanceId`, `url`)
+    - `reviewers`: resolved reviewer identities (`id`, `name`, `email`)
+    - `candidates`: candidate identity details (`id`, `name`, `scores`, `attributes`)
+- Sends a final summary object with `type: custom:report:summary` containing row totals, managed-account analysis totals, diagnostics, and processing time.
+
+### Typical use cases
+
+- Tune Match thresholds and algorithms before production changes.
+- Validate source ordering and account provenance (`originSource`) behavior.
+- Inspect correlated vs non-correlated outcomes without persisting state changes.
 
 ---
 
