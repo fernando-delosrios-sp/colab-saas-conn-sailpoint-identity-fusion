@@ -23,6 +23,7 @@ import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
+const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
 
 // ============================================================================
 // AttributeService Class
@@ -192,6 +193,7 @@ export class AttributeService {
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
             const sourceOrder = this.sourceConfigs.map((sc) => sc.name)
+            const prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
             const mappingTargets = this.getAttributeMappingTargetNames()
             for (const attribute of mappingTargets) {
                 if (this.uniqueAttributeNames.has(attribute) && attributeBag.current[attribute] !== undefined) {
@@ -199,7 +201,12 @@ export class AttributeService {
                 }
 
                 const processingConfig = this.attributeMappingConfig.get(attribute)!
-                const processedValue = processAttributeMapping(processingConfig, sourceAttributeMap, sourceOrder)
+                const processedValue = processAttributeMapping(
+                    processingConfig,
+                    sourceAttributeMap,
+                    sourceOrder,
+                    prioritizedAccount
+                )
                 if (processedValue === undefined) continue
 
                 attributes[attribute] = processedValue
@@ -556,7 +563,36 @@ export class AttributeService {
             ordered.push(...sourceAccounts)
         }
 
-        return ordered
+        const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
+        if (!mainAccountId) return ordered
+
+        const prioritizedIndex = ordered.findIndex((account) => String(account?._accountId ?? '').trim() === mainAccountId)
+        if (prioritizedIndex <= 0) return ordered
+
+        const prioritizedAccount = ordered[prioritizedIndex]
+        return [prioritizedAccount, ...ordered.slice(0, prioritizedIndex), ...ordered.slice(prioritizedIndex + 1)]
+    }
+
+    private getMainAccountOverrideId(fusionAccount: FusionAccount): string | undefined {
+        const rawValue = fusionAccount.attributeBag.current[MAIN_ACCOUNT_ATTRIBUTE]
+        if (!isValidAttributeValue(rawValue)) return undefined
+        const accountId = String(rawValue).trim()
+        return accountId.length > 0 ? accountId : undefined
+    }
+
+    private getMainAccountContextAccount(
+        fusionAccount: FusionAccount,
+        sourceAttributeMap: Map<string, Record<string, any>[]>
+    ): Record<string, any> | undefined {
+        const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
+        if (!mainAccountId) return undefined
+
+        for (const accounts of sourceAttributeMap.values()) {
+            const match = accounts.find((account) => String(account?._accountId ?? '').trim() === mainAccountId)
+            if (match) return match
+        }
+
+        return undefined
     }
 
     // ------------------------------------------------------------------------

@@ -1133,6 +1133,7 @@ export class FusionAccount {
 
             const contextAttributes: Attributes = {
                 ...(account.attributes ?? {}),
+                _accountId: accountId,
                 _source: account.sourceName,
                 // IdentityIQ-style compatibility: true means account is disabled.
                 IIQDisabled: Boolean(account.disabled),

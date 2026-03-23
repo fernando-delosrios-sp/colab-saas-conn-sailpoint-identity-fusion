@@ -66,6 +66,13 @@ export const fusionAccountSchemaAttributes: SchemaAttribute[] = [
         entitlement: false,
     },
     {
+        name: 'mainAccount',
+        description: 'Managed account ID evaluated first when present',
+        type: 'string',
+        multi: false,
+        entitlement: false,
+    },
+    {
         name: 'originSource',
         description: 'Origin source name (set on creation, immutable)',
         type: 'string',

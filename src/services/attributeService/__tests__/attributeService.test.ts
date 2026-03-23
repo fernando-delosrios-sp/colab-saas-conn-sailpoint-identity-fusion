@@ -422,3 +422,138 @@ describe('AttributeService template evaluation fallback behavior', () => {
         expect(fusionAccount.attributes.id).toHaveLength(36)
     })
 })
+
+describe('AttributeService mainAccount override', () => {
+    const createService = () => {
+        const config = {
+            attributeMaps: [
+                {
+                    newAttribute: 'nickname',
+                    existingAttributes: ['preferredName'],
+                    attributeMerge: 'first',
+                },
+            ],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }, { name: 'ERP' }],
+            normalAttributeDefinitions: [
+                {
+                    name: 'primaryFromAccounts',
+                    expression: '$accounts[0].preferredName',
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    refresh: true,
+                },
+            ],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname', 'mainAccount']),
+            getSchemaAttributes: jest.fn(() => [
+                { name: 'id' },
+                { name: 'name' },
+                { name: 'nickname' },
+                { name: 'mainAccount' },
+            ]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        return new AttributeService(config, schemas, sourceService, log, locks)
+    }
+
+    const createFusionAccount = (mainAccount?: string) => {
+        const attributeBag = {
+            current: mainAccount ? { mainAccount } : {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([
+                [
+                    'HR',
+                    [
+                        {
+                            preferredName: 'Neo',
+                            _accountId: 'hr-001',
+                            _source: 'HR',
+                        },
+                    ],
+                ],
+                [
+                    'ERP',
+                    [
+                        {
+                            preferredName: 'Trinity',
+                            _accountId: 'erp-777',
+                            _source: 'ERP',
+                        },
+                    ],
+                ],
+            ]),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'neo-1',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR', 'ERP'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        return fusionAccount
+    }
+
+    it('uses mainAccount managed account ID as first candidate for first-value mapping', () => {
+        const service = createService()
+        const fusionAccount = createFusionAccount('erp-777')
+
+        service.mapAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.nickname).toBe('Trinity')
+    })
+
+    it('keeps configured source order when mainAccount is missing or invalid', () => {
+        const service = createService()
+        const missingOverride = createFusionAccount()
+        const invalidOverride = createFusionAccount('missing-id')
+
+        service.mapAttributes(missingOverride)
+        service.mapAttributes(invalidOverride)
+
+        expect(missingOverride.attributes.nickname).toBe('Neo')
+        expect(invalidOverride.attributes.nickname).toBe('Neo')
+    })
+
+    it('places mainAccount managed account at index 0 for definition context', async () => {
+        const service = createService()
+        const fusionAccount = createFusionAccount('erp-777')
+
+        await service.refreshNormalAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.primaryFromAccounts).toBe('Trinity')
+    })
+})
