@@ -19,6 +19,14 @@ export const registerHandlebarsHelpers = (): void => {
     custom: 'Custom',
     average: 'Average Score',
   }
+  const formatDateYmd = (date: string | Date): string => {
+    const d = typeof date === 'string' ? new Date(date) : date
+    if (!(d instanceof Date) || Number.isNaN(d.getTime())) return 'N/A'
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}/${month}/${day}`
+  }
 
   // Format attribute values for display
   Handlebars.registerHelper('formatAttribute', (value: any) => {
@@ -95,8 +103,7 @@ export const registerHandlebarsHelpers = (): void => {
     if (!date) {
       return 'N/A'
     }
-    const d = typeof date === 'string' ? new Date(date) : date
-    return d.toLocaleDateString()
+    return formatDateYmd(date)
   })
 
   // Friendly algorithm names (aligned with connector-spec.json)
@@ -143,7 +150,7 @@ export const registerHandlebarsHelpers = (): void => {
       if (value === null || value === undefined || value === '') return
       cards.push({ label, value: String(value) })
     }
-    const formattedDate = reportDate ? new Date(reportDate).toLocaleDateString() : undefined
+    const formattedDate = reportDate ? formatDateYmd(reportDate) : undefined
 
     pushCard('Report Date', formattedDate)
     pushCard('Total Processing Time', stats.totalProcessingTime)
@@ -261,11 +268,25 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px; border-collapse:collapse;">
                 <tr>
                   <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700; width:140px;">Reviewer</td>
-                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{reviewerName}}{{#if reviewerEmail}} ({{reviewerEmail}}){{/if}}</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">
+                    {{#if reviewerUrl}}
+                    <a href="{{reviewerUrl}}" style="color:#0b5cab; text-decoration:underline;">{{reviewerName}}</a>
+                    {{else}}
+                    {{reviewerName}}
+                    {{/if}}
+                    {{#if reviewerEmail}} ({{reviewerEmail}}){{/if}}
+                  </td>
                 </tr>
                 <tr>
                   <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">Account</td>
-                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{accountName}} [{{accountSource}}]</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">
+                    {{#if accountUrl}}
+                    <a href="{{accountUrl}}" style="color:#0b5cab; text-decoration:underline;">{{accountName}}</a>
+                    {{else}}
+                    {{accountName}}
+                    {{/if}}
+                    [{{accountSource}}]
+                  </td>
                 </tr>
                 {{#if selectedIdentityId}}
                 <tr>
@@ -659,9 +680,11 @@ export type FusionReportEmailData = {
   fusionReviewDecisions?: Array<{
     reviewerId: string
     reviewerName: string
+    reviewerUrl?: string
     reviewerEmail?: string
     accountId: string
     accountName: string
+    accountUrl?: string
     accountSource: string
     sourceType?: 'authoritative' | 'record' | 'orphan'
     decision: 'assign-existing-identity' | 'create-new-identity' | 'confirm-no-match'

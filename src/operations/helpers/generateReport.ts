@@ -33,9 +33,11 @@ const toReportDecision = (
     return {
         reviewerId: decision.submitter.id,
         reviewerName,
+        reviewerUrl: urlContext.identity(decision.submitter.id),
         reviewerEmail: decision.submitter.email || undefined,
         accountId: decision.account.id,
         accountName: decision.account.name || decision.account.id,
+        accountUrl: urlContext.humanAccount(decision.account.id),
         accountSource: decision.account.sourceName || '',
         sourceType,
         decision: decisionType,

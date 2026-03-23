@@ -60,12 +60,16 @@ export type FusionReportDecision = {
     reviewerId: string
     /** Reviewer display name */
     reviewerName: string
+    /** Direct URL to reviewer identity in ISC UI */
+    reviewerUrl?: string
     /** Reviewer email (if available) */
     reviewerEmail?: string
     /** Source account ID tied to the review */
     accountId: string
     /** Source account display label */
     accountName: string
+    /** Direct URL to human account in ISC UI */
+    accountUrl?: string
     /** Managed source name */
     accountSource: string
     /** Source processing type (authoritative, record, or orphan) */
