@@ -93,7 +93,7 @@ export class FusionAccount {
     private _history: string[] = []
     private _managedAccountInfo: Map<string, { sourceName: string; nativeIdentity: string }> = new Map()
 
-    // Map & Define (Attribute management)
+    // Map & Define
     // Note: previous is initialized lazily only when needed to save memory for new accounts
     private _sourceAttributeMapCache?: Map<string, { [key: string]: any }>
     private _attributeBag: AttributeBag = {

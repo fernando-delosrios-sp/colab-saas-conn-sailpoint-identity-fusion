@@ -122,3 +122,121 @@ describe('SourceService fetchManagedAccount source scoping', () => {
         expect(service.managedAccountsAllById.size).toBe(0)
     })
 })
+
+describe('SourceService reverse correlation setup hardening', () => {
+    it('attempts one repair pass and succeeds when consistency is restored', async () => {
+        const { service } = createService({
+            correlationMode: 'reverse',
+            correlationAttribute: 'reverseNativeIdentity',
+            correlationDisplayName: 'Reverse Native Identity',
+        })
+
+        ;(service as any)._fusionSourceId = 'fusion-source-id'
+        ;(service as any).sourcesByName.set('Fusion Source', {
+            id: 'fusion-source-id',
+            name: 'Fusion Source',
+            isManaged: false,
+            sourceType: 'authoritative',
+            config: undefined,
+        })
+        ;(service as any).sourcesByName.set('HR Source', {
+            id: 'managed-source-id',
+            name: 'HR Source',
+            isManaged: true,
+            sourceType: 'authoritative',
+            config: {
+                name: 'HR Source',
+                correlationMode: 'reverse',
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity',
+            },
+        })
+
+        jest.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
+        const phasesSpy = jest
+            .spyOn(service as any, 'ensureReverseCorrelationSetupPhases')
+            .mockResolvedValue(undefined)
+        const statusSpy = jest.spyOn(service as any, 'getReverseCorrelationSetupStatus')
+        statusSpy
+            .mockResolvedValueOnce({
+                isConsistent: false,
+                missingArtifacts: ['identity_attribute'],
+            })
+            .mockResolvedValueOnce({
+                isConsistent: true,
+                missingArtifacts: [],
+            })
+        const repairSpy = jest.spyOn(service as any, 'repairReverseCorrelationSetup').mockResolvedValue(undefined)
+
+        await service.ensureReverseCorrelationSetup(
+            {
+                name: 'HR Source',
+                correlationMode: 'reverse',
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity',
+            } as any,
+            new Set()
+        )
+
+        expect(phasesSpy).toHaveBeenCalledTimes(1)
+        expect(repairSpy).toHaveBeenCalledTimes(1)
+        expect(statusSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('throws when setup remains inconsistent after one repair pass', async () => {
+        const { service } = createService({
+            correlationMode: 'reverse',
+            correlationAttribute: 'reverseNativeIdentity',
+            correlationDisplayName: 'Reverse Native Identity',
+        })
+
+        ;(service as any).sourcesByName.set('HR Source', {
+            id: 'managed-source-id',
+            name: 'HR Source',
+            isManaged: true,
+            sourceType: 'authoritative',
+            config: {
+                name: 'HR Source',
+                correlationMode: 'reverse',
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity',
+            },
+        })
+        jest.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
+        jest.spyOn(service as any, 'ensureReverseCorrelationSetupPhases').mockResolvedValue(undefined)
+        jest.spyOn(service as any, 'repairReverseCorrelationSetup').mockResolvedValue(undefined)
+        jest.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
+            isConsistent: false,
+            missingArtifacts: ['identity_profile_mapping'],
+        })
+
+        await expect(
+            service.ensureReverseCorrelationSetup(
+                {
+                    name: 'HR Source',
+                    correlationMode: 'reverse',
+                    correlationAttribute: 'reverseNativeIdentity',
+                    correlationDisplayName: 'Reverse Native Identity',
+                } as any,
+                new Set()
+            )
+        ).rejects.toThrow('Reverse correlation setup is inconsistent')
+    })
+})
+
+describe('SourceService identity attribute create error mapping', () => {
+    it('maps searchable-limit API errors to actionable guidance', () => {
+        const { service } = createService()
+        const error = {
+            response: {
+                data: {
+                    detailCode: '400.1 Bad request content',
+                    messages: [{ text: '"searchable" count exceeded max limit of 15 for "identity attributes".' }],
+                },
+            },
+        }
+        const message = (service as any).buildIdentityAttributeCreateErrorMessage('blackmesa-id', error)
+        expect(message).toContain('ISC tenant limit reached for searchable identity attributes')
+        expect(message).toContain('blackmesa-id')
+    })
+})

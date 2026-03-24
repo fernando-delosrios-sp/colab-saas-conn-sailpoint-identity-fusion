@@ -390,6 +390,7 @@ export class FusionService {
      */
     private async correlatePerSource(fusionAccount: FusionAccount, hasDecisionAssignment: boolean): Promise<void> {
         const missingIds = fusionAccount.missingAccountIds
+        const validatedReverseSources = new Set<string>()
 
         // Separate decision-assigned accounts (always use direct correlation)
         const directCorrelateIds: string[] = []
@@ -442,12 +443,16 @@ export class FusionService {
 
             const sourceConfig = this.sources.getSourceConfig(sourceName)
             if (!sourceConfig?.correlationAttribute) continue
+            if (!validatedReverseSources.has(sourceName)) {
+                await this.sources.assertReverseCorrelationReady(sourceConfig)
+                validatedReverseSources.add(sourceName)
+            }
 
             const firstAccountId = accountIds[0]
             const info = fusionAccount.getManagedAccountInfo(firstAccountId)
             if (info) {
                 fusionAccount.setReverseCorrelationAttribute(sourceConfig.correlationAttribute, info.nativeIdentity)
-                this.log.info(
+                this.log.debug(
                     `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.nativeIdentity}" ` +
                     `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
                 )

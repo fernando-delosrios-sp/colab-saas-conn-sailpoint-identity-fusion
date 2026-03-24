@@ -231,7 +231,8 @@ export class ClientService {
         apiFunction: () => Promise<TResponse>,
         priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string,
-        abortSignal?: AbortSignal
+        abortSignal?: AbortSignal,
+        throwOnError: boolean = false
     ): Promise<TResponse | undefined> {
         const fn = () => {
             if (abortSignal?.aborted) {
@@ -270,6 +271,16 @@ export class ClientService {
             const statusText = error?.response?.statusText
             const apiMessage = error?.response?.data?.message || error?.response?.data?.detailCode
             const baseMessage = error instanceof Error ? error.message : String(error)
+            if (context?.includes('SourceService>ensureIdentityAttribute')) {
+                // #region agent log
+                fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:'clientExecute-ensureIdentityAttribute',hypothesisId:'H4',location:'clientService.ts:execute:catch',message:'API error for ensureIdentityAttribute context',data:{context,status:status ?? null,statusText:statusText ?? null,apiMessage:apiMessage ?? null,baseMessage,responseDataType:typeof error?.response?.data,responseData:error?.response?.data ?? null},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+            }
+            if (context?.includes('SourceService>ensureIdentityProfileMapping')) {
+                // #region agent log
+                fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:'clientExecute-ensureIdentityProfileMapping',hypothesisId:'H7',location:'clientService.ts:execute:catch',message:'API error for ensureIdentityProfileMapping context',data:{context,status:status ?? null,statusText:statusText ?? null,apiMessage:apiMessage ?? null,baseMessage,responseDataType:typeof error?.response?.data,responseData:error?.response?.data ?? null},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
+            }
 
             let errorDetail = baseMessage
             if (status) {
@@ -278,6 +289,9 @@ export class ClientService {
 
             const contextHint = context ? ` (${context})` : ''
             this.log.error(`API request failed${contextHint}: ${errorDetail}`)
+            if (throwOnError) {
+                throw error
+            }
             return undefined
         }
     }

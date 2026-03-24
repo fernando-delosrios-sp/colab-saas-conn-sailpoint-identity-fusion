@@ -153,7 +153,7 @@ const processMultiValueMerge = (
     if (attributeMerge === 'list') {
         return uniqueSorted
     } else if (attributeMerge === 'concatenate') {
-        // Pass true to skip redundant deduplication/sorting since we already did it above
+        // Pass true to skip redundant uniqueness filtering/sorting since we already did it above
         return attrConcat(uniqueSorted, true)
     }
 

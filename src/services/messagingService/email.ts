@@ -122,8 +122,8 @@ export function sanitizeRecipients(recipients: (string | undefined | null)[]): s
         const trimmed = recipient.trim()
         if (trimmed.length === 0) continue
 
-        // Case-insensitive deduplication (emails are case-insensitive in the local part technically,
-        // but we normalize to lowercase for deduplication)
+        // Case-insensitive filtering (emails are case-insensitive in the local part technically,
+        // but we normalize to lowercase for exact matching)
         const normalized = trimmed.toLowerCase()
         if (!seen.has(normalized)) {
             seen.add(normalized)

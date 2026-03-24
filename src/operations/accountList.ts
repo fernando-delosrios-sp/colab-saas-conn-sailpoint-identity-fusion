@@ -37,7 +37,16 @@ async function setupPhase(serviceRegistry: ServiceRegistry, schema: any): Promis
         // Run reverse setup sequentially to avoid concurrent updates on the same
         // Fusion identity profile transforms, which can cause non-deterministic misses.
         for (const sc of reverseCorrelationSources) {
-            await sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
+            try {
+                await sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
+            } catch (error) {
+                log.error(
+                    `Reverse correlation setup failed for source "${sc.name}" (attribute="${sc.correlationAttribute ?? 'unset'}"): ${
+                        error instanceof Error ? error.message : String(error)
+                    }`
+                )
+                throw error
+            }
         }
         await schemas.setFusionAccountSchema(undefined)
         log.info('Fusion account schema refreshed after reverse correlation setup')

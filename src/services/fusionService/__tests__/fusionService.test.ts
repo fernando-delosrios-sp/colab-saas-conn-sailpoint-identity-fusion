@@ -249,6 +249,7 @@ describe('FusionService', () => {
 
             expect(result).toBeDefined()
             expect(result?.attributes.reverseNativeIdentity).toBe('native-1')
+            expect(mockSources.assertReverseCorrelationReady).toHaveBeenCalledTimes(1)
         })
 
         it('should hydrate missing account info during managed-account layer for historical missing accounts', async () => {
@@ -376,6 +377,38 @@ describe('FusionService', () => {
             await (fusionService as any).correlatePerSource(fusionAccount, false)
 
             expect(fusionAccount.attributes.reverseNativeIdentity).toBe('existing-value')
+        })
+
+        it('fails managed account processing when reverse correlation prerequisites are missing', async () => {
+            const mockManagedAccount = {
+                id: 'acct-2',
+                nativeIdentity: 'native-2',
+                name: 'Managed Account 2',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+
+            const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
+            ;(fusionService as any).sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: {},
+            })
+            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            mockSources.getSourceConfig.mockReturnValue({
+                name: 'Source A',
+                correlationMode: 'reverse',
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity',
+            } as any)
+            mockSources.assertReverseCorrelationReady.mockRejectedValueOnce(
+                new Error('Reverse correlation prerequisites are not ready')
+            )
+
+            await expect(fusionService.processManagedAccount(mockManagedAccount)).rejects.toThrow(
+                'Reverse correlation prerequisites are not ready'
+            )
         })
     })
 

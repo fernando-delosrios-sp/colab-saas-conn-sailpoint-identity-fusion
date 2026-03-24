@@ -32,6 +32,17 @@ import { buildSourceConfigPatch } from './helpers'
 import { SourceInfo } from './types'
 import { CompiledAccountJmespathFilter, compileAccountJmespathFilter } from './accountJmespathFilter'
 
+type ReverseCorrelationArtifact =
+    | 'fusion_schema_attribute'
+    | 'identity_attribute'
+    | 'identity_profile_mapping'
+    | 'managed_source_correlation'
+
+interface ReverseCorrelationSetupStatus {
+    isConsistent: boolean
+    missingArtifacts: ReverseCorrelationArtifact[]
+}
+
 // ============================================================================
 // SourceService Class
 // ============================================================================
@@ -42,6 +53,8 @@ import { CompiledAccountJmespathFilter, compileAccountJmespathFilter } from './a
  * managing managed sources, and coordinating aggregations.
  */
 export class SourceService {
+    private static readonly IDENTITY_PROFILE_PENDING_OPERATIONS_HINT =
+        'Please ensure there are no pending operations on identity profiles in ISC, then retry.'
     // Unified source storage - both managed and fusion sources
     private sourcesById: Map<string, SourceInfo> = new Map()
     private sourcesByName: Map<string, SourceInfo> = new Map()
@@ -1078,10 +1091,106 @@ export class SourceService {
             `Setting up reverse correlation for source "${sourceName}": attribute="${correlationAttribute}", displayName="${correlationDisplayName}"`
         )
 
+        await this.ensureReverseCorrelationSetupPhases(correlationAttribute, correlationDisplayName, sourceInfo.id)
+
+        const initialStatus = await this.getReverseCorrelationSetupStatus(correlationAttribute, sourceInfo.id)
+        if (initialStatus.isConsistent) {
+            return
+        }
+
+        this.log.warn(
+            `Reverse correlation setup verification failed for source "${sourceName}" (missing: ${initialStatus.missingArtifacts.join(', ')}). Attempting one auto-repair pass.`
+        )
+        await this.repairReverseCorrelationSetup(correlationAttribute, correlationDisplayName, sourceInfo.id, initialStatus)
+
+        const repairedStatus = await this.getReverseCorrelationSetupStatus(correlationAttribute, sourceInfo.id)
+        if (!repairedStatus.isConsistent) {
+            throw new ConnectorError(
+                `Reverse correlation setup is inconsistent for source "${sourceName}" after auto-repair. Missing artifacts: ${repairedStatus.missingArtifacts.join(', ')}.`,
+                ConnectorErrorType.Generic
+            )
+        }
+        this.log.info(`Reverse correlation setup verified for source "${sourceName}"`)
+    }
+
+    /**
+     * Validate reverse-correlation prerequisites for runtime operations.
+     * Throws when setup is incomplete.
+     */
+    public async assertReverseCorrelationReady(sourceConfig: SourceConfig): Promise<void> {
+        const { correlationAttribute, name: sourceName } = sourceConfig
+        assert(correlationAttribute, `Reverse correlation attribute name is required for source "${sourceName}"`)
+        const sourceInfo = this.sourcesByName.get(sourceName)
+        assert(sourceInfo, `Source "${sourceName}" not found`)
+        const status = await this.getReverseCorrelationSetupStatus(correlationAttribute, sourceInfo.id)
+        if (!status.isConsistent) {
+            throw new ConnectorError(
+                `Reverse correlation prerequisites are not ready for source "${sourceName}". Missing artifacts: ${status.missingArtifacts.join(', ')}.`,
+                ConnectorErrorType.Generic
+            )
+        }
+    }
+
+    private async ensureReverseCorrelationSetupPhases(
+        correlationAttribute: string,
+        correlationDisplayName: string,
+        managedSourceId: string
+    ): Promise<void> {
         await this.ensureFusionSchemaAttribute(correlationAttribute, correlationDisplayName)
         await this.ensureIdentityAttribute(correlationAttribute, correlationDisplayName)
         await this.ensureIdentityProfileMapping(correlationAttribute)
-        await this.ensureManagedSourceCorrelation(correlationAttribute, sourceInfo.id)
+        await this.ensureManagedSourceCorrelation(correlationAttribute, managedSourceId)
+    }
+
+    private async repairReverseCorrelationSetup(
+        correlationAttribute: string,
+        correlationDisplayName: string,
+        managedSourceId: string,
+        status: ReverseCorrelationSetupStatus
+    ): Promise<void> {
+        if (status.missingArtifacts.includes('fusion_schema_attribute')) {
+            await this.ensureFusionSchemaAttribute(correlationAttribute, correlationDisplayName)
+        }
+        if (status.missingArtifacts.includes('identity_attribute')) {
+            await this.ensureIdentityAttribute(correlationAttribute, correlationDisplayName)
+        }
+        if (status.missingArtifacts.includes('identity_profile_mapping')) {
+            await this.ensureIdentityProfileMapping(correlationAttribute)
+        }
+        if (status.missingArtifacts.includes('managed_source_correlation')) {
+            await this.ensureManagedSourceCorrelation(correlationAttribute, managedSourceId)
+        }
+    }
+
+    private async getReverseCorrelationSetupStatus(
+        correlationAttribute: string,
+        managedSourceId: string
+    ): Promise<ReverseCorrelationSetupStatus> {
+        const missingArtifacts: ReverseCorrelationArtifact[] = []
+        const fusionSchemaReady = await this.hasFusionSchemaAttribute(correlationAttribute)
+        if (!fusionSchemaReady) {
+            missingArtifacts.push('fusion_schema_attribute')
+        }
+
+        const identityAttributeReady = await this.hasSearchableIdentityAttribute(correlationAttribute)
+        if (!identityAttributeReady) {
+            missingArtifacts.push('identity_attribute')
+        }
+
+        const identityProfileReady = await this.hasIdentityProfileMapping(correlationAttribute)
+        if (!identityProfileReady) {
+            missingArtifacts.push('identity_profile_mapping')
+        }
+
+        const managedCorrelationReady = await this.hasManagedSourceCorrelation(correlationAttribute, managedSourceId)
+        if (!managedCorrelationReady) {
+            missingArtifacts.push('managed_source_correlation')
+        }
+
+        return {
+            isConsistent: missingArtifacts.length === 0,
+            missingArtifacts,
+        }
     }
 
     /**
@@ -1124,11 +1233,17 @@ export class SourceService {
         }
 
         const { sourcesApi } = this.client
-        await this.client.execute(
+        const updated = await this.client.execute(
             () => sourcesApi.putSourceSchema(requestParameters).then((r) => r.data),
             QueuePriority.HIGH,
             `SourceService>ensureFusionSchemaAttribute ${attributeName}`
         )
+        if (!updated) {
+            throw new ConnectorError(
+                `Failed to add reverse correlation attribute "${attributeName}" to Fusion source schema.`,
+                ConnectorErrorType.Generic
+            )
+        }
 
         this.log.info(`Added reverse correlation attribute "${attributeName}" to Fusion source schema`)
     }
@@ -1138,19 +1253,26 @@ export class SourceService {
      */
     private async ensureIdentityAttribute(attributeName: string, displayName: string): Promise<void> {
         const { identityAttributesApi } = this.client
+        const debugRunId = `ensureIdentityAttribute-${attributeName}`
+        // #region agent log
+        fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:debugRunId,hypothesisId:'H1',location:'sourceService.ts:ensureIdentityAttribute:entry',message:'Entering ensureIdentityAttribute',data:{attributeName,displayName,displayNameLength:displayName?.length ?? 0},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
         const existing = await this.client.execute(
             () => identityAttributesApi.getIdentityAttribute({ name: attributeName }).then((r) => r.data),
             QueuePriority.HIGH,
             `SourceService>ensureIdentityAttribute get ${attributeName}`
         )
+        // #region agent log
+        fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:debugRunId,hypothesisId:'H2',location:'sourceService.ts:ensureIdentityAttribute:after-get',message:'Identity attribute get result',data:{attributeName,found:!!existing,searchable:existing?.searchable ?? null,type:existing?.type ?? null,multi:existing?.multi ?? null,standard:existing?.standard ?? null,system:existing?.system ?? null},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
 
         if (existing) {
             if (existing.searchable) {
                 this.log.debug(`Identity attribute "${attributeName}" already exists and is searchable`)
                 return
             }
-            await this.client.execute(
+            const updated = await this.client.execute(
                 () =>
                     identityAttributesApi
                         .putIdentityAttribute({
@@ -1169,29 +1291,115 @@ export class SourceService {
                 QueuePriority.HIGH,
                 `SourceService>ensureIdentityAttribute update ${attributeName}`
             )
+            if (!updated) {
+                throw new ConnectorError(
+                    `Failed to update identity attribute "${attributeName}" to searchable.`,
+                    ConnectorErrorType.Generic
+                )
+            }
             this.log.info(`Updated identity attribute "${attributeName}" to be searchable`)
             return
         }
 
-        await this.client.execute(
-            () =>
-                identityAttributesApi
-                    .createIdentityAttribute({
-                        identityAttributeV2025: {
-                            name: attributeName,
-                            displayName,
-                            searchable: true,
-                            type: 'string',
-                            multi: false,
-                            standard: false,
-                            system: false,
-                        },
-                    })
-                    .then((r) => r.data),
-            QueuePriority.HIGH,
-            `SourceService>ensureIdentityAttribute create ${attributeName}`
-        )
+        const createPayload = {
+            identityAttributeV2025: {
+                name: attributeName,
+                displayName,
+                searchable: true,
+                type: 'string',
+                multi: false,
+                standard: false,
+                system: false,
+            },
+        }
+        // #region agent log
+        fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:debugRunId,hypothesisId:'H3',location:'sourceService.ts:ensureIdentityAttribute:before-create',message:'Creating identity attribute payload summary',data:{attributeName,payloadKeys:Object.keys(createPayload.identityAttributeV2025),payloadType:createPayload.identityAttributeV2025.type,searchable:createPayload.identityAttributeV2025.searchable,multi:createPayload.identityAttributeV2025.multi,standard:createPayload.identityAttributeV2025.standard,system:createPayload.identityAttributeV2025.system,displayNameLength:displayName?.length ?? 0},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        let created: any
+        try {
+            created = await this.client.execute(
+                () =>
+                    identityAttributesApi
+                        .createIdentityAttribute(createPayload)
+                        .then((r) => r.data),
+                QueuePriority.HIGH,
+                `SourceService>ensureIdentityAttribute create ${attributeName}`,
+                undefined,
+                true
+            )
+        } catch (error: any) {
+            throw new ConnectorError(
+                this.buildIdentityAttributeCreateErrorMessage(attributeName, error),
+                ConnectorErrorType.Generic
+            )
+        }
+        // #region agent log
+        fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:debugRunId,hypothesisId:'H3',location:'sourceService.ts:ensureIdentityAttribute:after-create',message:'Identity attribute create result',data:{attributeName,created:!!created,returnedName:(created as any)?.name ?? null,returnedType:(created as any)?.type ?? null},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        if (!created) {
+            throw new ConnectorError(
+                `Failed to create searchable identity attribute "${attributeName}".`,
+                ConnectorErrorType.Generic
+            )
+        }
         this.log.info(`Created searchable identity attribute "${attributeName}"`)
+    }
+
+    private buildIdentityAttributeCreateErrorMessage(attributeName: string, error: any): string {
+        const detailCode = error?.response?.data?.detailCode
+        const messages = error?.response?.data?.messages
+        const hasSearchableLimitMessage =
+            Array.isArray(messages) &&
+            messages.some((m: any) =>
+                String(m?.text ?? '')
+                    .toLowerCase()
+                    .includes('searchable')
+            ) &&
+            Array.isArray(messages) &&
+            messages.some((m: any) =>
+                String(m?.text ?? '')
+                    .toLowerCase()
+                    .includes('max limit')
+            )
+
+        if (detailCode === '400.1 Bad request content' && hasSearchableLimitMessage) {
+            return (
+                `Failed to create searchable identity attribute "${attributeName}": ISC tenant limit reached for searchable identity attributes. ` +
+                'Please mark an unused identity attribute as non-searchable or reuse an existing searchable identity attribute, then retry reverse correlation setup.'
+            )
+        }
+
+        return `Failed to create searchable identity attribute "${attributeName}".`
+    }
+
+    private buildIdentityProfileUpsertErrorMessage(profileId: string, attributeName: string, error: any): string {
+        const detailCode = error?.response?.data?.detailCode
+        const messages = Array.isArray(error?.response?.data?.messages)
+            ? error.response.data.messages.map((m: any) => String(m?.text ?? '')).filter((m: string) => m.length > 0)
+            : []
+        const hasMissingIdentityObjectConfigAttribute = messages.some((m: string) =>
+            m.includes('Identity Object Config attribute(s) referenced by Identity Profile attribute mapping(s)')
+        )
+        const detail =
+            messages.length > 0
+                ? messages.join(' | ')
+                : detailCode
+                  ? String(detailCode)
+                  : error instanceof Error
+                    ? error.message
+                    : String(error)
+        if (hasMissingIdentityObjectConfigAttribute) {
+            return (
+                `Failed to update identity profile ${profileId} for reverse correlation attribute "${attributeName}". ` +
+                'Identity profile contains mapping(s) to missing Identity Object Config attribute(s). ' +
+                'Restore the missing identity attribute(s) or remove stale mapping(s) from the identity profile, then retry reverse correlation setup. ' +
+                `ISC detail: ${detail}`
+            )
+        }
+        return (
+            `Failed to update identity profile ${profileId} for reverse correlation attribute "${attributeName}". ` +
+            `${SourceService.IDENTITY_PROFILE_PENDING_OPERATIONS_HINT} ISC detail: ${detail}`
+        )
     }
 
     /**
@@ -1215,11 +1423,11 @@ export class SourceService {
             (p: any) => p.authoritativeSource?.id === fusionSourceId || p.source?.id === fusionSourceId
         )
         if (matchingProfiles.length === 0) {
-            this.log.warn(
-                `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}". ` +
-                `Skipping identity profile mapping for reverse correlation attribute "${attributeName}".`
+            throw new ConnectorError(
+                `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}" while configuring reverse correlation attribute "${attributeName}". ` +
+                    SourceService.IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                ConnectorErrorType.Generic
             )
-            return
         }
         this.log.info(
             `Found ${matchingProfiles.length} identity profile(s) for fusion source "${fusionSource?.name ?? fusionSourceId}": ${matchingProfiles.map((p: any) => p.id).join(', ')}`
@@ -1232,21 +1440,24 @@ export class SourceService {
             transformDefinition: {
                 type: 'accountAttribute',
                 attributes: {
+                    sourceId: fusionSourceId,
                     sourceName: fusionSource.name,
                     attributeName,
                 },
             },
         }
         for (const profile of matchingProfiles) {
+            const profileDebugRunId = `ensureIdentityProfileMapping-${attributeName}-${profile.id}`
             const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
             const existingIndex = transforms.findIndex((t) => t.identityAttributeName === attributeName)
             const existing = existingIndex >= 0 ? transforms[existingIndex] : undefined
             const existingSourceName = existing?.transformDefinition?.attributes?.sourceName
+            const existingSourceId = existing?.transformDefinition?.attributes?.sourceId
             const existingAttributeName = existing?.transformDefinition?.attributes?.attributeName
             const isAlreadyDesired =
                 !!existing &&
-                existing.transformDefinition?.type === 'accountAttribute' &&
-                existingSourceName === fusionSource.name &&
+                this.isDesiredIdentityProfileTransform(existing, attributeName, fusionSource.name, fusionSourceId) &&
+                (existingSourceName === fusionSource.name || existingSourceId === fusionSourceId) &&
                 existingAttributeName === attributeName
 
             if (isAlreadyDesired) {
@@ -1279,48 +1490,59 @@ export class SourceService {
                         },
                     },
                 ]
+            // #region agent log
+            await fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:profileDebugRunId,hypothesisId:'H5',location:'sourceService.ts:ensureIdentityProfileMapping:before-upsert',message:'Identity profile upsert payload summary',data:{profileId:profile.id,attributeName,hasIdentityAttributeConfig,existingIndex,transformCount:transforms.length,nextTransformCount:nextTransforms.length,operation:hasIdentityAttributeConfig?'replace':'add',newTransformType:newTransform.transformDefinition.type,newTransformAttributeName:newTransform.transformDefinition.attributes.attributeName,newTransformSourceName:newTransform.transformDefinition.attributes.sourceName,hasSourceId:!!newTransform.transformDefinition.attributes.sourceId},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
 
-            await this.client.execute(
-                () =>
-                    identityProfilesApi
-                        .updateIdentityProfile({
-                            identityProfileId: profile.id!,
-                            jsonPatchOperationV2025,
-                        })
-                        .then((r) => r.data),
-                QueuePriority.HIGH,
-                `SourceService>ensureIdentityProfileMapping upsert ${attributeName} profile=${profile.id}`
-            )
+            let updatedProfile: any
+            try {
+                updatedProfile = await this.client.execute(
+                    () =>
+                        identityProfilesApi
+                            .updateIdentityProfile({
+                                identityProfileId: profile.id!,
+                                jsonPatchOperationV2025,
+                            })
+                            .then((r) => r.data),
+                    QueuePriority.HIGH,
+                    `SourceService>ensureIdentityProfileMapping upsert ${attributeName} profile=${profile.id}`,
+                    undefined,
+                    true
+                )
+            } catch (error: any) {
+                throw new ConnectorError(
+                    this.buildIdentityProfileUpsertErrorMessage(profile.id!, attributeName, error),
+                    ConnectorErrorType.Generic
+                )
+            }
+            // #region agent log
+            await fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:profileDebugRunId,hypothesisId:'H6',location:'sourceService.ts:ensureIdentityProfileMapping:after-upsert',message:'Identity profile upsert result',data:{profileId:profile.id,updatedProfile:!!updatedProfile,returnedId:(updatedProfile as any)?.id ?? null},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+            if (!updatedProfile) {
+                throw new ConnectorError(
+                    `Failed to update identity profile ${profile.id} for reverse correlation attribute "${attributeName}". ` +
+                        SourceService.IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                    ConnectorErrorType.Generic
+                )
+            }
             this.log.info(
                 `${existingIndex >= 0 ? 'Updated' : 'Added'} identity profile mapping for attribute "${attributeName}" on profile ${profile.id}`
             )
 
-            const refreshedProfiles = await this.client.paginate(
-                (params: IdentityProfilesV2025ApiListIdentityProfilesRequest) =>
-                    identityProfilesApi.listIdentityProfiles(params),
-                {},
-                QueuePriority.HIGH,
-                `SourceService>ensureIdentityProfileMapping verify ${attributeName} profile=${profile.id}`
-            )
-            const refreshedProfile = refreshedProfiles.find((p: any) => p.id === profile.id)
-            const refreshedTransforms = refreshedProfile?.identityAttributeConfig?.attributeTransforms ?? []
-            const verified = refreshedTransforms.some(
-                (t: any) =>
-                    t.identityAttributeName === attributeName &&
-                    t.transformDefinition?.type === 'accountAttribute' &&
-                    t.transformDefinition?.attributes?.sourceName === fusionSource.name &&
-                    t.transformDefinition?.attributes?.attributeName === attributeName
+            const verified = await this.waitForIdentityProfileMapping(
+                profile.id!,
+                attributeName,
+                fusionSource.name,
+                fusionSourceId
             )
             if (!verified) {
-                this.log.warn(
+                throw new ConnectorError(
                     `Identity profile mapping verification failed for profile ${profile.id} and attribute "${attributeName}". ` +
-                    `Existing transform keys: ${refreshedTransforms.map((t: any) => t.identityAttributeName).join(', ')}`
-                )
-            } else {
-                this.log.info(
-                    `Verified identity profile mapping for profile ${profile.id} and attribute "${attributeName}"`
+                        SourceService.IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                    ConnectorErrorType.Generic
                 )
             }
+            this.log.info(`Verified identity profile mapping for profile ${profile.id} and attribute "${attributeName}"`)
         }
     }
 
@@ -1376,7 +1598,7 @@ export class SourceService {
             ],
         }
 
-        await this.client.execute(
+        const updated = await this.client.execute(
             () =>
                 sourcesApi
                     .putCorrelationConfig({
@@ -1387,9 +1609,142 @@ export class SourceService {
             QueuePriority.HIGH,
             `SourceService>ensureManagedSourceCorrelation put ${managedSourceId}`
         )
+        if (!updated) {
+            throw new ConnectorError(
+                `Failed to update managed source correlation config for source ${managedSourceId} and attribute "${attributeName}".`,
+                ConnectorErrorType.Generic
+            )
+        }
         this.log.info(
             `Added correlation rule "${attributeName}" -> "${accountIdAttribute}" to managed source ${managedSourceId}`
         )
+    }
+
+    private async hasFusionSchemaAttribute(attributeName: string): Promise<boolean> {
+        const schemas = await this.listSourceSchemas(this.fusionSourceId)
+        const accountSchema = schemas.find((s) => s.name === 'account')
+        assert(accountSchema, 'Fusion source account schema not found')
+        return (accountSchema.attributes ?? []).some((a) => a.name?.toLowerCase() === attributeName.toLowerCase())
+    }
+
+    private async hasSearchableIdentityAttribute(attributeName: string): Promise<boolean> {
+        const { identityAttributesApi } = this.client
+        const existing = await this.client.execute(
+            () => identityAttributesApi.getIdentityAttribute({ name: attributeName }).then((r) => r.data),
+            QueuePriority.HIGH,
+            `SourceService>hasSearchableIdentityAttribute get ${attributeName}`
+        )
+        return !!existing?.searchable
+    }
+
+    private async hasIdentityProfileMapping(attributeName: string): Promise<boolean> {
+        const fusionSource = this.getFusionSource()
+        const fusionSourceId = this.fusionSourceId
+        assert(fusionSource, 'Fusion source not found')
+        const { identityProfilesApi } = this.client
+        const profiles = await this.client.paginate(
+            (params: IdentityProfilesV2025ApiListIdentityProfilesRequest) =>
+                identityProfilesApi.listIdentityProfiles(params),
+            {},
+            QueuePriority.HIGH,
+            `SourceService>hasIdentityProfileMapping listProfiles ${attributeName}`
+        )
+        const matchingProfiles = profiles.filter(
+            (p: any) => p.authoritativeSource?.id === fusionSourceId || p.source?.id === fusionSourceId
+        )
+        if (matchingProfiles.length === 0) {
+            return false
+        }
+        return matchingProfiles.every((profile: any) => {
+            const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
+            return transforms.some(
+                (t: any) => this.isDesiredIdentityProfileTransform(t, attributeName, fusionSource.name, fusionSourceId)
+            )
+        })
+    }
+
+    private async waitForIdentityProfileMapping(
+        profileId: string,
+        attributeName: string,
+        fusionSourceName: string,
+        fusionSourceId: string
+    ): Promise<boolean> {
+        const maxAttempts = 3
+        const waitMs = 1500
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            const profiles = await this.fetchIdentityProfiles(
+                `SourceService>waitForIdentityProfileMapping ${attributeName} profile=${profileId} attempt=${attempt}`
+            )
+            const profile = profiles.find((p: any) => p.id === profileId)
+            const transforms = profile?.identityAttributeConfig?.attributeTransforms ?? []
+            const verified = transforms.some((t: any) =>
+                this.isDesiredIdentityProfileTransform(t, attributeName, fusionSourceName, fusionSourceId)
+            )
+            if (verified) {
+                return true
+            }
+            if (attempt < maxAttempts) {
+                await this.sleep(waitMs)
+            }
+        }
+        return false
+    }
+
+    private async fetchIdentityProfiles(context: string): Promise<any[]> {
+        const { identityProfilesApi } = this.client
+        return this.client.paginate(
+            (params: IdentityProfilesV2025ApiListIdentityProfilesRequest) =>
+                identityProfilesApi.listIdentityProfiles(params),
+            {},
+            QueuePriority.HIGH,
+            context
+        )
+    }
+
+    private isDesiredIdentityProfileTransform(
+        transform: any,
+        attributeName: string,
+        fusionSourceName: string,
+        fusionSourceId: string
+    ): boolean {
+        if (transform?.identityAttributeName !== attributeName) {
+            return false
+        }
+        if (transform?.transformDefinition?.type !== 'accountAttribute') {
+            return false
+        }
+        const transformAttrs = transform?.transformDefinition?.attributes ?? {}
+        const sourceMatches =
+            transformAttrs.sourceName === fusionSourceName || transformAttrs.sourceId === fusionSourceId
+        return sourceMatches && transformAttrs.attributeName === attributeName
+    }
+
+    private async sleep(ms: number): Promise<void> {
+        await new Promise((resolve) => setTimeout(resolve, ms))
+    }
+
+    private async hasManagedSourceCorrelation(attributeName: string, managedSourceId: string): Promise<boolean> {
+        const { sourcesApi } = this.client
+        const schemas = await this.listSourceSchemas(managedSourceId)
+        const accountSchema = schemas.find((s) => s.name === 'account')
+        assert(accountSchema, `Managed source ${managedSourceId} account schema not found`)
+        const accountIdAttribute = accountSchema.identityAttribute
+        if (!accountIdAttribute) {
+            return false
+        }
+
+        const correlationConfig = await this.client.execute(
+            () =>
+                sourcesApi
+                    .getCorrelationConfig({
+                        id: managedSourceId,
+                    } as SourcesV2025ApiGetCorrelationConfigRequest)
+                    .then((r) => r.data),
+            QueuePriority.HIGH,
+            `SourceService>hasManagedSourceCorrelation get ${managedSourceId}`
+        )
+        const assignments = correlationConfig?.attributeAssignments ?? []
+        return assignments.some((a) => a.property === attributeName && a.value === accountIdAttribute)
     }
 
     // ------------------------------------------------------------------------

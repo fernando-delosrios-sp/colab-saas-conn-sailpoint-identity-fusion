@@ -36,7 +36,16 @@ export const testConnection = async (serviceRegistry: ServiceRegistry, _input: a
         if (reverseCorrelationSources.length > 0) {
             const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
             for (const sc of reverseCorrelationSources) {
-                await sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
+                try {
+                    await sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
+                } catch (error) {
+                    log.error(
+                        `Reverse correlation setup validation failed for source "${sc.name}" (attribute="${sc.correlationAttribute ?? 'unset'}"): ${
+                            error instanceof Error ? error.message : String(error)
+                        }`
+                    )
+                    throw error
+                }
             }
             log.info(`Reverse correlation setup validated for ${reverseCorrelationSources.length} source(s)`)
             timer.phase('Validated reverse correlation setup')
