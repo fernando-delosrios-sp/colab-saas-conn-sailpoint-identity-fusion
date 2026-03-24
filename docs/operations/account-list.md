@@ -14,13 +14,14 @@ flowchart TD
     Exist --> NewId[4. Process Identities]
     NewId --> Reviews[5. Process New Identity Decisions]
     Reviews --> Match[6. Match Remaining Managed Accounts]
-    Dedup --> Forms[7. Form & Entitlement Reconciliation]
+    Match --> Forms[7. Form & Entitlement Reconciliation]
     Forms --> Unique[8. Global Unique Attribute Refresh]
     Unique --> Report[9. Reporting]
     Report --> Clean[10. Cleanup Caches]
     Clean --> Output[11. Output Accounts to ISC]
     Output --> State[12. Save State & Final Cleanup]
-    State --> End([End])
+    State --> Delayed[13. Schedule Delayed Aggregation]
+    Delayed --> End([End])
 ```
 
 1.  **Setup & Initialization**:
@@ -28,6 +29,7 @@ flowchart TD
     - Acquires a **process lock** to prevent concurrent aggregations.
     - Checks for a "Reset" flag; if detected, it clears existing forms and resets state instead of performing aggregation.
     - Sets the fusion account schema.
+    - **Reverse correlation setup**: Validates and updates reverse correlation transforms if sources are configured for reverse correlation.
     - Aggregates managed sources enabled for aggregation if they were not aggregated after the latest Fusion aggregation.
     - Initializes attribute counters.
 
@@ -37,6 +39,7 @@ flowchart TD
         - Identities (from ISC).
         - Managed accounts (from configured sources).
         - Message sender workflow.
+        - Delayed aggregation sender workflow.
         - Current form data, including forms and associated form instances.
     - Managed machine accounts (`isMachine=true`) are discarded after fetch and never enter the work queue.
     - A warning is logged with discarded machine-account counts (per source and total).
@@ -153,6 +156,9 @@ To reduce email/report payload growth:
     - State is saved _after_ output generation so that a failure during transmission prevents stale state from being persisted.
     - Clears fusion account caches from memory.
     - Releases the process lock. The lock is released in a `finally` block, so it is also released if the operation fails after acquisition.
+
+13. **Schedule Delayed Aggregation**:
+    - Triggers the delayed aggregation workflow for any managed sources configured with delayed aggregation mode.
 
 ## Behavior Notes
 

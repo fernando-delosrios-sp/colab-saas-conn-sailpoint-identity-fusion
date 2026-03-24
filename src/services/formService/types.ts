@@ -11,3 +11,20 @@ export type Candidate = {
     attributes: Record<string, any>
     scores: any[]
 }
+
+export type PendingReviewFormContext = {
+    formInstanceId: string
+    url?: string
+}
+
+export type PendingReviewReviewerContext = {
+    id: string
+    name: string
+    email: string
+}
+
+export type PendingReviewAccountContext = {
+    forms: PendingReviewFormContext[]
+    reviewers: PendingReviewReviewerContext[]
+    candidateIds: string[]
+}

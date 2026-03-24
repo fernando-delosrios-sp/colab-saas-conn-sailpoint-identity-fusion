@@ -5,7 +5,12 @@ export { FormService } from './formService'
 export { ALGORITHM_LABELS } from './constants'
 
 // Re-export types
-export type { Candidate } from './types'
+export type {
+    Candidate,
+    PendingReviewFormContext,
+    PendingReviewReviewerContext,
+    PendingReviewAccountContext,
+} from './types'
 
 // Re-export helpers (for testing and external use if needed)
 export { buildCandidateList, buildFormName, calculateExpirationDate, getFormOwner, resolveIdentitiesSelectLabel } from './helpers'

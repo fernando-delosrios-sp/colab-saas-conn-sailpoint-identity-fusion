@@ -29,6 +29,12 @@ import { assert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
 import { getDateFromISOString } from '../../utils/date'
 import { buildSourceConfigPatch } from './helpers'
+import { buildSourceFilter } from './sourceAccountFilterHelpers'
+import {
+    buildIdentityAttributeCreateErrorMessage,
+    buildIdentityProfileUpsertErrorMessage,
+    IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+} from './sourceReverseCorrelationErrors'
 import { SourceInfo } from './types'
 import { CompiledAccountJmespathFilter, compileAccountJmespathFilter } from './accountJmespathFilter'
 
@@ -53,8 +59,6 @@ interface ReverseCorrelationSetupStatus {
  * managing managed sources, and coordinating aggregations.
  */
 export class SourceService {
-    private static readonly IDENTITY_PROFILE_PENDING_OPERATIONS_HINT =
-        'Please ensure there are no pending operations on identity profiles in ISC, then retry.'
     // Unified source storage - both managed and fusion sources
     private sourcesById: Map<string, SourceInfo> = new Map()
     private sourcesByName: Map<string, SourceInfo> = new Map()
@@ -458,7 +462,7 @@ export class SourceService {
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
-        const filters = this.buildSourceFilter(sourceInfo)
+        const filters = buildSourceFilter(sourceInfo)
         const sorters = 'created'
 
         const requestParameters: AccountsApiListAccountsRequest = {
@@ -497,7 +501,7 @@ export class SourceService {
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
-        const filters = this.buildSourceFilter(sourceInfo)
+        const filters = buildSourceFilter(sourceInfo)
         const sorters = 'created'
 
         const requestParameters: AccountsApiListAccountsRequest = {
@@ -693,7 +697,7 @@ export class SourceService {
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
-        const filters = this.buildSourceFilter(sourceInfo, `nativeIdentity eq "${nativeIdentity}"`)
+        const filters = buildSourceFilter(sourceInfo, `nativeIdentity eq "${nativeIdentity}"`)
 
         const requestParameters: AccountsApiListAccountsRequest = {
             filters,
@@ -1329,7 +1333,7 @@ export class SourceService {
             )
         } catch (error: any) {
             throw new ConnectorError(
-                this.buildIdentityAttributeCreateErrorMessage(attributeName, error),
+                buildIdentityAttributeCreateErrorMessage(attributeName, error),
                 ConnectorErrorType.Generic
             )
         }
@@ -1343,63 +1347,6 @@ export class SourceService {
             )
         }
         this.log.info(`Created searchable identity attribute "${attributeName}"`)
-    }
-
-    private buildIdentityAttributeCreateErrorMessage(attributeName: string, error: any): string {
-        const detailCode = error?.response?.data?.detailCode
-        const messages = error?.response?.data?.messages
-        const hasSearchableLimitMessage =
-            Array.isArray(messages) &&
-            messages.some((m: any) =>
-                String(m?.text ?? '')
-                    .toLowerCase()
-                    .includes('searchable')
-            ) &&
-            Array.isArray(messages) &&
-            messages.some((m: any) =>
-                String(m?.text ?? '')
-                    .toLowerCase()
-                    .includes('max limit')
-            )
-
-        if (detailCode === '400.1 Bad request content' && hasSearchableLimitMessage) {
-            return (
-                `Failed to create searchable identity attribute "${attributeName}": ISC tenant limit reached for searchable identity attributes. ` +
-                'Please mark an unused identity attribute as non-searchable or reuse an existing searchable identity attribute, then retry reverse correlation setup.'
-            )
-        }
-
-        return `Failed to create searchable identity attribute "${attributeName}".`
-    }
-
-    private buildIdentityProfileUpsertErrorMessage(profileId: string, attributeName: string, error: any): string {
-        const detailCode = error?.response?.data?.detailCode
-        const messages = Array.isArray(error?.response?.data?.messages)
-            ? error.response.data.messages.map((m: any) => String(m?.text ?? '')).filter((m: string) => m.length > 0)
-            : []
-        const hasMissingIdentityObjectConfigAttribute = messages.some((m: string) =>
-            m.includes('Identity Object Config attribute(s) referenced by Identity Profile attribute mapping(s)')
-        )
-        const detail =
-            messages.length > 0
-                ? messages.join(' | ')
-                : detailCode
-                  ? String(detailCode)
-                  : error instanceof Error
-                    ? error.message
-                    : String(error)
-        if (hasMissingIdentityObjectConfigAttribute) {
-            return (
-                `Failed to update identity profile ${profileId} for reverse correlation attribute "${attributeName}". ` +
-                'Identity profile contains mapping(s) to missing Identity Object Config attribute(s). ' +
-                'Restore the missing identity attribute(s) or remove stale mapping(s) from the identity profile, then retry reverse correlation setup. ' +
-                `ISC detail: ${detail}`
-            )
-        }
-        return (
-            `Failed to update identity profile ${profileId} for reverse correlation attribute "${attributeName}". ` +
-            `${SourceService.IDENTITY_PROFILE_PENDING_OPERATIONS_HINT} ISC detail: ${detail}`
-        )
     }
 
     /**
@@ -1425,7 +1372,7 @@ export class SourceService {
         if (matchingProfiles.length === 0) {
             throw new ConnectorError(
                 `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}" while configuring reverse correlation attribute "${attributeName}". ` +
-                    SourceService.IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                    IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
                 ConnectorErrorType.Generic
             )
         }
@@ -1511,7 +1458,7 @@ export class SourceService {
                 )
             } catch (error: any) {
                 throw new ConnectorError(
-                    this.buildIdentityProfileUpsertErrorMessage(profile.id!, attributeName, error),
+                    buildIdentityProfileUpsertErrorMessage(profile.id!, attributeName, error),
                     ConnectorErrorType.Generic
                 )
             }
@@ -1521,7 +1468,7 @@ export class SourceService {
             if (!updatedProfile) {
                 throw new ConnectorError(
                     `Failed to update identity profile ${profile.id} for reverse correlation attribute "${attributeName}". ` +
-                        SourceService.IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                        IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
                     ConnectorErrorType.Generic
                 )
             }
@@ -1538,7 +1485,7 @@ export class SourceService {
             if (!verified) {
                 throw new ConnectorError(
                     `Identity profile mapping verification failed for profile ${profile.id} and attribute "${attributeName}". ` +
-                        SourceService.IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                        IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
                     ConnectorErrorType.Generic
                 )
             }
@@ -1750,18 +1697,6 @@ export class SourceService {
     // ------------------------------------------------------------------------
     // Private Helper Methods
     // ------------------------------------------------------------------------
-
-    /**
-     * Builds an ISC account filter string for a source, optionally appending
-     * the source's configured accountFilter and any extra filter clauses.
-     */
-    private buildSourceFilter(sourceInfo: SourceInfo, ...extraFilters: string[]): string {
-        const filterParts: string[] = [`sourceId eq "${sourceInfo.id}"`, ...extraFilters]
-        if (sourceInfo.isManaged && sourceInfo.config?.accountFilter) {
-            filterParts.push(`(${sourceInfo.config.accountFilter})`)
-        }
-        return filterParts.join(' and ')
-    }
 
     /**
      * Lazily compile and cache per-source Accounts JMESPath filters.

@@ -1,4 +1,5 @@
 import { SourceService } from '../sourceService'
+import { buildIdentityAttributeCreateErrorMessage } from '../sourceReverseCorrelationErrors'
 import { SourceInfo } from '../types'
 
 const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
@@ -226,7 +227,6 @@ describe('SourceService reverse correlation setup hardening', () => {
 
 describe('SourceService identity attribute create error mapping', () => {
     it('maps searchable-limit API errors to actionable guidance', () => {
-        const { service } = createService()
         const error = {
             response: {
                 data: {
@@ -235,7 +235,7 @@ describe('SourceService identity attribute create error mapping', () => {
                 },
             },
         }
-        const message = (service as any).buildIdentityAttributeCreateErrorMessage('blackmesa-id', error)
+        const message = buildIdentityAttributeCreateErrorMessage('blackmesa-id', error)
         expect(message).toContain('ISC tenant limit reached for searchable identity attributes')
         expect(message).toContain('blackmesa-id')
     })

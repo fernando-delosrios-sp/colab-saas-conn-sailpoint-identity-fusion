@@ -135,7 +135,7 @@ export function sanitizeRecipients(recipients: (string | undefined | null)[]): s
 }
 
 /**
- * Merges multiple email sources into a single deduplicated array.
+ * Merges multiple email sources into a single array of unique values.
  * Useful when gathering recipients from multiple sources.
  */
 export function mergeEmailSources(...sources: (string | string[] | undefined | null)[]): string[] {

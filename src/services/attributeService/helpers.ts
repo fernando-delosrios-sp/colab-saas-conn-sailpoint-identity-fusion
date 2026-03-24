@@ -33,14 +33,14 @@ export const attrSplit = (text: string): string[] => {
  * Optimized to avoid unnecessary array operations and early return for empty lists
  *
  * @param list - Array of strings to concatenate
- * @param alreadyProcessed - If true, assumes list is already deduplicated and sorted (for performance)
+ * @param alreadyProcessed - If true, assumes list is already sorted with unique values (for performance)
  */
 export const attrConcat = (list: string[], alreadyProcessed: boolean = false): string => {
     if (list.length === 0) {
         return ''
     }
 
-    // If already deduplicated and sorted (e.g., from processAttributeMapping), skip redundant work
+    // If already sorted with unique values (e.g., from processAttributeMapping), skip redundant work
     const unique = alreadyProcessed ? list : Array.from(new Set(list)).sort()
 
     // Filter out empty strings to prevent empty brackets like "[] [Source]"
@@ -147,7 +147,7 @@ const processMultiValueMerge = (
         return undefined
     }
 
-    // Deduplicate and sort once for both 'list' and 'concatenate' strategies
+    // Extract unique values and sort once for both 'list' and 'concatenate' strategies
     const uniqueSorted = [...new Set(allValues)].sort()
 
     if (attributeMerge === 'list') {

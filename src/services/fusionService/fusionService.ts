@@ -8,7 +8,6 @@ import { SourceInfo, SourceService, buildSourceConfigPatch } from '../sourceServ
 import { FusionAccount } from '../../model/account'
 import { attrConcat, AttributeService } from '../attributeService'
 import { assert } from '../../utils/assert'
-import { pickAttributes } from '../../utils/attributes'
 import { createUrlContext, UrlContext } from '../../utils/url'
 import {
     mapValuesToArray,
@@ -22,13 +21,12 @@ import { FusionDecision } from '../../model/form'
 import { FusionMatch } from '../scoringService'
 import { ScoringService } from '../scoringService'
 import { SchemaService } from '../schemaService'
+import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
 import {
-    FusionReport,
-    FusionReportAccount,
-    FusionReportIdentityConflictOccurrence,
-    FusionReportStats,
-    FusionReportWarnings,
-} from './types'
+    buildIdentityConflictWarningsFromMap,
+    buildMinimalFusionReportAccount,
+    getFusionIdentityConflictTrackingKey,
+} from './fusionReportHelpers'
 import { AttributeOperations } from '../attributeService/types'
 import { MAX_CANDIDATES_FOR_FORM } from '../formService/constants'
 
@@ -391,6 +389,7 @@ export class FusionService {
     private async correlatePerSource(fusionAccount: FusionAccount, hasDecisionAssignment: boolean): Promise<void> {
         const missingIds = fusionAccount.missingAccountIds
         const validatedReverseSources = new Set<string>()
+        const canDirectCorrelate = Boolean(fusionAccount.identityId)
 
         // Separate decision-assigned accounts (always use direct correlation)
         const directCorrelateIds: string[] = []
@@ -410,7 +409,9 @@ export class FusionService {
             const mode = sourceConfig?.correlationMode ?? 'none'
 
             if (mode === 'correlate') {
-                directCorrelateIds.push(accountId)
+                if (canDirectCorrelate) {
+                    directCorrelateIds.push(accountId)
+                }
             } else if (mode === 'reverse') {
                 let ids = bySource.get(info.sourceName)
                 if (!ids) {
@@ -423,7 +424,7 @@ export class FusionService {
         }
 
         // If there's a decision assignment, ensure ALL missing accounts are directly correlated
-        if (hasDecisionAssignment) {
+        if (hasDecisionAssignment && canDirectCorrelate) {
             for (const accountId of missingIds) {
                 if (!directCorrelateIds.includes(accountId)) {
                     directCorrelateIds.push(accountId)
@@ -903,29 +904,18 @@ export class FusionService {
             this.log.debug(`No match found for managed account: ${name} [${sourceName}]`)
             // Store minimal report data when reporting is enabled or on-demand report
             if (this.fusionReportOnAggregation || this.commandType !== StandardCommand.StdAccountList) {
-                this.analyzedNonMatchReportData.push(this.buildNonMatchReportEntry(fusionAccount))
+                this.analyzedNonMatchReportData.push(
+                    buildMinimalFusionReportAccount(
+                        fusionAccount,
+                        this.urlContext,
+                        this.sourcesByName.get(fusionAccount.sourceName)?.sourceType,
+                        this.reportAttributes
+                    )
+                )
             }
         }
 
         return fusionAccount
-    }
-
-    /**
-     * Builds a minimal FusionReportAccount for non-match reporting.
-     * Avoids retaining the full FusionAccount object in memory.
-     */
-    private buildNonMatchReportEntry(fusionAccount: FusionAccount): FusionReportAccount {
-        const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
-        return {
-            accountName: this.getReportAccountLabel(fusionAccount),
-            accountUrl: this.urlContext.humanAccount(fusionAccount.managedAccountId),
-            accountSource: fusionAccount.sourceName,
-            sourceType: sourceInfo?.sourceType ?? 'authoritative',
-            accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
-            accountEmail: fusionAccount.email,
-            accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
-            matches: [],
-        }
     }
 
     /**
@@ -935,18 +925,15 @@ export class FusionService {
     private trackFailedMatching(fusionAccount: FusionAccount, error: string): void {
         this.log.error(`Failed matching for account ${fusionAccount.name} [${fusionAccount.sourceName}]: ${error}`)
         if (this.fusionReportOnAggregation || this.commandType !== StandardCommand.StdAccountList) {
-            const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
-            this.failedMatchingAccounts.push({
-                accountName: this.getReportAccountLabel(fusionAccount),
-                accountUrl: this.urlContext.humanAccount(fusionAccount.managedAccountId),
-                accountSource: fusionAccount.sourceName,
-                sourceType: sourceInfo?.sourceType ?? 'authoritative',
-                accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
-                accountEmail: fusionAccount.email,
-                accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
-                matches: [],
-                error,
-            })
+            this.failedMatchingAccounts.push(
+                buildMinimalFusionReportAccount(
+                    fusionAccount,
+                    this.urlContext,
+                    this.sourcesByName.get(fusionAccount.sourceName)?.sourceType,
+                    this.reportAttributes,
+                    error
+                )
+            )
         }
     }
 
@@ -1253,18 +1240,6 @@ export class FusionService {
     }
 
     /**
-     * Builds a stable key for identity conflict tracking when nativeIdentity may be missing.
-     */
-    private getIdentityConflictTrackingKey(fusionAccount: FusionAccount): string {
-        const nativeIdentity = fusionAccount.nativeIdentityOrUndefined
-        if (nativeIdentity && nativeIdentity.trim() !== '') {
-            return nativeIdentity
-        }
-        const name = fusionAccount.name || fusionAccount.displayName || 'unknown'
-        return `name:${name}`
-    }
-
-    /**
      * Records conflicting correlated Fusion accounts and logs warning guidance.
      */
     private trackConflictingFusionIdentity(
@@ -1278,8 +1253,8 @@ export class FusionService {
             this.conflictingFusionIdentityAccounts.set(identityId, accounts)
         }
 
-        const existingKey = this.getIdentityConflictTrackingKey(existingAccount)
-        const newKey = this.getIdentityConflictTrackingKey(newAccount)
+        const existingKey = getFusionIdentityConflictTrackingKey(existingAccount)
+        const newKey = getFusionIdentityConflictTrackingKey(newAccount)
         accounts.set(existingKey, existingAccount.name || existingAccount.displayName || existingKey)
         accounts.set(newKey, newAccount.name || newAccount.displayName || newKey)
 
@@ -1288,37 +1263,6 @@ export class FusionService {
             `Multiple Fusion accounts detected for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
             'This is generally caused by non-unique account names. Review the Fusion source configuration and consider using a unique attribute for the account name.'
         )
-    }
-
-    /**
-     * Builds report warning payload for conflicting correlated Fusion accounts.
-     */
-    private buildIdentityConflictWarnings(): FusionReportWarnings | undefined {
-        if (this.conflictingFusionIdentityAccounts.size === 0) {
-            return undefined
-        }
-
-        const occurrences: FusionReportIdentityConflictOccurrence[] = []
-        for (const [identityId, accounts] of this.conflictingFusionIdentityAccounts.entries()) {
-            const nativeIdentities = Array.from(accounts.keys()).sort((a, b) => a.localeCompare(b))
-            const accountNames = Array.from(new Set(accounts.values())).sort((a, b) => a.localeCompare(b))
-            occurrences.push({
-                identityId,
-                accountCount: nativeIdentities.length,
-                accountNames,
-                nativeIdentities,
-            })
-        }
-        occurrences.sort((a, b) => a.identityId.localeCompare(b.identityId))
-
-        return {
-            identityConflicts: {
-                message:
-                    'More than one Fusion account was found for one or more identities. This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.',
-                affectedIdentities: occurrences.length,
-                occurrences,
-            },
-        }
     }
 
     /**
@@ -1339,9 +1283,9 @@ export class FusionService {
         if (hasIdentityId && !isUncorrelated) {
             const existingFusionAccount = this.fusionIdentityMap.get(identityId!)
             const existingKey = existingFusionAccount
-                ? this.getIdentityConflictTrackingKey(existingFusionAccount)
+                ? getFusionIdentityConflictTrackingKey(existingFusionAccount)
                 : undefined
-            const incomingKey = this.getIdentityConflictTrackingKey(fusionAccount)
+            const incomingKey = getFusionIdentityConflictTrackingKey(fusionAccount)
             if (existingFusionAccount && existingKey !== incomingKey) {
                 this.trackConflictingFusionIdentity(identityId!, existingFusionAccount, fusionAccount)
             }
@@ -1385,7 +1329,7 @@ export class FusionService {
      */
     public generateReport(includeNonMatches: boolean = false, stats?: FusionReportStats): FusionReport {
         const accounts: FusionReportAccount[] = []
-        const warnings = this.buildIdentityConflictWarnings()
+        const warnings = buildIdentityConflictWarningsFromMap(this.conflictingFusionIdentityAccounts)
 
         // Report on the managed accounts that were flagged as potential matches (forms created)
         for (const fusionAccount of this.potentialMatchAccounts) {
@@ -1410,13 +1354,12 @@ export class FusionService {
 
                 const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
                 accounts.push({
-                    accountName: this.getReportAccountLabel(fusionAccount),
-                    accountUrl: this.urlContext.humanAccount(fusionAccount.managedAccountId),
-                    accountSource: fusionAccount.sourceName,
-                    sourceType: sourceInfo?.sourceType ?? 'authoritative',
-                    accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
-                    accountEmail: fusionAccount.email,
-                    accountAttributes: pickAttributes(fusionAccount.attributes as any, this.reportAttributes),
+                    ...buildMinimalFusionReportAccount(
+                        fusionAccount,
+                        this.urlContext,
+                        sourceInfo?.sourceType,
+                        this.reportAttributes
+                    ),
                     matches,
                 })
             }
@@ -1466,28 +1409,4 @@ export class FusionService {
         return nonMatchAccounts
     }
 
-    /**
-     * Build a stable, user-friendly account label for report rows.
-     * Prefer displayName/name, then fall back to uid-like identifiers.
-     */
-    private getReportAccountLabel(fusionAccount: FusionAccount): string {
-        const attrs = fusionAccount.attributes ?? {}
-        const displayName = String(attrs.displayName ?? fusionAccount.displayName ?? '').trim()
-        if (displayName) return displayName
-
-        const name = String(attrs.name ?? fusionAccount.name ?? '').trim()
-        const uid = String(
-            attrs.uid ??
-            attrs.id ??
-            fusionAccount.identityId ??
-            fusionAccount.managedAccountId ??
-            fusionAccount.nativeIdentityOrUndefined ??
-            ''
-        ).trim()
-
-        if (name && uid) return `${name} (${uid})`
-        if (name) return name
-        if (uid) return uid
-        return 'Unknown'
-    }
 }

@@ -197,22 +197,14 @@ export class AttributeService {
             let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
             const mappingTargets = this.getAttributeMappingTargetNames()
             for (const attribute of mappingTargets) {
-                const hasExistingValue = isValidAttributeValue(attributeBag.current[attribute])
-                const canResetDisplay = fusionAccount.needsReset && attribute === fusionDisplayAttribute
-                const shouldKeepIdentityImmutable =
-                    this.isExistingFusionAccount(fusionAccount) && fusionAccount.isIdentity
-                const isImmutableIdentityAttribute =
-                    attribute === fusionIdentityAttribute &&
-                    hasExistingValue &&
-                    shouldKeepIdentityImmutable
-                const isImmutableDisplayAttribute =
-                    attribute === fusionDisplayAttribute && hasExistingValue && !canResetDisplay
-
-                if (isImmutableIdentityAttribute || isImmutableDisplayAttribute) {
-                    continue
-                }
-
-                if (this.uniqueAttributeNames.has(attribute) && attributeBag.current[attribute] !== undefined) {
+                if (
+                    this.shouldSkipMappedAttribute(
+                        attribute,
+                        fusionAccount,
+                        fusionIdentityAttribute,
+                        fusionDisplayAttribute
+                    )
+                ) {
                     continue
                 }
 
@@ -240,10 +232,7 @@ export class AttributeService {
                         mainAccountId.length > 0 ? this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId) : undefined
                 }
                 if (attribute === 'history') {
-                    const history = processedValue as string[]
-                    if (Array.isArray(history) && history.length > 0) {
-                        fusionAccount.importHistory(history)
-                    }
+                    this.applyHistoryMapping(processedValue, fusionAccount)
                 }
             }
         }
@@ -255,6 +244,36 @@ export class AttributeService {
         }
 
         attributeBag.current = attributes
+    }
+
+    /**
+     * Skip attribute mapping when identity/display must stay immutable or unique values are already set.
+     */
+    private shouldSkipMappedAttribute(
+        attribute: string,
+        fusionAccount: FusionAccount,
+        fusionIdentityAttribute: string,
+        fusionDisplayAttribute: string
+    ): boolean {
+        const current = fusionAccount.attributeBag.current
+        const hasExistingValue = isValidAttributeValue(current[attribute])
+        const canResetDisplay = fusionAccount.needsReset && attribute === fusionDisplayAttribute
+        const shouldKeepIdentityImmutable =
+            this.isExistingFusionAccount(fusionAccount) && fusionAccount.isIdentity
+        const isImmutableIdentityAttribute =
+            attribute === fusionIdentityAttribute && hasExistingValue && shouldKeepIdentityImmutable
+        const isImmutableDisplayAttribute =
+            attribute === fusionDisplayAttribute && hasExistingValue && !canResetDisplay
+
+        if (isImmutableIdentityAttribute || isImmutableDisplayAttribute) return true
+        if (this.uniqueAttributeNames.has(attribute) && current[attribute] !== undefined) return true
+        return false
+    }
+
+    private applyHistoryMapping(processedValue: unknown, fusionAccount: FusionAccount): void {
+        const history = processedValue as string[]
+        if (!Array.isArray(history) || history.length === 0) return
+        fusionAccount.importHistory(history)
     }
 
     // ------------------------------------------------------------------------
@@ -270,13 +289,13 @@ export class AttributeService {
         await this.refreshDefinitions(
             fusionAccount,
             this.normalDefinitions,
-            this.processNormalDefinition.bind(this),
+            (d, fa, ctx) => this.processNormalDefinition(d, fa, ctx),
             'normal'
         )
         await this.refreshDefinitions(
             fusionAccount,
             this.uniqueDefinitions,
-            this.processUniqueDefinition.bind(this),
+            (d, fa, ctx) => this.processUniqueDefinition(d, fa, ctx),
             'unique'
         )
     }
@@ -288,13 +307,20 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to refresh normal attributes for
      */
     public async refreshNormalAttributes(fusionAccount: FusionAccount): Promise<void> {
-        const forceRefresh = this.forceAttributeRefresh || fusionAccount.needsReset || this.normalDefinitions.some((def) => def.refresh)
-        if (!fusionAccount.needsRefresh && !forceRefresh || this.normalDefinitions.length === 0) return
+        if (this.normalDefinitions.length === 0) return
+
+        const forceRefresh =
+            this.forceAttributeRefresh ||
+            fusionAccount.needsReset ||
+            this.normalDefinitions.some((def) => def.refresh)
+        const shouldRefresh = fusionAccount.needsRefresh || forceRefresh
+        if (!shouldRefresh) return
+
         this.log.debug(`Refreshing normal attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`)
         await this.refreshDefinitions(
             fusionAccount,
             this.normalDefinitions,
-            this.processNormalDefinition.bind(this),
+            (d, fa, ctx) => this.processNormalDefinition(d, fa, ctx),
             'normal'
         )
     }
@@ -313,7 +339,11 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to refresh unique attributes for
      */
     public async refreshUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
-        if (!fusionAccount.needsRefresh && !fusionAccount.needsReset || this.uniqueDefinitions.length === 0) return
+        if (this.uniqueDefinitions.length === 0) return
+
+        const shouldRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset
+        if (!shouldRefresh) return
+
         this.log.debug(`Refreshing unique attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`)
 
         if (fusionAccount.needsReset) {
@@ -323,7 +353,7 @@ export class AttributeService {
         await this.refreshDefinitions(
             fusionAccount,
             this.uniqueDefinitions,
-            this.processUniqueDefinition.bind(this),
+            (d, fa, ctx) => this.processUniqueDefinition(d, fa, ctx),
             'unique'
         )
     }
@@ -358,9 +388,10 @@ export class AttributeService {
                         `Attribute ${def.name} not found in unique attribute definition config`
                     )
                     valuesSet.add(valueStr)
-                } else if (valuesSet.delete(valueStr)) {
-                    this.log.debug(`Unregistered unique value '${valueStr}' for attribute ${def.name}`)
+                    return
                 }
+                if (!valuesSet.delete(valueStr)) return
+                this.log.debug(`Unregistered unique value '${valueStr}' for attribute ${def.name}`)
             })
         }
     }
@@ -641,24 +672,26 @@ export class AttributeService {
     private evaluateTemplate(
         definition: AnyDefinition,
         context: RenderContext,
-        accountName?: string
+        accountName?: string,
+        expressionOverride?: string
     ): string | undefined {
-        if (!definition.expression) {
+        const expression = expressionOverride ?? definition.expression
+        if (!expression) {
             this.log.error(`Expression is required for attribute ${definition.name}`)
             return undefined
         }
 
-        let value = evaluateVelocityTemplate(definition.expression, context, definition.maxLength)
+        let value = evaluateVelocityTemplate(expression, context, definition.maxLength)
         if (!value) {
             this.log.error(`Failed to evaluate velocity template for attribute ${definition.name}`)
             return undefined
         }
 
         // Compare to expression without trailing $counter (UniqueAttributeDefinition may auto-append it)
-        const exprWithoutCounter = definition.expression.replace(/\$counter$|\$\{counter\}$/, '')
+        const exprWithoutCounter = expression.replace(/\$counter$|\$\{counter\}$/, '')
         const outputMatchesExpression =
-            value === definition.expression || (exprWithoutCounter !== definition.expression && value === exprWithoutCounter)
-        if (outputMatchesExpression && this.hasVelocityVariableReference(exprWithoutCounter || definition.expression)) {
+            value === expression || (exprWithoutCounter !== expression && value === exprWithoutCounter)
+        if (outputMatchesExpression && this.hasVelocityVariableReference(exprWithoutCounter || expression)) {
             this.log.warn(
                 `Velocity template for attribute ${definition.name} returned unresolved variable expression: ${value}`
             )
@@ -783,24 +816,25 @@ export class AttributeService {
         const counter = StateWrapper.getCounter()
         const digits = definition.digits ?? 1
 
-        // Ensure expression has $counter for disambiguation fallback.
+        // Ensure expression has $counter for disambiguation fallback (local only; do not mutate config).
         // Skip auto-append for UUID-based expressions because UUID already
         // provides uniqueness and appending counter can mutate intent.
+        let effectiveExpression = definition.expression ?? ''
         if (
-            definition.expression &&
-            !definition.expression.includes('$counter') &&
-            !definition.expression.includes('${counter}') &&
-            !definition.expression.includes('$UUID') &&
-            !definition.expression.includes('${UUID}')
+            effectiveExpression &&
+            !effectiveExpression.includes('$counter') &&
+            !effectiveExpression.includes('${counter}') &&
+            !effectiveExpression.includes('$UUID') &&
+            !effectiveExpression.includes('${UUID}')
         ) {
-            definition.expression = `${definition.expression}$counter`
+            effectiveExpression = `${effectiveExpression}$counter`
         }
         context.counter = ''
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             this.injectUUIDIfNeeded(definition, context)
 
-            const value = this.evaluateTemplate(definition, context, fusionAccount.name)
+            const value = this.evaluateTemplate(definition, context, fusionAccount.name, effectiveExpression)
             if (!value) return undefined
 
             if (!registeredValues.has(value)) {
@@ -918,15 +952,15 @@ export class AttributeService {
         }
 
         const value = await this.generateNormalAttributeValue(definition, fusionAccount, context)
-        if (value !== undefined) {
-            fusionAccount.attributes[name] = value
-            context[name] = value
-        } else {
+        if (value === undefined) {
             // Clear attribute when expression fails (e.g. unresolved variables), so we do not
             // retain a literal template string that may have come from attribute mapping.
             delete fusionAccount.attributes[name]
             delete context[name]
+            return
         }
+        fusionAccount.attributes[name] = value
+        context[name] = value
     }
 
     /**
@@ -979,13 +1013,13 @@ export class AttributeService {
         }
 
         const value = await this.generateUniqueAttributeValue(definition, fusionAccount, context)
-        if (value !== undefined) {
-            fusionAccount.attributes[name] = value
-            context[name] = value
-        } else {
+        if (value === undefined) {
             // Clear attribute when expression fails (e.g. unresolved variables)
             delete fusionAccount.attributes[name]
             delete context[name]
+            return
         }
+        fusionAccount.attributes[name] = value
+        context[name] = value
     }
 }

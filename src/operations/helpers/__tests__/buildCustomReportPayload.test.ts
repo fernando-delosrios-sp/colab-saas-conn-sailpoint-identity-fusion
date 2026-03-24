@@ -80,7 +80,7 @@ describe('buildCustomReportPayload', () => {
         })
     })
 
-    it('deduplicates forms and reviewers across related account ids', () => {
+    it('merges unique forms and reviewers across related account ids', () => {
         const reportIndex = buildReportAccountIndex([])
         const row = {
             key: 'fusion-review-multi',

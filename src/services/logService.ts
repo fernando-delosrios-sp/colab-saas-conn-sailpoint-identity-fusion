@@ -1,6 +1,9 @@
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
 import { ApiQueue } from './clientService/queue'
 import { QueuePriority } from './clientService/types'
+import { getCallerInfo } from './logCallerInfo'
+
+export { getCallerInfo, getCallerFunctionName } from './logCallerInfo'
 
 type Logger = typeof logger
 
@@ -33,136 +36,6 @@ type LogConfig = {
     externalLoggingLevel?: LogLevel
     /** Optional operation name for log attribution, e.g. "accountList" */
     operationContext?: string
-}
-
-/**
- * Known operation function names
- */
-const OPERATION_NAMES = new Set([
-    'accountList',
-    'accountCreate',
-    'accountRead',
-    'accountUpdate',
-    'accountDelete',
-    'accountEnable',
-    'accountDisable',
-    'entitlementList',
-    'accountDiscoverSchema',
-    'testConnection',
-])
-
-/**
- * Extracts the caller service and method name from the stack trace
- * @param skipFrames Number of stack frames to skip (default: 2 to skip this function and the logging method)
- * @returns An object with origin (formatted string) and isOperation (boolean)
- */
-export function getCallerInfo(skipFrames: number = 2): { origin: string; isOperation: boolean } {
-    try {
-        const stack = new Error().stack
-        if (!stack) return { origin: 'unknown', isOperation: false }
-
-        const lines = stack.split('\n')
-
-        // Check if this is from an operations file (works in dev/source)
-        // or check the full stack for operations path (works in compiled code)
-        const isOperationByPath = stack.includes('/operations/')
-
-        // Walk the stack starting from the caller frame.
-        // When the log call is inside an arrow function or callback (e.g. Promise.all,
-        // withLock), the immediate frame is anonymous and only shows a file path.
-        // In bundled code that file is always "index.js", so we lose context.
-        // Walking up finds the enclosing ClassName.methodName or named function.
-        const startIdx = skipFrames + 1
-        // Limit the walk to avoid traversing runtime/node internals
-        const maxIdx = Math.min(lines.length - 1, startIdx + 8)
-
-        // Infrastructure class names to skip when walking the stack.
-        // These are utility/framework classes that wrap business logic - we want
-        // to attribute the log to the actual business caller, not the wrapper.
-        const INFRASTRUCTURE_CLASSES = new Set(['Object', 'Module', 'Promise', 'InMemoryLockService', 'ApiQueue'])
-
-        // Node.js runtime internals - skip entirely (do not use as fallback).
-        // When log calls run inside async callbacks, the stack often shows
-        // process.processTicksAndRejections etc.; we must walk past these
-        // to find the actual service/method (e.g. accountCreate, FusionService.processFusionAccount).
-        const RUNTIME_INTERNALS = new Set(['process', 'internal', 'node', 'AsyncLocalStorage', 'AsyncResource'])
-
-        // --- Pass 1: find the first ClassName.methodName (most specific) ---
-        // Skip infrastructure and runtime internals to find the real business caller.
-        let firstInfraOrigin: string | undefined
-        for (let i = startIdx; i <= maxIdx; i++) {
-            const line = lines[i]
-            if (!line) continue
-
-            const classMethodMatch = line.match(/at\s+(\w+)\.(\w+)\s*\(/)
-            if (classMethodMatch) {
-                const className = classMethodMatch[1]
-                const methodName = classMethodMatch[2]
-
-                if (RUNTIME_INTERNALS.has(className)) {
-                    continue
-                }
-                if (INFRASTRUCTURE_CLASSES.has(className)) {
-                    if (!firstInfraOrigin) {
-                        firstInfraOrigin = `${className}>${methodName}`
-                    }
-                    continue
-                }
-
-                return {
-                    origin: `${className}>${methodName}`,
-                    isOperation: false,
-                }
-            }
-        }
-
-        // --- Pass 2: find a named function (standalone, not ClassName.method) ---
-        for (let i = startIdx; i <= maxIdx; i++) {
-            const line = lines[i]
-            if (!line) continue
-
-            const functionMatch = line.match(/at\s+(?:new\s+)?(\w+)\s*\(/)
-            if (functionMatch) {
-                const functionName = functionMatch[1]
-                const isOperation = OPERATION_NAMES.has(functionName) || isOperationByPath
-                if (isOperation) {
-                    return { origin: `[${functionName}]`, isOperation: true }
-                }
-                return { origin: functionName, isOperation: isOperationByPath }
-            }
-        }
-
-        // If we only found infrastructure callers, use the first one as fallback
-        // (still much better than "index" or "unknown")
-        if (firstInfraOrigin) {
-            return { origin: firstInfraOrigin, isOperation: false }
-        }
-
-        // --- Pass 3: fall back to file name from the immediate caller frame ---
-        const callerLine = lines[startIdx]
-        if (callerLine) {
-            const fileMatch = callerLine.match(/[/\\]([^/\\]+)\.(?:ts|js|tsx|jsx)/)
-            if (fileMatch) {
-                const fileName = fileMatch[1]
-                const isOperation = OPERATION_NAMES.has(fileName) || isOperationByPath
-                if (isOperation) {
-                    return { origin: `[${fileName}]`, isOperation: true }
-                }
-                return { origin: fileName, isOperation: false }
-            }
-        }
-
-        return { origin: 'unknown', isOperation: false }
-    } catch {
-        return { origin: 'unknown', isOperation: false }
-    }
-}
-
-/**
- * Legacy function for backwards compatibility
- */
-export function getCallerFunctionName(skipFrames: number = 2): string | undefined {
-    return getCallerInfo(skipFrames).origin
 }
 
 /**

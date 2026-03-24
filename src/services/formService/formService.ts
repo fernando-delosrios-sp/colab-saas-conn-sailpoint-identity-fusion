@@ -20,7 +20,12 @@ import { SourceService } from '../sourceService'
 import { assert, softAssert } from '../../utils/assert'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
-import { Candidate } from './types'
+import {
+    Candidate,
+    PendingReviewFormContext,
+    PendingReviewReviewerContext,
+    PendingReviewAccountContext,
+} from './types'
 import { buildCandidateList, buildFormName, calculateExpirationDate, getFormOwner, resolveIdentitiesSelectLabel } from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 import {
@@ -31,22 +36,11 @@ import {
 } from './formProcessor'
 import { MAX_CANDIDATES_FOR_FORM } from './constants'
 
-export type PendingReviewFormContext = {
-    formInstanceId: string
-    url?: string
-}
-
-export type PendingReviewReviewerContext = {
-    id: string
-    name: string
-    email: string
-}
-
-export type PendingReviewAccountContext = {
-    forms: PendingReviewFormContext[]
-    reviewers: PendingReviewReviewerContext[]
-    candidateIds: string[]
-}
+export type {
+    PendingReviewFormContext,
+    PendingReviewReviewerContext,
+    PendingReviewAccountContext,
+} from './types'
 
 // ============================================================================
 // FormService Class

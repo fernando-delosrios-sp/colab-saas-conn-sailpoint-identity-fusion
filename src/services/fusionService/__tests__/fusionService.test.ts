@@ -193,6 +193,25 @@ describe('FusionService', () => {
             expect(result?.needsReset).toBe(true)
         })
 
+        it('uses identity display name (not ID-like attributes.name) in history entries', async () => {
+            const mockIdentity = {
+                id: 'identity-12345',
+                name: 'Jane Doe',
+                attributes: {
+                    name: 'identity-12345',
+                },
+            } as unknown as IdentityDocument
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const result = await fusionService.processIdentity(mockIdentity)
+
+            expect(result).toBeDefined()
+            expect(result?.history).toEqual(expect.arrayContaining([expect.stringContaining('Set Jane Doe [Identities] as baseline')]))
+            expect(result?.history.some((entry) => entry.includes('Set identity-12345 [Identities] as baseline'))).toBe(false)
+        })
+
         it('should skip existing identities', async () => {
             const mockIdentity = {
                 id: 'identity-1',

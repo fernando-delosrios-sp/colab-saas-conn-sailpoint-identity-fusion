@@ -15,7 +15,7 @@ describe('attributeService helpers', () => {
             expect(attrSplit('')).toEqual([])
         })
 
-        it('should deduplicate values', () => {
+        it('should extract unique values', () => {
             expect(attrSplit('[HR] [HR] [IT]')).toEqual(['HR', 'IT'])
         })
     })
@@ -29,11 +29,11 @@ describe('attributeService helpers', () => {
             expect(attrConcat([])).toBe('')
         })
 
-        it('should deduplicate and sort when not alreadyProcessed', () => {
+        it('should extract unique values and sort when not alreadyProcessed', () => {
             expect(attrConcat(['B', 'A', 'B'])).toBe('[A] [B]')
         })
 
-        it('should skip dedup/sort when alreadyProcessed', () => {
+        it('should skip extracting unique values/sorting when alreadyProcessed', () => {
             expect(attrConcat(['C', 'A', 'B'], true)).toBe('[C] [A] [B]')
         })
 
