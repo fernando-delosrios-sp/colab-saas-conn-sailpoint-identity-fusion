@@ -623,6 +623,8 @@ describe('AttributeService mainAccount override', () => {
     it('does not overwrite fusionIdentityAttribute or fusionDisplayAttribute from mapping', () => {
         const service = createService()
         const fusionAccount = createFusionAccount('erp-777')
+        fusionAccount.isIdentity = true
+        fusionAccount.previousAttributes = { id: 'fusion-id-1', name: 'immutable-name' }
 
         service.mapAttributes(fusionAccount)
 
@@ -634,6 +636,8 @@ describe('AttributeService mainAccount override', () => {
     it('allows fusionDisplayAttribute change on reset', () => {
         const service = createService()
         const fusionAccount = createFusionAccount('erp-777', true)
+        fusionAccount.isIdentity = true
+        fusionAccount.previousAttributes = { id: 'fusion-id-1', name: 'immutable-name' }
 
         service.mapAttributes(fusionAccount)
 
@@ -769,5 +773,189 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
         expect(fusionAccount.attributes.nicknameBefore).toBe('Neo')
         expect(fusionAccount.attributes.mainAccount).toBe('erp-777')
         expect(fusionAccount.attributes.nicknameAfter).toBe('Trinity')
+    })
+})
+
+describe('AttributeService unique identity reset for managed accounts', () => {
+    it('regenerates fusionIdentityAttribute when managed account needs reset', async () => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [
+                {
+                    name: 'id',
+                    expression: 'generated-id',
+                    useIncrementalCounter: false,
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                },
+            ],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+        const attributeBag = {
+            current: { id: 'mapped-id' },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ _source: 'HR' }]]]),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            isManaged: true,
+            needsRefresh: true,
+            needsReset: true,
+            name: 'test-user',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBe('generated-id')
+    })
+})
+
+describe('AttributeService identity immutability by account lifecycle', () => {
+    const createService = () => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [
+                {
+                    name: 'id',
+                    expression: 'generated-id',
+                    useIncrementalCounter: false,
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                },
+            ],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        return new AttributeService(config, schemas, sourceService, log, locks)
+    }
+
+    const attachAttributesAccessor = (fusionAccount: any, attributeBag: any) => {
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+    }
+
+    it('regenerates id for new identity-origin fusion account when reset is requested', async () => {
+        const service = createService()
+        const attributeBag = {
+            current: { id: 'seed-id' },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ _source: 'HR' }]]]),
+        }
+
+        const fusionAccount: any = {
+            type: 'identity',
+            needsRefresh: true,
+            needsReset: true,
+            name: 'new-identity-account',
+            sourceName: 'Identities',
+            fromIdentity: true,
+            isIdentity: true,
+            isManaged: false,
+            previousAttributes: {},
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBe('generated-id')
+    })
+
+    it('keeps id immutable for existing fusion account attached to identity', async () => {
+        const service = createService()
+        const attributeBag = {
+            current: { id: 'persisted-id' },
+            previous: { id: 'persisted-id' },
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ _source: 'HR' }]]]),
+        }
+
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: true,
+            name: 'existing-attached-account',
+            sourceName: 'Fusion',
+            fromIdentity: true,
+            isIdentity: true,
+            isManaged: false,
+            previousAttributes: attributeBag.previous,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBe('persisted-id')
     })
 })

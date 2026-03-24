@@ -178,6 +178,21 @@ describe('FusionService', () => {
             expect(fusionService.getFusionIdentity('identity-1')).toBeDefined()
         })
 
+        it('marks new identity-backed fusion accounts for unique reset', async () => {
+            const mockIdentity = {
+                id: 'identity-reset-1',
+                name: 'Reset Identity',
+            } as IdentityDocument
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const result = await fusionService.processIdentity(mockIdentity)
+
+            expect(result).toBeDefined()
+            expect(result?.needsReset).toBe(true)
+        })
+
         it('should skip existing identities', async () => {
             const mockIdentity = {
                 id: 'identity-1',

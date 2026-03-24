@@ -553,6 +553,9 @@ export class FusionService {
             const fusionAccount = FusionAccount.fromIdentity(identity)
             this.log.debug(`Processing new identity: ${identity.name} (${identityId})`)
             fusionAccount.addIdentityLayer(identity)
+            // New fusion accounts should regenerate unique attributes even when
+            // mapping pre-populates those fields, so uniqueness is enforced.
+            fusionAccount.setNeedsReset(true)
 
             assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
             // Pass direct reference to work queue - deletions will remove processed accounts

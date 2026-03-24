@@ -199,7 +199,12 @@ export class AttributeService {
             for (const attribute of mappingTargets) {
                 const hasExistingValue = isValidAttributeValue(attributeBag.current[attribute])
                 const canResetDisplay = fusionAccount.needsReset && attribute === fusionDisplayAttribute
-                const isImmutableIdentityAttribute = attribute === fusionIdentityAttribute && hasExistingValue
+                const shouldKeepIdentityImmutable =
+                    this.isExistingFusionAccount(fusionAccount) && fusionAccount.isIdentity
+                const isImmutableIdentityAttribute =
+                    attribute === fusionIdentityAttribute &&
+                    hasExistingValue &&
+                    shouldKeepIdentityImmutable
                 const isImmutableDisplayAttribute =
                     attribute === fusionDisplayAttribute && hasExistingValue && !canResetDisplay
 
@@ -826,6 +831,14 @@ export class AttributeService {
         }
     }
 
+    /**
+     * Existing Fusion accounts reconstructed from the Fusion source keep previous
+     * attributes populated. New in-run accounts leave this bag empty.
+     */
+    private isExistingFusionAccount(fusionAccount: FusionAccount): boolean {
+        return Object.keys(fusionAccount.previousAttributes ?? {}).length > 0
+    }
+
     // ------------------------------------------------------------------------
     // Private Attribute Processing Flow
     // ------------------------------------------------------------------------
@@ -881,10 +894,11 @@ export class AttributeService {
         const needsRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || refresh
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
         const canResetDisplay = fusionAccount.needsReset && name === fusionDisplayAttribute
+        const shouldKeepIdentityImmutable = this.isExistingFusionAccount(fusionAccount) && fusionAccount.isIdentity
 
         if (hasValue && !needsRefresh) return
 
-        if (hasValue && name === fusionIdentityAttribute) {
+        if (hasValue && name === fusionIdentityAttribute && shouldKeepIdentityImmutable) {
             return
         }
 
@@ -892,7 +906,7 @@ export class AttributeService {
             return
         }
 
-        if (fusionAccount.isIdentity && name === fusionIdentityAttribute) {
+        if (shouldKeepIdentityImmutable && name === fusionIdentityAttribute) {
             this.log.warn(`Skipping change of nativeIdentity for account: ${fusionAccount.name}`)
             return
         }
@@ -940,33 +954,25 @@ export class AttributeService {
         const { name } = definition
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
-        const canResetDisplay = fusionAccount.needsReset && name === fusionDisplayAttribute
+        const isFusionIdentityAttribute = name === fusionIdentityAttribute
+        const isFusionDisplayAttribute = name === fusionDisplayAttribute
+        const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
+        const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
 
-        if (hasValue && name === fusionIdentityAttribute) {
-            this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
-            return
-        }
-
-        if (hasValue && name === fusionDisplayAttribute && !canResetDisplay) {
-            this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
-            return
-        }
-
+        // Don't regenerate unique values if the account is not being reset
         if (hasValue && !fusionAccount.needsReset) {
             this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
             return
         }
 
-        if (hasValue && name === fusionIdentityAttribute && fusionAccount.needsReset) {
-            this.log.debug(
-                `Skipping unique attribute reset for nativeIdentity attribute '${name}' ` +
-                `on account: ${fusionAccount.name}`
-            )
+        // Don't regenerate Fusion identity attribute if the account is an existing identity
+        if (hasValue && isFusionIdentityAttribute && isExistingIdentity) {
             this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
             return
         }
 
-        if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
+        // Set identity name for display attribute if the account is an identity
+        if (fusionAccount.fromIdentity && isFusionDisplayAttribute) {
             this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
             fusionAccount.attributes[name] = fusionAccount.name!
             return
