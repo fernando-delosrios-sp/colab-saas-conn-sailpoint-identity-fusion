@@ -1,10 +1,35 @@
 # Identity Fusion NG
 
-Identity Fusion NG is an Identity Security Cloud (ISC) connector that addresses the complex challenge of identity and account data aggregation through a streamlined **map-define-match** process. This concept represents the high-level operation of the connector, which can execute all three steps or just one, but always in this logical sequence:
+> **Disclaimer:** Identity Fusion NG is the newest Identity Fusion version and supersedes any Identity Fusion v1.x previous release. Version 1.x is now **deprecated**. For those needing to upgrade an existing deployment, please refer to the [migration guide](docs/guides/migration-from-previous-fusion.md).
 
-1. **Map (Consolidation)** — Strict correlation often fails when data is inconsistent. Creating, normalizing, and combining attributes from multiple sources is complex. The connector provides flexible merging strategies when multiple sources contribute to the same attribute (first found, list, concatenate, or source preference).
-2. **Define (Unique identifiers / Computation)** — ISC has no built-in way to generate unique identifiers and handle value collision. The connector provides powerful attribute definition using Apache Velocity templates, unique ID generation with disambiguation counters, immutable UUID assignment, and computed attributes.
-3. **Match (Matching / Correlation)** — The connector provides similarity-based match detection comparing the resulting mapped and defined Fusion accounts against your identity baseline. It offers optional manual review workflows and configurable merging of account attributes.
+Identity Fusion NG is an Identity Security Cloud (ISC) connector that addresses the complex challenge of identity and account data aggregation through a streamlined **map-define-match framework**. This concept represents the high-level operation of the connector, which can execute all three steps or just one, but always in this logical sequence:
+
+### The Map, Define, Match Framework
+
+**The Three Pillars**
+Map your attributes from different sources and accounts to align with your identity schema. Define new attributes from the existing ones, like unique identifiers, normalised versions of the original attributes and other powerful transformations. Finally, match your new accounts with existing identities to avoid creating duplicates, using all the previously processed attributes with a series of comparison algorithms to pick and choose.
+
+1. **Map (Consolidation)**
+   Map your attributes from different sources and accounts to align with your identity schema. Strict correlation often fails when data is inconsistent. Creating, normalizing, and combining attributes from multiple sources is complex. The connector provides flexible merging strategies when multiple sources contribute to the same attribute (first found, list, concatenate, or source preference).
+
+2. **Define (Unique identifiers / Computation)**
+   Define new attributes from the existing ones, like unique identifiers, normalised versions of the original attributes and other powerful transformations. ISC has no built-in way to generate unique identifiers and handle value collision. The connector provides powerful attribute definition using Apache Velocity templates, unique ID generation with disambiguation counters, immutable UUID assignment, and computed attributes.
+
+3. **Match (Matching / Correlation)**
+   Match your new accounts with existing identities to avoid creating duplicates, using all the previously processed attributes with a series of comparison algorithms to pick and choose. The connector provides similarity-based match detection comparing the resulting mapped and defined Fusion accounts against your identity baseline. It offers optional manual review workflows and configurable merging of account attributes.
+
+![Map, Define, Match Framework](./docs/assets/images/map-define-match.png)
+
+### Operation Modes
+
+Identity Fusion NG features three distinct operation modes:
+
+- **Authoritative accounts**
+- **Records**
+- **Orphan accounts**
+
+**Deployment Architecture**
+The connector can be used side by side with any sources except when the goal is matching authoritative accounts to avoid duplication, in which case it acts like an umbrella of any source it manages and replaces the identity profile with its own.
 
 You can use the **map**, **define**, and **match** capabilities independently or together. For **matching**, the Identity Fusion NG source should be **authoritative** in most cases—so it can determine which incoming managed accounts create a new identity and which correlate to an existing one. For **mapping and defining only** (unique IDs, calculated or consolidated attributes), Fusion is rarely configured as authoritative; adding managed account sources is optional and depends on your Map requirements.
 
@@ -18,7 +43,7 @@ Configuration is grouped into menus in the connector source in ISC. Each menu co
 
 Authentication and connectivity to the ISC APIs.
 
-![Connection Settings](docs/assets/images/config-connection-settings.png)
+![Connection Settings](./docs/assets/images/config-connection-settings.png)
 
 | Field                               | Description                                    | Required                         | Notes                                                                                 |
 | ----------------------------------- | ---------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------- |
@@ -52,7 +77,7 @@ For an in-depth explanation of source types, aggregation rules, correlation mode
 
 Controls how source account attributes are mapped into the Fusion account and how values from multiple sources are merged.
 
-![Attribute Mapping Settings](docs/assets/images/config-attribute-mapping.png)
+![Attribute Mapping Settings](./docs/assets/images/config-attribute-mapping.png)
 
 #### Attribute Mapping Definitions Section
 
@@ -63,7 +88,7 @@ Controls how source account attributes are mapped into the Fusion account and ho
 
 **Per-attribute mapping configuration:**
 
-![Attribute Mapping Settings - Per-attribute mapping configuration](docs/assets/images/config-attribute-mapping-single.png)
+![Attribute Mapping Settings - Per-attribute mapping configuration](./docs/assets/images/config-attribute-mapping-single.png)
 
 | Field                                                        | Description                                             | Required                | Notes                                                                          |
 | ------------------------------------------------------------ | ------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------ |
@@ -82,7 +107,7 @@ Controls how source account attributes are mapped into the Fusion account and ho
 
 Controls how attributes are generated (Define step), including unique identifiers, UUIDs, counters, and Velocity-based computed attributes.
 
-![Attribute Definition Settings](docs/assets/images/config-attribute-definition.png)
+![Attribute Definition Settings](./docs/assets/images/config-attribute-definition.png)
 
 #### Attribute Definition Settings Section
 
@@ -93,7 +118,7 @@ Controls how attributes are generated (Define step), including unique identifier
 
 **Per-attribute definition configuration:**
 
-![Attribute Definition Settings - Per-attribute definition](docs/assets/images/config-attribute-definition-single.png)
+![Attribute Definition Settings - Per-attribute definition](./docs/assets/images/config-attribute-definition-single.png)
 
 | Field                                 | Description                                         | Required                   | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------------------------- | --------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -131,7 +156,7 @@ Controls Match behavior, including similarity matching and manual review workflo
 
 #### Matching Settings Section
 
-![Attribute Matching Settings - Matching](docs/assets/images/config-fusion-matching.png)
+![Attribute Matching Settings - Matching](./docs/assets/images/config-fusion-matching.png)
 
 | Field                                                       | Description                                                    | Required                         | Notes                                                                                                                                                                                                                                                      |
 | ----------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -142,7 +167,7 @@ Controls Match behavior, including similarity matching and manual review workflo
 
 **Per-attribute match configuration:**
 
-![Attribute Matching Settings - Matching - Per attribute matching](docs/assets/images/config-fusion-matching-single.png)
+![Attribute Matching Settings - Matching - Per attribute matching](./docs/assets/images/config-fusion-matching-single.png)
 
 | Field                        | Description                                                   | Required | Notes                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -158,7 +183,7 @@ Controls Match behavior, including similarity matching and manual review workflo
 
 #### Review Settings Section
 
-![Attribute Matching Settings - Review](docs/assets/images/config-fusion-review.png)
+![Attribute Matching Settings - Review](./docs/assets/images/config-fusion-review.png)
 
 | Field                                              | Description                                      | Required | Notes                                                                                                                                                                                                                                                                                                                   |
 | -------------------------------------------------- | ------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -173,7 +198,7 @@ Fine-tuning for API behavior, resilience, debugging, and proxy mode.
 
 #### Developer Settings Section
 
-![Advanced Settings - Developer](docs/assets/images/config-advanced-developer.png)
+![Advanced Settings - Developer](./docs/assets/images/config-advanced-developer.png)
 
 | Field                         | Description                                                   | Required                                    | Notes                                                                                                                                                                                         |
 | ----------------------------- | ------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -187,7 +212,7 @@ Fine-tuning for API behavior, resilience, debugging, and proxy mode.
 
 #### Advanced Connection Settings Section
 
-![Advanced Settings - Connection](docs/assets/images/config-advanced-connection.png)
+![Advanced Settings - Connection](./docs/assets/images/config-advanced-connection.png)
 
 | Field                              | Description                                                        | Required                         | Notes                                                                             |
 | ---------------------------------- | ------------------------------------------------------------------ | -------------------------------- | --------------------------------------------------------------------------------- |
@@ -203,7 +228,7 @@ Fine-tuning for API behavior, resilience, debugging, and proxy mode.
 
 #### Proxy Settings Section
 
-![Advanced Settings - Proxy](docs/assets/images/config-advanced-proxy.png)
+![Advanced Settings - Proxy](./docs/assets/images/config-advanced-proxy.png)
 
 | Field                  | Description                                  | Required                         | Notes                                                                                |
 | ---------------------- | -------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------ |
