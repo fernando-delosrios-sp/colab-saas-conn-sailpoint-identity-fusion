@@ -612,6 +612,40 @@ export class FusionService {
     public async processFusionIdentityDecision(fusionDecision: FusionDecision): Promise<FusionAccount | undefined> {
         const sourceType = fusionDecision.sourceType ?? 'authoritative'
 
+        // Enrich submitter and selected identity display names for user-facing output:
+        // - FusionAccount history strings (created here) use decision.submitter.name/email
+        // - Fusion report decisions section prefers decision.identityName/submitter.name when present
+        const submitterId = fusionDecision.submitter?.id
+        if (submitterId) {
+            const hasSubmitterLabel = Boolean(fusionDecision.submitter?.name || fusionDecision.submitter?.email)
+            if (!hasSubmitterLabel) {
+                try {
+                    const cached = this.identities.getIdentityById(submitterId)
+                    const identity = cached ?? (await this.identities.fetchIdentityById(submitterId))
+                    const label = identity?.displayName || identity?.name
+                    if (label) {
+                        fusionDecision.submitter.name = label
+                    }
+                } catch {
+                    // Best-effort: fall back to submitterId if fetch fails
+                }
+            }
+        }
+
+        // Prefer identity display name over ID in reports when identityName is missing.
+        if (fusionDecision.identityId && !fusionDecision.identityName) {
+            try {
+                const cached = this.identities.getIdentityById(fusionDecision.identityId)
+                const identity = cached ?? (await this.identities.fetchIdentityById(fusionDecision.identityId))
+                const label = identity?.displayName || identity?.name
+                if (label) {
+                    fusionDecision.identityName = label
+                }
+            } catch {
+                // Best-effort: leave identityName undefined if fetch fails
+            }
+        }
+
         const fusionAccount = FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
             `Created fusion account from decision: ${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +

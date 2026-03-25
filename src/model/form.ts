@@ -50,6 +50,12 @@ export type FusionDecision = {
     submitter: User
     account: FusionDecisionAccount
     newIdentity: boolean
+    /**
+     * Correlated identity ID for the fusion account at the time the decision was created.
+     * This allows downstream reporting/history to resolve a human-friendly display name
+     * even when the managed account name is an opaque identifier.
+     */
+    correlatedIdentityId?: string
     identityId?: string
     /** Selected identity display name at decision time (when available). */
     identityName?: string

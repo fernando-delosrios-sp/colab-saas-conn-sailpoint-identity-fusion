@@ -119,11 +119,11 @@ export const extractCandidateIdsFromFormInput = (formInput: any): string[] => {
  * accountInfoOverride allows overriding account info from managedAccountsById before it's deleted
  * Returns null if decision cannot be created
  */
-export const createFusionDecision = (
+export const createFusionDecision = async (
     formInstance: FormInstanceResponseV2025,
     identities?: IdentityService,
     accountInfoOverride?: { id: string; name: string; sourceName: string }
-): FusionDecision | null => {
+): Promise<FusionDecision | null> => {
     assert(formInstance, 'Form instance is required')
     assert(formInstance.id, 'Form instance ID is required')
 
@@ -139,7 +139,7 @@ export const createFusionDecision = (
     }
 
     // Use accountInfoOverride if provided (from managedAccountsById), otherwise extract from formInput
-    const accountInfo = accountInfoOverride || extractAccountInfoFromFormInput(formInput)
+    let accountInfo = accountInfoOverride || extractAccountInfoFromFormInput(formInput)
     if (!accountInfo) {
         return null
     }
@@ -173,15 +173,98 @@ export const createFusionDecision = (
         return null
     }
 
-    const selectedIdentity = existingIdentity ? identities?.getIdentityById(existingIdentity) : undefined
+    // Best-effort: hydrate reviewer displayName/email for history + reporting.
+    // getReviewerInfo is sync and only consults the local cache; for out-of-scope identities
+    // we try to fetch on-demand here (createFusionDecision is async).
+    if (identities && (!reviewer.name || reviewer.name === reviewerIdentityId || !reviewer.email)) {
+        try {
+            const fetched = await identities.fetchIdentityById(reviewerIdentityId)
+            const displayName =
+                fetched?.displayName || (fetched as any)?.attributes?.displayName || fetched?.name || reviewer.name
+            const email = (fetched as any)?.attributes?.email || reviewer.email
+            if (displayName) reviewer.name = displayName
+            if (email) reviewer.email = email
+        } catch {
+            // ignore: keep existing reviewer info
+        }
+    }
+
+    // Persist correlated identity reference (if the form stored it) for downstream reporting/history.
+    // Supports both flat and dictionary formInput structures.
+    const correlatedIdentityId =
+        (typeof (formInput as any)?.identityId === 'string' && (formInput as any).identityId.length > 0
+            ? String((formInput as any).identityId)
+            : undefined) ||
+        (() => {
+            try {
+                const dict = formInput as Record<string, any>
+                const inputObj = Object.values(dict ?? {}).find((x: any) => x?.id === 'identityId' && (x.value || x.description))
+                const value = inputObj?.value || inputObj?.description
+                return typeof value === 'string' && value.length > 0 ? value : undefined
+            } catch {
+                return undefined
+            }
+        })()
+
+    // Prefer correlated identity display name for downstream reporting/history.
+    // This is especially important for "new identity" decisions where there's no selected match,
+    // but the fusion account may already be attached to an identity.
+    if (correlatedIdentityId && identities) {
+        let correlated = identities.getIdentityById(correlatedIdentityId)
+        if (!correlated) {
+            try {
+                correlated = await identities.fetchIdentityById(correlatedIdentityId)
+            } catch {
+                correlated = undefined
+            }
+        }
+        const correlatedName = correlated?.displayName || correlated?.attributes?.displayName || correlated?.name
+        if (correlatedName) {
+            accountInfo = { ...accountInfo, name: correlatedName }
+        }
+    }
+
+    let selectedIdentity = existingIdentity ? identities?.getIdentityById(existingIdentity) : undefined
+    if (existingIdentity && identities && !selectedIdentity) {
+        try {
+            selectedIdentity = await identities.fetchIdentityById(existingIdentity)
+        } catch {
+            selectedIdentity = undefined
+        }
+    }
     const selectedIdentityName = existingIdentity
-        ? selectedIdentity?.displayName || selectedIdentity?.name || existingIdentity
+        ? selectedIdentity?.displayName ||
+          (selectedIdentity as any)?.attributes?.displayName ||
+          selectedIdentity?.name ||
+          existingIdentity
         : undefined
+
+    const normalizeScalar = (value: unknown): string => {
+        if (value === null || value === undefined) return ''
+        if (typeof value === 'string') return value
+        if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value)
+        if (typeof value === 'object') {
+            const anyVal: any = value as any
+            const maybeValue = anyVal?.value
+            if (typeof maybeValue === 'string') return maybeValue
+            const maybeDisplay = anyVal?.displayName ?? anyVal?.name ?? anyVal?.id
+            if (typeof maybeDisplay === 'string') return maybeDisplay
+        }
+        return String(value)
+    }
+
+    // Defensive: ensure decision.account fields are strings so templates never render "[object Object]".
+    accountInfo = {
+        id: normalizeScalar((accountInfo as any)?.id),
+        name: normalizeScalar((accountInfo as any)?.name) || normalizeScalar((accountInfo as any)?.id),
+        sourceName: normalizeScalar((accountInfo as any)?.sourceName),
+    }
 
     return {
         submitter: reviewer,
         account: accountInfo,
         newIdentity: isNewIdentity,
+        correlatedIdentityId,
         identityId: existingIdentity,
         identityName: selectedIdentityName,
         comments: formData?.comments || '',

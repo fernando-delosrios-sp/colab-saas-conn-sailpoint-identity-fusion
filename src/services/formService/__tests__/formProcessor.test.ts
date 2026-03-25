@@ -1,8 +1,8 @@
 import { createFusionDecision } from '../formProcessor'
 
 describe('formProcessor createFusionDecision', () => {
-    it('treats SUBMITTED state as finished', () => {
-        const decision = createFusionDecision({
+    it('treats SUBMITTED state as finished', async () => {
+        const decision = await createFusionDecision({
             id: 'fi-1',
             state: 'SUBMITTED',
             recipients: [{ id: 'reviewer-1', type: 'IDENTITY' }],

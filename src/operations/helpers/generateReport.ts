@@ -31,6 +31,8 @@ const toReportDecision = (
     const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
     const reviewerName = decision.submitter.name || resolveReviewerName?.(decision.submitter.id) || decision.submitter.id
     const selectedIdentityName = decision.identityName || selectedIdentityContext.selectedIdentityName || decision.identityId
+    const correlatedIdentityContext = resolveIdentityContext?.((decision as any).correlatedIdentityId) ?? {}
+    const correlatedAccountName = correlatedIdentityContext.selectedIdentityName
 
     return {
         reviewerId: decision.submitter.id,
@@ -38,7 +40,7 @@ const toReportDecision = (
         reviewerUrl: resolveReviewerUrl?.(decision.submitter.id),
         reviewerEmail: decision.submitter.email || undefined,
         accountId: decision.account.id,
-        accountName: decision.account.name || decision.account.id,
+        accountName: correlatedAccountName || decision.account.name || decision.account.id,
         accountUrl: resolveAccountUrl?.(decision.account.id),
         accountSource: decision.account.sourceName || '',
         sourceType,
@@ -116,20 +118,41 @@ export const generateReport = async (
         await fusion.processFusionAccounts()
         await fusion.processIdentities()
 
-        identities.clear()
-
         await fusion.analyzeManagedAccounts()
     }
 
     let stats: FusionReportStats | undefined
     const finishedDecisions = forms.finishedFusionDecisions
+    // Ensure we can render reviewer/selected identity display names even if the identity cache was cleared earlier
+    // (e.g. std:account:list clears identities for memory before report phase).
+    const idsToHydrate = new Set<string>()
+    for (const d of finishedDecisions) {
+        if (d?.submitter?.id) idsToHydrate.add(d.submitter.id)
+        if (d?.identityId) idsToHydrate.add(d.identityId)
+    }
+    for (const id of idsToHydrate) {
+        if (!identities.getIdentityById(id)) {
+            try {
+                // Best-effort: hydrate display names for reporting
+                await identities.fetchIdentityById(id)
+            } catch {
+                // ignore
+            }
+        }
+    }
+
     const urlContext = createUrlContext(serviceRegistry.config.baseurl)
     const resolveSourceType = (sourceName?: string): 'authoritative' | 'record' | 'orphan' | undefined =>
         sourceName ? sources.getSourceByName(sourceName)?.sourceType : undefined
     const resolveReviewerName = (reviewerId?: string): string | undefined => {
         if (!reviewerId) return undefined
         const reviewer = identities.getIdentityById(reviewerId)
-        return reviewer?.displayName || reviewer?.name || undefined
+        return (
+            (reviewer as any)?.displayName ||
+            (reviewer as any)?.attributes?.displayName ||
+            (reviewer as any)?.name ||
+            undefined
+        )
     }
     const resolveReviewerUrl = (reviewerId?: string): string | undefined =>
         reviewerId ? urlContext.identity(reviewerId) : undefined
@@ -140,7 +163,8 @@ export const generateReport = async (
     ): { selectedIdentityName?: string; selectedIdentityUrl?: string } => {
         if (!identityId) return {}
         const identity = identities.getIdentityById(identityId)
-        const selectedIdentityName = identity?.displayName || identity?.name || identityId
+        const selectedIdentityName =
+            (identity as any)?.displayName || (identity as any)?.attributes?.displayName || (identity as any)?.name || identityId
         return {
             selectedIdentityName,
             selectedIdentityUrl: urlContext.identity(identityId),
@@ -230,4 +254,9 @@ export const generateReport = async (
     const report = fusion.generateReport(includeNonMatches, stats)
     report.fusionReviewDecisions = reportDecisions
     await messaging.sendReport(report, fusionAccount)
+
+    // Keep memory behavior: on-demand/manual report path can clear identity cache after email formatting.
+    if (fusion.commandType !== StandardCommand.StdAccountList) {
+        identities.clear()
+    }
 }

@@ -134,7 +134,7 @@ export class FormService {
         for (const instances of formInstancesResults) {
             this._formInstancesFound += instances.length
             if (instances.length > 0) {
-                this.processFusionFormInstances(instances)
+                await this.processFusionFormInstances(instances)
             }
         }
 
@@ -242,6 +242,7 @@ export class FormService {
         assert(candidates, 'Failed to build candidate list')
 
         await this.enrichCandidateIdentitiesSelectLabels(candidates)
+        await this.enrichCandidateIdentityEmails(candidates)
 
         const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'authoritative'
 
@@ -278,6 +279,54 @@ export class FormService {
                 }
             }
             c.name = resolveIdentitiesSelectLabel(c.attributes, c.id, doc)
+        }
+    }
+
+    /**
+     * Ensure candidate identity documents have `attributes.email` populated for the identities SELECT sublabel.
+     * This is needed when fusion snapshots omit the identity layer and therefore don't carry email in attributes.
+     */
+    private async enrichCandidateIdentityEmails(candidates: Candidate[]): Promise<void> {
+        if (!this.identities) return
+
+        const normalizeEmail = (value: unknown): string | undefined => {
+            if (value === null || value === undefined) return undefined
+            if (Array.isArray(value)) {
+                for (const v of value) {
+                    const normalized = normalizeEmail(v)
+                    if (normalized) return normalized
+                }
+                return undefined
+            }
+            const str = String(value).trim()
+            return str.length > 0 ? str : undefined
+        }
+
+        for (const c of candidates) {
+            // Already present → nothing to do.
+            const existing = normalizeEmail((c.attributes as any)?.email)
+            if (existing) {
+                ;(c.attributes as any).email = existing
+                continue
+            }
+
+            let doc = this.identities.getIdentityById(c.id)
+            if (!doc) {
+                try {
+                    doc = await this.identities.fetchIdentityById(c.id)
+                } catch (error) {
+                    const detail = error instanceof Error ? error.message : String(error)
+                    this.log.debug(`Could not load identity ${c.id} for candidate email hydration: ${detail}`)
+                    continue
+                }
+            }
+
+            const attrs: any = (doc as any)?.attributes ?? {}
+            const hydrated = normalizeEmail(attrs.email ?? attrs.mail ?? attrs.emailAddress)
+            if (hydrated) {
+                // Ensure the form SEARCH_V2 sublabel (`attributes.email`) resolves.
+                ;(c.attributes as any).email = hydrated
+            }
         }
     }
 
@@ -700,7 +749,7 @@ export class FormService {
     /**
      * Process fusion form instances and extract decisions
      */
-    private processFusionFormInstances(formInstances: FormInstanceResponseV2025[]): void {
+    private async processFusionFormInstances(formInstances: FormInstanceResponseV2025[]): Promise<void> {
         assert(this._fusionIdentityDecisions, 'Fusion identity decisions array is not initialized')
         assert(this.fusionAssignmentDecisionMap, 'Fusion assignment decision map is not initialized')
         assert(formInstances, 'Form instances array is required')
@@ -711,7 +760,7 @@ export class FormService {
             processingResult.shouldRemoveAccountFromMap
         )
 
-        const decisionsAdded = this.createDecisionsFromInstances(
+        const decisionsAdded = await this.createDecisionsFromInstances(
             processingResult.instancesToProcess,
             accountInfoOverride
         )
@@ -912,14 +961,14 @@ export class FormService {
      * Create fusion decisions from processed instances
      * @returns The number of decisions successfully created
      */
-    private createDecisionsFromInstances(
+    private async createDecisionsFromInstances(
         instancesToProcess: FormInstanceResponseV2025[],
         accountInfoOverride: { id: string; name: string; sourceName: string } | undefined
-    ): number {
+    ): Promise<number> {
         let decisionsAdded = 0
 
         for (const instance of instancesToProcess) {
-            const decision = createFusionDecision(instance, this.identities, accountInfoOverride)
+            const decision = await createFusionDecision(instance, this.identities, accountInfoOverride)
             if (!decision) {
                 this.log.warn(`Failed to create fusion decision for form instance: ${instance.id}`)
                 continue

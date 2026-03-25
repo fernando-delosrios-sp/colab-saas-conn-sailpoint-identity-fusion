@@ -99,12 +99,32 @@ export const buildFormInput = (
     // Keep values primitive (STRING/BOOLEAN/NUMBER) to avoid Custom Forms payload issues.
     // IMPORTANT: Form values must be consistent with form conditions.
     // For identities SELECT, we use displayName as the label and id as the value.
-    if (!fusionAccount.displayName) {
-        logger.error(`[formBuilder] Missing displayName for fusion account. Using fallback value: ${accountIdentifier}`)
+    //
+    // Priority for the human-friendly account label used in reports and decision history:
+    // 1. identityDisplayName — the correlated identity's full name (most authoritative when attached)
+    // 2. accountDisplayName  — best-effort label derived from the managed account
+    // 3. displayName / name  — legacy / generic fallbacks
+    // 4. accountIdentifier   — last-resort opaque ID
+    const preferredAccountLabel =
+        fusionAccount.identityDisplayName ||
+        fusionAccount.accountDisplayName ||
+        fusionAccount.displayName ||
+        fusionAccount.name ||
+        accountIdentifier
+    if (!fusionAccount.identityDisplayName && !fusionAccount.displayName && !fusionAccount.accountDisplayName) {
+        logger.error(
+            `[formBuilder] Missing identityDisplayName/displayName/accountDisplayName for fusion account. Using fallback value: ${accountIdentifier}`
+        )
     }
-    formInput.name = fusionAccount.displayName || fusionAccount.name || accountIdentifier
+    // `name` is used downstream in reports and decision history messages; prefer human-friendly display labels.
+    formInput.name = preferredAccountLabel
     formInput.account = accountIdentifier
     formInput.source = fusionAccount.sourceName
+    // Persist correlated identity reference for downstream resolution (reports/history),
+    // even when identity layer is not in scope at decision processing time.
+    if (fusionAccount.identityId) {
+        formInput.identityId = fusionAccount.identityId
+    }
     // Defaults for interactive decision fields
     // Keep as string for newIdentity to align with TOGGLE element.
     formInput.newIdentity = 'false'
@@ -520,17 +540,22 @@ export const buildFormInputs = (
     const accountIdentifier = getAccountIdentifier(fusionAccount)
 
     // Account info
-    // IMPORTANT: Use displayName consistently with form conditions
-    if (!fusionAccount.displayName) {
+    // IMPORTANT: Use the same label priority as buildFormInput so form definition and instance are consistent.
+    if (!fusionAccount.identityDisplayName && !fusionAccount.displayName && !fusionAccount.accountDisplayName) {
         logger.error(
-            `[formBuilder] Missing displayName for fusion account in form inputs. Using fallback value: ${accountIdentifier}`
+            `[formBuilder] Missing identityDisplayName/displayName/accountDisplayName for fusion account in form inputs. Using fallback value: ${accountIdentifier}`
         )
     }
     formInputs.push({
         id: 'name',
         type: 'STRING',
         label: 'name',
-        description: fusionAccount.displayName || fusionAccount.name || accountIdentifier,
+        description:
+            fusionAccount.identityDisplayName ||
+            fusionAccount.accountDisplayName ||
+            fusionAccount.displayName ||
+            fusionAccount.name ||
+            accountIdentifier,
     })
     formInputs.push({
         id: 'account',
@@ -554,6 +579,14 @@ export const buildFormInputs = (
         label: 'newIdentity',
         description: 'false',
     })
+    if (fusionAccount.identityId) {
+        formInputs.push({
+            id: 'identityId',
+            type: 'STRING',
+            label: 'identityId',
+            description: fusionAccount.identityId,
+        })
+    }
 
     // New identity attributes
     if (fusionFormAttributes && fusionFormAttributes.length > 0) {
