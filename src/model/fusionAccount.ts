@@ -51,6 +51,11 @@ export class FusionAccount {
     private _email?: string
     private _name?: string
     private _displayName?: string
+    // Two explicit display names:
+    // - identityDisplayName: label for the correlated identity behind the Fusion account
+    // - accountDisplayName: label for the originating managed account (or best effort)
+    private _identityDisplayName?: string
+    private _accountDisplayName?: string
     private _sourceName = ''
     private _originSource?: string
 
@@ -131,6 +136,8 @@ export class FusionAccount {
         name?: string | null
         sourceName?: string | null
         displayName?: string | null
+        identityDisplayName?: string | null
+        accountDisplayName?: string | null
         disabled?: boolean
         needsRefresh?: boolean
         sources?: string[] | Set<string>
@@ -146,6 +153,8 @@ export class FusionAccount {
         if (config.nativeIdentity) this._nativeIdentity = config.nativeIdentity
         if (config.sourceName) this._sourceName = config.sourceName
         if (config.displayName) this._displayName = config.displayName
+        if (config.identityDisplayName) this._identityDisplayName = config.identityDisplayName
+        if (config.accountDisplayName) this._accountDisplayName = config.accountDisplayName
         if (config.disabled !== undefined) this._disabled = config.disabled
         if (config.needsRefresh !== undefined) this._needsRefresh = config.needsRefresh
         if (config.identityId != null) this._identityId = config.identityId
@@ -195,19 +204,35 @@ export class FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourceSet = new Set<string>()
         const statuses = attributeToSet(account.attributes, 'statuses')
+        const identityNameFromRef = String((account as any)?.identity?.name ?? '').trim()
+        const identityIdFallback = String(account.identityId ?? account.attributes?.id ?? account.id ?? account.nativeIdentity ?? '').trim()
+        const identityDisplayName = identityNameFromRef || identityIdFallback || undefined
+
+        const persistedAccountName = String(account.name ?? '').trim()
+        const persistedName = persistedAccountName || identityDisplayName || undefined
         const displayName =
             String(getDisplayName(account.attributes as Record<string, any>) ?? '').trim() ||
-            String(account.name ?? '').trim() ||
+            persistedAccountName ||
+            identityDisplayName ||
             String(account.nativeIdentity ?? '').trim() ||
             String(account.id ?? '').trim()
+        const accountDisplayName =
+            String(getDisplayName(account.attributes as Record<string, any>) ?? '').trim() ||
+            persistedAccountName ||
+            String(account.nativeIdentity ?? '').trim() ||
+            identityDisplayName ||
+            String(account.id ?? '').trim() ||
+            undefined
         if (statuses.has('baseline')) sourceSet.add('Identities')
 
         fusionAccount.initializeBasicProperties({
             type: 'fusion',
             nativeIdentity: account.nativeIdentity as string,
-            name: account.name,
+            name: persistedName,
             sourceName: account.sourceName,
             displayName,
+            identityDisplayName,
+            accountDisplayName,
             disabled: account.disabled,
             sources: sourceSet,
             attributes: account.attributes ?? undefined,
@@ -227,6 +252,18 @@ export class FusionAccount {
         if (Array.isArray(historyAttr) && historyAttr.length > 0) {
             fusionAccount.importHistory(historyAttr)
         }
+
+        // Preserve identity reference name from prior Fusion accounts for downstream reporting,
+        // especially when the Identity document is not available in this run.
+        if (identityDisplayName) {
+            const existingIdentityName = String((fusionAccount._attributeBag.identity as any)?.name ?? '').trim()
+            if (!existingIdentityName) {
+                fusionAccount._attributeBag.identity = {
+                    ...fusionAccount._attributeBag.identity,
+                    name: identityDisplayName,
+                }
+            }
+        }
         return fusionAccount
     }
 
@@ -241,15 +278,20 @@ export class FusionAccount {
     public static fromIdentity(identity: IdentityDocument): FusionAccount {
         const fusionAccount = new FusionAccount()
         const identityAttributes = (identity.attributes ?? {}) as Record<string, any>
-        const displayName =
+        const identityDisplayName = String(identity.name ?? '').trim() || String(identity.id ?? '').trim() || undefined
+        const accountDisplayName =
             String(identityAttributes.displayName ?? '').trim() ||
-            String(identity.name ?? '').trim() ||
-            String(identity.id ?? '').trim()
+            identityDisplayName ||
+            String(identity.id ?? '').trim() ||
+            undefined
+        const displayName = accountDisplayName
         fusionAccount.initializeBasicProperties({
             type: 'identity',
             nativeIdentity: identity.id,
-            name: displayName,
+            name: identityDisplayName ?? accountDisplayName,
             displayName,
+            identityDisplayName,
+            accountDisplayName,
             sourceName: 'Identities',
             disabled: identity.disabled,
             needsRefresh: true,
@@ -274,18 +316,27 @@ export class FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourcesAttr = account.attributes?.sources
         const sourceSet = sourcesAttr ? new Set(attrSplit(String(sourcesAttr))) : new Set<string>()
-        const displayName =
+        const identityNameFromRef = String((account as any)?.identity?.name ?? '').trim()
+        const identityIdFallback = String(account.identityId ?? account.id ?? account.nativeIdentity ?? '').trim()
+        const identityDisplayName = identityNameFromRef || identityIdFallback || undefined
+        const accountDisplayName =
             String(getDisplayName(account.attributes as Record<string, any>) ?? '').trim() ||
             String(account.name ?? '').trim() ||
             String(account.nativeIdentity ?? '').trim() ||
-            String(account.id ?? '').trim()
+            identityDisplayName ||
+            String(account.id ?? '').trim() ||
+            undefined
+        const displayName = accountDisplayName ?? identityDisplayName
+        const name = displayName
 
         fusionAccount.initializeBasicProperties({
             type: 'managed',
             nativeIdentity: account.id,
-            name: displayName,
+            name,
             sourceName: account.sourceName,
             displayName,
+            identityDisplayName,
+            accountDisplayName,
             disabled: account.disabled,
             needsRefresh: true,
             sources: sourceSet,
@@ -312,13 +363,17 @@ export class FusionAccount {
     public static fromFusionDecision(decision: FusionDecision): FusionAccount {
         const fusionAccount = new FusionAccount()
         const { account } = decision
-        const displayName = String(account.name ?? '').trim() || String(account.id ?? '').trim()
+        const identityDisplayName = String(decision.identityName ?? '').trim() || undefined
+        const accountDisplayName = String(account.name ?? '').trim() || String(account.id ?? '').trim() || identityDisplayName
+        const displayName = accountDisplayName
         fusionAccount.initializeBasicProperties({
             type: 'decision',
             nativeIdentity: account.id,
             name: displayName,
             sourceName: account.sourceName,
             displayName,
+            identityDisplayName,
+            accountDisplayName,
             needsRefresh: true,
             managedAccountId: account.id ?? undefined,
         })
@@ -383,6 +438,16 @@ export class FusionAccount {
     /** Display name for UI rendering. */
     public get displayName(): string | undefined {
         return this._displayName
+    }
+
+    /** Display label for the correlated identity behind this fusion account. */
+    public get identityDisplayName(): string | undefined {
+        return this._identityDisplayName
+    }
+
+    /** Display label for the originating managed account (best effort). */
+    public get accountDisplayName(): string | undefined {
+        return this._accountDisplayName
     }
 
     /** The fusion source name this account belongs to. */
@@ -958,8 +1023,18 @@ export class FusionAccount {
      */
     public addIdentityLayer(identity: IdentityDocument): void {
         this._email = identity.attributes?.email as string
-        this._name = identity.name ?? ''
+        const identityDisplayName = String(identity.name ?? '').trim() || String(identity.id ?? '').trim()
+        this._name = identityDisplayName
         this._displayName = identity.attributes?.displayName as string
+        this._identityDisplayName = identityDisplayName
+        if (!this._accountDisplayName || String(this._accountDisplayName).trim().length === 0) {
+            const accountDisplayName =
+                String((identity.attributes as any)?.displayName ?? '').trim() ||
+                identityDisplayName ||
+                String(identity.id ?? '').trim() ||
+                undefined
+            this._accountDisplayName = accountDisplayName
+        }
         this._attributeBag.identity = identity.attributes ?? {}
         this._identityId = identity.id ?? undefined
 

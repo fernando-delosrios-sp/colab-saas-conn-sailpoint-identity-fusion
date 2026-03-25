@@ -157,6 +157,58 @@ describe('FusionService', () => {
         })
     })
 
+    describe('FusionAccount identity reference hydration', () => {
+        it('hydrates identity name from prior fusion account identity reference when Identity document is unavailable', () => {
+            const prior = {
+                nativeIdentity: 'fusion-identity-1',
+                name: '',
+                attributes: {
+                    id: 'fusion-identity-1',
+                    // Simulate legacy/persisted state where attributes.name may be blank or not the true identity name
+                    name: '',
+                },
+                identity: {
+                    name: 'Jane Identity (from ref)',
+                },
+            } as unknown as Account
+
+            const fusionAccount = FusionAccount.fromFusionAccount(prior)
+
+            expect(fusionAccount.name).toBe('Jane Identity (from ref)')
+            expect(fusionAccount.displayName).toBe('Jane Identity (from ref)')
+            expect(fusionAccount.identityDisplayName).toBe('Jane Identity (from ref)')
+            expect(fusionAccount.accountDisplayName).toBe('fusion-identity-1')
+            expect((fusionAccount.attributeBag.identity as any).name).toBe('Jane Identity (from ref)')
+        })
+
+        it('prefers Identity document name when identity layer is applied', () => {
+            const prior = {
+                nativeIdentity: 'fusion-identity-2',
+                name: '',
+                attributes: {
+                    id: 'fusion-identity-2',
+                    name: '',
+                },
+                identity: {
+                    name: 'Stale Name (from ref)',
+                },
+                identityId: 'identity-xyz',
+            } as unknown as Account
+
+            const fusionAccount = FusionAccount.fromFusionAccount(prior)
+
+            const identityDoc = {
+                id: 'identity-xyz',
+                name: 'Authoritative Identity Name',
+                attributes: {},
+            } as unknown as IdentityDocument
+
+            fusionAccount.addIdentityLayer(identityDoc)
+
+            expect(fusionAccount.name).toBe('Authoritative Identity Name')
+        })
+    })
+
     describe('processIdentities', () => {
         it('should process new identities', async () => {
             const mockIdentity = {

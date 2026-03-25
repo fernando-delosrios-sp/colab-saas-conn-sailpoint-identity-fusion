@@ -155,29 +155,40 @@ function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): numb
 
     if (validTokens1.length === 0 || validTokens2.length === 0) return 0
 
-    // Compare phonetic codes for each token pair
-    let phoneticMatches = 0
+    const codeSimilarity = (a: string, b: string): number => {
+        if (!a || !b) return 0
+        if (a === b) return 1.0
+        return jaroWinklerSimilarity(a, b)
+    }
+
+    // Compare phonetic codes for each token pair.
+    // Keep exact matches as full credit, but allow partial credit for near matches.
+    const MIN_CODE_SIMILARITY = 0.65
+    let phoneticScore = 0
 
     for (const token1 of validTokens1) {
         const codes1 = doubleMetaphone(token1)
+        let bestForToken = 0
 
         for (const token2 of validTokens2) {
             const codes2 = doubleMetaphone(token2)
 
-            // Check if any phonetic codes match
-            if (
-                codes1[0] === codes2[0] ||
-                codes1[0] === codes2[1] ||
-                codes1[1] === codes2[0] ||
-                codes1[1] === codes2[1]
-            ) {
-                phoneticMatches++
-                break // Found a match for this token1, move to next
+            const similarities = [
+                codeSimilarity(codes1[0], codes2[0]),
+                codeSimilarity(codes1[0], codes2[1]),
+                codeSimilarity(codes1[1], codes2[0]),
+                codeSimilarity(codes1[1], codes2[1]),
+            ]
+            const bestPair = Math.max(...similarities)
+            if (bestPair >= MIN_CODE_SIMILARITY) {
+                bestForToken = Math.max(bestForToken, bestPair)
             }
         }
+
+        phoneticScore += bestForToken
     }
 
     // Normalize by the maximum number of tokens to compare
     const maxTokens = Math.max(validTokens1.length, validTokens2.length)
-    return maxTokens > 0 ? phoneticMatches / maxTokens : 0
+    return maxTokens > 0 ? phoneticScore / maxTokens : 0
 }

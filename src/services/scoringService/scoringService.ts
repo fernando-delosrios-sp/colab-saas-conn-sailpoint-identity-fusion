@@ -166,17 +166,14 @@ export class ScoringService {
      * Prefer displayName/name, then fall back to uid-like identifiers.
      */
     private getIdentityDisplayLabel(fusionIdentity: FusionAccount): string {
-        const attrs = fusionIdentity.attributes ?? {}
-        const displayName = String(attrs.displayName ?? fusionIdentity.displayName ?? '').trim()
-        if (displayName) return displayName
+        const identityDisplayName = String(fusionIdentity.identityDisplayName ?? '').trim()
+        if (identityDisplayName) return identityDisplayName
 
-        const name = String(attrs.name ?? fusionIdentity.name ?? '').trim()
-        const uid = String(attrs.uid ?? attrs.id ?? fusionIdentity.identityId ?? fusionIdentity.nativeIdentityOrUndefined ?? '').trim()
+        const identityId = String(fusionIdentity.identityId ?? '').trim()
+        if (identityId) return identityId
 
-        if (name && uid) return `${name} (${uid})`
-        if (name) return name
-        if (uid) return uid
-        return 'Unknown'
+        const fallback = String(fusionIdentity.nativeIdentityOrUndefined ?? '').trim()
+        return fallback || 'Unknown'
     }
 
     /**

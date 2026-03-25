@@ -47,8 +47,34 @@ export const scoreDoubleMetaphone = (
         score = 70
         comment = 'Cross-match between primary and secondary codes'
     } else {
-        score = 0
-        comment = 'No phonetic match'
+        const candidatesA = [accountCodes[0], accountCodes[1]].filter((c): c is string => Boolean(c))
+        const candidatesB = [identityCodes[0], identityCodes[1]].filter((c): c is string => Boolean(c))
+
+        let bestSimilarity = 0
+        for (const a of candidatesA) {
+            for (const b of candidatesB) {
+                const jw = jaroWinkler.similarity(a, b)
+                const dice = diceCoefficient.similarity(a, b)
+                bestSimilarity = Math.max(bestSimilarity, jw, dice)
+            }
+        }
+
+        if (bestSimilarity >= 0.85) {
+            score = 60
+            comment = 'Strong phonetic similarity'
+        } else if (bestSimilarity >= 0.7) {
+            score = 45
+            comment = 'Moderate phonetic similarity'
+        } else if (bestSimilarity >= 0.55) {
+            score = 30
+            comment = 'Partial phonetic similarity'
+        } else if (bestSimilarity >= 0.4) {
+            score = 15
+            comment = 'Weak phonetic similarity'
+        } else {
+            score = 0
+            comment = 'No phonetic match'
+        }
     }
 
     const threshold = matching.fusionScore ?? 0

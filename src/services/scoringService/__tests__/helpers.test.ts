@@ -38,6 +38,11 @@ describe('scoringService helpers', () => {
             expect(result.score).toBeGreaterThan(0)
         })
 
+        it('should give partial credit for near metaphone codes', () => {
+            const result = scoreDoubleMetaphone('Alvin', 'Calvin', baseMatching)
+            expect(result.score).toBeGreaterThan(0)
+        })
+
         it('should return 0 and comment for no match', () => {
             const result = scoreDoubleMetaphone('Apple', 'Banana', baseMatching)
             expect(result.score).toBe(0)

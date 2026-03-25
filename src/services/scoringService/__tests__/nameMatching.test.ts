@@ -31,6 +31,11 @@ describe('nameMatching', () => {
             expect(score).toBeGreaterThan(0.5)
         })
 
+        it('should give non-zero phonetic similarity for near-sounding names', () => {
+            const score = match('Alvin', 'Calvin')
+            expect(score).toBeGreaterThan(0.3)
+        })
+
         it('should handle non-string input', () => {
             const score = match('John' as any, 123 as any)
             expect(typeof score).toBe('number')

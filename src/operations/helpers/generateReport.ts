@@ -69,6 +69,20 @@ export const generateReport = async (
     }
     const { fusion, forms, identities, sources, messaging } = serviceRegistry
 
+    // Used to populate "Processing Statistics" even for on-demand/manual reports.
+    // (Aggregation path passes its own AggregationStats + timer.)
+    const timer = serviceRegistry.log.timer()
+    let autoFetchStats:
+        | Pick<
+              AggregationStats,
+              | 'identitiesFound'
+              | 'managedAccountsFound'
+              | 'managedAccountsFoundAuthoritative'
+              | 'managedAccountsFoundRecord'
+              | 'managedAccountsFoundOrphan'
+          >
+        | undefined
+
     if (fusion.commandType !== StandardCommand.StdAccountList) {
         const fetchPromises = [
             messaging.fetchSender(),
@@ -78,6 +92,26 @@ export const generateReport = async (
         ]
 
         await Promise.all(fetchPromises)
+
+        // Capture "found" snapshot counts before work-queue processing mutates/consumes the maps.
+        const identitiesFound = identities.identityCount
+        const managedAccountsFound = sources.managedAccountsById.size
+        let managedAccountsFoundAuthoritative = 0
+        let managedAccountsFoundRecord = 0
+        let managedAccountsFoundOrphan = 0
+        for (const account of sources.managedAccountsById.values()) {
+            const sourceType = sources.getSourceByName(account.sourceName ?? '')?.sourceType ?? 'authoritative'
+            if (sourceType === 'record') managedAccountsFoundRecord++
+            else if (sourceType === 'orphan') managedAccountsFoundOrphan++
+            else managedAccountsFoundAuthoritative++
+        }
+        autoFetchStats = {
+            identitiesFound,
+            managedAccountsFound,
+            managedAccountsFoundAuthoritative,
+            managedAccountsFoundRecord,
+            managedAccountsFoundOrphan,
+        }
 
         await fusion.processFusionAccounts()
         await fusion.processIdentities()
@@ -168,6 +202,28 @@ export const generateReport = async (
             errorSamples: issueSummary.errorSamples,
             usedMemory: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
             ...aggregationStats,
+        }
+    } else if (autoFetchStats) {
+        // Manual/on-demand report path: build stats from locally available snapshot values.
+        const issueSummary = serviceRegistry.log.getAggregationIssueSummary()
+        const memoryUsage = process.memoryUsage()
+        stats = {
+            totalFusionAccounts: fusion.totalFusionAccountCount,
+            fusionAccountsFound: sources.fusionAccountCount,
+            fusionReviewsCreated: forms.formsCreated,
+            fusionReviewAssignments: forms.formInstancesCreated,
+            fusionReviewsFound: forms.formsFound,
+            fusionReviewInstancesFound: forms.formInstancesFound,
+            fusionReviewsProcessed: forms.answeredFormInstancesProcessed,
+            managedAccountsProcessed: fusion.newManagedAccountsCount,
+            identitiesProcessed: fusion.identitiesProcessedCount,
+            aggregationWarnings: issueSummary.warningCount,
+            aggregationErrors: issueSummary.errorCount,
+            warningSamples: issueSummary.warningSamples,
+            errorSamples: issueSummary.errorSamples,
+            usedMemory: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
+            totalProcessingTime: timer.totalElapsed(),
+            ...autoFetchStats,
         }
     }
 

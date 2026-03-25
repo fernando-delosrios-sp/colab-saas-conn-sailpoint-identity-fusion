@@ -24,24 +24,22 @@ export function getFusionIdentityConflictTrackingKey(fusionAccount: FusionAccoun
  * Prefer displayName/name, then fall back to uid-like identifiers.
  */
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {
-    const attrs = fusionAccount.attributes ?? {}
-    const displayName = String(attrs.displayName ?? fusionAccount.displayName ?? '').trim()
-    if (displayName) return displayName
+    const accountDisplayName = String(fusionAccount.accountDisplayName ?? '').trim()
+    if (accountDisplayName) return accountDisplayName
 
-    const name = String(attrs.name ?? fusionAccount.name ?? '').trim()
+    const legacyDisplayName = String(fusionAccount.displayName ?? '').trim()
+    if (legacyDisplayName) return legacyDisplayName
+
+    const legacyName = String(fusionAccount.name ?? '').trim()
+    if (legacyName) return legacyName
+
     const uid = String(
-        attrs.uid ??
-            attrs.id ??
-            fusionAccount.identityId ??
-            fusionAccount.managedAccountId ??
+        fusionAccount.managedAccountId ??
             fusionAccount.nativeIdentityOrUndefined ??
+            fusionAccount.identityId ??
             ''
     ).trim()
-
-    if (name && uid) return `${name} (${uid})`
-    if (name) return name
-    if (uid) return uid
-    return 'Unknown'
+    return uid || 'Unknown'
 }
 
 /**
