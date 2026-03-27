@@ -687,14 +687,13 @@ export class FusionService {
         // must preserve immutable mapped fields (for example display/account name).
         fusionAccount.setNeedsReset(Boolean(fusionDecision.newIdentity))
         fusionAccount.addFusionDecisionLayer(fusionDecision)
-        const suppressAssociationHistoryForAutoCorrelation =
-            isAuthorizedDecision && fusionDecision.submitter?.id === 'system'
+        const suppressAssociationHistoryForAuthorizedDecision = isAuthorizedDecision
         fusionAccount.addManagedAccountLayer(
             this.sources.managedAccountsById,
             this.sources.managedAccountsByIdentityId,
             this.sources.managedAccountsAllById,
             this.shouldPruneDeletedManagedAccounts(),
-            !suppressAssociationHistoryForAutoCorrelation
+            !suppressAssociationHistoryForAuthorizedDecision
         )
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)

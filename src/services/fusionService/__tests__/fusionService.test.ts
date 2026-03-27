@@ -781,6 +781,8 @@ describe('FusionService', () => {
             expect(result?.needsReset).toBe(false)
             expect(result?.statuses).toContain('authorized')
             expect(result?.statuses).not.toContain('unmatched')
+            expect(result?.history.some((h) => h.includes('as authorized by Reviewer'))).toBe(true)
+            expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
             expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(existingFusionAccount, ['acct-authz-existing-1'])
             expect(fusionService.getFusionIdentity('identity-1')).toBe(existingFusionAccount)
         })
