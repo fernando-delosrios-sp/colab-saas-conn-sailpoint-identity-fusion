@@ -14,7 +14,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 920px; margin: 0 auto; background: #ffffff; border: 1px solid #e6ebf5; border-radius: 12px; box-shadow: 0 8px 20px rgba(16,24,40,0.08);">
     <tr>
       <td style="padding: 14px 14px;">
-        <h1 style="margin: 0; color: #0b5cab; font-size: 24px;">Identity Fusion Report</h1>
+        <h1 style="margin: 0; color: #0b5cab; font-size: 24px;">Identity Fusion Account Aggregation Report</h1>
 
         {{#if stats}}
         <div style="margin-top: 18px;">
@@ -35,32 +35,6 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
             </tr>
             {{/each}}
           </table>
-        </div>
-        {{/if}}
-
-        {{#if warnings.identityConflicts}}
-        <div style="margin-top: 14px; padding: 12px; border: 1px solid #fecaca; border-left: 6px solid #ef4444; border-radius: 10px; background: #fef2f2;">
-          <div style="font-size: 12px; color: #991b1b; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Warning</div>
-          <div style="font-size: 13px; color: #7f1d1d; line-height: 1.5; margin-bottom: 10px;">{{warnings.identityConflicts.message}}</div>
-          {{#if (gt warnings.identityConflicts.occurrences.length 0)}}
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
-            <tr>
-              <th style="text-align: left; border: 1px solid #fecaca; background: #fee2e2; color: #7f1d1d; font-size: 11px; padding: 6px 8px; text-transform: uppercase;">Identity ID</th>
-              <th style="text-align: left; border: 1px solid #fecaca; background: #fee2e2; color: #7f1d1d; font-size: 11px; padding: 6px 8px; text-transform: uppercase;">Fusion Accounts</th>
-              <th style="text-align: left; border: 1px solid #fecaca; background: #fee2e2; color: #7f1d1d; font-size: 11px; padding: 6px 8px; text-transform: uppercase;">Account Names / Native Identities</th>
-            </tr>
-            {{#each warnings.identityConflicts.occurrences}}
-            <tr>
-              <td style="border: 1px solid #fecaca; color: #7f1d1d; font-size: 12px; padding: 6px 8px; word-break: break-all;">{{identityId}}</td>
-              <td style="border: 1px solid #fecaca; color: #7f1d1d; font-size: 12px; padding: 6px 8px; font-weight: 700;">{{accountCount}}</td>
-              <td style="border: 1px solid #fecaca; color: #7f1d1d; font-size: 12px; padding: 6px 8px;">
-                {{#each accountNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
-                {{#if nativeIdentities}} ({{#each nativeIdentities}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}){{/if}}
-              </td>
-            </tr>
-            {{/each}}
-          </table>
-          {{/if}}
         </div>
         {{/if}}
 

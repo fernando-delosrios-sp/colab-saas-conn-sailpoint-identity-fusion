@@ -185,6 +185,142 @@ describe('AttributeService mainAccount stale cleanup', () => {
     })
 })
 
+describe('AttributeService mapping undefined behavior', () => {
+    it('clears stale mapped attributes when mapping resolves to undefined', () => {
+        const config = {
+            attributeMaps: [
+                {
+                    newAttribute: 'nickname',
+                    existingAttributes: ['preferredName'],
+                    attributeMerge: 'first',
+                },
+            ],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+        const attributeBag = {
+            current: { nickname: 'old-value' },
+            previous: { nickname: 'old-value' },
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([
+                ['HR', [{ preferredName: 'Neo', _accountId: 'acct-1', _source: 'HR' }]],
+            ]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        service.mapAttributes(fusionAccount)
+        expect(fusionAccount.attributes.nickname).toBe('Neo')
+
+        attributeBag.sources.set('HR', [{ _accountId: 'acct-1', _source: 'HR' }])
+        service.mapAttributes(fusionAccount)
+        expect(fusionAccount.attributes.nickname).toBeUndefined()
+    })
+
+    it('keeps current mapped values when no managed accounts and no identity remain', () => {
+        const config = {
+            attributeMaps: [
+                {
+                    newAttribute: 'nickname',
+                    existingAttributes: ['preferredName'],
+                    attributeMerge: 'first',
+                },
+            ],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+        const attributeBag = {
+            current: { nickname: 'old-value' },
+            previous: { nickname: 'old-value' },
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', []]]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        service.mapAttributes(fusionAccount)
+        expect(fusionAccount.attributes.nickname).toBe('old-value')
+    })
+})
+
 describe('AttributeService template evaluation fallback behavior', () => {
     const createServiceWithExpression = (expression: string) => {
         const config = {

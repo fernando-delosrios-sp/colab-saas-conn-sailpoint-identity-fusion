@@ -193,6 +193,8 @@ export class AttributeService {
         }
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
+            const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some((accounts) => accounts.length > 0)
+            const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sc) => sc.name)
             let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
             const mappingTargets = this.getAttributeMappingTargetNames()
@@ -216,6 +218,9 @@ export class AttributeService {
                     prioritizedAccount
                 )
                 if (processedValue === undefined) {
+                    if (!shouldPreserveCurrentWithoutContext) {
+                        delete attributes[attribute]
+                    }
                     // mainAccount is used as an override context selector; when no supporting
                     // source value exists anymore, clear stale values so account mapping can update.
                     if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {

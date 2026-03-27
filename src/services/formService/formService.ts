@@ -548,6 +548,18 @@ export class FormService {
     }
 
     /**
+     * Registers a completed decision for reporting/metrics.
+     * Optionally include it in the processing queue when it should be handled by
+     * processFusionIdentityDecisions (new-identity/no-match decisions from forms).
+     */
+    public registerFinishedDecision(decision: FusionDecision, includeInProcessingQueue: boolean = false): void {
+        this._finishedFusionDecisions.push(decision)
+        if (!includeInProcessingQueue) return
+        assert(this._fusionIdentityDecisions, 'Fusion identity decisions not fetched')
+        this._fusionIdentityDecisions.push(decision)
+    }
+
+    /**
      * Get all fusion identity decisions
      */
     public get fusionIdentityDecisions(): FusionDecision[] {
@@ -975,10 +987,8 @@ export class FormService {
             }
 
             if (decision.finished) {
-                this._finishedFusionDecisions.push(decision)
-                if (decision.newIdentity) {
-                    this._fusionIdentityDecisions!.push(decision)
-                } else {
+                this.registerFinishedDecision(decision, decision.newIdentity)
+                if (!decision.newIdentity) {
                     this.fusionAssignmentDecisionMap!.set(decision.identityId!, decision)
                 }
 

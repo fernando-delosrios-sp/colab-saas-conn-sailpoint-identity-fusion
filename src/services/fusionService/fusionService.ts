@@ -361,6 +361,12 @@ export class FusionService {
         // Per-source correlation for missing accounts during aggregation
         await this.applyPerSourceCorrelationIfNeeded(fusionAccount, hasDecisionAssignment)
 
+        // Sync _uncorrelated flag with actual _missingAccountIds state so that
+        // setFusionAccount routes the account to the correct map (fusionIdentityMap
+        // vs fusionAccountMap). Without this, optimistic correlations from
+        // correlatePerSource leave _uncorrelated stale.
+        fusionAccount.updateCorrelationStatus()
+
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
             `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
@@ -611,6 +617,7 @@ export class FusionService {
      */
     public async processFusionIdentityDecision(fusionDecision: FusionDecision): Promise<FusionAccount | undefined> {
         const sourceType = fusionDecision.sourceType ?? 'authoritative'
+        let selectedIdentity: IdentityDocument | undefined
 
         // Enrich submitter and selected identity display names for user-facing output:
         // - FusionAccount history strings (created here) use decision.submitter.name/email
@@ -637,6 +644,7 @@ export class FusionService {
             try {
                 const cached = this.identities.getIdentityById(fusionDecision.identityId)
                 const identity = cached ?? (await this.identities.fetchIdentityById(fusionDecision.identityId))
+                selectedIdentity = identity
                 const label = identity?.displayName || identity?.name
                 if (label) {
                     fusionDecision.identityName = label
@@ -646,22 +654,55 @@ export class FusionService {
             }
         }
 
-        const fusionAccount = FusionAccount.fromFusionDecision(fusionDecision)
+        const isAuthorizedDecision = !fusionDecision.newIdentity && Boolean(fusionDecision.identityId)
+        const existingIdentityAccount =
+            isAuthorizedDecision && fusionDecision.identityId
+                ? this.fusionIdentityMap.get(fusionDecision.identityId)
+                : undefined
+        const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
-            `Created fusion account from decision: ${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
-            `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
+            `${existingIdentityAccount ? 'Reusing' : 'Created'} fusion account from decision: ` +
+                `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
+                `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
         )
 
-        fusionAccount.setNeedsReset(true)
+        // For authorized decisions (including synthetic perfect-match auto-correlation),
+        // hydrate the selected identity so per-source direct correlation can execute now.
+        if (isAuthorizedDecision && fusionDecision.identityId) {
+            if (!selectedIdentity) {
+                try {
+                    selectedIdentity =
+                        this.identities.getIdentityById(fusionDecision.identityId) ??
+                        (await this.identities.fetchIdentityById(fusionDecision.identityId))
+                } catch {
+                    // Best-effort: if identity fetch fails, continue without immediate correlation.
+                }
+            }
+            if (selectedIdentity) {
+                fusionAccount.addIdentityLayer(selectedIdentity)
+            }
+        }
+
+        // Only new-identity decisions should force a full reset. Authorized decisions
+        // must preserve immutable mapped fields (for example display/account name).
+        fusionAccount.setNeedsReset(Boolean(fusionDecision.newIdentity))
         fusionAccount.addFusionDecisionLayer(fusionDecision)
+        const suppressAssociationHistoryForAutoCorrelation =
+            isAuthorizedDecision && fusionDecision.submitter?.id === 'system'
         fusionAccount.addManagedAccountLayer(
             this.sources.managedAccountsById,
             this.sources.managedAccountsByIdentityId,
             this.sources.managedAccountsAllById,
-            this.shouldPruneDeletedManagedAccounts()
+            this.shouldPruneDeletedManagedAccounts(),
+            !suppressAssociationHistoryForAutoCorrelation
         )
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)
+
+        if (isAuthorizedDecision) {
+            await this.applyPerSourceCorrelationIfNeeded(fusionAccount, true)
+            this.setFusionAccount(fusionAccount)
+        }
 
         if (fusionDecision.newIdentity) {
             if (sourceType === 'record') {
@@ -808,10 +849,12 @@ export class FusionService {
             const perfectMatch = fusionAccount.fusionMatches.find((m) => FusionService.hasAllAttributeScoresPerfect(m))
             const identityId = perfectMatch?.identityId
             if (this.config.fusionMergingIdentical && identityId) {
+                this.removePotentialMatchAccount(fusionAccount.managedAccountId)
                 this.log.debug(
                     `Account ${account.name} [${fusionAccount.sourceName}] has all scores 100, auto-correlating to identity ${identityId}`
                 )
                 const syntheticDecision = this.createAutoCorrelationDecision(fusionAccount, account, identityId)
+                this.forms.registerFinishedDecision(syntheticDecision)
                 return await this.processFusionIdentityDecision(syntheticDecision)
             } else {
                 assert(sourceInfo, 'Source info not found')
@@ -969,6 +1012,15 @@ export class FusionService {
                 )
             )
         }
+    }
+
+    /**
+     * Removes an account from potential-match reporting when it is auto-correlated.
+     * This prevents "manual review" report sections from showing resolved perfect matches.
+     */
+    private removePotentialMatchAccount(managedAccountId?: string): void {
+        if (!managedAccountId) return
+        this.potentialMatchAccounts = this.potentialMatchAccounts.filter((x) => x.managedAccountId !== managedAccountId)
     }
 
     // ------------------------------------------------------------------------
@@ -1294,8 +1346,8 @@ export class FusionService {
 
         const accountLabels = Array.from(accounts.entries()).map(([nativeIdentity, name]) => `${name} (${nativeIdentity})`)
         this.log.warn(
-            `Multiple Fusion accounts detected for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
-            'This is generally caused by non-unique account names. Review the Fusion source configuration and consider using a unique attribute for the account name.'
+            `More than one Fusion account was found for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
+            'This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.'
         )
     }
 

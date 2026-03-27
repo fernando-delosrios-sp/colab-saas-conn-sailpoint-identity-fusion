@@ -347,7 +347,7 @@ export class MessagingService {
             return
         }
 
-        const subject = `Identity Fusion Report - ${potentialMatches} Potential Match(es) Found`
+        const subject = `Identity Fusion Account Aggregation Report - ${potentialMatches} Potential Match(es) Found`
         const emailData: FusionReportEmailData = {
             ...report,
             totalAccounts,

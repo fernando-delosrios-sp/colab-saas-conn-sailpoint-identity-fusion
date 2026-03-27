@@ -284,6 +284,93 @@ describe('FusionService', () => {
     })
 
     describe('processManagedAccounts', () => {
+        it('records only unmatched history when creating a new authoritative non-match fusion account', async () => {
+            const mockManagedAccount = {
+                id: 'acct-unmatched-1',
+                nativeIdentity: 'NE00002',
+                name: 'Matt Usalen NE00002 Assignment00002',
+                sourceName: 'NERM',
+                attributes: {},
+            } as Account
+
+            ;(fusionService as any).sourcesByName.set('NERM', {
+                id: 'src-nerm',
+                name: 'NERM',
+                sourceType: 'authoritative',
+                config: {},
+            })
+            const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
+            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+
+            const result = await fusionService.processManagedAccount(mockManagedAccount)
+
+            expect(result).toBeDefined()
+            expect(result?.history.some((h) => h.includes('as unmatched'))).toBe(true)
+            expect(result?.history.some((h) => h.includes('Associated managed account'))).toBe(false)
+        })
+
+        it('removes perfect auto-correlated accounts from potential manual-review report list', async () => {
+            ;(fusionService as any).config.fusionMergingIdentical = true
+            const account = {
+                id: 'acct-perfect-1',
+                nativeIdentity: 'acct-perfect-1',
+                name: 'Perfect User',
+                sourceName: 'LH2',
+                attributes: {},
+            } as Account
+
+            const analyzed = FusionAccount.fromManagedAccount(account)
+            analyzed.addFusionMatch({
+                identityId: 'identity-perfect-1',
+                identityName: 'Perfect Identity',
+                scores: [
+                    { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
+                    { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
+                ],
+            } as any)
+            ;(fusionService as any).potentialMatchAccounts = [analyzed]
+            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            jest.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
+
+            await fusionService.processManagedAccount(account)
+
+            expect((fusionService as any).potentialMatchAccounts).toHaveLength(0)
+        })
+
+        it('registers synthetic auto-correlation decisions for reporting', async () => {
+            ;(fusionService as any).config.fusionMergingIdentical = true
+            const account = {
+                id: 'acct-perfect-report-1',
+                nativeIdentity: 'acct-perfect-report-1',
+                name: 'Perfect Report User',
+                sourceName: 'LH2',
+                attributes: {},
+            } as Account
+
+            const analyzed = FusionAccount.fromManagedAccount(account)
+            analyzed.addFusionMatch({
+                identityId: 'identity-perfect-report-1',
+                identityName: 'Perfect Report Identity',
+                scores: [
+                    { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
+                    { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
+                ],
+            } as any)
+            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            jest.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
+
+            await fusionService.processManagedAccount(account)
+
+            expect(mockForms.registerFinishedDecision).toHaveBeenCalledTimes(1)
+            expect(mockForms.registerFinishedDecision).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    newIdentity: false,
+                    identityId: 'identity-perfect-report-1',
+                    comments: 'Auto-correlated: all attribute scores were 100',
+                })
+            )
+        })
+
         it('should process managed accounts', async () => {
             const mockManagedAccount = {
                 nativeIdentity: 'mgmt-1',
@@ -385,6 +472,63 @@ describe('FusionService', () => {
             expect(result.attributes.reverseNativeIdentity).toBe('native-missing-1')
         })
 
+        it('writes history when a newly associated managed account is picked up for an identity', async () => {
+            const historicalAccount = {
+                nativeIdentity: 'fusion-identity-1',
+                identityId: 'identity-1',
+                name: 'Fusion Identity',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {
+                    accounts: ['acct-existing-1'],
+                },
+            } as unknown as Account
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+                new Map([
+                    [
+                        'acct-new-2',
+                        {
+                            id: 'acct-new-2',
+                            name: 'Managed Account New',
+                            nativeIdentity: 'native-new-2',
+                            sourceName: 'Source A',
+                            identityId: 'identity-1',
+                            attributes: {},
+                        } as unknown as Account,
+                    ],
+                ])
+            )
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
+                new Map([['identity-1', new Set(['acct-new-2'])]])
+            )
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+                new Map([
+                    [
+                        'acct-new-2',
+                        {
+                            id: 'acct-new-2',
+                            name: 'Managed Account New',
+                            nativeIdentity: 'native-new-2',
+                            sourceName: 'Source A',
+                            identityId: 'identity-1',
+                            attributes: {},
+                        } as unknown as Account,
+                    ],
+                ])
+            )
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockAttributes.registerUniqueAttributes.mockResolvedValue()
+
+            const result = await fusionService.processFusionAccount(historicalAccount)
+
+            expect(result.accountIds).toContain('acct-new-2')
+            expect(result.history).toEqual(
+                expect.arrayContaining([expect.stringContaining('Associated managed account Managed Account New [Source A]')])
+            )
+        })
+
         it('should remove deleted managed accounts from accounts and missing-accounts history', async () => {
             const historicalAccount = {
                 nativeIdentity: 'fusion-1',
@@ -434,6 +578,7 @@ describe('FusionService', () => {
             expect(result.accountIds).not.toContain('acct-deleted-1')
             expect(result.missingAccountIds).toContain('acct-existing-1')
             expect(result.missingAccountIds).not.toContain('acct-deleted-1')
+            expect(result.needsRefresh).toBe(true)
             expect(result.history).toEqual(
                 expect.arrayContaining([expect.stringContaining('Removed deleted managed account reference: acct-deleted-1')])
             )
@@ -591,6 +736,135 @@ describe('FusionService', () => {
     })
 
     describe('processFusionIdentityDecision sourceType branches', () => {
+        it('updates the existing fusion identity account for authorized decisions', async () => {
+            const existingIdentity = {
+                id: 'identity-1',
+                name: 'Existing Identity',
+                accounts: [],
+                attributes: {},
+            } as unknown as IdentityDocument
+            const existingFusionAccount = FusionAccount.fromIdentity(existingIdentity)
+            existingFusionAccount.setUnmatched()
+            fusionService.setFusionAccount(existingFusionAccount)
+
+            const managedAccount = {
+                id: 'acct-authz-existing-1',
+                name: 'LH2 User',
+                sourceName: 'LH2',
+                attributes: {},
+            } as Account
+            const managedMap = new Map<string, Account>([['acct-authz-existing-1', managedAccount]])
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+                new Map([['acct-authz-existing-1', managedAccount]])
+            )
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
+            mockIdentities.correlateAccounts.mockResolvedValue(true)
+
+            const decision = {
+                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
+                account: { id: 'acct-authz-existing-1', name: 'LH2 User', sourceName: 'LH2' },
+                newIdentity: false,
+                identityId: 'identity-1',
+                comments: 'Assign to existing identity',
+                finished: true,
+                sourceType: 'authoritative',
+            } as any
+
+            const result = await fusionService.processFusionIdentityDecision(decision)
+
+            expect(result).toBe(existingFusionAccount)
+            expect(result?.needsReset).toBe(false)
+            expect(result?.statuses).toContain('authorized')
+            expect(result?.statuses).not.toContain('unmatched')
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(existingFusionAccount, ['acct-authz-existing-1'])
+            expect(fusionService.getFusionIdentity('identity-1')).toBe(existingFusionAccount)
+        })
+
+        it('writes auto-assignment history for system auto-correlation decisions', async () => {
+            const existingIdentity = {
+                id: 'identity-2',
+                name: 'Existing Identity Two',
+                accounts: [],
+                attributes: {},
+            } as unknown as IdentityDocument
+            const existingFusionAccount = FusionAccount.fromIdentity(existingIdentity)
+            fusionService.setFusionAccount(existingFusionAccount)
+
+            const managedAccount = {
+                id: 'acct-auto-1',
+                name: 'LH2 User',
+                sourceName: 'LH2',
+                attributes: {},
+            } as Account
+            const managedMap = new Map<string, Account>([['acct-auto-1', managedAccount]])
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map([['acct-auto-1', managedAccount]]))
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
+            mockIdentities.correlateAccounts.mockResolvedValue(true)
+
+            const decision = {
+                submitter: { id: 'system', email: '', name: 'System (auto-correlated)' },
+                account: { id: 'acct-auto-1', name: 'LH2 User', sourceName: 'LH2' },
+                newIdentity: false,
+                identityId: 'identity-2',
+                comments: 'Auto-correlated: all attribute scores were 100',
+                finished: true,
+                sourceType: 'authoritative',
+            } as any
+
+            const result = await fusionService.processFusionIdentityDecision(decision)
+            expect(result?.history.some((h) => h.includes('Auto-assigned LH2 User [LH2] to existing identity'))).toBe(true)
+            expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
+        })
+
+        it('auto-correlates authorized decisions to the selected identity in the same run', async () => {
+            const managedAccount = {
+                id: 'acct-authz-1',
+                name: 'Authorized User',
+                sourceName: 'Authoritative Source',
+                attributes: {},
+            } as Account
+            const managedMap = new Map<string, Account>([['acct-authz-1', managedAccount]])
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map([['acct-authz-1', managedAccount]]))
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockIdentities.getIdentityById.mockReturnValue(undefined as any)
+            mockIdentities.fetchIdentityById.mockResolvedValue({
+                id: 'identity-1',
+                name: 'Identity One',
+                accounts: [],
+                attributes: {},
+            } as unknown as IdentityDocument)
+            mockIdentities.correlateAccounts.mockResolvedValue(true)
+
+            const decision = {
+                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
+                account: { id: 'acct-authz-1', name: 'Authorized User', sourceName: 'Authoritative Source' },
+                newIdentity: false,
+                identityId: 'identity-1',
+                comments: 'Assign to existing identity',
+                finished: true,
+                sourceType: 'authoritative',
+            } as any
+
+            await fusionService.processFusionIdentityDecision(decision)
+
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledTimes(1)
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(expect.any(FusionAccount), ['acct-authz-1'])
+        })
+
         it('registers unique attributes and skips output for record no-match decisions', async () => {
             const managedMap = new Map<string, Account>()
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)

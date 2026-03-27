@@ -347,7 +347,7 @@ export class FusionAccount {
         fusionAccount._originSource = account.sourceName ?? undefined
         fusionAccount.setUncorrelated()
         fusionAccount.setUncorrelatedAccount(account.id!)
-        fusionAccount.setManagedAccount(account)
+        fusionAccount.setManagedAccount(account, false)
         fusionAccount.setNeedsReset(true)
         return fusionAccount
     }
@@ -1071,7 +1071,8 @@ export class FusionAccount {
         accountsById: Map<string, Account>,
         accountsByIdentityId: Map<string, Set<string>>,
         allAccountsById?: Map<string, Account>,
-        pruneDeletedManagedAccounts = false
+        pruneDeletedManagedAccounts = false,
+        addAssociationHistory = true
     ): void {
         // Phase 1: Identity-based matching via index (O(1) lookup)
         if (this._identityId !== undefined) {
@@ -1081,7 +1082,7 @@ export class FusionAccount {
                     const account = accountsById.get(id)
                     if (account) {
                         this.setCorrelatedAccount(id)
-                        this.setManagedAccount(account)
+                        this.setManagedAccount(account, addAssociationHistory)
                         accountsById.delete(id)
                     }
                 }
@@ -1095,7 +1096,7 @@ export class FusionAccount {
             for (const [id, account] of accountsById) {
                 if (this._previousAccountIds.has(id) || this._missingAccountIds.has(id)) {
                     this.setUncorrelatedAccount(id)
-                    this.setManagedAccount(account)
+                    this.setManagedAccount(account, addAssociationHistory)
                     accountsById.delete(id)
                     // Also clean up the identity index
                     if (account.identityId) {
@@ -1148,6 +1149,7 @@ export class FusionAccount {
             ...this._missingAccountIds,
             ...this._previousAccountIds,
         ])
+        let removedAnyReference = false
 
         for (const accountId of trackedIds) {
             if (allAccountsById.has(accountId)) continue
@@ -1155,10 +1157,16 @@ export class FusionAccount {
             const removedFromAccounts = this._accountIds.delete(accountId)
             const removedFromMissing = this._missingAccountIds.delete(accountId)
             if (removedFromAccounts || removedFromMissing) {
+                removedAnyReference = true
                 this.addHistory(`Removed deleted managed account reference: ${accountId}`)
             }
             this._previousAccountIds.delete(accountId)
             this._managedAccountInfo.delete(accountId)
+        }
+        if (removedAnyReference) {
+            // Deleting managed-account references changes mapping/definition context.
+            // Force a refresh so dependent attributes are recomputed in the same run.
+            this.setNeedsRefresh(true)
         }
     }
 
@@ -1199,12 +1207,17 @@ export class FusionAccount {
      *
      * @param account - The managed account to absorb
      */
-    private setManagedAccount(account: Account): void {
+    private setManagedAccount(account: Account, addAssociationHistory: boolean = true): void {
         const accountId = account.id!
         const isNewAccount = !this._previousAccountIds.has(accountId)
 
         if (isNewAccount) {
             this.setNeedsRefresh(true)
+            if (addAssociationHistory) {
+                const accountLabel = String(account.name ?? account.nativeIdentity ?? accountId).trim() || accountId
+                const sourceLabel = String(account.sourceName ?? this._sourceName ?? 'Unknown')
+                this.addHistory(`Associated managed account ${accountLabel} [${sourceLabel}]`)
+            }
         }
 
         if (!this._needsRefresh) {
@@ -1302,11 +1315,16 @@ export class FusionAccount {
         const submitterName = decision.submitter.name || decision.submitter.email
         const accountInfo = `${decision.account.name} [${decision.account.sourceName}]`
         const sourceType = decision.sourceType ?? 'authoritative'
+        const isAutoCorrelation =
+            decision.submitter?.id === 'system' || String(decision.comments ?? '').includes('Auto-correlated')
 
         if (action === 'manual') {
             return `Set ${accountInfo} as new account by ${submitterName}`
         }
 
+        if (isAutoCorrelation) {
+            return `Auto-assigned ${accountInfo} to existing identity`
+        }
         if (sourceType === 'record') {
             return `Assigned record ${accountInfo} to existing identity by ${submitterName}`
         }
@@ -1318,6 +1336,7 @@ export class FusionAccount {
 
     /** Marks this account as "manual" (reviewer decided to create a new identity or confirmed no match). */
     private setManual(decision: FusionDecision): void {
+        this._statuses.delete('unmatched')
         this._statuses.add('manual')
         const message = this.createDecisionHistoryMessage(decision, 'manual')
         this.addHistory(message)
@@ -1325,6 +1344,7 @@ export class FusionAccount {
 
     /** Marks this account as "authorized" (reviewer approved merging/assignment into an existing identity). */
     private setAuthorized(decision: FusionDecision): void {
+        this._statuses.delete('unmatched')
         this._statuses.add('authorized')
         const message = this.createDecisionHistoryMessage(decision, 'authorized')
         this.addHistory(message)
