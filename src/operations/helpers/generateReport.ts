@@ -253,7 +253,7 @@ export const generateReport = async (
 
     const report = fusion.generateReport(includeNonMatches, stats)
     report.fusionReviewDecisions = reportDecisions
-    await messaging.sendReport(report, fusionAccount)
+    await messaging.sendReport(report, fusionAccount, aggregationStats ? 'aggregation' : 'fusion')
 
     // Keep memory behavior: on-demand/manual report path can clear identity cache after email formatting.
     if (fusion.commandType !== StandardCommand.StdAccountList) {

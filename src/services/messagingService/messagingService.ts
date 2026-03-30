@@ -311,7 +311,11 @@ export class MessagingService {
     /**
      * Send report email with potential match accounts
      */
-    public async sendReport(report: FusionReport, fusionAccount?: FusionAccount): Promise<void> {
+    public async sendReport(
+        report: FusionReport,
+        fusionAccount: FusionAccount | undefined,
+        reportType: 'aggregation' | 'fusion'
+    ): Promise<void> {
         const totalAccounts = report.totalAccounts ?? report.accounts.length
         const potentialMatches = report.potentialMatches ?? report.accounts.filter((a) => a.matches.length > 0).length
 
@@ -347,12 +351,15 @@ export class MessagingService {
             return
         }
 
-        const subject = `Identity Fusion Account Aggregation Report - ${potentialMatches} Potential Match(es) Found`
+        const reportTitle =
+            reportType === 'aggregation' ? 'Identity Fusion Account Aggregation Report' : 'Identity Fusion Report'
+        const subject = `${reportTitle} - ${potentialMatches} Potential Match(es) Found`
         const emailData: FusionReportEmailData = {
             ...report,
             totalAccounts,
             potentialMatches,
             reportDate: report.reportDate || new Date(),
+            reportTitle,
         }
         const body = renderFusionReport(this.templates, emailData)
 

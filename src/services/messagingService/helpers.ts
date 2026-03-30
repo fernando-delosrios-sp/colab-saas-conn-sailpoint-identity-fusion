@@ -14,7 +14,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 920px; margin: 0 auto; background: #ffffff; border: 1px solid #e6ebf5; border-radius: 12px; box-shadow: 0 8px 20px rgba(16,24,40,0.08);">
     <tr>
       <td style="padding: 14px 14px;">
-        <h1 style="margin: 0; color: #0b5cab; font-size: 24px;">Identity Fusion Account Aggregation Report</h1>
+        <h1 style="margin: 0; color: #0b5cab; font-size: 24px;">{{reportTitle}}</h1>
 
         {{#if stats}}
         <div style="margin-top: 18px;">
@@ -460,6 +460,7 @@ export type EditRequestEmailData = {
 }
 
 export type FusionReportEmailData = {
+  reportTitle: string
   accounts: Array<{
     accountName: string
     accountUrl?: string
