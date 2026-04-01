@@ -359,7 +359,7 @@
                             "label": "Skip accounts with missing ID?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Skip accounts that are missing a unique identity value. These accounts will be logged so you can review them later"
+                            "helpKey": "When enabled, accounts with an empty fusion identity attribute are still aggregated using a provisional account key prefixed with missing: and status missing-id (so they appear in account list and custom:report unmatched rows). A warning is logged for each case."
                         }
                     ]
                 }

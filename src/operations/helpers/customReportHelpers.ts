@@ -145,6 +145,8 @@ const categorizeRow = (
     const statuses = new Set<string>(Array.isArray(enrichedAccount?.attributes?.statuses) ? enrichedAccount.attributes.statuses : [])
     const relatedAccounts = Array.isArray(enrichedAccount?.attributes?.accounts) ? enrichedAccount.attributes.accounts : []
 
+    // Provisional-key accounts (empty fusion identity attribute with skip-missing-ID): same bucket as unmatched for reporting.
+    if (statuses.has('missing-id')) categories.push('unmatched')
     if (statuses.has('baseline')) categories.push('baseline')
     // "Unmatched" should include analysis-level non-matches plus explicit unmatched status tags.
     if (statuses.has('unmatched') || status === 'non-matched') categories.push('unmatched')

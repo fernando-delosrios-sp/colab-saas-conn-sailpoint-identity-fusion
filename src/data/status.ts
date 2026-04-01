@@ -11,6 +11,12 @@ export const statuses: EntitlementSource[] = [
     { id: 'manual', name: 'Manual', description: 'A new base account was manually approved by a reviewer' },
     { id: 'orphan', name: 'Orphan', description: 'No managed accounts left' },
     { id: 'unmatched', name: 'Unmatched', description: 'No match found for base account' },
+    {
+        id: 'missing-id',
+        name: 'Missing fusion ID',
+        description:
+            'Fusion identity attribute is empty while skip-missing-ID is enabled; account is listed with a provisional key (missing:…)',
+    },
     { id: 'reviewer', name: 'Reviewer', description: 'An identity Match reviewer of any source' },
     { id: 'requested', name: 'Requested', description: 'Account was requested' },
     { id: 'uncorrelated', name: 'Uncorrelated', description: 'Account has sources accounts pending correlation' },

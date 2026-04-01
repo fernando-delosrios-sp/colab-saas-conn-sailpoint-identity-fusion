@@ -16,7 +16,7 @@ import { RenderContext } from 'velocityjs/dist/src/type'
 import { v4 as uuidv4 } from 'uuid'
 import { assert } from '../../utils/assert'
 import { SourceService, buildSourceConfigPatch } from '../sourceService'
-import { COMPOUND_KEY_UNIQUE_ID_ATTRIBUTE, FUSION_STATE_CONFIG_PATH } from './constants'
+import { COMPOUND_KEY_UNIQUE_ID_ATTRIBUTE, FUSION_MISSING_ID_KEY_PREFIX, FUSION_STATE_CONFIG_PATH } from './constants'
 import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
 import { isValidAttributeValue } from '../../utils/attributes'
@@ -451,15 +451,11 @@ export class AttributeService {
      *
      * The key is derived from the fusion identity attribute value (typically a unique
      * attribute such as a UUID or generated username). If the attribute is empty and
-     * `skipAccountsWithMissingId` is enabled, the method returns `undefined`, which
-     * causes {@link FusionService.getISCAccount} to omit the account from the output.
+     * `skipAccountsWithMissingId` is enabled, a **provisional** key is returned whose id
+     * starts with {@link FUSION_MISSING_ID_KEY_PREFIX} so the account still appears in
+     * account list and reporting (with status `missing-id`), instead of being dropped.
      *
-     * This enables a deliberate pattern: generate an intentionally empty identity
-     * attribute (via attribute definitions that resolve to an empty string) combined
-     * with the "Skip accounts with a missing identifier" processing option to prevent
-     * specific managed accounts or identities from producing Fusion accounts.
-     *
-     * @returns SimpleKeyType if successful, undefined if skipAccountsWithMissingId is enabled and the ID is missing
+     * @returns SimpleKeyType for all cases when a stable provisional or real id can be built
      */
     public getSimpleKey(fusionAccount: FusionAccount): SimpleKeyType | undefined {
         const { fusionIdentityAttribute } = this.schemas
@@ -467,17 +463,37 @@ export class AttributeService {
         const uniqueId = fusionAccount.attributes[fusionIdentityAttribute] as string | undefined
 
         if (this.skipAccountsWithMissingId && !uniqueId) {
+            const provisionalBase = this.buildProvisionalKeyBaseForMissingFusionId(fusionAccount)
+            const provisionalId = `${FUSION_MISSING_ID_KEY_PREFIX}${provisionalBase}`
             this.log.warn(
-                `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                `Account ${fusionAccount.name} [${fusionAccount.sourceName}] has no value for fusion identity attribute ` +
+                    `'${fusionIdentityAttribute}'; listing with provisional key '${provisionalId}'`
             )
-            return undefined
+            return SimpleKey(provisionalId)
         }
 
         const finalId = uniqueId ?? fusionAccount.nativeIdentity
         assert(finalId, `Unique ID is required for simple key`)
 
         return SimpleKey(finalId)
+    }
+
+    /** Best-effort stable segment for provisional `missing:…` keys (managed account id preferred). */
+    private buildProvisionalKeyBaseForMissingFusionId(fusionAccount: FusionAccount): string {
+        const managed = fusionAccount.managedAccountId?.trim()
+        if (managed) return managed
+
+        const native = fusionAccount.nativeIdentity?.trim()
+        if (native) return native
+
+        const origin = fusionAccount.originAccountId?.trim()
+        if (origin) return origin
+
+        const name = fusionAccount.name?.trim()
+        const src = fusionAccount.sourceName?.trim()
+        if (name && src) return `${src}:${name}`
+        if (name) return name
+        return 'unknown'
     }
 
     /**

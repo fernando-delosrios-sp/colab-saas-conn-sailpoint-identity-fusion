@@ -7,6 +7,7 @@ import { IdentityService } from '../identityService'
 import { SourceInfo, SourceService, buildSourceConfigPatch } from '../sourceService'
 import { FusionAccount } from '../../model/account'
 import { attrConcat, AttributeService } from '../attributeService'
+import { FUSION_MISSING_ID_KEY_PREFIX } from '../attributeService/constants'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
 import { mapValuesToArray, forEachBatched, promiseAllBatched, compact } from './collections'
@@ -1271,10 +1272,9 @@ export class FusionService {
      *   disconnection between the existing Fusion account and the platform.
      * - For interim accounts (from processIdentity or processFusionIdentityDecision),
      *   the key is generated here via {@link AttributeService.getSimpleKey}.
-     * - When `skipAccountsWithMissingId` is enabled and the identity attribute is empty,
-     *   getSimpleKey returns undefined and the account is omitted from the output. This
-     *   enables a deliberate pattern: generate an empty identity attribute to prevent
-     *   specific managed accounts or identities from producing Fusion accounts.
+     * - When `skipAccountsWithMissingId` is enabled and the fusion identity attribute is empty,
+     *   getSimpleKey returns a provisional key whose id starts with `missing:`; the account is
+     *   included in output with status `missing-id` so it appears in custom:report's unmatched bucket.
      *
      * @param fusionAccount - The fusion account to convert
      * @returns The formatted account output for the platform, or undefined if key cannot be generated
@@ -1298,6 +1298,14 @@ export class FusionService {
                 return undefined
             }
             fusionAccount.setKey(key)
+        }
+
+        const keySimpleId = key.simple?.id ?? ''
+        if (keySimpleId.startsWith(FUSION_MISSING_ID_KEY_PREFIX)) {
+            fusionAccount.addStatus(
+                'missing-id',
+                'Provisional account key: fusion identity attribute is empty (skip accounts with missing identifier is enabled).'
+            )
         }
 
         const attributes = this.schemas.getFusionAttributeSubset(fusionAccount.attributes)

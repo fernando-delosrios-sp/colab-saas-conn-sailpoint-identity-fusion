@@ -1,4 +1,5 @@
 import { AttributeService } from '../attributeService'
+import { FUSION_MISSING_ID_KEY_PREFIX } from '../constants'
 
 describe('AttributeService mapping targets for definition context', () => {
     const createService = () => {
@@ -1397,5 +1398,107 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
         expect(fusionAccount.attributes.derived).toBe('prefix-acc-99')
+    })
+})
+
+describe('AttributeService getSimpleKey when skipAccountsWithMissingId', () => {
+    const attachAttributesAccessor = (fusionAccount: any, attributeBag: any) => {
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+    }
+
+    const buildService = (skipAccountsWithMissingId: boolean) => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId,
+            forceAttributeRefresh: false,
+        } as any
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_k: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+        return { service: new AttributeService(config, schemas, {} as any, log, locks), log }
+    }
+
+    it('returns a provisional missing:… simple key when fusion identity attribute is empty', () => {
+        const { service, log } = buildService(true)
+        const attributeBag = { current: {}, previous: {}, identity: {}, accounts: [], sources: new Map() }
+        const fusionAccount: any = {
+            type: 'managed',
+            name: 'Jane',
+            sourceName: 'HR',
+            managedAccountId: 'managed-42',
+            nativeIdentity: 'ni-1',
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+
+        const key = service.getSimpleKey(fusionAccount)
+
+        expect(key?.simple.id).toBe(`${FUSION_MISSING_ID_KEY_PREFIX}managed-42`)
+        expect(log.warn).toHaveBeenCalled()
+    })
+
+    it('falls back to nativeIdentity in provisional key when managedAccountId is absent', () => {
+        const { service } = buildService(true)
+        const attributeBag = { current: {}, previous: {}, identity: {}, accounts: [], sources: new Map() }
+        const fusionAccount: any = {
+            type: 'identity',
+            name: 'Baseline',
+            sourceName: 'HR',
+            nativeIdentity: 'nat-99',
+            originAccountId: 'oid-1',
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+
+        const key = service.getSimpleKey(fusionAccount)
+
+        expect(key?.simple.id).toBe(`${FUSION_MISSING_ID_KEY_PREFIX}nat-99`)
+    })
+
+    it('uses normal key when fusion identity attribute is present', () => {
+        const { service, log } = buildService(true)
+        const attributeBag = {
+            current: { id: 'real-id', name: 'X' },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map(),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            name: 'Jane',
+            sourceName: 'HR',
+            managedAccountId: 'managed-42',
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+
+        const key = service.getSimpleKey(fusionAccount)
+
+        expect(key?.simple.id).toBe('real-id')
+        expect(log.warn).not.toHaveBeenCalled()
     })
 })
