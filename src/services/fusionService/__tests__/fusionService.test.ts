@@ -844,7 +844,9 @@ describe('FusionService', () => {
             fusionService.setFusionAccount(accountB)
 
             expect(mockLog.warn).toHaveBeenCalledWith(
-                expect.stringContaining('Multiple Fusion accounts detected for identity identity-duplicate')
+                expect.stringContaining(
+                    'More than one Fusion account was found for identity identity-duplicate'
+                )
             )
 
             const report = fusionService.generateReport()
