@@ -20,7 +20,7 @@ export type CustomReportSummary = {
     }
     managedAccounts: {
         analyzed: number
-        potentialMatches: number
+        matches: number
         nonMatches: number
         reviewErrors: number
     }
@@ -305,9 +305,9 @@ export const buildCustomReportSummary = (params: {
     totalProcessingTime: string
     stats?: FusionReportStats
 }): CustomReportSummary => {
-    const potentialMatches = params.reportAccounts.filter((x) => x.matches.length > 0).length
+    const accountsWithMatches = params.reportAccounts.filter((x) => x.matches.length > 0).length
     const reviewErrors = params.reportAccounts.filter((x) => Boolean(x.error)).length
-    const nonMatches = params.reportAccounts.length - potentialMatches - reviewErrors
+    const nonMatches = params.reportAccounts.length - accountsWithMatches - reviewErrors
 
     return {
         type: 'custom:report:summary',
@@ -323,7 +323,7 @@ export const buildCustomReportSummary = (params: {
         },
         managedAccounts: {
             analyzed: params.reportAccounts.length,
-            potentialMatches,
+            matches: accountsWithMatches,
             nonMatches: Math.max(nonMatches, 0),
             reviewErrors,
         },

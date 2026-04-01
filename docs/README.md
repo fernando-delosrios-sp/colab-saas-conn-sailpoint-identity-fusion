@@ -8,7 +8,7 @@ This folder contains the **usage guides** linked from the [main README](../READM
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | [Map](guides/map.md)                                                                | Attribute mapping, merging, and consolidation from multiple sources.                                         |
 | [Define](guides/define.md)                                                          | Attribute definitions (Velocity computed attributes, unique identifiers, UUIDs, counters).                   |
-| [Match](guides/match.md)                                                            | Detect and resolve potential matching identities using one or more sources.                                  |
+| [Match](guides/match.md)                                                            | Detect and resolve matching identities using one or more sources.                                  |
 | [Source configuration](guides/source-configuration.md)                              | In-depth guide on source settings, scope, aggregation timing, and correlation modes.                         |
 | [Migration from previous Identity Fusion](guides/migration-from-previous-fusion.md) | Migrate from an earlier Identity Fusion version: add the old source as managed, align schemas, then migrate. |
 | [Advanced connection settings](guides/advanced-connection-settings.md)              | Queue, retry, batching, timeouts, and external logging.                                                      |

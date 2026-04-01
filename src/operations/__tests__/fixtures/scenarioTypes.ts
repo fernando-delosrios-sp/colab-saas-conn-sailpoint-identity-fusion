@@ -33,7 +33,7 @@ export type SmokeMatrixScenario = {
     forms?: Array<Record<string, unknown>>
     expected: {
         correlatedCount: number
-        potentialMatchesCount?: number
+        matchesCount?: number
         disablePlannedCount?: number
     }
 }

@@ -1,6 +1,6 @@
 # Match
 
-This comprehensive guide explains how to use Identity Fusion NG's **Match** capability to **detect and resolve potential matching identities**. This use case **requires one or more sources** to be configured. **Identities are optional but highly recommended** because they provide the baseline to compare mapped and defined accounts against.
+This comprehensive guide explains how to use Identity Fusion NG's **Match** capability to **detect and resolve matching identities**. This use case **requires one or more sources** to be configured. **Identities are optional but highly recommended** because they provide the baseline to compare mapped and defined accounts against.
 
 ---
 
@@ -41,7 +41,7 @@ Use Identity Fusion for Match when you face these challenges:
 | Option                            | Configuration                                                           | Use case                                               |
 | --------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------ |
 | **Access profiles for reviewers** | Create access profile per source with reviewer entitlement              | Assign reviewers per source for targeted notifications |
-| **Fusion report access profile**  | Access profile with "Fusion report" entitlement                         | Allow specific users to view potential match reports   |
+| **Fusion report access profile**  | Access profile with "Fusion report" entitlement                         | Allow specific users to view match reports   |
 | **Auto-correlate when identical** | **Attribute Matching Settings → Automatically correlate if identical?** | Skip manual review for obvious matches                 |
 
 **Screenshot placeholder:** High-level Match flow diagram.
@@ -121,7 +121,7 @@ Configure **Source Settings → Processing Control** for account lifecycle:
 
 ## Step 2: Configure Attribute Matching Settings for matching
 
-Attribute Matching Settings control how potential matches are detected and reviewed.
+Attribute Matching Settings control how matches are detected and reviewed.
 
 ### Matching configuration
 
@@ -223,7 +223,7 @@ A mandatory attribute must always meet its threshold. When no attribute is marke
 
 | Field                                     | Value | Effect                                                        |
 | ----------------------------------------- | ----- | ------------------------------------------------------------- |
-| **Automatically correlate if identical?** | No    | All potential matches go to manual review                     |
+| **Automatically correlate if identical?** | No    | All matches go to manual review                     |
 | **Automatically correlate if identical?** | Yes   | Clear matches auto-correlate; borderline cases still reviewed |
 
 **When to enable auto-correlate:**
@@ -255,9 +255,9 @@ Configure **Attribute Matching Settings → Review Settings** for the manual rev
 
 When **Send report to owner on aggregation?** is enabled, reports include:
 
-- High-level summary (date, total analyzed accounts, potential matches)
+- High-level summary (date, total analyzed accounts, matches)
 - Processing statistics (managed/fusion/review metrics, processing time, memory usage)
-- Potential match details with candidate identity score breakdowns
+- Match details with candidate identity score breakdowns
 - Failed matching entries (for example, form creation constraints/errors)
 - Warning block when more than one Fusion account is found for the same identity, including guidance to review configuration and consider a unique account-name attribute
 - Compact aggregation issues summary with warning/error counts and short sampled messages
@@ -295,7 +295,7 @@ Include attributes that help reviewers decide if identities are matches:
 
 ![Match review form - Example](../assets/images/match-review-form.png)
 
-<!-- PLACEHOLDER: Screenshot of manual review form for potential matches. Save as docs/assets/images/match-review-form.png -->
+<!-- PLACEHOLDER: Screenshot of manual review form for matches. Save as docs/assets/images/match-review-form.png -->
 
 **Screenshot placeholder:** Email notification to reviewer.
 
@@ -333,7 +333,7 @@ Create an access profile for viewing match reports:
 
 | Access profile    | Entitlement   | Assignment                         | Purpose                                                   |
 | ----------------- | ------------- | ---------------------------------- | --------------------------------------------------------- |
-| **Fusion Report** | Fusion report | Identity governance team, auditors | View list of potential matches without review permissions |
+| **Fusion Report** | Fusion report | Identity governance team, auditors | View list of matches without review permissions |
 
 **Note:** The Fusion source automatically creates entitlements for each source reviewer and the Fusion report. Run **Entitlement Aggregation** to populate these entitlements.
 
@@ -407,16 +407,16 @@ For each Fusion account (new or updated):
     - If **Use overall fusion similarity score?**:
         - Average all per-attribute scores → overall score
         - Every evaluated **mandatory** attribute must meet its threshold or the match fails
-        - If overall score ≥ threshold and all evaluated mandatory rules pass → potential match (non-mandatory thresholds may not all be met)
+        - If overall score ≥ threshold and all evaluated mandatory rules pass → match (non-mandatory thresholds may not all be met)
     - Else (per-attribute mode):
         - Every **mandatory** attribute must meet its threshold or the match fails
         - If no attribute is mandatory, all attributes are treated as mandatory (all must meet thresholds)
-        - If all conditions met → potential match
+        - If all conditions met → match
 3. Sort identities by similarity score (highest first)
 
 **Step 4: Decision point**
 
-For each potential match:
+For each match:
 
 | Condition                                                                                                              | Action                                                                                                               |
 | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -429,7 +429,7 @@ If review form created:
 
 1. ISC creates form instance with:
     - Proxy account attributes
-    - List of potential matching identities with similarity scores
+    - List of matching identities with similarity scores
     - Attributes configured in **List of identity attributes to include in form**
 2. ISC sends email to:
     - Reviewers assigned via `<Source Name> reviewer` access profiles

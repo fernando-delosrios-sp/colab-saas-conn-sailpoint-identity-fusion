@@ -207,9 +207,9 @@ export const buildFormFields = (
     if (topSectionElements.length > 0) {
         const sectionDescriptions: Record<SourceType, string> = {
             authoritative:
-                'A potential matching identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
-            record: 'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
-            orphan: 'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
+                'A matching identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
+            record: 'A matching record has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
+            orphan: 'A match has been detected for an orphan account. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
         }
 
         formFields.push({

@@ -36,8 +36,8 @@ import { MAX_CANDIDATES_FOR_FORM } from '../formService/constants'
 export class FusionService {
     private fusionIdentityMap: Map<string, FusionAccount> = new Map()
     private fusionAccountMap: Map<string, FusionAccount> = new Map()
-    // Managed accounts that were flagged as potential matches (forms created)
-    private potentialMatchAccounts: FusionAccount[] = []
+    // Managed accounts with matches (forms created for review)
+    private matchAccounts: FusionAccount[] = []
     // Minimal report data for deferred matches against current-run unmatched candidates
     private deferredMatchReportData: FusionReportAccount[] = []
     // Minimal report data for non-matches (avoids holding full FusionAccount objects)
@@ -61,6 +61,11 @@ export class FusionService {
     private readonly managedAccountsBatchSize: number
     public readonly commandType?: StandardCommand
     private readonly currentRunUnmatchedFusionNativeIdentities: Set<string> = new Set()
+    /**
+     * Source names that passed {@link SourceService.assertReverseCorrelationReady} in this operation.
+     * correlatePerSource used a function-local Set, so readiness was re-checked on every account (very slow).
+     */
+    private readonly reverseCorrelationReadinessValidatedSources: Set<string> = new Set()
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -391,7 +396,6 @@ export class FusionService {
      */
     private async correlatePerSource(fusionAccount: FusionAccount, hasDecisionAssignment: boolean): Promise<void> {
         const missingIds = fusionAccount.missingAccountIds
-        const validatedReverseSources = new Set<string>()
         const canDirectCorrelate = Boolean(fusionAccount.identityId)
 
         // Separate decision-assigned accounts (always use direct correlation)
@@ -447,9 +451,9 @@ export class FusionService {
 
             const sourceConfig = this.sources.getSourceConfig(sourceName)
             if (!sourceConfig?.correlationAttribute) continue
-            if (!validatedReverseSources.has(sourceName)) {
+            if (!this.reverseCorrelationReadinessValidatedSources.has(sourceName)) {
                 await this.sources.assertReverseCorrelationReady(sourceConfig)
-                validatedReverseSources.add(sourceName)
+                this.reverseCorrelationReadinessValidatedSources.add(sourceName)
             }
 
             const firstAccountId = accountIds[0]
@@ -930,7 +934,7 @@ export class FusionService {
             const perfectMatch = fusionAccount.fusionMatches.find((m) => FusionService.hasAllAttributeScoresPerfect(m))
             const identityId = perfectMatch?.identityId
             if (this.config.fusionMergingIdentical && identityId) {
-                this.removePotentialMatchAccount(fusionAccount.managedAccountId)
+                this.removeMatchAccount(fusionAccount.managedAccountId)
                 this.log.debug(
                     `Account ${account.name} [${fusionAccount.sourceName}] has all scores 100, auto-correlating to identity ${identityId}`
                 )
@@ -1051,7 +1055,7 @@ export class FusionService {
      * Analyzes a single managed account by scoring it against all existing fusion identities.
      * Tracks the account for reporting when reporting is enabled.
      *
-     * Memory: Only populates potentialMatchAccounts/analyzedNonMatchReportData when
+     * Memory: Only populates matchAccounts/analyzedNonMatchReportData when
      * fusionReportOnAggregation is true or on-demand report (non-StdAccountList).
      * Stores minimal FusionReportAccount for non-matches when report data is needed.
      *
@@ -1071,15 +1075,15 @@ export class FusionService {
         if (fusionAccount.isMatch) {
             const matchCount = fusionAccount.fusionMatches.length
             if (hasIdentityBackedMatches) {
-                this.log.info(`POTENTIAL MATCH FOUND: ${name} [${sourceName}] - ${matchCount} candidate(s)`)
+                this.log.info(`MATCH FOUND: ${name} [${sourceName}] - ${matchCount} candidate(s)`)
             } else {
-                this.log.info(`DEFERRED POTENTIAL MATCH FOUND: ${name} [${sourceName}] - ${matchCount} candidate(s)`)
+                this.log.info(`DEFERRED MATCH FOUND: ${name} [${sourceName}] - ${matchCount} candidate(s)`)
             }
 
             // Keep full FusionAccount for report when reporting is enabled (aggregation) or on-demand report
             if (this.fusionReportOnAggregation || this.commandType !== StandardCommand.StdAccountList) {
                 if (hasIdentityBackedMatches) {
-                    this.potentialMatchAccounts.push(fusionAccount)
+                    this.matchAccounts.push(fusionAccount)
                 } else {
                     const deferredMatches = fusionAccount.fusionMatches
                         .filter((match) => match.candidateType === 'new-unmatched')
@@ -1155,12 +1159,12 @@ export class FusionService {
     }
 
     /**
-     * Removes an account from potential-match reporting when it is auto-correlated.
+     * Removes an account from match reporting when it is auto-correlated.
      * This prevents "manual review" report sections from showing resolved perfect matches.
      */
-    private removePotentialMatchAccount(managedAccountId?: string): void {
+    private removeMatchAccount(managedAccountId?: string): void {
         if (!managedAccountId) return
-        this.potentialMatchAccounts = this.potentialMatchAccounts.filter((x) => x.managedAccountId !== managedAccountId)
+        this.matchAccounts = this.matchAccounts.filter((x) => x.managedAccountId !== managedAccountId)
     }
 
     // ------------------------------------------------------------------------
@@ -1171,7 +1175,7 @@ export class FusionService {
      * Clear analyzed managed account arrays to free memory.
      *
      * Memory Optimization:
-     * analyzedNonMatchReportData and potentialMatchAccounts accumulate during
+     * analyzedNonMatchReportData and matchAccounts accumulate during
      * processManagedAccounts. They are also cleared inside generateReport(), but
      * when fusionReportOnAggregation is false, generateReport is never called and
      * these arrays would persist for the lifetime of the operation. This method
@@ -1182,14 +1186,14 @@ export class FusionService {
     public clearAnalyzedAccounts(): void {
         if (
             this.analyzedNonMatchReportData.length > 0 ||
-            this.potentialMatchAccounts.length > 0 ||
+            this.matchAccounts.length > 0 ||
             this.deferredMatchReportData.length > 0 ||
             this.failedMatchingAccounts.length > 0 ||
             this.conflictingFusionIdentityAccounts.size > 0
         ) {
             this.log.debug('Clearing analyzed managed accounts from memory')
             this.analyzedNonMatchReportData = []
-            this.potentialMatchAccounts = []
+            this.matchAccounts = []
             this.deferredMatchReportData = []
             this.failedMatchingAccounts = []
             this.conflictingFusionIdentityAccounts = new Map()
@@ -1364,14 +1368,14 @@ export class FusionService {
     }
 
     /**
-     * Same-aggregation (deferred) matching: when false for a source, its accounts neither
-     * score against nor register as current-run unmatched peers. Default true if unknown.
+     * Same-aggregation (deferred) matching: only when enabled in source config (normalized
+     * default is off). Without a resolved source entry or config, same-run peer matching stays off.
      */
     private isDeferredMatchingEnabledForSource(sourceName: string | undefined): boolean {
-        if (!sourceName) return true
+        if (!sourceName) return false
         const info = this.sourcesByName.get(sourceName)
-        if (!info?.config) return true
-        return info.config.deferredMatching !== false
+        if (!info?.config) return false
+        return info.config.deferredMatching === true
     }
 
     private registerCurrentRunUnmatchedCandidate(fusionAccount: FusionAccount): void {
@@ -1588,11 +1592,11 @@ export class FusionService {
     }
 
     /**
-     * Generate a fusion report with all accounts that have potential matches.
+     * Generate a fusion report with all accounts that have matches.
      *
      * Memory Optimization:
      * After generating the report, this method clears the analyzedNonMatchReportData
-     * and potentialMatchAccounts arrays to free memory. These arrays hold
+     * and matchAccounts arrays to free memory. These arrays hold
      * references to all managed accounts that were analyzed during processManagedAccounts,
      * which could be thousands of objects. Clearing them as soon as the report is
      * generated significantly reduces memory footprint.
@@ -1605,8 +1609,8 @@ export class FusionService {
         const accounts: FusionReportAccount[] = []
         const warnings = buildIdentityConflictWarningsFromMap(this.conflictingFusionIdentityAccounts)
 
-        // Report on the managed accounts that were flagged as potential matches (forms created)
-        for (const fusionAccount of this.potentialMatchAccounts) {
+        // Report on managed accounts with matches (forms created)
+        for (const fusionAccount of this.matchAccounts) {
             const fusionMatches = fusionAccount.fusionMatches
             if (fusionMatches && fusionMatches.length > 0) {
                 const matches = fusionMatches.map((match) => ({
@@ -1659,12 +1663,12 @@ export class FusionService {
         // Combine: identity-backed matches, deferred matches, failed matchings, then non-matches
         const allAccounts = [...accounts, ...deferredAccounts, ...failedAccounts, ...nonMatchAccounts]
 
-        const potentialMatches = accounts.length + deferredAccounts.length
+        const matchAccountCount = accounts.length + deferredAccounts.length
 
         const report: FusionReport = {
             accounts: allAccounts,
             totalAccounts: this.newManagedAccountsCount,
-            potentialMatches,
+            matches: matchAccountCount,
             reportDate: new Date(),
             stats,
             warnings,
@@ -1673,7 +1677,7 @@ export class FusionService {
         // Release memory from analyzed accounts after report generation
         this.log.debug('Clearing analyzed managed accounts from memory')
         this.analyzedNonMatchReportData = []
-        this.potentialMatchAccounts = []
+        this.matchAccounts = []
         this.deferredMatchReportData = []
         this.failedMatchingAccounts = []
         this.conflictingFusionIdentityAccounts = new Map()

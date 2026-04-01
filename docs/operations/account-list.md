@@ -114,7 +114,7 @@ When report-on-aggregation is enabled, the generated Fusion report can include:
 - **Header summary**
     - Report date
     - Total accounts analyzed
-    - Potential matches count
+    - Matches count
 - **Processing statistics**
     - Fusion totals (accounts, forms, assignments)
     - Review decisions and outcomes
@@ -128,7 +128,7 @@ When report-on-aggregation is enabled, the generated Fusion report can include:
     - Short sampled warning/error messages (not full logs)
     - Samples are intentionally capped and truncated to reduce report size
 - **Per-account detail cards**
-    - Potential match account context (source, id, email, selected attributes)
+    - Match account context (source, id, email, selected attributes)
     - Candidate identities with score breakdown by attribute/algorithm/threshold
     - Failed matching/form creation entries with error details
 - **Optional non-match entries**

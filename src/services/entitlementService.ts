@@ -36,7 +36,7 @@ export class EntitlementService {
         const sourceInput = sources.map(({ id, name }) => ({
             id: `reviewer:${id!}`,
             name: `${name} reviewer`,
-            description: `Reviewer for potentially duplicated identities from ${name} source`,
+            description: `Reviewer for identities with matches from ${name} source`,
         }))
 
         const sourceEntitlements = sourceInput.map((x) => new Action(x))

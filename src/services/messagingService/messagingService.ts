@@ -294,7 +294,7 @@ export class MessagingService {
                 },
             ],
             totalAccounts: 1,
-            potentialMatches: 1,
+            matches: 1,
             reportDate: new Date(),
             formInstanceId: formInstance.id,
             formUrl: formInstance.standAloneFormUrl,
@@ -309,7 +309,7 @@ export class MessagingService {
     }
 
     /**
-     * Send report email with potential match accounts
+     * Send report email for accounts with matches
      */
     public async sendReport(
         report: FusionReport,
@@ -317,7 +317,7 @@ export class MessagingService {
         reportType: 'aggregation' | 'fusion'
     ): Promise<void> {
         const totalAccounts = report.totalAccounts ?? report.accounts.length
-        const potentialMatches = report.potentialMatches ?? report.accounts.filter((a) => a.matches.length > 0).length
+        const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
 
         // Recipients:
         // - the initiating fusion account (if we can resolve an email)
@@ -353,11 +353,11 @@ export class MessagingService {
 
         const reportTitle =
             reportType === 'aggregation' ? 'Identity Fusion Account Aggregation Report' : 'Identity Fusion Report'
-        const subject = `${reportTitle} - ${potentialMatches} Potential Match(es) Found`
+        const subject = `${reportTitle} - ${matchAccountCount} Match(es) Found`
         const emailData: FusionReportEmailData = {
             ...report,
             totalAccounts,
-            potentialMatches,
+            matches: matchAccountCount,
             reportDate: report.reportDate || new Date(),
             reportTitle,
         }

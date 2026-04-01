@@ -200,8 +200,8 @@ export type FusionReport = {
     accounts: FusionReportAccount[]
     /** Total number of accounts analyzed */
     totalAccounts?: number
-    /** Number of accounts flagged as potential matches */
-    potentialMatches?: number
+    /** Number of accounts with matches (for review or correlation) */
+    matches?: number
     /** Timestamp when the report was generated */
     reportDate?: Date | string
     /** Processing statistics */

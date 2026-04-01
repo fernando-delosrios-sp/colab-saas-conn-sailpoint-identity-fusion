@@ -308,7 +308,7 @@ $firstname$lastname      ## Throws error if null
 
 ## Category 4: Matching issues
 
-### Issue 4.1: No potential matches found (expected some)
+### Issue 4.1: No matches found (expected some)
 
 **Symptom:** No review forms generated even though matches are expected.
 
@@ -695,7 +695,7 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 | Unique generation fails  | Expression always same       | Add variable parts                    | [3.1](#issue-31-unique-attribute-generation-fails-or-loops)         |
 | Wrong schema             | Config not saved             | Save, re-discover                     | [3.2](#issue-32-schema-discovery-shows-wrong-or-missing-attributes) |
 | Velocity error           | Null value                   | Add null checks                       | [3.3](#issue-33-velocity-expression-errors)                         |
-| No duplicates found      | Threshold too high           | Lower thresholds                      | [4.1](#issue-41-no-potential-duplicates-found-expected-some)        |
+| No matches found         | Threshold too high           | Lower thresholds                      | [4.1](#issue-41-no-matches-found-expected-some)        |
 | Too many false positives | Threshold too low            | Raise thresholds; add mandatory       | [4.2](#issue-42-too-many-false-positives-wrong-matches)             |
 | No review emails         | Access profile not assigned  | Assign reviewer access                | [4.3](#issue-43-reviewers-not-receiving-forms)                      |
 | Proxy connection fails   | Server not reachable         | Check URL, firewall                   | [5.1](#issue-51-connection-to-proxy-fails)                          |

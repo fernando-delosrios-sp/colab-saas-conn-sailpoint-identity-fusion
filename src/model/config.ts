@@ -160,9 +160,11 @@ export interface SourceConfig {
     correlationAttribute?: string
     correlationDisplayName?: string
     /**
-     * When true (default), accounts from this source participate in same-aggregation matching:
-     * they can be scored against other new-unmatched accounts from the current run, and
-     * authoritative non-matches from this source become candidates for later accounts.
+     * Same-aggregation matching: after identity matching, also compare to other new
+     * unmatched accounts from this run. If the only strong match is such a peer, defer
+     * instead of creating another Fusion identity until a later run. When false, skip
+     * that check (normal unmatched handling). Default false; enable when one person may
+     * appear as multiple accounts in a single aggregation.
      */
     deferredMatching?: boolean
 }

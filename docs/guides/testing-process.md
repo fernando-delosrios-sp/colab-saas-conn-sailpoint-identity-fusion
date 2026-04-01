@@ -48,7 +48,7 @@ npm test -- src/operations/__tests__/accountList.test.ts src/operations/__tests_
 
 ## Required assertions
 
-- Pass1 should create potential/candidate matching state without over-correlation.
+- Pass1 should establish match and candidate state without over-correlation.
 - Pass2 should apply submitted decisions deterministically.
 - Correlation/unmatched counts and disable side effects should be stable for each run.
 - Single-account operation tests remain isolated from accountList lifecycle tests.

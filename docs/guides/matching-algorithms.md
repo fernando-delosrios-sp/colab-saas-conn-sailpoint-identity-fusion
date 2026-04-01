@@ -1,12 +1,12 @@
 # Effective Use of Matching Algorithms
 
-Identity Fusion NG uses **similarity scoring** to detect potential matching identities. This comprehensive guide helps you choose, configure, and tune the **matching algorithms** used in **Attribute Matching Settings → Matching Settings** for optimal matching results.
+Identity Fusion NG uses **similarity scoring** to detect matching identities. This comprehensive guide helps you choose, configure, and tune the **matching algorithms** used in **Attribute Matching Settings → Matching Settings** for optimal matching results.
 
 ---
 
 ## Overview: Matching in Identity Fusion
 
-Matching algorithms calculate **similarity scores** (0–100) between attribute values from different identities. These scores determine whether two identities are potential matches.
+Matching algorithms calculate **similarity scores** (0–100) between attribute values from different identities. These scores determine whether two identities match (by similarity).
 
 | Component                      | Purpose                            | Configuration location                                                              |
 | ------------------------------ | ---------------------------------- | ----------------------------------------------------------------------------------- |
@@ -327,7 +327,7 @@ Configuration 4: Comprehensive (overall score)
 
 - Each attribute match has its own **Similarity score [0-100]** threshold
 - A **mandatory** attribute must always meet or exceed its threshold or the match fails
-- Identity is flagged as a potential match if:
+- Identity is flagged as a match if:
     - Every mandatory attribute meets its threshold, and
     - When no attribute is marked mandatory: **all** attributes are treated as mandatory (all must meet their thresholds)
     - When at least one attribute is mandatory: those must pass; non-mandatory attributes contribute to the match but their thresholds are also enforced for a pass
@@ -499,7 +499,7 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 
 ### Pattern 3: Aggressive (catch more matches)
 
-**Goal:** Flag potential matches even with lower confidence; accept some false positives.
+**Goal:** Flag matches even with lower confidence; accept some false positives.
 
 ```
 - Attribute: firstname, Algorithm: Enhanced Name Matcher, Score: 75

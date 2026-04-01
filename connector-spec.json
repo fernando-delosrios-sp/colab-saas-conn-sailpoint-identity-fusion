@@ -188,8 +188,8 @@
                                             "label": "Same-aggregation matching",
                                             "type": "toggle",
                                             "required": false,
-                                            "value": "true",
-                                            "helpKey": "When <strong>on</strong> (recommended when duplicates are possible), accounts from this source are compared to <strong>other new unmatched accounts from the same aggregation</strong> after identity-based matching. If the only strong match is such a peer, the connector reports <strong>deferred</strong> and avoids creating a second Fusion identity until a later run resolves correlation. Accounts from this source both <strong>consume</strong> and <strong>contribute</strong> to that same-run peer list. When <strong>off</strong>, non-identity matches go straight to normal unmatched handling for this source with no same-run peer comparison."
+                                            "value": "false",
+                                            "helpKey": "After identity matching, also compare to other new unmatched accounts from this aggregation. If the only strong match is one of those peers, defer instead of creating another Fusion identity until a later run. Off: skip that check and use normal unmatched handling. Turn on when the same person might appear as multiple accounts in one run."
                                         },
                                         {
                                             "key": "accountFilter",
@@ -846,14 +846,14 @@
                 {
                     "type": "section",
                     "sectionTitle": "Review Settings",
-                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong><br><br><ul><li><strong>Form attributes:</strong> Identity attributes shown to reviewers (e.g. name, email, department).</li><li><strong>Expiration:</strong> Days before review form expires (default: 7).</li><li><strong>Global reviewer:</strong> Add source owner as reviewer to all forms (ensures assignment).</li><li><strong>Report:</strong> Email report to owner after aggregation.</li></ul>",
+                    "sectionHelpMessage": "<strong>Configure manual review for matches.</strong><br><br><ul><li><strong>Form attributes:</strong> Identity attributes shown to reviewers (e.g. name, email, department).</li><li><strong>Expiration:</strong> Days before review form expires (default: 7).</li><li><strong>Global reviewer:</strong> Add source owner as reviewer to all forms (ensures assignment).</li><li><strong>Report:</strong> Email report to owner after aggregation.</li></ul>",
                     "items": [
                         {
                             "key": "fusionFormAttributes",
                             "label": "List of Fusion account attributes to include in form",
                             "type": "list",
                             "required": false,
-                            "helpKey": "Account attributes displayed on the review form to help reviewers compare potential matches. For example: name, email, department"
+                            "helpKey": "Account attributes displayed on the review form to help reviewers compare matches. For example: name, email, department"
                         },
                         {
                             "key": "fusionFormExpirationDays",
@@ -867,14 +867,14 @@
                             "label": "Owner is global reviewer?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Always add the source owner as a reviewer on every review form, ensuring someone is always assigned to review potential matches"
+                            "helpKey": "Always add the source owner as a reviewer on every review form, ensuring someone is always assigned to review matches"
                         },
                         {
                             "key": "fusionReportOnAggregation",
                             "label": "Send report to owner on aggregation?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-type breakdown metrics"
+                            "helpKey": "Send a summary report to the source owner after each run, including matches, processing outcomes, and source-type breakdown metrics"
                         }
                     ]
                 }
