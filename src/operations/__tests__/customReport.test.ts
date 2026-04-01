@@ -63,6 +63,18 @@ function createRegistry() {
                         accountName: 'Bob IT',
                         accountSource: 'IT',
                         matches: [],
+                        deferred: true,
+                    },
+                ],
+                fusionReviewDecisions: [
+                    {
+                        accountId: 'acc-2',
+                        accountName: 'Bob IT',
+                        accountSource: 'IT',
+                        reviewerId: 'rev-1',
+                        reviewerName: 'Reviewer One',
+                        decision: 'assign-existing-identity',
+                        decisionLabel: 'Assign Existing Identity',
                     },
                 ],
                 stats: { managedAccountsFound: 2 },
@@ -75,7 +87,7 @@ function createRegistry() {
                         name: 'Fusion One',
                         accounts: ['acc-1'],
                         reviews: [],
-                        statuses: [],
+                        statuses: ['baseline'],
                     },
                 })
                 send({
@@ -85,7 +97,7 @@ function createRegistry() {
                         name: 'Fusion Two',
                         accounts: ['acc-2'],
                         reviews: [],
-                        statuses: [],
+                        statuses: ['unmatched'],
                     },
                 })
                 return 2
@@ -130,66 +142,87 @@ describe('customReport', () => {
     it('streams enriched rows and sends a final summary object', async () => {
         const registry = createRegistry()
 
-        await customReport(registry, { schema: { attributes: [] } } as any)
+        await customReport(
+            registry,
+            { schema: { attributes: [] }, includeMatched: true, includeDeferred: true, includeDecisions: true } as any
+        )
 
         expect(registry.fusion.generateReport).toHaveBeenCalledWith(true, expect.any(Object))
         expect(registry.res.send).toHaveBeenCalledTimes(3)
 
         const firstRow = registry.res.send.mock.calls[0][0]
-        expect(firstRow.attributes.matching.status).toBe('matched')
-        expect(firstRow.attributes.matching.matches).toHaveLength(1)
+        expect(firstRow.matchingStatus.status).toBe('matched')
+        expect(firstRow.matchingStatus.matches).toHaveLength(1)
+        expect(firstRow.sourceStatus).toBeDefined()
+        expect(firstRow.correlationStatus).toBeDefined()
+        expect(firstRow.reportCategories).toEqual(['matched'])
+        expect(firstRow.account.attributes.matching).toBeUndefined()
 
         const secondRow = registry.res.send.mock.calls[1][0]
-        expect(secondRow.attributes.matching.status).toBe('non-matched')
+        expect(secondRow.matchingStatus.status).toBe('deferred')
+        expect(secondRow.reportCategories).toEqual(['deferred', 'decisions'])
+        expect(secondRow.review).toBeDefined()
 
         const summary = registry.res.send.mock.calls[2][0]
         expect(summary.type).toBe('custom:report:summary')
         expect(summary.rows.sent).toBe(2)
         expect(summary.rows.matched).toBe(1)
-        expect(summary.rows.nonMatched).toBe(1)
+        expect(summary.rows.nonMatched).toBe(0)
     })
 
-    it('applies limit option to streamed account rows', async () => {
+    it('emits no account rows when no include option is selected', async () => {
         const registry = createRegistry()
 
-        await customReport(registry, { schema: { attributes: [] }, limit: 1 } as any)
+        await customReport(registry, { schema: { attributes: [] } } as any)
 
-        expect(registry.res.send).toHaveBeenCalledTimes(2)
-        const firstRow = registry.res.send.mock.calls[0][0]
-        expect(firstRow.type).toBeUndefined()
-        const summary = registry.res.send.mock.calls[1][0]
+        expect(registry.res.send).toHaveBeenCalledTimes(1)
+        const summary = registry.res.send.mock.calls[0][0]
         expect(summary.type).toBe('custom:report:summary')
-        expect(summary.rows.sent).toBe(1)
+        expect(summary.rows.sent).toBe(0)
     })
 
-    it('skips summary payload when summary option is false', async () => {
+    it('always sends summary even when summary input is false', async () => {
         const registry = createRegistry()
 
-        await customReport(registry, { schema: { attributes: [] }, summary: false } as any)
+        await customReport(registry, { schema: { attributes: [] }, includeMatched: true, summary: false } as any)
 
         expect(registry.res.send).toHaveBeenCalledTimes(2)
         const firstRow = registry.res.send.mock.calls[0][0]
         const secondRow = registry.res.send.mock.calls[1][0]
         expect(firstRow.type).toBeUndefined()
-        expect(secondRow.type).toBeUndefined()
+        expect(secondRow.type).toBe('custom:report:summary')
     })
 
-    it('filters rows to matched entries when onlyMatching is true', async () => {
+    it('ignores legacy runtime options and emits no rows without include* flags', async () => {
         const registry = createRegistry()
 
-        await customReport(registry, { schema: { attributes: [] }, onlyMatching: true } as any)
+        await customReport(
+            registry,
+            { schema: { attributes: [] }, onlyMatching: true, onlyReview: true, limit: 1, summary: true } as any
+        )
+
+        expect(registry.res.send).toHaveBeenCalledTimes(1)
+        const summary = registry.res.send.mock.calls[0][0]
+        expect(summary.type).toBe('custom:report:summary')
+        expect(summary.rows.sent).toBe(0)
+    })
+
+    it('filters rows to matched entries when includeMatched is true', async () => {
+        const registry = createRegistry()
+
+        await customReport(registry, { schema: { attributes: [] }, includeMatched: true } as any)
 
         expect(registry.res.send).toHaveBeenCalledTimes(2)
         const firstRow = registry.res.send.mock.calls[0][0]
         const summary = registry.res.send.mock.calls[1][0]
-        expect(firstRow.attributes.matching.status).toBe('matched')
+        expect(firstRow.matchingStatus.status).toBe('matched')
         expect(summary.type).toBe('custom:report:summary')
         expect(summary.rows.sent).toBe(1)
         expect(summary.rows.matched).toBe(1)
         expect(summary.rows.nonMatched).toBe(0)
     })
 
-    it('filters rows to pending review entries when onlyReview is true', async () => {
+    it('filters rows to pending review entries when includeReview is true', async () => {
         const registry = createRegistry()
         registry.forms.pendingReviewContextByAccountId = new Map<string, any>([
             [
@@ -202,18 +235,31 @@ describe('customReport', () => {
             ],
         ])
 
-        await customReport(registry, { schema: { attributes: [] }, onlyReview: true } as any)
+        await customReport(registry, { schema: { attributes: [] }, includeReview: true } as any)
 
         expect(registry.res.send).toHaveBeenCalledTimes(2)
         const firstRow = registry.res.send.mock.calls[0][0]
         const summary = registry.res.send.mock.calls[1][0]
-        expect(firstRow.attributes.review.pending).toBe(true)
-        expect(firstRow.attributes.review.forms).toHaveLength(1)
-        expect(firstRow.attributes.review.reviewers).toHaveLength(1)
+        expect(firstRow.review.pending).toBe(true)
+        expect(firstRow.review.forms).toHaveLength(1)
+        expect(firstRow.review.reviewers).toHaveLength(1)
         expect(summary.rows.sent).toBe(1)
     })
 
-    it('includes matched or pending-review rows when onlyMatching and onlyReview are true', async () => {
+    it('filters rows to analysis non-matches when includeUnmatched is true', async () => {
+        const registry = createRegistry()
+
+        await customReport(registry, { schema: { attributes: [] }, includeUnmatched: true } as any)
+
+        expect(registry.res.send).toHaveBeenCalledTimes(2)
+        const firstRow = registry.res.send.mock.calls[0][0]
+        const summary = registry.res.send.mock.calls[1][0]
+        expect(firstRow.reportCategories).toContain('unmatched')
+        expect(firstRow.review).toBeUndefined()
+        expect(summary.rows.sent).toBe(1)
+    })
+
+    it('groups output rows by selected category order and deduplicates rows', async () => {
         const registry = createRegistry()
         registry.forms.pendingReviewContextByAccountId = new Map<string, any>([
             [
@@ -226,26 +272,35 @@ describe('customReport', () => {
             ],
         ])
 
-        await customReport(registry, { schema: { attributes: [] }, onlyMatching: true, onlyReview: true } as any)
+        await customReport(
+            registry,
+            {
+                schema: { attributes: [] },
+                includeBaseline: true,
+                includeUnmatched: true,
+                includeDeferred: true,
+                includeReview: true,
+                includeDecisions: true,
+            } as any
+        )
 
         expect(registry.res.send).toHaveBeenCalledTimes(3)
         const firstRow = registry.res.send.mock.calls[0][0]
         const secondRow = registry.res.send.mock.calls[1][0]
         const summary = registry.res.send.mock.calls[2][0]
 
-        expect(firstRow.attributes.matching.status).toBe('matched')
-        expect(firstRow.attributes.review.pending).toBe(false)
-        expect(secondRow.attributes.matching.status).toBe('non-matched')
-        expect(secondRow.attributes.review.pending).toBe(true)
+        expect(firstRow.reportCategories).toEqual(['baseline'])
+        expect(secondRow.reportCategories).toEqual(['unmatched', 'deferred', 'review', 'decisions'])
+        expect(firstRow.review).toBeUndefined()
+        expect(secondRow.review).toBeDefined()
         expect(summary.rows.sent).toBe(2)
-        expect(summary.rows.matched).toBe(1)
-        expect(summary.rows.nonMatched).toBe(1)
+        expect(summary.rows.deferred).toBe(1)
     })
 
     it('does not execute persistence paths from std:account:list', async () => {
         const registry = createRegistry()
 
-        await customReport(registry, { schema: { attributes: [] } } as any)
+        await customReport(registry, { schema: { attributes: [] }, includeMatched: true, includeDeferred: true } as any)
 
         expect(registry.forms.fetchFormData).toHaveBeenCalled()
         expect(registry.fusion.refreshUniqueAttributes).toHaveBeenCalled()
@@ -258,7 +313,7 @@ describe('customReport', () => {
         const registry = createRegistry()
         registry.sources.hasFusionSource = false
 
-        await customReport(registry, { schema: { attributes: [] } } as any)
+        await customReport(registry, { schema: { attributes: [] }, includeMatched: true, includeDeferred: true } as any)
 
         expect(registry.sources.fetchFusionAccounts).not.toHaveBeenCalled()
         expect(registry.res.send).toHaveBeenCalled()
@@ -272,12 +327,13 @@ describe('customReport', () => {
             { key: 'managed-2', name: 'Managed Two', accounts: ['acc-2'] },
         ])
 
-        await customReport(registry, { schema: { attributes: [] } } as any)
+        await customReport(registry, { schema: { attributes: [] }, includeMatched: true, includeDeferred: true } as any)
 
         expect(registry.attributes.refreshUniqueAttributes).toHaveBeenCalledTimes(2)
         expect(registry.fusion.getISCAccount).toHaveBeenCalledTimes(2)
         expect(registry.res.send).toHaveBeenCalledTimes(3)
         const firstRow = registry.res.send.mock.calls[0][0]
-        expect(firstRow.attributes.matching).toBeDefined()
+        expect(firstRow.matchingStatus).toBeDefined()
+        expect(firstRow.account).toBeDefined()
     })
 })

@@ -31,13 +31,14 @@ export const customReport = async (serviceRegistry: ServiceRegistry, input: StdA
         log.info('Starting custom:report')
         const sender = createSafeSender(serviceRegistry)
         const runtimeOptions: CustomReportRuntimeOptions = {
-            limit:
-                typeof (input as any).limit === 'number' && Number.isFinite((input as any).limit) && (input as any).limit >= 0
-                    ? Math.floor((input as any).limit)
-                    : undefined,
-            summary: typeof (input as any).summary === 'boolean' ? (input as any).summary : true,
-            onlyMatching: typeof (input as any).onlyMatching === 'boolean' ? (input as any).onlyMatching : false,
-            onlyReview: typeof (input as any).onlyReview === 'boolean' ? (input as any).onlyReview : false,
+            includeBaseline: typeof (input as any).includeBaseline === 'boolean' ? (input as any).includeBaseline : false,
+            includeUnmatched:
+                typeof (input as any).includeUnmatched === 'boolean' ? (input as any).includeUnmatched : false,
+            includeMatched: typeof (input as any).includeMatched === 'boolean' ? (input as any).includeMatched : false,
+            includeDeferred: typeof (input as any).includeDeferred === 'boolean' ? (input as any).includeDeferred : false,
+            includeReview: typeof (input as any).includeReview === 'boolean' ? (input as any).includeReview : false,
+            includeDecisions:
+                typeof (input as any).includeDecisions === 'boolean' ? (input as any).includeDecisions : false,
         }
 
         const fetchResult = await fetchPhase(serviceRegistry, input.schema)
@@ -58,23 +59,29 @@ export const customReport = async (serviceRegistry: ServiceRegistry, input: StdA
         )
         const reportIndex = buildReportAccountIndex(report.accounts)
         const pendingReviewByAccountId = forms.pendingReviewContextByAccountId
+        const decisionAccountIds = new Set((report.fusionReviewDecisions ?? []).map((decision) => decision.accountId))
+        const emittedRowKeys = new Set<string>()
         const rowCounter = createCustomReportRowCounter()
 
         let sentRows = await streamEnrichedOutputRows(
             serviceRegistry,
             reportIndex,
             pendingReviewByAccountId,
+            decisionAccountIds,
+            emittedRowKeys,
             rowCounter,
             sender,
             runtimeOptions
         )
 
-        if (sentRows === 0 && analyzedManagedAccounts.length > 0) {
+        if (analyzedManagedAccounts.length > 0) {
             sentRows = await streamFallbackAnalyzedRows(
                 serviceRegistry,
                 analyzedManagedAccounts,
                 reportIndex,
                 pendingReviewByAccountId,
+                decisionAccountIds,
+                emittedRowKeys,
                 rowCounter,
                 sender,
                 sentRows,
@@ -83,17 +90,15 @@ export const customReport = async (serviceRegistry: ServiceRegistry, input: StdA
         }
         timer.phase('PHASE 3: Streaming enriched ISC account rows')
 
-        if (runtimeOptions.summary) {
-            const summary = buildCustomReportSummary({
-                sentRows,
-                rowCounter,
-                reportAccounts: report.accounts,
-                issueSummary,
-                totalProcessingTime: timer.totalElapsed(),
-                stats: report.stats,
-            })
-            sender.send(summary)
-        }
+        const summary = buildCustomReportSummary({
+            sentRows,
+            rowCounter,
+            reportAccounts: report.accounts,
+            issueSummary,
+            totalProcessingTime: timer.totalElapsed(),
+            stats: report.stats,
+        })
+        sender.send(summary)
         await sender.drain()
         timer.phase('PHASE 4: Building and sending summary')
 

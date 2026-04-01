@@ -119,7 +119,7 @@ describe('AttributeService mainAccount stale cleanup', () => {
             attributeMaps: [
                 {
                     newAttribute: 'mainAccount',
-                    existingAttributes: ['_accountId'],
+                    existingAttributes: ['_id'],
                     attributeMerge: 'first',
                 },
             ],
@@ -152,7 +152,7 @@ describe('AttributeService mainAccount stale cleanup', () => {
             identity: {},
             accounts: [],
             sources: new Map<string, Record<string, any>[]>([
-                ['HR', [{ _accountId: 'acct-1', _source: 'HR' }]],
+                ['HR', [{ _id: 'acct-1', _source: 'HR' }]],
             ]),
         }
         const fusionAccount: any = {
@@ -224,7 +224,7 @@ describe('AttributeService mapping undefined behavior', () => {
             identity: {},
             accounts: [],
             sources: new Map<string, Record<string, any>[]>([
-                ['HR', [{ preferredName: 'Neo', _accountId: 'acct-1', _source: 'HR' }]],
+                ['HR', [{ preferredName: 'Neo', _id: 'acct-1', _source: 'HR' }]],
             ]),
         }
         const fusionAccount: any = {
@@ -251,7 +251,7 @@ describe('AttributeService mapping undefined behavior', () => {
         service.mapAttributes(fusionAccount)
         expect(fusionAccount.attributes.nickname).toBe('Neo')
 
-        attributeBag.sources.set('HR', [{ _accountId: 'acct-1', _source: 'HR' }])
+        attributeBag.sources.set('HR', [{ _id: 'acct-1', _source: 'HR' }])
         service.mapAttributes(fusionAccount)
         expect(fusionAccount.attributes.nickname).toBeUndefined()
     })
@@ -704,7 +704,7 @@ describe('AttributeService mainAccount override', () => {
                         {
                             preferredName: 'Neo',
                             employeeId: 'hr-id-001',
-                            _accountId: 'hr-001',
+                            _id: 'hr-001',
                             _source: 'HR',
                         },
                     ],
@@ -715,7 +715,7 @@ describe('AttributeService mainAccount override', () => {
                         {
                             preferredName: 'Trinity',
                             employeeId: 'erp-id-777',
-                            _accountId: 'erp-777',
+                            _id: 'erp-777',
                             _source: 'ERP',
                         },
                     ],
@@ -864,7 +864,7 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
                     [
                         {
                             preferredName: 'Neo',
-                            _accountId: 'hr-001',
+                            _id: 'hr-001',
                             _source: 'HR',
                         },
                     ],
@@ -875,7 +875,7 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
                         {
                             preferredName: 'Trinity',
                             preferredAccountId: 'erp-777',
-                            _accountId: 'erp-777',
+                            _id: 'erp-777',
                             _source: 'ERP',
                         },
                     ],
@@ -1093,5 +1093,309 @@ describe('AttributeService identity immutability by account lifecycle', () => {
         await service.refreshUniqueAttributes(fusionAccount)
 
         expect(fusionAccount.attributes.id).toBe('persisted-id')
+    })
+})
+
+describe('AttributeService $originAccount and $account Velocity context', () => {
+    const velocitySchemas = {
+        listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'derived']),
+        getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'derived' }]),
+        fusionIdentityAttribute: 'id',
+        fusionDisplayAttribute: 'name',
+    } as any
+
+    const velocityDeps = () => ({
+        sourceService: {} as any,
+        log: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any,
+        locks: {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any,
+    })
+
+    const velocityConfig = (expression: string, sourceList: { name: string }[]) =>
+        ({
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: sourceList,
+            normalAttributeDefinitions: [
+                {
+                    name: 'derived',
+                    expression,
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    refresh: true,
+                },
+            ],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        }) as any
+
+    const attachAttributesAccessor = (fusionAccount: any, attributeBag: any) => {
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value: any) => {
+                attributeBag.current = value
+            },
+        })
+    }
+
+    it('exposes managed account fields on $account for non-Identities origin', async () => {
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('$account.preferredName', [{ name: 'HR' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([
+                ['HR', [{ preferredName: 'FromHR', _id: 'm-1', _name: 'FromHR', _source: 'HR' }]],
+            ]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'x',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            originSource: 'HR',
+            originAccountId: 'm-1',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.derived).toBe('FromHR')
+    })
+
+    it('exposes _id and _name on managed snapshots for Velocity', async () => {
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('$account._id:$account._name', [{ name: 'HR' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([
+                [
+                    'HR',
+                    [
+                        {
+                            _id: 'managed-42',
+                            _name: 'Contoso Smith',
+                            _source: 'HR',
+                            IIQDisabled: false,
+                        },
+                    ],
+                ],
+            ]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'x',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            originSource: 'HR',
+            originAccountId: 'managed-42',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.derived).toBe('managed-42:Contoso Smith')
+    })
+
+    it('prefers managed $account over identity-backed when originSource is Identities and managed accounts are present', async () => {
+        // When a baseline (identity-origin) Fusion account has managed accounts attached,
+        // $account should resolve to the first managed account so Velocity expressions
+        // referencing managed-account attributes (e.g. $account.employeeNumber) work correctly.
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('$account.employeeNumber', [{ name: 'HR' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: { employeeNumber: 'E-ID' },
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([
+                [
+                    'HR',
+                    [
+                        {
+                            employeeNumber: 'E-MANAGED',
+                            _id: 'same-id',
+                            _name: 'managed',
+                            _source: 'HR',
+                        },
+                    ],
+                ],
+            ]),
+        }
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'y',
+            sourceName: 'Fusion',
+            fromIdentity: true,
+            isIdentity: true,
+            sources: ['HR', 'Identities'],
+            originSource: 'Identities',
+            originAccountId: 'same-id',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        // Managed account is preferred so expressions like $account.employeeNumber resolve
+        // managed-source data rather than identity data when managed accounts are present.
+        expect(fusionAccount.attributes.derived).toBe('E-MANAGED')
+    })
+
+    it('falls back to identity-backed $account when originSource is Identities and no managed accounts are present', async () => {
+        // When a baseline Fusion account has no managed accounts yet, $account should
+        // fall back to the identity-backed object so identity attributes remain accessible.
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('$account.employeeNumber', [{ name: 'HR' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: { employeeNumber: 'E-ID' },
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'y',
+            sourceName: 'Fusion',
+            fromIdentity: true,
+            isIdentity: true,
+            sources: ['Identities'],
+            originSource: 'Identities',
+            originAccountId: 'id-only',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        // No managed accounts → falls back to identity bag, so $account.employeeNumber = 'E-ID'
+        expect(fusionAccount.attributes.derived).toBe('E-ID')
+    })
+
+    it('synthetic Identities $account when origin is Identities and identity bag empty', async () => {
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('$account._source$account._id', [{ name: 'HR' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'z',
+            sourceName: 'Fusion',
+            fromIdentity: true,
+            isIdentity: true,
+            sources: ['Identities'],
+            originSource: 'Identities',
+            originAccountId: 'id-only',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.derived).toBe('Identitiesid-only')
+    })
+
+    it('uses $originAccount id string in expressions', async () => {
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('prefix-$originAccount', [{ name: 'HR' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'a',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            originSource: 'HR',
+            originAccountId: 'acc-99',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.derived).toBe('prefix-acc-99')
     })
 })

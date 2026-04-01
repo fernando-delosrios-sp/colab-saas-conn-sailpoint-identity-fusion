@@ -79,4 +79,11 @@ export const fusionAccountSchemaAttributes: SchemaAttribute[] = [
         multi: false,
         entitlement: false,
     },
+    {
+        name: 'originAccount',
+        description: 'Origin identity or managed account ID (set on creation, immutable)',
+        type: 'string',
+        multi: false,
+        entitlement: false,
+    },
 ]

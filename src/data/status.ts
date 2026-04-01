@@ -11,11 +11,6 @@ export const statuses: EntitlementSource[] = [
     { id: 'manual', name: 'Manual', description: 'A new base account was manually approved by a reviewer' },
     { id: 'orphan', name: 'Orphan', description: 'No managed accounts left' },
     { id: 'unmatched', name: 'Unmatched', description: 'No match found for base account' },
-    {
-        id: 'edited',
-        name: 'Edited',
-        description: 'The account was manually edited and no longer gets updates from current source accounts',
-    },
     { id: 'reviewer', name: 'Reviewer', description: 'An identity Match reviewer of any source' },
     { id: 'requested', name: 'Requested', description: 'Account was requested' },
     { id: 'uncorrelated', name: 'Uncorrelated', description: 'Account has sources accounts pending correlation' },

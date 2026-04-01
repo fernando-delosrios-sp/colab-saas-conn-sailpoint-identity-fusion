@@ -28,6 +28,8 @@ export type FusionReportMatch = {
     identityUrl?: string
     /** Whether this candidate is considered a match overall */
     isMatch: boolean
+    /** Candidate source used for downstream diagnostics/reporting. */
+    candidateType?: 'identity' | 'new-unmatched'
     /** Per-attribute score breakdown */
     scores?: FusionReportScore[]
 }
@@ -52,6 +54,8 @@ export type FusionReportAccount = {
     matches: FusionReportMatch[]
     /** Error message when form creation failed (excessive candidates or runtime error) */
     error?: string
+    /** True when the account matched only new unmatched candidates and was deferred. */
+    deferred?: boolean
 }
 
 /** A processed reviewer decision entry included in the fusion report. */
