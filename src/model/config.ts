@@ -159,6 +159,12 @@ export interface SourceConfig {
     correlationMode?: CorrelationMode
     correlationAttribute?: string
     correlationDisplayName?: string
+    /**
+     * When true (default), accounts from this source participate in same-aggregation matching:
+     * they can be scored against other new-unmatched accounts from the current run, and
+     * authoritative non-matches from this source become candidates for later accounts.
+     */
+    deferredMatching?: boolean
 }
 
 /** Configuration for all managed sources and aggregation behavior. */

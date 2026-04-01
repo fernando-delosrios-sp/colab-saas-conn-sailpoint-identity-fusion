@@ -83,6 +83,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
                 accountFilter: sourceConfig.accountFilter ?? undefined,
                 accountJmespathFilter: sourceConfig.accountJmespathFilter ?? undefined,
                 correlationMode: sourceConfig.correlationMode ?? 'none',
+                deferredMatching: sourceConfig.deferredMatching ?? true,
             }
         })
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)

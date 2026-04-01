@@ -1064,7 +1064,7 @@ export class FusionService {
         const sourceType = this.sourcesByName.get(account.sourceName ?? '')?.sourceType ?? 'authoritative'
         this.scoring.scoreFusionAccount(fusionAccount, this.fusionIdentities, 'identity')
         const hasIdentityBackedMatches = this.hasIdentityBackedMatches(fusionAccount)
-        if (!hasIdentityBackedMatches) {
+        if (!hasIdentityBackedMatches && this.isDeferredMatchingEnabledForSource(account.sourceName ?? undefined)) {
             this.scoring.scoreFusionAccount(fusionAccount, this.currentRunUnmatchedCandidates, 'new-unmatched')
         }
 
@@ -1114,7 +1114,7 @@ export class FusionService {
             }
         } else {
             this.log.debug(`No match found for managed account: ${name} [${sourceName}]`)
-            if (sourceType === 'authoritative') {
+            if (sourceType === 'authoritative' && this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
                 // Keep current-run authoritative non-matches available as deferred candidates
                 // for subsequent managed-account analysis in custom:report.
                 this.registerCurrentRunUnmatchedCandidate(fusionAccount)
@@ -1357,8 +1357,21 @@ export class FusionService {
         fusionAccount.setUnmatched()
         await this.applyPerSourceCorrelationIfNeeded(fusionAccount)
         this.setFusionAccount(fusionAccount)
-        this.registerCurrentRunUnmatchedCandidate(fusionAccount)
+        if (this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
+            this.registerCurrentRunUnmatchedCandidate(fusionAccount)
+        }
         return fusionAccount
+    }
+
+    /**
+     * Same-aggregation (deferred) matching: when false for a source, its accounts neither
+     * score against nor register as current-run unmatched peers. Default true if unknown.
+     */
+    private isDeferredMatchingEnabledForSource(sourceName: string | undefined): boolean {
+        if (!sourceName) return true
+        const info = this.sourcesByName.get(sourceName)
+        if (!info?.config) return true
+        return info.config.deferredMatching !== false
     }
 
     private registerCurrentRunUnmatchedCandidate(fusionAccount: FusionAccount): void {

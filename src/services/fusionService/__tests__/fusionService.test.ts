@@ -329,6 +329,64 @@ describe('FusionService', () => {
             expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('DEFERRED MATCH FOUND'))
         })
 
+        it('skips same-aggregation matching when deferredMatching is false for the source', async () => {
+            const firstAccount = {
+                id: 'acct-seq-off-1',
+                nativeIdentity: 'native-seq-off-1',
+                name: 'Taylor Jordan',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+            const secondAccount = {
+                id: 'acct-seq-off-2',
+                nativeIdentity: 'native-seq-off-2',
+                name: 'Taylor Jordan',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+
+            ;(fusionService as any).sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                isManaged: true,
+                sourceType: 'authoritative',
+                config: { name: 'Source A', deferredMatching: false },
+            })
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+                new Map([
+                    ['acct-seq-off-1', firstAccount],
+                    ['acct-seq-off-2', secondAccount],
+                ])
+            )
+            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            mockScoring.scoreFusionAccount.mockImplementation((account, candidates, candidateType) => {
+                if (candidateType !== 'new-unmatched') return
+                const candidateList = Array.from(candidates as Iterable<unknown>)
+                if (candidateList.length > 0) {
+                    account.addFusionMatch({
+                        identityId: '',
+                        identityName: 'Current run unmatched',
+                        candidateType: 'new-unmatched',
+                        scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any],
+                    } as any)
+                }
+            })
+
+            await fusionService.processManagedAccounts()
+
+            expect(fusionService.fusionAccounts).toHaveLength(2)
+            expect(mockLog.info).not.toHaveBeenCalledWith(expect.stringContaining('DEFERRED MATCH FOUND'))
+            expect(mockScoring.scoreFusionAccount).not.toHaveBeenCalledWith(
+                expect.anything(),
+                expect.anything(),
+                'new-unmatched'
+            )
+        })
+
         it('short-circuits duplicate checks when an identity-backed match already exists', async () => {
             const mockManagedAccount = {
                 id: 'acct-short-circuit-1',

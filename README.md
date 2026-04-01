@@ -181,7 +181,7 @@ Controls Match behavior, including similarity matching and manual review workflo
 
 > **Tip:** Remember that mandatory match configurations scoring below their threshold invalidate the match. Add them to the top of the list to avoid unnecessary overhead.
 
-> **Note:** During managed-account analysis, Identity Fusion evaluates identity-backed candidates first. Duplicate checks against newly discovered unmatched Fusion accounts are only executed when no identity-backed match is found. If such a duplicate is detected, it is logged/reported as **deferred** and no ISC account is emitted for that path until a later aggregation correlates that Fusion account to an identity.
+> **Note (same-aggregation matching):** Managed accounts are processed in order within one aggregation. For each source you can enable **Same-aggregation matching** (default on). When enabled, after **identity-backed** matching fails, Identity Fusion also compares the account to **other accounts from the same run** that were classified as **new unmatched** (not linked to an ISC identity yet). If the only strong match is one of those peers, the run logs **DEFERRED MATCH FOUND**, reports **deferred** (when reporting is on), and does **not** emit another Fusion ISC account until a later aggregation can resolve correlation. **Turn this on** for a source when the same person may appear as two or more accounts in a single aggregation and you want those collisions detected before creating duplicate Fusion identities. **Turn it off** when every non-identity miss should immediately become its own unmatched Fusion account with no same-run peer comparison.
 
 #### Review Settings Section
 

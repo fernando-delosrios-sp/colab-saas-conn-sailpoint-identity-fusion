@@ -117,7 +117,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Sources",
-                    "sectionHelpMessage": "<strong>Select the account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Source type:</strong> Choose Authoritative, Record, or Orphan behavior for unmatched accounts.</li><li><strong>Account aggregation:</strong> Choose to aggregate before processing, after a delay, or not at all. Optimized aggregation can be disabled for reverse correlation. Delimited text sources cannot be aggregated.</li><li><strong>Correlation mode:</strong> Choose whether to correlate during processing, set up reverse correlation, or leave accounts uncorrelated.</li><li><strong>Accounts API filter:</strong> Limit which accounts are fetched from ISC (server-side).</li><li><strong>Accounts JMESPath filter:</strong> Further filter fetched account pages client-side using JMESPath.</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li><li><strong>Enabled:</strong> Turn off to temporarily exclude this source from processing without removing it.</li></ul>",
+                    "sectionHelpMessage": "<strong>Select the account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Source type:</strong> Choose Authoritative, Record, or Orphan behavior for unmatched accounts.</li><li><strong>Same-aggregation matching:</strong> Per-source toggle (on by default). Turn on when duplicates or the same person may appear as multiple accounts within one aggregation; turn off when every non-identity match should become its own unmatched Fusion account with no same-run peer comparison.</li><li><strong>Account aggregation:</strong> Choose to aggregate before processing, after a delay, or not at all. Optimized aggregation can be disabled for reverse correlation. Delimited text sources cannot be aggregated.</li><li><strong>Correlation mode:</strong> Choose whether to correlate during processing, set up reverse correlation, or leave accounts uncorrelated.</li><li><strong>Accounts API filter:</strong> Limit which accounts are fetched from ISC (server-side).</li><li><strong>Accounts JMESPath filter:</strong> Further filter fetched account pages client-side using JMESPath.</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li><li><strong>Enabled:</strong> Turn off to temporarily exclude this source from processing without removing it.</li></ul>",
                     "items": [
                         {
                             "key": "sources",
@@ -182,6 +182,14 @@
                                             "parentKey": "sourceType",
                                             "parentValue": "orphan",
                                             "helpKey": "Automatically disable orphan accounts that no longer match any identity after aggregation"
+                                        },
+                                        {
+                                            "key": "deferredMatching",
+                                            "label": "Same-aggregation matching",
+                                            "type": "toggle",
+                                            "required": false,
+                                            "value": "true",
+                                            "helpKey": "When <strong>on</strong> (recommended when duplicates are possible), accounts from this source are compared to <strong>other new unmatched accounts from the same aggregation</strong> after identity-based matching. If the only strong match is such a peer, the connector reports <strong>deferred</strong> and avoids creating a second Fusion identity until a later run resolves correlation. Accounts from this source both <strong>consume</strong> and <strong>contribute</strong> to that same-run peer list. When <strong>off</strong>, non-identity matches go straight to normal unmatched handling for this source with no same-run peer comparison."
                                         },
                                         {
                                             "key": "accountFilter",
