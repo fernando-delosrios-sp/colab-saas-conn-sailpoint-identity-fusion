@@ -7,6 +7,11 @@ jest.mock('../actions', () => ({
 }))
 
 function createRegistry() {
+    const fusionIdentity = {
+        nativeIdentity: 'fusion-id-1',
+        addStatus: jest.fn(),
+    }
+
     const timer = {
         phase: jest.fn(),
         end: jest.fn(),
@@ -34,7 +39,7 @@ function createRegistry() {
         fusion: {
             preProcessFusionAccounts: jest.fn().mockResolvedValue(undefined),
             processIdentity: jest.fn().mockResolvedValue(undefined),
-            getFusionIdentity: jest.fn().mockReturnValue({ nativeIdentity: 'fusion-id-1' }),
+            getFusionIdentity: jest.fn().mockReturnValue(fusionIdentity),
             getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-created' }),
         },
         attributes: {
@@ -76,6 +81,10 @@ describe('accountCreate', () => {
         expect(registry.attributes.registerUniqueValuesFromRawAccounts).toHaveBeenCalledWith(registry.sources.fusionAccounts)
         expect(registry.fusion.preProcessFusionAccounts).toHaveBeenCalledTimes(1)
         expect(registry.fusion.processIdentity).toHaveBeenCalledWith({ id: 'id-1', name: 'Alice Doe' })
+        expect(registry.fusion.getFusionIdentity().addStatus).toHaveBeenCalledWith(
+            'requested',
+            'Status set by accountCreate operation'
+        )
         expect(executeActions).toHaveBeenCalledTimes(2)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-created' })
     })

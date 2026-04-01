@@ -80,6 +80,32 @@ describe('buildCustomReportPayload', () => {
         })
     })
 
+    it('marks rows as deferred when report account is deferred', () => {
+        const reportIndex = buildReportAccountIndex([
+            {
+                accountId: 'acc-deferred-1',
+                accountName: 'Deferred Account',
+                accountSource: 'HR',
+                sourceType: 'authoritative',
+                deferred: true,
+                matches: [{ identityName: 'Unmatched Candidate', isMatch: true, candidateType: 'new-unmatched', scores: [] }],
+            },
+        ])
+        const row = {
+            key: 'fusion-deferred-1',
+            disabled: false,
+            attributes: {
+                accounts: ['acc-deferred-1'],
+                statuses: [],
+                reviews: [],
+            },
+        } as any
+
+        const enriched = enrichISCAccountWithMatching(row, reportIndex)
+        expect(enriched.status).toBe('deferred')
+        expect((enriched.account as any).attributes.matching.matches[0].candidateType).toBe('new-unmatched')
+    })
+
     it('merges unique forms and reviewers across related account ids', () => {
         const reportIndex = buildReportAccountIndex([])
         const row = {
@@ -126,6 +152,7 @@ describe('buildCustomReportPayload', () => {
     it('builds a summary object from counters and report diagnostics', () => {
         const rowCounter = createCustomReportRowCounter()
         rowCounter.matched = 2
+        rowCounter.deferred = 1
         rowCounter['non-matched'] = 1
 
         const summary = buildCustomReportSummary({
@@ -147,6 +174,7 @@ describe('buildCustomReportPayload', () => {
 
         expect(summary.type).toBe('custom:report:summary')
         expect(summary.rows.sent).toBe(3)
+        expect(summary.rows.deferred).toBe(1)
         expect(summary.managedAccounts.analyzed).toBe(2)
         expect(summary.diagnostics.warnings).toBe(1)
     })

@@ -60,6 +60,7 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
         const fusionIdentity = fusion.getFusionIdentity(identity.id)
         assert(fusionIdentity, `Fusion identity not found for identity ID: ${identity.id}`)
         log.debug(`Found fusion identity: ${fusionIdentity.nativeIdentity}`)
+        fusionIdentity.addStatus('requested', 'Status set by accountCreate operation')
 
         await attributes.refreshUniqueAttributes(fusionIdentity)
         timer.phase('Step 3: Processing identity')

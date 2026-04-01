@@ -123,7 +123,7 @@ Controls how attributes are generated (Define step), including unique identifier
 | Field                                 | Description                                         | Required                   | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------------------------- | --------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Attribute Name**                    | Name of the account attribute to generate           | Yes                        | Will appear in the discovered schema                                                                                                                                                                                                                                                                                                                                                                                                        |
-| **Apache Velocity expression**        | Template expression to generate the attribute value | No                         | Context includes: mapped account attributes, `$accounts`, `$sources`, `$previous`, optional `$identity` and `$originSource`, plus `$Math`, `$Datefns` (format, parse, add/sub days/months/years, isBefore, isAfter, differenceInDays, etc.), `$AddressParse` (getCityState, getCityStateCode, parse), and `$Normalize` (date, phone, name, fullName, ssn, address). Example: `#set($initial = $firstname.substring(0, 1))$initial$lastname` |
+| **Apache Velocity expression**        | Template expression to generate the attribute value | No                         | Context includes: mapped account attributes, `$accounts`, `$sources`, `$previous`, optional `$identity`, `$originSource`, `$originAccount` (id), `$account` (origin snapshot object), plus `$Math`, `$Datefns` (format, parse, add/sub days/months/years, isBefore, isAfter, differenceInDays, etc.), `$AddressParse` (getCityState, getCityStateCode, parse), and `$Normalize` (date, phone, name, fullName, ssn, address). Example: `#set($initial = $firstname.substring(0, 1))$initial$lastname` |
 | **Case selection**                    | Case transformation to apply                        | Yes                        | Options: **Do not change**, **Lower case**, **Upper case**, **Capitalize**                                                                                                                                                                                                                                                                                                                                                                  |
 | **Attribute Type**                    | Type of attribute                                   | Yes                        | **Normal** (standard attribute), **Unique** (must be unique across accounts; counter added if collision), **UUID** (generates immutable UUID), **Counter-based** (increments with each use)                                                                                                                                                                                                                                                 |
 | **Counter start value**               | Starting value for counter                          | Yes (counter type)         | Example: 1, 1000, etc.                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -148,7 +148,7 @@ Controls how attributes are generated (Define step), including unique identifier
 
 > **Tip:** Remember that normal attributes are automatically refreshed when new data is found. You don't need to force global or individual attribute refresh unless there's a good reason, like troubleshooting, testing, or if the attribute definition is time-sensitive.
 
-> **Note:** In Velocity context, managed account snapshots (`$accounts` and `$sources`) include `_source` (source name) and `IIQDisabled` (IdentityIQ-style disabled flag where `true` means disabled). `$accounts` is deterministic: sources follow configured order, accounts keep insertion order within each source, and non-configured sources are appended.
+> **Note:** In Velocity context, managed account snapshots (`$accounts` and `$sources`) include each source account’s **`attributes`** plus **`_id`** and **`_name`** (from the ISC account’s top-level `id` and `name` / `nativeIdentity`), **`_source`** (source name), and **`IIQDisabled`** (IdentityIQ-style disabled flag where `true` means disabled). `$accounts` is deterministic: sources follow configured order, accounts keep insertion order within each source, and non-configured sources are appended. **`$originAccount`** is the immutable origin id string; **`$account`** is the origin snapshot (managed shape or identity-backed when the origin is `Identities`).
 
 ### Attribute Matching Settings
 
@@ -180,6 +180,8 @@ Controls Match behavior, including similarity matching and manual review workflo
 > **Tip:** Use Fusion reports to fine-tune your matching thresholds and algorithms.
 
 > **Tip:** Remember that mandatory match configurations scoring below their threshold invalidate the match. Add them to the top of the list to avoid unnecessary overhead.
+
+> **Note:** During managed-account analysis, Identity Fusion evaluates identity-backed candidates first. Duplicate checks against newly discovered unmatched Fusion accounts are only executed when no identity-backed match is found. If such a duplicate is detected, it is logged/reported as **deferred** and no ISC account is emitted for that path until a later aggregation correlates that Fusion account to an identity.
 
 #### Review Settings Section
 
@@ -280,25 +282,30 @@ Use `custom:report` to run a **non-persistent aggregation analysis**. It evaluat
 
 `custom:report` supports optional runtime controls in the command input:
 
-- `limit` (number): Maximum number of account rows to stream. If omitted, all rows are eligible.
-- `summary` (boolean): Whether to emit the final `custom:report:summary` payload. Default: `true`.
-- `onlyMatching` (boolean): Stream only rows whose `attributes.matching.status` is `matched`. Default: `false`.
-- `onlyReview` (boolean): Stream only rows with `attributes.review.pending === true`. Default: `false`.
-- If both `onlyMatching` and `onlyReview` are `true`, rows matching either condition are streamed.
+- `includeBaseline` (boolean): Emit rows categorized as baseline.
+- `includeUnmatched` (boolean): Emit rows categorized as unmatched.
+- `includeMatched` (boolean): Emit rows whose `matching.status` is `matched`.
+- `includeDeferred` (boolean): Emit rows whose `matching.status` is `deferred`.
+- `includeReview` (boolean): Emit rows with `review.pending === true`.
+- `includeDecisions` (boolean): Emit rows linked to processed fusion review decisions.
+
+All `include*` options default to `false`. If none are enabled, no account rows are streamed.
+`summary` is always emitted by default and is not a runtime option.
 
 ### What it returns
 
 - Streams final ISC account rows (`key`, `attributes`, `disabled`) like account list output.
-- Adds `attributes.matching` to every streamed row with:
-    - `status`: `matched`, `non-matched`, `review-error`, or `not-analyzed`
+- Adds root-level `matching` to every streamed row with:
+    - `status`: `matched`, `deferred`, `non-matched`, `review-error`, or `not-analyzed`
     - `matches`: candidate identities and per-attribute scores when available
-    - `sourceContext`: source provenance (`originSource`, `sources`)
+    - `sourceContext`: source provenance (`originSource`, `originAccount`, `sources`)
     - `correlationContext`: linked and missing account context (`accounts`, `missing-accounts`, `reviews`, `statuses`)
-- Adds `attributes.review` to every streamed row:
+- Adds root-level `review` only for rows categorized as `review` or `decisions`:
     - `pending`: whether there is an active pending form instance linked to any account id in `attributes.accounts`
     - `forms`: pending form references (`formInstanceId`, `url`)
     - `reviewers`: resolved reviewer identities (`id`, `name`, `email`)
     - `candidates`: candidate identity details (`id`, `name`, `scores`, `attributes`)
+- Adds root-level `reportCategories` to every streamed row, listing all matched output categories for that row.
 - Sends a final summary object with `type: custom:report:summary` containing row totals, managed-account analysis totals, diagnostics, and processing time.
 
 ### Typical use cases
@@ -326,6 +333,7 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
 | **sources**          | string               | No    | Comma-separated list of managed source names currently contributing to this account                                                                                                                                                                                                                  |
 | **mainAccount**      | string               | No    | Managed account ID evaluated first when present. If populated with a valid managed account ID, that managed account is evaluated first for mapping and definition context.                                                                                                                           |
 | **originSource**     | string               | No    | Name of the source that originally created this account. Set once at creation and never modified. Equals the managed account source name when the account originates from a source account, or `Identities` when it originates from an identity. Useful for auditing and tracing account provenance. |
+| **originAccount**    | string               | No    | Identity id or managed account id that originally created this Fusion account. Set once at creation and never modified. Pairs with **`$account`** in Velocity for the origin snapshot object. |
 
 > **Note:** In addition to these standard attributes, the discovered schema includes any attributes defined via **Attribute Mapping** and **Attribute Definition** settings.
 

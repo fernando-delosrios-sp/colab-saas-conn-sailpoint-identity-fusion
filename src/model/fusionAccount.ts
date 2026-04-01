@@ -58,6 +58,8 @@ export class FusionAccount {
     private _accountDisplayName?: string
     private _sourceName = ''
     private _originSource?: string
+    /** Identity id or managed account id that created this Fusion account (immutable). */
+    private _originAccountId?: string
 
     // State flags
     private _uncorrelated = false
@@ -243,6 +245,12 @@ export class FusionAccount {
         // Restore persisted originSource; fallback for legacy accounts without it
         fusionAccount._originSource =
             account.attributes?.originSource ?? (statuses.has('baseline') ? 'Identities' : undefined)
+        const persistedOriginAccount = account.attributes?.originAccount
+        fusionAccount._originAccountId =
+            (typeof persistedOriginAccount === 'string' && persistedOriginAccount.trim() !== ''
+                ? persistedOriginAccount.trim()
+                : undefined) ??
+            (statuses.has('baseline') && account.identityId ? String(account.identityId) : undefined)
         // Capture the previously stored account IDs so we can later rebuild
         // the current and missing account sets based on which managed accounts
         // still exist in configured sources.
@@ -300,6 +308,7 @@ export class FusionAccount {
             identityId: identity.id ?? undefined,
         })
         fusionAccount._originSource = 'Identities'
+        fusionAccount._originAccountId = identity.id ?? undefined
         fusionAccount.setBaseline()
         return fusionAccount
     }
@@ -345,6 +354,7 @@ export class FusionAccount {
             managedAccountId: account.id ?? undefined,
         })
         fusionAccount._originSource = account.sourceName ?? undefined
+        fusionAccount._originAccountId = account.id ?? undefined
         fusionAccount.setUncorrelated()
         fusionAccount.setUncorrelatedAccount(account.id!)
         fusionAccount.setManagedAccount(account, false)
@@ -378,6 +388,7 @@ export class FusionAccount {
             managedAccountId: account.id ?? undefined,
         })
         fusionAccount._originSource = account.sourceName ?? undefined
+        fusionAccount._originAccountId = account.id ?? undefined
         fusionAccount.setUncorrelated()
         fusionAccount.setUncorrelatedAccount(account.id)
         return fusionAccount
@@ -458,6 +469,11 @@ export class FusionAccount {
     /** The original source that created this fusion account (e.g. "Identities" or a managed source name). */
     public get originSource(): string | undefined {
         return this._originSource
+    }
+
+    /** Identity id or managed account id that originally created this fusion account. */
+    public get originAccountId(): string | undefined {
+        return this._originAccountId
     }
 
     // ============================================================================
@@ -859,9 +875,12 @@ export class FusionAccount {
         this._attributeBag.current['actions'] = Array.from(this._actions)
         this._attributeBag.current['missing-accounts'] = Array.from(this._missingAccountIds)
         this._attributeBag.current['sources'] = attrConcat(Array.from(this._sources))
-        this._attributeBag.current['history'] = this._history
+        this._attributeBag.current['history'] = [...this._history]
         if (this._originSource) {
             this._attributeBag.current['originSource'] = this._originSource
+        }
+        if (this._originAccountId) {
+            this._attributeBag.current['originAccount'] = this._originAccountId
         }
     }
 
@@ -972,8 +991,13 @@ export class FusionAccount {
      * Add a dated history entry
      */
     private addHistory(message: string): void {
+        const normalizedMessage = String(message ?? '').trim()
+        if (!normalizedMessage) return
+
         const now = new Date().toISOString().split('T')[0]
-        const datedMessage = `[${now}] ${message}`
+        const datedMessage = `[${now}] ${normalizedMessage}`
+        const previousMessage = this._history[this._history.length - 1]
+        if (previousMessage === datedMessage) return
         this._history.push(datedMessage)
 
         // Enforce maximum history size by keeping only the most recent entries
@@ -986,17 +1010,32 @@ export class FusionAccount {
      * Import history from existing account, respecting max history limit
      */
     public importHistory(history: string[]): void {
-        this._history = history.slice(-this.maxHistoryMessages)
+        const normalizedHistory = history
+            .filter((entry): entry is string => typeof entry === 'string')
+            .map((entry) => entry.trim())
+            .filter((entry) => entry.length > 0)
+
+        const dedupedHistory: string[] = []
+        for (const entry of normalizedHistory) {
+            if (dedupedHistory[dedupedHistory.length - 1] !== entry) {
+                dedupedHistory.push(entry)
+            }
+        }
+
+        this._history = dedupedHistory.slice(-this.maxHistoryMessages)
     }
 
     /**
      * Helper method to add an item to a Set and optionally log history
      */
-    private addToSet<T>(set: Set<T>, item: T, message?: string): void {
+    private addToSet<T>(set: Set<T>, item: T, message?: string): boolean {
+        const initialSize = set.size
         set.add(item)
-        if (message) {
+        const added = set.size > initialSize
+        if (added && message) {
             this.addHistory(message)
         }
+        return added
     }
 
     /**
@@ -1215,8 +1254,8 @@ export class FusionAccount {
             this.setNeedsRefresh(true)
             if (addAssociationHistory) {
                 const accountLabel = String(account.name ?? account.nativeIdentity ?? accountId).trim() || accountId
-                const sourceLabel = String(account.sourceName ?? this._sourceName ?? 'Unknown')
-                this.addHistory(`Associated managed account ${accountLabel} [${sourceLabel}]`)
+                const sourceLabel = account.sourceName ?? this._sourceName
+                this.addHistory(`Associated managed account ${this.formatHistoryAccountInfo(accountLabel, sourceLabel)}`)
             }
         }
 
@@ -1235,7 +1274,8 @@ export class FusionAccount {
 
             const contextAttributes: Attributes = {
                 ...(account.attributes ?? {}),
-                _accountId: accountId,
+                _id: accountId,
+                _name: String(account.name ?? account.nativeIdentity ?? '').trim() || accountId,
                 _source: account.sourceName,
                 // IdentityIQ-style compatibility: true means account is disabled.
                 IIQDisabled: Boolean(account.disabled),
@@ -1292,13 +1332,13 @@ export class FusionAccount {
     /** Marks this account with "baseline" status (created from an identity in authoritative mode). */
     private setBaseline(): void {
         this._statuses.add('baseline')
-        this.addHistory(`Set ${this._name} [${this._sourceName}] as baseline`)
+        this.addHistory(`Set ${this.formatHistoryAccountInfo(this._name, this._sourceName)} as baseline`)
     }
 
     /** Marks this account as "unmatched" (no Match found, pending review). */
     public setUnmatched(): void {
         this._statuses.add('unmatched')
-        this.addHistory(`Set ${this._name} [${this._sourceName}] as unmatched`)
+        this.addHistory(`Set ${this.formatHistoryAccountInfo(this._name, this._sourceName)} as unmatched`)
     }
 
     /**
@@ -1312,8 +1352,11 @@ export class FusionAccount {
      * addFusionDecisionLayer skips setManual for those source types.
      */
     private createDecisionHistoryMessage(decision: FusionDecision, action: string): string {
-        const submitterName = decision.submitter.name || decision.submitter.email
-        const accountInfo = `${decision.account.name} [${decision.account.sourceName}]`
+        const submitterName = this.normalizeHistoryLabel(
+            decision.submitter.name || decision.submitter.email,
+            'Unknown reviewer'
+        )
+        const accountInfo = this.formatHistoryAccountInfo(decision.account.name, decision.account.sourceName)
         const sourceType = decision.sourceType ?? 'authoritative'
         const isAutoCorrelation =
             decision.submitter?.id === 'system' || String(decision.comments ?? '').includes('Auto-correlated')
@@ -1422,6 +1465,17 @@ export class FusionAccount {
         }
 
         this.addHistory(`Source account removed: ${id}`)
+    }
+
+    private normalizeHistoryLabel(value: unknown, fallback: string): string {
+        const normalized = String(value ?? '').trim()
+        return normalized.length > 0 ? normalized : fallback
+    }
+
+    private formatHistoryAccountInfo(name: unknown, source: unknown): string {
+        const accountLabel = this.normalizeHistoryLabel(name, 'Unknown account')
+        const sourceLabel = this.normalizeHistoryLabel(source, 'Unknown source')
+        return `${accountLabel} [${sourceLabel}]`
     }
 
     private markAsOrphan(): void {

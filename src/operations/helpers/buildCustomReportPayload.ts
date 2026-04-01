@@ -2,7 +2,7 @@ import { StdAccountListOutput } from '@sailpoint/connector-sdk'
 import { FusionReportAccount, FusionReportMatch, FusionReportStats } from '../../services/fusionService/types'
 import { PendingReviewAccountContext } from '../../services/formService/formService'
 
-export type MatchingStatus = 'matched' | 'non-matched' | 'review-error' | 'not-analyzed'
+export type MatchingStatus = 'matched' | 'deferred' | 'non-matched' | 'review-error' | 'not-analyzed'
 
 export type CustomReportRowCounter = Record<MatchingStatus, number>
 
@@ -13,6 +13,7 @@ export type CustomReportSummary = {
     rows: {
         sent: number
         matched: number
+        deferred: number
         nonMatched: number
         reviewErrors: number
         notAnalyzed: number
@@ -41,6 +42,7 @@ type MatchingCandidate = {
     identityId?: string
     identityUrl?: string
     isMatch: boolean
+    candidateType?: 'identity' | 'new-unmatched'
     scores?: FusionReportMatch['scores']
 }
 
@@ -54,6 +56,7 @@ type MatchingPayload = {
     matches: MatchingCandidate[]
     sourceContext: {
         originSource?: unknown
+        originAccount?: unknown
         sources?: unknown
     }
     correlationContext: {
@@ -101,6 +104,7 @@ const EMPTY_REVIEW_PAYLOAD: ReviewPayload = { pending: false, forms: [], reviewe
 
 export const createCustomReportRowCounter = (): CustomReportRowCounter => ({
     matched: 0,
+    deferred: 0,
     'non-matched': 0,
     'review-error': 0,
     'not-analyzed': 0,
@@ -119,6 +123,8 @@ export const buildReportAccountIndex = (reportAccounts: FusionReportAccount[]): 
 
 const deriveMatchingStatus = (reportAccounts: FusionReportAccount[]): MatchingStatus => {
     if (reportAccounts.length === 0) return 'not-analyzed'
+    const hasDeferred = reportAccounts.some((x) => Boolean(x.deferred))
+    if (hasDeferred) return 'deferred'
     const hasError = reportAccounts.some((x) => Boolean(x.error))
     if (hasError) return 'review-error'
     const hasMatch = reportAccounts.some((x) => x.matches.length > 0)
@@ -148,6 +154,7 @@ const buildMatchingPayload = (account: StdAccountListOutput, reportAccounts: Fus
                 identityId: match.identityId,
                 identityUrl: match.identityUrl,
                 isMatch: match.isMatch,
+                candidateType: match.candidateType,
                 scores: match.scores,
             })
         }
@@ -166,6 +173,7 @@ const buildMatchingPayload = (account: StdAccountListOutput, reportAccounts: Fus
         matches: allMatches,
         sourceContext: {
             originSource: attributes.originSource,
+            originAccount: attributes.originAccount,
             sources: attributes.sources,
         },
         correlationContext: {
@@ -308,6 +316,7 @@ export const buildCustomReportSummary = (params: {
         rows: {
             sent: params.sentRows,
             matched: params.rowCounter.matched,
+            deferred: params.rowCounter.deferred,
             nonMatched: params.rowCounter['non-matched'],
             reviewErrors: params.rowCounter['review-error'],
             notAnalyzed: params.rowCounter['not-analyzed'],

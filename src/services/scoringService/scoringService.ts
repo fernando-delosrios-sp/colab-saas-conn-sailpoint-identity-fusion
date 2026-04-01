@@ -44,14 +44,18 @@ export class ScoringService {
      * @param fusionAccount - The account to score (typically a new/unmatched account)
      * @param fusionIdentities - The set of existing fusion identities to compare against
      */
-    public scoreFusionAccount(fusionAccount: FusionAccount, fusionIdentities: Iterable<FusionAccount>): void {
+    public scoreFusionAccount(
+        fusionAccount: FusionAccount,
+        fusionIdentities: Iterable<FusionAccount>,
+        candidateType: 'identity' | 'new-unmatched' = 'identity'
+    ): void {
         // No matching configs → no scoring possible; skip entirely to avoid
         // false positives (empty scores would otherwise mark every identity as a match).
         if (this.matchingConfigs.length === 0) return
 
         // Use for...of instead of forEach for better performance in hot path
         for (const fusionIdentity of fusionIdentities) {
-            this.compareFusionAccounts(fusionAccount, fusionIdentity)
+            this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType)
         }
     }
 
@@ -66,7 +70,11 @@ export class ScoringService {
      * @param fusionAccount - The candidate account being evaluated
      * @param fusionIdentity - The existing identity to compare against
      */
-    private compareFusionAccounts(fusionAccount: FusionAccount, fusionIdentity: FusionAccount): void {
+    private compareFusionAccounts(
+        fusionAccount: FusionAccount,
+        fusionIdentity: FusionAccount,
+        candidateType: 'identity' | 'new-unmatched'
+    ): void {
         const fullRun = this.reportMode || this.fusionUseAverageScore
         const scores: ScoreReport[] = []
         let isMatch = false
@@ -154,6 +162,7 @@ export class ScoringService {
             fusionIdentity,
             identityId,
             identityName,
+            candidateType,
             scores,
         }
         if (isMatch) {

@@ -24,6 +24,8 @@ import { StateWrapper } from './stateWrapper'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
+/** System-managed provenance id; not mapped or defined via Velocity. */
+const ORIGIN_ACCOUNT_ATTRIBUTE = 'originAccount'
 
 // ============================================================================
 // AttributeService Class
@@ -260,6 +262,7 @@ export class AttributeService {
         fusionIdentityAttribute: string,
         fusionDisplayAttribute: string
     ): boolean {
+        if (attribute === ORIGIN_ACCOUNT_ATTRIBUTE) return true
         const current = fusionAccount.attributeBag.current
         const hasExistingValue = isValidAttributeValue(current[attribute])
         const canResetDisplay = fusionAccount.needsReset && attribute === fusionDisplayAttribute
@@ -276,8 +279,14 @@ export class AttributeService {
     }
 
     private applyHistoryMapping(processedValue: unknown, fusionAccount: FusionAccount): void {
-        const history = processedValue as string[]
-        if (!Array.isArray(history) || history.length === 0) return
+        if (!Array.isArray(processedValue) || processedValue.length === 0) return
+
+        const history = processedValue
+            .filter((entry): entry is string => typeof entry === 'string')
+            .map((entry) => entry.trim())
+            .filter((entry) => entry.length > 0)
+
+        if (history.length === 0) return
         fusionAccount.importHistory(history)
     }
 
@@ -341,12 +350,24 @@ export class AttributeService {
      * This ensures the re-enabled account receives fresh, collision-free unique values
      * (such as usernames) that may have been reassigned while it was disabled.
      *
+     * Additionally, if any unique attribute is currently empty or missing (e.g. because a
+     * prior generation failed when `$account` resolved to an identity-backed object lacking
+     * managed-account attributes), this method will attempt to regenerate those values
+     * regardless of the needsRefresh flag, preventing a permanent empty-attribute state.
+     *
      * @param fusionAccount - The fusion account to refresh unique attributes for
      */
     public async refreshUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
         if (this.uniqueDefinitions.length === 0) return
 
-        const shouldRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset
+        // Also refresh when any unique attribute value is missing or empty, to recover from
+        // failed generation on a prior run (e.g. $account resolved to an identity object
+        // that lacked the managed-account attributes referenced by the expression).
+        const hasMissingUniqueAttribute = this.uniqueDefinitions.some(
+            (def) => !isValidAttributeValue(fusionAccount.attributes[def.name])
+        )
+
+        const shouldRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || hasMissingUniqueAttribute
         if (!shouldRefresh) return
 
         this.log.debug(`Refreshing unique attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`)
@@ -593,12 +614,85 @@ export class AttributeService {
         context.accounts = orderedAccounts
         context.previous = fusionAccount.attributeBag.previous
         context.sources = fusionAccount.attributeBag.sources
+        context.account = this.resolveOriginAccountObjectForVelocity(fusionAccount, orderedAccounts)
 
         if (fusionAccount.originSource) {
             context.originSource = fusionAccount.originSource
         }
+        if (fusionAccount.originAccountId) {
+            context.originAccount = fusionAccount.originAccountId
+        }
 
         return context
+    }
+
+    /**
+     * Velocity `$account`: origin snapshot (managed account shape or identity-backed).
+     * `$originAccount` remains the string id (set on context above).
+     *
+     * For identity-origin (baseline) accounts that have managed accounts attached,
+     * the first managed account is preferred as `$account` so Velocity expressions
+     * referencing managed-account attributes (e.g. `$account.employeeId`) resolve
+     * correctly. `$identity` always carries identity-specific attributes regardless.
+     * When no managed accounts are present, falls back to the identity object.
+     */
+    private resolveOriginAccountObjectForVelocity(
+        fusionAccount: FusionAccount,
+        orderedAccounts: Record<string, any>[]
+    ): Record<string, any> | undefined {
+        const originIdRaw = fusionAccount.originAccountId ?? fusionAccount.attributeBag.current[ORIGIN_ACCOUNT_ATTRIBUTE]
+        const originId =
+            originIdRaw != null && String(originIdRaw).trim() !== '' ? String(originIdRaw).trim() : undefined
+        if (!originId) return undefined
+
+        const originSource = fusionAccount.originSource
+        const identityBag = fusionAccount.attributeBag.identity ?? {}
+        const identityHasData = Object.keys(identityBag).length > 0
+
+        const identityBackedName =
+            String(
+                fusionAccount.name ??
+                    (identityBag as Record<string, unknown>).name ??
+                    (identityBag as Record<string, unknown>).displayName ??
+                    ''
+            ).trim() || originId
+
+        // For baseline accounts with managed accounts already attached, prefer the first
+        // managed account as $account so attribute expressions resolve managed-source data.
+        // This covers the common case where a baseline Fusion account has one or more
+        // managed accounts added after initial creation.
+        if (originSource === 'Identities' && orderedAccounts.length > 0) {
+            return orderedAccounts[0]
+        }
+
+        if (originSource === 'Identities' && identityHasData) {
+            return {
+                ...identityBag,
+                _id: originId,
+                _name: identityBackedName,
+                _source: 'Identities',
+                IIQDisabled: Boolean(fusionAccount.disabled),
+            }
+        }
+
+        const managed = orderedAccounts.find((a) => String(a?._id ?? '').trim() === originId)
+        if (managed) return managed
+
+        if (originSource === 'Identities') {
+            return {
+                ...identityBag,
+                _id: originId,
+                _name: identityBackedName,
+                _source: 'Identities',
+                IIQDisabled: Boolean(fusionAccount.disabled),
+            }
+        }
+
+        return {
+            _id: originId,
+            _name: String(fusionAccount.name ?? '').trim() || originId,
+            _source: originSource ?? '',
+        }
     }
 
     /**
@@ -631,7 +725,7 @@ export class AttributeService {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
-        const prioritizedIndex = ordered.findIndex((account) => String(account?._accountId ?? '').trim() === mainAccountId)
+        const prioritizedIndex = ordered.findIndex((account) => String(account?._id ?? '').trim() === mainAccountId)
         if (prioritizedIndex <= 0) return ordered
 
         const prioritizedAccount = ordered[prioritizedIndex]
@@ -660,7 +754,7 @@ export class AttributeService {
         accountId: string
     ): Record<string, any> | undefined {
         for (const accounts of sourceAttributeMap.values()) {
-            const match = accounts.find((account) => String(account?._accountId ?? '').trim() === accountId)
+            const match = accounts.find((account) => String(account?._id ?? '').trim() === accountId)
             if (match) return match
         }
 
@@ -929,6 +1023,7 @@ export class AttributeService {
         context: { [key: string]: any }
     ): Promise<void> {
         const { name, refresh } = definition
+        if (name === ORIGIN_ACCOUNT_ATTRIBUTE) return
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
         const needsRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || refresh
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
@@ -991,6 +1086,7 @@ export class AttributeService {
         context: { [key: string]: any }
     ): Promise<void> {
         const { name } = definition
+        if (name === ORIGIN_ACCOUNT_ATTRIBUTE) return
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
         const isFusionIdentityAttribute = name === fusionIdentityAttribute
@@ -1019,6 +1115,22 @@ export class AttributeService {
 
         const value = await this.generateUniqueAttributeValue(definition, fusionAccount, context)
         if (value === undefined) {
+            // For identity-origin (baseline) accounts with managed accounts available,
+            // retry generation with the first managed account as $account. This covers
+            // the case where Fix 4 did not apply (e.g. no managed accounts at context
+            // build time) or as a safety net when $account differs from $accounts[0].
+            if (fusionAccount.fromIdentity) {
+                const orderedAccounts = context.accounts as Record<string, any>[] | undefined
+                if (orderedAccounts && orderedAccounts.length > 0 && context.account !== orderedAccounts[0]) {
+                    const retryContext = { ...context, account: orderedAccounts[0] }
+                    const retryValue = await this.generateUniqueAttributeValue(definition, fusionAccount, retryContext)
+                    if (retryValue !== undefined) {
+                        fusionAccount.attributes[name] = retryValue
+                        context[name] = retryValue
+                        return
+                    }
+                }
+            }
             // Clear attribute when expression fails (e.g. unresolved variables)
             delete fusionAccount.attributes[name]
             delete context[name]

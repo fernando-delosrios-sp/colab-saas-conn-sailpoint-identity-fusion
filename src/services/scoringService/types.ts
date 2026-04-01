@@ -32,6 +32,8 @@ export type FusionMatch = {
     identityId: string
     /** Display name for report - always present */
     identityName: string
+    /** Candidate origin used by downstream workflow routing. */
+    candidateType?: 'identity' | 'new-unmatched'
     /** Score reports for each matching rule evaluated */
     scores: ScoreReport[]
 }

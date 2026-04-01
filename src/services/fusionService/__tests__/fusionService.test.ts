@@ -284,6 +284,132 @@ describe('FusionService', () => {
     })
 
     describe('processManagedAccounts', () => {
+        it('uses newly unmatched current-run accounts as deferred candidates for subsequent managed accounts', async () => {
+            const firstAccount = {
+                id: 'acct-seq-1',
+                nativeIdentity: 'native-seq-1',
+                name: 'Taylor Jordan',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+            const secondAccount = {
+                id: 'acct-seq-2',
+                nativeIdentity: 'native-seq-2',
+                name: 'Taylor Jordan',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+                new Map([
+                    ['acct-seq-1', firstAccount],
+                    ['acct-seq-2', secondAccount],
+                ])
+            )
+            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            mockScoring.scoreFusionAccount.mockImplementation((account, candidates, candidateType) => {
+                if (candidateType !== 'new-unmatched') return
+                const candidateList = Array.from(candidates)
+                if (candidateList.length > 0) {
+                    account.addFusionMatch({
+                        identityId: '',
+                        identityName: 'Current run unmatched',
+                        candidateType: 'new-unmatched',
+                        scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any],
+                    } as any)
+                }
+            })
+
+            await fusionService.processManagedAccounts()
+
+            expect(fusionService.fusionAccounts).toHaveLength(1)
+            expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('DEFERRED MATCH FOUND'))
+        })
+
+        it('short-circuits duplicate checks when an identity-backed match already exists', async () => {
+            const mockManagedAccount = {
+                id: 'acct-short-circuit-1',
+                nativeIdentity: 'native-short-circuit-1',
+                name: 'Managed Account 1',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+            const existingIdentity = FusionAccount.fromIdentity({
+                id: 'identity-1',
+                name: 'Identity One',
+                attributes: {},
+            } as any)
+            fusionService.setFusionAccount(existingIdentity)
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            mockScoring.scoreFusionAccount.mockImplementation((account, _candidates, candidateType) => {
+                if (candidateType === 'identity') {
+                    account.addFusionMatch({
+                        identityId: 'identity-1',
+                        identityName: 'Identity One',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 95, isMatch: true } as any],
+                    } as any)
+                }
+            })
+
+            await fusionService.analyzeManagedAccount(mockManagedAccount)
+
+            expect(mockScoring.scoreFusionAccount).toHaveBeenCalledTimes(1)
+            expect(mockScoring.scoreFusionAccount).toHaveBeenCalledWith(expect.any(FusionAccount), expect.anything(), 'identity')
+        })
+
+        it('logs deferred matches and suppresses output for new-unmatched candidate matches', async () => {
+            const mockManagedAccount = {
+                id: 'acct-deferred-1',
+                nativeIdentity: 'native-deferred-1',
+                name: 'Deferred User',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+
+            ;(fusionService as any).sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: {},
+            })
+
+            const unmatchedCandidate = FusionAccount.fromManagedAccount({
+                id: 'acct-prev-unmatched-1',
+                nativeIdentity: 'native-prev-unmatched-1',
+                name: 'Unmatched Candidate',
+                sourceName: 'Source A',
+                attributes: {},
+            } as any)
+            ;(fusionService as any).fusionAccountMap.set('native-prev-unmatched-1', unmatchedCandidate)
+            ;(fusionService as any).currentRunUnmatchedFusionNativeIdentities.add('native-prev-unmatched-1')
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            mockScoring.scoreFusionAccount.mockImplementation((account, _candidates, candidateType) => {
+                if (candidateType === 'new-unmatched') {
+                    account.addFusionMatch({
+                        identityId: '',
+                        identityName: 'Unmatched Candidate',
+                        candidateType: 'new-unmatched',
+                        scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
+                    } as any)
+                }
+            })
+
+            const result = await fusionService.processManagedAccount(mockManagedAccount)
+
+            expect(result).toBeUndefined()
+            expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('DEFERRED MATCH FOUND'))
+        })
+
         it('records only unmatched history when creating a new authoritative non-match fusion account', async () => {
             const mockManagedAccount = {
                 id: 'acct-unmatched-1',
@@ -643,6 +769,58 @@ describe('FusionService', () => {
         })
     })
 
+    describe('analyzeManagedAccounts', () => {
+        it('uses first authoritative non-match as deferred candidate for subsequent account analysis', async () => {
+            const firstAccount = {
+                id: 'acct-analyze-1',
+                nativeIdentity: 'native-analyze-1',
+                name: 'A. Wesker',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+            const secondAccount = {
+                id: 'acct-analyze-2',
+                nativeIdentity: 'native-analyze-2',
+                name: 'Albert Wesker',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+                new Map([
+                    ['acct-analyze-1', firstAccount],
+                    ['acct-analyze-2', secondAccount],
+                ])
+            )
+            ;(fusionService as any).sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: {},
+            })
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            mockScoring.scoreFusionAccount.mockImplementation((account, candidates, candidateType) => {
+                if (candidateType !== 'new-unmatched') return
+                if (Array.from(candidates).length > 0) {
+                    account.addFusionMatch({
+                        identityId: '',
+                        identityName: 'A. Wesker',
+                        candidateType: 'new-unmatched',
+                        scores: [{ attribute: 'lastname', algorithm: 'jaro-winkler', score: 100, isMatch: true } as any],
+                    } as any)
+                }
+            })
+
+            const analyzed = await fusionService.analyzeManagedAccounts()
+
+            expect(analyzed).toHaveLength(2)
+            expect(analyzed[1].fusionMatches.some((match) => match.candidateType === 'new-unmatched')).toBe(true)
+            expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('DEFERRED POTENTIAL MATCH FOUND'))
+        })
+    })
+
     describe('identity conflict warnings', () => {
         it('logs warning and includes identity conflict details in report', () => {
             const accountA = FusionAccount.fromFusionAccount({
@@ -828,6 +1006,38 @@ describe('FusionService', () => {
             expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
         })
 
+        it('suppresses generic association history for authorized decisions without identityId', async () => {
+            const managedAccount = {
+                id: 'acct-authz-no-id-1',
+                name: 'LH2 User',
+                sourceName: 'LH2',
+                attributes: {},
+            } as Account
+            const managedMap = new Map<string, Account>([['acct-authz-no-id-1', managedAccount]])
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+                new Map([['acct-authz-no-id-1', managedAccount]])
+            )
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const decision = {
+                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
+                account: { id: 'acct-authz-no-id-1', name: 'LH2 User', sourceName: 'LH2' },
+                newIdentity: false,
+                identityId: undefined,
+                comments: 'Assign to existing identity',
+                finished: true,
+                sourceType: 'authoritative',
+            } as any
+
+            const result = await fusionService.processFusionIdentityDecision(decision)
+            expect(result?.history.some((h) => h.includes('as authorized by Reviewer'))).toBe(true)
+            expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
+        })
+
         it('auto-correlates authorized decisions to the selected identity in the same run', async () => {
             const managedAccount = {
                 id: 'acct-authz-1',
@@ -953,6 +1163,70 @@ describe('FusionService', () => {
 
             expect(result).toBeDefined()
             expect(setFusionAccountSpy).toHaveBeenCalledTimes(1)
+        })
+    })
+
+    describe('history consistency safeguards', () => {
+        it('does not duplicate set-history messages on no-op add', () => {
+            const fusionAccount = FusionAccount.fromManagedAccount({
+                id: 'acct-history-noop-1',
+                name: 'History User',
+                sourceName: 'History Source',
+                attributes: {},
+            } as Account)
+
+            fusionAccount.addStatus('candidate', 'Set candidate status')
+            fusionAccount.addStatus('candidate', 'Set candidate status')
+
+            const duplicateMessages = fusionAccount.history.filter((h) => h.includes('Set candidate status'))
+            expect(duplicateMessages).toHaveLength(1)
+        })
+
+        it('normalizes imported history by trimming and removing blank entries', () => {
+            const fusionAccount = FusionAccount.fromManagedAccount({
+                id: 'acct-history-import-1',
+                name: 'History User',
+                sourceName: 'History Source',
+                attributes: {},
+            } as Account)
+
+            fusionAccount.importHistory(['   ', 'first-entry', 'first-entry', '  second-entry  '])
+
+            expect(fusionAccount.history).toEqual(['first-entry', 'second-entry'])
+        })
+
+        it('uses fallback labels when decision names are blank', async () => {
+            const managedAccount = {
+                id: 'acct-history-fallback-1',
+                name: 'LH2 User',
+                sourceName: 'LH2',
+                attributes: {},
+            } as Account
+            const managedMap = new Map<string, Account>([['acct-history-fallback-1', managedAccount]])
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+                new Map([['acct-history-fallback-1', managedAccount]])
+            )
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const decision = {
+                submitter: { id: 'reviewer-1', email: ' ', name: ' ' },
+                account: { id: 'acct-history-fallback-1', name: '  ', sourceName: '  ' },
+                newIdentity: false,
+                comments: 'Assign to existing identity',
+                finished: true,
+                sourceType: 'authoritative',
+            } as any
+
+            const result = await fusionService.processFusionIdentityDecision(decision)
+            expect(
+                result?.history.some((h) =>
+                    h.includes('Set Unknown account [Unknown source] as authorized by Unknown reviewer')
+                )
+            ).toBe(true)
         })
     })
 })

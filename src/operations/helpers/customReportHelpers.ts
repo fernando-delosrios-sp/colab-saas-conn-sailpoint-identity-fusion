@@ -22,10 +22,12 @@ export type SafeSender = {
 }
 
 export type CustomReportRuntimeOptions = {
-    limit?: number
-    summary: boolean
-    onlyMatching: boolean
-    onlyReview: boolean
+    includeBaseline: boolean
+    includeUnmatched: boolean
+    includeMatched: boolean
+    includeDeferred: boolean
+    includeReview: boolean
+    includeDecisions: boolean
 }
 
 /**
@@ -84,24 +86,21 @@ export const streamEnrichedOutputRows = async (
     serviceRegistry: ServiceRegistry,
     reportIndex: ReturnType<typeof buildReportAccountIndex>,
     pendingReviewByAccountId: PendingReviewContextByAccountId,
+    decisionAccountIds: Set<string>,
+    emittedRowKeys: Set<string>,
     rowCounter: CustomReportRowCounter,
     sender: SafeSender,
     runtimeOptions: CustomReportRuntimeOptions
 ): Promise<number> => {
     const { fusion } = serviceRegistry
-    let emittedRows = 0
+    const enrichedRows: Array<{ account: any; status: keyof CustomReportRowCounter }> = []
 
     await fusion.forEachISCAccount((account) => {
         const enriched = enrichISCAccountWithMatching(account, reportIndex, pendingReviewByAccountId)
-        if (!shouldEmitRow(enriched.account, enriched.status, runtimeOptions, emittedRows)) {
-            return
-        }
-        rowCounter[enriched.status] += 1
-        sender.send(enriched.account)
-        emittedRows += 1
+        enrichedRows.push(enriched)
     })
 
-    return emittedRows
+    return emitGroupedRows(enrichedRows, decisionAccountIds, emittedRowKeys, rowCounter, sender, runtimeOptions)
 }
 
 
@@ -110,6 +109,8 @@ export const streamFallbackAnalyzedRows = async (
     analyzedManagedAccounts: FusionAccount[],
     reportIndex: ReturnType<typeof buildReportAccountIndex>,
     pendingReviewByAccountId: PendingReviewContextByAccountId,
+    decisionAccountIds: Set<string>,
+    emittedRowKeys: Set<string>,
     rowCounter: CustomReportRowCounter,
     sender: SafeSender,
     sentRows: number,
@@ -117,55 +118,124 @@ export const streamFallbackAnalyzedRows = async (
 ): Promise<number> => {
     const { log, fusion } = serviceRegistry
 
-    let totalSentRows = sentRows
-    if (hasReachedLimit(runtimeOptions.limit, totalSentRows)) {
-        return totalSentRows
-    }
+    const enrichedRows: Array<{ account: any; status: keyof CustomReportRowCounter }> = []
     for (const analyzedAccount of analyzedManagedAccounts) {
-        if (hasReachedLimit(runtimeOptions.limit, totalSentRows)) {
-            break
-        }
         const output = await fusion.getISCAccount(analyzedAccount, false)
         if (!output) continue
 
         const enriched = enrichISCAccountWithMatching(output, reportIndex, pendingReviewByAccountId)
-        if (!shouldEmitRow(enriched.account, enriched.status, runtimeOptions, totalSentRows)) {
-            continue
-        }
-        rowCounter[enriched.status] += 1
-        sender.send(enriched.account)
-        totalSentRows += 1
+        enrichedRows.push(enriched)
     }
 
+    const emittedRows = emitGroupedRows(enrichedRows, decisionAccountIds, emittedRowKeys, rowCounter, sender, runtimeOptions)
+    const totalSentRows = sentRows + emittedRows
     log.info(`Fallback streaming emitted ${totalSentRows} analyzed managed account row(s)`)
     return totalSentRows
 }
 
-const hasReachedLimit = (limit: number | undefined, emittedRows: number): boolean =>
-    typeof limit === 'number' && emittedRows >= limit
+const CATEGORY_ORDER = ['baseline', 'unmatched', 'matched', 'deferred', 'review', 'decisions'] as const
+type ReportCategory = (typeof CATEGORY_ORDER)[number]
 
-const shouldEmitRow = (
+const categorizeRow = (
     enrichedAccount: any,
     status: keyof CustomReportRowCounter,
-    runtimeOptions: CustomReportRuntimeOptions,
-    emittedRows: number
-): boolean => {
-    if (hasReachedLimit(runtimeOptions.limit, emittedRows)) {
-        return false
-    }
-    const isMatched = status === 'matched'
-    const reviewPending = Boolean(enrichedAccount?.attributes?.review?.pending)
+    decisionAccountIds: Set<string>
+): ReportCategory[] => {
+    const categories: ReportCategory[] = []
+    const statuses = new Set<string>(Array.isArray(enrichedAccount?.attributes?.statuses) ? enrichedAccount.attributes.statuses : [])
+    const relatedAccounts = Array.isArray(enrichedAccount?.attributes?.accounts) ? enrichedAccount.attributes.accounts : []
 
-    if (runtimeOptions.onlyMatching && runtimeOptions.onlyReview) {
-        return isMatched || reviewPending
+    if (statuses.has('baseline')) categories.push('baseline')
+    // "Unmatched" should include analysis-level non-matches plus explicit unmatched status tags.
+    if (statuses.has('unmatched') || status === 'non-matched') categories.push('unmatched')
+    if (status === 'matched') categories.push('matched')
+    if (status === 'deferred') categories.push('deferred')
+
+    const reviewPending = Boolean(enrichedAccount?.attributes?.review?.pending)
+    if (reviewPending) categories.push('review')
+
+    if (relatedAccounts.some((accountId: string) => decisionAccountIds.has(accountId))) {
+        categories.push('decisions')
     }
-    if (runtimeOptions.onlyMatching && !isMatched) {
-        return false
+
+    return categories
+}
+
+const emitGroupedRows = (
+    enrichedRows: Array<{ account: any; status: keyof CustomReportRowCounter }>,
+    decisionAccountIds: Set<string>,
+    emittedKeys: Set<string>,
+    rowCounter: CustomReportRowCounter,
+    sender: SafeSender,
+    runtimeOptions: CustomReportRuntimeOptions
+): number => {
+    const selectedCategories = new Set<ReportCategory>()
+    if (runtimeOptions.includeBaseline) selectedCategories.add('baseline')
+    if (runtimeOptions.includeUnmatched) selectedCategories.add('unmatched')
+    if (runtimeOptions.includeMatched) selectedCategories.add('matched')
+    if (runtimeOptions.includeDeferred) selectedCategories.add('deferred')
+    if (runtimeOptions.includeReview) selectedCategories.add('review')
+    if (runtimeOptions.includeDecisions) selectedCategories.add('decisions')
+
+    if (selectedCategories.size === 0) {
+        return 0
     }
-    if (runtimeOptions.onlyReview && !reviewPending) {
-        return false
+
+    const groupedRows = new Map<ReportCategory, Array<{ account: any; status: keyof CustomReportRowCounter; categories: ReportCategory[] }>>()
+    for (const category of CATEGORY_ORDER) groupedRows.set(category, [])
+    for (const enriched of enrichedRows) {
+        const rowCategories = categorizeRow(enriched.account, enriched.status, decisionAccountIds).filter((category) =>
+            selectedCategories.has(category)
+        )
+        if (rowCategories.length === 0) continue
+
+        const firstCategory = rowCategories[0]
+        const key = getEmissionKey(enriched.account)
+        if (emittedKeys.has(key)) continue
+
+        groupedRows.get(firstCategory)?.push({ ...enriched, categories: rowCategories })
+        emittedKeys.add(key)
     }
-    return true
+
+    let emittedRows = 0
+    for (const category of CATEGORY_ORDER) {
+        const rows = groupedRows.get(category) ?? []
+        for (const row of rows) {
+            rowCounter[row.status] += 1
+            const attributes = { ...(row.account.attributes ?? {}) }
+            const matching = attributes.matching
+            const review = attributes.review
+            delete attributes.matching
+            delete attributes.review
+
+            const includeReview = row.categories.includes('review') || row.categories.includes('decisions')
+            const { sourceContext: sourceStatus, correlationContext: correlationStatus, ...matchingStatus } = matching ?? {}
+            sender.send({
+                reportCategories: row.categories,
+                matchingStatus,
+                sourceStatus,
+                correlationStatus,
+                ...(includeReview ? { review } : {}),
+                account: {
+                    key: row.account.key,
+                    attributes,
+                    disabled: row.account.disabled,
+                },
+            })
+            emittedRows += 1
+        }
+    }
+
+    return emittedRows
+}
+
+const getEmissionKey = (account: any): string => {
+    const keySimple = account?.key?.simple?.id
+    if (keySimple) return String(keySimple)
+    if (account?.key) return String(account.key)
+    if (account?.attributes?.id) return String(account.attributes.id)
+    if (account?.attributes?.originAccount) return String(account.attributes.originAccount)
+    return JSON.stringify(account?.attributes?.accounts ?? [])
 }
 
 export const refreshUniqueAttributesForCustomReport = async (
