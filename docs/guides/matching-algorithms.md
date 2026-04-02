@@ -34,6 +34,7 @@ Matching algorithms calculate **similarity scores** (0–100) between attribute 
 | **Jaro-Winkler**          | Short strings, codes, emails, usernames           | Emphasizes prefix matching; good for typos at start; fast              | Less effective for long text; suffix typos score lower           | Low                |
 | **Dice**                  | Longer text (addresses, job titles, descriptions) | Robust for substring matching; handles reordering well                 | Can miss phonetic variations; requires adequate text length      | Medium             |
 | **Double Metaphone**      | Names with spelling variations, phonetic matching | Catches "Catherine"/"Katherine", "John"/"Jon", "Smith"/"Smyth"         | May generate false positives for short names; language-dependent | Low                |
+| **LIG3**                  | Compound identifiers, names with missing parts    | Excellent with international accents and compound gap handling         | Heavily punishes transpositions (e.g. inverted dates/names)      | High               |
 | **Custom**                | Domain-specific requirements                      | Your own logic via SaaS customizer                                     | Requires development and testing                                 | Variable           |
 
 ### Decision tree: Which algorithm to use?
@@ -239,6 +240,42 @@ What type of attribute are you comparing?
 - Non-name fields
 - Very short strings (<4 characters) → less reliable
 - Non-English names (algorithm is English-centric)
+
+### LIG3
+
+**Purpose:** Advanced hybrid algorithm combining token handling with Levenshtein-style penalties.
+
+**How it works:**
+
+- Evaluates character variations and normalizes accents (e.g., highly accurate for "José" vs "Jose").
+- Considers gaps and missing elements conservatively across compound identifiers.
+- Positional weighting prevents over-penalizing missing middle names.
+
+**Recommended thresholds:**
+
+| Use case                         | Threshold | Rationale                                          |
+| -------------------------------- | --------- | -------------------------------------------------- |
+| Compound identifier / Full name  | 70–80     | Allows for missing words/tokens                    |
+| Short identifier                 | 85–95     | Be stricter with short strings                     |
+
+**Examples:**
+
+| String 1        | String 2       | Score | Match? (threshold 75) |
+| --------------- | -------------- | ----- | --------------------- |
+| José Garcia     | Jose Garcia    | 100   | Yes                   |
+| John Robert Doe | John Doe       | 64    | No                    |
+| 05-10-1990      | 10-05-1990     | 46    | No                    |
+| Christopher     | Christoper     | 74    | No (borderline typo)  |
+
+**When to use:**
+
+- Full names or compound identifiers where structural layout matters.
+- You have international characters that need to be evaluated gracefully.
+
+**When NOT to use:**
+
+- You expect transpositions (e.g. swapped DOBs, or swapped first/last names). LIG3 heavily penalizes misordered data.
+- Short substrings or pure typographical error matching—Jaro-Winkler handles typos better.
 
 ### Custom (from SaaS customizer)
 
@@ -470,6 +507,24 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 
 ---
 
+## Data Preprocessing and Edge Cases
+
+### The Normalizer Tool
+Before relying entirely on matching algorithms, consider enabling the **Normalize special characters?** transformation during the *Define* phase. Normalization transliterates international accents and strips erratic punctuation (like apostrophes in "O'Conner" or hyphens).
+- **Why it matters:** Algorithms like `Jaro-Winkler` and `Dice` are strictly mechanically based on characters. "Renée" vs "Renee" scores poorly under Dice (50%) but scores 100% when normalized. `LIG3` penalizes punctuation as unmapped insertions (dropping scores to ~64%), which the normalizer effortlessly resolves.
+- **Exception**: The `Enhanced Name Matcher` natively handles accents and unicode transliteration, so it is less reliant on upstream normalization.
+
+### Dates
+Dates are notoriously poor candidates for pure string-matching algorithms due to format variance (e.g. `10/05/1990` vs `1990-10-05` vs `Oct 5th 1990`).
+- String matching models (like `LIG3` or `Dice`) treat dates entirely as structural tokens which often drop similarity bounds below 50% if the standard is mixed.
+- **Best Practice:** Do not match raw dates using these algorithms. Standardize the date formats (either into epoch arrays or ISO standard strings) upstream using Velocity templates or the Map engine. 
+
+### Long Addresses
+- When addresses use standardized structural variations (e.g. `1234 Elm Street Suite 500` vs `1234 Elm St Ste 500`), **Jaro-Winkler** is the most robust (90%), followed tightly by **LIG3** (82%).
+- When addresses get structurally re-ordered (e.g. `Apt 12 400 Broad St` vs `400 Broad St Apt 12`), prefix-based algorithms like `Jaro-Winkler` and `LIG3` break down rapidly. In this specific format, **Dice** becomes the optimal choice due to its non-linear N-gram tokenizing (76% consistency).
+
+---
+
 ## Troubleshooting matching issues
 
 | Issue                        | Possible cause                           | Solution                                                                       |
@@ -491,10 +546,13 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 | ----------------------- | --------------------- | --------------- |
 | Full name, display name | Enhanced Name Matcher | 75–85           |
 | First name, last name   | Enhanced Name Matcher | 80–92           |
+| Missing middle names    | LIG3                  | 60-70           |
+| International names     | Enhanced Name Matcher / LIG3 | 80-92 |
 | Email                   | Jaro-Winkler          | 90–95           |
 | Username, employee ID   | Jaro-Winkler          | 95–100          |
 | Phone (normalized)      | Jaro-Winkler          | 85–92           |
 | Address                 | Dice                  | 70–80           |
+| Transposed identifiers  | Dice                  | 85-95           |
 | Job title, department   | Dice                  | 72–85           |
 | Name (phonetic)         | Double Metaphone      | 75–85           |
 

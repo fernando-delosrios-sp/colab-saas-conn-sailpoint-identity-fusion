@@ -94,14 +94,14 @@
                 {
                     "type": "section",
                     "sectionTitle": "Scope",
-                    "sectionHelpMessage": "<strong>Define which identities are in scope for processing.</strong><br><br>Use <strong>Include identities in the scope?</strong> to include identities in addition to managed accounts from configured sources. This is useful for identity-only Defines or to define the baseline for Match.<br><br>Use <strong>Identity Scope Query</strong> to limit which identities are evaluated. This uses ISC search syntax (e.g. <code>attributes.cloudLifecycleState:active</code>, <code>source.name:\"Workday\"</code>). Only identities matching this query are considered.",
+                    "sectionHelpMessage": "<strong>Define which identities are in scope.</strong><br><br>Limit processing using an <strong>Identity Scope Query</strong> (standard ISC search syntax). Toggle <strong>Include identities in the scope</strong> to establish a baseline for Match.",
                     "items": [
                         {
                             "key": "includeIdentities",
                             "label": "Include identities in the scope?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "When enabled, existing identities are included alongside accounts from your configured sources. Turn this on if you want to generate attributes from identity data or use identities as a baseline for detecting duplicates"
+                            "helpKey": "When enabled, existing identities are included alongside accounts from your configured sources. Turn this on if you want to define attributes from identity data or use identities as a baseline for detecting potential matches"
                         },
                         {
                             "key": "identityScopeQuery",
@@ -117,7 +117,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Sources",
-                    "sectionHelpMessage": "<strong>Select the account sources that feed Identity Fusion.</strong><br><br>Use <strong>Authoritative Account Sources</strong> to configure sources whose accounts will be merged. For each source:<br><ul><li><strong>Source name:</strong> Must match the ISC source name exactly.</li><li><strong>Source type:</strong> Choose Authoritative, Record, or Orphan behavior for unmatched accounts.</li><li><strong>Account aggregation:</strong> Choose to aggregate before processing, after a delay, or not at all. Optimized aggregation can be disabled for reverse correlation. Delimited text sources cannot be aggregated.</li><li><strong>Correlation mode:</strong> Choose whether to correlate during processing, set up reverse correlation, or leave accounts uncorrelated.</li><li><strong>Accounts API filter:</strong> Limit which accounts are fetched from ISC (server-side).</li><li><strong>Accounts JMESPath filter:</strong> Further filter fetched account pages client-side using JMESPath.</li><li><strong>Aggregation batch size:</strong> Limit accounts per run (useful for initial loading).</li><li><strong>Enabled:</strong> Turn off to temporarily exclude this source from processing without removing it.</li></ul>",
+                    "sectionHelpMessage": "<strong>Select and configure authoritative account sources.</strong><br><br><ul><li><strong>Source type & behavior:</strong> Define role (Authoritative, Record, Orphan) and handling for unmatched non-identity accounts (disable, defer).</li><li><strong>Aggregation & correlation:</strong> Control timing (delays, retries), optimized aggregation, and correlation strategy (in-process or reverse).</li><li><strong>Filtering & limits:</strong> Process subsets via API/JMESPath filters and set batch capacities.</li></ul>",
                     "items": [
                         {
                             "key": "sources",
@@ -336,7 +336,7 @@
                                             "required": true,
                                             "parentKey": "correlationMode",
                                             "parentValue": "reverse",
-                                            "helpKey": "Internal name for the attribute used to link accounts via reverse correlation. This must be unique and cannot overlap mapped/generated attributes or existing source schema attributes"
+                                            "helpKey": "Internal name for the attribute used to link accounts via reverse correlation. This must be unique and cannot overlap mapped/defined attributes or existing source schema attributes"
                                         }
                                     ]
                                 }
@@ -347,7 +347,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Processing Control",
-                    "sectionHelpMessage": "<strong>Control how Identity Fusion accounts are maintained.</strong><br><br><ul><li><strong>Maximum history messages:</strong> Limit history entries per account (default: 10).</li><li><strong>Delete accounts...:</strong> Remove Fusion account when all source accounts are gone.</li><li><strong>Skip accounts...:</strong> Skip processing if native identity attribute is missing.</li></ul>",
+                    "sectionHelpMessage": "<strong>Control account maintenance.</strong><br><br><ul><li><strong>History limits:</strong> Cap the number of audit history messages stored per account.</li><li><strong>Delete when empty:</strong> Remove the Fusion account if all its underlying source accounts are deleted.</li><li><strong>Skip missing targets:</strong> Ignore source accounts missing a mapped native identity attribute.</li></ul>",
                     "items": [
                         {
                             "key": "maxHistoryMessages",
@@ -382,7 +382,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Attribute Mapping Definitions",
-                    "sectionHelpMessage": "<strong>Map and merge source attributes into the Fusion account.</strong><br><br><strong>Default attribute merge:</strong> Global strategy for combining values (First found, Keep a list, Concatenate).<br><br><strong>Attribute Mapping:</strong> Configure per-attribute rules.<br><ul><li><strong>New attribute:</strong> Name on Fusion account.</li><li><strong>Existing attributes:</strong> Source attributes to map.</li><li><strong>Merge override:</strong> Override global strategy for this attribute (includes \"Source name\" to prefer a specific source).</li></ul>",
+                    "sectionHelpMessage": "<strong>Map and merge source attributes.</strong><br><br>Choose a <strong>Default attribute merge</strong> mode. Then configure per-attribute rules to target specific source fields, rename them on the Fusion account, and optionally override the merge strategy or pin specific sources.",
                     "items": [
                         {
                             "key": "attributeMerge",
@@ -489,7 +489,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Normal Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define computed attributes using Velocity templates.</strong><br><br>Normal attributes are recalculated on each aggregation when <em>Refresh</em> is enabled.<br><br><strong>Expression context:</strong> Mapped account attributes, <code>$Math</code>, <code>$Datefns</code>, <code>$AddressParse</code>, <code>$Normalize</code>.<br><strong>Options:</strong> Case transform, normalization, space removal, max length.",
+                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong><br><br>Evaluated via Velocity templates during generation. Can optionally be continuously refreshed. Includes built-in formatting options: case transforms, string normalization, and length constraints.",
                     "items": [
                         {
                             "key": "normalAttributeDefinitions",
@@ -513,7 +513,7 @@
                                             "label": "Attribute Name",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Name for this generated attribute on the Fusion account"
+                                            "helpKey": "Name for this defined attribute on the Fusion account"
                                         },
                                         {
                                             "key": "expression",
@@ -593,11 +593,11 @@
                 {
                     "type": "section",
                     "sectionTitle": "Unique Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define unique attributes using Velocity templates with uniqueness enforcement.</strong><br><br>Unique attribute values are preserved once defined and only recalculated on account reset/enable.<br><br><strong>Expression context:</strong> Mapped account attributes, <code>$UUID</code> (auto-generated v4 UUID), <code>$counter</code> (incremental or collision-based), <code>$Math</code>, <code>$Datefns</code>, <code>$AddressParse</code>, <code>$Normalize</code>.<br><br><strong>Collision handling:</strong> On duplicate, the connector appends a disambiguation counter (<code>$counter</code>). Enable <em>Use incremental counter</em> for sequential numbering instead.<br><strong>UUID:</strong> Use <code>$UUID</code> in the expression for an auto-generated immutable UUID.<br><strong>Max attempts:</strong> Limits retries to prevent infinite loops.",
+                    "sectionHelpMessage": "<strong>Define persistent unique attributes (e.g. identifiers).</strong><br><br>Generated values are permanently stored and only recalculate on account reset. Supports Velocity templates, runtime context, collision handling via counters, and UUIDv4 generation.",
                     "items": [
                         {
                             "key": "maxAttempts",
-                            "label": "Maximum attempts for unique Define generation",
+                            "label": "Maximum attempts for unique definition",
                             "type": "number",
                             "required": false,
                             "min": "1",
@@ -645,7 +645,7 @@
                                             "key": "useIncrementalCounter",
                                             "label": "Use incremental counter?",
                                             "type": "toggle",
-                                            "helpKey": "Always assign the next number in sequence instead of only adding a number when there is a conflict. Useful for generating sequential IDs like employee numbers"
+                                            "helpKey": "Always assign the next number in sequence instead of only adding a number when there is a conflict. Useful for defining sequential IDs like employee numbers"
                                         },
                                         {
                                             "key": "counterStart",
@@ -727,7 +727,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Matching Settings",
-                    "sectionHelpMessage": "<strong>Configure duplicate identity detection.</strong><br><br><strong>Combined match score:</strong> A weighted blend of attribute similarities; each rule’s <strong>minimum similarity &amp; blend weight</strong> is one number: pass threshold and influence in the blend. Set <strong>Minimum combined match score</strong> as the global floor for a potential match. Evaluated mandatory rules must pass their own threshold.<br><br><strong>Fusion attribute matches:</strong> Define attributes to compare.<br><ul><li><strong>Algorithm:</strong> Enhanced Name Matcher, Jaro-Winkler, LIG3, Dice, Double Metaphone.</li><li><strong>Minimum similarity &amp; blend weight [0-100]:</strong> Minimum similarity for that rule to pass; the same value weights the rule in the combined score (higher = stricter and more influence).</li><li><strong>Mandatory:</strong> Must pass this rule’s minimum similarity for a potential match.</li><li><strong>Skip match if missing:</strong> When enabled (default), the rule is skipped if either value is missing (no penalty to combined score; auto-correlate when identical still requires every rule evaluated).</li></ul><br><strong>Auto-correlate:</strong> Optionally merge only when every rule scores 100 and none were skipped.",
+                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><ul><li><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.</li><li><strong>Thresholds & weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.</li><li><strong>Strictness:</strong> Enforce mandatory rules or trigger auto-correlation for identical matches.</li></ul>",
                     "items": [
                         {
                             "key": "fusionAverageScore",
@@ -764,44 +764,44 @@
                                             "label": "Attribute",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "The identity attribute to compare when looking for duplicates (e.g. firstname, lastname, email)"
+                                            "helpKey": "The identity attribute to compare when looking for matches (e.g. firstname, lastname, email)"
                                         },
                                         {
                                             "key": "algorithm",
                                             "label": "Matching algorithm",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Algorithm used to compare values. 'Enhanced Name Matcher' is best for names. 'Jaro-Winkler' works well for short strings with typos. 'LIG3' handles international characters. 'Dice' suits longer text. 'Double Metaphone' matches by pronunciation",
+                                            "helpKey": "Algorithm used to compare values. 'Enhanced Name Matcher' excels at strict formatting and accents. 'Jaro-Winkler' is highly tolerant of typographical errors. 'LIG3' balances gaps, missing fragments, and character variations. 'Dice' is forgiving of total word reordering. 'Double Metaphone' captures English phonetic similarity",
                                             "options": [
                                                 {
                                                     "label": "Enhanced Name Matcher",
                                                     "value": "name-matcher",
                                                     "docLink": "https://github.com/craj/name-match",
-                                                    "docLinkLabel": "Learn more about Enhanced Name Matcher"
+                                                    "docLinkLabel": "Strict matching that handles accents and normalization"
                                                 },
                                                 {
                                                     "label": "Jaro-Winkler",
                                                     "value": "jaro-winkler",
                                                     "docLink": "https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance",
-                                                    "docLinkLabel": "Learn more about Jaro-Winkler similarity"
+                                                    "docLinkLabel": "Mechanical string comparison tolerant of typos"
                                                 },
                                                 {
                                                     "label": "LIG3",
                                                     "value": "lig3",
                                                     "docLink": "https://en.wikipedia.org/wiki/Levenshtein_distance",
-                                                    "docLinkLabel": "Learn more about LIG3 (based on Levenshtein distance)"
+                                                    "docLinkLabel": "Advanced hybrid handling missing gaps and character variations"
                                                 },
                                                 {
                                                     "label": "Dice",
                                                     "value": "dice",
                                                     "docLink": "https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient",
-                                                    "docLinkLabel": "Learn more about Dice coefficient"
+                                                    "docLinkLabel": "N-gram model highly tolerant of word reordering"
                                                 },
                                                 {
                                                     "label": "Double Metaphone",
                                                     "value": "double-metaphone",
                                                     "docLink": "https://en.wikipedia.org/wiki/Metaphone",
-                                                    "docLinkLabel": "Learn more about Double Metaphone algorithm"
+                                                    "docLinkLabel": "Evaluates strings based on their English pronunciation"
                                                 },
                                                 {
                                                     "label": "Custom Algorithm (from SaaS customizer)",
@@ -811,14 +811,14 @@
                                         },
                                         {
                                             "key": "fusionScore",
-                                            "label": "Minimum similarity & blend weight [0-100]",
+                                            "label": "Similarity threshold & weight [0-100]",
                                             "type": "number",
                                             "required": true,
                                             "helpKey": "One setting, two roles: (1) minimum similarity (0-100) the rule must meet to pass, and (2) blend weight in the combined score—higher means stricter and more influence. Use 0 only for minimal weight; it is treated as weight 1 in the blend."
                                         },
                                         {
                                             "key": "mandatory",
-                                            "label": "Mandatory match?",
+                                            "label": "Mandatory match",
                                             "type": "toggle",
                                             "required": false,
                                             "helpKey": "When enabled, this rule must meet its minimum similarity for a potential match. Passing mandatory rules contribute to the weighted combined score like other rules."
@@ -839,7 +839,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Review Settings",
-                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong><br><br><ul><li><strong>Form attributes:</strong> Identity attributes shown to reviewers (e.g. name, email, department).</li><li><strong>Max match candidates:</strong> When many identities score as potential matches, the form shows the highest-scoring ones up to this limit (range 1–15; default 10).</li><li><strong>Expiration:</strong> Days before review form expires (default: 7).</li><li><strong>Global reviewer:</strong> Add source owner as reviewer to all forms (ensures assignment).</li><li><strong>Report:</strong> Email report to owner after aggregation.</li></ul>",
+                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong><br><br>Define <strong>Form attributes</strong> to display to reviewers and set candidate limits. Assign global reviewers to act as fail-safes and optionally email them processing reports after aggregation runs.",
                     "items": [
                         {
                             "key": "fusionFormAttributes",
@@ -850,7 +850,7 @@
                         },
                         {
                             "key": "fusionMaxCandidatesForForm",
-                            "label": "Max match candidates per review form",
+                            "label": "Maximum candidates per review form",
                             "type": "number",
                             "required": false,
                             "helpKey": "Maximum number of potential identity matches shown on each manual review form. If more identities qualify, only the highest-scoring candidates are included (combined match score, then stable tie-break). Valid range: 1–15. Default: 10"
@@ -887,7 +887,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br><ul><li><strong>Reset accounts:</strong> Force rebuild from scratch (caution in production).</li><li><strong>Managed accounts batch size:</strong> Controls how many uncorrelated managed accounts are processed per duplicate-detection batch. Lower values reduce peak memory usage; higher values can improve throughput.</li><li><strong>Force attribute refresh:</strong> Recalculate Normal-type attributes on every aggregation run, even when not strictly required.</li><li><strong>Concurrency check:</strong> Prevent concurrent aggregations (default: enabled).</li><li><strong>External logging:</strong> Send logs to an external service (Splunk, etc.) for monitoring and incident analysis.</li></ul><br>Start with the default batch size and tune only if needed: reduce it when runs are memory-constrained, increase it when memory headroom is available and you want faster processing.",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance.</strong><br><br><ul><li><strong>Reset & refresh:</strong> Rebuild all Fusion accounts from scratch or force recalculate all Normal-type attributes on every run.</li><li><strong>Batch limits:</strong> Optimize memory usage vs throughput during match detection.</li><li><strong>Misc:</strong> Prevent multiple runs overlapping or stream logs to monitoring services.</li></ul>",
                     "items": [
                         {
                             "key": "reset",
@@ -901,7 +901,7 @@
                             "label": "Managed accounts batch size",
                             "type": "number",
                             "required": false,
-                            "helpKey": "Number of uncorrelated managed accounts processed in each duplicate-detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100. Default: 50"
+                            "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100. Default: 50"
                         },
                         {
                             "key": "forceAttributeRefresh",
