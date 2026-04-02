@@ -839,7 +839,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Review Settings",
-                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong><br><br><ul><li><strong>Form attributes:</strong> Identity attributes shown to reviewers (e.g. name, email, department).</li><li><strong>Expiration:</strong> Days before review form expires (default: 7).</li><li><strong>Global reviewer:</strong> Add source owner as reviewer to all forms (ensures assignment).</li><li><strong>Report:</strong> Email report to owner after aggregation.</li></ul>",
+                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong><br><br><ul><li><strong>Form attributes:</strong> Identity attributes shown to reviewers (e.g. name, email, department).</li><li><strong>Max match candidates:</strong> When many identities score as potential matches, the form shows the highest-scoring ones up to this limit (range 1–15; default 10).</li><li><strong>Expiration:</strong> Days before review form expires (default: 7).</li><li><strong>Global reviewer:</strong> Add source owner as reviewer to all forms (ensures assignment).</li><li><strong>Report:</strong> Email report to owner after aggregation.</li></ul>",
                     "items": [
                         {
                             "key": "fusionFormAttributes",
@@ -847,6 +847,13 @@
                             "type": "list",
                             "required": false,
                             "helpKey": "Account attributes displayed on the review form to help reviewers compare potential matches. For example: name, email, department"
+                        },
+                        {
+                            "key": "fusionMaxCandidatesForForm",
+                            "label": "Max match candidates per review form",
+                            "type": "number",
+                            "required": false,
+                            "helpKey": "Maximum number of potential identity matches shown on each manual review form. If more identities qualify, only the highest-scoring candidates are included (combined match score, then stable tie-break). Valid range: 1–15. Default: 10"
                         },
                         {
                             "key": "fusionFormExpirationDays",
@@ -880,7 +887,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br><ul><li><strong>Reset accounts:</strong> Force rebuild from scratch (caution in production).</li><li><strong>Managed accounts batch size:</strong> Controls how many uncorrelated managed accounts are processed per duplicate-detection batch. Lower values reduce peak memory usage; higher values can improve throughput.</li><li><strong>Max match candidates per review form:</strong> When many identities score as potential matches, the form shows the highest-scoring ones up to this limit (range 1–15; default 10).</li><li><strong>Force attribute refresh:</strong> Recalculate Normal-type attributes on every aggregation run, even when not strictly required.</li><li><strong>Concurrency check:</strong> Prevent concurrent aggregations (default: enabled).</li><li><strong>External logging:</strong> Send logs to an external service (Splunk, etc.) for monitoring and incident analysis.</li></ul><br>Start with the default batch size and tune only if needed: reduce it when runs are memory-constrained, increase it when memory headroom is available and you want faster processing.",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br><ul><li><strong>Reset accounts:</strong> Force rebuild from scratch (caution in production).</li><li><strong>Managed accounts batch size:</strong> Controls how many uncorrelated managed accounts are processed per duplicate-detection batch. Lower values reduce peak memory usage; higher values can improve throughput.</li><li><strong>Force attribute refresh:</strong> Recalculate Normal-type attributes on every aggregation run, even when not strictly required.</li><li><strong>Concurrency check:</strong> Prevent concurrent aggregations (default: enabled).</li><li><strong>External logging:</strong> Send logs to an external service (Splunk, etc.) for monitoring and incident analysis.</li></ul><br>Start with the default batch size and tune only if needed: reduce it when runs are memory-constrained, increase it when memory headroom is available and you want faster processing.",
                     "items": [
                         {
                             "key": "reset",
@@ -895,13 +902,6 @@
                             "type": "number",
                             "required": false,
                             "helpKey": "Number of uncorrelated managed accounts processed in each duplicate-detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100. Default: 50"
-                        },
-                        {
-                            "key": "fusionMaxCandidatesForForm",
-                            "label": "Max match candidates per review form",
-                            "type": "number",
-                            "required": false,
-                            "helpKey": "Maximum number of potential identity matches shown on each manual review form. If more identities qualify, only the highest-scoring candidates are included (combined match score, then stable tie-break). Valid range: 1–15. Default: 10"
                         },
                         {
                             "key": "forceAttributeRefresh",
