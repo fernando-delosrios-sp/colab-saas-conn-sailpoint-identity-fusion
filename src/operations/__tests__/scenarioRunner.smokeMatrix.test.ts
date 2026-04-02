@@ -33,7 +33,7 @@ describe('scenarioRunner smoke matrix', () => {
             managedAccounts: [baseManagedAccount],
             expected: {
                 correlatedCount: 0,
-                potentialMatchesCount: 0,
+                matchesCount: 0,
                 disablePlannedCount: 0,
             },
         },
@@ -63,7 +63,7 @@ describe('scenarioRunner smoke matrix', () => {
             ],
             expected: {
                 correlatedCount: 0,
-                potentialMatchesCount: 0,
+                matchesCount: 0,
                 disablePlannedCount: 0,
             },
         },
@@ -84,7 +84,7 @@ describe('scenarioRunner smoke matrix', () => {
             ],
             expected: {
                 correlatedCount: 0,
-                potentialMatchesCount: 0,
+                matchesCount: 0,
                 disablePlannedCount: 1,
             },
         },
@@ -94,8 +94,8 @@ describe('scenarioRunner smoke matrix', () => {
         const result = runPass('pass1', scenario.config, scenario.identities, scenario.managedAccounts, [])
 
         expect(result.summary.correlatedCount).toBe(scenario.expected.correlatedCount)
-        if (scenario.expected.potentialMatchesCount !== undefined) {
-            expect(result.summary.potentialMatchesCount).toBe(scenario.expected.potentialMatchesCount)
+        if (scenario.expected.matchesCount !== undefined) {
+            expect(result.summary.matchesCount).toBe(scenario.expected.matchesCount)
         }
         if (scenario.expected.disablePlannedCount !== undefined) {
             expect(result.summary.disablePlannedCount).toBe(scenario.expected.disablePlannedCount)

@@ -446,7 +446,7 @@ export const compileEmailTemplates = (): Map<string, HandlebarsTemplateDelegate>
 export type FusionReviewEmailData = {
   accounts: FusionReportEmailData['accounts']
   totalAccounts: number
-  potentialMatches: number
+  matches: number
   reportDate: Date | string
   formInstanceId?: string
   formUrl?: string
@@ -486,7 +486,7 @@ export type FusionReportEmailData = {
     }>
   }>
   totalAccounts: number
-  potentialMatches: number
+  matches: number
   reportDate: Date | string
   fusionReviewDecisions?: Array<{
     reviewerId: string

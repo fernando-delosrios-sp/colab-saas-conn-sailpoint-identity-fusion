@@ -6,12 +6,12 @@
         "managedAccountsCount": 19,
         "identitiesCount": 4,
         "formDecisionsCount": 3,
-        "potentialMatchesCount": 5,
+        "matchesCount": 5,
         "correlatedCount": 3,
         "unmatchedCount": 16,
         "disablePlannedCount": 0
     },
-    "potentialMatches": [
+    "matches": [
         {
             "accountId": "8d21e32028604862b2006c0708eb4049",
             "accountName": "H. Unknown",

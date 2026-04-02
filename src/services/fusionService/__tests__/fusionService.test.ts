@@ -435,7 +435,7 @@ describe('FusionService', () => {
             expect(result?.history.some((h) => h.includes('Associated managed account'))).toBe(false)
         })
 
-        it('removes perfect auto-correlated accounts from potential manual-review report list', async () => {
+        it('removes perfect auto-correlated accounts from manual-review report list', async () => {
             ;(fusionService as any).config.fusionMergingIdentical = true
             const account = {
                 id: 'acct-perfect-1',
@@ -454,13 +454,13 @@ describe('FusionService', () => {
                     { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
                 ],
             } as any)
-            ;(fusionService as any).potentialMatchAccounts = [analyzed]
+            ;(fusionService as any).matchAccounts = [analyzed]
             jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
             jest.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
 
             await fusionService.processManagedAccount(account)
 
-            expect((fusionService as any).potentialMatchAccounts).toHaveLength(0)
+            expect((fusionService as any).matchAccounts).toHaveLength(0)
         })
 
         it('registers synthetic auto-correlation decisions for reporting', async () => {
@@ -817,7 +817,7 @@ describe('FusionService', () => {
 
             expect(analyzed).toHaveLength(2)
             expect(analyzed[1].fusionMatches.some((match) => match.candidateType === 'new-unmatched')).toBe(true)
-            expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('DEFERRED POTENTIAL MATCH FOUND'))
+            expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('DEFERRED MATCH FOUND'))
         })
     })
 

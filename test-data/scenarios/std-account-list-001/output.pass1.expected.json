@@ -6,11 +6,11 @@
         "managedAccountsCount": 17,
         "identitiesCount": 4,
         "formDecisionsCount": 0,
-        "potentialMatchesCount": 3,
+        "matchesCount": 3,
         "correlatedCount": 0,
         "unmatchedCount": 17
     },
-    "potentialMatches": [
+    "matches": [
         {
             "accountId": "07f15e74e03e4ccdbcdc25c25daa5360",
             "accountName": "C. Oliveira",
