@@ -26,15 +26,35 @@ function getAccountIdentifier(fusionAccount: FusionAccount): string {
 }
 
 /**
- * Formats a score/threshold pair as "Score: X [Y]" or "Score: X".
+ * Formats match score rows for form defaults: Value (raw) and Score (weighted partial), or combined row.
  */
-function formatScoreDisplay(scoreValue: number, thresholdValue?: number | null): string {
-    const trimmedScore = Number.isFinite(scoreValue) ? parseFloat(scoreValue.toFixed(2)) : undefined
-    const scoreStr = trimmedScore !== undefined ? String(trimmedScore) : 'N/A'
-    if (thresholdValue !== undefined && thresholdValue !== null) {
-        return `Score: ${scoreStr} [${thresholdValue}]`
+function formatScoreDisplay(score: {
+    score?: number
+    fusionScore?: number
+    weightedScore?: number
+    skipped?: boolean
+    algorithm?: string
+}): string {
+    if (score.skipped) return 'Skipped (missing value)'
+    const algo = String(score.algorithm ?? '')
+    if (algo === 'weighted-mean' || algo === 'average') {
+        const s = Number(score.score)
+        const t = score.fusionScore
+        const scoreStr = Number.isFinite(s) ? String(parseFloat(s.toFixed(2))) : 'N/A'
+        if (t !== undefined && t !== null) return `Score: ${scoreStr} [${t}]`
+        return `Score: ${scoreStr}`
     }
-    return `Score: ${scoreStr}`
+    const raw = Number(score.score)
+    const w = score.weightedScore
+    const t = score.fusionScore
+    const rawStr = Number.isFinite(raw) ? parseFloat(raw.toFixed(2)) : undefined
+    if (rawStr !== undefined && typeof w === 'number' && Number.isFinite(w)) {
+        return `Value: ${rawStr} | Score: ${parseFloat(w.toFixed(2))} [${t}]`
+    }
+    if (rawStr !== undefined && t !== undefined && t !== null) {
+        return `Value: ${rawStr} [${t}]`
+    }
+    return `Value: ${rawStr ?? 'N/A'}`
 }
 
 /**
@@ -161,10 +181,7 @@ export const buildFormInput = (
                 if (score.attribute && score.score !== undefined) {
                     const attrKey = String(score.attribute).charAt(0).toLowerCase() + String(score.attribute).slice(1)
                     const algorithmKey = String(score.algorithm ?? 'unknown')
-                    formInput[`${candidateId}.${attrKey}.${algorithmKey}.score`] = formatScoreDisplay(
-                        Number(score.score),
-                        score.fusionScore
-                    )
+                    formInput[`${candidateId}.${attrKey}.${algorithmKey}.score`] = formatScoreDisplay(score)
                 }
             })
         }
@@ -361,7 +378,7 @@ export const buildFormFields = (
                         config: {
                             label: capitalizeFirst(attrName),
                             helpText: algorithm,
-                            default: formatScoreDisplay(Number(score.score), score.fusionScore),
+                            default: formatScoreDisplay(score),
                         },
                         validations: [],
                     })
@@ -631,7 +648,7 @@ export const buildFormInputs = (
                         id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
                         type: 'STRING',
                         label: `${candidateId}.${attrKey}.${algorithmKey}.score`,
-                        description: formatScoreDisplay(Number(score.score), score.fusionScore),
+                        description: formatScoreDisplay(score),
                     })
                 }
             })

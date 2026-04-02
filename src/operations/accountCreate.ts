@@ -1,6 +1,7 @@
 import { AttributeChangeOp, ConnectorError, StdAccountCreateInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { assert } from '../utils/assert'
+import { normalizeActionTokens } from '../utils/attributes'
 import { executeActions } from './actions'
 
 /**
@@ -65,7 +66,7 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
         await attributes.refreshUniqueAttributes(fusionIdentity)
         timer.phase('Step 3: Processing identity')
 
-        const actions = [...(input.attributes.actions ?? [])]
+        const actions = normalizeActionTokens(input.attributes.actions)
         log.info(`Processing ${actions.length} action(s)`)
 
         for (const action of actions) {

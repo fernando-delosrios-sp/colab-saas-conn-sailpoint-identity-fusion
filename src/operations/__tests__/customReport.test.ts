@@ -121,6 +121,7 @@ function createRegistry() {
             cleanUpForms: jest.fn(),
         },
         attributes: {
+            initializeCounters: jest.fn().mockResolvedValue(undefined),
             saveState: jest.fn(),
             refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
         },
@@ -276,7 +277,7 @@ describe('customReport', () => {
             registry,
             {
                 schema: { attributes: [] },
-                includeBaseline: true,
+                includeExisting: true,
                 includeUnmatched: true,
                 includeDeferred: true,
                 includeReview: true,
@@ -306,7 +307,7 @@ describe('customReport', () => {
         expect(registry.fusion.refreshUniqueAttributes).toHaveBeenCalled()
         expect(registry.forms.cleanUpForms).not.toHaveBeenCalled()
         expect(registry.attributes.saveState).not.toHaveBeenCalled()
-        expect(registry.fusion.processManagedAccounts).not.toHaveBeenCalled()
+        expect(registry.fusion.processManagedAccounts).toHaveBeenCalled()
     })
 
     it('continues when fusion source is unavailable', async () => {
@@ -317,6 +318,17 @@ describe('customReport', () => {
 
         expect(registry.sources.fetchFusionAccounts).not.toHaveBeenCalled()
         expect(registry.res.send).toHaveBeenCalled()
+    })
+
+    it('seeds incremental counters from existing fusion accounts after fetch', async () => {
+        const registry = createRegistry()
+        registry.sources.hasFusionSource = true
+        registry.sources.fusionAccounts = [{ attributes: { id: 'NG015' } }]
+        registry.attributes.seedIncrementalCountersFromRawAccounts = jest.fn().mockResolvedValue(undefined)
+
+        await customReport(registry, { schema: { attributes: [] }, includeMatched: true } as any)
+
+        expect(registry.attributes.seedIncrementalCountersFromRawAccounts).toHaveBeenCalledWith(registry.sources.fusionAccounts)
     })
 
     it('falls back to analyzed managed accounts when forEach emits no rows', async () => {

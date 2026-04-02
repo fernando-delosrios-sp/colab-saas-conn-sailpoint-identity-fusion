@@ -497,6 +497,167 @@ describe('FusionService', () => {
             )
         })
 
+        it('does not auto-correlate when a rule was skipped (missing)', async () => {
+            ;(fusionService as any).config.fusionMergingIdentical = true
+            ;(fusionService as any).sourcesByName.set('LH2', {
+                id: 'src-lh2',
+                name: 'LH2',
+                sourceType: 'authoritative',
+                config: {},
+            })
+            const reviewer = FusionAccount.fromIdentity({ id: 'rev-skip-1', name: 'Rev', attributes: {} } as any)
+            fusionService.reviewersBySourceId.set('src-lh2', new Set([reviewer]))
+
+            const account = {
+                id: 'acct-perfect-skip-1',
+                nativeIdentity: 'acct-perfect-skip-1',
+                name: 'Skipped Rule User',
+                sourceName: 'LH2',
+                attributes: {},
+            } as Account
+
+            const analyzed = FusionAccount.fromManagedAccount(account)
+            analyzed.addFusionMatch({
+                identityId: 'identity-perfect-skip-1',
+                identityName: 'Perfect Skip Identity',
+                scores: [
+                    { attribute: 'firstname', algorithm: 'name', score: 100 } as any,
+                    { attribute: 'email', algorithm: 'jaro-winkler', score: 0, skipped: true } as any,
+                ],
+            } as any)
+            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+
+            await fusionService.processManagedAccount(account)
+
+            expect(mockForms.registerFinishedDecision).not.toHaveBeenCalled()
+        })
+
+        it('does not create fusion review forms when commandType is not StdAccountList', async () => {
+            const analysisFusion = new FusionService(
+                mockConfig,
+                mockLog,
+                mockIdentities,
+                mockSources,
+                mockForms,
+                mockAttributes,
+                mockScoring,
+                mockSchemas,
+                undefined
+            )
+            const reviewer = FusionAccount.fromIdentity({ id: 'rev-1', name: 'Rev', attributes: {} } as any)
+            analysisFusion.reviewersBySourceId.set('source-a-id', new Set([reviewer]))
+            ;(analysisFusion as any).sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: {},
+            })
+
+            const account = {
+                id: 'acct-partial-1',
+                nativeIdentity: 'native-partial-1',
+                name: 'Partial User',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+            const analyzed = FusionAccount.fromManagedAccount(account)
+            analyzed.addFusionMatch({
+                identityId: 'identity-partial-1',
+                identityName: 'Partial Identity',
+                candidateType: 'identity',
+                scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 95, isMatch: true } as any],
+            } as any)
+            mockForms.createFusionForm.mockResolvedValue(true)
+            jest.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+
+            const result = await analysisFusion.processManagedAccount(account)
+
+            expect(mockForms.createFusionForm).not.toHaveBeenCalled()
+            expect(result).toBeUndefined()
+        })
+
+        it('does not auto-correlate perfect matches when commandType is not StdAccountList', async () => {
+            const cfg = { ...mockConfig, fusionMergingIdentical: true } as unknown as FusionConfig
+            const analysisFusion = new FusionService(
+                cfg,
+                mockLog,
+                mockIdentities,
+                mockSources,
+                mockForms,
+                mockAttributes,
+                mockScoring,
+                mockSchemas,
+                undefined
+            )
+            ;(analysisFusion as any).sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: {},
+            })
+
+            const account = {
+                id: 'acct-perfect-analysis-1',
+                nativeIdentity: 'acct-perfect-analysis-1',
+                name: 'Perfect Analysis User',
+                sourceName: 'Source A',
+                attributes: {},
+            } as Account
+            const analyzed = FusionAccount.fromManagedAccount(account)
+            analyzed.addFusionMatch({
+                identityId: 'identity-perfect-analysis-1',
+                identityName: 'Perfect Analysis Identity',
+                scores: [
+                    { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
+                    { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
+                ],
+            } as any)
+            jest.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            const processDecision = jest.spyOn(analysisFusion, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
+
+            await analysisFusion.processManagedAccount(account)
+
+            expect(mockForms.registerFinishedDecision).not.toHaveBeenCalled()
+            expect(processDecision).not.toHaveBeenCalled()
+        })
+
+        it('does not fire disable for orphan non-matches when commandType is not StdAccountList', async () => {
+            const analysisFusion = new FusionService(
+                mockConfig,
+                mockLog,
+                mockIdentities,
+                mockSources,
+                mockForms,
+                mockAttributes,
+                mockScoring,
+                mockSchemas,
+                undefined
+            )
+            ;(analysisFusion as any).sourcesByName.set('OrphanSrc', {
+                id: 'orphan-src-id',
+                name: 'OrphanSrc',
+                sourceType: 'orphan',
+                config: { disableNonMatchingAccounts: true },
+            })
+            const reviewer = FusionAccount.fromIdentity({ id: 'rev-1', name: 'Rev', attributes: {} } as any)
+            analysisFusion.reviewersBySourceId.set('orphan-src-id', new Set([reviewer]))
+
+            const account = {
+                id: 'acct-orphan-analysis-1',
+                nativeIdentity: 'native-orphan-a1',
+                name: 'Orphan User',
+                sourceName: 'OrphanSrc',
+                attributes: {},
+            } as Account
+            const analyzed = FusionAccount.fromManagedAccount(account)
+            jest.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            jest.spyOn(mockSources, 'fireDisableAccount').mockResolvedValue(undefined)
+
+            await analysisFusion.processManagedAccount(account)
+
+            expect(mockSources.fireDisableAccount).not.toHaveBeenCalled()
+        })
+
         it('should process managed accounts', async () => {
             const mockManagedAccount = {
                 nativeIdentity: 'mgmt-1',

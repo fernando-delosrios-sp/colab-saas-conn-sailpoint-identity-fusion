@@ -1,6 +1,6 @@
 {
     "name": "Identity Fusion NG",
-    "description": "Identity Fusion NG is a connector that allows you to manage Identity Fusion accounts by generating unique identifiers, preventing duplicate identities through similarity matching, and merging account attributes from multiple authoritative sources.",
+    "description": "Identity Fusion NG is a connector that allows you to manage Identity Fusion accounts by mapping account attributes from multiple sources, defining new attributes and unique identifiers, and matching accounts with existing identities to prevent duplicates.",
     "commands": [
         "std:test-connection",
         "std:account:list",
@@ -20,6 +20,7 @@
         "fusionAverageScore": 80,
         "provisioningTimeout": 300,
         "managedAccountsBatchSize": 50,
+        "fusionMaxCandidatesForForm": 10,
         "includeIdentities": true,
         "identityScopeQuery": "*",
         "maxHistoryMessages": 10,
@@ -46,7 +47,6 @@
         "trim": false,
         "force": false,
         "algorithm": "name-matcher",
-        "skipMatchIfMissing": true,
         "enableBatching": true,
         "enablePriority": true,
         "aggregationMode": "none",
@@ -182,6 +182,16 @@
                                             "parentKey": "sourceType",
                                             "parentValue": "orphan",
                                             "helpKey": "Automatically disable orphan accounts that no longer match any identity after aggregation"
+                                        },
+                                        {
+                                            "key": "deferredMatching",
+                                            "label": "Same-aggregation matching",
+                                            "type": "toggle",
+                                            "required": false,
+                                            "value": "true",
+                                            "parentKey": "sourceType",
+                                            "parentValue": "authoritative",
+                                            "helpKey": "After identity matching, also compare to other new unmatched accounts from this aggregation. If the only strong match is one of those peers, defer instead of creating another Fusion identity until a later run. Off: skip that check and use normal unmatched handling. Turn on when the same person might appear as multiple accounts in one run."
                                         },
                                         {
                                             "key": "accountFilter",
@@ -479,7 +489,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Normal Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Generate computed attributes using Velocity templates.</strong><br><br>Normal attributes are recalculated on each aggregation when <em>Refresh</em> is enabled.<br><br><strong>Expression context:</strong> Mapped account attributes, <code>$Math</code>, <code>$Datefns</code>, <code>$AddressParse</code>, <code>$Normalize</code>.<br><strong>Options:</strong> Case transform, normalization, space removal, max length.",
+                    "sectionHelpMessage": "<strong>Define computed attributes using Velocity templates.</strong><br><br>Normal attributes are recalculated on each aggregation when <em>Refresh</em> is enabled.<br><br><strong>Expression context:</strong> Mapped account attributes, <code>$Math</code>, <code>$Datefns</code>, <code>$AddressParse</code>, <code>$Normalize</code>.<br><strong>Options:</strong> Case transform, normalization, space removal, max length.",
                     "items": [
                         {
                             "key": "normalAttributeDefinitions",
@@ -493,7 +503,7 @@
                             "copyButton": true,
                             "buttonLabel": "New Normal Attribute Definition",
                             "type": "cardList",
-                            "helpKey": "Define attributes whose values are generated from templates using mapped account data",
+                            "helpKey": "Define attributes whose values are defined from templates using mapped account data",
                             "subMenus": [
                                 {
                                     "label": "Attribute Definition",
@@ -510,7 +520,7 @@
                                             "label": "Apache Velocity expression",
                                             "type": "textarea",
                                             "required": true,
-                                            "helpKey": "Velocity template that generates the attribute value. You can reference any mapped attribute by name. Example: #set($i=$firstname.substring(0, 1))$i$lastname produces 'jsmith' from 'John Smith'"
+                                            "helpKey": "Velocity template that defines the attribute value. You can reference any mapped attribute by name. Example: #set($i=$firstname.substring(0, 1))$i$lastname produces 'jsmith' from 'John Smith'"
                                         },
                                         {
                                             "key": "refresh",
@@ -528,7 +538,7 @@
                                             "label": "Case selection",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Convert the generated value to a specific letter case",
+                                            "helpKey": "Convert the defined value to a specific letter case",
                                             "options": [
                                                 {
                                                     "label": "Do not change",
@@ -558,13 +568,13 @@
                                             "key": "spaces",
                                             "label": "Remove spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove all spaces from the generated value"
+                                            "helpKey": "Remove all spaces from the defined value"
                                         },
                                         {
                                             "key": "trim",
                                             "label": "Trim leading and trailing spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove extra spaces at the beginning and end of the generated value"
+                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value"
                                         },
                                         {
                                             "key": "maxLength",
@@ -572,7 +582,7 @@
                                             "type": "number",
                                             "required": false,
                                             "min": "1",
-                                            "helpKey": "Limit the generated value to this many characters. Leave empty for no limit"
+                                            "helpKey": "Limit the defined value to this many characters. Leave empty for no limit"
                                         }
                                     ]
                                 }
@@ -583,7 +593,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Unique Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Generate unique attributes using Velocity templates with uniqueness enforcement.</strong><br><br>Unique attribute values are preserved once generated and only recalculated on account reset/enable.<br><br><strong>Expression context:</strong> Mapped account attributes, <code>$UUID</code> (auto-generated v4 UUID), <code>$counter</code> (incremental or collision-based), <code>$Math</code>, <code>$Datefns</code>, <code>$AddressParse</code>, <code>$Normalize</code>.<br><br><strong>Collision handling:</strong> On duplicate, the connector appends a disambiguation counter (<code>$counter</code>). Enable <em>Use incremental counter</em> for sequential numbering instead.<br><strong>UUID:</strong> Use <code>$UUID</code> in the expression for an auto-generated immutable UUID.<br><strong>Max attempts:</strong> Limits retries to prevent infinite loops.",
+                    "sectionHelpMessage": "<strong>Define unique attributes using Velocity templates with uniqueness enforcement.</strong><br><br>Unique attribute values are preserved once defined and only recalculated on account reset/enable.<br><br><strong>Expression context:</strong> Mapped account attributes, <code>$UUID</code> (auto-generated v4 UUID), <code>$counter</code> (incremental or collision-based), <code>$Math</code>, <code>$Datefns</code>, <code>$AddressParse</code>, <code>$Normalize</code>.<br><br><strong>Collision handling:</strong> On duplicate, the connector appends a disambiguation counter (<code>$counter</code>). Enable <em>Use incremental counter</em> for sequential numbering instead.<br><strong>UUID:</strong> Use <code>$UUID</code> in the expression for an auto-generated immutable UUID.<br><strong>Max attempts:</strong> Limits retries to prevent infinite loops.",
                     "items": [
                         {
                             "key": "maxAttempts",
@@ -622,7 +632,7 @@
                                             "label": "Apache Velocity expression",
                                             "type": "textarea",
                                             "required": true,
-                                            "helpKey": "Velocity template that generates the unique value. Use $counter for an automatic number suffix (e.g. jsmith1, jsmith2) or $UUID for a random unique ID. Example: #set($i=$firstname.substring(0, 1))$i$lastname$counter"
+                                            "helpKey": "Velocity template that defines the unique value. Use $counter for an automatic number suffix (e.g. jsmith1, jsmith2) or $UUID for a random unique ID. Example: #set($i=$firstname.substring(0, 1))$i$lastname$counter"
                                         },
                                         {
                                             "key": "digits",
@@ -656,7 +666,7 @@
                                             "label": "Case selection",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Convert the generated value to a specific letter case",
+                                            "helpKey": "Convert the defined value to a specific letter case",
                                             "options": [
                                                 {
                                                     "label": "Do not change",
@@ -686,13 +696,13 @@
                                             "key": "spaces",
                                             "label": "Remove spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove all spaces from the generated value"
+                                            "helpKey": "Remove all spaces from the defined value"
                                         },
                                         {
                                             "key": "trim",
                                             "label": "Trim leading and trailing spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove extra spaces at the beginning and end of the generated value"
+                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value"
                                         },
                                         {
                                             "key": "maxLength",
@@ -700,7 +710,7 @@
                                             "type": "number",
                                             "required": false,
                                             "min": "1",
-                                            "helpKey": "Limit the generated value to this many characters. Leave empty for no limit"
+                                            "helpKey": "Limit the defined value to this many characters. Leave empty for no limit"
                                         }
                                     ]
                                 }
@@ -717,8 +727,22 @@
                 {
                     "type": "section",
                     "sectionTitle": "Matching Settings",
-                    "sectionHelpMessage": "<strong>Configure duplicate identity detection.</strong><br><br><strong>Fusion attribute matches:</strong> Define attributes to compare.<br><ul><li><strong>Algorithm:</strong> Enhanced Name Matcher, Jaro-Winkler, LIG3, Dice, Double Metaphone.</li><li><strong>Score:</strong> Similarity threshold (0-100).</li><li><strong>Mandatory:</strong> Require this match?</li><li><strong>Skip match if missing:</strong> When enabled (default), this rule is ignored if either value is missing; when disabled, missing values are still scored and counted.</li></ul><br><strong>Scoring mode:</strong> Use per-attribute thresholds (default) or single overall average score.<br><strong>Auto-correlate:</strong> Automatically merge precise matches without manual review.",
+                    "sectionHelpMessage": "<strong>Configure duplicate identity detection.</strong><br><br><strong>Combined match score:</strong> A weighted blend of attribute similarities; each rule’s <strong>minimum similarity &amp; blend weight</strong> is one number: pass threshold and influence in the blend. Set <strong>Minimum combined match score</strong> as the global floor for a potential match. Evaluated mandatory rules must pass their own threshold.<br><br><strong>Fusion attribute matches:</strong> Define attributes to compare.<br><ul><li><strong>Algorithm:</strong> Enhanced Name Matcher, Jaro-Winkler, LIG3, Dice, Double Metaphone.</li><li><strong>Minimum similarity &amp; blend weight [0-100]:</strong> Minimum similarity for that rule to pass; the same value weights the rule in the combined score (higher = stricter and more influence).</li><li><strong>Mandatory:</strong> Must pass this rule’s minimum similarity for a potential match.</li><li><strong>Skip match if missing:</strong> When enabled (default), the rule is skipped if either value is missing (no penalty to combined score; auto-correlate when identical still requires every rule evaluated).</li></ul><br><strong>Auto-correlate:</strong> Optionally merge only when every rule scores 100 and none were skipped.",
                     "items": [
+                        {
+                            "key": "fusionAverageScore",
+                            "label": "Minimum combined match score [0-100]",
+                            "type": "number",
+                            "required": true,
+                            "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match. Mandatory rules must still meet their own minimums."
+                        },
+                        {
+                            "key": "fusionMergingIdentical",
+                            "label": "Automatically correlate if identical?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "Automatically merge matching records without requiring manual review. Only enable this when you are confident your matching rules produce accurate results"
+                        },
                         {
                             "key": "matchingConfigs",
                             "label": "Fusion attribute matches",
@@ -787,17 +811,17 @@
                                         },
                                         {
                                             "key": "fusionScore",
-                                            "label": "Similarity score [0-100]",
+                                            "label": "Minimum similarity & blend weight [0-100]",
                                             "type": "number",
                                             "required": true,
-                                            "helpKey": "How similar two values must be to count as a match, from 0 (no similarity) to 100 (exact match). Higher values reduce false positives"
+                                            "helpKey": "One setting, two roles: (1) minimum similarity (0-100) the rule must meet to pass, and (2) blend weight in the combined score—higher means stricter and more influence. Use 0 only for minimal weight; it is treated as weight 1 in the blend."
                                         },
                                         {
                                             "key": "mandatory",
                                             "label": "Mandatory match?",
                                             "type": "toggle",
                                             "required": false,
-                                            "helpKey": "When enabled, this attribute must meet its similarity threshold for a match to be considered. If no attributes are marked as mandatory, all are treated as required"
+                                            "helpKey": "When enabled, this rule must meet its minimum similarity for a potential match. Passing mandatory rules contribute to the weighted combined score like other rules."
                                         },
                                         {
                                             "key": "skipMatchIfMissing",
@@ -809,29 +833,6 @@
                                     ]
                                 }
                             ]
-                        },
-                        {
-                            "key": "fusionUseAverageScore",
-                            "label": "Use overall fusion similarity score for all attributes?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Instead of requiring each attribute to meet its own threshold, use a single combined score across all attributes to determine a match"
-                        },
-                        {
-                            "key": "fusionAverageScore",
-                            "label": "Similarity score [0-100]",
-                            "parentKey": "fusionUseAverageScore",
-                            "parentValue": "true",
-                            "type": "number",
-                            "required": true,
-                            "helpKey": "The minimum combined similarity score (0-100) needed to consider two records a match"
-                        },
-                        {
-                            "key": "fusionMergingIdentical",
-                            "label": "Automatically correlate if identical?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Automatically merge matching records without requiring manual review. Only enable this when you are confident your matching rules produce accurate results"
                         }
                     ]
                 },
@@ -879,7 +880,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br><ul><li><strong>Reset accounts:</strong> Force rebuild from scratch (caution in production).</li><li><strong>Managed accounts batch size:</strong> Controls how many uncorrelated managed accounts are processed per duplicate-detection batch. Lower values reduce peak memory usage; higher values can improve throughput.</li><li><strong>Force attribute refresh:</strong> Recalculate Normal-type attributes on every aggregation run, even when not strictly required.</li><li><strong>Concurrency check:</strong> Prevent concurrent aggregations (default: enabled).</li><li><strong>External logging:</strong> Send logs to an external service (Splunk, etc.) for monitoring and incident analysis.</li></ul><br>Start with the default batch size and tune only if needed: reduce it when runs are memory-constrained, increase it when memory headroom is available and you want faster processing.",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br><ul><li><strong>Reset accounts:</strong> Force rebuild from scratch (caution in production).</li><li><strong>Managed accounts batch size:</strong> Controls how many uncorrelated managed accounts are processed per duplicate-detection batch. Lower values reduce peak memory usage; higher values can improve throughput.</li><li><strong>Max match candidates per review form:</strong> When many identities score as potential matches, the form shows the highest-scoring ones up to this limit (range 1–15; default 10).</li><li><strong>Force attribute refresh:</strong> Recalculate Normal-type attributes on every aggregation run, even when not strictly required.</li><li><strong>Concurrency check:</strong> Prevent concurrent aggregations (default: enabled).</li><li><strong>External logging:</strong> Send logs to an external service (Splunk, etc.) for monitoring and incident analysis.</li></ul><br>Start with the default batch size and tune only if needed: reduce it when runs are memory-constrained, increase it when memory headroom is available and you want faster processing.",
                     "items": [
                         {
                             "key": "reset",
@@ -894,6 +895,13 @@
                             "type": "number",
                             "required": false,
                             "helpKey": "Number of uncorrelated managed accounts processed in each duplicate-detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100. Default: 50"
+                        },
+                        {
+                            "key": "fusionMaxCandidatesForForm",
+                            "label": "Max match candidates per review form",
+                            "type": "number",
+                            "required": false,
+                            "helpKey": "Maximum number of potential identity matches shown on each manual review form. If more identities qualify, only the highest-scoring candidates are included (combined match score, then stable tie-break). Valid range: 1–15. Default: 10"
                         },
                         {
                             "key": "forceAttributeRefresh",

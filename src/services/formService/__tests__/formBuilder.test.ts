@@ -54,7 +54,24 @@ describe('candidate list building', () => {
             ],
         } as any
 
-        const candidates = buildCandidateList(fusionAccount)
+        const candidates = buildCandidateList(fusionAccount, 10)
         expect(candidates[0].name).toBe('fallback-id-1')
+    })
+
+    it('orders candidates by combined match score descending and respects cap', () => {
+        const mkMatch = (id: string, combined: number) =>
+            ({
+                fusionIdentity: { identityId: id, attributes: { displayName: id } },
+                identityId: id,
+                identityName: id,
+                scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: combined } as any],
+            }) as any
+
+        const fusionAccount = {
+            fusionMatches: [mkMatch('low', 80), mkMatch('high', 95), mkMatch('mid', 88)],
+        } as any
+
+        const candidates = buildCandidateList(fusionAccount, 2)
+        expect(candidates.map((c) => c.id)).toEqual(['high', 'mid'])
     })
 })

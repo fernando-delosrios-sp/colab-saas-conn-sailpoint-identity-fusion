@@ -288,16 +288,16 @@
         }
     </style>
 </head>
-<body style="margin:0; padding:0; overflow-x:auto; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; background:#f3f6fb;">
+<body style="margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; background:#f3f6fb;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="border-collapse:collapse; width:auto; white-space:normal;">
         <tr>
             <td align="center" style="padding:0 16px;">
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; width:auto;">
                     <tr>
-                        <td style="padding:12px 0;">
+                        <td style="padding:12px 20px;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #e6ebf5; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.12);">
                                 <tr>
-                                    <td style="padding:14px;">
+                                    <td style="padding:14px 24px 14px 14px;">
         <div class="header" style="padding-bottom:18px; margin-bottom:22px; border-bottom:1px solid #e6ebf5;">
             <div style="margin-bottom:12px;">
                 <h1 style="margin:0; color:#0b5cab; font-size:26px; letter-spacing:-0.2px;">{{reportTitle}}</h1>
@@ -442,19 +442,18 @@
                                 {{#if accountEmail}}
                                 <tr>
                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Email:</td>
-                                    <td style="padding:2px 8px; word-break:break-all;">{{accountEmail}}</td>
+                                    <td style="padding:2px 8px; width:150px; max-width:150px;"><div style="display:block; width:150px; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{accountEmail}}">{{accountEmail}}</div></td>
                                 </tr>
                                 {{/if}}
                             </table>
                         </div>
 
                         {{#if accountAttributes}}
-                        <div style="color:#0b5cab; font-size:12px; font-weight:900; letter-spacing:0.35px; text-transform:uppercase; margin:12px 0 8px 0;">Attributes</div>
-                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse; table-layout:auto;">
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse; table-layout:auto; margin-top:8px;">
                             {{#each accountAttributes}}
                             <tr>
-                                <td style="padding:6px 8px; font-size:12px; color:#5f6b7a; font-weight:700; border:1px solid #eef2f7; background:#f8fbff; width:30%; min-width:30%; white-space:nowrap; word-break:keep-all; overflow-wrap:normal;">{{@key}}</td>
-                                <td style="padding:6px 8px; font-size:12px; color:#0f172a; border:1px solid #eef2f7; word-break:break-word; overflow-wrap:anywhere;">{{formatAttribute this}}</td>
+                                <td style="padding:6px 8px; font-size:12px; color:#5f6b7a; font-weight:700; border:1px solid #eef2f7; background:#f8fbff; width:1%; white-space:nowrap; word-break:keep-all; overflow-wrap:normal;">{{@key}}</td>
+                                <td style="padding:6px 8px; font-size:12px; color:#0f172a; border:1px solid #eef2f7; word-break:break-word; overflow-wrap:anywhere;">{{{formatAccountAttributeValue @key this}}}</td>
                             </tr>
                             {{/each}}
                         </table>
@@ -462,12 +461,12 @@
                     </td>
                     <td style="width:34px; min-width:34px; max-width:34px; vertical-align:middle; padding:8px 4px; border-right:1px solid #eef2f7; text-align:center;">
                         <div style="display:inline-block; font-size:11px; line-height:1.05; color:#5f6b7a; font-weight:800; letter-spacing:0.15px; text-transform:uppercase;">
-                            P<br>O<br>T<br>E<br>N<br>T<br>I<br>A<br>L<br><br>M<br>A<br>T<br>C<br>H<br>E<br>S
+                            M<br>A<br>T<br>C<br>H<br>E<br>S
                         </div>
                     </td>
 
                     <!-- Right: candidates or error -->
-                    <td style="vertical-align:top; padding-left:14px;">
+                    <td style="vertical-align:top; padding-left:14px; width:100%;">
                         {{#if error}}
                         <div style="padding:16px 18px; background:#fef2f2; border:1px solid #fecaca; border-left:6px solid #ef4444; border-radius:10px;">
                             <div style="font-size:12px; color:#991b1b; font-weight:900; letter-spacing:0.35px; text-transform:uppercase; margin-bottom:6px;">Error</div>
@@ -480,32 +479,41 @@
                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; margin-bottom:12px;">
                                 <tr>
                                 {{#each matches}}
-                                <td valign="top" style="width:auto; min-width:240px; vertical-align:top; padding:4px;">
-                                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse; table-layout:auto;">
-                                        <tr>
-                                            <td colspan="4" style="padding:6px 8px;">
-                                                <div style="font-size:14px; font-weight:800; color:#0b5cab; line-height:1.3; word-wrap:break-word;">
+                                <td valign="top" style="width:auto; vertical-align:top; padding:4px;">
+                                    <div style="padding:6px 8px 8px 8px;">
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table; width:auto; border-collapse:collapse; vertical-align:top;">
+                                            <tr>
+                                                <td style="vertical-align:middle; font-size:14px; font-weight:800; color:#0b5cab; line-height:1.3; white-space:nowrap;">
                                                     {{#if identityUrl}}
-                                                    <a href="{{identityUrl}}" style="color:#0b5cab; text-decoration:underline; word-wrap:break-word;">{{identityName}}</a>
+                                                    <a href="{{identityUrl}}" style="color:#0b5cab; text-decoration:underline; white-space:nowrap;">{{identityName}}</a>
                                                     {{else}}
                                                     {{identityName}}
                                                     {{/if}}
-                                                </div>
-                                            </td>
-                                        </tr>
+                                                </td>
+                                                <td style="vertical-align:middle; text-align:right; white-space:nowrap; width:1%; padding-left:14px;">
+                                                    {{#if ../deferred}}
+                                                    <span style="display:inline-block; vertical-align:middle; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase;">Deferred</span>
+                                                    {{/if}}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table; width:auto; border-collapse:collapse; table-layout:auto; vertical-align:top;">
                                         {{#if scores}}
                                         <tr>
-                                            <th style="text-align:left; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Attribute</th>
-                                            <th style="text-align:left; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Algorithm</th>
-                                            <th style="width:1%; white-space:nowrap; text-align:right; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Score</th>
-                                            <th style="width:1%; white-space:nowrap; text-align:right; padding:5px 3px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Threshold</th>
+                                            <th style="white-space:nowrap; text-align:left; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Attribute</th>
+                                            <th style="white-space:nowrap; text-align:left; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Algorithm</th>
+                                            <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Threshold</th>
+                                            <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Value</th>
+                                            <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:10px; font-weight:600;">Score</th>
                                         </tr>
                                         {{#each scores}}
                                         <tr style="background:{{#if (isAverageScoreRow attribute algorithm)}}#e0f2fe{{else}}{{#if isMatch}}#f0fdf4{{else}}#fef2f2{{/if}}{{/if}};">
-                                            <td style="padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{attribute}}</td>
-                                            <td style="padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{algorithmLabel algorithm}}</td>
-                                            <td style="width:1%; white-space:nowrap; padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-weight:900; font-size:10px;">{{formatPercent score}}%</td>
-                                            <td style="width:1%; white-space:nowrap; padding:5px 3px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{formatPercent fusionScore}}%</td>
+                                            <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{attribute}}</td>
+                                            <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{algorithmLabel algorithm}}</td>
+                                            <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{formatPercent fusionScore}}%</td>
+                                            <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:10px;">{{#if skipped}}—{{else}}{{#if (isAverageScoreRow attribute algorithm)}}—{{else}}{{formatPercent score}}%{{/if}}{{/if}}</td>
+                                            <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-weight:900; font-size:10px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{#if skipped}}—{{else}}{{#if (isAverageScoreRow attribute algorithm)}}{{formatPercent score}}%{{else}}{{#if (isFiniteNumber weightedScore)}}{{formatPercent weightedScore}}%{{else}}—{{/if}}{{/if}}{{/if}}</td>
                                         </tr>
                                         {{/each}}
                                         {{/if}}
@@ -516,10 +524,10 @@
                             </table>
                         </div>
                         {{else}}
-                        <div style="color:#999; font-style:italic; padding:20px; background-color:#f8f9fa; border-radius:4px; text-align:center;">No potential matches found for this account.</div>
+                        <div style="color:#999; font-style:italic; padding:20px; background-color:#f8f9fa; border-radius:4px; text-align:center;">No match found</div>
                         {{/if}}
                         {{else}}
-                        <div style="color:#999; font-style:italic; padding:20px; background-color:#f8f9fa; border-radius:4px; text-align:center;">No potential matches found for this account.</div>
+                        <div style="color:#999; font-style:italic; padding:20px; background-color:#f8f9fa; border-radius:4px; text-align:center;">No match found</div>
                         {{/if}}
                         {{/if}}
                     </td>

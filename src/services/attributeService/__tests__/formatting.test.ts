@@ -169,6 +169,18 @@ describe('evaluateVelocityTemplate', () => {
             const result = evaluateVelocityTemplate('$Normalize.phone($phone)', context)
             expect(result).toBe('+1 555 678 9012')
         })
+
+        it('should normalize UK local phone when default country is provided', () => {
+            const context = { phone: '020 7946 0958' }
+            const result = evaluateVelocityTemplate('$Normalize.phone($phone, "GB")', context)
+            expect(result).toBe('+44 20 7946 0958')
+        })
+
+        it('should prefer explicit country code in the phone over default country', () => {
+            const context = { phone: '+1 555 234 5678' }
+            const result = evaluateVelocityTemplate('$Normalize.phone($phone, "GB")', context)
+            expect(result).toBe('+1 555 234 5678')
+        })
     })
 
     // ========================================================================

@@ -17,3 +17,6 @@ export * from './assert'
 
 // Error utilities
 export * from './error'
+
+// Numeric utilities
+export * from './numbers'

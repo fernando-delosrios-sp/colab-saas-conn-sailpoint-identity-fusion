@@ -96,7 +96,7 @@ export class AttributeService {
      * Save the current state to the source configuration
      */
     public async saveState(): Promise<void> {
-        const fusionSourceId = this.sourceService.fusionSourceId
+        const { fusionSourceId } = this.sourceService
         const stateObject = await this.getStateObject()
 
         this.log.info(`Saving state object: ${JSON.stringify(stateObject)}`)
@@ -263,7 +263,7 @@ export class AttributeService {
         fusionDisplayAttribute: string
     ): boolean {
         if (attribute === ORIGIN_ACCOUNT_ATTRIBUTE) return true
-        const current = fusionAccount.attributeBag.current
+        const { current } = fusionAccount.attributeBag
         const hasExistingValue = isValidAttributeValue(current[attribute])
         const canResetDisplay = fusionAccount.needsReset && attribute === fusionDisplayAttribute
         const shouldKeepIdentityImmutable =
@@ -593,6 +593,57 @@ export class AttributeService {
         )
     }
 
+    /**
+     * Seed persistent incremental counters from raw Account objects.
+     *
+     * This is a lightweight step used by non-aggregation flows (like custom:report)
+     * to avoid "burning" counter values on collisions when persisted counter state
+     * is missing/out of date but existing accounts already have assigned values.
+     *
+     * For each unique attribute definition with useIncrementalCounter enabled, this
+     * scans raw account attribute values and advances the counter state to at least
+     * the max numeric suffix observed (e.g. NG015 -> 15).
+     */
+    public async seedIncrementalCountersFromRawAccounts(accounts: Account[]): Promise<void> {
+        if (this.uniqueDefinitions.length === 0) return
+        if (!accounts.length) return
+
+        const incrementalDefs = this.uniqueDefinitions.filter((d) => d.useIncrementalCounter)
+        if (incrementalDefs.length === 0) return
+
+        const stateWrapper = this.getStateWrapper()
+
+        for (const def of incrementalDefs) {
+            let maxSeen = 0
+            for (const account of accounts) {
+                const raw = account.attributes?.[def.name]
+                if (raw == null || raw === '') continue
+                const str = String(raw)
+                const match = str.match(/(\d+)\s*$/)
+                if (!match) continue
+                const parsed = Number.parseInt(match[1], 10)
+                if (Number.isFinite(parsed) && parsed > maxSeen) {
+                    maxSeen = parsed
+                }
+            }
+            if (maxSeen <= 0) continue
+
+            const key = def.name
+            const lockKey = `counter:${key}`
+            await this.locks.withLock(lockKey, async () => {
+                const current = stateWrapper.state.get(key)
+                if (current === undefined) {
+                    const start = def.counterStart ?? 1
+                    await stateWrapper.initCounter(key, start)
+                }
+                const nextCurrent = stateWrapper.state.get(key) ?? 0
+                if (maxSeen > nextCurrent) {
+                    stateWrapper.state.set(key, maxSeen)
+                }
+            })
+        }
+    }
+
     private getStateWrapper(): StateWrapper {
         assert(this.stateWrapper, 'State wrapper is not set')
         return this.stateWrapper!
@@ -645,7 +696,7 @@ export class AttributeService {
             originIdRaw != null && String(originIdRaw).trim() !== '' ? String(originIdRaw).trim() : undefined
         if (!originId) return undefined
 
-        const originSource = fusionAccount.originSource
+        const { originSource } = fusionAccount
         const identityBag = fusionAccount.attributeBag.identity ?? {}
         const identityHasData = Object.keys(identityBag).length > 0
 
@@ -1088,7 +1139,8 @@ export class AttributeService {
         const { name } = definition
         if (name === ORIGIN_ACCOUNT_ATTRIBUTE) return
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
-        const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
+        const existingValue = fusionAccount.attributes[name]
+        const hasValue = isValidAttributeValue(existingValue)
         const isFusionIdentityAttribute = name === fusionIdentityAttribute
         const isFusionDisplayAttribute = name === fusionDisplayAttribute
         const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
@@ -1096,7 +1148,11 @@ export class AttributeService {
 
         // Don't regenerate unique values if the account is not being reset
         if (hasValue && !fusionAccount.needsReset) {
-            this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
+            const valueStr = String(existingValue)
+            this.getUniqueValues(name).add(valueStr)
+            if (definition.useIncrementalCounter) {
+                await this.seedIncrementalCounterFromExistingValue(definition, valueStr)
+            }
             return
         }
 
@@ -1138,5 +1194,27 @@ export class AttributeService {
         }
         fusionAccount.attributes[name] = value
         context[name] = value
+    }
+
+    private async seedIncrementalCounterFromExistingValue(definition: UniqueAttributeDefinition, value: string): Promise<void> {
+        const match = value.match(/(\d+)\s*$/)
+        if (!match) return
+        const parsed = Number.parseInt(match[1], 10)
+        if (!Number.isFinite(parsed) || parsed <= 0) return
+
+        const stateWrapper = this.getStateWrapper()
+        const key = definition.name
+        const lockKey = `counter:${key}`
+        await this.locks.withLock(lockKey, async () => {
+            const current = stateWrapper.state.get(key)
+            if (current === undefined) {
+                const start = definition.counterStart ?? 1
+                await stateWrapper.initCounter(key, start)
+            }
+            const nextCurrent = stateWrapper.state.get(key) ?? 0
+            if (parsed > nextCurrent) {
+                stateWrapper.state.set(key, parsed)
+            }
+        })
     }
 }

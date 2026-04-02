@@ -8,12 +8,16 @@ export type FusionReportScore = {
     attribute: string
     /** The algorithm used for comparison (e.g. "jaro-winkler", "name-matcher") */
     algorithm?: string
-    /** The calculated similarity score (0-1) */
+    /** Raw algorithm similarity (0–100) */
     score: number
-    /** The configured threshold for this attribute */
+    /** Weighted partial toward combined score: (weight/Σw)×raw */
+    weightedScore?: number
+    /** The configured minimum similarity (also blend weight): fusionScore */
     fusionScore?: number
     /** Whether the score met or exceeded the threshold */
     isMatch: boolean
+    /** When true, rule was not evaluated for the blend (e.g. missing values) */
+    skipped?: boolean
     /** Human-readable explanation of the score result */
     comment?: string
 }

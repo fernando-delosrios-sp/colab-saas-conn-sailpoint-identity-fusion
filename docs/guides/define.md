@@ -195,6 +195,7 @@ Parse and normalize US addresses (`$AddressParse.getCityState(city)`, `$AddressP
 #### $Normalize (data normalization)
 
 Standardize common data formats (`$Normalize.phone(number)`, `$Normalize.date(date)`, `$Normalize.name(name)`).
+`Normalize.phone` also accepts an optional default country code for local numbers, for example: `$Normalize.phone($phone, "GB")`. If the phone string already includes an international prefix (for example `+1`), that explicit prefix is used instead of the default.
 For ambiguous numeric dates, `Normalize.date` accepts an optional priority argument:
 `$Normalize.date($birthDate, "dd-MM-yyyy,MM-dd-yyyy")` (default) or
 `$Normalize.date($birthDate, "MM-dd-yyyy,dd-MM-yyyy")`.

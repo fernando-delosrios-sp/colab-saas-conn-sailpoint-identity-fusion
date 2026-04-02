@@ -10,10 +10,14 @@ import { MatchingConfig } from '../../model/config'
  * with the calculated score and match result.
  */
 export type ScoreReport = MatchingConfig & {
-    /** The calculated similarity score (0-1) */
+    /** Raw algorithm similarity (0-100) */
     score: number
+    /** Weighted partial toward the combined score: (blendWeight/Σw)×raw; sums to combined for evaluated rules */
+    weightedScore?: number
     /** Whether the score met or exceeded the configured threshold */
     isMatch: boolean
+    /** When true, the rule was not scored (e.g. skip-on-missing); excluded from combined score */
+    skipped?: boolean
     /** Human-readable description of the score result */
     comment?: string
 }

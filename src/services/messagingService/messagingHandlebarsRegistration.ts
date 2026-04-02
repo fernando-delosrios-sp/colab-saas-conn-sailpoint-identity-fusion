@@ -1,5 +1,11 @@
 import Handlebars from 'handlebars'
 
+import {
+    mailtoHrefForHtmlAttribute,
+    maxDisplayCharsForAccountAttributeValue,
+    truncateWithEllipsis,
+} from './accountAttributeValueDisplay'
+
 /**
  * Register Handlebars helpers for common operations (email/report templates).
  */
@@ -11,7 +17,8 @@ export const registerHandlebarsHelpers = (): void => {
         dice: 'Dice',
         'double-metaphone': 'Double Metaphone',
         custom: 'Custom',
-        average: 'Average Score',
+        average: 'Combined match score (legacy)',
+        'weighted-mean': 'Combined score',
     }
     const formatDateYmd = (date: string | Date): string => {
         const d = typeof date === 'string' ? new Date(date) : date
@@ -32,6 +39,41 @@ export const registerHandlebarsHelpers = (): void => {
         return String(value)
     })
 
+    const emailAddressPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const accountAttrMaxChars = maxDisplayCharsForAccountAttributeValue()
+
+    /** Renders attribute values; long text is shortened with a character budget; emails become mailto links (triple braces in templates). */
+    Handlebars.registerHelper('formatAccountAttributeValue', (_attributeKey: any, value: any) => {
+        if (value === null || value === undefined) {
+            return 'N/A'
+        }
+        if (typeof value === 'object') {
+            const raw = JSON.stringify(value)
+            const { display, title } = truncateWithEllipsis(raw, accountAttrMaxChars)
+            const escDisplay = Handlebars.escapeExpression(display)
+            const titleAttr = title ? ` title="${Handlebars.escapeExpression(title)}"` : ''
+            return new Handlebars.SafeString(
+                `<span style="word-break:break-word; overflow-wrap:anywhere;"${titleAttr}>${escDisplay}</span>`,
+            )
+        }
+        const str = String(value).trim()
+        const { display, title } = truncateWithEllipsis(str, accountAttrMaxChars)
+        const escDisplay = Handlebars.escapeExpression(display)
+        const titleAttr = title ? ` title="${Handlebars.escapeExpression(title)}"` : ''
+        const linkStyle = 'color:#0b5cab;text-decoration:underline;'
+
+        if (!emailAddressPattern.test(str)) {
+            return new Handlebars.SafeString(
+                `<span style="word-break:break-word; overflow-wrap:anywhere;"${titleAttr}>${escDisplay}</span>`,
+            )
+        }
+        const href = mailtoHrefForHtmlAttribute(str)
+        const escFull = Handlebars.escapeExpression(str)
+        return new Handlebars.SafeString(
+            `<a href="${href}" title="${escFull}" style="${linkStyle}">${escDisplay}</a>`,
+        )
+    })
+
     Handlebars.registerHelper('formatScores', (scores: any[]) => {
         if (!scores || scores.length === 0) {
             return 'N/A'
@@ -50,6 +92,8 @@ export const registerHandlebarsHelpers = (): void => {
         if (Number.isNaN(num)) return '0'
         return String(Math.round(num))
     })
+
+    Handlebars.registerHelper('isFiniteNumber', (value: any) => typeof value === 'number' && Number.isFinite(value))
 
     Handlebars.registerHelper('multiply', (a: any, b: any) => {
         const left = typeof a === 'number' ? a : Number.parseFloat(String(a))
@@ -98,7 +142,13 @@ export const registerHandlebarsHelpers = (): void => {
     Handlebars.registerHelper('isAverageScoreRow', (attribute?: string, algorithm?: string) => {
         const attr = String(attribute ?? '')
         const alg = String(algorithm ?? '')
-        return attr === 'Average Score' || alg === 'average'
+        return (
+            attr === 'Average Score' ||
+            attr === 'Combined score' ||
+            attr === 'Combined match score' ||
+            alg === 'average' ||
+            alg === 'weighted-mean'
+        )
     })
 
     Handlebars.registerHelper('sourceTypeLabel', (sourceType: string) => {

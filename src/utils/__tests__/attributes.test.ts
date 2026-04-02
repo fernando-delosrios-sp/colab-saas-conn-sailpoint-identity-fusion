@@ -14,6 +14,7 @@ import {
     extractNumber,
     extractArray,
     toSetFromAttribute,
+    normalizeActionTokens,
     getDisplayName,
     getFirstValidAttribute,
     buildAccountIdentifier,
@@ -229,6 +230,25 @@ describe('attributes', () => {
 
         it('should return empty Set for null attributes', () => {
             expect(toSetFromAttribute(null, 'tags')).toEqual(new Set())
+        })
+    })
+
+    describe('normalizeActionTokens', () => {
+        it('treats a scalar action string as one token (not per-character)', () => {
+            expect(normalizeActionTokens('report')).toEqual(['report'])
+        })
+
+        it('normalizes arrays and entitlement-shaped objects', () => {
+            expect(normalizeActionTokens(['fusion', 'report:x'])).toEqual(['fusion', 'report:x'])
+            expect(normalizeActionTokens([{ id: 'correlated' }])).toEqual(['correlated'])
+            expect(normalizeActionTokens({ id: 'report' })).toEqual(['report'])
+        })
+
+        it('returns empty list for null, empty string, or unrecognizable values', () => {
+            expect(normalizeActionTokens(null)).toEqual([])
+            expect(normalizeActionTokens(undefined)).toEqual([])
+            expect(normalizeActionTokens('')).toEqual([])
+            expect(normalizeActionTokens({})).toEqual([])
         })
     })
 

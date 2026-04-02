@@ -89,6 +89,27 @@ describe('accountCreate', () => {
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-created' })
     })
 
+    it('executes a single report action when actions is a string (not char-split)', async () => {
+        const registry = createRegistry()
+        const input = {
+            identity: 'Alice Doe',
+            schema: { attributes: [] },
+            attributes: {
+                name: 'Alice Doe',
+                actions: 'report',
+            },
+        } as any
+
+        await accountCreate(registry, input)
+
+        expect(executeActions).toHaveBeenCalledTimes(1)
+        expect(executeActions).toHaveBeenCalledWith(
+            registry.fusion.getFusionIdentity(),
+            { op: expect.anything(), attribute: 'actions', value: 'report' },
+            registry
+        )
+    })
+
     it('creates account using attributes.name when identity is missing', async () => {
         const registry = createRegistry()
         const input = {

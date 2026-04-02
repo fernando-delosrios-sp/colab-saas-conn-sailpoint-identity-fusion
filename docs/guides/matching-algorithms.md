@@ -12,9 +12,9 @@ Matching algorithms calculate **similarity scores** (0–100) between attribute 
 | ------------------------------ | ---------------------------------- | ----------------------------------------------------------------------------------- |
 | **Fusion attribute matches**   | Define which attributes to compare | Attribute Matching Settings → Matching Settings                                                 |
 | **Matching algorithm**         | How to calculate similarity        | Per attribute (Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Custom) |
-| **Similarity score threshold** | Minimum score to flag as a match   | Per attribute or overall                                                            |
-| **Mandatory match**            | Require attribute to participate   | Per attribute (Yes/No)                                                              |
-| **Overall vs per-attribute**   | Scoring mode                       | Use overall fusion similarity score? (Yes/No)                                       |
+| **Minimum similarity (per rule)** | Threshold for that rule; also its weight in the combined score | Per attribute (0–100)                                                    |
+| **Minimum combined match score**  | Global floor for the weighted combined score                  | Matching Settings (0–100)                                                 |
+| **Mandatory match**               | Rule must pass its minimum for a potential match              | Per attribute (Yes/No)                                                    |
 
 **Screenshot placeholder:** Fusion attribute matches configuration.
 
@@ -275,16 +275,16 @@ For each **Fusion attribute match**, configure:
 | ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | **Attribute**                | Identity attribute name to compare | Must exist on identities in scope; examples: `name`, `email`, `firstname`, `lastname`, `displayName`                                 |
 | **Matching algorithm**       | Algorithm to calculate similarity  | Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Custom                                                                  |
-| **Similarity score [0-100]** | Minimum score for this attribute   | Per-attribute threshold (optional if using overall score mode)                                                                       |
-| **Mandatory match?**         | Require this attribute to match    | Yes = this attribute must meet its threshold or match fails; when no attribute is mandatory, all attributes are treated as mandatory |
+| **Minimum similarity [0-100]** | Threshold and blend weight for this rule | Higher values are stricter and count more in the **combined match score**                                                               |
+| **Mandatory match?**           | Must pass this rule for a potential match | Passing mandatories contribute to the weighted combined score like other rules                                                         |
 
 ### Single attribute vs multi-attribute matching
 
 | Strategy                        | Configuration                                                                 | Use when                                                                     |
 | ------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | **Single attribute**            | One Fusion attribute match (e.g., name only)                                  | Simple matching; one strong identifier                                       |
-| **Multi-attribute (overall mode)** | Multiple matches with overall score enabled and tuned threshold                | Average score drives the match; failed mandatory rules still invalidate     |
-| **Multi-attribute (AND logic)** | Multiple matches, all with per-attribute thresholds or high overall threshold | All attributes must agree for high confidence                                |
+| **Multi-attribute (combined)** | Several attribute matches + **minimum combined match score** | Weighted blend of similarities; tune global floor and per-rule minima/weights |
+| **Multi-attribute (strict)**   | Several mandatories with high minima                         | All critical attributes must pass; combined score must still meet global floor  |
 | **Hybrid**                      | Some mandatory, some optional                                                 | Critical attribute (email) must match; others (name, phone) support decision |
 
 **Example configurations:**
@@ -299,113 +299,45 @@ Configuration 1: Name-only matching (simple)
 Configuration 2: Name + email (balanced)
 - Attribute: name, Algorithm: Enhanced Name Matcher, Score: 80
 - Attribute: email, Algorithm: Jaro-Winkler, Score: 90
-- Overall score: No (per-attribute mode)
-→ Both must pass their thresholds
+- Minimum combined score tuned with both rules contributing weighted similarity
+→ Both contribute to combined score; mandatory rules must pass
 
 Configuration 3: Strict email + supporting name
 - Attribute: email, Algorithm: Jaro-Winkler, Score: 95, Mandatory: Yes
 - Attribute: name, Algorithm: Enhanced Name Matcher, Score: 75, Mandatory: No
 → Email must match; name optional but helps
 
-Configuration 4: Comprehensive (overall score)
-- Attribute: firstname, Algorithm: Enhanced Name Matcher
-- Attribute: lastname, Algorithm: Enhanced Name Matcher
-- Attribute: email, Algorithm: Jaro-Winkler
-- Use overall score: Yes, Threshold: 80
-→ Average of all three must be ≥80
+Configuration 4: Comprehensive combined score
+- Attribute: firstname, Algorithm: Enhanced Name Matcher, Minimum similarity: 80
+- Attribute: lastname, Algorithm: Enhanced Name Matcher, Minimum similarity: 80
+- Attribute: email, Algorithm: Jaro-Winkler, Minimum similarity: 90
+- Minimum combined match score: 80
+→ Weighted combined score must be ≥80; evaluated mandatory rules must pass
 ```
 
 ---
 
-## Scoring modes: Overall vs per-attribute
+## Combined match score
 
-### Per-attribute scoring (default)
+Matching always uses a **weighted combined score**: for each evaluated (non-skipped) rule, multiply its similarity by its **minimum similarity** (weight; 0 → treated as 1), sum, and divide by the sum of weights. That value must be ≥ **minimum combined match score**. Evaluated **mandatory** rules must also meet their own minimums. Non-mandatory rules can be below their minimum while still contributing their raw similarity to the blend.
 
-**Configuration:** **Use overall fusion similarity score for all attributes?** = No
-
-**Logic:**
-
-- Each attribute match has its own **Similarity score [0-100]** threshold
-- A **mandatory** attribute must always meet or exceed its threshold or the match fails
-- Identity is flagged as a potential match if:
-    - Every mandatory attribute meets its threshold, and
-    - When no attribute is marked mandatory: **all** attributes are treated as mandatory (all must meet their thresholds)
-    - When at least one attribute is mandatory: those must pass; non-mandatory attributes contribute to the match but their thresholds are also enforced for a pass
-
-**Advantages:**
-
-- Fine control per attribute
-- Different thresholds for different attribute importance
-- Explicit mandatory vs optional attributes
-
-**Disadvantages:**
-
-- More complex to configure
-- Harder to reason about combined effect
-
-**Example:**
+**Example:** three rules with minimums (weights) 80, 90, 75 — similarities 85, 90, 70:
 
 ```
-Configuration:
-- name: threshold 80, score 85 → Pass
-- email: threshold 90, score 88 → Fail
-Result: Not a match (email failed)
-
-Configuration with mandatory:
-- email: threshold 95, mandatory Yes, score 96 → Pass
-- name: threshold 80, mandatory No, score 70 → Fail (but not mandatory)
-Result: Match (email passed, name optional)
+Combined = (85×80 + 90×90 + 70×75) / (80+90+75) ≈ 82.5
 ```
 
-### Overall scoring
+With **minimum combined match score** 80 → potential match if all mandatory rules pass.
 
-**Configuration:** **Use overall fusion similarity score for all attributes?** = Yes
+**Tuning weights:** Raise a rule’s **minimum similarity** to make that attribute stricter **and** give it more influence on the combined score.
 
-**Logic:**
+### Tuning tips
 
-- Average of all attribute similarity scores → overall score
-- Identity is flagged if overall score ≥ global **Similarity score [0-100]**
-- When average is enabled, the overall threshold must be met and any evaluated mandatory attribute must meet its threshold; non-mandatory attribute thresholds may still be below target
-
-**Advantages:**
-
-- Simple to understand and configure
-- One threshold to tune
-- All attributes equally weighted
-
-**Disadvantages:**
-
-- Cannot prioritize certain attributes
-- Low score on one attribute can be offset by high scores on others
-
-**Example:**
-
-```
-Configuration:
-- Overall threshold: 80
-
-Scores:
-- name: 85
-- email: 90
-- phone: 70
-Overall: (85 + 90 + 70) / 3 = 81.67 → Pass (≥80)
-
-Scores (different case):
-- name: 95
-- email: 95
-- phone: 50
-Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
-→ Note: Phone is 50 (very low) but offset by name+email
-```
-
-### Which mode to use?
-
-| Choose per-attribute if...                                      | Choose overall if...                  |
-| --------------------------------------------------------------- | ------------------------------------- |
-| Attributes have different importance                            | All attributes equally important      |
-| You want explicit mandatory matches                             | Simpler configuration preferred       |
-| Fine control needed                                             | Starting out / testing                |
-| Some attributes are critical (email), others supporting (phone) | You want aggregate view of similarity |
+| Goal                                      | Approach                                                                 |
+| ----------------------------------------- | ------------------------------------------------------------------------ |
+| Stricter on one attribute                 | Raise its minimum (stronger weight + harder to pass if mandatory)       |
+| Softer global bar                         | Lower **minimum combined match score**                                   |
+| Stricter overall                          | Raise **minimum combined match score** or add mandatory rules            |
 
 ---
 
@@ -466,7 +398,7 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 | Review burden is high (>50 forms/week) | You want manual approval for all merges |
 | Obvious matches are common          | Data quality is poor                    |
 
-**When auto-correlation runs:** When **Automatically correlate if identical?** is enabled, the connector skips the review form and performs the Fusion assignment directly when **all** attribute similarity scores for the best match are **100** (perfect match). No manual review is required in that case.
+**When auto-correlation runs:** When **Automatically correlate if identical?** is enabled, the connector skips the review form when **every** rule was evaluated (**none** skipped for missing values) and **all** attribute similarity scores are **100**.
 
 ---
 
@@ -489,10 +421,10 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 **Goal:** Balance between catching matches and avoiding false positives.
 
 ```
-- Attribute: name, Algorithm: Enhanced Name Matcher, Score: 80
-- Attribute: email, Algorithm: Jaro-Winkler, Score: 85
-- Overall score: No (per-attribute mode)
-→ Both must meet thresholds
+- Attribute: name, Algorithm: Enhanced Name Matcher, Minimum similarity: 80
+- Attribute: email, Algorithm: Jaro-Winkler, Minimum similarity: 85
+- Minimum combined match score: e.g. 80
+→ Weighted combined score must meet global floor; mandatories must pass
 ```
 
 **Use case:** General corporate environments; standard data quality.
@@ -502,11 +434,11 @@ Overall: (95 + 95 + 50) / 3 = 80 → Pass (≥80)
 **Goal:** Flag potential matches even with lower confidence; accept some false positives.
 
 ```
-- Attribute: firstname, Algorithm: Enhanced Name Matcher, Score: 75
-- Attribute: lastname, Algorithm: Enhanced Name Matcher, Score: 78
-- Attribute: email, Algorithm: Jaro-Winkler, Score: 70
-- Overall score: Yes, Threshold: 75
-→ Relaxed thresholds; overall average
+- Attribute: firstname, Algorithm: Enhanced Name Matcher, Minimum similarity: 75
+- Attribute: lastname, Algorithm: Enhanced Name Matcher, Minimum similarity: 78
+- Attribute: email, Algorithm: Jaro-Winkler, Minimum similarity: 70
+- Minimum combined match score: 75
+→ Relaxed per-rule minima; combined score must still reach global floor
 ```
 
 **Use case:** Poor data quality; many known matches; strong review team.

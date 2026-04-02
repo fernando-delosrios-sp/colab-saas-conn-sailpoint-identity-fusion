@@ -1,11 +1,31 @@
 import { FusionAccount } from '../../model/account'
 import { pickAttributes } from '../../utils/attributes'
+import { roundMetric2 } from '../../utils/numbers'
 import { UrlContext } from '../../utils/url'
+import type { ScoreReport } from '../scoringService/types'
 import {
     FusionReportAccount,
     FusionReportIdentityConflictOccurrence,
+    FusionReportScore,
     FusionReportWarnings,
 } from './types'
+
+/**
+ * Turn in-memory {@link ScoreReport} rows into the slim payload used by fusion report / email templates.
+ * Renames nothing in the wire format (`score` = raw Value %, `weightedScore` = blend partial); only rounds for stable output.
+ */
+export function mapScoreReportsForFusionReport(scoreReports: ScoreReport[]): FusionReportScore[] {
+    return scoreReports.map((row) => ({
+        attribute: row.attribute,
+        algorithm: row.algorithm,
+        score: roundMetric2(row.score),
+        weightedScore: row.weightedScore !== undefined ? roundMetric2(row.weightedScore) : undefined,
+        fusionScore: row.fusionScore,
+        isMatch: row.isMatch,
+        skipped: row.skipped,
+        comment: row.comment,
+    }))
+}
 
 /**
  * Stable key for identity conflict tracking when nativeIdentity may be missing.

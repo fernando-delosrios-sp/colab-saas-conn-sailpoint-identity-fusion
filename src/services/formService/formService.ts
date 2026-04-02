@@ -26,6 +26,7 @@ import {
     PendingReviewReviewerContext,
     PendingReviewAccountContext,
 } from './types'
+import { FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT } from './constants'
 import { buildCandidateList, buildFormName, calculateExpirationDate, getFormOwner, resolveIdentitiesSelectLabel } from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 import {
@@ -34,7 +35,6 @@ import {
     extractCandidateIdsFromFormInput,
     getReviewerInfo,
 } from './formProcessor'
-import { MAX_CANDIDATES_FOR_FORM } from './constants'
 
 export type {
     PendingReviewFormContext,
@@ -73,6 +73,7 @@ export class FormService {
     private readonly fusionFormNamePattern: string
     private readonly fusionFormExpirationDays: number
     private readonly fusionFormAttributes?: string[]
+    private readonly fusionMaxCandidatesForForm: number
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -89,6 +90,8 @@ export class FormService {
         this.fusionFormNamePattern = config.fusionFormNamePattern
         this.fusionFormExpirationDays = config.fusionFormExpirationDays
         this.fusionFormAttributes = config.fusionFormAttributes
+        this.fusionMaxCandidatesForForm =
+            config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
     }
 
     // ------------------------------------------------------------------------
@@ -238,7 +241,7 @@ export class FormService {
     }> {
         this.log.debug(`Building fusion form for account ${fusionAccount.name} with ${reviewerCount} reviewer(s)`)
 
-        const candidates = buildCandidateList(fusionAccount)
+        const candidates = buildCandidateList(fusionAccount, this.fusionMaxCandidatesForForm)
         assert(candidates, 'Failed to build candidate list')
 
         await this.enrichCandidateIdentitiesSelectLabels(candidates)
@@ -1019,8 +1022,10 @@ export class FormService {
         fusionAccount: FusionAccount,
         candidates: Candidate[]
     ): Promise<FormDefinitionResponseV2025 | undefined> {
-        if (candidates.length > MAX_CANDIDATES_FOR_FORM) {
-            this.log.error(`Candidates must be less than or equal to ${MAX_CANDIDATES_FOR_FORM}`)
+        if (candidates.length > this.fusionMaxCandidatesForForm) {
+            this.log.error(
+                `Candidates must be less than or equal to ${this.fusionMaxCandidatesForForm} (fusionMaxCandidatesForForm)`
+            )
             return
         }
         const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'authoritative'

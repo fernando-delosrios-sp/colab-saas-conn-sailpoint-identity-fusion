@@ -22,7 +22,8 @@ export type SafeSender = {
 }
 
 export type CustomReportRuntimeOptions = {
-    includeBaseline: boolean
+    /** Emit rows in the `baseline` report category (`statuses` includes `baseline`), not every pre-existing fusion account. */
+    includeExisting: boolean
     includeUnmatched: boolean
     includeMatched: boolean
     includeDeferred: boolean
@@ -170,7 +171,7 @@ const emitGroupedRows = (
     runtimeOptions: CustomReportRuntimeOptions
 ): number => {
     const selectedCategories = new Set<ReportCategory>()
-    if (runtimeOptions.includeBaseline) selectedCategories.add('baseline')
+    if (runtimeOptions.includeExisting) selectedCategories.add('baseline')
     if (runtimeOptions.includeUnmatched) selectedCategories.add('unmatched')
     if (runtimeOptions.includeMatched) selectedCategories.add('matched')
     if (runtimeOptions.includeDeferred) selectedCategories.add('deferred')
@@ -203,10 +204,7 @@ const emitGroupedRows = (
         for (const row of rows) {
             rowCounter[row.status] += 1
             const attributes = { ...(row.account.attributes ?? {}) }
-            const matching = attributes.matching
-            const review = attributes.review
-            delete attributes.matching
-            delete attributes.review
+            const { matching, review, ...cleanAttributes } = attributes
 
             const includeReview = row.categories.includes('review') || row.categories.includes('decisions')
             const { sourceContext: sourceStatus, correlationContext: correlationStatus, ...matchingStatus } = matching ?? {}
@@ -218,7 +216,7 @@ const emitGroupedRows = (
                 ...(includeReview ? { review } : {}),
                 account: {
                     key: row.account.key,
-                    attributes,
+                    attributes: cleanAttributes,
                     disabled: row.account.disabled,
                 },
             })
@@ -240,18 +238,40 @@ const getEmissionKey = (account: any): string => {
 
 export const refreshUniqueAttributesForCustomReport = async (
     serviceRegistry: ServiceRegistry,
-    analyzedManagedAccounts: FusionAccount[]
+    analyzedManagedAccounts: FusionAccount[],
+    runtimeOptions: CustomReportRuntimeOptions
 ): Promise<void> => {
     const { fusion, attributes, log } = serviceRegistry
 
-    // Refresh unique attributes for accounts already tracked in fusion maps.
-    await fusion.refreshUniqueAttributes()
+    // Refresh unique attributes only for the account types we may emit.
+    // Otherwise, incremental counter-based IDs can be consumed by rows that are never sent
+    // (e.g. identity-origin fusion accounts when includeExisting=false), making report-only runs appear to "skip" numbers.
+    //
+    // Note: some unit-test mocks provide fusion.refreshUniqueAttributes() but not fusionAccounts/fusionIdentities getters.
+    // Fall back to the legacy call in that case to keep tests and mocks stable.
+    const batchSize = serviceRegistry.config?.managedAccountsBatchSize ?? 50
+    const fusionAccounts = (fusion as any).fusionAccounts as FusionAccount[] | undefined
+    const fusionIdentities = (fusion as any).fusionIdentities as Iterable<FusionAccount> | undefined
+    if (Array.isArray(fusionAccounts) && fusionIdentities && Symbol.iterator in Object(fusionIdentities)) {
+        const shouldIncludeIdentities = runtimeOptions.includeExisting
+        const refreshTargets = shouldIncludeIdentities ? [...fusionAccounts, ...fusionIdentities] : [...fusionAccounts]
+        for (let i = 0; i < refreshTargets.length; i += batchSize) {
+            const batch = refreshTargets.slice(i, i + batchSize)
+            await Promise.all(batch.map((account) => attributes.refreshUniqueAttributes(account)))
+        }
+    } else {
+        await fusion.refreshUniqueAttributes()
+    }
 
     // Also refresh analyzed managed accounts that may only exist in fallback mode.
     if (analyzedManagedAccounts.length === 0) return
-    const batchSize = serviceRegistry.config?.managedAccountsBatchSize ?? 50
-    for (let i = 0; i < analyzedManagedAccounts.length; i += batchSize) {
-        const batch = analyzedManagedAccounts.slice(i, i + batchSize)
+    const stableAnalyzed = [...analyzedManagedAccounts].sort((a: any, b: any) => {
+        const aKey = String(a?.originAccountId ?? a?.attributes?.originAccount ?? a?.nativeIdentity ?? a?.key ?? a?.name ?? '')
+        const bKey = String(b?.originAccountId ?? b?.attributes?.originAccount ?? b?.nativeIdentity ?? b?.key ?? b?.name ?? '')
+        return aKey.localeCompare(bKey)
+    })
+    for (let i = 0; i < stableAnalyzed.length; i += batchSize) {
+        const batch = stableAnalyzed.slice(i, i + batchSize)
         await Promise.all(batch.map((account) => attributes.refreshUniqueAttributes(account)))
     }
 
@@ -262,7 +282,7 @@ export async function fetchPhase(
     serviceRegistry: ServiceRegistry,
     inputSchema: StdAccountListInput['schema']
 ): Promise<FetchResult> {
-    const { log, identities, sources, schemas } = serviceRegistry
+    const { log, identities, sources, schemas, attributes } = serviceRegistry
     await sources.fetchAllSources(false)
     log.info(`Loaded ${sources.managedSources.length} managed source(s)`)
 
@@ -274,6 +294,11 @@ export async function fetchPhase(
         log.info('Input schema not provided; using dynamically built fusion account schema for custom:report')
     }
 
+    // Match std:account:list behavior: ensure incremental counters used by unique
+    // attribute definitions are initialized before any unique-attribute refresh.
+    await attributes.initializeCounters()
+    log.info('Attribute counters initialized')
+
     const fetchTasks: Array<Promise<void>> = [identities.fetchIdentities(), sources.fetchManagedAccounts()]
     if (sources.hasFusionSource) {
         fetchTasks.push(sources.fetchFusionAccounts())
@@ -281,6 +306,18 @@ export async function fetchPhase(
         log.info('Fusion source not found; custom:report will run without existing fusion accounts')
     }
     await Promise.all(fetchTasks)
+
+    // Ensure counter-based unique attributes start after the max already assigned in the Fusion source.
+    // Without this, custom:report can "burn" early counter values on collisions when state is missing/out of date.
+    const { hasFusionSource, fusionAccounts } = sources
+    if (
+        hasFusionSource &&
+        Array.isArray(fusionAccounts) &&
+        fusionAccounts.length > 0 &&
+        typeof attributes.seedIncrementalCountersFromRawAccounts === 'function'
+    ) {
+        await attributes.seedIncrementalCountersFromRawAccounts(fusionAccounts)
+    }
 
     const identitiesFound = identities.identityCount
     const managedAccountsFound = sources.managedAccountsById.size

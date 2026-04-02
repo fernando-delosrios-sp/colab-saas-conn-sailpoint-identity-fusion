@@ -127,12 +127,11 @@ Attribute Matching Settings control how potential matches are detected and revie
 
 Configure **Attribute Matching Settings → Matching Settings** to define match detection rules:
 
-| Field                                                       | Purpose                                     | Recommended value                                        |
-| ----------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
-| **Fusion attribute matches**                                | List of identity attributes to compare      | At least 2 attributes (e.g. name + email)                |
-| **Use overall fusion similarity score for all attributes?** | Single overall threshold vs per-attribute   | Start with No; use per-attribute scores for fine-tuning  |
-| **Similarity score [0-100]**                                | Global threshold when overall score enabled | 80 (start); adjust based on false positive/negative rate |
-| **Automatically correlate if identical?**                   | Skip manual review for obvious matches      | No initially; enable after tuning                        |
+| Field                                         | Purpose                                              | Recommended value                                        |
+| --------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------- |
+| **Minimum combined match score [0-100]**      | Global floor for the weighted combined match score   | 80 (start); tune with false positive/negative rate        |
+| **Automatically correlate if identical?**     | Skip review when every rule is 100 and none skipped  | No initially; enable after tuning                       |
+| **Fusion attribute matches**                  | List of identity attributes to compare               | At least 2 attributes (e.g. name + email)             |
 
 **Screenshot placeholder:** Attribute Matching Settings - Matching section.
 
@@ -148,9 +147,9 @@ For each attribute you want to use in match detection, add a **Fusion attribute 
 | ---------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Attribute**                | Identity attribute name                     | `name`, `email`, `displayName`, `firstname`, `lastname`                                                                                                                                              |
 | **Matching algorithm**       | Similarity calculation method               | See [Matching algorithms](matching-algorithms.md) for details                                                                                                                                        |
-| **Similarity score [0-100]** | Minimum score for this attribute            | 75–85 (name); 90–100 (email); adjust per algorithm                                                                                                                                                   |
-| **Mandatory match?**         | Require this attribute to match             | Yes for critical identifiers (e.g. employee ID); No for optional                                                                                                                                     |
-| **Skip match if missing**    | Skip this rule when either value is missing | Default: Yes. Missing means `null`, `undefined`, or empty after trim. When enabled, the rule is ignored (neither positive nor negative). When disabled, missing values are still scored and counted. |
+| **Minimum similarity [0-100]** | Threshold for this rule; also its weight in the combined score | 75–85 (name); 90–100 (email). Higher values are stricter and count more in the blend. |
+| **Mandatory match?**           | Must meet this rule’s minimum for a potential match           | Yes for critical identifiers; passing mandatories still contribute weighted score like other rules. |
+| **Skip match if missing**      | Skip when either value is missing                              | Default: Yes. Skipped rules do not affect the combined score. Auto-correlate-when-identical requires no skipped rules and all scores 100. |
 
 **Algorithm selection guide:**
 
@@ -180,43 +179,31 @@ Strategy 3: Multiple name components
 - Attribute: firstname, Algorithm: Enhanced Name Matcher, Score: 85
 - Attribute: lastname, Algorithm: Enhanced Name Matcher, Score: 90
 - Attribute: email, Algorithm: Jaro-Winkler, Score: 80
-→ All three contribute; overall score or per-attribute logic applies
+→ All three contribute similarities and weights to the combined match score
 
 Strategy 4: Phonetic name matching
 - Attribute: name, Algorithm: Double Metaphone, Score: 80
 → Catches spelling variations ("Catherine"/"Katherine")
 ```
 
-### Overall vs per-attribute scoring
+### Combined match score (weighted)
 
-| Mode              | Configuration                | Logic                                                                                                             | Use when                                                              |
-| ----------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| **Per-attribute** | **Use overall score?** = No  | Each attribute must meet its own threshold AND all contribute                                                     | You want fine control; different attributes have different importance |
-| **Overall**       | **Use overall score?** = Yes | Average of attribute scores must meet global threshold; any failed evaluated mandatory rule invalidates the match | Simplicity; all attributes weighted equally                           |
+Matching always uses one **combined match score**: a weighted mean of per-rule similarity scores. Each rule’s **minimum similarity** (`fusionScore`) is also its **weight** in the blend (values ≤ 0 use weight 1). The **minimum combined match score** is the global threshold: a **potential match** requires combined ≥ that value **and** every evaluated **mandatory** rule to pass its own minimum.
 
 **Interaction with `Skip match if missing`:**
 
-- With **Skip match if missing = Yes** (default), a missing-value rule contributes nothing in either mode.
-- With **Skip match if missing = No**, that rule is always evaluated and its result contributes in both modes.
-- **Mandatory** still applies when a rule is evaluated: if a mandatory rule is scored and fails, the overall match fails.
+- With **Skip match if missing = Yes** (default), a missing-value rule is skipped: it does not enter the combined score.
+- With **Skip match if missing = No**, that rule is always evaluated and contributes to the combined score.
+- **Mandatory** rules that are evaluated must pass their minimum or the candidate is rejected.
 
-**Example with overall score:**
-
-```
-- Name similarity: 85
-- Email similarity: 90
-- Average: (85 + 90) / 2 = 87.5
-- Overall threshold: 80
-→ Match detected (87.5 ≥ 80)
-```
-
-**Example with per-attribute scores:**
-A mandatory attribute must always meet its threshold. When no attribute is marked mandatory, all attributes are treated as mandatory.
+**Example:**
 
 ```
-- Attribute: name, Score: 75, Result: 85 → Pass
-- Attribute: email, Score: 90, Result: 88 → Fail (88 < 90)
-→ No match detected (email threshold not met)
+- Name similarity: 85, minimum 80 → weight 80
+- Email similarity: 90, minimum 90 → weight 90
+- Combined: (85×80 + 90×90) / (80+90) ≈ 87.6
+- Minimum combined match score: 80
+→ Potential match if all mandatory rules pass (87.6 ≥ 80)
 ```
 
 ### Auto-correlation
@@ -250,6 +237,8 @@ Configure **Attribute Matching Settings → Review Settings** for the manual rev
 | **Manual review expiration days**                  | Form expiration                             | 7 (default); adjust based on SLA                              |
 | **Owner is global reviewer?**                      | Add Fusion source owner to all review forms | Yes (ensures at least one reviewer)                           |
 | **Send report to owner on aggregation?**           | Email report after each aggregation         | Yes (useful for monitoring)                                   |
+
+> **Note:** The maximum number of candidate identities shown on a single review form is controlled by **Max match candidates per review form** in **Advanced Settings → Developer Settings** (default is 10, max 15). Only the highest-scoring potential matches are included if the limit is exceeded.
 
 ### What the aggregation report includes
 
@@ -404,14 +393,9 @@ For each Fusion account (new or updated):
             - Enabled (default): skip this rule if either value is `null`, `undefined`, or empty after trim.
             - Disabled: compare values even when one/both are missing, and include the result.
         - Calculate similarity score using specified algorithm
-    - If **Use overall fusion similarity score?**:
-        - Average all per-attribute scores → overall score
-        - Every evaluated **mandatory** attribute must meet its threshold or the match fails
-        - If overall score ≥ threshold and all evaluated mandatory rules pass → potential match (non-mandatory thresholds may not all be met)
-    - Else (per-attribute mode):
-        - Every **mandatory** attribute must meet its threshold or the match fails
-        - If no attribute is mandatory, all attributes are treated as mandatory (all must meet thresholds)
-        - If all conditions met → potential match
+    - Compute **combined match score**: weighted mean of each evaluated rule’s similarity, weights = that rule’s minimum similarity (`fusionScore`; 0 → weight 1)
+    - Every evaluated **mandatory** rule must meet its minimum or the candidate is not a match
+    - If combined score ≥ **minimum combined match score** and mandatory rules pass → potential match (non-mandatory rules may be below their minimum but still contribute their raw similarity to the blend)
 3. Sort identities by similarity score (highest first)
 
 **Step 4: Decision point**
@@ -420,7 +404,7 @@ For each potential match:
 
 | Condition                                                                                                              | Action                                                                                                               |
 | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| **Automatically correlate if identical?** = Yes and **all** attribute similarity scores for the best match are **100** | Skip review form; correlate the managed account to that identity directly (Fusion assignment is applied immediately) |
+| **Automatically correlate if identical?** = Yes, **every** rule was evaluated (none skipped), and **all** attribute similarity scores are **100** | Skip review form; correlate directly (Fusion assignment applied immediately) |
 | Else                                                                                                                   | Create review form; notify reviewers                                                                                 |
 
 **Step 5–6: Manual review**

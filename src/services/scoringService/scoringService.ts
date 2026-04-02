@@ -4,15 +4,19 @@ import { LogService } from '../logService'
 import { FusionMatch, ScoreReport } from './types'
 import { scoreDice, scoreDoubleMetaphone, scoreJaroWinkler, scoreLIG3, scoreNameMatcher } from './helpers'
 
+/** Algorithm id for the synthetic combined score row (excluded from identical-match checks). */
+export const WEIGHTED_MEAN_ALGORITHM = 'weighted-mean'
+
+/** Attribute label on the synthetic combined score row in reports and forms. */
+export const COMBINED_SCORE_ROW_ATTRIBUTE = 'Combined score'
+
 /**
  * Service for calculating and managing similarity scores for identity matching.
  * Handles score calculation, threshold checking, and score formatting.
  */
 export class ScoringService {
     private readonly matchingConfigs: MatchingConfig[]
-    private readonly fusionUseAverageScore: boolean
     private readonly fusionAverageScore: number
-    private reportMode: boolean = false
 
     /**
      * @param config - Fusion configuration containing matching rules and score thresholds
@@ -23,17 +27,15 @@ export class ScoringService {
         private log: LogService
     ) {
         this.matchingConfigs = config.matchingConfigs ?? []
-        this.fusionUseAverageScore = config.fusionUseAverageScore ?? false
         this.fusionAverageScore = config.fusionAverageScore ?? 0
     }
 
     /**
-     * Enables report mode, which forces full evaluation of all matching rules
-     * even when early termination would normally occur (e.g. a mandatory rule fails).
-     * Used when generating fusion reports that need complete score breakdowns.
+     * Blend weight from a rule's minimum similarity (`fusionScore`). Zero or unset uses 1 to avoid divide-by-zero.
      */
-    public enableReportMode(): void {
-        this.reportMode = true
+    static blendWeight(fusionScore?: number): number {
+        const t = fusionScore ?? 0
+        return t <= 0 ? 1 : t
     }
 
     /**
@@ -53,7 +55,6 @@ export class ScoringService {
         // false positives (empty scores would otherwise mark every identity as a match).
         if (this.matchingConfigs.length === 0) return
 
-        // Use for...of instead of forEach for better performance in hot path
         for (const fusionIdentity of fusionIdentities) {
             this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType)
         }
@@ -61,11 +62,7 @@ export class ScoringService {
 
     /**
      * Compares two fusion accounts across all configured matching rules and records
-     * a match if thresholds are met. Supports both individual-attribute matching
-     * and average-score matching modes.
-     *
-     * In non-report mode without average scoring, evaluation short-circuits on
-     * the first failed mandatory rule for performance.
+     * a match if the weighted combined score and mandatory rules pass.
      *
      * @param fusionAccount - The candidate account being evaluated
      * @param fusionIdentity - The existing identity to compare against
@@ -75,9 +72,7 @@ export class ScoringService {
         fusionIdentity: FusionAccount,
         candidateType: 'identity' | 'new-unmatched'
     ): void {
-        const fullRun = this.reportMode || this.fusionUseAverageScore
         const scores: ScoreReport[] = []
-        let isMatch = false
         let hasFailedMandatory = false
 
         for (const matching of this.matchingConfigs) {
@@ -88,6 +83,13 @@ export class ScoringService {
                 this.isMissingMatchValue(accountAttribute) || this.isMissingMatchValue(identityAttribute)
 
             if (skipMatchIfMissing && hasMissingValue) {
+                scores.push({
+                    ...matching,
+                    skipped: true,
+                    score: 0,
+                    isMatch: false,
+                    comment: 'Rule skipped (missing value on one or both sides)',
+                })
                 continue
             }
 
@@ -97,64 +99,50 @@ export class ScoringService {
                     (identityAttribute ?? '').toString(),
                     matching
                 )
-                if (!scoreReport.isMatch && matching.mandatory && !fullRun) {
-                    return
-                }
                 if (matching.mandatory && !scoreReport.isMatch) {
                     hasFailedMandatory = true
                 }
-                isMatch = isMatch || scoreReport.isMatch
                 scores.push(scoreReport)
             }
         }
 
-        if (this.fusionUseAverageScore) {
-            const hasScoredAttributes = scores.length > 0
-            const score = hasScoredAttributes ? scores.reduce((acc, score) => acc + score.score, 0) / scores.length : 0
-            const match = hasScoredAttributes && score >= this.fusionAverageScore && !hasFailedMandatory
+        let weightedSum = 0
+        let weightTotal = 0
+        for (const s of scores) {
+            if (s.skipped) continue
+            const w = ScoringService.blendWeight(s.fusionScore)
+            weightedSum += w * s.score
+            weightTotal += w
+        }
 
-            const scoreReport: ScoreReport = {
-                attribute: 'Average Score',
-                algorithm: 'average',
-                fusionScore: this.fusionAverageScore,
-                mandatory: true,
-                score,
-                isMatch: match,
-                comment: match
-                    ? 'Average score is above threshold'
-                    : hasFailedMandatory
-                    ? 'Average score invalidated by failed mandatory attribute'
-                    : 'Average score is below threshold',
-            }
-            scores.push(scoreReport)
-            isMatch = match
-        } else {
-            if (scores.length === 0) {
-                isMatch = false
-            } else {
-                let hasMandatory = false
-                let allScoresMatch = true
-                for (const score of scores) {
-                    if (score.mandatory) {
-                        hasMandatory = true
-                    }
-                    if (!score.isMatch) {
-                        allScoresMatch = false
-                    }
-                    if (score.mandatory && !score.isMatch) {
-                        hasFailedMandatory = true
-                        break
-                    }
-                }
-                if (hasFailedMandatory) {
-                    isMatch = false
-                } else if (hasMandatory) {
-                    isMatch = true
-                } else if (allScoresMatch) {
-                    isMatch = true
-                }
+        const combinedScore = weightTotal > 0 ? weightedSum / weightTotal : 0
+        const hasContributing = weightTotal > 0
+        const combinedPasses = hasContributing && combinedScore >= this.fusionAverageScore && !hasFailedMandatory
+
+        if (weightTotal > 0) {
+            for (const s of scores) {
+                if (s.skipped) continue
+                const w = ScoringService.blendWeight(s.fusionScore)
+                s.weightedScore = Math.round((w / weightTotal) * s.score * 100) / 100
             }
         }
+
+        const combinedReport: ScoreReport = {
+            attribute: COMBINED_SCORE_ROW_ATTRIBUTE,
+            algorithm: WEIGHTED_MEAN_ALGORITHM,
+            fusionScore: this.fusionAverageScore,
+            mandatory: true,
+            score: Math.round(combinedScore * 100) / 100,
+            isMatch: combinedPasses,
+            comment: combinedPasses
+                ? 'Combined score meets minimum threshold'
+                : hasFailedMandatory
+                ? 'Combined score invalidated by failed mandatory attribute'
+                : !hasContributing
+                ? 'No rules contributed to combined score'
+                : 'Combined score is below minimum threshold',
+        }
+        scores.push(combinedReport)
 
         const identityId = fusionIdentity.identityId ?? ''
         const identityName = this.getIdentityDisplayLabel(fusionIdentity)
@@ -165,7 +153,7 @@ export class ScoringService {
             candidateType,
             scores,
         }
-        if (isMatch) {
+        if (combinedPasses) {
             fusionAccount.addFusionMatch(fusionMatch)
         }
     }

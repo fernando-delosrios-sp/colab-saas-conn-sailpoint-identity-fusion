@@ -20,7 +20,11 @@ import {
  *
  * This command analyzes managed accounts against fusion identities and streams
  * final ISC account rows with a `matching` payload in attributes. It does not
- * execute persistence/writeback phases used by std:account:list.
+ * execute persistence/writeback phases used by std:account:list, and it does not
+ * perform aggregation side effects (Match review forms, managed-account disables,
+ * or per-source correlation API calls) — those run only when `commandType` is
+ * `std:account:list`. In-memory unique-value tracking for the run behaves like
+ * aggregation; it is not persisted unless `std:account:list` saves connector state.
  */
 export const customReport = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
@@ -31,7 +35,12 @@ export const customReport = async (serviceRegistry: ServiceRegistry, input: StdA
         log.info('Starting custom:report')
         const sender = createSafeSender(serviceRegistry)
         const runtimeOptions: CustomReportRuntimeOptions = {
-            includeBaseline: typeof (input as any).includeBaseline === 'boolean' ? (input as any).includeBaseline : false,
+            includeExisting:
+                typeof (input as any).includeExisting === 'boolean'
+                    ? (input as any).includeExisting
+                    : typeof (input as any).includeBaseline === 'boolean'
+                      ? (input as any).includeBaseline
+                      : false,
             includeUnmatched:
                 typeof (input as any).includeUnmatched === 'boolean' ? (input as any).includeUnmatched : false,
             includeMatched: typeof (input as any).includeMatched === 'boolean' ? (input as any).includeMatched : false,
@@ -48,9 +57,21 @@ export const customReport = async (serviceRegistry: ServiceRegistry, input: StdA
         await fusion.processFusionAccounts()
         await fusion.processIdentities()
         identities.clear()
-        const analyzedManagedAccounts = await fusion.analyzeManagedAccounts()
-        await refreshUniqueAttributesForCustomReport(serviceRegistry, analyzedManagedAccounts)
-        timer.phase('PHASE 2: Analyzing managed accounts and refreshing unique attributes')
+
+        // Match std:account:list work-queue depletion behavior so unique attributes
+        // (including incremental counters) are applied to the same set of registered
+        // fusion accounts that will be eligible for output.
+        if (typeof (fusion as any).processFusionIdentityDecisions === 'function') {
+            await (fusion as any).processFusionIdentityDecisions()
+        }
+        await fusion.processManagedAccounts()
+        if (typeof (fusion as any).reconcilePendingFormState === 'function') {
+            ;(fusion as any).reconcilePendingFormState()
+        }
+
+        const analyzedManagedAccounts: any[] = []
+        await refreshUniqueAttributesForCustomReport(serviceRegistry, analyzedManagedAccounts as any, runtimeOptions)
+        timer.phase('PHASE 2: Processing managed accounts and refreshing unique attributes')
 
         const issueSummary = log.getAggregationIssueSummary()
         const report = fusion.generateReport(
@@ -74,10 +95,15 @@ export const customReport = async (serviceRegistry: ServiceRegistry, input: StdA
             runtimeOptions
         )
 
-        if (analyzedManagedAccounts.length > 0) {
+        // Safety net: if no registered accounts were emitted (e.g. highly filtered run),
+        // analyze remaining managed accounts and stream them as fallback.
+        const fallbackAnalyzedManagedAccounts =
+            sentRows === 0 && typeof fusion.analyzeManagedAccounts === 'function' ? await fusion.analyzeManagedAccounts() : []
+        if (fallbackAnalyzedManagedAccounts.length > 0) {
+            await refreshUniqueAttributesForCustomReport(serviceRegistry, fallbackAnalyzedManagedAccounts, runtimeOptions)
             sentRows = await streamFallbackAnalyzedRows(
                 serviceRegistry,
-                analyzedManagedAccounts,
+                fallbackAnalyzedManagedAccounts,
                 reportIndex,
                 pendingReviewByAccountId,
                 decisionAccountIds,

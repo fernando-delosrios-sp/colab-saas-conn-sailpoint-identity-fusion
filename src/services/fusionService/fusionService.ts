@@ -3,6 +3,7 @@ import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../../model/config'
 import { LogService } from '../logService'
 import { FormService } from '../formService'
+import { FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT } from '../formService/constants'
 import { IdentityService } from '../identityService'
 import { SourceInfo, SourceService, buildSourceConfigPatch } from '../sourceService'
 import { FusionAccount } from '../../model/account'
@@ -19,9 +20,9 @@ import {
     buildIdentityConflictWarningsFromMap,
     buildMinimalFusionReportAccount,
     getFusionIdentityConflictTrackingKey,
+    mapScoreReportsForFusionReport,
 } from './fusionReportHelpers'
 import { AttributeOperations } from '../attributeService/types'
-import { MAX_CANDIDATES_FOR_FORM } from '../formService/constants'
 
 // ============================================================================
 // FusionService Class
@@ -125,14 +126,14 @@ export class FusionService {
      * Disable the reset flag in the source configuration
      */
     public async disableReset(): Promise<void> {
-        const fusionSourceId = this.sources.fusionSourceId
+        const { fusionSourceId } = this.sources
         const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/reset', false)
         await this.sources.patchSourceConfig(fusionSourceId, requestParameters, 'FusionService>disableReset')
     }
 
     /** Clears the persisted fusion state in the source configuration. */
     public async resetState(): Promise<void> {
-        const fusionSourceId = this.sources.fusionSourceId
+        const { fusionSourceId } = this.sources
         const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/fusionState', false)
         await this.sources.patchSourceConfig(fusionSourceId, requestParameters, 'FusionService>resetState')
     }
@@ -149,7 +150,7 @@ export class FusionService {
      * @returns Empty array (registration is done via setFusionAccount; return kept for API consistency)
      */
     public async preProcessFusionAccounts(): Promise<FusionAccount[]> {
-        const fusionAccounts = this.sources.fusionAccounts
+        const { fusionAccounts } = this.sources
         this.log.debug(`Pre-processing ${fusionAccounts.length} fusion account(s)`)
         const results: FusionAccount[] = []
         await forEachBatched(fusionAccounts, async (x: Account) => {
@@ -181,7 +182,7 @@ export class FusionService {
      * @returns Processed fusion accounts
      */
     public async processFusionAccounts(): Promise<FusionAccount[]> {
-        const fusionAccounts = this.sources.fusionAccounts
+        const { fusionAccounts } = this.sources
         this.log.info(`Processing ${fusionAccounts.length} fusion account(s)`)
         const results = await promiseAllBatched(fusionAccounts, async (x: Account) => {
             return await this.processFusionAccount(x)
@@ -205,7 +206,7 @@ export class FusionService {
         // pending form instance data (fetchFormData) AND from forms created in the
         // current run (createFusionForm). No other source should contribute candidate IDs.
         const pendingCandidateIds = this.forms.pendingCandidateIdentityIds
-        const pendingReviewUrlsByReviewerId = this.forms.pendingReviewUrlsByReviewerId
+        const { pendingReviewUrlsByReviewerId } = this.forms
 
         // Clear stale transient state for ALL accounts we may output.
         // Some accounts can be keyed in fusionAccountMap (e.g. missing/blank identityId or uncorrelated),
@@ -740,8 +741,8 @@ export class FusionService {
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
             `${existingIdentityAccount ? 'Reusing' : 'Created'} fusion account from decision: ` +
-                `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
-                `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
+            `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
+            `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
         )
 
         // For authorized decisions (including synthetic perfect-match auto-correlation),
@@ -929,6 +930,13 @@ export class FusionService {
             const perfectMatch = fusionAccount.fusionMatches.find((m) => FusionService.hasAllAttributeScoresPerfect(m))
             const identityId = perfectMatch?.identityId
             if (this.config.fusionMergingIdentical && identityId) {
+                if (this.commandType !== StandardCommand.StdAccountList) {
+                    // Analysis-only runs (e.g. custom:report): keep match report data but do not
+                    // register decisions or mutate fusion state as in a real aggregation.
+                    this.flagCandidatesWithStatus(fusionAccount)
+                    fusionAccount.clearFusionIdentityReferences()
+                    return undefined
+                }
                 this.removeMatchAccount(fusionAccount.managedAccountId)
                 this.log.debug(
                     `Account ${account.name} [${fusionAccount.sourceName}] has all scores 100, auto-correlating to identity ${identityId}`
@@ -939,14 +947,28 @@ export class FusionService {
             } else {
                 assert(sourceInfo, 'Source info not found')
                 const reviewers = this.reviewersBySourceId.get(sourceInfo.id!)
+                if (this.commandType !== StandardCommand.StdAccountList) {
+                    this.flagCandidatesWithStatus(fusionAccount)
+                    fusionAccount.clearFusionIdentityReferences()
+                    return undefined
+                }
                 try {
                     const formCreated = await this.forms.createFusionForm(fusionAccount, reviewers)
                     if (!formCreated) {
-                        const candidateCount = fusionAccount.fusionMatches.length
-                        this.trackFailedMatching(
-                            fusionAccount,
-                            `Too many candidates (${candidateCount}) - maximum is ${MAX_CANDIDATES_FOR_FORM}`
-                        )
+                        const matchCount = fusionAccount.fusionMatches.length
+                        const maxForm =
+                            this.config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
+                        if (!reviewers || reviewers.size === 0) {
+                            this.trackFailedMatching(
+                                fusionAccount,
+                                'Match review form was not created: no reviewers available for this source'
+                            )
+                        } else {
+                            this.trackFailedMatching(
+                                fusionAccount,
+                                `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
+                            )
+                        }
                     }
                 } catch (error) {
                     const message = error instanceof Error ? error.message : String(error)
@@ -984,16 +1006,20 @@ export class FusionService {
         }
     }
 
+    /** Algorithms on synthetic aggregate rows (not real attribute rules). */
+    private static readonly SYNTHETIC_MATCH_SCORE_ALGORITHMS = new Set(['average', 'weighted-mean'])
+
     /**
-     * Returns true when all attribute similarity scores in the match are 100 (perfect match).
-     * Excludes the synthetic 'average' score when overall scoring is used.
-     *
-     * @param match - The fusion match to check
-     * @returns true if all attribute scores are 100
+     * Returns true when every configured rule was evaluated (none skipped) and scored 100.
+     * Excludes synthetic combined rows (`weighted-mean` / legacy `average`).
      */
     private static hasAllAttributeScoresPerfect(match: FusionMatch): boolean {
-        const attributeScores = match.scores.filter((s) => s.algorithm !== 'average')
-        return attributeScores.length > 0 && attributeScores.every((s) => s.score === 100)
+        const ruleScores = match.scores.filter(
+            (s) => !FusionService.SYNTHETIC_MATCH_SCORE_ALGORITHMS.has(String(s.algorithm ?? ''))
+        )
+        if (ruleScores.length === 0) return false
+        if (ruleScores.some((s) => s.skipped)) return false
+        return ruleScores.every((s) => s.score === 100)
     }
 
     /**
@@ -1063,7 +1089,7 @@ export class FusionService {
         const sourceType = this.sourcesByName.get(account.sourceName ?? '')?.sourceType ?? 'authoritative'
         this.scoring.scoreFusionAccount(fusionAccount, this.fusionIdentities, 'identity')
         const hasIdentityBackedMatches = this.hasIdentityBackedMatches(fusionAccount)
-        if (!hasIdentityBackedMatches) {
+        if (!hasIdentityBackedMatches && this.isDeferredMatchingEnabledForSource(account.sourceName ?? undefined)) {
             this.scoring.scoreFusionAccount(fusionAccount, this.currentRunUnmatchedCandidates, 'new-unmatched')
         }
 
@@ -1088,14 +1114,7 @@ export class FusionService {
                             identityUrl: undefined,
                             isMatch: true,
                             candidateType: 'new-unmatched' as const,
-                            scores: match.scores.map((score) => ({
-                                attribute: score.attribute,
-                                algorithm: score.algorithm,
-                                score: parseFloat(score.score.toFixed(2)),
-                                fusionScore: score.fusionScore,
-                                isMatch: score.isMatch,
-                                comment: score.comment,
-                            })),
+                            scores: mapScoreReportsForFusionReport(match.scores),
                         }))
                     this.deferredMatchReportData.push(
                         {
@@ -1113,7 +1132,7 @@ export class FusionService {
             }
         } else {
             this.log.debug(`No match found for managed account: ${name} [${sourceName}]`)
-            if (sourceType === 'authoritative') {
+            if (sourceType === 'authoritative' && this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
                 // Keep current-run authoritative non-matches available as deferred candidates
                 // for subsequent managed-account analysis in custom:report.
                 this.registerCurrentRunUnmatchedCandidate(fusionAccount)
@@ -1132,6 +1151,19 @@ export class FusionService {
         }
 
         return fusionAccount
+    }
+
+    /**
+     * Same-aggregation (deferred) matching.
+     *
+     * Default is enabled to preserve existing behavior unless explicitly disabled
+     * per-source via config.
+     */
+    private isDeferredMatchingEnabledForSource(sourceName: string | undefined): boolean {
+        if (!sourceName) return false
+        const info = this.sourcesByName.get(sourceName)
+        if (!info?.config) return true
+        return info.config.deferredMatching !== false
     }
 
     /**
@@ -1332,6 +1364,9 @@ export class FusionService {
      * Used by the orphan source type when disableNonMatchingAccounts is enabled.
      */
     private queueDisableOperation(account: Account): void {
+        if (this.commandType !== StandardCommand.StdAccountList) {
+            return
+        }
         const op = this.fireDisableOperation(account)
             .catch((error) => {
                 const message = error instanceof Error ? error.message : String(error)
@@ -1349,12 +1384,14 @@ export class FusionService {
         fusionAccount.setUnmatched()
         await this.applyPerSourceCorrelationIfNeeded(fusionAccount)
         this.setFusionAccount(fusionAccount)
-        this.registerCurrentRunUnmatchedCandidate(fusionAccount)
+        if (this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
+            this.registerCurrentRunUnmatchedCandidate(fusionAccount)
+        }
         return fusionAccount
     }
 
     private registerCurrentRunUnmatchedCandidate(fusionAccount: FusionAccount): void {
-        const nativeIdentity = fusionAccount.nativeIdentity
+        const { nativeIdentity } = fusionAccount
         if (!nativeIdentity) return
         this.fusionAccountMap.set(nativeIdentity, fusionAccount)
         this.currentRunUnmatchedFusionNativeIdentities.add(nativeIdentity)
@@ -1594,14 +1631,7 @@ export class FusionService {
                     identityUrl: this.urlContext.identity(match.identityId),
                     isMatch: true,
                     candidateType: match.candidateType,
-                    scores: match.scores.map((score) => ({
-                        attribute: score.attribute,
-                        algorithm: score.algorithm,
-                        score: parseFloat(score.score.toFixed(2)),
-                        fusionScore: score.fusionScore,
-                        isMatch: score.isMatch,
-                        comment: score.comment,
-                    })),
+                    scores: mapScoreReportsForFusionReport(match.scores),
                 }))
                 // Release fusionIdentity refs after extracting report data (on-demand report path)
                 fusionAccount.clearFusionIdentityReferences()

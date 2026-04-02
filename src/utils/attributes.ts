@@ -267,6 +267,44 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
     return new Set(normalized)
 }
 
+/**
+ * Normalizes `actions` (or similar multi-valued entitlement input) from account create payloads.
+ * ISC may send a single string (e.g. `"report"`) instead of `["report"]`; spreading a string
+ * into an array would yield per-character tokens and break action dispatch.
+ */
+export function normalizeActionTokens(raw: unknown): string[] {
+    if (raw == null || raw === '') return []
+    if (Array.isArray(raw)) {
+        const out: string[] = []
+        for (const item of raw) {
+            if (item == null || item === '') continue
+            if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+                out.push(String(item))
+                continue
+            }
+            if (typeof item === 'object') {
+                const id = (item as any).id
+                const value = (item as any).value
+                const name = (item as any).name
+                const pick = id ?? value ?? name
+                if (pick != null && pick !== '') out.push(String(pick))
+            }
+        }
+        return out
+    }
+    if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') {
+        return [String(raw)]
+    }
+    if (typeof raw === 'object') {
+        const id = (raw as any).id
+        const value = (raw as any).value
+        const name = (raw as any).name
+        const pick = id ?? value ?? name
+        return pick != null && pick !== '' ? [String(pick)] : []
+    }
+    return []
+}
+
 // ============================================================================
 // Identity/Account Attribute Helpers
 // ============================================================================

@@ -4,7 +4,9 @@ import { IdentityDocument, OwnerDto } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
+import { FusionMatch } from '../scoringService/types'
 import { Candidate } from './types'
+import { FUSION_MAX_CANDIDATES_FOR_FORM_MAX } from './constants'
 
 // ============================================================================
 // Helper Functions
@@ -35,17 +37,48 @@ export const resolveIdentitiesSelectLabel = (
 }
 
 /**
- * Build candidate list from fusion matches
+ * Sort key for ranking match candidates on review forms: combined match score when present,
+ * otherwise the best non-skipped rule score.
  */
-export const buildCandidateList = (fusionAccount: FusionAccount): Candidate[] => {
+const rankScoreForMatch = (match: FusionMatch): number => {
+    const combined = match.scores?.find(
+        (s) =>
+            s.algorithm === 'weighted-mean' ||
+            s.attribute === 'Combined score' ||
+            s.attribute === 'Combined match score'
+    )
+    if (combined) return combined.score
+    const scored = match.scores?.filter((s) => !s.skipped) ?? []
+    if (scored.length === 0) return 0
+    return Math.max(...scored.map((s) => s.score))
+}
+
+const compareMatchesForForm = (a: FusionMatch, b: FusionMatch): number => {
+    const delta = rankScoreForMatch(b) - rankScoreForMatch(a)
+    if (delta !== 0) return delta
+    const ida = String(a.fusionIdentity?.identityId ?? a.identityId ?? '')
+    const idb = String(b.fusionIdentity?.identityId ?? b.identityId ?? '')
+    return ida.localeCompare(idb)
+}
+
+/**
+ * Build the ordered candidate list for a fusion review form (highest combined score first),
+ * capped at `maxCandidates` (configured via `fusionMaxCandidatesForForm`).
+ */
+export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: number): Candidate[] => {
     assert(fusionAccount, 'Fusion account is required')
     assert(fusionAccount.fusionMatches, 'Fusion matches are required')
+    assert(
+        maxCandidates >= 1 && maxCandidates <= FUSION_MAX_CANDIDATES_FOR_FORM_MAX,
+        `maxCandidates must be between 1 and ${FUSION_MAX_CANDIDATES_FOR_FORM_MAX}`
+    )
 
-    const candidates = fusionAccount.fusionMatches.map((match) => {
+    const ordered = [...fusionAccount.fusionMatches].sort(compareMatchesForForm).slice(0, maxCandidates)
+
+    return ordered.map((match) => {
         assert(match.fusionIdentity, 'Fusion identity is required in match')
         assert(match.fusionIdentity.identityId, 'Fusion identity ID is required')
         const attrs: Record<string, any> = match.fusionIdentity.attributes || {}
-        // Label uses attributes.displayName (same as SEARCH_V2 SELECT). Value remains identityId.
         const id = match.fusionIdentity.identityId
         return {
             id,
@@ -54,8 +87,6 @@ export const buildCandidateList = (fusionAccount: FusionAccount): Candidate[] =>
             scores: match.scores || [],
         }
     })
-
-    return candidates
 }
 
 /**

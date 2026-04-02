@@ -1,5 +1,10 @@
 import { ConnectorError, ConnectorErrorType, readConfig, logger } from '@sailpoint/connector-sdk'
 import { FusionConfig, MatchingConfig, SourceConfig } from '../model/config'
+import {
+    FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT,
+    FUSION_MAX_CANDIDATES_FOR_FORM_MAX,
+    FUSION_MAX_CANDIDATES_FOR_FORM_MIN,
+} from '../services/formService/constants'
 import { assert, softAssert } from '../utils/assert'
 
 const internalConfig = {
@@ -83,6 +88,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
                 accountFilter: sourceConfig.accountFilter ?? undefined,
                 accountJmespathFilter: sourceConfig.accountJmespathFilter ?? undefined,
                 correlationMode: sourceConfig.correlationMode ?? 'none',
+                deferredMatching: sourceConfig.deferredMatching ?? true,
             }
         })
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)
@@ -104,9 +110,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     // Default from connector-spec.json: fusionExpirationDays: 7
     config.fusionFormExpirationDays = config.fusionFormExpirationDays ?? 7
     config.fusionMergingIdentical = config.fusionMergingIdentical ?? false
-    config.fusionUseAverageScore = config.fusionUseAverageScore ?? false
-    // fusionAverageScore is only used when fusionUseAverageScore is true
-    // Default to 80 (80% similarity threshold) if not specified
+    // Minimum weighted combined match score (0-100); default aligned with connector-spec
     config.fusionAverageScore = config.fusionAverageScore ?? 80
 
     // ============================================================================
@@ -134,6 +138,17 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     // ============================================================================
     config.reset = config.reset ?? false
     config.managedAccountsBatchSize = config.managedAccountsBatchSize ?? 50
+    const rawMaxCandidates =
+        config.fusionMaxCandidatesForForm !== undefined
+            ? Number(config.fusionMaxCandidatesForForm)
+            : FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
+    assert(
+        Number.isFinite(rawMaxCandidates) &&
+            rawMaxCandidates >= FUSION_MAX_CANDIDATES_FOR_FORM_MIN &&
+            rawMaxCandidates <= FUSION_MAX_CANDIDATES_FOR_FORM_MAX,
+        `fusionMaxCandidatesForForm must be between ${FUSION_MAX_CANDIDATES_FOR_FORM_MIN} and ${FUSION_MAX_CANDIDATES_FOR_FORM_MAX}`
+    )
+    config.fusionMaxCandidatesForForm = Math.trunc(rawMaxCandidates)
     config.concurrencyCheckEnabled = config.concurrencyCheckEnabled ?? true
     // Default from connector-spec.json: provisioningTimeout: 300
     config.provisioningTimeout = config.provisioningTimeout ?? 300
@@ -142,52 +157,43 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     // Default to 'info' level for external logging if enabled but level not specified
     config.externalLoggingLevel = config.externalLoggingLevel ?? 'info'
 
-    if (config.fusionUseAverageScore) {
-        assert(
-            config.fusionAverageScore !== undefined,
-            'Fusion average score is required when using average score mode'
-        )
-        assert(
-            config.fusionAverageScore >= 0 && config.fusionAverageScore <= 100,
-            'Fusion average score must be between 0 and 100'
-        )
+    assert(
+        config.fusionAverageScore >= 0 && config.fusionAverageScore <= 100,
+        'Minimum combined match score (fusionAverageScore) must be between 0 and 100'
+    )
 
-        config.getScore = (): number => {
-            return config.fusionAverageScore!
-        }
-        logger.debug(`Using average fusion score: ${config.fusionAverageScore}`)
-    } else {
-        softAssert(
-            config.matchingConfigs.length > 0,
-            'No matching configurations defined - fusion matching may not work correctly',
-            'warn'
-        )
+    softAssert(
+        config.matchingConfigs.length > 0,
+        'No matching configurations defined - fusion matching may not work correctly',
+        'warn'
+    )
 
-        config.fusionScoreMap = new Map<string, number>()
-        for (const matchingConfig of config.matchingConfigs) {
-            assert(matchingConfig.attribute, 'Matching config attribute is required')
-            if (matchingConfig.fusionScore !== undefined) {
-                assert(
-                    matchingConfig.fusionScore >= 0 && matchingConfig.fusionScore <= 100,
-                    `Fusion score for attribute ${matchingConfig.attribute} must be between 0 and 100`
-                )
-                config.fusionScoreMap.set(matchingConfig.attribute, matchingConfig.fusionScore)
-            }
+    config.fusionScoreMap = new Map<string, number>()
+    for (const matchingConfig of config.matchingConfigs) {
+        assert(matchingConfig.attribute, 'Matching config attribute is required')
+        if (matchingConfig.fusionScore !== undefined) {
+            assert(
+                matchingConfig.fusionScore >= 0 && matchingConfig.fusionScore <= 100,
+                `Fusion score for attribute ${matchingConfig.attribute} must be between 0 and 100`
+            )
+            config.fusionScoreMap.set(matchingConfig.attribute, matchingConfig.fusionScore)
         }
-
-        config.getScore = (attribute?: string): number => {
-            assert(attribute, 'Attribute is required to get fusion score')
-            const score = config.fusionScoreMap!.get(attribute)
-            if (!score) {
-                throw new ConnectorError(
-                    `Fusion score not found for attribute: ${attribute}`,
-                    ConnectorErrorType.NotFound
-                )
-            }
-            return score
-        }
-        logger.debug(`Using per-attribute fusion scores for ${config.fusionScoreMap.size} attribute(s)`)
     }
+
+    config.getScore = (attribute?: string): number => {
+        assert(attribute, 'Attribute is required to get fusion score')
+        const score = config.fusionScoreMap!.get(attribute)
+        if (!score) {
+            throw new ConnectorError(
+                `Fusion score not found for attribute: ${attribute}`,
+                ConnectorErrorType.NotFound
+            )
+        }
+        return score
+    }
+    logger.debug(
+        `Minimum combined match score: ${config.fusionAverageScore}; per-attribute thresholds mapped: ${config.fusionScoreMap.size}`
+    )
 
     // Validate external logging configuration if enabled
     if (config.externalLoggingEnabled) {

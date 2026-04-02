@@ -98,10 +98,10 @@ export interface MatchingConfig {
     /** The attribute name to compare between accounts */
     attribute: string
     /** The similarity algorithm to use for comparison */
-    algorithm?: 'name-matcher' | 'jaro-winkler' | 'lig3' | 'dice' | 'double-metaphone' | 'average' | 'custom'
+    algorithm?: 'name-matcher' | 'jaro-winkler' | 'lig3' | 'dice' | 'double-metaphone' | 'average' | 'weighted-mean' | 'custom'
     /** Minimum similarity score (0-1) required to consider this attribute a match */
     fusionScore?: number
-    /** If true, this rule must pass for the overall match to succeed (unless average scoring is used) */
+    /** If true, this rule must pass its minimum similarity for the pair to be a potential match */
     mandatory?: boolean
     /** If true (default), skip this rule when either side is missing (null/undefined/empty after trim). */
     skipMatchIfMissing?: boolean
@@ -159,6 +159,14 @@ export interface SourceConfig {
     correlationMode?: CorrelationMode
     correlationAttribute?: string
     correlationDisplayName?: string
+    /**
+     * Same-aggregation matching: after identity matching, also compare to other new
+     * unmatched accounts from this run. If the only strong match is such a peer, defer
+     * instead of creating another Fusion identity until a later run. When false, skip
+     * that check (normal unmatched handling). Default true; disable when one person may
+     * appear as multiple accounts in a single aggregation.
+     */
+    deferredMatching?: boolean
 }
 
 /** Configuration for all managed sources and aggregation behavior. */
@@ -222,7 +230,7 @@ export type UniqueAttributeDefinitionSettingsMenu = UniqueAttributeDefinitionSet
 /** Configuration for Match rules and scoring strategy. */
 export interface MatchingSettingsSection {
     matchingConfigs?: MatchingConfig[]
-    fusionUseAverageScore: boolean
+    /** Minimum weighted combined match score (0-100). Required for matching. */
     fusionAverageScore?: number
     fusionMergingIdentical: boolean
 }
@@ -265,6 +273,12 @@ export interface DeveloperSettingsSection {
      * Enabled by default.
      */
     concurrencyCheckEnabled: boolean
+    /**
+     * Maximum number of potential identity matches included on each fusion review form.
+     * When there are more candidates than this cap, the highest-scoring matches are kept (see form builder).
+     * Valid range: 1–15. Default: 10.
+     */
+    fusionMaxCandidatesForForm?: number
     externalLoggingEnabled: boolean
     externalLoggingUrl?: string
     externalLoggingLevel?: 'error' | 'warn' | 'info' | 'debug'

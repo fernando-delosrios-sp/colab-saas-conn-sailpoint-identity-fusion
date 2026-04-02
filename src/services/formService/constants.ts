@@ -12,7 +12,13 @@ export const ALGORITHM_LABELS: Record<string, string> = {
     dice: 'Dice',
     'double-metaphone': 'Double Metaphone',
     custom: 'Custom Algorithm (from SaaS customizer)',
-    average: 'Average Score',
+    average: 'Combined match score (legacy)',
+    'weighted-mean': 'Combined score',
 }
 
-export const MAX_CANDIDATES_FOR_FORM = 15
+/** Minimum configurable match candidates shown on a single fusion review form. */
+export const FUSION_MAX_CANDIDATES_FOR_FORM_MIN = 1
+/** Maximum configurable match candidates shown on a single fusion review form (platform/UI limit). */
+export const FUSION_MAX_CANDIDATES_FOR_FORM_MAX = 15
+/** Default cap when `fusionMaxCandidatesForForm` is omitted from source config. */
+export const FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT = 10

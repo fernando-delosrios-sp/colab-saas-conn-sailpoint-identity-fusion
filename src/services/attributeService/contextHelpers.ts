@@ -292,7 +292,15 @@ const normalizeDate = (date: string, ambiguousPriority = DEFAULT_AMBIGUOUS_DATE_
 }
 
 const normalizePhoneNumber = (phone: string, defaultCountry: CountryCode = 'US'): string | undefined => {
-    return parsePhoneNumberFromString(phone, defaultCountry)?.formatInternational()
+    const input = phone?.trim()
+    if (!input) return undefined
+
+    // If the number already includes an international prefix (+...), let it drive country resolution.
+    // Otherwise use the provided default country as a fallback for local/national numbers.
+    const parsed = input.startsWith('+')
+        ? parsePhoneNumberFromString(input)
+        : parsePhoneNumberFromString(input, defaultCountry)
+    return parsed?.formatInternational()
 }
 
 /**

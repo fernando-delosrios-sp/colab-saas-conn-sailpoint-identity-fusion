@@ -185,6 +185,100 @@ describe('AttributeService mainAccount stale cleanup', () => {
     })
 })
 
+describe('AttributeService incremental counter seeding', () => {
+    const createService = () => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [
+                {
+                    name: 'id',
+                    expression: 'NG$counter',
+                    useIncrementalCounter: true,
+                    digits: 3,
+                    counterStart: 1,
+                },
+            ],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = { fusionSourceId: 'src-1', patchSourceConfig: jest.fn() } as any
+        const log = {
+            debug: jest.fn(),
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+        } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+        service.setStateWrapper({})
+        return service
+    }
+
+    const createFusionAccount = (attrs: Record<string, any>) => {
+        const attributeBag = {
+            current: { ...attrs },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'neo-1',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        return fusionAccount
+    }
+
+    it('seeds the persistent counter from existing incremental values to avoid burning through collisions', async () => {
+        const service = createService()
+        await service.initializeCounters()
+
+        const existing = createFusionAccount({ id: 'NG015' })
+        await service.refreshUniqueAttributes(existing)
+
+        expect(await service.getStateObject()).toEqual({ id: 15 })
+
+        const next = createFusionAccount({})
+        await service.refreshUniqueAttributes(next)
+
+        expect(next.attributes.id).toBe('NG016')
+        expect(await service.getStateObject()).toEqual({ id: 16 })
+    })
+})
+
 describe('AttributeService mapping undefined behavior', () => {
     it('clears stale mapped attributes when mapping resolves to undefined', () => {
         const config = {
