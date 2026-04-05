@@ -72,7 +72,7 @@ flowchart TD
         - **Orphan**: Drops the account entirely (and optionally triggers a background disable operation).
         - **Identity**: Proceeds to matching pipeline.
     - **Reviewer validation**: Before scoring begins, each managed source is checked for valid reviewers. Sources without a configured reviewer are logged once as an error and their accounts bypass scoring entirely, being added as unmatched directly.
-    - For sources with valid reviewers, the full matching pipeline runs: scoring, auto-correlation (for perfect matches when enabled), review form creation (for partial matches), or unmatched addition.
+    - For sources with valid reviewers, the full matching pipeline runs: scoring, automatic assignment on exact match (when enabled and scores are perfect), review form creation (for partial matches), or unmatched addition.
 
 <details>
 <summary><b>View Graphic: Managed Account Processing (Step 6)</b></summary>
@@ -87,7 +87,7 @@ flowchart TD
     F -- No --> G[Skip Scoring: Add as Unmatched]
     F -- Yes --> H[Run Matching/Scoring Engine]
     H --> I{Score Thresholds}
-    I -- Perfect Match --> J[Auto-correlate]
+    I -- Perfect Match --> J[Assign automatically]
     I -- Partial Match --> K[Generate Review Form]
     I -- No Match --> G
 ```

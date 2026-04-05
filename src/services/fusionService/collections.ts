@@ -212,7 +212,8 @@ export function last<T>(array: T[]): T | undefined {
  * The SailPoint SDK logger uses pino with async buffering; during intensive batch processing
  * the event loop stays busy and logs accumulate. A single setImmediate tick allows flushing.
  */
-function yieldToEventLoop(): Promise<void> {
+/** Lets timers, I/O, and SDK health checks run during CPU-heavy batches. */
+export function yieldToEventLoop(): Promise<void> {
     return new Promise((resolve) => setImmediate(resolve))
 }
 

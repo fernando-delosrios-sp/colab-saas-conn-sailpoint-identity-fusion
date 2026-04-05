@@ -21,7 +21,7 @@ export type SmokeMatrixScenario = {
     config: {
         includeIdentities?: boolean
         fusionAverageScore?: number
-        fusionMergingIdentical?: boolean
+        fusionMergingExactMatch?: boolean
         sources?: Array<{
             name: string
             sourceType?: 'authoritative' | 'record' | 'orphan'

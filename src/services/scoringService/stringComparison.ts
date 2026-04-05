@@ -8,7 +8,8 @@
  * Returns a value between 0 and 1, where 1 is an exact match
  */
 export function jaroWinklerSimilarity(s1: string, s2: string): number {
-    // Handle edge cases
+    // Handle edge cases (two blanks are not a meaningful match for identity scoring)
+    if (s1.length === 0 && s2.length === 0) return 0.0
     if (s1 === s2) return 1.0
     if (s1.length === 0 || s2.length === 0) return 0.0
 
@@ -87,7 +88,8 @@ function jaroSimilarity(s1: string, s2: string): number {
  * Returns a value between 0 and 1, where 1 is an exact match
  */
 export function diceCoefficientSimilarity(s1: string, s2: string): number {
-    // Handle edge cases
+    // Handle edge cases (two blanks are not a meaningful match for identity scoring)
+    if (s1.length === 0 && s2.length === 0) return 0.0
     if (s1 === s2) return 1.0
     if (s1.length < 2 || s2.length < 2) return 0.0
 

@@ -1,11 +1,19 @@
 import { FusionAccount } from '../../model/account'
-import { MatchingConfig, FusionConfig } from '../../model/config'
+import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing } from '../../model/config'
 import { LogService } from '../logService'
 import { FusionMatch, ScoreReport } from './types'
 import { scoreDice, scoreDoubleMetaphone, scoreJaroWinkler, scoreLIG3, scoreNameMatcher } from './helpers'
+import { isExactAttributeMatchScores } from './exactMatch'
 
-/** Algorithm id for the synthetic combined score row (excluded from identical-match checks). */
+/** Algorithm id for the synthetic combined score row (excluded from exact-match checks). */
 export const WEIGHTED_MEAN_ALGORITHM = 'weighted-mean'
+
+/**
+ * How many identity comparisons to run before yielding to the event loop.
+ * Large aggregations compare each managed account against every fusion identity; without yields,
+ * the connector SDK can log multi-second "event loop blocked" warnings.
+ */
+const SCORING_IDENTITY_YIELD_INTERVAL = 100
 
 /** Attribute label on the synthetic combined score row in reports and forms. */
 export const COMBINED_SCORE_ROW_ATTRIBUTE = 'Combined score'
@@ -17,6 +25,7 @@ export const COMBINED_SCORE_ROW_ATTRIBUTE = 'Combined score'
 export class ScoringService {
     private readonly matchingConfigs: MatchingConfig[]
     private readonly fusionAverageScore: number
+    private readonly fusionMergingExactMatch: boolean
 
     /**
      * @param config - Fusion configuration containing matching rules and score thresholds
@@ -28,6 +37,7 @@ export class ScoringService {
     ) {
         this.matchingConfigs = config.matchingConfigs ?? []
         this.fusionAverageScore = config.fusionAverageScore ?? 0
+        this.fusionMergingExactMatch = config.fusionMergingExactMatch ?? false
     }
 
     /**
@@ -43,21 +53,44 @@ export class ScoringService {
      * For each identity that meets the matching threshold, a {@link FusionMatch} is
      * added to the fusion account via {@link FusionAccount#addFusionMatch}.
      *
+     * Yields periodically so heavy Match scoring does not block the Node event loop.
+     *
      * @param fusionAccount - The account to score (typically a new/unmatched account)
      * @param fusionIdentities - The set of existing fusion identities to compare against
      */
-    public scoreFusionAccount(
+    public async scoreFusionAccount(
         fusionAccount: FusionAccount,
         fusionIdentities: Iterable<FusionAccount>,
         candidateType: 'identity' | 'new-unmatched' = 'identity'
-    ): void {
+    ): Promise<number> {
         // No matching configs → no scoring possible; skip entirely to avoid
         // false positives (empty scores would otherwise mark every identity as a match).
-        if (this.matchingConfigs.length === 0) return
+        if (this.matchingConfigs.length === 0) return 0
 
+        // When exact-match automatic assignment is enabled, there is no benefit in
+        // continuing to score after a perfect match is found: the first exact match
+        // wins and all subsequent comparisons would be discarded. Early exit here
+        // avoids O(n) identity comparisons for every exact-match account.
+        const earlyExitOnExactMatch = this.fusionMergingExactMatch && candidateType === 'identity'
+
+        let compared = 0
         for (const fusionIdentity of fusionIdentities) {
             this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType)
+            compared += 1
+            if (earlyExitOnExactMatch) {
+                const matches = fusionAccount.fusionMatches
+                if (
+                    matches.length > 0 &&
+                    isExactAttributeMatchScores(matches[matches.length - 1].scores)
+                ) {
+                    break
+                }
+            }
+            if (compared % SCORING_IDENTITY_YIELD_INTERVAL === 0) {
+                await new Promise<void>((resolve) => setImmediate(resolve))
+            }
         }
+        return compared
     }
 
     /**
@@ -78,11 +111,11 @@ export class ScoringService {
         for (const matching of this.matchingConfigs) {
             const accountAttribute = fusionAccount.attributes[matching.attribute]
             const identityAttribute = fusionIdentity.attributes[matching.attribute]
-            const skipMatchIfMissing = matching.skipMatchIfMissing ?? true
+            const skipForMissing = effectiveSkipMatchIfMissing(matching)
             const hasMissingValue =
                 this.isMissingMatchValue(accountAttribute) || this.isMissingMatchValue(identityAttribute)
 
-            if (skipMatchIfMissing && hasMissingValue) {
+            if (skipForMissing && hasMissingValue) {
                 scores.push({
                     ...matching,
                     skipped: true,
@@ -93,17 +126,15 @@ export class ScoringService {
                 continue
             }
 
-            if (!hasMissingValue || matching.mandatory || !skipMatchIfMissing) {
-                const scoreReport: ScoreReport = this.scoreAttribute(
-                    (accountAttribute ?? '').toString(),
-                    (identityAttribute ?? '').toString(),
-                    matching
-                )
-                if (matching.mandatory && !scoreReport.isMatch) {
-                    hasFailedMandatory = true
-                }
-                scores.push(scoreReport)
+            const scoreReport: ScoreReport = this.scoreAttribute(
+                (accountAttribute ?? '').toString(),
+                (identityAttribute ?? '').toString(),
+                matching
+            )
+            if (matching.mandatory && !scoreReport.isMatch) {
+                hasFailedMandatory = true
             }
+            scores.push(scoreReport)
         }
 
         let weightedSum = 0

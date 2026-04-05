@@ -207,7 +207,7 @@ export class FusionAccount {
         const sourceSet = new Set<string>()
         const statuses = attributeToSet(account.attributes, 'statuses')
         const identityNameFromRef = String((account as any)?.identity?.name ?? '').trim()
-        const identityIdFallback = String(account.identityId ?? account.attributes?.id ?? account.id ?? account.nativeIdentity ?? '').trim()
+        const identityIdFallback = String(account.identityId ?? account.nativeIdentity ?? '').trim()
         const identityDisplayName = identityNameFromRef || identityIdFallback || undefined
 
         const persistedAccountName = String(account.name ?? '').trim()
@@ -480,7 +480,7 @@ export class FusionAccount {
     // Accessors - State Flags
     // ============================================================================
 
-    /** Whether this account has uncorrelated (unmatched) source accounts. */
+    /** Whether this account has uncorrelated (non-matched) source accounts. */
     public get uncorrelated(): boolean {
         return this._uncorrelated
     }
@@ -1211,7 +1211,8 @@ export class FusionAccount {
 
     /**
      * Applies a reviewer's fusion decision to this account, setting it as either
-     * "manual" (new identity) or "authorized" (merge into existing).
+     * "manual" (new identity), "authorized" (reviewer merge into existing), or
+     * "auto" (system exact-match assignment only — no `authorized` entitlement).
      *
      * Record and orphan no-match decisions are skipped: those source types never
      * yield a persisted Fusion account on no-match, so status/history is not set.
@@ -1335,16 +1336,17 @@ export class FusionAccount {
         this.addHistory(`Set ${this.formatHistoryAccountInfo(this._name, this._sourceName)} as baseline`)
     }
 
-    /** Marks this account as "unmatched" (no Match found, pending review). */
-    public setUnmatched(): void {
-        this._statuses.add('unmatched')
-        this.addHistory(`Set ${this.formatHistoryAccountInfo(this._name, this._sourceName)} as unmatched`)
+    /** Marks this account as NonMatched (no Match found, pending review). */
+    public setNonMatched(): void {
+        this._statuses.add('nonMatched')
+        this.addHistory(`Set ${this.formatHistoryAccountInfo(this._name, this._sourceName)} as NonMatched`)
     }
 
     /**
      * Builds a history message for decision actions, varying wording by source type.
      * - authoritative manual: "new account"
-     * - authoritative authorized: "authorized"
+     * - authoritative merge (reviewer): "authorized"
+     * - authoritative merge (automaticAssignment): "Auto-assigned …"
      * - record authorized: "assigned record"
      * - orphan authorized: "assigned orphan account"
      *
@@ -1358,14 +1360,12 @@ export class FusionAccount {
         )
         const accountInfo = this.formatHistoryAccountInfo(decision.account.name, decision.account.sourceName)
         const sourceType = decision.sourceType ?? 'authoritative'
-        const isAutoCorrelation =
-            decision.submitter?.id === 'system' || String(decision.comments ?? '').includes('Auto-correlated')
 
         if (action === 'manual') {
             return `Set ${accountInfo} as new account by ${submitterName}`
         }
 
-        if (isAutoCorrelation) {
+        if (decision.automaticAssignment === true) {
             return `Auto-assigned ${accountInfo} to existing identity`
         }
         if (sourceType === 'record') {
@@ -1379,16 +1379,23 @@ export class FusionAccount {
 
     /** Marks this account as "manual" (reviewer decided to create a new identity or confirmed no match). */
     private setManual(decision: FusionDecision): void {
-        this._statuses.delete('unmatched')
+        this._statuses.delete('nonMatched')
         this._statuses.add('manual')
         const message = this.createDecisionHistoryMessage(decision, 'manual')
         this.addHistory(message)
     }
 
-    /** Marks this account as "authorized" (reviewer approved merging/assignment into an existing identity). */
+    /**
+     * Marks merge-into-existing decisions: reviewer-approved adds `authorized`;
+     * exact-match automatic assignment adds `auto` only (not `authorized`).
+     */
     private setAuthorized(decision: FusionDecision): void {
-        this._statuses.delete('unmatched')
-        this._statuses.add('authorized')
+        this._statuses.delete('nonMatched')
+        if (decision.automaticAssignment === true) {
+            this._statuses.add('auto')
+        } else {
+            this._statuses.add('authorized')
+        }
         const message = this.createDecisionHistoryMessage(decision, 'authorized')
         this.addHistory(message)
     }

@@ -31,6 +31,7 @@ function createTwoPassRegistry(scenario: AggregationScenario) {
             map.set(account.id, account)
         }
         sources.managedAccountsById = map
+        sources.managedAccountsAllById = new Map(map)
     })
 
     sources.fusionAccountCount = 2
@@ -85,6 +86,7 @@ describe('accountList setup phase', () => {
 
         await accountList(registry, input)
 
+        expect(sources.clearReverseCorrelationReadinessCache).toHaveBeenCalledTimes(1)
         expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledTimes(1)
         expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledWith(reverseSource, expect.any(Set))
         expect(schemas.setFusionAccountSchema).toHaveBeenNthCalledWith(1, input.schema)
@@ -101,6 +103,7 @@ describe('accountList setup phase', () => {
 
         await accountList(registry, input)
 
+        expect(sources.clearReverseCorrelationReadinessCache).toHaveBeenCalledTimes(1)
         expect(sources.ensureReverseCorrelationSetup).not.toHaveBeenCalled()
         expect(schemas.setFusionAccountSchema).toHaveBeenCalledTimes(1)
         expect(schemas.setFusionAccountSchema).toHaveBeenCalledWith(input.schema)

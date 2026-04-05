@@ -32,12 +32,15 @@
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                     <tr>
                         <td style="padding:12px 20px;">
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #e6ebf5; border-radius:14px; box-shadow:0 8px 20px rgba(16,24,40,0.10);">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #e6ebf5; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.12);">
                                 <tr>
                                     <td style="padding:14px 24px 14px 14px;">
                                         <div style="padding-bottom:18px; margin-bottom:22px; border-bottom:1px solid #e6ebf5;">
                                             <div style="margin-bottom:12px;">
                                                 <h1 style="margin:0; color:#0b5cab; font-size:26px; letter-spacing:-0.2px;">Identity Fusion Review Required</h1>
+                                                {{#if headerSubtitle}}
+                                                <div style="color:#0b5cab; font-size:15px; font-weight:700; margin-top:8px;">{{headerSubtitle}}</div>
+                                                {{/if}}
                                                 <div style="color:#5f6b7a; font-size:13px; margin-top:6px;">
                                                     Please review the potential match and take appropriate action.
                                                 </div>
@@ -126,9 +129,14 @@
                                                                                     {{/if}}
                                                                                 </td>
                                                                                 <td style="vertical-align:middle; text-align:right; white-space:nowrap; width:1%; padding-left:14px;">
+                                                                                    <span style="display:inline-flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
+                                                                                    {{#if exact}}
+                                                                                    <span style="display:inline-block; vertical-align:middle; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:10px; font-weight:700; text-transform:uppercase;">Exact</span>
+                                                                                    {{/if}}
                                                                                     {{#if ../deferred}}
                                                                                     <span style="display:inline-block; vertical-align:middle; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase;">Deferred</span>
                                                                                     {{/if}}
+                                                                                    </span>
                                                                                 </td>
                                                                             </tr>
                                                                         </table>

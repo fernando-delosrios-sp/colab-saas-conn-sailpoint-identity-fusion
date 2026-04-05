@@ -18,13 +18,15 @@ import { accountEnable } from './operations/accountEnable'
 import { accountDisable } from './operations/accountDisable'
 import { entitlementList } from './operations/entitlementList'
 import { accountDiscoverSchema } from './operations/accountDiscoverSchema'
-import { customReport } from './operations/customReport'
+import { dryRun } from './operations/dryRun'
 
 type KeepAliveMode = 'memory' | 'simple'
 
 interface HandlerOptions {
     errorMessage: string | ((input: any) => string)
     keepAlive?: KeepAliveMode
+    /** Override `config.processingWait` for the keepAlive timer (ms). Use when pre-output work can exceed client idle timeouts. */
+    keepAliveIntervalMs?: number
 }
 
 /**
@@ -46,6 +48,7 @@ function createHandler(
             const isProxy = !isProxyServer && serviceRegistry.proxy.isProxyMode()
             const runMode = isCustom ? 'custom' : isProxy ? 'proxy' : 'default'
 
+            const keepAliveEveryMs = options.keepAliveIntervalMs ?? config.processingWait
             if (options.keepAlive === 'memory') {
                 if (!isProxyServer) {
                     interval = setInterval(() => {
@@ -54,12 +57,12 @@ function createHandler(
                             `Memory usage - RSS: ${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB, Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB, Heap Total: ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`
                         )
                         res.keepAlive()
-                    }, config.processingWait)
+                    }, keepAliveEveryMs)
                 }
             } else if (options.keepAlive === 'simple' && runMode !== 'proxy') {
                 interval = setInterval(() => {
                     res.keepAlive()
-                }, config.processingWait)
+                }, keepAliveEveryMs)
             }
 
             logger.info(`Running ${operationName} in ${runMode} mode`)
@@ -146,9 +149,12 @@ export const connector = async () => {
             })
         )
         .command(
-            'custom:report',
-            createHandler('custom:report', customReport, config, {
-                errorMessage: 'Failed to run custom report',
+            'custom:dryrun',
+            createHandler('custom:dryrun', dryRun, config, {
+                errorMessage: 'Failed to run custom:dryrun',
+                // Long fetch/analyze phases send no row output; peers often idle-timeout (~60s) before the first NDJSON line.
+                keepAlive: 'simple',
+                keepAliveIntervalMs: 15_000,
             })
         )
 }

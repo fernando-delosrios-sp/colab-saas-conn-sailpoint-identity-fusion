@@ -2,10 +2,11 @@ import { FusionAccount } from '../../model/account'
 import { pickAttributes } from '../../utils/attributes'
 import { roundMetric2 } from '../../utils/numbers'
 import { UrlContext } from '../../utils/url'
-import type { ScoreReport } from '../scoringService/types'
+import type { FusionMatch, ScoreReport } from '../scoringService/types'
 import {
     FusionReportAccount,
     FusionReportIdentityConflictOccurrence,
+    FusionReportMatch,
     FusionReportScore,
     FusionReportWarnings,
 } from './types'
@@ -43,6 +44,21 @@ export function getFusionIdentityConflictTrackingKey(fusionAccount: FusionAccoun
  * User-facing account label for fusion report rows.
  * Prefer displayName/name, then fall back to uid-like identifiers.
  */
+/** Fusion candidate keys for report / dry-run rows (works after `fusionIdentity` refs are cleared). */
+export function fusionReportMatchCandidateAccountFields(match: FusionMatch): Pick<FusionReportMatch, 'accountId' | 'accountName'> {
+    const fi = match.fusionIdentity
+    if (fi) {
+        const accountId =
+            String(fi.identityId ?? fi.nativeIdentityOrUndefined ?? '').trim() || undefined
+        return { accountId, accountName: getFusionReportAccountLabel(fi) }
+    }
+    const id = String(match.identityId ?? '').trim()
+    return {
+        accountId: id || undefined,
+        accountName: match.identityName,
+    }
+}
+
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {
     const accountDisplayName = String(fusionAccount.accountDisplayName ?? '').trim()
     if (accountDisplayName) return accountDisplayName

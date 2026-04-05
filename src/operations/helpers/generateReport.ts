@@ -1,9 +1,9 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { FusionAccount } from '../../model/account'
-import { StandardCommand } from '@sailpoint/connector-sdk'
 import { AggregationStats, FusionReportDecision, FusionReportStats } from '../../services/fusionService/types'
 import { FusionDecision } from '../../model/form'
 import { createUrlContext } from '../../utils/url'
+import { setupPhase, fetchPhase, processPhase } from './corePipeline'
 
 const toReportDecision = (
     decision: FusionDecision,
@@ -34,10 +34,14 @@ const toReportDecision = (
     const correlatedIdentityContext = resolveIdentityContext?.((decision as any).correlatedIdentityId) ?? {}
     const correlatedAccountName = correlatedIdentityContext.selectedIdentityName
 
+    const reviewerId = decision.submitter.id
+    const reviewerUrl =
+        reviewerId && reviewerId !== 'system' ? resolveReviewerUrl?.(reviewerId) : undefined
+
     return {
-        reviewerId: decision.submitter.id,
+        reviewerId,
         reviewerName,
-        reviewerUrl: resolveReviewerUrl?.(decision.submitter.id),
+        reviewerUrl,
         reviewerEmail: decision.submitter.email || undefined,
         accountId: decision.account.id,
         accountName: correlatedAccountName || decision.account.name || decision.account.id,
@@ -51,14 +55,60 @@ const toReportDecision = (
         selectedIdentityUrl: selectedIdentityContext.selectedIdentityUrl,
         comments: decision.comments || undefined,
         formUrl: decision.formUrl || undefined,
+        automaticAssignment: decision.automaticAssignment === true ? true : undefined,
     }
 }
 
 /**
- * Generates and sends a fusion report for the given account.
- * When called outside of account list, fetches all required data first.
- * When aggregationStats are provided (account list path), builds full report stats
- * from the services plus the externally-known snapshot values.
+ * Self-contained fetch + process for standalone report triggers (e.g. reportAction).
+ *
+ * Runs the full dry-run pipeline (setup → fetch → process) so that all fusion
+ * accounts, identities, and managed accounts are in memory — matching exactly
+ * what accountList phases 1–3 do, but without persistence or side-effects.
+ *
+ * The messaging sender is fetched separately here because fetchPhase skips it
+ * for non-persistent runs, but it is required to send the report email.
+ *
+ * @returns AggregationStats ready to pass to generateReport.
+ */
+export async function fetchAndProcessForReport(serviceRegistry: ServiceRegistry): Promise<AggregationStats> {
+    const { log, messaging } = serviceRegistry
+    const options = { mode: { kind: 'dry-run' } as const }
+    const timer = log.timer()
+
+    const shouldContinue = await setupPhase(serviceRegistry, undefined, options)
+    if (!shouldContinue) {
+        // Reset flag was set — return empty stats; caller should check or ignore report
+        return { identitiesFound: 0, managedAccountsFound: 0, totalProcessingTime: timer.totalElapsed() }
+    }
+
+    const fetchResult = await fetchPhase(serviceRegistry, options)
+
+    // Fetch sender separately — fetchPhase omits it for dry-run, but the report email needs it
+    await messaging.fetchSender()
+
+    await processPhase(serviceRegistry, options)
+
+    return {
+        identitiesFound: fetchResult.identitiesFound,
+        managedAccountsFound: fetchResult.managedAccountsFound,
+        managedAccountsFoundAuthoritative: fetchResult.managedAccountsFoundAuthoritative,
+        managedAccountsFoundRecord: fetchResult.managedAccountsFoundRecord,
+        managedAccountsFoundOrphan: fetchResult.managedAccountsFoundOrphan,
+        totalProcessingTime: timer.totalElapsed(),
+    }
+}
+
+
+/**
+ * Builds and sends a fusion report email for the given fusion account.
+ *
+ * Data (fusion accounts, identities, managed accounts) must already be in memory.
+ * Callers that need to self-fetch should call {@link fetchAndProcessForReport} first
+ * and pass the returned stats as `aggregationStats`.
+ *
+ * Aggregation and account-action reports use `includeNonMatches: false` so unmatched managed
+ * accounts are not listed per row; {@link FusionReportStats} still carries consolidated counters.
  */
 export const generateReport = async (
     fusionAccount: FusionAccount,
@@ -70,58 +120,6 @@ export const generateReport = async (
         serviceRegistry = ServiceRegistry.getCurrent()
     }
     const { fusion, forms, identities, sources, messaging } = serviceRegistry
-
-    // Used to populate "Processing Statistics" even for on-demand/manual reports.
-    // (Aggregation path passes its own AggregationStats + timer.)
-    const timer = serviceRegistry.log.timer()
-    let autoFetchStats:
-        | Pick<
-              AggregationStats,
-              | 'identitiesFound'
-              | 'managedAccountsFound'
-              | 'managedAccountsFoundAuthoritative'
-              | 'managedAccountsFoundRecord'
-              | 'managedAccountsFoundOrphan'
-          >
-        | undefined
-
-    if (fusion.commandType !== StandardCommand.StdAccountList) {
-        const fetchPromises = [
-            messaging.fetchSender(),
-            sources.fetchFusionAccounts(),
-            identities.fetchIdentities(),
-            sources.fetchManagedAccounts(),
-        ]
-
-        await Promise.all(fetchPromises)
-
-        // Capture "found" snapshot counts before work-queue processing mutates/consumes the maps.
-        const identitiesFound = identities.identityCount
-        const managedAccountsFound = sources.managedAccountsById.size
-        let managedAccountsFoundAuthoritative = 0
-        let managedAccountsFoundRecord = 0
-        let managedAccountsFoundOrphan = 0
-        for (const account of sources.managedAccountsById.values()) {
-            const sourceType = sources.getSourceByName(account.sourceName ?? '')?.sourceType ?? 'authoritative'
-            if (sourceType === 'record') managedAccountsFoundRecord++
-            else if (sourceType === 'orphan') managedAccountsFoundOrphan++
-            else managedAccountsFoundAuthoritative++
-        }
-        autoFetchStats = {
-            identitiesFound,
-            managedAccountsFound,
-            managedAccountsFoundAuthoritative,
-            managedAccountsFoundRecord,
-            managedAccountsFoundOrphan,
-        }
-
-        await fusion.processFusionAccounts()
-        await fusion.processIdentities()
-
-        await fusion.analyzeManagedAccounts()
-    }
-
-    let stats: FusionReportStats | undefined
     const finishedDecisions = forms.finishedFusionDecisions
     // Ensure we can render reviewer/selected identity display names even if the identity cache was cleared earlier
     // (e.g. std:account:list clears identities for memory before report phase).
@@ -202,13 +200,14 @@ export const generateReport = async (
         const recordNoMatches = decisions.filter((d) => decisionSourceType(d) === 'record' && d.newIdentity).length
         const orphanNoMatches = decisions.filter((d) => decisionSourceType(d) === 'orphan' && d.newIdentity).length
         const memoryUsage = process.memoryUsage()
-        stats = {
+        const stats: FusionReportStats = {
             totalFusionAccounts: fusion.totalFusionAccountCount,
             fusionAccountsFound: sources.fusionAccountCount,
             fusionReviewsCreated: forms.formsCreated,
             fusionReviewAssignments: forms.formInstancesCreated,
             fusionReviewsFound: forms.formsFound,
             fusionReviewInstancesFound: forms.formInstancesFound,
+            fusionAutomaticMatches: decisions.filter((d) => d.automaticAssignment === true).length,
             fusionReviewsProcessed: forms.answeredFormInstancesProcessed,
             fusionReviewNewIdentities: authoritativeNewIdentities,
             fusionReviewNonMatches: recordNoMatches + orphanNoMatches,
@@ -227,36 +226,18 @@ export const generateReport = async (
             usedMemory: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
             ...aggregationStats,
         }
-    } else if (autoFetchStats) {
-        // Manual/on-demand report path: build stats from locally available snapshot values.
-        const issueSummary = serviceRegistry.log.getAggregationIssueSummary()
-        const memoryUsage = process.memoryUsage()
-        stats = {
-            totalFusionAccounts: fusion.totalFusionAccountCount,
-            fusionAccountsFound: sources.fusionAccountCount,
-            fusionReviewsCreated: forms.formsCreated,
-            fusionReviewAssignments: forms.formInstancesCreated,
-            fusionReviewsFound: forms.formsFound,
-            fusionReviewInstancesFound: forms.formInstancesFound,
-            fusionReviewsProcessed: forms.answeredFormInstancesProcessed,
-            managedAccountsProcessed: fusion.newManagedAccountsCount,
-            identitiesProcessed: fusion.identitiesProcessedCount,
-            aggregationWarnings: issueSummary.warningCount,
-            aggregationErrors: issueSummary.errorCount,
-            warningSamples: issueSummary.warningSamples,
-            errorSamples: issueSummary.errorSamples,
-            usedMemory: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
-            totalProcessingTime: timer.totalElapsed(),
-            ...autoFetchStats,
-        }
-    }
-
-    const report = fusion.generateReport(includeNonMatches, stats)
-    report.fusionReviewDecisions = reportDecisions
-    await messaging.sendReport(report, fusionAccount, aggregationStats ? 'aggregation' : 'fusion')
-
-    // Keep memory behavior: on-demand/manual report path can clear identity cache after email formatting.
-    if (fusion.commandType !== StandardCommand.StdAccountList) {
+        const report = fusion.generateReport(includeNonMatches, stats)
+        report.fusionReviewDecisions = reportDecisions
+        // aggregationStats is present for both the aggregation report path and reportAction path.
+        // Use 'aggregation' label when it came from the real accountList pipeline; 'fusion' for standalone.
+        await messaging.sendReport(report, fusionAccount, 'aggregation')
+    } else {
+        // No aggregation stats — send report without processing statistics.
+        // (Legacy call path; callers should prefer passing stats via fetchAndProcessForReport.)
+        const report = fusion.generateReport(includeNonMatches, undefined)
+        report.fusionReviewDecisions = reportDecisions
+        await messaging.sendReport(report, fusionAccount, 'fusion')
+        // Clear identity cache since this is a standalone call (no caller owns identity lifecycle)
         identities.clear()
     }
 }

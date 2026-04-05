@@ -13,6 +13,12 @@ describe('scoringService helpers', () => {
             expect(result.isMatch).toBe(true)
         })
 
+        it('should return 0 when both strings are empty', () => {
+            const result = scoreDice('', '', { ...baseMatching, fusionScore: 100 })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+        })
+
         it('should respect fusionScore threshold', () => {
             const result = scoreDice('abc', 'xyz', { ...baseMatching, fusionScore: 80 })
             expect(result.isMatch).toBe(result.score >= 80)
@@ -23,6 +29,12 @@ describe('scoringService helpers', () => {
         it('should return 100 for identical strings', () => {
             const result = scoreJaroWinkler('matching', 'matching', baseMatching)
             expect(result.score).toBe(100)
+        })
+
+        it('should return 0 when both strings are empty', () => {
+            const result = scoreJaroWinkler('', '', { ...baseMatching, fusionScore: 100 })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
         })
     })
 
@@ -72,6 +84,12 @@ describe('scoringService helpers', () => {
         it('should return 0 for empty comparison', () => {
             const result = scoreLIG3('', 'test', baseMatching)
             expect(result.score).toBe(0)
+        })
+
+        it('should return 0 when both sides are empty (not a 100% match)', () => {
+            const result = scoreLIG3('', '', { ...baseMatching, fusionScore: 100 })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
         })
 
         it('should handle typos with moderate score', () => {

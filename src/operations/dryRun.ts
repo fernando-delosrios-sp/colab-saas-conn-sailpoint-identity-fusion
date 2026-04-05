@@ -1,0 +1,196 @@
+import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
+import { ServiceRegistry } from '../services/serviceRegistry'
+import {
+    buildDryRunSummary,
+    buildReportAccountIndex,
+    createDryRunOptionEmitCounter,
+} from './helpers/buildDryRunPayload'
+import {
+    buildStatsForDryRun,
+    createDryRunRowEmitter,
+    createSafeSender,
+    DryRunRuntimeOptions,
+    streamEnrichedOutputRows,
+    streamOrphanDeferredReportRows,
+    streamFallbackAnalyzedRows,
+} from './helpers/dryRunHelpers'
+import {
+    setupPhase,
+    fetchPhase,
+    processPhase,
+} from './helpers/corePipeline'
+
+/**
+ * custom:dryrun command - non-persistent aggregation analysis output.
+ *
+ * This command analyzes managed accounts against fusion identities and streams
+ * final ISC account rows with a `matching` payload in attributes (unless
+ * `writeToDisk` is true, in which case rows plus the same summary object are written as
+ * pretty-printed JSON (`{ "summary": {...}, "rows": [...] }`) under `./reports` and
+ * only the summary is returned). It shares the same setup and process phases as
+ * std:account:list to ensure perfect consistency, but uses isPersistent=false to inhibit
+ * persistence and external API side-effects.
+ */
+export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
+    ServiceRegistry.setCurrent(serviceRegistry)
+    const { log, sources, fusion, forms } = serviceRegistry
+    const options = { mode: { kind: 'dry-run' } as const }
+
+    try {
+        const timer = log.timer()
+        log.info('Starting custom:dryrun')
+        const { res } = serviceRegistry
+        if (typeof res.keepAlive === 'function') {
+            res.keepAlive()
+        }
+        const sender = createSafeSender(serviceRegistry)
+        const runtimeOptions: DryRunRuntimeOptions = {
+            includeExisting: typeof (input as any).includeExisting === 'boolean' ? (input as any).includeExisting : false,
+            includeNonMatched:
+                typeof (input as any).includeNonMatched === 'boolean' ? (input as any).includeNonMatched : false,
+            includeMatched: typeof (input as any).includeMatched === 'boolean' ? (input as any).includeMatched : false,
+            includeExact: typeof (input as any).includeExact === 'boolean' ? (input as any).includeExact : false,
+            includeDeferred: typeof (input as any).includeDeferred === 'boolean' ? (input as any).includeDeferred : false,
+            includeReview: typeof (input as any).includeReview === 'boolean' ? (input as any).includeReview : false,
+            includeDecisions:
+                typeof (input as any).includeDecisions === 'boolean' ? (input as any).includeDecisions : false,
+            writeToDisk: typeof (input as any).writeToDisk === 'boolean' ? (input as any).writeToDisk : false,
+        }
+
+        const rowEmitter = await createDryRunRowEmitter(serviceRegistry, sender, runtimeOptions)
+
+        const shouldContinue = await setupPhase(serviceRegistry, input.schema, options)
+        if (!shouldContinue) return
+        timer.phase('PHASE 1: Setup and initialization')
+
+        const fetchResult = await fetchPhase(serviceRegistry, options)
+        timer.phase('PHASE 2: Fetching data in parallel')
+
+        await processPhase(serviceRegistry, options)
+        timer.phase('PHASE 3: Work queue depletion and form reconciliation')
+
+        const issueSummary = log.getAggregationIssueSummary()
+        const fusionCounts = {
+            fusionAccountsFound: sources.fusionAccountCount,
+            totalFusionAccounts:
+                typeof (fusion as any).totalFusionAccountCount === 'number'
+                    ? (fusion as any).totalFusionAccountCount
+                    : sources.fusionAccountCount,
+        }
+        const report = fusion.generateReport(
+            true,
+            buildStatsForDryRun(fetchResult, issueSummary, timer.totalElapsed(), fusionCounts)
+        )
+        const reportIndex = buildReportAccountIndex(report.accounts)
+        const pendingReviewByAccountId = forms.pendingReviewContextByAccountId
+        const decisionAccountIds = new Set((report.fusionReviewDecisions ?? []).map((decision) => decision.accountId))
+        const coveredManagedAccountIds = new Set<string>()
+        const emittedRowKeys = new Set<string>()
+        const optionEmitCounter = createDryRunOptionEmitCounter()
+
+        let sentRows = 0
+        try {
+            // Baseline + identity-linked items found via existing records
+            sentRows = await streamEnrichedOutputRows(
+                serviceRegistry,
+                reportIndex,
+                pendingReviewByAccountId,
+                decisionAccountIds,
+                coveredManagedAccountIds,
+                emittedRowKeys,
+                optionEmitCounter,
+                rowEmitter,
+                runtimeOptions
+            )
+
+            // Everything else (nonMatched, newly matched, exact) left in the work queue
+            // must manually be processed. We analyze remaining accounts without mutating 
+            // state (like processManagedAccounts does conditionally), and emit them.
+            const fallbackAnalyzedManagedAccounts = await fusion.analyzeManagedAccounts()
+            if (fallbackAnalyzedManagedAccounts.length > 0) {
+                // Ensure they have unique attributes assigned for valid platform representations
+                const dryRunHelpers = require('./helpers/dryRunHelpers')
+                if (dryRunHelpers.refreshUniqueAttributesForDryRun) {
+                    await dryRunHelpers.refreshUniqueAttributesForDryRun(serviceRegistry, fallbackAnalyzedManagedAccounts, runtimeOptions)
+                }
+
+                sentRows = await streamFallbackAnalyzedRows(
+                    serviceRegistry,
+                    fallbackAnalyzedManagedAccounts,
+                    reportIndex,
+                    pendingReviewByAccountId,
+                    decisionAccountIds,
+                    coveredManagedAccountIds,
+                    emittedRowKeys,
+                    optionEmitCounter,
+                    rowEmitter,
+                    sentRows,
+                    runtimeOptions
+                )
+            }
+
+            // Deferred same-aggregation matches do not create a fusion account in the run, so 
+            // the managed account id never appears on any `forEachISCAccount` row. Emit synthetic 
+            // ISC-shaped stubs so we keep the deferred tracking aligning with original categories.
+            sentRows += await streamOrphanDeferredReportRows(
+                serviceRegistry,
+                report.accounts,
+                reportIndex,
+                pendingReviewByAccountId,
+                decisionAccountIds,
+                coveredManagedAccountIds,
+                emittedRowKeys,
+                optionEmitCounter,
+                rowEmitter,
+                runtimeOptions
+            )
+        } finally {
+            if (!runtimeOptions.writeToDisk) {
+                try {
+                    await rowEmitter.close()
+                } catch {
+                    /* ignore close errors after a failed run */
+                }
+            }
+        }
+
+        timer.phase('PHASE 4: Streaming enriched ISC account rows')
+
+        const summary = buildDryRunSummary({
+            sentRows,
+            optionEmitCounter,
+            reportOptions: runtimeOptions,
+            reportAccounts: report.accounts,
+            issueSummary,
+            totalProcessingTime: timer.totalElapsed(),
+            stats: report.stats,
+            fusionReviewDecisionsCount: (report.fusionReviewDecisions ?? []).length,
+            writeToDisk: runtimeOptions.writeToDisk,
+            reportOutputPath: rowEmitter.diskOutputPath,
+        })
+
+        if (runtimeOptions.writeToDisk) {
+            try {
+                await rowEmitter.close(summary)
+            } catch {
+                /* ignore close errors after a failed run */
+            }
+        }
+
+        sender.send(summary)
+        await sender.drain()
+        timer.phase('PHASE 5: Building and sending summary')
+
+        fusion.clearAnalyzedAccounts()
+        sources.clearManagedAccounts()
+        sources.clearFusionAccounts()
+
+        const doneMsg = runtimeOptions.writeToDisk
+            ? `✓ custom:dryrun completed successfully - ${sentRows} account row(s) written to disk; summary sent (${rowEmitter.diskOutputPath ?? 'n/a'})`
+            : `✓ custom:dryrun completed successfully - ${sentRows} account row(s) sent`
+        timer.end(doneMsg)
+    } catch (error) {
+        if (error instanceof ConnectorError) throw error
+        console.error(error); log.crash('Failed to run custom:dryrun', error)
+    }
+}

@@ -15,12 +15,13 @@ import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { assert, softAssert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
 import { pickAttributes } from '../../utils/attributes'
-import { createUrlContext, UrlContext } from '../../utils/url'
+import { createUrlContext, getUIOriginFromBaseUrl, UrlContext } from '../../utils/url'
 import { normalizeEmailValue, sanitizeRecipients } from './email'
 import { IdentityService } from '../identityService'
 import { SourceService } from '../sourceService'
 import type { FusionAccount } from '../../model/account'
 import { FusionReport } from '../fusionService/types'
+import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import {
     registerHandlebarsHelpers,
     compileEmailTemplates,
@@ -68,6 +69,29 @@ export class MessagingService {
         this.urlContext = createUrlContext(config.baseurl)
         registerHandlebarsHelpers()
         this.templates = compileEmailTemplates()
+    }
+
+    /** Hostname from UI origin plus fusion source display name for email headers. */
+    private buildEmailHeaderSubtitle(): string | undefined {
+        let host: string | undefined
+        try {
+            const origin = getUIOriginFromBaseUrl(this.apiBaseUrl) ?? this.apiBaseUrl
+            host = new URL(origin).hostname
+        } catch {
+            host = undefined
+        }
+        if (!host) {
+            try {
+                host = new URL(this.apiBaseUrl).hostname
+            } catch {
+                host = undefined
+            }
+        }
+        if (!host) {
+            return undefined
+        }
+        const sourceName = this.sources.getFusionSource()?.name ?? 'Fusion source'
+        return `${host} - ${sourceName}`
     }
 
     // ------------------------------------------------------------------------
@@ -268,6 +292,7 @@ export class MessagingService {
         const subject = `Identity Fusion Review Required: ${accountName} [${accountSource}]`
         const sourceType = context?.sourceType ?? (formInput as any)?.sourceType ?? undefined
         const emailData: FusionReviewEmailData = {
+            headerSubtitle: this.buildEmailHeaderSubtitle(),
             accounts: [
                 {
                     accountName,
@@ -282,6 +307,7 @@ export class MessagingService {
                         identityId: candidate.id || undefined,
                         identityUrl: candidate.identityUrl,
                         isMatch: true,
+                        exact: isExactAttributeMatchScores(candidate.scores),
                         scores: (candidate.scores || []).map((s: any) => ({
                             attribute: s.attribute,
                             algorithm: s.algorithm,
@@ -362,6 +388,7 @@ export class MessagingService {
             matches: matchAccountCount,
             reportDate: report.reportDate || new Date(),
             reportTitle,
+            headerSubtitle: this.buildEmailHeaderSubtitle(),
         }
         const body = renderFusionReport(this.templates, emailData)
 

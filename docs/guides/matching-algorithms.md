@@ -410,7 +410,7 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 | ------------------------ | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **High false positives** | Many forms for obvious non-duplicates | Raise thresholds; add mandatory matches for critical attributes                                 |
 | **High false negatives** | Missing obvious matches            | Lower thresholds; add more attributes; try different algorithms                                 |
-| **Borderline cases**     | Many ambiguous matches                | Enable **Automatically correlate if identical?** for obvious ones; manual review for borderline |
+| **Borderline cases**     | Many ambiguous matches                | Enable **Automatically assign on exact match?** for obvious ones; manual review for borderline |
 
 **Screenshot placeholder:** Review form showing per-attribute similarity scores.
 
@@ -420,13 +420,13 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 
 ---
 
-## Auto-correlation
+## Automatic assignment (exact scores)
 
 ### When to use
 
-**Automatically correlate if identical?** = Yes
+**Automatically assign on exact match?** = Yes
 
-**Effect:** Identities that meet similarity criteria and are "effectively identical" are auto-correlated without manual review.
+**Effect:** Candidates that are an **exact attribute match** (every real rule scored 100 with none skipped) are assigned to that identity without manual review.
 
 | Enable when...                         | Keep disabled when...                   |
 | -------------------------------------- | --------------------------------------- |
@@ -435,7 +435,7 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 | Review burden is high (>50 forms/week) | You want manual approval for all merges |
 | Obvious matches are common          | Data quality is poor                    |
 
-**When auto-correlation runs:** When **Automatically correlate if identical?** is enabled, the connector skips the review form when **every** rule was evaluated (**none** skipped for missing values) and **all** attribute similarity scores are **100**.
+**When it runs:** When **Automatically assign on exact match?** is enabled, the connector skips the review form when **every** real rule was evaluated (**none** skipped for missing values) and **all** attribute similarity scores are **100**.
 
 ---
 
@@ -563,7 +563,7 @@ Dates are notoriously poor candidates for pure string-matching algorithms due to
 3. **Test with samples** — Don't run on full dataset until thresholds are tuned
 4. **Monitor and adjust** — Track false positive/negative rates; iterate
 5. **Balance precision and recall** — Lower thresholds catch more matches but increase false positives
-6. **Consider auto-correlation** — Enable after tuning to reduce manual review burden
+6. **Consider automatic assignment** — Enable after tuning to reduce manual review burden
 
 **Next steps:**
 

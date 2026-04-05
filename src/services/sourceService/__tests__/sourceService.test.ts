@@ -44,7 +44,7 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         id: 'managed-source-id',
         name: 'HR Source',
         isManaged: true,
-        sourceType: 'authoritative',
+        sourceType: (sourceConfigOverrides.sourceType as SourceInfo['sourceType']) ?? 'authoritative',
         config: config.sources[0],
     }
     ;(service as any)._allSources = [sourceInfo]
@@ -222,6 +222,210 @@ describe('SourceService reverse correlation setup hardening', () => {
                 new Set()
             )
         ).rejects.toThrow('Reverse correlation setup is inconsistent')
+    })
+
+    it.each(['record', 'orphan'] as const)(
+        'runs minimal reverse correlation phases for sourceType=%s (identity attribute + managed correlation only)',
+        async (sourceType) => {
+            const { service } = createService({
+                correlationMode: 'reverse',
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity',
+                sourceType,
+            })
+
+            ;(service as any)._fusionSourceId = 'fusion-source-id'
+            ;(service as any).sourcesByName.set('Fusion Source', {
+                id: 'fusion-source-id',
+                name: 'Fusion Source',
+                isManaged: false,
+                sourceType: 'authoritative',
+                config: undefined,
+            })
+            const hrConfig = {
+                name: 'HR Source',
+                sourceType,
+                correlationMode: 'reverse' as const,
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity',
+            }
+            ;(service as any).sourcesByName.set('HR Source', {
+                id: 'managed-source-id',
+                name: 'HR Source',
+                isManaged: true,
+                sourceType,
+                config: hrConfig,
+            })
+
+            jest.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
+            const fusionSpy = jest.spyOn(service as any, 'ensureFusionSchemaAttribute').mockResolvedValue(undefined)
+            const identitySpy = jest.spyOn(service as any, 'ensureIdentityAttribute').mockResolvedValue(undefined)
+            const profileSpy = jest.spyOn(service as any, 'ensureIdentityProfileMapping').mockResolvedValue(undefined)
+            const managedSpy = jest.spyOn(service as any, 'ensureManagedSourceCorrelation').mockResolvedValue(undefined)
+            jest.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
+                isConsistent: true,
+                missingArtifacts: [],
+            })
+
+            await service.ensureReverseCorrelationSetup(hrConfig as any, new Set())
+
+            expect(fusionSpy).not.toHaveBeenCalled()
+            expect(profileSpy).not.toHaveBeenCalled()
+            expect(identitySpy).toHaveBeenCalledWith('reverseNativeIdentity', 'Reverse Native Identity')
+            expect(managedSpy).toHaveBeenCalledWith('reverseNativeIdentity', 'managed-source-id')
+        }
+    )
+})
+
+describe('SourceService authoritative reverse correlation identity profile mapping', () => {
+    it('does not PATCH identity profile when a transform for the correlation attribute already exists', async () => {
+        const { service, client } = createService({
+            correlationMode: 'reverse',
+            correlationAttribute: 'reverseNativeIdentity',
+            correlationDisplayName: 'Reverse Native Identity',
+        })
+        const fusionSource: SourceInfo = {
+            id: 'fusion-source-id',
+            name: 'Fusion Source',
+            isManaged: false,
+            sourceType: 'authoritative',
+            config: undefined,
+        }
+        const managedSource = (service as any).sourcesByName.get('HR Source')
+        ;(service as any)._fusionSourceId = 'fusion-source-id'
+        ;(service as any).sourcesById = new Map([
+            [fusionSource.id, fusionSource],
+            [managedSource.id, managedSource],
+        ])
+
+        client.identityProfilesApi = {
+            updateIdentityProfile: jest.fn().mockResolvedValue({ data: { id: 'profile-1' } }),
+        }
+        client.paginate = jest.fn().mockResolvedValue([
+            {
+                id: 'profile-1',
+                authoritativeSource: { id: 'fusion-source-id' },
+                identityAttributeConfig: {
+                    attributeTransforms: [
+                        {
+                            identityAttributeName: 'reverseNativeIdentity',
+                            transformDefinition: {
+                                type: 'rule',
+                                attributes: { name: 'CustomRule' },
+                            },
+                        },
+                    ],
+                },
+            },
+        ])
+
+        await (service as any).ensureIdentityProfileMapping('reverseNativeIdentity', {
+            name: 'HR Source',
+            sourceType: 'authoritative',
+        } as any)
+
+        expect(client.identityProfilesApi.updateIdentityProfile).not.toHaveBeenCalled()
+    })
+
+    it('adds default accountAttribute mapping when profile has no transform for that identity attribute', async () => {
+        const { service, client } = createService({
+            correlationMode: 'reverse',
+            correlationAttribute: 'reverseNativeIdentity',
+            correlationDisplayName: 'Reverse Native Identity',
+        })
+        const fusionSource: SourceInfo = {
+            id: 'fusion-source-id',
+            name: 'Fusion Source',
+            isManaged: false,
+            sourceType: 'authoritative',
+            config: undefined,
+        }
+        const managedSource = (service as any).sourcesByName.get('HR Source')
+        ;(service as any)._fusionSourceId = 'fusion-source-id'
+        ;(service as any).sourcesById = new Map([
+            [fusionSource.id, fusionSource],
+            [managedSource.id, managedSource],
+        ])
+
+        client.identityProfilesApi = {
+            updateIdentityProfile: jest.fn().mockResolvedValue({ data: { id: 'profile-1' } }),
+        }
+        client.paginate = jest.fn().mockResolvedValue([
+            {
+                id: 'profile-1',
+                authoritativeSource: { id: 'fusion-source-id' },
+                identityAttributeConfig: { attributeTransforms: [] },
+            },
+        ])
+        jest.spyOn(service as any, 'waitForIdentityProfileMapping').mockResolvedValue(true)
+
+        await (service as any).ensureIdentityProfileMapping('reverseNativeIdentity', {
+            name: 'HR Source',
+            sourceType: 'authoritative',
+        } as any)
+
+        expect(client.identityProfilesApi.updateIdentityProfile).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe('SourceService reverse correlation readiness cache', () => {
+    it('assertReverseCorrelationReady calls getReverseCorrelationSetupStatus only once per source until cleared', async () => {
+        const { service } = createService({
+            correlationMode: 'reverse',
+            correlationAttribute: 'reverseNativeIdentity',
+            correlationDisplayName: 'Reverse Native Identity',
+        })
+        const statusSpy = jest.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
+            isConsistent: true,
+            missingArtifacts: [],
+        })
+        const sourceConfig = {
+            name: 'HR Source',
+            correlationMode: 'reverse' as const,
+            correlationAttribute: 'reverseNativeIdentity',
+            correlationDisplayName: 'Reverse Native Identity',
+        }
+        await service.assertReverseCorrelationReady(sourceConfig as any)
+        await service.assertReverseCorrelationReady(sourceConfig as any)
+        expect(statusSpy).toHaveBeenCalledTimes(1)
+
+        service.clearReverseCorrelationReadinessCache()
+        await service.assertReverseCorrelationReady(sourceConfig as any)
+        expect(statusSpy).toHaveBeenCalledTimes(2)
+    })
+
+    it('ensureReverseCorrelationSetup seeds cache so assertReverseCorrelationReady skips status checks', async () => {
+        const { service } = createService({
+            correlationMode: 'reverse',
+            correlationAttribute: 'reverseNativeIdentity',
+            correlationDisplayName: 'Reverse Native Identity',
+        })
+        jest.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
+        jest.spyOn(service as any, 'ensureReverseCorrelationSetupPhases').mockResolvedValue(undefined)
+        const statusSpy = jest.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
+            isConsistent: true,
+            missingArtifacts: [],
+        })
+
+        await service.ensureReverseCorrelationSetup(
+            {
+                name: 'HR Source',
+                correlationMode: 'reverse',
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity',
+            } as any,
+            new Set()
+        )
+
+        statusSpy.mockClear()
+        await service.assertReverseCorrelationReady({
+            name: 'HR Source',
+            correlationMode: 'reverse',
+            correlationAttribute: 'reverseNativeIdentity',
+            correlationDisplayName: 'Reverse Native Identity',
+        } as any)
+
+        expect(statusSpy).not.toHaveBeenCalled()
     })
 })
 

@@ -166,7 +166,7 @@ export class IdentityService {
      * @returns The fetched identity document
      */
     public async fetchIdentityById(id: string): Promise<IdentityDocument> {
-        this.log.info(`Fetching identity ${id}.`)
+        this.log.debug(`Fetching identity ${id}.`)
 
         const query = buildIdentityQuery(`id:"${id}"`)
 
@@ -188,7 +188,7 @@ export class IdentityService {
      * @returns The fetched identity document
      */
     public async fetchIdentityByName(name: string): Promise<IdentityDocument> {
-        this.log.info(`Fetching identity ${name}.`)
+        this.log.debug(`Fetching identity ${name}.`)
 
         const query = buildIdentityQuery(`name.exact:"${name}"`)
 
@@ -295,6 +295,18 @@ export class IdentityService {
     // ------------------------------------------------------------------------
     // Public Utility Methods
     // ------------------------------------------------------------------------
+
+    /**
+     * Removes a single identity from the cache by ID.
+     * Called by FusionService.processFusionAccount after claiming a fusion account
+     * for a given identity, so that processIdentities skips it rather than
+     * relying solely on the fusionIdentityMap.has() lazy guard.
+     *
+     * @param id - The identity ID to remove from the cache
+     */
+    public deleteIdentity(id: string): void {
+        this.identitiesById.delete(id)
+    }
 
     /**
      * Clear the identity cache

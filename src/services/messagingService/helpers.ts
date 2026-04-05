@@ -10,11 +10,21 @@ export { registerHandlebarsHelpers } from './messagingHandlebarsRegistration'
 
 const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
-<body style="font-family: Arial, sans-serif; color: #1f2937; margin: 0; padding: 20px; background: #f7f9fc;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 920px; margin: 0 auto; background: #ffffff; border: 1px solid #e6ebf5; border-radius: 12px; box-shadow: 0 8px 20px rgba(16,24,40,0.08);">
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; color:#1f2937; margin:0; padding:0; background:#f3f6fb;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="width:100%; border-collapse:collapse;">
     <tr>
-      <td style="padding: 14px 14px;">
-        <h1 style="margin: 0; color: #0b5cab; font-size: 24px;">{{reportTitle}}</h1>
+      <td align="center" style="padding:0 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:920px; border-collapse:collapse;">
+          <tr>
+            <td style="padding:12px 20px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #e6ebf5; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.12);">
+                <tr>
+                  <td style="padding:14px 24px 14px 14px;">
+        <h1 style="margin:0; color:#0b5cab; font-size:26px; letter-spacing:-0.2px;">{{reportTitle}}</h1>
+        {{#if headerSubtitle}}
+        <div style="color:#0b5cab; font-size:15px; font-weight:700; margin-top:8px;">{{headerSubtitle}}</div>
+        {{/if}}
+        <div style="color:#5f6b7a; font-size:13px; margin-top:8px; line-height:1.5;">A curated view of potential matches and the scoring evidence behind them.</div>
 
         {{#if stats}}
         <div style="margin-top: 18px;">
@@ -73,6 +83,9 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                 {{decisionLabel}}
                 {{#if sourceType}}
                 <span style="display:inline-block; margin-left:6px; padding:1px 8px; border-radius:8px; background:#eef2f7; color:#5f6b7a; font-size:11px; font-weight:800; text-transform:uppercase; vertical-align:middle;">{{sourceTypeLabel sourceType}}</span>
+                {{/if}}
+                {{#if automaticAssignment}}
+                <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle;">AUTO</span>
                 {{/if}}
               </div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px; border-collapse:collapse;">
@@ -194,9 +207,14 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                                   {{/if}}
                                 </td>
                                 <td style="vertical-align:middle; text-align:right; white-space:nowrap; width:1%; padding-left:14px;">
+                                  <span style="display:inline-flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
+                                  {{#if exact}}
+                                  <span style="display:inline-block; vertical-align:middle; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:10px; font-weight:700; text-transform:uppercase;">Exact</span>
+                                  {{/if}}
                                   {{#if ../deferred}}
                                   <span style="display:inline-block; vertical-align:middle; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase;">Deferred</span>
                                   {{/if}}
+                                  </span>
                                 </td>
                               </tr>
                             </table>
@@ -242,6 +260,12 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
         {{else}}
           <p style="margin: 18px 0 0 0; color: #6b7280;">No accounts included in this report.</p>
         {{/if}}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
   </table>
@@ -282,12 +306,15 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                     <tr>
                         <td style="padding:12px 20px;">
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #e6ebf5; border-radius:14px; box-shadow:0 8px 20px rgba(16,24,40,0.10);">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #e6ebf5; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.12);">
                                 <tr>
                                     <td style="padding:14px 24px 14px 14px;">
                                         <div style="padding-bottom:18px; margin-bottom:22px; border-bottom:1px solid #e6ebf5;">
                                             <div style="margin-bottom:12px;">
                                                 <h1 style="margin:0; color:#0b5cab; font-size:26px; letter-spacing:-0.2px;">Identity Fusion Review Required</h1>
+                                                {{#if headerSubtitle}}
+                                                <div style="color:#0b5cab; font-size:15px; font-weight:700; margin-top:8px;">{{headerSubtitle}}</div>
+                                                {{/if}}
                                                 <div style="color:#5f6b7a; font-size:13px; margin-top:6px;">
                                                     Please review the potential match and take appropriate action.
                                                 </div>
@@ -376,9 +403,14 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                                                     {{/if}}
                                                                                 </td>
                                                                                 <td style="vertical-align:middle; text-align:right; white-space:nowrap; width:1%; padding-left:14px;">
+                                                                                  <span style="display:inline-flex; align-items:center; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
+                                                                                  {{#if exact}}
+                                                                                  <span style="display:inline-block; vertical-align:middle; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:10px; font-weight:700; text-transform:uppercase;">Exact</span>
+                                                                                  {{/if}}
                                                                                     {{#if ../deferred}}
                                                                                     <span style="display:inline-block; vertical-align:middle; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase;">Deferred</span>
                                                                                     {{/if}}
+                                                                                  </span>
                                                                                 </td>
                                                                             </tr>
                                                                         </table>
@@ -466,6 +498,8 @@ export type FusionReviewEmailData = {
   reportDate: Date | string
   formInstanceId?: string
   formUrl?: string
+  /** Tenant host and fusion source, e.g. "acme.identitynow.com - My Fusion Source" */
+  headerSubtitle?: string
 }
 
 export type EditRequestEmailData = {
@@ -477,6 +511,8 @@ export type EditRequestEmailData = {
 
 export type FusionReportEmailData = {
   reportTitle: string
+  /** Tenant host and fusion source, e.g. "acme.identitynow.com - My Fusion Source" */
+  headerSubtitle?: string
   accounts: Array<{
     accountName: string
     accountUrl?: string
@@ -492,6 +528,7 @@ export type FusionReportEmailData = {
       identityId?: string
       identityUrl?: string
       isMatch: boolean
+      exact?: boolean
       scores?: Array<{
         attribute: string
         algorithm?: string
@@ -522,6 +559,7 @@ export type FusionReportEmailData = {
     selectedIdentityUrl?: string
     comments?: string
     formUrl?: string
+    automaticAssignment?: boolean
   }>
   stats?: {
     totalFusionAccounts?: number
@@ -530,6 +568,7 @@ export type FusionReportEmailData = {
     fusionReviewAssignments?: number
     fusionReviewsFound?: number
     fusionReviewInstancesFound?: number
+    fusionAutomaticMatches?: number
     fusionReviewsProcessed?: number
     fusionReviewNewIdentities?: number
     fusionReviewNonMatches?: number

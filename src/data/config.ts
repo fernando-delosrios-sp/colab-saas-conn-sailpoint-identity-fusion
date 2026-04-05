@@ -1,5 +1,5 @@
 import { ConnectorError, ConnectorErrorType, readConfig, logger } from '@sailpoint/connector-sdk'
-import { FusionConfig, MatchingConfig, SourceConfig } from '../model/config'
+import { FusionConfig, SourceConfig } from '../model/config'
 import {
     FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT,
     FUSION_MAX_CANDIDATES_FOR_FORM_MAX,
@@ -57,10 +57,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     config.uniqueAttributeDefinitions = config.uniqueAttributeDefinitions ?? []
     config.sources = config.sources ?? []
     config.fusionFormAttributes = config.fusionFormAttributes ?? []
-    config.matchingConfigs = (config.matchingConfigs ?? []).map((matchingConfig: MatchingConfig) => ({
-        ...matchingConfig,
-        skipMatchIfMissing: matchingConfig.skipMatchIfMissing ?? true,
-    }))
+    config.matchingConfigs = config.matchingConfigs ?? []
     config.trim = config.trim ?? false
 
     // ============================================================================
@@ -109,7 +106,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     // ============================================================================
     // Default from connector-spec.json: fusionExpirationDays: 7
     config.fusionFormExpirationDays = config.fusionFormExpirationDays ?? 7
-    config.fusionMergingIdentical = config.fusionMergingIdentical ?? false
+    config.fusionMergingExactMatch = config.fusionMergingExactMatch ?? false
     // Minimum weighted combined match score (0-100); default aligned with connector-spec
     config.fusionAverageScore = config.fusionAverageScore ?? 80
 

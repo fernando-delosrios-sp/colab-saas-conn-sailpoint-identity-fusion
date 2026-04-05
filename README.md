@@ -172,7 +172,7 @@ Attribute Matching Settings - Matching
 | Field                                     | Description                                                    | Required | Notes                                                                                                                                                                                                 |
 | ----------------------------------------- | -------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Minimum combined match score [0-100]** | Global floor for the weighted **combined match score**         | Yes      | Typical range: 70-90; higher = stricter. The combined score is a weighted blend of per-attribute similarities; each rule’s **minimum similarity** is also its weight (higher minimum = more influence). |
-| **Automatically correlate if identical?**| Auto-merge when every rule scores 100 and none were skipped   | No       | Skips manual review only when all configured rules were evaluated at 100% similarity (not when a rule was skipped due to missing values).                                                             |
+| **Automatically assign on exact match?**   | Assign to the matched identity without review when every real rule scores 100 and none were skipped | No    | Skips manual review only for an **exact attribute match**: all configured rules evaluated at 100% similarity with **no** rules skipped for missing values.                                                                 |
 | **Fusion attribute matches**             | List of identity attributes to compare for match detection     | Yes      | At least one attribute match required; each match specifies an attribute and algorithm                                                                                                                |
 
 
@@ -187,7 +187,7 @@ Attribute Matching Settings - Matching - Per attribute matching
 | **Matching algorithm**       | Algorithm for similarity calculation                          | Yes      | **Enhanced Name Matcher** (person names, handles variations), **Jaro-Winkler** (short strings with typos, emphasizes beginning), **LIG3** (Levenshtein-based with intelligent gap penalties, excellent for international names and multi-word fields), **Dice** (longer text, bigram-based), **Double Metaphone** (phonetic, similar pronunciation), **Custom** (from SaaS customizer) |
 | **Similarity threshold & weight [0-100]** | Per-rule similarity threshold and blend weight             | Yes      | Values must meet this minimum for the rule to **pass**. The same value weights the rule in the **combined match score** (stricter rules count more). Use 0 only if you need minimal weight; it is treated as weight 1 in the blend. |
 | **Mandatory match**           | Rule must pass for a potential match                      | No       | When Yes: similarity must be ≥ this rule’s minimum or the candidate is rejected, regardless of combined score. Passing mandatory rules still contribute to the weighted combined score like other rules.                           |
-| **Skip match if missing**      | Skip rule when one side is missing                         | No       | Default: Yes. Skipped rules do not affect the combined score. Auto-correlate-when-identical requires **no** skipped rules and every evaluated score at 100.                                                                        |
+| **Skip match if missing**      | Skip rule when one side is missing                         | No       | Default: Yes. Skipped rules do not affect the combined score. Automatic assignment on exact match requires **no** skipped rules and every evaluated score at 100.                                                                        |
 
 
 > **Tip:** Use Fusion reports to fine-tune your matching thresholds and algorithms.
@@ -302,37 +302,39 @@ For step-by-step instructions and UI details, see the [Map](docs/guides/map.md),
 
 ## Custom command: `custom:report`
 
-Use `custom:report` to run a **non-persistent aggregation analysis**. It evaluates managed accounts with the same matching logic used for reports, but it does not execute the persistence/writeback phase used by `std:account:list`.
+Use `custom:report` to run a **non-persistent aggregation analysis**. It evaluates managed accounts with the same matching logic used for reports, but it does not execute the persistence/writeback phase used by `std:account:list`. The connector records match/deferred/non-match report data for this command using the operation name (`custom:report`), so deferred and other totals align with aggregation even when the SDK reports `commandType` as account list. When **Owner is global reviewer?** is enabled, it also loads the fusion source owner’s identity if missing from cache (same as `std:account:list`), so Match/reviewer setup works even when the Fusion source has no accounts yet.
 
 ### Input options
 
 `custom:report` supports optional runtime controls in the command input:
 
-- `includeExisting` (boolean): Emit rows whose `reportCategories` include **`baseline`**. That is the slice where fusion `statuses` includes **`baseline`** (identity-origin accounts in scope—not “every” fusion row that already existed). A fusion account that was created or grown from **managed sources** is not necessarily identity-origin and may **not** carry `baseline`; use `includeMatched`, `includeUnmatched`, `includeDeferred`, etc. to pull those into the report. When a baseline-tagged row has **no** correlated managed accounts yet, it is still emitted under this flag. For backward compatibility, `includeBaseline` is still accepted and behaves the same.
-- `includeUnmatched` (boolean): Emit rows categorized as unmatched.
+- `includeExisting` (boolean): Emit **every** fusion account row produced by the connector’s fusion account listing (`forEachISCAccount`), regardless of origin (identity baseline, identity-correlated, uncorrelated, managed-grown, and so on). Detail rows include the **`existing-fusion`** category; **`baseline`** and **`identity-linked`** may also appear as descriptive tags when they apply. Synthetic deferred stubs (`orphan-deferred:…`) and fallback analyzed-managed rows are not fusion listing rows and are not tagged `existing-fusion`. In the summary, **`emitted.includeExisting`** matches **`totals.fusionAccountsExisting`** (the same fusion inventory count from fetch / in-memory totals).
+- `includeNonMatched` (boolean): Emit rows categorized as NonMatched.
 - `includeMatched` (boolean): Emit rows whose `matching.status` is `matched`.
-- `includeDeferred` (boolean): Emit rows whose `matching.status` is `deferred`.
+- `includeExact` (boolean): Emit rows that have at least one **exact** match candidate: every real attribute rule scored 100 with none skipped (same predicate as **Automatically assign on exact match?**). You can use this without `includeMatched` to list only those rows.
+- `includeDeferred` (boolean): Emit rows whose `matching.status` is `deferred`. Same-aggregation deferrals that are not yet linked on any fusion account’s `accounts` list in this run are still included via a synthetic stub row (key `orphan-deferred:<managedAccountId>`), matching aggregation-style deferred reporting.
 - `includeReview` (boolean): Emit rows with `review.pending === true`.
 - `includeDecisions` (boolean): Emit rows linked to processed fusion review decisions.
+- `writeToDisk` (boolean): When `true`, **does not** stream per-account rows in the HTTP response (which avoids client “maximum response size” limits). Instead, the connector writes one **pretty-printed JSON document** to a file under the connector host’s working directory in a `reports` subfolder: `{ "rows": [ ... ], "summary": { ... } }`, where `summary` is the same `custom:report:summary` object returned over HTTP. The file name is `./reports/custom-report-<host-label>-<timestamp>.json`, where `<timestamp>` is the run start time in UTC as an ISO-8601 string with `:` and `.` replaced by `-` (for example `2026-04-04T14-30-00-000Z`), and `<host-label>` is the **first DNS label** of the API host in the connector **`baseurl`** (for example `acme` from `https://acme.api.identitynow.com`), not the full FQDN—so tenant or environment names stay short in filenames. The HTTP response still ends with that summary object, which includes `writeToDisk: true` and `reportOutputPath` (absolute path on the host where the connector process runs). Defaults to `false`.
 
-All `include*` options default to `false`. If none are enabled, no account rows are streamed.
+All `include*` options default to `false`. If none are enabled, no account rows are streamed (or written).
 `summary` is always emitted by default and is not a runtime option.
 
 ### What it returns
 
-- Streams final ISC account rows (`key`, `attributes`, `disabled`) like account list output.
-- Adds root-level `matching` to every streamed row with:
+- Unless `writeToDisk` is `true`, streams final ISC account rows (`key`, `attributes`, `disabled`) like account list output. With `writeToDisk`, those row objects are stored under the `rows` array in the report file (not over HTTP).
+- Adds root-level `matchingStatus` (and related context) to every streamed row with:
   - `status`: `matched`, `deferred`, `non-matched`, `review-error`, or `not-analyzed`
+  - `matchAttempts`: how many managed accounts had Match run for this row in this report
   - `matches`: candidate identities and per-attribute scores when available
-  - `sourceContext`: source provenance (`originSource`, `originAccount`, `sources`)
-  - `correlationContext`: linked and missing account context (`accounts`, `missing-accounts`, `reviews`, `statuses`)
+- Adds root-level `sourceStatus` and `correlationStatus` (source provenance and linked account context: `accounts`, `missing-accounts`, `reviews`, `statuses`, etc.)
 - Adds root-level `review` only for rows categorized as `review` or `decisions`:
   - `pending`: whether there is an active pending form instance linked to any account id in `attributes.accounts`
   - `forms`: pending form references (`formInstanceId`, `url`)
   - `reviewers`: resolved reviewer identities (`id`, `name`, `email`)
   - `candidates`: candidate identity details (`id`, `name`, `scores`, `attributes`)
 - Adds root-level `reportCategories` to every streamed row, listing all matched output categories for that row.
-- Sends a final summary object with `type: custom:report:summary` containing row totals, managed-account analysis totals, diagnostics, and processing time.
+- Sends a final summary object with `type: custom:report:summary` containing: `options` (the `include*` / `writeToDisk` flags used for the run), `emitted` (per **emitted** row, how often each report category appeared—filtered by your `include*` flags, so e.g. `includeDeferred` can stay `0` while `totals.deferredMatches` is non-zero if you did not enable `includeDeferred`), `totals` (run-wide analysis: Fusion account counts from the loaded source, custom-report Match-attempt slice counts such as `matchAttempts`, `matches`, `deferredMatches`, `nonMatches`, etc.), diagnostics, optional report `stats`, and processing time.
 
 ### Typical use cases
 
@@ -367,7 +369,7 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
 
 > **Tip:** Do not include attributes you don't need in your schema, and do not remove internal attributes.
 
-> **Tip:** You can use status entitlements in search to find identities in different situations, such as those included in a pending Fusion review, your Fusion reviewers, identities with uncorrelated managed accounts, baseline-only identities, unmatched identities, identities with manual assignments, etc.
+> **Tip:** You can use status entitlements in search to find identities in different situations, such as those included in a pending Fusion review, your Fusion reviewers, identities with uncorrelated managed accounts, baseline-only identities, NonMatched identities, identities with manual assignments, etc.
 
 > **Tip:** Account name definition is ignored for baseline Fusion accounts to ensure the Fusion account is automatically correlated with the identity that originated it.
 

@@ -921,14 +921,16 @@ export class FormService {
     }
 
     /**
-     * Check if a managed account still exists in the source
+     * Check if a managed account is present in this run's source inventory.
+     * Uses managedAccountsAllById (full snapshot), not managedAccountsById (work queue),
+     * because the queue is depleted during fetchFormData when completed forms remove entries.
      */
     private managedAccountExists(accountId: string): boolean {
-        const managedAccountsMap = this.sources.managedAccountsById
-        if (!managedAccountsMap) {
+        const allById = this.sources.managedAccountsAllById
+        if (!allById) {
             return false
         }
-        return managedAccountsMap.has(accountId)
+        return allById.has(accountId)
     }
 
     /**
@@ -949,20 +951,23 @@ export class FormService {
             return undefined
         }
 
-        const managedAccountsMap = this.sources.managedAccountsById
-        assert(managedAccountsMap, 'Managed accounts have not been loaded')
+        const workQueue = this.sources.managedAccountsById
+        const allById = this.sources.managedAccountsAllById
+        assert(workQueue, 'Managed accounts have not been loaded')
 
-        const account = managedAccountsMap.get(accountId)
+        // Prefer work queue, then full snapshot — another form processed earlier in this
+        // run may have already removed the account from the queue only.
+        const account = workQueue.get(accountId) ?? allById.get(accountId)
         if (!account) {
-            // Account doesn't exist anymore, return undefined.
+            // Account not in this run's managed inventory, return undefined.
             // The form will be deleted due to missing account check in analyzeFormInstances.
             return undefined
         }
 
         if (shouldRemoveAccountFromMap) {
             // We have a response instance for this form, so remove the managed
-            // account from the map to avoid re-processing it on subsequent runs.
-            managedAccountsMap.delete(accountId)
+            // account from the work queue to avoid re-processing it on subsequent runs.
+            workQueue.delete(accountId)
         }
 
         return {

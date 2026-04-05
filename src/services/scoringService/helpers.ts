@@ -158,6 +158,16 @@ export const scoreLIG3 = (
     const s1 = normalize(accountAttribute)
     const s2 = normalize(identityAttribute)
 
+    if (s1.length === 0 && s2.length === 0) {
+        const threshold = matching.fusionScore ?? 0
+        return {
+            ...matching,
+            score: 0,
+            isMatch: 0 >= threshold,
+            comment: 'Both values empty',
+        }
+    }
+
     if (s1 === s2) {
         return {
             ...matching,

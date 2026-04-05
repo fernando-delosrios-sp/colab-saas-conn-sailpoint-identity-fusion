@@ -11,7 +11,7 @@
         "std:account:update",
         "std:account:discover-schema",
         "std:entitlement:list",
-        "custom:report"
+        "custom:dryrun"
     ],
     "supportsCustomSchemas": true,
     "showDebugLoggingOption": true,
@@ -727,7 +727,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Matching Settings",
-                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><ul><li><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.</li><li><strong>Thresholds & weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.</li><li><strong>Strictness:</strong> Enforce mandatory rules or trigger auto-correlation for identical matches.</li></ul>",
+                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><ul><li><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.</li><li><strong>Thresholds & weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.</li><li><strong>Strictness:</strong> Enforce mandatory rules or optionally assign to the matched identity without manual review when scores are an exact attribute match (every real rule scored 100 with none skipped).</li></ul>",
                     "items": [
                         {
                             "key": "fusionAverageScore",
@@ -737,11 +737,11 @@
                             "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match. Mandatory rules must still meet their own minimums."
                         },
                         {
-                            "key": "fusionMergingIdentical",
-                            "label": "Automatically correlate if identical?",
+                            "key": "fusionMergingExactMatch",
+                            "label": "Automatically assign on exact match?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Automatically merge matching records without requiring manual review. Only enable this when you are confident your matching rules produce accurate results"
+                            "helpKey": "When every configured attribute rule scores 100 and none were skipped (exact attribute match), assign the managed account to that identity without a review form. Merge and correlation behave like a link-to-existing review, but the fusion account receives the Auto status entitlement only (not Authorized). Only enable when you are confident your matching rules produce accurate results."
                         },
                         {
                             "key": "matchingConfigs",
@@ -821,7 +821,7 @@
                                             "label": "Mandatory match",
                                             "type": "toggle",
                                             "required": false,
-                                            "helpKey": "When enabled, this rule must meet its minimum similarity for a potential match. Passing mandatory rules contribute to the weighted combined score like other rules."
+                                            "helpKey": "When enabled, this rule must meet its minimum similarity for a potential match. Mandatory rules are always evaluated even when a value is missing (Skip match if missing does not apply), so absent data can fail the rule. Passing mandatory rules contribute to the weighted combined score like other rules."
                                         },
                                         {
                                             "key": "skipMatchIfMissing",

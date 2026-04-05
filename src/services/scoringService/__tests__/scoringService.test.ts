@@ -1,4 +1,5 @@
 import { COMBINED_SCORE_ROW_ATTRIBUTE, ScoringService, WEIGHTED_MEAN_ALGORITHM } from '../scoringService'
+import { effectiveSkipMatchIfMissing } from '../../../model/config'
 
 describe('ScoringService mandatory matching behavior', () => {
     const baseMatchingConfigs = [
@@ -37,7 +38,7 @@ describe('ScoringService mandatory matching behavior', () => {
         return { fusionAccount, fusionIdentity }
     }
 
-    it('invalidates combined match when a mandatory threshold fails', () => {
+    it('invalidates combined match when a mandatory threshold fails', async () => {
         const service = new ScoringService(
             {
                 matchingConfigs: baseMatchingConfigs,
@@ -47,12 +48,12 @@ describe('ScoringService mandatory matching behavior', () => {
         )
         const { fusionAccount, fusionIdentity } = createAccounts()
 
-        service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
 
         expect(fusionAccount.addFusionMatch).not.toHaveBeenCalled()
     })
 
-    it('matches when mandatory threshold is met and combined score passes', () => {
+    it('matches when mandatory threshold is met and combined score passes', async () => {
         const service = new ScoringService(
             {
                 matchingConfigs: baseMatchingConfigs,
@@ -76,7 +77,7 @@ describe('ScoringService mandatory matching behavior', () => {
             displayName: 'Identity One',
         } as any
 
-        service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
 
         expect(fusionAccount.addFusionMatch).toHaveBeenCalledTimes(1)
         const fusionMatch = fusionAccount.addFusionMatch.mock.calls[0][0]
@@ -86,7 +87,44 @@ describe('ScoringService mandatory matching behavior', () => {
         expect(combined.isMatch).toBe(true)
     })
 
-    it('assigns weightedScore partials that sum to the combined score', () => {
+    it('evaluates mandatory rules when values are missing (does not skip), failing the candidate', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'birthdate',
+                        algorithm: 'lig3',
+                        fusionScore: 100,
+                        mandatory: true,
+                        skipMatchIfMissing: true,
+                    },
+                    {
+                        attribute: 'last4ssn',
+                        algorithm: 'lig3',
+                        fusionScore: 100,
+                    },
+                ],
+                fusionAverageScore: 80,
+            } as any,
+            { crash: jest.fn() } as any
+        )
+
+        const fusionAccount = {
+            attributes: { birthdate: '', last4ssn: '1234' },
+            addFusionMatch: jest.fn(),
+        } as any
+        const fusionIdentity = {
+            attributes: { birthdate: '', last4ssn: '1234' },
+            identityId: 'identity-m',
+            displayName: 'Identity M',
+        } as any
+
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+
+        expect(fusionAccount.addFusionMatch).not.toHaveBeenCalled()
+    })
+
+    it('assigns weightedScore partials that sum to the combined score', async () => {
         const service = new ScoringService(
             {
                 matchingConfigs: [
@@ -107,7 +145,7 @@ describe('ScoringService mandatory matching behavior', () => {
             identityDisplayName: 'J S',
         } as any
 
-        service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
 
         expect(fusionAccount.addFusionMatch).toHaveBeenCalled()
         const fusionMatch = fusionAccount.addFusionMatch.mock.calls[0][0]
@@ -124,7 +162,7 @@ describe('ScoringService mandatory matching behavior', () => {
 describe('ScoringService skipMatchIfMissing behavior', () => {
     const log = { crash: jest.fn() } as any
 
-    it('pushes skipped row and does not match when only rule is skipped', () => {
+    it('pushes skipped row and does not match when only rule is skipped', async () => {
         const service = new ScoringService(
             {
                 matchingConfigs: [
@@ -150,13 +188,13 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
             displayName: 'Identity One',
         } as any
 
-        service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
 
         expect(fusionAccount.addFusionMatch).not.toHaveBeenCalled()
         expect(log.crash).not.toHaveBeenCalled()
     })
 
-    it('evaluates missing values when toggle is disabled (counts toward combined)', () => {
+    it('evaluates missing values when toggle is disabled (counts toward combined)', async () => {
         const service = new ScoringService(
             {
                 matchingConfigs: [
@@ -182,12 +220,12 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
             displayName: 'Identity Two',
         } as any
 
-        service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
 
         expect(fusionAccount.addFusionMatch).toHaveBeenCalledTimes(1)
     })
 
-    it('uses only non-skipped rules in weighted combined when missing values are skipped', () => {
+    it('uses only non-skipped rules in weighted combined when missing values are skipped', async () => {
         const service = new ScoringService(
             {
                 matchingConfigs: [
@@ -219,7 +257,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
             displayName: 'Identity Three',
         } as any
 
-        service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
 
         expect(fusionAccount.addFusionMatch).toHaveBeenCalledTimes(1)
         const fusionMatch = fusionAccount.addFusionMatch.mock.calls[0][0]
@@ -228,7 +266,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
         expect(fusionMatch.scores.find((s: any) => s.algorithm === WEIGHTED_MEAN_ALGORITHM)).toBeDefined()
     })
 
-    it('includes missing-value rules in blend when skip is disabled on both', () => {
+    it('includes missing-value rules in blend when skip is disabled on both', async () => {
         const service = new ScoringService(
             {
                 matchingConfigs: [
@@ -260,9 +298,23 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
             displayName: 'Identity Four',
         } as any
 
-        service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
 
         expect(fusionAccount.addFusionMatch).not.toHaveBeenCalled()
+    })
+})
+
+describe('effectiveSkipMatchIfMissing', () => {
+    it('skips when omitted or true, unless mandatory', () => {
+        expect(effectiveSkipMatchIfMissing({})).toBe(true)
+        expect(effectiveSkipMatchIfMissing({ skipMatchIfMissing: true })).toBe(true)
+        expect(effectiveSkipMatchIfMissing({ mandatory: true })).toBe(false)
+        expect(effectiveSkipMatchIfMissing({ mandatory: true, skipMatchIfMissing: true })).toBe(false)
+    })
+
+    it('does not skip when explicitly false', () => {
+        expect(effectiveSkipMatchIfMissing({ skipMatchIfMissing: false })).toBe(false)
+        expect(effectiveSkipMatchIfMissing({ mandatory: false, skipMatchIfMissing: false })).toBe(false)
     })
 })
 

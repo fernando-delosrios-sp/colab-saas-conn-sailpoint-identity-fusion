@@ -33,6 +33,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         releaseProcessLock: jest.fn().mockResolvedValue(undefined),
         resetBatchCumulativeCount: jest.fn().mockResolvedValue(undefined),
         ensureReverseCorrelationSetup: jest.fn().mockResolvedValue(undefined),
+        clearReverseCorrelationReadinessCache: jest.fn(),
         aggregateManagedSources: jest.fn().mockResolvedValue(undefined),
         aggregateDelayedSources: jest.fn().mockResolvedValue(undefined),
         fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
@@ -43,6 +44,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         getSourceByName: jest.fn(),
         managedSources: [],
         managedAccountsById: new Map(),
+        managedAccountsAllById: new Map(),
         fusionAccountCount: 0,
         fusionSourceOwner: { id: 'fusion-owner' },
     }

@@ -245,7 +245,7 @@ export class AttributeService {
         }
 
         // Ensure fusion account history is never lost: for accounts that have their own audit log
-        // (e.g. type 'managed' with setUnmatched), keep it in the bag so output is correct.
+        // (e.g. type 'managed' with setNonMatched), keep it in the bag so output is correct.
         if (fusionAccount.history.length > 0) {
             attributes['history'] = [...fusionAccount.history]
         }
@@ -1068,6 +1068,25 @@ export class AttributeService {
      * Generated values are written to both the account's attribute bag and the shared
      * Velocity context, making them available to subsequent definitions in the same run.
      */
+    /**
+     * Best-effort display label for the correlated ISC identity (not persisted fusion account.name,
+     * which may still hold a managed native id when the identity layer was skipped).
+     */
+    private hostingIdentityDisplayLabel(fusionAccount: FusionAccount): string | undefined {
+        const trim = (v: unknown) => {
+            const s = String(v ?? '').trim()
+            return s.length > 0 ? s : undefined
+        }
+        const idn = trim(fusionAccount.identityDisplayName)
+        if (idn) return idn
+        const bag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
+        if (bag) {
+            const fromBag = trim(bag.displayName) ?? trim(bag.name)
+            if (fromBag) return fromBag
+        }
+        return trim(fusionAccount.name)
+    }
+
     private async processNormalDefinition(
         definition: NormalAttributeDefinition,
         fusionAccount: FusionAccount,
@@ -1097,8 +1116,11 @@ export class AttributeService {
         }
 
         if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
-            this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
-            fusionAccount.attributes[name] = fusionAccount.name!
+            const label = this.hostingIdentityDisplayLabel(fusionAccount)
+            if (label) {
+                this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
+                fusionAccount.attributes[name] = label
+            }
             return
         }
 
@@ -1164,8 +1186,11 @@ export class AttributeService {
 
         // Set identity name for display attribute if the account is an identity
         if (fusionAccount.fromIdentity && isFusionDisplayAttribute) {
-            this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
-            fusionAccount.attributes[name] = fusionAccount.name!
+            const label = this.hostingIdentityDisplayLabel(fusionAccount)
+            if (label) {
+                this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
+                fusionAccount.attributes[name] = label
+            }
             return
         }
 

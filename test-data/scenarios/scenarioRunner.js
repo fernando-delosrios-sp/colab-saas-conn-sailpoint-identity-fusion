@@ -116,7 +116,7 @@ function buildDecisionMap(forms) {
 function runPass(passName, config, identities, managedAccounts, forms) {
     const threshold = Number(config?.fusionAverageScore ?? 80)
     const includeIdentities = config?.includeIdentities !== false
-    const fusionMergingIdentical = Boolean(config?.fusionMergingIdentical)
+    const fusionMergingExactMatch = Boolean(config?.fusionMergingExactMatch)
 
     const decisionMap = buildDecisionMap(forms)
     const sourceConfigMap = new Map(
@@ -186,7 +186,7 @@ function runPass(passName, config, identities, managedAccounts, forms) {
             continue
         }
 
-        if (fusionMergingIdentical && top && top.score === 100) {
+        if (fusionMergingExactMatch && top && top.score === 100) {
             correlations.push({
                 accountId,
                 accountName,

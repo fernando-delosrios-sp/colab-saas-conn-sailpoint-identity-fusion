@@ -12,7 +12,7 @@ export type FusionReportScore = {
     score: number
     /** Weighted partial toward combined score: (weight/Σw)×raw */
     weightedScore?: number
-    /** The configured minimum similarity (also blend weight): fusionScore */
+    /** The configured per-attribute minimum similarity threshold (also used as blend weight). Emitted as `threshold` in custom:dryrun output. */
     fusionScore?: number
     /** Whether the score met or exceeded the threshold */
     isMatch: boolean
@@ -28,12 +28,18 @@ export type FusionReportMatch = {
     identityName: string
     /** ISC identity ID */
     identityId?: string
+    /** Fusion listing / native key for the candidate identity account (dry-run wire: alongside identity fields). */
+    accountId?: string
+    /** Display label for the candidate fusion account */
+    accountName?: string
     /** Direct URL to the identity in the ISC UI */
     identityUrl?: string
     /** Whether this candidate is considered a match overall */
     isMatch: boolean
     /** Candidate source used for downstream diagnostics/reporting. */
     candidateType?: 'identity' | 'new-unmatched'
+    /** True when every configured rule scored 100 with none skipped (exact attribute match). */
+    exact?: boolean
     /** Per-attribute score breakdown */
     scores?: FusionReportScore[]
 }
@@ -56,6 +62,8 @@ export type FusionReportAccount = {
     accountAttributes?: Record<string, any>
     /** List of identity match candidates with their scores */
     matches: FusionReportMatch[]
+    /** How many fusion identity accounts were compared against this managed account in this run (per scoring passes). */
+    fusionIdentityComparisons?: number
     /** Error message when form creation failed (excessive candidates or runtime error) */
     error?: string
     /** True when the account matched only new unmatched candidates and was deferred. */
@@ -96,6 +104,8 @@ export type FusionReportDecision = {
     comments?: string
     /** Standalone form URL for traceability */
     formUrl?: string
+    /** True when the connector assigned without a review form (exact match) */
+    automaticAssignment?: boolean
 }
 
 /** Processing statistics included in the fusion report. */
@@ -125,6 +135,8 @@ export type FusionReportStats = {
     fusionReviewsFound?: number
     /** Number of fusion review form instances found during fetch */
     fusionReviewInstancesFound?: number
+    /** Accounts assigned by exact-match automatic assignment (no manual review) */
+    fusionAutomaticMatches?: number
     /** Number of answered fusion review instances processed */
     fusionReviewsProcessed?: number
     /** Number of "new identity" decisions from reviews */

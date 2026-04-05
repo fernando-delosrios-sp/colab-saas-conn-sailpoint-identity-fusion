@@ -91,7 +91,8 @@ export class ServiceRegistry {
                 this.attributes,
                 this.scoring,
                 this.schemas,
-                commandType
+                commandType,
+                operationContext
             )
 
         this.proxy = context.proxyService ?? new ProxyService(this.config, this.log, this.res, commandType)

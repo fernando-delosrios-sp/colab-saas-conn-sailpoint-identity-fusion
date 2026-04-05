@@ -66,6 +66,11 @@ export type FusionDecision = {
      */
     finished: boolean
     /**
+     * Set only by the connector when assigning to an existing identity without a review form
+     * (exact attribute match). Drives the `auto` status entitlement and auto-assignment history.
+     */
+    automaticAssignment?: boolean
+    /**
      * Optional URL of the underlying form instance (standalone form).
      * Used to populate reviewer review links without refetching form instances.
      */

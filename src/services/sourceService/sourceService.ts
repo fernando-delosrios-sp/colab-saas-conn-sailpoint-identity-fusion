@@ -49,6 +49,11 @@ interface ReverseCorrelationSetupStatus {
     missingArtifacts: ReverseCorrelationArtifact[]
 }
 
+/** Authoritative sources need fusion schema + identity profile mapping for reverse correlation; record/orphan only identity attribute + managed-source correlation. */
+function requiresFullReverseCorrelationArtifacts(sourceConfig: SourceConfig): boolean {
+    return (sourceConfig.sourceType ?? 'authoritative') === 'authoritative'
+}
+
 // ============================================================================
 // SourceService Class
 // ============================================================================
@@ -67,6 +72,9 @@ export class SourceService {
     private _allSources?: SourceInfo[]
     private _fusionSourceId?: string
     private _fusionSourceOwner?: OwnerDto
+
+    /** Per-run cache: managed source names that passed reverse-correlation setup/assert this session. */
+    private reverseCorrelationReadinessBySourceName = new Set<string>()
 
     // Account caching and work queue
     // managedAccountsById serves dual purpose:
@@ -1091,30 +1099,60 @@ export class SourceService {
         const sourceInfo = this.sourcesByName.get(sourceName)
         assert(sourceInfo, `Source "${sourceName}" not found`)
 
+        const scope = requiresFullReverseCorrelationArtifacts(sourceConfig) ? 'full' : 'minimal'
         this.log.info(
-            `Setting up reverse correlation for source "${sourceName}": attribute="${correlationAttribute}", displayName="${correlationDisplayName}"`
+            `Setting up reverse correlation for source "${sourceName}" (${scope}): attribute="${correlationAttribute}", displayName="${correlationDisplayName}"`
         )
 
-        await this.ensureReverseCorrelationSetupPhases(correlationAttribute, correlationDisplayName, sourceInfo.id)
+        await this.ensureReverseCorrelationSetupPhases(
+            correlationAttribute,
+            correlationDisplayName,
+            sourceInfo.id,
+            sourceConfig
+        )
 
-        const initialStatus = await this.getReverseCorrelationSetupStatus(correlationAttribute, sourceInfo.id)
+        const initialStatus = await this.getReverseCorrelationSetupStatus(
+            correlationAttribute,
+            sourceInfo.id,
+            sourceConfig
+        )
         if (initialStatus.isConsistent) {
+            this.reverseCorrelationReadinessBySourceName.add(sourceName)
             return
         }
 
         this.log.warn(
             `Reverse correlation setup verification failed for source "${sourceName}" (missing: ${initialStatus.missingArtifacts.join(', ')}). Attempting one auto-repair pass.`
         )
-        await this.repairReverseCorrelationSetup(correlationAttribute, correlationDisplayName, sourceInfo.id, initialStatus)
+        await this.repairReverseCorrelationSetup(
+            correlationAttribute,
+            correlationDisplayName,
+            sourceInfo.id,
+            initialStatus,
+            sourceConfig
+        )
 
-        const repairedStatus = await this.getReverseCorrelationSetupStatus(correlationAttribute, sourceInfo.id)
+        const repairedStatus = await this.getReverseCorrelationSetupStatus(
+            correlationAttribute,
+            sourceInfo.id,
+            sourceConfig
+        )
         if (!repairedStatus.isConsistent) {
             throw new ConnectorError(
                 `Reverse correlation setup is inconsistent for source "${sourceName}" after auto-repair. Missing artifacts: ${repairedStatus.missingArtifacts.join(', ')}.`,
                 ConnectorErrorType.Generic
             )
         }
+        this.reverseCorrelationReadinessBySourceName.add(sourceName)
         this.log.info(`Reverse correlation setup verified for source "${sourceName}"`)
+    }
+
+    /**
+     * Reset reverse-correlation readiness cache (e.g. at account-list aggregation start).
+     * Allows {@link ensureReverseCorrelationSetup} to re-verify each run before per-account processing.
+     */
+    public clearReverseCorrelationReadinessCache(): void {
+        this.reverseCorrelationReadinessBySourceName.clear()
     }
 
     /**
@@ -1124,25 +1162,41 @@ export class SourceService {
     public async assertReverseCorrelationReady(sourceConfig: SourceConfig): Promise<void> {
         const { correlationAttribute, name: sourceName } = sourceConfig
         assert(correlationAttribute, `Reverse correlation attribute name is required for source "${sourceName}"`)
+        if (this.reverseCorrelationReadinessBySourceName.has(sourceName)) {
+            return
+        }
         const sourceInfo = this.sourcesByName.get(sourceName)
         assert(sourceInfo, `Source "${sourceName}" not found`)
-        const status = await this.getReverseCorrelationSetupStatus(correlationAttribute, sourceInfo.id)
+        const status = await this.getReverseCorrelationSetupStatus(correlationAttribute, sourceInfo.id, sourceConfig)
         if (!status.isConsistent) {
             throw new ConnectorError(
                 `Reverse correlation prerequisites are not ready for source "${sourceName}". Missing artifacts: ${status.missingArtifacts.join(', ')}.`,
                 ConnectorErrorType.Generic
             )
         }
+        this.reverseCorrelationReadinessBySourceName.add(sourceName)
     }
 
     private async ensureReverseCorrelationSetupPhases(
         correlationAttribute: string,
         correlationDisplayName: string,
-        managedSourceId: string
+        managedSourceId: string,
+        sourceConfig: SourceConfig
     ): Promise<void> {
-        await this.ensureFusionSchemaAttribute(correlationAttribute, correlationDisplayName)
+        const full = requiresFullReverseCorrelationArtifacts(sourceConfig)
+        if (full) {
+            await this.ensureFusionSchemaAttribute(correlationAttribute, correlationDisplayName)
+            await this.ensureIdentityAttribute(correlationAttribute, correlationDisplayName)
+            await this.ensureIdentityProfileMapping(correlationAttribute, sourceConfig)
+            await this.ensureManagedSourceCorrelation(correlationAttribute, managedSourceId)
+            return
+        }
+
+        this.log.info(
+            `Reverse correlation for source "${sourceConfig.name}" (sourceType=${sourceConfig.sourceType}): ` +
+                'minimal setup — identity attribute and managed source correlation only (no fusion schema or identity profile changes).'
+        )
         await this.ensureIdentityAttribute(correlationAttribute, correlationDisplayName)
-        await this.ensureIdentityProfileMapping(correlationAttribute)
         await this.ensureManagedSourceCorrelation(correlationAttribute, managedSourceId)
     }
 
@@ -1150,16 +1204,18 @@ export class SourceService {
         correlationAttribute: string,
         correlationDisplayName: string,
         managedSourceId: string,
-        status: ReverseCorrelationSetupStatus
+        status: ReverseCorrelationSetupStatus,
+        sourceConfig: SourceConfig
     ): Promise<void> {
-        if (status.missingArtifacts.includes('fusion_schema_attribute')) {
+        const full = requiresFullReverseCorrelationArtifacts(sourceConfig)
+        if (full && status.missingArtifacts.includes('fusion_schema_attribute')) {
             await this.ensureFusionSchemaAttribute(correlationAttribute, correlationDisplayName)
         }
         if (status.missingArtifacts.includes('identity_attribute')) {
             await this.ensureIdentityAttribute(correlationAttribute, correlationDisplayName)
         }
-        if (status.missingArtifacts.includes('identity_profile_mapping')) {
-            await this.ensureIdentityProfileMapping(correlationAttribute)
+        if (full && status.missingArtifacts.includes('identity_profile_mapping')) {
+            await this.ensureIdentityProfileMapping(correlationAttribute, sourceConfig)
         }
         if (status.missingArtifacts.includes('managed_source_correlation')) {
             await this.ensureManagedSourceCorrelation(correlationAttribute, managedSourceId)
@@ -1168,12 +1224,17 @@ export class SourceService {
 
     private async getReverseCorrelationSetupStatus(
         correlationAttribute: string,
-        managedSourceId: string
+        managedSourceId: string,
+        sourceConfig: SourceConfig
     ): Promise<ReverseCorrelationSetupStatus> {
         const missingArtifacts: ReverseCorrelationArtifact[] = []
-        const fusionSchemaReady = await this.hasFusionSchemaAttribute(correlationAttribute)
-        if (!fusionSchemaReady) {
-            missingArtifacts.push('fusion_schema_attribute')
+        const full = requiresFullReverseCorrelationArtifacts(sourceConfig)
+
+        if (full) {
+            const fusionSchemaReady = await this.hasFusionSchemaAttribute(correlationAttribute)
+            if (!fusionSchemaReady) {
+                missingArtifacts.push('fusion_schema_attribute')
+            }
         }
 
         const identityAttributeReady = await this.hasSearchableIdentityAttribute(correlationAttribute)
@@ -1181,9 +1242,11 @@ export class SourceService {
             missingArtifacts.push('identity_attribute')
         }
 
-        const identityProfileReady = await this.hasIdentityProfileMapping(correlationAttribute)
-        if (!identityProfileReady) {
-            missingArtifacts.push('identity_profile_mapping')
+        if (full) {
+            const identityProfileReady = await this.hasIdentityProfileMapping(correlationAttribute, sourceConfig)
+            if (!identityProfileReady) {
+                missingArtifacts.push('identity_profile_mapping')
+            }
         }
 
         const managedCorrelationReady = await this.hasManagedSourceCorrelation(correlationAttribute, managedSourceId)
@@ -1353,7 +1416,7 @@ export class SourceService {
      * Ensure the Identity Fusion NG source's identity profile has a mapping from the
      * Fusion account attribute to the identity attribute.
      */
-    private async ensureIdentityProfileMapping(attributeName: string): Promise<void> {
+    private async ensureIdentityProfileMapping(attributeName: string, sourceConfig: SourceConfig): Promise<void> {
         const fusionSourceId = this.fusionSourceId
         const fusionSource = this.getFusionSource()
         const { identityProfilesApi } = this.client
@@ -1370,6 +1433,13 @@ export class SourceService {
             (p: any) => p.authoritativeSource?.id === fusionSourceId || p.source?.id === fusionSourceId
         )
         if (matchingProfiles.length === 0) {
+            if (!requiresFullReverseCorrelationArtifacts(sourceConfig)) {
+                this.log.warn(
+                    `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}" while configuring reverse correlation attribute "${attributeName}". ` +
+                        'Skipping identity profile mapping (non-authoritative source).'
+                )
+                return
+            }
             throw new ConnectorError(
                 `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}" while configuring reverse correlation attribute "${attributeName}". ` +
                     IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
@@ -1397,27 +1467,23 @@ export class SourceService {
             const profileDebugRunId = `ensureIdentityProfileMapping-${attributeName}-${profile.id}`
             const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
             const existingIndex = transforms.findIndex((t) => t.identityAttributeName === attributeName)
-            const existing = existingIndex >= 0 ? transforms[existingIndex] : undefined
-            const existingSourceName = existing?.transformDefinition?.attributes?.sourceName
-            const existingSourceId = existing?.transformDefinition?.attributes?.sourceId
-            const existingAttributeName = existing?.transformDefinition?.attributes?.attributeName
-            const isAlreadyDesired =
-                !!existing &&
-                this.isDesiredIdentityProfileTransform(existing, attributeName, fusionSource.name, fusionSourceId) &&
-                (existingSourceName === fusionSource.name || existingSourceId === fusionSourceId) &&
-                existingAttributeName === attributeName
 
-            if (isAlreadyDesired) {
-                this.log.info(
-                    `Identity profile ${profile.id} already maps "${attributeName}" from source "${fusionSource.name}"`
-                )
+            if (existingIndex >= 0) {
+                const existing = transforms[existingIndex]
+                if (this.isDesiredIdentityProfileTransform(existing, attributeName, fusionSource.name, fusionSourceId)) {
+                    this.log.info(
+                        `Identity profile ${profile.id} already maps "${attributeName}" from source "${fusionSource.name}"`
+                    )
+                } else {
+                    this.log.info(
+                        `Identity profile ${profile.id} already defines a mapping for identity attribute "${attributeName}"; ` +
+                            'leaving it unchanged so a custom transform is not overwritten.'
+                    )
+                }
                 continue
             }
 
-            const nextTransforms =
-                existingIndex >= 0
-                    ? transforms.map((t, idx) => (idx === existingIndex ? newTransform : t))
-                    : [...transforms, newTransform]
+            const nextTransforms = [...transforms, newTransform]
 
             const hasIdentityAttributeConfig = !!profile.identityAttributeConfig
             const jsonPatchOperationV2025 = hasIdentityAttributeConfig
@@ -1472,9 +1538,7 @@ export class SourceService {
                     ConnectorErrorType.Generic
                 )
             }
-            this.log.info(
-                `${existingIndex >= 0 ? 'Updated' : 'Added'} identity profile mapping for attribute "${attributeName}" on profile ${profile.id}`
-            )
+            this.log.info(`Added identity profile mapping for attribute "${attributeName}" on profile ${profile.id}`)
 
             const verified = await this.waitForIdentityProfileMapping(
                 profile.id!,
@@ -1584,7 +1648,11 @@ export class SourceService {
         return !!existing?.searchable
     }
 
-    private async hasIdentityProfileMapping(attributeName: string): Promise<boolean> {
+    private async hasIdentityProfileMapping(attributeName: string, sourceConfig: SourceConfig): Promise<boolean> {
+        if (!requiresFullReverseCorrelationArtifacts(sourceConfig)) {
+            return true
+        }
+
         const fusionSource = this.getFusionSource()
         const fusionSourceId = this.fusionSourceId
         assert(fusionSource, 'Fusion source not found')
@@ -1602,12 +1670,7 @@ export class SourceService {
         if (matchingProfiles.length === 0) {
             return false
         }
-        return matchingProfiles.every((profile: any) => {
-            const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
-            return transforms.some(
-                (t: any) => this.isDesiredIdentityProfileTransform(t, attributeName, fusionSource.name, fusionSourceId)
-            )
-        })
+        return matchingProfiles.every((profile: any) => this.profileHasIdentityAttributeTransform(profile, attributeName))
     }
 
     private async waitForIdentityProfileMapping(
@@ -1646,6 +1709,12 @@ export class SourceService {
             QueuePriority.HIGH,
             context
         )
+    }
+
+    /** True if the profile defines any transform for this identity attribute (custom or default). */
+    private profileHasIdentityAttributeTransform(profile: any, attributeName: string): boolean {
+        const transforms = profile?.identityAttributeConfig?.attributeTransforms ?? []
+        return transforms.some((t: any) => t?.identityAttributeName === attributeName)
     }
 
     private isDesiredIdentityProfileTransform(

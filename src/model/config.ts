@@ -107,6 +107,18 @@ export interface MatchingConfig {
     skipMatchIfMissing?: boolean
 }
 
+/**
+ * Whether a rule should be skipped when either side has a missing match value.
+ * Default is to skip when the key is omitted or true; explicit `false` always evaluates.
+ * Mandatory rules are always evaluated so missing data can fail the threshold.
+ */
+export function effectiveSkipMatchIfMissing(matching: Pick<MatchingConfig, 'skipMatchIfMissing' | 'mandatory'>): boolean {
+    if (matching.mandatory === true) {
+        return false
+    }
+    return matching.skipMatchIfMissing !== false
+}
+
 // ============================================================================
 // Connection Settings Menu
 // ============================================================================
@@ -232,7 +244,8 @@ export interface MatchingSettingsSection {
     matchingConfigs?: MatchingConfig[]
     /** Minimum weighted combined match score (0-100). Required for matching. */
     fusionAverageScore?: number
-    fusionMergingIdentical: boolean
+    /** When true, exact attribute matches skip manual review (automatic assignment to the matched identity). */
+    fusionMergingExactMatch: boolean
 }
 
 /** Configuration for the manual review workflow and fusion reports. */

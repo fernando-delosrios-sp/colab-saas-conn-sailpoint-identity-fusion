@@ -12,13 +12,12 @@ export const correlateAction = async (
     change: ActionChange,
     serviceRegistry: ServiceRegistry
 ): Promise<void> => {
-    const { log, identities } = serviceRegistry
+    const { log, fusion } = serviceRegistry
 
     log.debug(`Correlate action called for account ${fusionAccount.name} with operation ${change.op}`)
 
     if (change.op === AttributeChangeOp.Add) {
-        // Trigger correlation for all missing accounts
-        await identities.correlateAccounts(fusionAccount)
+        await fusion.correlateMissingAccountsPerSource(fusionAccount)
     } else if (change.op === AttributeChangeOp.Remove) {
         // Removing the correlate action doesn't undo correlations, just removes the action
         log.debug(`Correlate action removed for account ${fusionAccount.name}`)
