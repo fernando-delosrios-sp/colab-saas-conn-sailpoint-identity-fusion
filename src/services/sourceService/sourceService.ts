@@ -1395,6 +1395,36 @@ export class SourceService {
                 true
             )
         } catch (error: any) {
+            if (this.isIdentityAttributeAlreadyExistsError(error)) {
+                this.log.warn(
+                    `Create reported existing identity attribute "${attributeName}". Retrying as idempotent update to searchable=true.`
+                )
+                const updated = await this.client.execute(
+                    () =>
+                        identityAttributesApi
+                            .putIdentityAttribute({
+                                name: attributeName,
+                                identityAttributeV2025: {
+                                    name: attributeName,
+                                    displayName,
+                                    searchable: true,
+                                    type: 'string',
+                                    multi: false,
+                                    standard: false,
+                                    system: false,
+                                },
+                            })
+                            .then((r) => r.data),
+                    QueuePriority.HIGH,
+                    `SourceService>ensureIdentityAttribute update-after-conflict ${attributeName}`
+                )
+                if (updated) {
+                    this.log.info(
+                        `Updated existing identity attribute "${attributeName}" to be searchable after create conflict`
+                    )
+                    return
+                }
+            }
             throw new ConnectorError(
                 buildIdentityAttributeCreateErrorMessage(attributeName, error),
                 ConnectorErrorType.Generic
@@ -1410,6 +1440,17 @@ export class SourceService {
             )
         }
         this.log.info(`Created searchable identity attribute "${attributeName}"`)
+    }
+
+    private isIdentityAttributeAlreadyExistsError(error: any): boolean {
+        const detailCode = String(error?.response?.data?.detailCode ?? '').toLowerCase()
+        const detailMessage = String(error?.response?.data?.detailMessage ?? '').toLowerCase()
+        const message = error instanceof Error ? error.message.toLowerCase() : String(error ?? '').toLowerCase()
+        const apiMessages = Array.isArray(error?.response?.data?.messages)
+            ? error.response.data.messages.map((m: any) => String(m?.text ?? '').toLowerCase()).join(' | ')
+            : ''
+        const combined = `${detailCode} ${detailMessage} ${message} ${apiMessages}`
+        return combined.includes('already exists') || combined.includes('duplicate')
     }
 
     /**
