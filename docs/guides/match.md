@@ -253,16 +253,16 @@ When **Send report to owner on aggregation?** is enabled, reports include:
 
 To avoid oversized reports, warning/error details are intentionally summarized (not full log dumps).
 
-### Non-persistent analysis with `custom:report`
+### Non-persistent analysis with `custom:dryrun`
 
-When you want report-like visibility during aggregation analysis without persisting changes, run the connector command `custom:report`.
+When you want report-like visibility during aggregation analysis without persisting changes, run the connector command `custom:dryrun`.
 
-`custom:report`:
+`custom:dryrun`:
 
 - Executes fetch + matching analysis flow only (no account-list persistence/writeback phase).
 - Streams final ISC account rows with an additional `attributes.matching` object.
 - Includes matching and non-matching visibility in `matching.status` and `matching.matches`.
-- Sends a final `custom:report:summary` payload with totals and diagnostics (warnings/errors and sampled messages).
+- Sends a final `custom:dryrun:summary` payload with totals and diagnostics (warnings/errors and sampled messages).
 
 Use this command while tuning matching thresholds, validating source precedence, or reviewing correlation context before enabling/adjusting production automation.
 

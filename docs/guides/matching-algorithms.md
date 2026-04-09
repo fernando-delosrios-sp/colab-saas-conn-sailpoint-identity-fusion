@@ -398,7 +398,7 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 | Phase                    | Action                                   | Goal                                  | Metrics                                   |
 | ------------------------ | ---------------------------------------- | ------------------------------------- | ----------------------------------------- |
 | **1. Baseline**          | Use starting thresholds from table above | Conservative; low false positive rate | Review 10–20 initial matches manually     |
-| **2. Test with sample**  | Run on 100–500 accounts (recommended via `custom:report`) | Assess match quality                  | False positive rate, false negative rate  |
+| **2. Test with sample**  | Run on 100–500 accounts (recommended via `custom:dryrun`) | Assess match quality                  | False positive rate, false negative rate  |
 | **3. Analyze results**   | Review all generated forms               | Identify patterns                     | Are false positives due to one attribute? |
 | **4. Adjust thresholds** | Increase (stricter) or decrease (looser) | Balance precision vs recall           | Target: <10% false positive rate          |
 | **5. Retest**            | Run on same or different sample          | Validate improvements                 | Compare metrics to phase 2                |
