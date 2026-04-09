@@ -13,10 +13,10 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; color:#1f2937; margin:0; padding:0; background:#f3f6fb;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="width:100%; border-collapse:collapse;">
     <tr>
-      <td align="center" style="padding:0 16px;">
+      <td align="center" style="padding:0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:920px; border-collapse:collapse;">
           <tr>
-            <td style="padding:12px 20px;">
+            <td style="padding:12px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #e6ebf5; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.12);">
                 <tr>
                   <td style="padding:14px 24px 14px 14px;">
@@ -302,10 +302,10 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
 <body style="margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; background:#f3f6fb;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="width:100%; border-collapse:collapse;">
         <tr>
-            <td align="center" style="padding:0 16px;">
+            <td align="center" style="padding:0;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="padding:12px 20px;">
+                        <td style="padding:12px;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #e6ebf5; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.12);">
                                 <tr>
                                     <td style="padding:14px 24px 14px 14px;">
