@@ -73,6 +73,8 @@ export class SourceService {
     private _allSources?: SourceInfo[]
     private _fusionSourceId?: string
     private _fusionSourceOwner?: OwnerDto
+    private _fusionSourceManagementWorkgroupId?: string
+    private _fusionSourceWorkgroupMemberIds?: string[]
 
     /** Per-run cache: managed source names that passed reverse-correlation setup/assert this session. */
     private reverseCorrelationReadinessBySourceName = new Set<string>()
@@ -315,6 +317,8 @@ export class SourceService {
                 id: fusionSource.owner.id!,
                 type: 'IDENTITY',
             }
+            this._fusionSourceManagementWorkgroupId = (fusionSource as any).managementWorkgroup?.id ?? undefined
+            this._fusionSourceWorkgroupMemberIds = undefined
 
             resolvedSources.push({
                 id: fusionSource.id!,
@@ -332,6 +336,8 @@ export class SourceService {
         } else {
             this._fusionSourceId = undefined
             this._fusionSourceOwner = undefined
+            this._fusionSourceManagementWorkgroupId = undefined
+            this._fusionSourceWorkgroupMemberIds = undefined
             this.log.warn(
                 'Fusion source not found for this run. Continuing with managed sources only (custom report mode).'
             )
@@ -366,6 +372,43 @@ export class SourceService {
     public get fusionSourceOwner(): OwnerDto {
         assert(this._fusionSourceOwner, 'Fusion source owner not found')
         return this._fusionSourceOwner
+    }
+
+    /**
+     * Returns the deduplicated list of identity IDs that act as global owners for this fusion
+     * source: the direct source owner plus all members of the assigned management workgroup
+     * (if one is configured). Result is cached after the first API call.
+     */
+    public async fetchGlobalOwnerIdentityIds(): Promise<string[]> {
+        const ownerIdSet = new Set<string>()
+
+        let ownerId: string | undefined
+        try {
+            ownerId = this.fusionSourceOwner?.id
+        } catch {
+            // fusionSourceOwner asserts when undefined; return empty list
+        }
+        if (ownerId) ownerIdSet.add(ownerId)
+
+        const workgroupId = this._fusionSourceManagementWorkgroupId
+        if (workgroupId) {
+            if (this._fusionSourceWorkgroupMemberIds === undefined) {
+                const { governanceGroupsApi } = this.client
+                const fetchMembers = async () => {
+                    const response = await governanceGroupsApi.listWorkgroupMembers({ workgroupId, limit: 250 })
+                    return response.data
+                }
+                const members = await this.client.execute(
+                    fetchMembers,
+                    QueuePriority.HIGH,
+                    'SourceService>fetchGlobalOwnerIdentityIds'
+                )
+                this._fusionSourceWorkgroupMemberIds = (members ?? []).filter((m) => m.id).map((m) => m.id!)
+            }
+            for (const id of this._fusionSourceWorkgroupMemberIds) ownerIdSet.add(id)
+        }
+
+        return Array.from(ownerIdSet)
     }
 
     /**

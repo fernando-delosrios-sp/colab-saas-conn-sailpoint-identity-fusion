@@ -377,16 +377,13 @@ export class MessagingService {
             }
         }
 
-        // Always add the fusion source owner (resolved via IdentityService)
-        let ownerId: string | undefined
-        try {
-            ownerId = this.sources.fusionSourceOwner?.id
-        } catch {
-            ownerId = undefined
-        }
-        if (ownerId && this.identities) {
-            const ownerEmails = await this.getRecipientEmails([ownerId])
-            for (const e of ownerEmails) recipientEmails.add(e)
+        // Add all global owners (source owner + governance group members) as recipients
+        if (this.identities) {
+            const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
+            if (globalOwnerIds.length > 0) {
+                const ownerEmails = await this.getRecipientEmails(globalOwnerIds)
+                for (const e of ownerEmails) recipientEmails.add(e)
+            }
         }
 
         if (recipientEmails.size === 0) {

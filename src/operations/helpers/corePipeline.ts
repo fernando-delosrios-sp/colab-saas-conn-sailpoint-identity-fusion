@@ -122,13 +122,13 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
     }
 
     if (sources.hasFusionSource) {
-        const fusionOwner = sources.fusionSourceOwner
-        if (fusionOwner && (fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer)) {
-            const fusionOwnerIdentity = identities.getIdentityById(fusionOwner.id!)
-            if (!fusionOwnerIdentity) {
-                log.info(`Fusion owner identity missing. Fetching identity: ${fusionOwner.id}`)
-                await identities.fetchIdentityById(fusionOwner.id!)
-            }
+        if (fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer) {
+            const globalOwnerIds = await sources.fetchGlobalOwnerIdentityIds()
+            await Promise.all(
+                globalOwnerIds
+                    .filter((id) => !identities.getIdentityById(id))
+                    .map((id) => identities.fetchIdentityById(id))
+            )
         }
     }
 

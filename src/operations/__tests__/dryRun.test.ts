@@ -27,6 +27,7 @@ function createRegistry() {
             managedSources: [{ id: 'src-1' }],
             hasFusionSource: true,
             fusionSourceOwner: { id: 'fusion-owner-1', type: 'IDENTITY' },
+            fetchGlobalOwnerIdentityIds: jest.fn().mockResolvedValue(['fusion-owner-1']),
             managedAccountsById: new Map<string, any>([
                 ['acc-1', { id: 'acc-1', sourceName: 'HR' }],
                 ['acc-2', { id: 'acc-2', sourceName: 'IT' }],
@@ -205,7 +206,7 @@ describe('dryRun', () => {
 
     it('fetches fusion owner identity when fusionOwnerIsGlobalReviewer and owner not in cache', async () => {
         const registry = createRegistry()
-        registry.sources.fusionSourceOwner = { id: 'owner-missing-1', type: 'IDENTITY' }
+        registry.sources.fetchGlobalOwnerIdentityIds = jest.fn().mockResolvedValue(['owner-missing-1'])
         registry.fusion.fusionOwnerIsGlobalReviewer = true
         registry.identities.getIdentityById = jest.fn().mockReturnValue(undefined)
         registry.identities.fetchIdentityById = jest.fn().mockResolvedValue({

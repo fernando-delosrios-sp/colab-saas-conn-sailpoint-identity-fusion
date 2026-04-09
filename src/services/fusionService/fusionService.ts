@@ -604,14 +604,15 @@ export class FusionService {
         })
 
         if (this.fusionOwnerIsGlobalReviewer) {
-            const { fusionSourceOwner } = this.sources
-
-            const globalReviewer = this.fusionIdentityMap.get(fusionSourceOwner.id!)
-            if (globalReviewer) {
-                managedSources.forEach((source) => {
-                    this.setReviewerForSource(globalReviewer, source.id!)
-                })
-                this.populateReviewerFusionReviewsFromPending(globalReviewer)
+            const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
+            for (const reviewerId of globalOwnerIds) {
+                const reviewer = this.fusionIdentityMap.get(reviewerId)
+                if (reviewer) {
+                    managedSources.forEach((source) => {
+                        this.setReviewerForSource(reviewer, source.id!)
+                    })
+                    this.populateReviewerFusionReviewsFromPending(reviewer)
+                }
             }
         }
         this.log.info('Identities processing completed')

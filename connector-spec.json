@@ -864,10 +864,10 @@
                         },
                         {
                             "key": "fusionOwnerIsGlobalReviewer",
-                            "label": "Owner is global reviewer?",
+                            "label": "Owners are global reviewers?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Always add the source owner as a reviewer on every review form, ensuring someone is always assigned to review potential matches"
+                            "helpKey": "Always add the source owner and any member of the source's assigned governance group as reviewers on every review form, ensuring someone is always assigned to review potential matches"
                         },
                         {
                             "key": "fusionReportOnAggregation",
