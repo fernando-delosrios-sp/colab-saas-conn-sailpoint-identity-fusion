@@ -10,7 +10,7 @@ export const statuses: EntitlementSource[] = [
     { id: 'baseline', name: 'Baseline', description: 'Pre-existing identity' },
     { id: 'manual', name: 'Manual', description: 'A new base account was manually approved by a reviewer' },
     { id: 'orphan', name: 'Orphan', description: 'No managed accounts left' },
-    { id: 'nonMatched', name: 'NonMatched', description: 'No match found for base account' },
+    { id: 'nonMatched', name: 'Non-matched', description: 'No match found for base account' },
     { id: 'reviewer', name: 'Reviewer', description: 'An identity Match reviewer of any source' },
     { id: 'requested', name: 'Requested', description: 'Account was requested' },
     { id: 'uncorrelated', name: 'Uncorrelated', description: 'Account has sources accounts pending correlation' },

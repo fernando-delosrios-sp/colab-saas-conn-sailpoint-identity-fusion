@@ -26,6 +26,7 @@ export type DryRunInputOptions = {
     includeReview: boolean
     includeDecisions: boolean
     writeToDisk: boolean
+    sendReportTo?: string[]
 }
 
 /**
@@ -96,6 +97,8 @@ export type DryRunSummary = {
     totalProcessingTime: string
     /** When `writeToDisk` was true: absolute path of the pretty-printed JSON detail file on the connector host. */
     reportOutputPath?: string
+    /** When `writeToDisk` was true: absolute path of the generated HTML report on the connector host. */
+    reportHtmlOutputPath?: string
     writeToDisk?: boolean
 }
 
@@ -418,6 +421,7 @@ export const buildDryRunSummary = (params: {
     fusionReviewDecisionsCount?: number
     writeToDisk?: boolean
     reportOutputPath?: string
+    reportHtmlOutputPath?: string
 }): DryRunSummary => {
     const deferredMatchesCount = params.reportAccounts.filter(
         (x) => Boolean(x.deferred) && x.matches.length > 0
@@ -474,6 +478,12 @@ export const buildDryRunSummary = (params: {
         },
         stats: params.stats,
         totalProcessingTime: params.totalProcessingTime,
-        ...(params.writeToDisk ? { writeToDisk: true as const, reportOutputPath: params.reportOutputPath } : {}),
+        ...(params.writeToDisk
+            ? {
+                  writeToDisk: true as const,
+                  reportOutputPath: params.reportOutputPath,
+                  reportHtmlOutputPath: params.reportHtmlOutputPath,
+              }
+            : {}),
     }
 }

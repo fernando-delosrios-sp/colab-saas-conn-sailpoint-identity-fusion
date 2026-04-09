@@ -40,6 +40,19 @@ import {
  * Handles workflow creation, email composition, and notification delivery.
  */
 export class MessagingService {
+    /** ISC: workflow definition + test input must stay under this combined size (bytes). */
+    private static readonly WORKFLOW_COMBINED_LIMIT_BYTES = 1_500_000
+    /** Room for serialization differences vs the platform measurement. */
+    private static readonly WORKFLOW_COMBINED_SAFETY_MARGIN_BYTES = 131_072
+    /**
+     * When getWorkflow fails, cap test `input` JSON this small so we do not assume the definition is tiny
+     * (listWorkflows summaries are often incomplete; underestimating definition size caused oversized payloads).
+     */
+    private static readonly FALLBACK_MAX_TEST_INPUT_BYTES = 120_000
+    private static readonly TRUNCATION_NOTICE_HTML =
+        '<div style="margin-top:16px;padding:12px;border:1px solid #fde68a;border-left:6px solid #f59e0b;background:#fffbeb;color:#92400e;font-size:12px;">Report content was truncated to fit ISC workflow input size limits.</div>'
+    /** Email subject and template H1 for all fusion report sends (aggregation + explicit recipient paths). */
+    private static readonly FUSION_REPORT_EMAIL_TITLE = 'Identity Fusion Report'
     private workflow: WorkflowV2025 | undefined
     private delayedAggregationWorkflow: WorkflowV2025 | undefined
     private templates: Map<string, HandlebarsTemplateDelegate> = new Map()
@@ -49,6 +62,9 @@ export class MessagingService {
     private readonly apiBaseUrl: string
     private readonly urlContext: UrlContext
     private readonly reportAttributes: string[]
+
+    /** UTF-8 byte length of JSON-serialized workflow from getWorkflow; undefined if not measured yet or call failed. */
+    private emailSenderWorkflowDefinitionBytes: number | undefined
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -127,6 +143,7 @@ export class MessagingService {
             // The Workflows v2025 test endpoint rejects enabled workflows (400).
             // We rely on testWorkflow for delivery in this connector, so keep it disabled.
             await this.disableWorkflowIfEnabled(this.workflow)
+            await this.refreshEmailWorkflowDefinitionBytes()
             return
         }
 
@@ -143,6 +160,7 @@ export class MessagingService {
             assert(this.workflow.id, 'Workflow ID is required')
 
             this.log.info(`Created workflow: ${workflowName} (ID: ${this.workflow.id})`)
+            await this.refreshEmailWorkflowDefinitionBytes()
         }, `Workflow preparation failed. Unable to create email workflow "${workflowName}"`)
     }
 
@@ -344,9 +362,6 @@ export class MessagingService {
         fusionAccount: FusionAccount | undefined,
         reportType: 'aggregation' | 'fusion'
     ): Promise<void> {
-        const totalAccounts = report.totalAccounts ?? report.accounts.length
-        const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
-
         // Recipients:
         // - the initiating fusion account (if we can resolve an email)
         // - the fusion source owner (always)
@@ -379,9 +394,15 @@ export class MessagingService {
             return
         }
 
-        const reportTitle =
-            reportType === 'aggregation' ? 'Identity Fusion Account Aggregation Report' : 'Identity Fusion Report'
-        const subject = `${reportTitle} - ${matchAccountCount} Match(es) Found`
+        const recipients = Array.from(recipientEmails)
+        await this.sendReportTo(report, { recipients, reportType })
+    }
+
+    /** Build fusion report HTML without sending (used by dry-run disk persistence). */
+    public renderFusionReportHtml(report: FusionReport, _reportType: 'aggregation' | 'fusion'): string {
+        const totalAccounts = report.totalAccounts ?? report.accounts.length
+        const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
+        const reportTitle = MessagingService.FUSION_REPORT_EMAIL_TITLE
         const emailData: FusionReportEmailData = {
             ...report,
             totalAccounts,
@@ -390,11 +411,21 @@ export class MessagingService {
             reportTitle,
             headerSubtitle: this.buildEmailHeaderSubtitle(),
         }
-        const body = renderFusionReport(this.templates, emailData)
+        return renderFusionReport(this.templates, emailData)
+    }
 
-        const recipients = Array.from(recipientEmails)
-        await this.sendEmail(recipients, subject, body)
-        this.log.info(`Sent fusion report email to ${recipients.length} recipient(s)`)
+    /** Send report email to explicit recipients, independent from fusion account resolution. */
+    public async sendReportTo(
+        report: FusionReport,
+        args: { recipients: string[]; reportType: 'aggregation' | 'fusion' }
+    ): Promise<void> {
+        const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
+        const reportTitle = MessagingService.FUSION_REPORT_EMAIL_TITLE
+        const subject = `${reportTitle} - ${matchAccountCount} Match(es) Found`
+        const body = this.renderFusionReportHtml(report, args.reportType)
+        await this.sendEmail(args.recipients, subject, body)
+        const sentRecipientCount = sanitizeRecipients(args.recipients).length
+        this.log.info(`Sent fusion report email to ${sentRecipientCount} recipient(s)`)
     }
 
     // ------------------------------------------------------------------------
@@ -447,10 +478,27 @@ export class MessagingService {
         assert(workflow, 'Workflow is required')
         assert(workflow.id, 'Workflow ID is required')
 
+        const maxTestInputBytes = this.getMaxTestWorkflowInputBytes()
+        if (this.emailSenderWorkflowDefinitionBytes !== undefined) {
+            const headroom =
+                MessagingService.WORKFLOW_COMBINED_LIMIT_BYTES -
+                MessagingService.WORKFLOW_COMBINED_SAFETY_MARGIN_BYTES -
+                this.emailSenderWorkflowDefinitionBytes
+            if (headroom < 4096) {
+                this.log.error(
+                    `Email workflow definition is ~${this.emailSenderWorkflowDefinitionBytes} bytes; combined limit (${MessagingService.WORKFLOW_COMBINED_LIMIT_BYTES}) leaves almost no room for report body. Shrink the email sender workflow in ISC or simplify its steps.`
+                )
+            }
+        }
+        let safeBody = this.fitEmailBodyToWorkflowLimit(subject, sanitizedRecipientList, body, maxTestInputBytes)
+        if (!safeBody) {
+            safeBody =
+                '<p>Identity Fusion: report body omitted because it exceeds the ISC combined workflow size limit.</p>'
+        }
         const testRequest: TestWorkflowRequestV2025 = {
             input: {
                 subject,
-                body,
+                body: safeBody,
                 recipients: sanitizedRecipientList,
             },
         }
@@ -468,6 +516,97 @@ export class MessagingService {
             // Never crash aggregation because email delivery failed.
             this.log.error(`Failed to execute email workflow ${workflow.id}: ${e}`)
         }
+    }
+
+    private workflowInputByteLength(subject: string, body: string, recipients: string[]): number {
+        return Buffer.byteLength(JSON.stringify({ input: { subject, body, recipients } }), 'utf8')
+    }
+
+    /**
+     * Max UTF-8 bytes for JSON.stringify({ input: { subject, body, recipients } }) so that
+     * definition + input stays under ISC combined limit.
+     */
+    private getMaxTestWorkflowInputBytes(): number {
+        const limit = MessagingService.WORKFLOW_COMBINED_LIMIT_BYTES
+        const margin = MessagingService.WORKFLOW_COMBINED_SAFETY_MARGIN_BYTES
+        if (this.emailSenderWorkflowDefinitionBytes === undefined) {
+            return MessagingService.FALLBACK_MAX_TEST_INPUT_BYTES
+        }
+        return Math.max(1024, limit - margin - this.emailSenderWorkflowDefinitionBytes)
+    }
+
+    /**
+     * Measure full workflow JSON via getWorkflow (listWorkflows entries are often incomplete).
+     */
+    private async refreshEmailWorkflowDefinitionBytes(): Promise<void> {
+        if (!this.workflow?.id) {
+            return
+        }
+        const workflowId = this.workflow.id
+        const getWorkflowFn = async () => {
+            const response = await this.client.workflowsApi.getWorkflow({ id: workflowId })
+            return response.data
+        }
+        const full = await this.client.execute(
+            getWorkflowFn,
+            undefined,
+            'MessagingService>refreshEmailWorkflowDefinitionBytes'
+        )
+        if (full !== undefined && full !== null) {
+            this.emailSenderWorkflowDefinitionBytes = Buffer.byteLength(JSON.stringify(full), 'utf8')
+            this.log.debug(
+                `Email workflow definition JSON ~${this.emailSenderWorkflowDefinitionBytes} bytes; max test input ~${this.getMaxTestWorkflowInputBytes()} bytes`
+            )
+        } else {
+            this.emailSenderWorkflowDefinitionBytes = undefined
+            this.log.warn(
+                `Could not load workflow ${workflowId} to measure definition size; capping test input at ${MessagingService.FALLBACK_MAX_TEST_INPUT_BYTES} bytes`
+            )
+        }
+    }
+
+    private fitEmailBodyToWorkflowLimit(
+        subject: string,
+        recipients: string[],
+        body: string,
+        maxSerializedInputBytes: number
+    ): string {
+        if (this.workflowInputByteLength(subject, body, recipients) <= maxSerializedInputBytes) {
+            return body
+        }
+
+        const notice = MessagingService.TRUNCATION_NOTICE_HTML
+        const bodyWithNotice = `${body}${notice}`
+        if (this.workflowInputByteLength(subject, bodyWithNotice, recipients) <= maxSerializedInputBytes) {
+            return bodyWithNotice
+        }
+
+        let low = 0
+        let high = body.length
+        let best = ''
+        while (low <= high) {
+            const mid = Math.floor((low + high) / 2)
+            const candidate = `${body.slice(0, mid)}${notice}`
+            if (this.workflowInputByteLength(subject, candidate, recipients) <= maxSerializedInputBytes) {
+                best = candidate
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+
+        if (!best) {
+            const fallback = notice
+            if (this.workflowInputByteLength(subject, fallback, recipients) <= maxSerializedInputBytes) {
+                this.log.warn('Email body exceeded workflow payload limit; sent truncation notice only')
+                return fallback
+            }
+            this.log.warn('Email payload exceeds workflow limit after aggressive truncation')
+            return ''
+        }
+
+        this.log.warn('Email body exceeded workflow payload limit; content truncated before send')
+        return best
     }
 
     /**

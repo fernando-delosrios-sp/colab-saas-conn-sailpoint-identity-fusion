@@ -469,12 +469,12 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account
 
-            ;(fusionService as any).sourcesByName.set('Source A', {
-                id: 'source-a-id',
-                name: 'Source A',
-                sourceType: 'authoritative',
-                config: {},
-            })
+                ; (fusionService as any).sourcesByName.set('Source A', {
+                    id: 'source-a-id',
+                    name: 'Source A',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
 
             const unmatchedCandidate = FusionAccount.fromManagedAccount({
                 id: 'acct-prev-unmatched-1',
@@ -483,8 +483,8 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;(fusionService as any).fusionAccountMap.set('native-prev-unmatched-1', unmatchedCandidate)
-            ;(fusionService as any).currentRunUnmatchedFusionNativeIdentities.add('native-prev-unmatched-1')
+                ; (fusionService as any).fusionAccountMap.set('native-prev-unmatched-1', unmatchedCandidate)
+                ; (fusionService as any).currentRunUnmatchedFusionNativeIdentities.add('native-prev-unmatched-1')
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
@@ -522,12 +522,12 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account
 
-            ;(fusionService as any).sourcesByName.set('Source A', {
-                id: 'source-a-id',
-                name: 'Source A',
-                sourceType: 'authoritative',
-                config: {},
-            })
+                ; (fusionService as any).sourcesByName.set('Source A', {
+                    id: 'source-a-id',
+                    name: 'Source A',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
 
             const unmatchedCandidate = FusionAccount.fromManagedAccount({
                 id: 'acct-prev-unmatched-cap',
@@ -536,8 +536,8 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;(fusionService as any).fusionAccountMap.set('native-prev-unmatched-cap', unmatchedCandidate)
-            ;(fusionService as any).currentRunUnmatchedFusionNativeIdentities.add('native-prev-unmatched-cap')
+                ; (fusionService as any).fusionAccountMap.set('native-prev-unmatched-cap', unmatchedCandidate)
+                ; (fusionService as any).currentRunUnmatchedFusionNativeIdentities.add('native-prev-unmatched-cap')
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
@@ -582,12 +582,12 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account
 
-            ;(customReportFusion as any).sourcesByName.set('Source A', {
-                id: 'source-a-id',
-                name: 'Source A',
-                sourceType: 'authoritative',
-                config: {},
-            })
+                ; (customReportFusion as any).sourcesByName.set('Source A', {
+                    id: 'source-a-id',
+                    name: 'Source A',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
 
             const unmatchedCandidate = FusionAccount.fromManagedAccount({
                 id: 'acct-prev-unmatched-cr',
@@ -596,8 +596,8 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;(customReportFusion as any).fusionAccountMap.set('native-prev-unmatched-cr', unmatchedCandidate)
-            ;(customReportFusion as any).currentRunUnmatchedFusionNativeIdentities.add('native-prev-unmatched-cr')
+                ; (customReportFusion as any).fusionAccountMap.set('native-prev-unmatched-cr', unmatchedCandidate)
+                ; (customReportFusion as any).currentRunUnmatchedFusionNativeIdentities.add('native-prev-unmatched-cr')
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
@@ -629,12 +629,12 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account
 
-            ;(fusionService as any).sourcesByName.set('NERM', {
-                id: 'src-nerm',
-                name: 'NERM',
-                sourceType: 'authoritative',
-                config: {},
-            })
+                ; (fusionService as any).sourcesByName.set('NERM', {
+                    id: 'src-nerm',
+                    name: 'NERM',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
             const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
             jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
 
@@ -646,7 +646,7 @@ describe('FusionService', () => {
         })
 
         it('removes perfect automatically assigned accounts from manual-review report list', async () => {
-            ;(fusionService as any).config.fusionMergingExactMatch = true
+            ; (fusionService as any).config.fusionMergingExactMatch = true
             const account = {
                 id: 'acct-perfect-1',
                 nativeIdentity: 'acct-perfect-1',
@@ -664,7 +664,7 @@ describe('FusionService', () => {
                     { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
                 ],
             } as any)
-            ;(fusionService as any).matchAccounts = [analyzed]
+                ; (fusionService as any).matchAccounts = [analyzed]
             jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
             jest.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
 
@@ -674,7 +674,7 @@ describe('FusionService', () => {
         })
 
         it('registers synthetic automatic-assignment decisions for reporting', async () => {
-            ;(fusionService as any).config.fusionMergingExactMatch = true
+            ; (fusionService as any).config.fusionMergingExactMatch = true
             const account = {
                 id: 'acct-perfect-report-1',
                 nativeIdentity: 'acct-perfect-report-1',
@@ -709,13 +709,13 @@ describe('FusionService', () => {
         })
 
         it('does not assign automatically when a rule was skipped (missing)', async () => {
-            ;(fusionService as any).config.fusionMergingExactMatch = true
-            ;(fusionService as any).sourcesByName.set('LH2', {
-                id: 'src-lh2',
-                name: 'LH2',
-                sourceType: 'authoritative',
-                config: {},
-            })
+            ; (fusionService as any).config.fusionMergingExactMatch = true
+                ; (fusionService as any).sourcesByName.set('LH2', {
+                    id: 'src-lh2',
+                    name: 'LH2',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
             const reviewer = FusionAccount.fromIdentity({ id: 'rev-skip-1', name: 'Rev', attributes: {} } as any)
             fusionService.reviewersBySourceId.set('src-lh2', new Set([reviewer]))
 
@@ -757,12 +757,12 @@ describe('FusionService', () => {
             )
             const reviewer = FusionAccount.fromIdentity({ id: 'rev-1', name: 'Rev', attributes: {} } as any)
             analysisFusion.reviewersBySourceId.set('source-a-id', new Set([reviewer]))
-            ;(analysisFusion as any).sourcesByName.set('Source A', {
-                id: 'source-a-id',
-                name: 'Source A',
-                sourceType: 'authoritative',
-                config: {},
-            })
+                ; (analysisFusion as any).sourcesByName.set('Source A', {
+                    id: 'source-a-id',
+                    name: 'Source A',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
 
             const account = {
                 id: 'acct-partial-1',
@@ -800,12 +800,12 @@ describe('FusionService', () => {
                 mockSchemas,
                 undefined
             )
-            ;(analysisFusion as any).sourcesByName.set('Source A', {
-                id: 'source-a-id',
-                name: 'Source A',
-                sourceType: 'authoritative',
-                config: {},
-            })
+                ; (analysisFusion as any).sourcesByName.set('Source A', {
+                    id: 'source-a-id',
+                    name: 'Source A',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
 
             const account = {
                 id: 'acct-perfect-analysis-1',
@@ -844,12 +844,12 @@ describe('FusionService', () => {
                 mockSchemas,
                 undefined
             )
-            ;(analysisFusion as any).sourcesByName.set('OrphanSrc', {
-                id: 'orphan-src-id',
-                name: 'OrphanSrc',
-                sourceType: 'orphan',
-                config: { disableNonMatchingAccounts: true },
-            })
+                ; (analysisFusion as any).sourcesByName.set('OrphanSrc', {
+                    id: 'orphan-src-id',
+                    name: 'OrphanSrc',
+                    sourceType: 'orphan',
+                    config: { disableNonMatchingAccounts: true },
+                })
             const reviewer = FusionAccount.fromIdentity({ id: 'rev-1', name: 'Rev', attributes: {} } as any)
             analysisFusion.reviewersBySourceId.set('orphan-src-id', new Set([reviewer]))
 
@@ -900,12 +900,12 @@ describe('FusionService', () => {
             } as Account
 
             const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
-            ;(fusionService as any).sourcesByName.set('Source A', {
-                id: 'source-a-id',
-                name: 'Source A',
-                sourceType: 'authoritative',
-                config: {},
-            })
+                ; (fusionService as any).sourcesByName.set('Source A', {
+                    id: 'source-a-id',
+                    name: 'Source A',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
             jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
             mockSources.getSourceConfig.mockReturnValue({
                 name: 'Source A',
@@ -1113,7 +1113,7 @@ describe('FusionService', () => {
         })
 
         it('should not clear reverse attribute when missing account source info is unresolved', async () => {
-            ;(fusionService as any).config.sources = [
+            ; (fusionService as any).config.sources = [
                 {
                     name: 'Source A',
                     correlationMode: 'reverse',
@@ -1180,12 +1180,12 @@ describe('FusionService', () => {
             } as Account
 
             const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
-            ;(fusionService as any).sourcesByName.set('Source A', {
-                id: 'source-a-id',
-                name: 'Source A',
-                sourceType: 'authoritative',
-                config: {},
-            })
+                ; (fusionService as any).sourcesByName.set('Source A', {
+                    id: 'source-a-id',
+                    name: 'Source A',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
             jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
             mockSources.getSourceConfig.mockReturnValue({
                 name: 'Source A',
@@ -1226,12 +1226,12 @@ describe('FusionService', () => {
                     ['acct-analyze-2', secondAccount],
                 ])
             )
-            ;(fusionService as any).sourcesByName.set('Source A', {
-                id: 'source-a-id',
-                name: 'Source A',
-                sourceType: 'authoritative',
-                config: {},
-            })
+                ; (fusionService as any).sourcesByName.set('Source A', {
+                    id: 'source-a-id',
+                    name: 'Source A',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
@@ -1666,14 +1666,14 @@ describe('FusionService', () => {
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
-            ;(fusionService as any).sourcesByName.set('Orphan Source', {
-                id: 'src-orphan-1',
-                name: 'Orphan Source',
-                sourceType: 'orphan',
-                config: { disableNonMatchingAccounts: true },
-            })
+                ; (fusionService as any).sourcesByName.set('Orphan Source', {
+                    id: 'src-orphan-1',
+                    name: 'Orphan Source',
+                    sourceType: 'orphan',
+                    config: { disableNonMatchingAccounts: true },
+                })
 
-            const queueDisableSpy = jest.spyOn(fusionService as any, 'queueDisableOperation').mockImplementation(() => {})
+            const queueDisableSpy = jest.spyOn(fusionService as any, 'queueDisableOperation').mockImplementation(() => { })
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
                 account: { id: 'acct-orphan-1', name: 'Orphan User', sourceName: 'Orphan Source' },

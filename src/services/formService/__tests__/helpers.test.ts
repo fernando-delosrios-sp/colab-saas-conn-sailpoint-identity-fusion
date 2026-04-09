@@ -36,7 +36,7 @@ describe('formService helpers', () => {
                 sourceName: 'HR Source',
             } as any
             const result = buildFormName(fusionAccount, 'Fusion Review')
-            expect(result).toBe('Fusion Review - John Doe (acc-123) [HR Source]')
+            expect(result).toBe('Fusion Review - John Doe [HR Source]')
         })
 
         it('should use displayName when name is missing', () => {
@@ -46,28 +46,28 @@ describe('formService helpers', () => {
                 sourceName: 'IT',
             } as any
             const result = buildFormName(fusionAccount, 'Review')
-            expect(result).toBe('Review - Jane Smith (acc-999) [IT]')
+            expect(result).toBe('Review - Jane Smith [IT]')
         })
 
         it('should use Unknown when both name and displayName missing', () => {
             const fusionAccount = { sourceName: 'S', managedAccountId: 'managed-1' } as any
             const result = buildFormName(fusionAccount, 'F')
-            expect(result).toBe('F - Unknown (managed-1) [S]')
+            expect(result).toBe('F - Unknown [S]')
         })
 
-        it('should use UnknownId when no account identifier is present', () => {
+        it('should use Unknown when no name fields are present', () => {
             const fusionAccount = { sourceName: 'S' } as any
             const result = buildFormName(fusionAccount, 'F')
-            expect(result).toBe('F - Unknown (UnknownId) [S]')
+            expect(result).toBe('F - Unknown [S]')
         })
 
-        it('should omit account id for orphan source reviews', () => {
+        it('should not append native identity to the title', () => {
             const fusionAccount = {
                 name: 'fcooper',
                 nativeIdentity: 'aa7459e540f94cbdbaa859019ef5c4f1',
                 sourceName: 'Active Directory',
             } as any
-            const result = buildFormName(fusionAccount, 'Fusion Review', 'orphan')
+            const result = buildFormName(fusionAccount, 'Fusion Review')
             expect(result).toBe('Fusion Review - fcooper [Active Directory]')
         })
     })

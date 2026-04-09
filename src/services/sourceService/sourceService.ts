@@ -37,6 +37,7 @@ import {
 } from './sourceReverseCorrelationErrors'
 import { SourceInfo } from './types'
 import { CompiledAccountJmespathFilter, compileAccountJmespathFilter } from './accountJmespathFilter'
+import { getManagedAccountKeyFromAccount, resolveManagedAccountKey } from '../../model/managedAccountKey'
 
 type ReverseCorrelationArtifact =
     | 'fusion_schema_attribute'
@@ -87,6 +88,8 @@ export class SourceService {
     // Secondary index: identityId → Set of account IDs for O(1) identity-based lookups
     // in addManagedAccountLayer. Kept in sync with managedAccountsById.
     public managedAccountsByIdentityId: Map<string, Set<string>> = new Map()
+    // Compatibility index: raw ISC account id -> managed account key
+    public managedAccountKeysByRawId: Map<string, string> = new Map()
     public fusionAccountsByNativeIdentity?: Map<string, Account>
 
     /**
@@ -102,6 +105,7 @@ export class SourceService {
         this.managedAccountsById.clear()
         this.managedAccountsAllById.clear()
         this.managedAccountsByIdentityId.clear()
+        this.managedAccountKeysByRawId.clear()
         this.log.debug('Managed accounts cache cleared from memory')
     }
 
@@ -588,15 +592,20 @@ export class SourceService {
                                 continue
                             }
                             if (account.id) {
-                                this.managedAccountsById.set(account.id, account)
-                                this.managedAccountsAllById.set(account.id, account)
+                                const accountKey = getManagedAccountKeyFromAccount(account)
+                                if (!accountKey) {
+                                    continue
+                                }
+                                this.managedAccountsById.set(accountKey, account)
+                                this.managedAccountsAllById.set(accountKey, account)
+                                this.managedAccountKeysByRawId.set(account.id, accountKey)
                                 if (account.identityId) {
                                     let idSet = this.managedAccountsByIdentityId.get(account.identityId)
                                     if (!idSet) {
                                         idSet = new Set()
                                         this.managedAccountsByIdentityId.set(account.identityId, idSet)
                                     }
-                                    idSet.add(account.id)
+                                    idSet.add(accountKey)
                                 }
                                 collectedCount++
                             }
@@ -682,16 +691,26 @@ export class SourceService {
             return
         }
 
-        this.managedAccountsById.set(managedAccount.id!, managedAccount)
-        this.managedAccountsAllById.set(managedAccount.id!, managedAccount)
+        const accountKey = getManagedAccountKeyFromAccount(managedAccount)
+        if (!accountKey) {
+            this.log.warn(`Managed account missing key data for id: ${id}`)
+            return
+        }
+        this.managedAccountsById.set(accountKey, managedAccount)
+        this.managedAccountsAllById.set(accountKey, managedAccount)
+        this.managedAccountKeysByRawId.set(managedAccount.id!, accountKey)
         if (managedAccount.identityId) {
             let idSet = this.managedAccountsByIdentityId.get(managedAccount.identityId)
             if (!idSet) {
                 idSet = new Set()
                 this.managedAccountsByIdentityId.set(managedAccount.identityId, idSet)
             }
-            idSet.add(managedAccount.id!)
+            idSet.add(accountKey)
         }
+    }
+
+    public resolveManagedAccountKey(value: string | undefined | null): string | undefined {
+        return resolveManagedAccountKey(value, (rawId) => this.managedAccountKeysByRawId.get(rawId))
     }
 
     /**
@@ -1395,6 +1414,36 @@ export class SourceService {
                 true
             )
         } catch (error: any) {
+            if (this.isIdentityAttributeAlreadyExistsError(error)) {
+                this.log.warn(
+                    `Create reported existing identity attribute "${attributeName}". Retrying as idempotent update to searchable=true.`
+                )
+                const updated = await this.client.execute(
+                    () =>
+                        identityAttributesApi
+                            .putIdentityAttribute({
+                                name: attributeName,
+                                identityAttributeV2025: {
+                                    name: attributeName,
+                                    displayName,
+                                    searchable: true,
+                                    type: 'string',
+                                    multi: false,
+                                    standard: false,
+                                    system: false,
+                                },
+                            })
+                            .then((r) => r.data),
+                    QueuePriority.HIGH,
+                    `SourceService>ensureIdentityAttribute update-after-conflict ${attributeName}`
+                )
+                if (updated) {
+                    this.log.info(
+                        `Updated existing identity attribute "${attributeName}" to be searchable after create conflict`
+                    )
+                    return
+                }
+            }
             throw new ConnectorError(
                 buildIdentityAttributeCreateErrorMessage(attributeName, error),
                 ConnectorErrorType.Generic
@@ -1410,6 +1459,17 @@ export class SourceService {
             )
         }
         this.log.info(`Created searchable identity attribute "${attributeName}"`)
+    }
+
+    private isIdentityAttributeAlreadyExistsError(error: any): boolean {
+        const detailCode = String(error?.response?.data?.detailCode ?? '').toLowerCase()
+        const detailMessage = String(error?.response?.data?.detailMessage ?? '').toLowerCase()
+        const message = error instanceof Error ? error.message.toLowerCase() : String(error ?? '').toLowerCase()
+        const apiMessages = Array.isArray(error?.response?.data?.messages)
+            ? error.response.data.messages.map((m: any) => String(m?.text ?? '').toLowerCase()).join(' | ')
+            : ''
+        const combined = `${detailCode} ${detailMessage} ${message} ${apiMessages}`
+        return combined.includes('already exists') || combined.includes('duplicate')
     }
 
     /**

@@ -141,6 +141,11 @@ function createRegistry() {
             saveState: jest.fn(),
             refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
         },
+        messaging: {
+            fetchSender: jest.fn().mockResolvedValue(undefined),
+            sendReportTo: jest.fn().mockResolvedValue(undefined),
+            renderFusionReportHtml: jest.fn(() => '<html><body>dry-run report</body></html>'),
+        },
         res: {
             send: jest.fn(),
             keepAlive: jest.fn(),
@@ -546,6 +551,38 @@ describe('dryRun', () => {
         expect(registry.attributes.seedIncrementalCountersFromRawAccounts).toHaveBeenCalledWith(registry.sources.fusionAccounts)
     })
 
+    it('sends report email to explicit recipients even when report candidates have no identityId', async () => {
+        const registry = createRegistry()
+        registry.fusion.generateReport.mockImplementation((_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
+            accounts: [
+                {
+                    accountId: 'acc-no-identity-match',
+                    accountName: 'No Identity Match',
+                    accountSource: 'HR',
+                    fusionIdentityComparisons: 1,
+                    matches: [{ identityName: 'Unknown Candidate', isMatch: true, scores: [] }],
+                },
+            ],
+            fusionReviewDecisions: [],
+            stats: { managedAccountsFound: 1, ...stats },
+        }))
+
+        await dryRun(
+            registry,
+            {
+                schema: { attributes: [] },
+                includeMatched: true,
+                sendReportTo: [' reviewer.one@example.com ', 'reviewer.two@example.com'],
+            } as any
+        )
+
+        expect(registry.messaging.fetchSender).toHaveBeenCalledTimes(1)
+        expect(registry.messaging.sendReportTo).toHaveBeenCalledWith(expect.any(Object), {
+            recipients: ['reviewer.one@example.com', 'reviewer.two@example.com'],
+            reportType: 'aggregation',
+        })
+    })
+
 
     it('writes a pretty JSON array detail file and returns only the summary when writeToDisk is true', async () => {
         const fs = await import('fs')
@@ -558,8 +595,12 @@ describe('dryRun', () => {
         expect(summary.type).toBe('custom:dryrun:summary')
         expect(summary.writeToDisk).toBe(true)
         expect(summary.reportOutputPath).toBeDefined()
+        expect(summary.reportHtmlOutputPath).toBeDefined()
         expect(String(summary.reportOutputPath)).toMatch(
             /reports[\\/]custom-report-tenant-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/
+        )
+        expect(String(summary.reportHtmlOutputPath)).toMatch(
+            /reports[\\/]custom-report-tenant-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.html$/
         )
 
         const raw = fs.readFileSync(summary.reportOutputPath, 'utf8')
@@ -570,7 +611,9 @@ describe('dryRun', () => {
         expect((body.rows[0] as any).account).toBeDefined()
         expect(body.summary?.type).toBe('custom:dryrun:summary')
         expect(body.summary).toMatchObject({ emitted: expect.any(Object), totals: expect.any(Object) })
+        expect(fs.readFileSync(summary.reportHtmlOutputPath, 'utf8')).toContain('dry-run report')
 
         fs.unlinkSync(summary.reportOutputPath)
+        fs.unlinkSync(summary.reportHtmlOutputPath)
     })
 })

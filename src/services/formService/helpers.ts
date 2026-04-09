@@ -1,5 +1,4 @@
 import { FusionAccount } from '../../model/account'
-import { SourceType } from '../../model/config'
 import { IdentityDocument, OwnerDto } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import { SourceService } from '../sourceService'
@@ -90,25 +89,12 @@ export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: 
 }
 
 /**
- * Build form name from fusion account.
- * Orphan-source reviews omit the account id segment so titles stay readable (managed id is often a long opaque value).
+ * Build form name from fusion account (pattern, display name, source label only).
  */
-export const buildFormName = (
-    fusionAccount: FusionAccount,
-    fusionFormNamePattern: string,
-    sourceType: SourceType = 'authoritative'
-): string => {
+export const buildFormName = (fusionAccount: FusionAccount, fusionFormNamePattern: string): string => {
     const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
-    const accountId =
-        fusionAccount.nativeIdentityOrUndefined ||
-        (fusionAccount as unknown as { nativeIdentity?: string }).nativeIdentity ||
-        fusionAccount.managedAccountId ||
-        'UnknownId'
     const source = `[${fusionAccount.sourceName}]`
-    if (sourceType === 'orphan') {
-        return `${fusionFormNamePattern} - ${accountName} ${source}`
-    }
-    return `${fusionFormNamePattern} - ${accountName} (${accountId}) ${source}`
+    return `${fusionFormNamePattern} - ${accountName} ${source}`
 }
 
 /**
