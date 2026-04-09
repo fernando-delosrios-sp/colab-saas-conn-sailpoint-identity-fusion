@@ -82,10 +82,10 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
               <div style="font-size:14px; font-weight:900; color:#0f172a; line-height:1.3;">
                 {{decisionLabel}}
                 {{#if sourceType}}
-                <span style="display:inline-block; margin-left:6px; padding:1px 8px; border-radius:8px; background:#eef2f7; color:#5f6b7a; font-size:11px; font-weight:800; text-transform:uppercase; vertical-align:middle;">{{sourceTypeLabel sourceType}}</span>
+                <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:11px; font-weight:700; text-transform:uppercase; vertical-align:middle;">{{sourceTypeLabel sourceType}}</span>
                 {{/if}}
                 {{#if automaticAssignment}}
-                <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle;">AUTO</span>
+                <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:11px; font-weight:700; text-transform:uppercase; vertical-align:middle;">AUTO</span>
                 {{/if}}
               </div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px; border-collapse:collapse;">
@@ -155,7 +155,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                         <tr>
                           <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Source:</td>
-                          <td style="padding:2px 8px;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:#eef2f7; color:#5f6b7a; font-size:10px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
+                          <td style="padding:2px 8px;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:2px 8px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:11px; font-weight:700; text-transform:uppercase;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
                         </tr>
                         {{#if accountEmail}}
                         <tr>
@@ -322,7 +322,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                 {{#if accountSource}}
                                                 <div style="color:#5f6b7a; font-size:12px; margin-top:8px; font-weight:600;">
                                                     Source: <span style="color:#0b5cab;">{{accountSource}}</span>
-                                                    {{#if sourceType}}<span style="display:inline-block; margin-left:6px; padding:1px 8px; border-radius:8px; background:#eef2f7; color:#5f6b7a; font-size:11px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}
+                                                    {{#if sourceType}}<span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:11px; font-weight:700; text-transform:uppercase;">{{sourceTypeLabel sourceType}}</span>{{/if}}
                                                 </div>
                                                 {{/if}}
                                                 {{/each}}
@@ -355,7 +355,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                                                                 <tr>
                                                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Source:</td>
-                                                                    <td style="padding:2px 8px;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:1px 6px; border-radius:6px; background:#eef2f7; color:#5f6b7a; font-size:10px; font-weight:700; text-transform:capitalize;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
+                                                                    <td style="padding:2px 8px;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:2px 8px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:11px; font-weight:700; text-transform:uppercase;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
                                                                 </tr>
                                                                 {{#if accountEmail}}
                                                                 <tr>
