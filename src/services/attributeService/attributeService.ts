@@ -21,6 +21,7 @@ import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
 import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
+import { parseManagedAccountKey } from '../../model/managedAccountKey'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
@@ -726,7 +727,15 @@ export class AttributeService {
             }
         }
 
-        const managed = orderedAccounts.find((a) => String(a?._id ?? '').trim() === originId)
+        const parsedManagedKey = parseManagedAccountKey(originId)
+        const managed = orderedAccounts.find((a) => {
+            const accountId = String(a?._id ?? '').trim()
+            if (accountId === originId) return true
+            if (!parsedManagedKey) return false
+            const sourceId = String(a?._sourceId ?? '').trim()
+            const nativeIdentity = String(a?._nativeIdentity ?? '').trim()
+            return sourceId === parsedManagedKey.sourceId && nativeIdentity === parsedManagedKey.nativeIdentity
+        })
         if (managed) return managed
 
         if (originSource === 'Identities') {

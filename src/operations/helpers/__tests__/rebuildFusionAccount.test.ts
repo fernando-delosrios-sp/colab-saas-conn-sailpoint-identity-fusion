@@ -57,4 +57,45 @@ describe('rebuildFusionAccount', () => {
         expect(fetchManagedAccount).not.toHaveBeenCalledWith('acct-unknown')
         expect(fetchManagedAccount).not.toHaveBeenCalledWith('acct-nosource')
     })
+
+    it('resolves composite managed account keys through sourceId/nativeIdentity lookup', async () => {
+        const fetchManagedAccount = jest.fn().mockResolvedValue(undefined)
+        const fetchSourceAccountByNativeIdentity = jest.fn().mockResolvedValue({
+            id: 'acct-rotated',
+            sourceName: 'Source A',
+        })
+
+        const registry = {
+            sources: {
+                fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
+                fusionAccountsByNativeIdentity: new Map([
+                    [
+                        'fusion-2',
+                        {
+                            nativeIdentity: 'fusion-2',
+                            identityId: 'identity-2',
+                            attributes: {
+                                accounts: ['source-a::native-99'],
+                            },
+                        },
+                    ],
+                ]),
+                fetchManagedAccount,
+                fetchSourceAccountByNativeIdentity,
+                getSourceByName: jest.fn(() => ({ isManaged: true })),
+            },
+            identities: {
+                fetchIdentityById: jest.fn().mockResolvedValue(undefined),
+                getIdentityById: jest.fn().mockReturnValue({ id: 'identity-2', accounts: [] }),
+            },
+            fusion: {
+                processFusionAccount: jest.fn().mockResolvedValue({ nativeIdentity: 'fusion-2' }),
+            },
+        } as any
+
+        await rebuildFusionAccount('fusion-2', {} as any, registry)
+
+        expect(fetchSourceAccountByNativeIdentity).toHaveBeenCalledWith('source-a', 'native-99')
+        expect(fetchManagedAccount).toHaveBeenCalledWith('acct-rotated')
+    })
 })

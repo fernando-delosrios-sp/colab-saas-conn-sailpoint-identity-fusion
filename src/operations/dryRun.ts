@@ -1,15 +1,20 @@
 import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
+import { mkdir, writeFile } from 'fs/promises'
+import * as path from 'path'
 import { ServiceRegistry } from '../services/serviceRegistry'
+import { sanitizeRecipients } from '../services/messagingService/email'
 import {
     buildDryRunSummary,
     buildReportAccountIndex,
     createDryRunOptionEmitCounter,
 } from './helpers/buildDryRunPayload'
+import { buildEmailReportFromFusionReport, hydrateIdentitiesForReportDecisions } from './helpers/generateReport'
 import {
     buildStatsForDryRun,
     createDryRunRowEmitter,
     createSafeSender,
     DryRunRuntimeOptions,
+    hostnameSegmentFromBaseurl,
     streamEnrichedOutputRows,
     streamOrphanDeferredReportRows,
     streamFallbackAnalyzedRows,
@@ -19,6 +24,14 @@ import {
     fetchPhase,
     processPhase,
 } from './helpers/corePipeline'
+
+const REPORT_DISK_SUBDIR = 'reports'
+
+const buildDryRunHtmlReportPath = (baseurl: string | undefined): string => {
+    const hostSeg = hostnameSegmentFromBaseurl(baseurl)
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    return path.join(process.cwd(), REPORT_DISK_SUBDIR, `custom-report-${hostSeg}-${stamp}.html`)
+}
 
 /**
  * custom:dryrun command - non-persistent aggregation analysis output.
@@ -55,6 +68,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             includeDecisions:
                 typeof (input as any).includeDecisions === 'boolean' ? (input as any).includeDecisions : false,
             writeToDisk: typeof (input as any).writeToDisk === 'boolean' ? (input as any).writeToDisk : false,
+            sendReportTo: sanitizeRecipients(Array.isArray((input as any).sendReportTo) ? (input as any).sendReportTo : []),
         }
 
         const rowEmitter = await createDryRunRowEmitter(serviceRegistry, sender, runtimeOptions)
@@ -77,10 +91,8 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
                     ? (fusion as any).totalFusionAccountCount
                     : sources.fusionAccountCount,
         }
-        const report = fusion.generateReport(
-            true,
-            buildStatsForDryRun(fetchResult, issueSummary, timer.totalElapsed(), fusionCounts)
-        )
+        const dryRunStats = buildStatsForDryRun(fetchResult, issueSummary, timer.totalElapsed(), fusionCounts)
+        const report = fusion.generateReport(true, dryRunStats)
         const reportIndex = buildReportAccountIndex(report.accounts)
         const pendingReviewByAccountId = forms.pendingReviewContextByAccountId
         const decisionAccountIds = new Set((report.fusionReviewDecisions ?? []).map((decision) => decision.accountId))
@@ -155,6 +167,30 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         }
 
         timer.phase('PHASE 4: Streaming enriched ISC account rows')
+        let reportHtmlOutputPath: string | undefined
+        const shouldWriteHtmlReport = runtimeOptions.writeToDisk
+        const shouldSendReportEmail = (runtimeOptions.sendReportTo?.length ?? 0) > 0
+        if (shouldWriteHtmlReport || shouldSendReportEmail) {
+            await hydrateIdentitiesForReportDecisions(serviceRegistry)
+            const emailReport = buildEmailReportFromFusionReport(serviceRegistry, report, dryRunStats)
+            const htmlReportBody = serviceRegistry.messaging.renderFusionReportHtml(emailReport, 'aggregation')
+
+            if (shouldWriteHtmlReport) {
+                const htmlPath = buildDryRunHtmlReportPath(serviceRegistry.config?.baseurl)
+                await mkdir(path.dirname(htmlPath), { recursive: true })
+                await writeFile(htmlPath, htmlReportBody, 'utf8')
+                reportHtmlOutputPath = htmlPath
+                log.info(`custom:report wrote HTML report to ${htmlPath}`)
+            }
+
+            if (shouldSendReportEmail) {
+                await serviceRegistry.messaging.fetchSender()
+                await serviceRegistry.messaging.sendReportTo(emailReport, {
+                    recipients: runtimeOptions.sendReportTo ?? [],
+                    reportType: 'aggregation',
+                })
+            }
+        }
 
         const summary = buildDryRunSummary({
             sentRows,
@@ -167,6 +203,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             fusionReviewDecisionsCount: (report.fusionReviewDecisions ?? []).length,
             writeToDisk: runtimeOptions.writeToDisk,
             reportOutputPath: rowEmitter.diskOutputPath,
+            reportHtmlOutputPath,
         })
 
         if (runtimeOptions.writeToDisk) {

@@ -24,6 +24,7 @@ import {
     mapScoreReportsForFusionReport,
 } from './fusionReportHelpers'
 import { AttributeOperations } from '../attributeService/types'
+import { buildManagedAccountKey, getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 
 // ============================================================================
 // FusionService Class
@@ -384,6 +385,7 @@ export class FusionService {
             this.sources.managedAccountsById,
             this.sources.managedAccountsByIdentityId,
             this.sources.managedAccountsAllById,
+            this.sources.managedAccountKeysByRawId,
             this.shouldPruneDeletedManagedAccounts()
         )
         this.log.debug(
@@ -470,7 +472,8 @@ export class FusionService {
 
             if (mode === 'correlate') {
                 if (canDirectCorrelate) {
-                    directCorrelateIds.push(accountId)
+                    const rawAccountId = info.rawAccountId ?? accountId
+                    directCorrelateIds.push(rawAccountId)
                 }
             } else if (mode === 'reverse') {
                 let ids = bySource.get(info.sourceName)
@@ -486,11 +489,16 @@ export class FusionService {
         if (authorizedLinkDecision && !authorizedLinkDecision.newIdentity && canDirectCorrelate) {
             const assignedId = authorizedLinkDecision.account.id
             const assignedSource = authorizedLinkDecision.account.sourceName
+            const assignedKey = buildManagedAccountKey({
+                id: assignedId,
+                sourceName: assignedSource,
+                nativeIdentity: assignedId,
+            })
             if (
                 assignedId &&
                 assignedSource &&
-                missingIds.includes(assignedId) &&
-                !fusionAccount.getManagedAccountInfo(assignedId) &&
+                missingIds.includes(assignedKey ?? assignedId) &&
+                !fusionAccount.getManagedAccountInfo(assignedKey ?? assignedId) &&
                 (this.sources.getSourceConfig(assignedSource)?.correlationMode ?? 'none') === 'correlate' &&
                 !directCorrelateIds.includes(assignedId)
             ) {
@@ -681,6 +689,7 @@ export class FusionService {
                 this.sources.managedAccountsById,
                 this.sources.managedAccountsByIdentityId,
                 this.sources.managedAccountsAllById,
+                this.sources.managedAccountKeysByRawId,
                 this.shouldPruneDeletedManagedAccounts()
             )
 
@@ -712,8 +721,15 @@ export class FusionService {
         const identityAccountIds = new Set<string>(
             (identity.accounts ?? [])
                 .filter((a) => sourceNames.has(a.source?.name ?? ''))
-                .map((a) => a.id!)
-                .filter(Boolean)
+                .map((a) =>
+                    buildManagedAccountKey({
+                        id: a.id,
+                        sourceId: a.source?.id,
+                        sourceName: a.source?.name,
+                        nativeIdentity: (a as any).nativeIdentity ?? a.id,
+                    })
+                )
+                .filter((value): value is string => Boolean(value))
         )
         if (identityAccountIds.size === 0) return undefined
 
@@ -856,6 +872,7 @@ export class FusionService {
             this.sources.managedAccountsById,
             this.sources.managedAccountsByIdentityId,
             this.sources.managedAccountsAllById,
+            this.sources.managedAccountKeysByRawId,
             this.shouldPruneDeletedManagedAccounts(),
             !suppressAssociationHistoryForAuthorizedDecision
         )
@@ -880,7 +897,10 @@ export class FusionService {
                 this.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
                 const sourceInfo = this.sourcesByName.get(fusionDecision.account.sourceName)
                 if (sourceInfo?.config?.disableNonMatchingAccounts) {
-                    const managedAccount = this.sources.managedAccountsById.get(fusionDecision.account.id)
+                    const decisionManagedKey = this.sources.resolveManagedAccountKey(fusionDecision.account.id)
+                    const managedAccount = decisionManagedKey
+                        ? this.sources.managedAccountsById.get(decisionManagedKey)
+                        : undefined
                     if (managedAccount) {
                         this.queueDisableOperation(managedAccount)
                     }
@@ -1523,7 +1543,7 @@ export class FusionService {
      * counted as unprocessed or touched again until the next aggregation reloads them from sources.
      */
     private removeManagedAccountFromWorkQueue(account: Account): void {
-        const id = account.id
+        const id = getManagedAccountKeyFromAccount(account)
         const byId = this.sources.managedAccountsById
         if (!id || !byId?.has(id)) {
             return

@@ -2,6 +2,7 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 import { assert } from '../../utils/assert'
 import { FusionAccount } from '../../model/account'
 import { AttributeOperations } from '../../services/attributeService/types'
+import { parseManagedAccountKey } from '../../model/managedAccountKey'
 
 /**
  * Rebuilds a fusion account by fetching fresh data and reprocessing attributes.
@@ -39,6 +40,17 @@ export const rebuildFusionAccount = async (
     }
     await Promise.all(
         Array.from(accountIds).map(async (id: string) => {
+            const parsedManagedKey = parseManagedAccountKey(id)
+            if (parsedManagedKey) {
+                const managedAccount = await sources.fetchSourceAccountByNativeIdentity(
+                    parsedManagedKey.sourceId,
+                    parsedManagedKey.nativeIdentity
+                )
+                if (managedAccount?.id) {
+                    await sources.fetchManagedAccount(managedAccount.id)
+                }
+                return
+            }
             await sources.fetchManagedAccount(id)
         })
     )

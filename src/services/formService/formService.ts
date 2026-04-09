@@ -249,7 +249,7 @@ export class FormService {
 
         const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'authoritative'
 
-        const formName = buildFormName(fusionAccount, this.fusionFormNamePattern, sourceType)
+        const formName = buildFormName(fusionAccount, this.fusionFormNamePattern)
         assert(formName, 'Form name is required')
 
         const formDefinition = await this.getOrCreateFormDefinition(formName, fusionAccount, candidates)
