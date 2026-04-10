@@ -489,7 +489,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Normal Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong><br><br>Evaluated via Velocity templates during generation. Can optionally be continuously refreshed. Includes built-in formatting options: case transforms, string normalization, and length constraints.",
+                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong><br><br>Evaluated via Apache Velocity during generation. Can optionally be continuously refreshed. Includes built-in formatting options: case transforms, string normalization, and length constraints.<br><br><strong>Velocity context</strong> (in addition to any mapped Fusion attribute as a top-level <code>$attributeName</code>):<br><ul><li><code>$identity</code> — correlated identity attributes</li><li><code>$accounts</code> — ordered list of managed source account snapshots</li><li><code>$account</code> — origin account snapshot (managed account or identity-backed shape)</li><li><code>$originAccount</code> — origin native identity id (when present)</li><li><code>$originSource</code> — origin source name (when present)</li><li><code>$previous</code> — prior Fusion attribute values from the last run</li><li><code>$sources</code> — accounts grouped by source name</li><li><code>$Math</code>, <code>$Datefns</code>, <code>$Normalize</code>, <code>$AddressParse</code> — built-in helpers</li></ul>Earlier definitions in the list run first; each computed value is added to the context so later definitions can reference it by name.",
                     "items": [
                         {
                             "key": "normalAttributeDefinitions",
@@ -593,7 +593,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Unique Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define persistent unique attributes (e.g. identifiers).</strong><br><br>Generated values are permanently stored and only recalculate on account reset. Supports Velocity templates, runtime context, collision handling via counters, and UUIDv4 generation.",
+                    "sectionHelpMessage": "<strong>Define persistent unique attributes (e.g. identifiers).</strong><br><br>Generated values are permanently stored and only recalculate on account reset. Uses the same Velocity runtime and context as normal definitions, plus uniqueness handling.<br><br><strong>Velocity context</strong> (same as normal attribute definitions): mapped Fusion attributes as top-level <code>$attributeName</code>; <code>$identity</code>; <code>$accounts</code>; <code>$account</code>; <code>$originAccount</code> (when present); <code>$originSource</code> (when present); <code>$previous</code>; <code>$sources</code>; helpers <code>$Math</code>, <code>$Datefns</code>, <code>$Normalize</code>, <code>$AddressParse</code>. Earlier unique definitions in the list run first and expose their values to later ones.<br><br><strong>Unique variables:</strong> <code>$counter</code> — numeric suffix for disambiguation (empty on first attempt unless using incremental mode; padded per <strong>Minimum counter digits</strong>); <code>$UUID</code> — random v4 UUID when referenced in the expression.",
                     "items": [
                         {
                             "key": "maxAttempts",
