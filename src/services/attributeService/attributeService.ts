@@ -29,16 +29,14 @@ const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
 const ORIGIN_ACCOUNT_ATTRIBUTE = 'originAccount'
 
 /**
- * Managed account key for matching `mainAccount` / `$originAccount` — same composite as
- * `sourceId::nativeIdentity` when both parts exist, else the raw id (`_rawId`). Not stored as
- * a separate snapshot field; use top-level `$originAccount` in Velocity when you need the key.
+ * Managed account key for matching `mainAccount` / `$originAccount` — composite `sourceId::nativeIdentity`
+ * from snapshot fields only. Use top-level `$originAccount` in Velocity when you need the origin key.
  */
 function getManagedAccountSnapshotKey(account: Record<string, any> | undefined): string {
     if (!account) return ''
     const key = buildManagedAccountKey({
         sourceId: (account as any)._sourceId,
         nativeIdentity: (account as any)._nativeIdentity,
-        id: (account as any)._rawId,
     })
     return String(key ?? '').trim()
 }
@@ -763,10 +761,19 @@ export class AttributeService {
             }
         }
 
+        const parsedOrigin = parseManagedAccountKey(originId)
+        if (parsedOrigin) {
+            return {
+                _name: String(fusionAccount.name ?? '').trim() || originId,
+                _source: originSource ?? '',
+                _sourceId: parsedOrigin.sourceId,
+                _nativeIdentity: parsedOrigin.nativeIdentity,
+            }
+        }
         return {
-            _rawId: originId,
             _name: String(fusionAccount.name ?? '').trim() || originId,
             _source: originSource ?? '',
+            _nativeIdentity: originId,
         }
     }
 
