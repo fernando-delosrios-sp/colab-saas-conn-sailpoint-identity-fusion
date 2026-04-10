@@ -21,12 +21,28 @@ import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
 import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
-import { parseManagedAccountKey } from '../../model/managedAccountKey'
+import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
 /** System-managed provenance id; not mapped or defined via Velocity. */
 const ORIGIN_ACCOUNT_ATTRIBUTE = 'originAccount'
+
+/**
+ * Canonical managed-account key on Velocity snapshots (`managedAccountKey`), or derived from
+ * `_sourceId` and `_nativeIdentity` when present.
+ */
+function getManagedAccountSnapshotKey(account: Record<string, any> | undefined): string {
+    if (!account) return ''
+    const explicit = String((account as any).managedAccountKey ?? '').trim()
+    if (explicit) return explicit
+    return (
+        buildManagedAccountKey({
+            sourceId: (account as any)._sourceId,
+            nativeIdentity: (account as any)._nativeIdentity,
+        }) ?? ''
+    ).trim()
+}
 
 // ============================================================================
 // AttributeService Class
@@ -680,7 +696,7 @@ export class AttributeService {
 
     /**
      * Velocity `$account`: origin snapshot (managed account shape or identity-backed).
-     * `$originAccount` remains the string id (set on context above).
+     * `$originAccount` remains the origin key string (set on context above).
      *
      * For identity-origin (baseline) accounts that have managed accounts attached,
      * the first managed account is preferred as `$account` so Velocity expressions
@@ -720,7 +736,7 @@ export class AttributeService {
         if (originSource === 'Identities' && identityHasData) {
             return {
                 ...identityBag,
-                _id: originId,
+                originIdentityId: originId,
                 _name: identityBackedName,
                 _source: 'Identities',
                 IIQDisabled: Boolean(fusionAccount.disabled),
@@ -729,8 +745,8 @@ export class AttributeService {
 
         const parsedManagedKey = parseManagedAccountKey(originId)
         const managed = orderedAccounts.find((a) => {
-            const accountId = String(a?._id ?? '').trim()
-            if (accountId === originId) return true
+            const snapshotKey = getManagedAccountSnapshotKey(a)
+            if (snapshotKey === originId) return true
             if (!parsedManagedKey) return false
             const sourceId = String(a?._sourceId ?? '').trim()
             const nativeIdentity = String(a?._nativeIdentity ?? '').trim()
@@ -741,7 +757,7 @@ export class AttributeService {
         if (originSource === 'Identities') {
             return {
                 ...identityBag,
-                _id: originId,
+                originIdentityId: originId,
                 _name: identityBackedName,
                 _source: 'Identities',
                 IIQDisabled: Boolean(fusionAccount.disabled),
@@ -749,7 +765,7 @@ export class AttributeService {
         }
 
         return {
-            _id: originId,
+            managedAccountKey: originId,
             _name: String(fusionAccount.name ?? '').trim() || originId,
             _source: originSource ?? '',
         }
@@ -785,7 +801,7 @@ export class AttributeService {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
-        const prioritizedIndex = ordered.findIndex((account) => String(account?._id ?? '').trim() === mainAccountId)
+        const prioritizedIndex = ordered.findIndex((account) => getManagedAccountSnapshotKey(account) === mainAccountId)
         if (prioritizedIndex <= 0) return ordered
 
         const prioritizedAccount = ordered[prioritizedIndex]
@@ -814,7 +830,7 @@ export class AttributeService {
         accountId: string
     ): Record<string, any> | undefined {
         for (const accounts of sourceAttributeMap.values()) {
-            const match = accounts.find((account) => String(account?._id ?? '').trim() === accountId)
+            const match = accounts.find((account) => getManagedAccountSnapshotKey(account) === accountId)
             if (match) return match
         }
 

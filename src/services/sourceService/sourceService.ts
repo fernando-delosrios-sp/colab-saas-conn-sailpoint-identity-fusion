@@ -954,7 +954,7 @@ export class SourceService {
      * @param context - Optional hint for error logs (e.g. "SourceService>saveBatchCumulativeCount")
      */
     public async patchSourceConfig(
-        _id: string,
+        sourceId: string,
         requestParameters: SourcesV2025ApiUpdateSourceRequest,
         context?: string
     ): Promise<Source | undefined> {

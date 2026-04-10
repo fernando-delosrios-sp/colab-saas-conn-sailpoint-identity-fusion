@@ -55,7 +55,7 @@ flowchart TD
     - **Optimistic correlation**: When `correlateOnAggregation` is enabled, missing accounts are marked as correlated _immediately_ before the API call is enqueued, so the account output reflects a successful correlation without waiting for the queue to drain. Correlation API calls proceed as fire-and-forget in the background; any failures are logged and will be re-detected on the next aggregation.
 
 4.  **Identity Processing** (attribute mapping + normal definitions):
-    - Processes all _identities_. This creates new fusion identities for identities that don't yet have a fusion account but should. This step also "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
+    - Processes all identities. This creates new fusion identities for identities that don't yet have a fusion account but should. This step also "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
     - For each identity:
         - Managed account layer is applied to match collected managed accounts with Fusion accounts.
         - Same attribute mapping + normal definition evaluation as step 3.
@@ -165,7 +165,7 @@ To reduce email/report payload growth:
 ### Attribute evaluation order
 
 Normal attributes are created **before** Fusion matching occurs (steps 3–6). Unique attributes are evaluated **after** all matching is complete (step 8). Attribute definitions can access previously defined attributes via the shared Velocity context, so definition order matters. Unique attributes can reference normal attribute values, but normal attributes cannot reference unique attributes because of the order in which they are calculated.
-When the Fusion schema attribute `mainAccount` is populated with a valid managed account ID, that managed account is evaluated first for mapping/definition context (including `$accounts[0]`); if not set or invalid, managed-source order is used.
+When the Fusion schema attribute `mainAccount` is populated with a valid managed account key (`sourceId::nativeIdentity`), that managed account is evaluated first for mapping/definition context (including `$accounts[0]`); if not set or invalid, managed-source order is used.
 
 ### Attribute mapping and unique definition synergy
 
