@@ -1,5 +1,4 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
-import { softAssert } from '../../utils/assert'
 import { generateReport } from './generateReport'
 
 export type PipelineMode =
@@ -18,12 +17,20 @@ export interface FetchResult {
     managedAccountsFoundOrphan: number
 }
 
+async function applyPersistentFusionReset(serviceRegistry: ServiceRegistry): Promise<void> {
+    const { forms, fusion, sources } = serviceRegistry
+    await forms.deleteExistingForms()
+    await fusion.disableReset()
+    await fusion.resetState()
+    await sources.resetBatchCumulativeCount()
+}
+
 /**
  * Phase 1: Setup and initialization.
  * @returns true if processing should continue, false on reset.
  */
 export async function setupPhase(serviceRegistry: ServiceRegistry, schema: any, options: CorePipelineOptions): Promise<boolean> {
-    const { log, fusion, forms, schemas, sources, attributes, config } = serviceRegistry
+    const { log, fusion, schemas, sources, attributes, config } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
 
     await sources.fetchAllSources(isPersistent)
@@ -36,10 +43,7 @@ export async function setupPhase(serviceRegistry: ServiceRegistry, schema: any, 
     if (fusion.isReset()) {
         log.info('Reset flag detected, disabling reset and exiting')
         if (isPersistent) {
-            await forms.deleteExistingForms()
-            await fusion.disableReset()
-            await fusion.resetState()
-            await sources.resetBatchCumulativeCount()
+            await applyPersistentFusionReset(serviceRegistry)
         }
         return false
     }
@@ -49,9 +53,7 @@ export async function setupPhase(serviceRegistry: ServiceRegistry, schema: any, 
     } else {
         const dynamicSchema = await schemas.buildDynamicSchema()
         await schemas.setFusionAccountSchema(dynamicSchema)
-        if (!isPersistent) {
-            log.info('Input schema not provided; using dynamically built fusion account schema')
-        }
+        log.info('Input schema not provided; using dynamically built fusion account schema')
     }
     log.info('Fusion account schema set successfully')
 
@@ -201,6 +203,7 @@ export async function reportPhase(
     timer: ReturnType<ServiceRegistry['log']['timer']>,
     options: CorePipelineOptions
 ): Promise<void> {
+    void options
     const { fusion, sources } = serviceRegistry
 
     // We can generate the report in memory for customReport, but only write/send if persistent
