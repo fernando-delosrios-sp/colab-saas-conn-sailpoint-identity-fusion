@@ -1322,7 +1322,6 @@ export class FusionAccount {
 
             const contextAttributes: Attributes = {
                 ...(account.attributes ?? {}),
-                managedAccountKey: accountId,
                 ...(account.id ? { _rawId: account.id } : {}),
                 _name: String(account.name ?? account.nativeIdentity ?? '').trim() || accountId,
                 _source: account.sourceName,

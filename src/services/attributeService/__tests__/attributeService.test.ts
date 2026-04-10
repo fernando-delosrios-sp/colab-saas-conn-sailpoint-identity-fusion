@@ -119,7 +119,7 @@ describe('AttributeService mainAccount stale cleanup', () => {
             attributeMaps: [
                 {
                     newAttribute: 'mainAccount',
-                    existingAttributes: ['managedAccountKey'],
+                    existingAttributes: ['_rawId'],
                     attributeMerge: 'first',
                 },
             ],
@@ -152,7 +152,7 @@ describe('AttributeService mainAccount stale cleanup', () => {
             identity: {},
             accounts: [],
             sources: new Map<string, Record<string, any>[]>([
-                ['HR', [{ managedAccountKey: 'acct-1', _source: 'HR' }]],
+                ['HR', [{ _rawId: 'acct-1', _source: 'HR' }]],
             ]),
         }
         const fusionAccount: any = {
@@ -318,7 +318,7 @@ describe('AttributeService mapping undefined behavior', () => {
             identity: {},
             accounts: [],
             sources: new Map<string, Record<string, any>[]>([
-                ['HR', [{ preferredName: 'Neo', managedAccountKey: 'acct-1', _source: 'HR' }]],
+                ['HR', [{ preferredName: 'Neo', _rawId: 'acct-1', _source: 'HR' }]],
             ]),
         }
         const fusionAccount: any = {
@@ -345,7 +345,7 @@ describe('AttributeService mapping undefined behavior', () => {
         service.mapAttributes(fusionAccount)
         expect(fusionAccount.attributes.nickname).toBe('Neo')
 
-        attributeBag.sources.set('HR', [{ managedAccountKey: 'acct-1', _source: 'HR' }])
+        attributeBag.sources.set('HR', [{ _rawId: 'acct-1', _source: 'HR' }])
         service.mapAttributes(fusionAccount)
         expect(fusionAccount.attributes.nickname).toBeUndefined()
     })
@@ -798,7 +798,7 @@ describe('AttributeService mainAccount override', () => {
                         {
                             preferredName: 'Neo',
                             employeeId: 'hr-id-001',
-                            managedAccountKey: 'hr-001',
+                            _rawId: 'hr-001',
                             _source: 'HR',
                         },
                     ],
@@ -809,7 +809,7 @@ describe('AttributeService mainAccount override', () => {
                         {
                             preferredName: 'Trinity',
                             employeeId: 'erp-id-777',
-                            managedAccountKey: 'erp-777',
+                            _rawId: 'erp-777',
                             _source: 'ERP',
                         },
                     ],
@@ -958,7 +958,7 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
                     [
                         {
                             preferredName: 'Neo',
-                            managedAccountKey: 'hr-001',
+                            _rawId: 'hr-001',
                             _source: 'HR',
                         },
                     ],
@@ -969,7 +969,7 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
                         {
                             preferredName: 'Trinity',
                             preferredAccountId: 'erp-777',
-                            managedAccountKey: 'erp-777',
+                            _rawId: 'erp-777',
                             _source: 'ERP',
                         },
                     ],
@@ -1257,7 +1257,6 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     [
                         {
                             preferredName: 'FromHR',
-                            managedAccountKey: 'src-hr::native-m1',
                             _sourceId: 'src-hr',
                             _nativeIdentity: 'native-m1',
                             _name: 'FromHR',
@@ -1288,10 +1287,10 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         expect(fusionAccount.attributes.derived).toBe('FromHR')
     })
 
-    it('exposes managedAccountKey and _name on managed snapshots for Velocity', async () => {
+    it('exposes origin key via $originAccount and display name on $account for Velocity', async () => {
         const { sourceService, log, locks } = velocityDeps()
         const service = new AttributeService(
-            velocityConfig('$account.managedAccountKey:$account._name', [{ name: 'HR' }]),
+            velocityConfig('$originAccount:$account._name', [{ name: 'HR' }]),
             velocitySchemas,
             sourceService,
             log,
@@ -1307,7 +1306,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     'HR',
                     [
                         {
-                            managedAccountKey: 'managed-42',
+                            _rawId: 'managed-42',
                             _name: 'Contoso Smith',
                             _source: 'HR',
                             IIQDisabled: false,
@@ -1360,7 +1359,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     [
                         {
                             employeeNumber: 'E-MANAGED',
-                            managedAccountKey: 'same-id',
+                            _rawId: 'same-id',
                             _name: 'managed',
                             _source: 'HR',
                         },
