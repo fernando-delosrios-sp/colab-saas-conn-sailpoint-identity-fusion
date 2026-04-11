@@ -9,7 +9,6 @@ describe('managedAccountKey helpers', () => {
     it('builds composite key from sourceId and nativeIdentity', () => {
         expect(
             buildManagedAccountKey({
-                id: 'raw-1',
                 sourceId: 'source-a',
                 nativeIdentity: 'native-1',
             })
@@ -19,7 +18,6 @@ describe('managedAccountKey helpers', () => {
     it('returns undefined when composite fields are missing', () => {
         expect(
             buildManagedAccountKey({
-                id: 'raw-1',
                 sourceName: 'HR',
             })
         ).toBeUndefined()

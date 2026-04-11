@@ -393,7 +393,6 @@ export class FusionAccount {
         const accountDisplayName = String(account.name ?? '').trim() || String(account.id ?? '').trim() || identityDisplayName
         const displayName = accountDisplayName
         let managedAccountKey = buildManagedAccountKey({
-            id: account.id,
             sourceId: (account as any).sourceId,
             sourceName: account.sourceName,
             nativeIdentity: (account as any).nativeIdentity,
@@ -1115,7 +1114,6 @@ export class FusionAccount {
         identity.accounts?.forEach((account) => {
             if (sourceNames.includes(account.source?.name ?? '')) {
                 const managedAccountKey = buildManagedAccountKey({
-                    id: account.id,
                     sourceId: account.source?.id,
                     sourceName: account.source?.name,
                     nativeIdentity: (account as any).nativeIdentity,

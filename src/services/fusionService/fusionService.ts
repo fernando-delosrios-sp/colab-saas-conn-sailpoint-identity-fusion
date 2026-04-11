@@ -720,10 +720,9 @@ export class FusionService {
                 .filter((a) => sourceNames.has(a.source?.name ?? ''))
                 .map((a) =>
                     buildManagedAccountKey({
-                        id: a.id,
                         sourceId: a.source?.id,
                         sourceName: a.source?.name,
-                        nativeIdentity: (a as any).nativeIdentity ?? a.id,
+                        nativeIdentity: (a as any).nativeIdentity,
                     })
                 )
                 .filter((value): value is string => Boolean(value))

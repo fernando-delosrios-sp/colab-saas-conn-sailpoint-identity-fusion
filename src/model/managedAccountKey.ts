@@ -3,7 +3,6 @@ import { Account } from 'sailpoint-api-client'
 const MANAGED_ACCOUNT_KEY_SEPARATOR = '::'
 
 type ManagedKeyAccountLike = {
-    id?: string | null
     nativeIdentity?: string | null
     sourceId?: string | null
     sourceName?: string | null
@@ -69,7 +68,6 @@ export function getManagedAccountKeyFromAccount(
     lookupByRawId?: (rawId: string) => string | undefined
 ): string | undefined {
     const composite = buildManagedAccountKey({
-        id: account.id,
         sourceId: (account as any).sourceId,
         sourceName: account.sourceName,
         nativeIdentity: account.nativeIdentity,
