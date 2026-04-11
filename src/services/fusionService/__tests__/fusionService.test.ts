@@ -49,8 +49,8 @@ describe('FusionService', () => {
         // Reset mocks
         mockLog = new LogService({ spConnDebugLoggingEnabled: false }) as jest.Mocked<LogService>
         const mockClient = {} as any
-        mockIdentities = new IdentityService(mockConfig, mockLog, mockClient) as jest.Mocked<IdentityService>
         mockSources = new SourceService(mockConfig, mockLog, mockClient) as jest.Mocked<SourceService>
+        mockIdentities = new IdentityService(mockConfig, mockLog, mockClient, mockSources) as jest.Mocked<IdentityService>
         mockForms = new FormService(
             mockConfig,
             mockLog,
@@ -97,6 +97,19 @@ describe('FusionService', () => {
         Object.defineProperty(mockSchemas, 'fusionDisplayAttribute', {
             get: jest.fn(() => 'displayName'),
             configurable: true,
+        })
+
+        mockSources.resolveIscAccountIdForManagedKey = jest.fn((managedKey: string) => {
+            const work = mockSources.managedAccountsById as unknown as Map<string, Account> | undefined
+            const all = mockSources.managedAccountsAllById as unknown as Map<string, Account> | undefined
+            const acc =
+                (work instanceof Map ? work.get(managedKey) : undefined) ??
+                (all instanceof Map ? all.get(managedKey) : undefined)
+            const raw = acc?.id
+            if (raw != null && String(raw).trim() !== '') return String(raw).trim()
+            // Tests without composite map entries: treat non-composite keys as ISC account ids
+            if (!managedKey.includes('::')) return managedKey
+            return undefined
         })
 
         fusionService = new FusionService(
@@ -381,6 +394,7 @@ describe('FusionService', () => {
                 id: 'acct-seq-1',
                 nativeIdentity: 'native-seq-1',
                 name: 'Taylor Jordan',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
@@ -388,13 +402,14 @@ describe('FusionService', () => {
                 id: 'acct-seq-2',
                 nativeIdentity: 'native-seq-2',
                 name: 'Taylor Jordan',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
 
             const workQueue = new Map([
-                ['acct-seq-1', firstAccount],
-                ['acct-seq-2', secondAccount],
+                ['source-a-id::native-seq-1', firstAccount],
+                ['source-a-id::native-seq-2', secondAccount],
             ])
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
@@ -419,7 +434,7 @@ describe('FusionService', () => {
             await fusionService.processManagedAccounts()
 
             expect(fusionService.fusionAccounts).toHaveLength(1)
-            expect(workQueue.has('acct-seq-2')).toBe(false)
+            expect(workQueue.has('source-a-id::native-seq-2')).toBe(false)
             expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
         })
 
@@ -428,6 +443,7 @@ describe('FusionService', () => {
                 id: 'acct-short-circuit-1',
                 nativeIdentity: 'native-short-circuit-1',
                 name: 'Managed Account 1',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
@@ -465,6 +481,7 @@ describe('FusionService', () => {
                 id: 'acct-deferred-1',
                 nativeIdentity: 'native-deferred-1',
                 name: 'Deferred User',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
@@ -480,11 +497,14 @@ describe('FusionService', () => {
                 id: 'acct-prev-unmatched-1',
                 nativeIdentity: 'native-prev-unmatched-1',
                 name: 'Unmatched Candidate',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-                ; (fusionService as any).fusionAccountMap.set('native-prev-unmatched-1', unmatchedCandidate)
-                ; (fusionService as any).currentRunUnmatchedFusionNativeIdentities.add('native-prev-unmatched-1')
+                ; (fusionService as any).fusionAccountMap.set('source-a-id::native-prev-unmatched-1', unmatchedCandidate)
+                ; (fusionService as any).currentRunUnmatchedFusionNativeIdentities.add(
+                    'source-a-id::native-prev-unmatched-1'
+                )
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
@@ -502,14 +522,14 @@ describe('FusionService', () => {
                 return n
             })
 
-            const workQueue = new Map([['acct-deferred-1', mockManagedAccount]])
+            const workQueue = new Map([['source-a-id::native-deferred-1', mockManagedAccount]])
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
 
             const result = await fusionService.processManagedAccount(mockManagedAccount)
 
             expect(result).toBeUndefined()
-            expect(workQueue.has('acct-deferred-1')).toBe(false)
+            expect(workQueue.has('source-a-id::native-deferred-1')).toBe(false)
             expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
         })
 
@@ -518,6 +538,7 @@ describe('FusionService', () => {
                 id: 'acct-no-report-cap',
                 nativeIdentity: 'native-no-report-cap',
                 name: 'No Report Cap',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
@@ -533,11 +554,14 @@ describe('FusionService', () => {
                 id: 'acct-prev-unmatched-cap',
                 nativeIdentity: 'native-prev-unmatched-cap',
                 name: 'Unmatched Candidate',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-                ; (fusionService as any).fusionAccountMap.set('native-prev-unmatched-cap', unmatchedCandidate)
-                ; (fusionService as any).currentRunUnmatchedFusionNativeIdentities.add('native-prev-unmatched-cap')
+                ; (fusionService as any).fusionAccountMap.set('source-a-id::native-prev-unmatched-cap', unmatchedCandidate)
+                ; (fusionService as any).currentRunUnmatchedFusionNativeIdentities.add(
+                    'source-a-id::native-prev-unmatched-cap'
+                )
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
@@ -557,7 +581,9 @@ describe('FusionService', () => {
 
             await fusionService.analyzeManagedAccount(mockManagedAccount)
             const report = fusionService.generateReport(true)
-            expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-no-report-cap')).toBe(false)
+            expect(
+                report.accounts.some((a) => a.deferred && a.accountId === 'source-a-id::native-no-report-cap')
+            ).toBe(false)
         })
 
         it('records deferred match report rows for custom:dryrun even when commandType is StdAccountList and fusionReportOnAggregation is false', async () => {
@@ -578,6 +604,7 @@ describe('FusionService', () => {
                 id: 'acct-custom-report-def',
                 nativeIdentity: 'native-custom-report-def',
                 name: 'Custom Report Deferred',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
@@ -593,11 +620,14 @@ describe('FusionService', () => {
                 id: 'acct-prev-unmatched-cr',
                 nativeIdentity: 'native-prev-unmatched-cr',
                 name: 'Unmatched Candidate CR',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-                ; (customReportFusion as any).fusionAccountMap.set('native-prev-unmatched-cr', unmatchedCandidate)
-                ; (customReportFusion as any).currentRunUnmatchedFusionNativeIdentities.add('native-prev-unmatched-cr')
+                ; (customReportFusion as any).fusionAccountMap.set('source-a-id::native-prev-unmatched-cr', unmatchedCandidate)
+                ; (customReportFusion as any).currentRunUnmatchedFusionNativeIdentities.add(
+                    'source-a-id::native-prev-unmatched-cr'
+                )
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
@@ -617,7 +647,9 @@ describe('FusionService', () => {
 
             await customReportFusion.analyzeManagedAccount(mockManagedAccount)
             const report = customReportFusion.generateReport(true)
-            expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-custom-report-def')).toBe(true)
+            expect(
+                report.accounts.some((a) => a.deferred && a.accountId === 'source-a-id::native-custom-report-def')
+            ).toBe(true)
         })
 
         it('records only unmatched history when creating a new authoritative non-match fusion account', async () => {
@@ -625,6 +657,7 @@ describe('FusionService', () => {
                 id: 'acct-unmatched-1',
                 nativeIdentity: 'NE00002',
                 name: 'Matt Usalen NE00002 Assignment00002',
+                sourceId: 'src-nerm',
                 sourceName: 'NERM',
                 attributes: {},
             } as Account
@@ -651,6 +684,7 @@ describe('FusionService', () => {
                 id: 'acct-perfect-1',
                 nativeIdentity: 'acct-perfect-1',
                 name: 'Perfect User',
+                sourceId: 'src-lh2',
                 sourceName: 'LH2',
                 attributes: {},
             } as Account
@@ -679,6 +713,7 @@ describe('FusionService', () => {
                 id: 'acct-perfect-report-1',
                 nativeIdentity: 'acct-perfect-report-1',
                 name: 'Perfect Report User',
+                sourceId: 'src-lh2',
                 sourceName: 'LH2',
                 attributes: {},
             } as Account
@@ -723,6 +758,7 @@ describe('FusionService', () => {
                 id: 'acct-perfect-skip-1',
                 nativeIdentity: 'acct-perfect-skip-1',
                 name: 'Skipped Rule User',
+                sourceId: 'src-lh2',
                 sourceName: 'LH2',
                 attributes: {},
             } as Account
@@ -768,6 +804,7 @@ describe('FusionService', () => {
                 id: 'acct-partial-1',
                 nativeIdentity: 'native-partial-1',
                 name: 'Partial User',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
@@ -811,6 +848,7 @@ describe('FusionService', () => {
                 id: 'acct-perfect-analysis-1',
                 nativeIdentity: 'acct-perfect-analysis-1',
                 name: 'Perfect Analysis User',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
@@ -857,6 +895,7 @@ describe('FusionService', () => {
                 id: 'acct-orphan-analysis-1',
                 nativeIdentity: 'native-orphan-a1',
                 name: 'Orphan User',
+                sourceId: 'orphan-src-id',
                 sourceName: 'OrphanSrc',
                 attributes: {},
             } as Account
@@ -871,13 +910,16 @@ describe('FusionService', () => {
 
         it('should process managed accounts', async () => {
             const mockManagedAccount = {
+                id: 'mgmt-raw-1',
                 nativeIdentity: 'mgmt-1',
                 name: 'Managed Account 1',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
+                attributes: {},
             } as Account
 
             const managedAccountsMap = new Map<string, Account>()
-            managedAccountsMap.set('mgmt-1', mockManagedAccount)
+            managedAccountsMap.set('source-a-id::mgmt-1', mockManagedAccount)
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedAccountsMap)
 
@@ -895,6 +937,7 @@ describe('FusionService', () => {
                 id: 'acct-1',
                 nativeIdentity: 'native-1',
                 name: 'Managed Account 1',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
@@ -929,7 +972,7 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {
-                    accounts: ['acct-missing-1'],
+                    accounts: ['source-a-id::native-missing-1'],
                 },
             } as unknown as Account
 
@@ -938,10 +981,11 @@ describe('FusionService', () => {
             jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([
                     [
-                        'acct-missing-1',
+                        'source-a-id::native-missing-1',
                         {
                             id: 'acct-missing-1',
                             nativeIdentity: 'native-missing-1',
+                            sourceId: 'source-a-id',
                             sourceName: 'Source A',
                             attributes: {},
                         } as unknown as Account,
@@ -1008,18 +1052,19 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {
-                    accounts: ['acct-existing-1'],
+                    accounts: ['source-a-id::native-existing-1'],
                 },
             } as unknown as Account
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
                     [
-                        'acct-new-2',
+                        'source-a-id::native-new-2',
                         {
                             id: 'acct-new-2',
                             name: 'Managed Account New',
                             nativeIdentity: 'native-new-2',
+                            sourceId: 'source-a-id',
                             sourceName: 'Source A',
                             identityId: 'identity-1',
                             attributes: {},
@@ -1028,16 +1073,17 @@ describe('FusionService', () => {
                 ])
             )
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
-                new Map([['identity-1', new Set(['acct-new-2'])]])
+                new Map([['identity-1', new Set(['source-a-id::native-new-2'])]])
             )
             jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([
                     [
-                        'acct-new-2',
+                        'source-a-id::native-new-2',
                         {
                             id: 'acct-new-2',
                             name: 'Managed Account New',
                             nativeIdentity: 'native-new-2',
+                            sourceId: 'source-a-id',
                             sourceName: 'Source A',
                             identityId: 'identity-1',
                             attributes: {},
@@ -1051,7 +1097,7 @@ describe('FusionService', () => {
 
             const result = await fusionService.processFusionAccount(historicalAccount)
 
-            expect(result.accountIds).toContain('acct-new-2')
+            expect(result.accountIds).toContain('source-a-id::native-new-2')
             expect(result.history).toEqual(
                 expect.arrayContaining([expect.stringContaining('Associated managed account Managed Account New [Source A]')])
             )
@@ -1065,17 +1111,18 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {
-                    accounts: ['acct-existing-1', 'acct-deleted-1'],
+                    accounts: ['source-a-id::native-existing-1', 'source-a-id::native-deleted-1'],
                 },
             } as unknown as Account
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
                     [
-                        'acct-existing-1',
+                        'source-a-id::native-existing-1',
                         {
                             id: 'acct-existing-1',
                             nativeIdentity: 'native-existing-1',
+                            sourceId: 'source-a-id',
                             sourceName: 'Source A',
                             attributes: {},
                         } as unknown as Account,
@@ -1086,10 +1133,11 @@ describe('FusionService', () => {
             jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([
                     [
-                        'acct-existing-1',
+                        'source-a-id::native-existing-1',
                         {
                             id: 'acct-existing-1',
                             nativeIdentity: 'native-existing-1',
+                            sourceId: 'source-a-id',
                             sourceName: 'Source A',
                             attributes: {},
                         } as unknown as Account,
@@ -1102,13 +1150,15 @@ describe('FusionService', () => {
 
             const result = await fusionService.processFusionAccount(historicalAccount)
 
-            expect(result.accountIds).toContain('acct-existing-1')
-            expect(result.accountIds).not.toContain('acct-deleted-1')
-            expect(result.missingAccountIds).toContain('acct-existing-1')
-            expect(result.missingAccountIds).not.toContain('acct-deleted-1')
+            expect(result.accountIds).toContain('source-a-id::native-existing-1')
+            expect(result.accountIds).not.toContain('source-a-id::native-deleted-1')
+            expect(result.missingAccountIds).toContain('source-a-id::native-existing-1')
+            expect(result.missingAccountIds).not.toContain('source-a-id::native-deleted-1')
             expect(result.needsRefresh).toBe(true)
             expect(result.history).toEqual(
-                expect.arrayContaining([expect.stringContaining('Removed deleted managed account reference: acct-deleted-1')])
+                expect.arrayContaining([
+                    expect.stringContaining('Removed deleted managed account reference: source-a-id::native-deleted-1'),
+                ])
             )
         })
 
@@ -1150,12 +1200,18 @@ describe('FusionService', () => {
                 identityId: 'identity-1',
                 name: 'Fusion Account',
                 sourceName: 'Identity Fusion NG',
-                attributes: { accounts: ['acct-no-meta'] },
+                attributes: { accounts: ['source-a-id::native-no-meta'] },
             } as unknown as Account)
 
             const linkDecision = {
                 submitter: { id: 'rev-1', email: '', name: 'Reviewer' },
-                account: { id: 'acct-no-meta', name: 'U', sourceName: 'Source A' },
+                account: {
+                    id: 'source-a-id::native-no-meta',
+                    name: 'U',
+                    sourceName: 'Source A',
+                    sourceId: 'source-a-id',
+                    nativeIdentity: 'native-no-meta',
+                },
                 newIdentity: false,
                 identityId: 'identity-1',
                 comments: 'Assign',
@@ -1163,11 +1219,13 @@ describe('FusionService', () => {
             } as any
 
             fusionAccount.addFusionDecisionLayer(linkDecision)
-            expect(fusionAccount.getManagedAccountInfo('acct-no-meta')).toBeUndefined()
+            expect(fusionAccount.getManagedAccountInfo('source-a-id::native-no-meta')).toBeUndefined()
 
             await (fusionService as any).correlatePerSource(fusionAccount, linkDecision)
 
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(fusionAccount, ['acct-no-meta'])
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(fusionAccount, [
+                'source-a-id::native-no-meta',
+            ])
         })
 
         it('fails managed account processing when reverse correlation prerequisites are missing', async () => {
@@ -1175,6 +1233,7 @@ describe('FusionService', () => {
                 id: 'acct-2',
                 nativeIdentity: 'native-2',
                 name: 'Managed Account 2',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
@@ -1209,6 +1268,7 @@ describe('FusionService', () => {
                 id: 'acct-analyze-1',
                 nativeIdentity: 'native-analyze-1',
                 name: 'A. Wesker',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
@@ -1216,14 +1276,15 @@ describe('FusionService', () => {
                 id: 'acct-analyze-2',
                 nativeIdentity: 'native-analyze-2',
                 name: 'Albert Wesker',
+                sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as Account
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
-                    ['acct-analyze-1', firstAccount],
-                    ['acct-analyze-2', secondAccount],
+                    ['source-a-id::native-analyze-1', firstAccount],
+                    ['source-a-id::native-analyze-2', secondAccount],
                 ])
             )
                 ; (fusionService as any).sourcesByName.set('Source A', {
@@ -1406,16 +1467,17 @@ describe('FusionService', () => {
             const managedAccount = {
                 id: 'acct-authz-existing-1',
                 name: 'LH2 User',
+                sourceId: 'src-lh2',
+                nativeIdentity: 'lh2-authz-existing',
                 sourceName: 'LH2',
                 attributes: {},
             } as Account
-            const managedMap = new Map<string, Account>([['acct-authz-existing-1', managedAccount]])
+            const managedKey = 'src-lh2::lh2-authz-existing'
+            const managedMap = new Map<string, Account>([[managedKey, managedAccount]])
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([['acct-authz-existing-1', managedAccount]])
-            )
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map([[managedKey, managedAccount]]))
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
@@ -1428,7 +1490,13 @@ describe('FusionService', () => {
 
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: { id: 'acct-authz-existing-1', name: 'LH2 User', sourceName: 'LH2' },
+                account: {
+                    id: managedKey,
+                    name: 'LH2 User',
+                    sourceName: 'LH2',
+                    sourceId: 'src-lh2',
+                    nativeIdentity: 'lh2-authz-existing',
+                },
                 newIdentity: false,
                 identityId: 'identity-1',
                 comments: 'Assign to existing identity',
@@ -1445,7 +1513,7 @@ describe('FusionService', () => {
             expect(result?.statuses).not.toContain('nonMatched')
             expect(result?.history.some((h) => h.includes('as authorized by Reviewer'))).toBe(true)
             expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(existingFusionAccount, ['acct-authz-existing-1'])
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(existingFusionAccount, [managedKey])
             expect(fusionService.getFusionIdentity('identity-1')).toBe(existingFusionAccount)
         })
 
@@ -1462,14 +1530,19 @@ describe('FusionService', () => {
             const managedAccount = {
                 id: 'acct-auto-1',
                 name: 'LH2 User',
+                sourceId: 'src-lh2',
+                nativeIdentity: 'lh2-auto',
                 sourceName: 'LH2',
                 attributes: {},
             } as Account
-            const managedMap = new Map<string, Account>([['acct-auto-1', managedAccount]])
+            const managedKeyAuto = 'src-lh2::lh2-auto'
+            const managedMap = new Map<string, Account>([[managedKeyAuto, managedAccount]])
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map([['acct-auto-1', managedAccount]]))
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+                new Map([[managedKeyAuto, managedAccount]])
+            )
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
@@ -1482,7 +1555,13 @@ describe('FusionService', () => {
 
             const decision = {
                 submitter: { id: 'system', email: '', name: 'System (automatic assignment)' },
-                account: { id: 'acct-auto-1', name: 'LH2 User', sourceName: 'LH2' },
+                account: {
+                    id: managedKeyAuto,
+                    name: 'LH2 User',
+                    sourceName: 'LH2',
+                    sourceId: 'src-lh2',
+                    nativeIdentity: 'lh2-auto',
+                },
                 newIdentity: false,
                 identityId: 'identity-2',
                 comments: 'Automatically assigned: exact attribute match (all rules 100, none skipped)',
@@ -1512,15 +1591,18 @@ describe('FusionService', () => {
             const managedAccount = {
                 id: 'acct-auto-corr-1',
                 name: 'User',
+                sourceId: 'src-lh2',
+                nativeIdentity: 'lh2-auto-corr',
                 sourceName: 'LH2',
                 attributes: {},
             } as Account
-            const managedMap = new Map<string, Account>([['acct-auto-corr-1', managedAccount]])
+            const managedKeyAutoCorr = 'src-lh2::lh2-auto-corr'
+            const managedMap = new Map<string, Account>([[managedKeyAutoCorr, managedAccount]])
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([['acct-auto-corr-1', managedAccount]])
+                new Map([[managedKeyAutoCorr, managedAccount]])
             )
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
@@ -1534,7 +1616,13 @@ describe('FusionService', () => {
 
             const decision = {
                 submitter: { id: 'system', email: '', name: 'System (automatic assignment)' },
-                account: { id: 'acct-auto-corr-1', name: 'User', sourceName: 'LH2' },
+                account: {
+                    id: managedKeyAutoCorr,
+                    name: 'User',
+                    sourceName: 'LH2',
+                    sourceId: 'src-lh2',
+                    nativeIdentity: 'lh2-auto-corr',
+                },
                 newIdentity: false,
                 identityId: 'identity-auto-corr',
                 comments: 'Automatically assigned: exact attribute match (all rules 100, none skipped)',
@@ -1546,7 +1634,7 @@ describe('FusionService', () => {
             await fusionService.processFusionIdentityDecision(decision)
             expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(
                 expect.any(FusionAccount),
-                ['acct-auto-corr-1']
+                [managedKeyAutoCorr]
             )
         })
 
@@ -1554,22 +1642,31 @@ describe('FusionService', () => {
             const managedAccount = {
                 id: 'acct-authz-no-id-1',
                 name: 'LH2 User',
+                sourceId: 'src-lh2',
+                nativeIdentity: 'lh2-authz-noid',
                 sourceName: 'LH2',
                 attributes: {},
             } as Account
-            const managedMap = new Map<string, Account>([['acct-authz-no-id-1', managedAccount]])
+            const managedKeyNoId = 'src-lh2::lh2-authz-noid'
+            const managedMap = new Map<string, Account>([[managedKeyNoId, managedAccount]])
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([['acct-authz-no-id-1', managedAccount]])
+                new Map([[managedKeyNoId, managedAccount]])
             )
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: { id: 'acct-authz-no-id-1', name: 'LH2 User', sourceName: 'LH2' },
+                account: {
+                    id: managedKeyNoId,
+                    name: 'LH2 User',
+                    sourceName: 'LH2',
+                    sourceId: 'src-lh2',
+                    nativeIdentity: 'lh2-authz-noid',
+                },
                 newIdentity: false,
                 identityId: undefined,
                 comments: 'Assign to existing identity',
@@ -1586,14 +1683,19 @@ describe('FusionService', () => {
             const managedAccount = {
                 id: 'acct-authz-1',
                 name: 'Authorized User',
+                sourceId: 'src-auth-src',
+                nativeIdentity: 'auth-src-native-1',
                 sourceName: 'Authoritative Source',
                 attributes: {},
             } as Account
-            const managedMap = new Map<string, Account>([['acct-authz-1', managedAccount]])
+            const managedKeyAuthz = 'src-auth-src::auth-src-native-1'
+            const managedMap = new Map<string, Account>([[managedKeyAuthz, managedAccount]])
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map([['acct-authz-1', managedAccount]]))
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+                new Map([[managedKeyAuthz, managedAccount]])
+            )
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(undefined as any)
@@ -1612,7 +1714,13 @@ describe('FusionService', () => {
 
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: { id: 'acct-authz-1', name: 'Authorized User', sourceName: 'Authoritative Source' },
+                account: {
+                    id: managedKeyAuthz,
+                    name: 'Authorized User',
+                    sourceName: 'Authoritative Source',
+                    sourceId: 'src-auth-src',
+                    nativeIdentity: 'auth-src-native-1',
+                },
                 newIdentity: false,
                 identityId: 'identity-1',
                 comments: 'Assign to existing identity',
@@ -1623,7 +1731,7 @@ describe('FusionService', () => {
             await fusionService.processFusionIdentityDecision(decision)
 
             expect(mockIdentities.correlateAccounts).toHaveBeenCalledTimes(1)
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(expect.any(FusionAccount), ['acct-authz-1'])
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(expect.any(FusionAccount), [managedKeyAuthz])
         })
 
         it('registers unique attributes and skips output for record no-match decisions', async () => {
@@ -1637,7 +1745,13 @@ describe('FusionService', () => {
 
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: { id: 'acct-record-1', name: 'Record User', sourceName: 'Record Source' },
+                account: {
+                    id: 'src-record-src::record-native-1',
+                    name: 'Record User',
+                    sourceName: 'Record Source',
+                    sourceId: 'src-record-src',
+                    nativeIdentity: 'record-native-1',
+                },
                 newIdentity: true,
                 identityId: undefined,
                 comments: 'No matching identity',
@@ -1655,10 +1769,13 @@ describe('FusionService', () => {
             const managedAccount = {
                 id: 'acct-orphan-1',
                 name: 'Orphan User',
+                sourceId: 'src-orphan-1',
+                nativeIdentity: 'orphan-native-1',
                 sourceName: 'Orphan Source',
                 attributes: {},
             } as Account
-            const managedMap = new Map<string, Account>([['acct-orphan-1', managedAccount]])
+            const managedKeyOrphan = 'src-orphan-1::orphan-native-1'
+            const managedMap = new Map<string, Account>([[managedKeyOrphan, managedAccount]])
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
@@ -1676,7 +1793,13 @@ describe('FusionService', () => {
             const queueDisableSpy = jest.spyOn(fusionService as any, 'queueDisableOperation').mockImplementation(() => { })
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: { id: 'acct-orphan-1', name: 'Orphan User', sourceName: 'Orphan Source' },
+                account: {
+                    id: managedKeyOrphan,
+                    name: 'Orphan User',
+                    sourceName: 'Orphan Source',
+                    sourceId: 'src-orphan-1',
+                    nativeIdentity: 'orphan-native-1',
+                },
                 newIdentity: true,
                 identityId: undefined,
                 comments: 'Reject orphan match',
@@ -1700,7 +1823,13 @@ describe('FusionService', () => {
             const setFusionAccountSpy = jest.spyOn(fusionService, 'setFusionAccount')
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: { id: 'acct-auth-1', name: 'Auth User', sourceName: 'Authoritative Source' },
+                account: {
+                    id: 'src-auth-src::auth-new-native-1',
+                    name: 'Auth User',
+                    sourceName: 'Authoritative Source',
+                    sourceId: 'src-auth-src',
+                    nativeIdentity: 'auth-new-native-1',
+                },
                 newIdentity: true,
                 identityId: undefined,
                 comments: 'Create new identity',
@@ -1720,6 +1849,8 @@ describe('FusionService', () => {
             const fusionAccount = FusionAccount.fromManagedAccount({
                 id: 'acct-history-noop-1',
                 name: 'History User',
+                sourceId: 'src-history',
+                nativeIdentity: 'hist-noop',
                 sourceName: 'History Source',
                 attributes: {},
             } as Account)
@@ -1735,6 +1866,8 @@ describe('FusionService', () => {
             const fusionAccount = FusionAccount.fromManagedAccount({
                 id: 'acct-history-import-1',
                 name: 'History User',
+                sourceId: 'src-history',
+                nativeIdentity: 'hist-import',
                 sourceName: 'History Source',
                 attributes: {},
             } as Account)
@@ -1748,22 +1881,23 @@ describe('FusionService', () => {
             const managedAccount = {
                 id: 'acct-history-fallback-1',
                 name: 'LH2 User',
+                sourceId: 'src-lh2',
+                nativeIdentity: 'hist-fallback',
                 sourceName: 'LH2',
                 attributes: {},
             } as Account
-            const managedMap = new Map<string, Account>([['acct-history-fallback-1', managedAccount]])
+            const histKey = 'src-lh2::hist-fallback'
+            const managedMap = new Map<string, Account>([[histKey, managedAccount]])
 
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([['acct-history-fallback-1', managedAccount]])
-            )
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map([[histKey, managedAccount]]))
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
             const decision = {
                 submitter: { id: 'reviewer-1', email: ' ', name: ' ' },
-                account: { id: 'acct-history-fallback-1', name: '  ', sourceName: '  ' },
+                account: { id: histKey, name: '  ', sourceName: '  ', sourceId: 'src-lh2', nativeIdentity: 'hist-fallback' },
                 newIdentity: false,
                 comments: 'Assign to existing identity',
                 finished: true,

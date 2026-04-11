@@ -10,6 +10,8 @@ import type { FusionAttributeBag } from './fusionAccountTypes'
 import {
     buildManagedAccountKey,
     getManagedAccountKeyFromAccount,
+    isCompositeManagedAccountKey,
+    parseManagedAccountKey,
     resolveManagedAccountKey,
 } from './managedAccountKey'
 
@@ -49,7 +51,6 @@ export class FusionAccount {
     private _type: 'fusion' | 'identity' | 'managed' | 'decision' = 'fusion'
     private _identityId?: string
     private _nativeIdentity?: string
-    private _managedAccountId?: string
     private _key?: SimpleKeyType
 
     // Basic account information
@@ -62,9 +63,10 @@ export class FusionAccount {
     private _identityDisplayName?: string
     private _accountDisplayName?: string
     private _sourceName = ''
-    private _originSource?: string
-    /** Identity id or managed account id that created this Fusion account (immutable). */
-    private _originAccountId?: string
+    /** Origin source name when the fusion account was created (e.g. Identities or a managed source). */
+    private origin?: { name: string }
+    /** Identity id or managed account key (sourceId::nativeIdentity) that created this fusion account (immutable). */
+    private originAccountKey?: string
 
     // State flags
     private _uncorrelated = false
@@ -86,8 +88,7 @@ export class FusionAccount {
     private _reviewPromises: Array<Promise<string | undefined>> = []
     private _fusionMatches: FusionMatch[] = []
     private _history: string[] = []
-    private _managedAccountInfo: Map<string, { sourceName: string; nativeIdentity: string; rawAccountId?: string }> =
-        new Map()
+    private _managedAccountInfo: Map<string, { source: { name: string }; schema: { id: string } }> = new Map()
 
     // Map & Define
     // Note: previous is initialized lazily only when needed to save memory for new accounts
@@ -153,7 +154,6 @@ export class FusionAccount {
         /** Extract these attribute keys into collection sets; 'accounts' -> _missingAccountIds, others -> _* */
         collectionKeys?: (typeof FusionAccount.COLLECTION_KEYS)[number][]
         identityId?: string | null
-        managedAccountId?: string | null
         modified?: string
     }): void {
         if (config.type) this._type = config.type
@@ -166,7 +166,6 @@ export class FusionAccount {
         if (config.disabled !== undefined) this._disabled = config.disabled
         if (config.needsRefresh !== undefined) this._needsRefresh = config.needsRefresh
         if (config.identityId != null) this._identityId = config.identityId
-        if (config.managedAccountId != null) this._managedAccountId = config.managedAccountId
         if (config.modified !== undefined) this._modified = config.modified
         if (config.sources) {
             this._sources = Array.isArray(config.sources) ? new Set(config.sources) : config.sources
@@ -249,10 +248,15 @@ export class FusionAccount {
             modified: account.modified ?? '',
         })
         // Restore persisted originSource; fallback for legacy accounts without it
-        fusionAccount._originSource =
-            account.attributes?.originSource ?? (statuses.has('baseline') ? 'Identities' : undefined)
+        const persistedOriginSource = account.attributes?.originSource
+        fusionAccount.origin =
+            typeof persistedOriginSource === 'string' && persistedOriginSource.trim() !== ''
+                ? { name: persistedOriginSource.trim() }
+                : statuses.has('baseline')
+                  ? { name: 'Identities' }
+                  : undefined
         const persistedOriginAccount = account.attributes?.originAccount
-        fusionAccount._originAccountId =
+        fusionAccount.originAccountKey =
             (typeof persistedOriginAccount === 'string' && persistedOriginAccount.trim() !== ''
                 ? persistedOriginAccount.trim()
                 : undefined) ??
@@ -313,8 +317,8 @@ export class FusionAccount {
             attributes: identity.attributes ?? undefined,
             identityId: identity.id ?? undefined,
         })
-        fusionAccount._originSource = 'Identities'
-        fusionAccount._originAccountId = identity.id ?? undefined
+        fusionAccount.origin = { name: 'Identities' }
+        fusionAccount.originAccountKey = identity.id ?? undefined
         fusionAccount.setBaseline()
         return fusionAccount
     }
@@ -344,7 +348,13 @@ export class FusionAccount {
         const displayName = accountDisplayName ?? identityDisplayName
         const name = displayName
 
-        const managedAccountKey = getManagedAccountKeyFromAccount(account) ?? account.id ?? undefined
+        const managedAccountKey = getManagedAccountKeyFromAccount(account)
+        if (!managedAccountKey) {
+            throw new ConnectorError(
+                'Managed account is missing sourceId and nativeIdentity; cannot build composite account key.',
+                ConnectorErrorType.Generic
+            )
+        }
         fusionAccount.initializeBasicProperties({
             type: 'managed',
             nativeIdentity: managedAccountKey,
@@ -358,10 +368,9 @@ export class FusionAccount {
             sources: sourceSet,
             attributes: account.attributes ?? undefined,
             collectionKeys: ['accounts', 'statuses', 'actions', 'reviews'],
-            managedAccountId: account.id ?? undefined,
         })
-        fusionAccount._originSource = account.sourceName ?? undefined
-        fusionAccount._originAccountId = managedAccountKey
+        fusionAccount.origin = account.sourceName ? { name: account.sourceName } : undefined
+        fusionAccount.originAccountKey = managedAccountKey
         fusionAccount.setUncorrelated()
         fusionAccount.setUncorrelatedAccount(managedAccountKey)
         fusionAccount.setManagedAccount(account, false)
@@ -383,26 +392,35 @@ export class FusionAccount {
         const identityDisplayName = String(decision.identityName ?? '').trim() || undefined
         const accountDisplayName = String(account.name ?? '').trim() || String(account.id ?? '').trim() || identityDisplayName
         const displayName = accountDisplayName
-        const managedAccountKey = buildManagedAccountKey({
+        let managedAccountKey = buildManagedAccountKey({
             id: account.id,
+            sourceId: (account as any).sourceId,
             sourceName: account.sourceName,
-            nativeIdentity: account.id,
+            nativeIdentity: (account as any).nativeIdentity,
         })
+        if (!managedAccountKey && account.id && isCompositeManagedAccountKey(account.id)) {
+            managedAccountKey = String(account.id).trim()
+        }
+        if (!managedAccountKey) {
+            throw new ConnectorError(
+                'Fusion decision account is missing sourceId and nativeIdentity; cannot build composite account key.',
+                ConnectorErrorType.Generic
+            )
+        }
         fusionAccount.initializeBasicProperties({
             type: 'decision',
-            nativeIdentity: managedAccountKey ?? account.id,
+            nativeIdentity: managedAccountKey,
             name: displayName,
             sourceName: account.sourceName,
             displayName,
             identityDisplayName,
             accountDisplayName,
             needsRefresh: true,
-            managedAccountId: account.id ?? undefined,
         })
-        fusionAccount._originSource = account.sourceName ?? undefined
-        fusionAccount._originAccountId = managedAccountKey ?? account.id
+        fusionAccount.origin = account.sourceName ? { name: account.sourceName } : undefined
+        fusionAccount.originAccountKey = managedAccountKey
         fusionAccount.setUncorrelated()
-        fusionAccount.setUncorrelatedAccount(managedAccountKey ?? account.id)
+        fusionAccount.setUncorrelatedAccount(managedAccountKey)
         return fusionAccount
     }
 
@@ -433,10 +451,10 @@ export class FusionAccount {
     }
 
     /**
-     * Stable ISC account id for this source account (may be undefined for non-account FusionAccount types)
+     * Managed account key (sourceId::nativeIdentity) when this fusion row represents an uncorrelated managed account.
      */
     public get managedAccountId(): string | undefined {
-        return this._managedAccountId
+        return this._type === 'managed' ? this._nativeIdentity : undefined
     }
 
     /** The SDK simple key used for account output. Asserts non-null. */
@@ -480,12 +498,12 @@ export class FusionAccount {
 
     /** The original source that created this fusion account (e.g. "Identities" or a managed source name). */
     public get originSource(): string | undefined {
-        return this._originSource
+        return this.origin?.name
     }
 
-    /** Identity id or managed account id that originally created this fusion account. */
+    /** Identity id or managed account key (sourceId::nativeIdentity) that originally created this fusion account. */
     public get originAccountId(): string | undefined {
-        return this._originAccountId
+        return this.originAccountKey
     }
 
     // ============================================================================
@@ -517,7 +535,7 @@ export class FusionAccount {
         const originFromAttributes = this._attributeBag.current?.originSource
         const legacyOriginFromAttributes = this._attributeBag.current?.sourceOrigin
         return (
-            this._originSource === 'Identities' ||
+            this.origin?.name === 'Identities' ||
             originFromAttributes === 'Identities' ||
             legacyOriginFromAttributes === 'Identities'
         )
@@ -731,23 +749,15 @@ export class FusionAccount {
     // ============================================================================
 
     /** Get source and native identity info for a managed account by its ID. */
-    public getManagedAccountInfo(
-        accountId: string
-    ): { sourceName: string; nativeIdentity: string; rawAccountId?: string } | undefined {
+    public getManagedAccountInfo(accountId: string): { source: { name: string }; schema: { id: string } } | undefined {
         return this._managedAccountInfo.get(accountId)
     }
 
-    /** Store source and native identity info for a managed account ID. */
-    public setManagedAccountInfo(
-        accountId: string,
-        sourceName: string,
-        nativeIdentity: string,
-        rawAccountId?: string
-    ): void {
+    /** Store source and schema id (native identity) for a managed account key. */
+    public setManagedAccountInfo(accountId: string, sourceName: string, nativeIdentity: string): void {
         this._managedAccountInfo.set(accountId, {
-            sourceName,
-            nativeIdentity,
-            rawAccountId,
+            source: { name: sourceName },
+            schema: { id: nativeIdentity },
         })
     }
 
@@ -759,7 +769,7 @@ export class FusionAccount {
         const result: string[] = []
         for (const id of this._missingAccountIds) {
             const info = this._managedAccountInfo.get(id)
-            if (info && info.sourceName === sourceName) {
+            if (info && info.source.name === sourceName) {
                 result.push(id)
             }
         }
@@ -896,11 +906,11 @@ export class FusionAccount {
         this._attributeBag.current['missing-accounts'] = Array.from(this._missingAccountIds)
         this._attributeBag.current['sources'] = attrConcat(Array.from(this._sources))
         this._attributeBag.current['history'] = [...this._history]
-        if (this._originSource) {
-            this._attributeBag.current['originSource'] = this._originSource
+        if (this.origin?.name) {
+            this._attributeBag.current['originSource'] = this.origin.name
         }
-        if (this._originAccountId) {
-            this._attributeBag.current['originAccount'] = this._originAccountId
+        if (this.originAccountKey) {
+            this._attributeBag.current['originAccount'] = this.originAccountKey
         }
     }
 
@@ -1104,13 +1114,12 @@ export class FusionAccount {
         const sourceNames = this.sourceConfigs.map((sc) => sc.name)
         identity.accounts?.forEach((account) => {
             if (sourceNames.includes(account.source?.name ?? '')) {
-                const managedAccountKey =
-                    buildManagedAccountKey({
-                        id: account.id,
-                        sourceId: account.source?.id,
-                        sourceName: account.source?.name,
-                        nativeIdentity: (account as any).nativeIdentity ?? account.id,
-                    }) ?? account.id
+                const managedAccountKey = buildManagedAccountKey({
+                    id: account.id,
+                    sourceId: account.source?.id,
+                    sourceName: account.source?.name,
+                    nativeIdentity: (account as any).nativeIdentity,
+                })
                 if (managedAccountKey) {
                     this.setCorrelatedAccount(managedAccountKey)
                 }
@@ -1154,9 +1163,9 @@ export class FusionAccount {
         this._accountIds = new Set(
             Array.from(this._accountIds, (value) => resolveKey(value)).filter((value): value is string => !!value)
         )
-        const resolvedOriginAccountId = resolveKey(this._originAccountId)
+        const resolvedOriginAccountId = resolveKey(this.originAccountKey)
         if (resolvedOriginAccountId) {
-            this._originAccountId = resolvedOriginAccountId
+            this.originAccountKey = resolvedOriginAccountId
         }
         // Phase 1: Identity-based matching via index (O(1) lookup)
         if (this._identityId !== undefined) {
@@ -1206,11 +1215,10 @@ export class FusionAccount {
                 if (this._managedAccountInfo.has(accountId)) continue
                 const account = allAccountsById.get(accountId)
                 if (!account?.sourceName) continue
-                this._managedAccountInfo.set(accountId, {
-                    sourceName: account.sourceName,
-                    nativeIdentity: account.nativeIdentity ?? account.id ?? accountId,
-                    rawAccountId: account.id ?? undefined,
-                })
+                const parsed = parseManagedAccountKey(accountId)
+                const nativeId =
+                    String(account.nativeIdentity ?? parsed?.nativeIdentity ?? '').trim() || accountId
+                this.setManagedAccountInfo(accountId, account.sourceName, nativeId)
             }
         }
 
@@ -1265,8 +1273,10 @@ export class FusionAccount {
      *
      * @param decision - The fusion decision from the review form
      */
-    public addFusionDecisionLayer(decision: FusionDecision): void {
-        this.setUncorrelatedAccount(decision.account.id!)
+    public addFusionDecisionLayer(decision: FusionDecision, resolveManagedKey?: (rawId: string) => string | undefined): void {
+        const raw = decision.account.id!
+        const managedKey = resolveManagedKey?.(raw) ?? raw
+        this.setUncorrelatedAccount(managedKey)
         const sourceType = decision.sourceType ?? 'authoritative'
 
         if (decision.newIdentity) {
@@ -1294,7 +1304,13 @@ export class FusionAccount {
      * @param account - The managed account to absorb
      */
     private setManagedAccount(account: Account, addAssociationHistory: boolean = true): void {
-        const accountId = getManagedAccountKeyFromAccount(account) ?? account.id!
+        const accountId = getManagedAccountKeyFromAccount(account)
+        if (!accountId) {
+            throw new ConnectorError(
+                'Cannot absorb managed account without sourceId and nativeIdentity (composite key).',
+                ConnectorErrorType.Generic
+            )
+        }
         const isNewAccount = !this._previousAccountIds.has(accountId)
 
         if (isNewAccount) {
@@ -1314,23 +1330,21 @@ export class FusionAccount {
         }
 
         if (account.sourceName) {
-            this._managedAccountInfo.set(accountId, {
-                sourceName: account.sourceName,
-                nativeIdentity: account.nativeIdentity ?? accountId,
-                rawAccountId: account.id ?? undefined,
-            })
+            const parsedKey = parseManagedAccountKey(accountId)
+            const schemaNative =
+                String(account.nativeIdentity ?? parsedKey?.nativeIdentity ?? '').trim() || accountId
+            this.setManagedAccountInfo(accountId, account.sourceName, schemaNative)
 
             const contextAttributes = {
                 ...(account.attributes ?? {}),
                 _id: accountId,
-                ...(account.id ? { _rawId: account.id } : {}),
                 source: {
                     id: String((account as any).sourceId ?? '').trim(),
                     name: account.sourceName ?? '',
                 },
                 schema: {
                     name: String(account.name ?? account.nativeIdentity ?? '').trim() || accountId,
-                    id: String(account.nativeIdentity ?? account.id ?? accountId).trim(),
+                    id: schemaNative,
                 },
                 // IdentityIQ-style compatibility: true means account is disabled.
                 IIQDisabled: Boolean(account.disabled),

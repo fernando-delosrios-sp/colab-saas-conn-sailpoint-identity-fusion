@@ -374,7 +374,9 @@ export class FusionService {
 
             authorizedLinkDecision = this.forms.getFusionAssignmentDecision(identityId)
             if (authorizedLinkDecision) {
-                fusionAccount.addFusionDecisionLayer(authorizedLinkDecision)
+                fusionAccount.addFusionDecisionLayer(authorizedLinkDecision, (raw) =>
+                    this.sources.resolveManagedAccountKey(raw)
+                )
             }
             this.log.debug(`Applied identity layer for ${fusionAccount.name}: identityId=${identityId}`)
         }
@@ -467,19 +469,18 @@ export class FusionService {
                 continue
             }
 
-            const sourceConfig = this.sources.getSourceConfig(info.sourceName)
+            const sourceConfig = this.sources.getSourceConfig(info.source.name)
             const mode = sourceConfig?.correlationMode ?? 'none'
 
             if (mode === 'correlate') {
                 if (canDirectCorrelate) {
-                    const rawAccountId = info.rawAccountId ?? accountId
-                    directCorrelateIds.push(rawAccountId)
+                    directCorrelateIds.push(accountId)
                 }
             } else if (mode === 'reverse') {
-                let ids = bySource.get(info.sourceName)
+                let ids = bySource.get(info.source.name)
                 if (!ids) {
                     ids = []
-                    bySource.set(info.sourceName, ids)
+                    bySource.set(info.source.name, ids)
                 }
                 ids.push(accountId)
             }
@@ -487,22 +488,17 @@ export class FusionService {
         }
 
         if (authorizedLinkDecision && !authorizedLinkDecision.newIdentity && canDirectCorrelate) {
-            const assignedId = authorizedLinkDecision.account.id
+            const assignedKey = authorizedLinkDecision.account.id
             const assignedSource = authorizedLinkDecision.account.sourceName
-            const assignedKey = buildManagedAccountKey({
-                id: assignedId,
-                sourceName: assignedSource,
-                nativeIdentity: assignedId,
-            })
             if (
-                assignedId &&
+                assignedKey &&
                 assignedSource &&
-                missingIds.includes(assignedKey ?? assignedId) &&
-                !fusionAccount.getManagedAccountInfo(assignedKey ?? assignedId) &&
+                missingIds.includes(assignedKey) &&
+                !fusionAccount.getManagedAccountInfo(assignedKey) &&
                 (this.sources.getSourceConfig(assignedSource)?.correlationMode ?? 'none') === 'correlate' &&
-                !directCorrelateIds.includes(assignedId)
+                !directCorrelateIds.includes(assignedKey)
             ) {
-                directCorrelateIds.push(assignedId)
+                directCorrelateIds.push(assignedKey)
             }
         }
 
@@ -523,9 +519,9 @@ export class FusionService {
             const firstAccountId = accountIds[0]
             const info = fusionAccount.getManagedAccountInfo(firstAccountId)
             if (info) {
-                fusionAccount.setReverseCorrelationAttribute(sourceConfig.correlationAttribute, info.nativeIdentity)
+                fusionAccount.setReverseCorrelationAttribute(sourceConfig.correlationAttribute, info.schema.id)
                 this.log.debug(
-                    `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.nativeIdentity}" ` +
+                    `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.schema.id}" ` +
                     `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
                 )
             }
@@ -867,7 +863,7 @@ export class FusionService {
         // Only new-identity decisions should force a full reset. Authorized decisions
         // must preserve immutable mapped fields (for example display/account name).
         fusionAccount.setNeedsReset(Boolean(fusionDecision.newIdentity))
-        fusionAccount.addFusionDecisionLayer(fusionDecision)
+        fusionAccount.addFusionDecisionLayer(fusionDecision, (raw) => this.sources.resolveManagedAccountKey(raw))
         const suppressAssociationHistoryForAuthorizedDecision = isAuthorizedDecision
         fusionAccount.addManagedAccountLayer(
             this.sources.managedAccountsById,
@@ -912,7 +908,7 @@ export class FusionService {
             this.setFusionAccount(fusionAccount)
             this.log.debug(
                 `Registered decision account as fusion account: ${fusionDecision.account.name} ` +
-                `[${fusionDecision.account.sourceName}] (${fusionDecision.account.id})`
+                `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`
             )
         }
         return fusionAccount
@@ -1114,8 +1110,9 @@ export class FusionService {
 
             // authoritative (default)
             await this.finalizeAuthoritativeUnmatched(fusionAccount)
+            const mk = getManagedAccountKeyFromAccount(account)
             this.log.debug(
-                `Registered managed account as fusion account: ${account.name} [${account.sourceName}] (${account.id})`
+                `Registered managed account as fusion account: ${account.name} [${account.sourceName}] (${mk ?? 'no-key'})`
             )
             return fusionAccount
         }
@@ -1143,12 +1140,16 @@ export class FusionService {
         account: Account,
         identityId: string
     ): FusionDecision {
+        const accountKey = getManagedAccountKeyFromAccount(account)
+        assert(accountKey, 'Managed account missing composite key for automatic assignment decision')
         return {
             submitter: { id: 'system', email: '', name: 'System (automatic assignment)' },
             account: {
-                id: fusionAccount.managedAccountId!,
+                id: accountKey,
                 name: fusionAccount.name ?? account.name ?? '',
                 sourceName: fusionAccount.sourceName,
+                sourceId: (account as any).sourceId,
+                nativeIdentity: account.nativeIdentity ?? undefined,
             },
             newIdentity: false,
             identityId,

@@ -122,7 +122,7 @@ export const extractCandidateIdsFromFormInput = (formInput: any): string[] => {
 export const createFusionDecision = async (
     formInstance: FormInstanceResponseV2025,
     identities?: IdentityService,
-    accountInfoOverride?: { id: string; name: string; sourceName: string }
+    accountInfoOverride?: { id: string; name: string; sourceName: string; sourceId?: string; nativeIdentity?: string }
 ): Promise<FusionDecision | null> => {
     assert(formInstance, 'Form instance is required')
     assert(formInstance.id, 'Form instance ID is required')
@@ -254,10 +254,14 @@ export const createFusionDecision = async (
     }
 
     // Defensive: ensure decision.account fields are strings so templates never render "[object Object]".
+    const sourceIdNorm = normalizeScalar((accountInfo as any)?.sourceId)
+    const nativeIdNorm = normalizeScalar((accountInfo as any)?.nativeIdentity)
     accountInfo = {
         id: normalizeScalar((accountInfo as any)?.id),
         name: normalizeScalar((accountInfo as any)?.name) || normalizeScalar((accountInfo as any)?.id),
         sourceName: normalizeScalar((accountInfo as any)?.sourceName),
+        ...(sourceIdNorm ? { sourceId: sourceIdNorm } : {}),
+        ...(nativeIdNorm ? { nativeIdentity: nativeIdNorm } : {}),
     }
 
     return {

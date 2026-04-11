@@ -16,13 +16,13 @@ describe('managedAccountKey helpers', () => {
         ).toBe('source-a::native-1')
     })
 
-    it('falls back to raw id when composite fields are missing', () => {
+    it('returns undefined when composite fields are missing', () => {
         expect(
             buildManagedAccountKey({
                 id: 'raw-1',
                 sourceName: 'HR',
             })
-        ).toBe('raw-1')
+        ).toBeUndefined()
     })
 
     it('resolves legacy raw id to composite using lookup', () => {

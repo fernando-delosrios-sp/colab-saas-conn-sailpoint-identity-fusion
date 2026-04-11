@@ -32,7 +32,7 @@ export function buildManagedAccountKey(account: ManagedKeyAccountLike): string |
     if (sourceId && nativeIdentity) {
         return `${sourceId}${MANAGED_ACCOUNT_KEY_SEPARATOR}${nativeIdentity}`
     }
-    return normalizePart(account.id)
+    return undefined
 }
 
 export function isCompositeManagedAccountKey(value: string | undefined | null): boolean {
@@ -68,12 +68,15 @@ export function getManagedAccountKeyFromAccount(
     account: Account,
     lookupByRawId?: (rawId: string) => string | undefined
 ): string | undefined {
-    return (
-        buildManagedAccountKey({
-            id: account.id,
-            sourceId: (account as any).sourceId,
-            sourceName: account.sourceName,
-            nativeIdentity: account.nativeIdentity,
-        }) ?? resolveManagedAccountKey(account.id, lookupByRawId)
-    )
+    const composite = buildManagedAccountKey({
+        id: account.id,
+        sourceId: (account as any).sourceId,
+        sourceName: account.sourceName,
+        nativeIdentity: account.nativeIdentity,
+    })
+    if (composite) return composite
+    if (account.id && lookupByRawId) {
+        return resolveManagedAccountKey(account.id, lookupByRawId)
+    }
+    return undefined
 }
