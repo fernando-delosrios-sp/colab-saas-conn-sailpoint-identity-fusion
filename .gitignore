@@ -25,7 +25,6 @@ exportedObjects/
 test/
 
 # Local configs
-*.local.http
 input.json
 config.json
 .sentryclirc
@@ -34,8 +33,4 @@ config.json
 
 # Logs
 logs/
-remote-logs.jsonl
-
-# Dev notes
-TODO.md
 

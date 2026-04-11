@@ -22,6 +22,7 @@ import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
 import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
 import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
+import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
@@ -35,8 +36,8 @@ const ORIGIN_ACCOUNT_ATTRIBUTE = 'originAccount'
 function getManagedAccountSnapshotKey(account: Record<string, any> | undefined): string {
     if (!account) return ''
     const key = buildManagedAccountKey({
-        sourceId: (account as any)._sourceId,
-        nativeIdentity: (account as any)._nativeIdentity,
+        sourceId: velocitySnapshotSourceId(account),
+        nativeIdentity: velocitySnapshotSchemaId(account),
     })
     return String(key ?? '').trim()
 }
@@ -733,9 +734,12 @@ export class AttributeService {
         if (originSource === 'Identities' && identityHasData) {
             return {
                 ...identityBag,
-                originIdentityId: originId,
-                _name: identityBackedName,
-                _source: 'Identities',
+                _id: originId,
+                source: { name: 'Identities' },
+                schema: {
+                    name: identityBackedName,
+                    id: originId,
+                },
                 IIQDisabled: Boolean(fusionAccount.disabled),
             }
         }
@@ -744,9 +748,11 @@ export class AttributeService {
         const managed = orderedAccounts.find((a) => {
             const snapshotKey = getManagedAccountSnapshotKey(a)
             if (snapshotKey === originId) return true
+            const accountRowId = String(a?._id ?? '').trim()
+            if (accountRowId === originId) return true
             if (!parsedManagedKey) return false
-            const sourceId = String(a?._sourceId ?? '').trim()
-            const nativeIdentity = String(a?._nativeIdentity ?? '').trim()
+            const sourceId = velocitySnapshotSourceId(a)
+            const nativeIdentity = velocitySnapshotSchemaId(a)
             return sourceId === parsedManagedKey.sourceId && nativeIdentity === parsedManagedKey.nativeIdentity
         })
         if (managed) return managed
@@ -754,26 +760,23 @@ export class AttributeService {
         if (originSource === 'Identities') {
             return {
                 ...identityBag,
-                originIdentityId: originId,
-                _name: identityBackedName,
-                _source: 'Identities',
+                _id: originId,
+                source: { name: 'Identities' },
+                schema: {
+                    name: identityBackedName,
+                    id: originId,
+                },
                 IIQDisabled: Boolean(fusionAccount.disabled),
             }
         }
 
-        const parsedOrigin = parseManagedAccountKey(originId)
-        if (parsedOrigin) {
-            return {
-                _name: String(fusionAccount.name ?? '').trim() || originId,
-                _source: originSource ?? '',
-                _sourceId: parsedOrigin.sourceId,
-                _nativeIdentity: parsedOrigin.nativeIdentity,
-            }
-        }
         return {
-            _name: String(fusionAccount.name ?? '').trim() || originId,
-            _source: originSource ?? '',
-            _nativeIdentity: originId,
+            _id: originId,
+            source: { name: originSource ?? '' },
+            schema: {
+                name: String(fusionAccount.name ?? '').trim() || originId,
+                id: originId,
+            },
         }
     }
 
@@ -807,7 +810,11 @@ export class AttributeService {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
-        const prioritizedIndex = ordered.findIndex((account) => getManagedAccountSnapshotKey(account) === mainAccountId)
+        const prioritizedIndex = ordered.findIndex(
+            (account) =>
+                getManagedAccountSnapshotKey(account) === mainAccountId ||
+                String(account?._id ?? '').trim() === mainAccountId
+        )
         if (prioritizedIndex <= 0) return ordered
 
         const prioritizedAccount = ordered[prioritizedIndex]
@@ -836,7 +843,11 @@ export class AttributeService {
         accountId: string
     ): Record<string, any> | undefined {
         for (const accounts of sourceAttributeMap.values()) {
-            const match = accounts.find((account) => getManagedAccountSnapshotKey(account) === accountId)
+            const match = accounts.find(
+                (account) =>
+                    getManagedAccountSnapshotKey(account) === accountId ||
+                    String(account?._id ?? '').trim() === accountId
+            )
             if (match) return match
         }
 

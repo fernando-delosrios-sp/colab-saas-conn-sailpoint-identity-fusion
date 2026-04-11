@@ -1,6 +1,7 @@
 import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import {
+    type CorePipelineOptions,
     setupPhase,
     fetchPhase,
     processPhase,
@@ -21,7 +22,7 @@ import {
 export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, sources } = serviceRegistry
-    const options = { mode: { kind: 'aggregation' } as const }
+    const options: CorePipelineOptions = { mode: { kind: 'aggregation' } }
 
     let processLockAcquired = false
 

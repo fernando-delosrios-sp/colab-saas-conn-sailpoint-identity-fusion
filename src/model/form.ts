@@ -16,9 +16,12 @@ type Account = {
  * Attributes are not needed since they're never accessed from FusionDecision.
  */
 type FusionDecisionAccount = {
+    /** Managed account key: sourceId::nativeIdentity */
     id: string
     name: string
     sourceName: string
+    sourceId?: string
+    nativeIdentity?: string
 }
 
 /** User reference used in form submissions (reviewer or submitter). */

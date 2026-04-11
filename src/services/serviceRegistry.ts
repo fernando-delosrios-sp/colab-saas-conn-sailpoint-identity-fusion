@@ -64,7 +64,8 @@ export class ServiceRegistry {
         this.sources = context.sourceService ?? new SourceService(this.config, this.log, this.client)
         this.entitlements = context.entitlementService ?? new EntitlementService(this.sources)
         this.scoring = context.scoringService ?? new ScoringService(this.config, this.log)
-        this.identities = context.identityService ?? new IdentityService(this.config, this.log, this.client)
+        this.identities =
+            context.identityService ?? new IdentityService(this.config, this.log, this.client, this.sources)
         this.messaging =
             context.messagingService ??
             new MessagingService(this.config, this.log, this.client, this.sources, this.identities)
