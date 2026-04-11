@@ -1320,17 +1320,21 @@ export class FusionAccount {
                 rawAccountId: account.id ?? undefined,
             })
 
-            const contextAttributes: Attributes = {
+            const contextAttributes = {
                 ...(account.attributes ?? {}),
                 _id: accountId,
                 ...(account.id ? { _rawId: account.id } : {}),
-                _name: String(account.name ?? account.nativeIdentity ?? '').trim() || accountId,
-                _source: account.sourceName,
-                _sourceId: (account as any).sourceId,
-                _nativeIdentity: account.nativeIdentity ?? account.id ?? accountId,
+                source: {
+                    id: String((account as any).sourceId ?? '').trim(),
+                    name: account.sourceName ?? '',
+                },
+                schema: {
+                    name: String(account.name ?? account.nativeIdentity ?? '').trim() || accountId,
+                    id: String(account.nativeIdentity ?? account.id ?? accountId).trim(),
+                },
                 // IdentityIQ-style compatibility: true means account is disabled.
                 IIQDisabled: Boolean(account.disabled),
-            }
+            } as unknown as Attributes
 
             const existingSourceAccounts = this._attributeBag.sources.get(account.sourceName) || []
             existingSourceAccounts.push(contextAttributes)

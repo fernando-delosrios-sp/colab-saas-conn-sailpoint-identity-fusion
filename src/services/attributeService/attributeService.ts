@@ -22,6 +22,7 @@ import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
 import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
 import { parseManagedAccountKey } from '../../model/managedAccountKey'
+import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
@@ -721,8 +722,11 @@ export class AttributeService {
             return {
                 ...identityBag,
                 _id: originId,
-                _name: identityBackedName,
-                _source: 'Identities',
+                source: { name: 'Identities' },
+                schema: {
+                    name: identityBackedName,
+                    id: originId,
+                },
                 IIQDisabled: Boolean(fusionAccount.disabled),
             }
         }
@@ -732,8 +736,8 @@ export class AttributeService {
             const accountId = String(a?._id ?? '').trim()
             if (accountId === originId) return true
             if (!parsedManagedKey) return false
-            const sourceId = String(a?._sourceId ?? '').trim()
-            const nativeIdentity = String(a?._nativeIdentity ?? '').trim()
+            const sourceId = velocitySnapshotSourceId(a)
+            const nativeIdentity = velocitySnapshotSchemaId(a)
             return sourceId === parsedManagedKey.sourceId && nativeIdentity === parsedManagedKey.nativeIdentity
         })
         if (managed) return managed
@@ -742,16 +746,22 @@ export class AttributeService {
             return {
                 ...identityBag,
                 _id: originId,
-                _name: identityBackedName,
-                _source: 'Identities',
+                source: { name: 'Identities' },
+                schema: {
+                    name: identityBackedName,
+                    id: originId,
+                },
                 IIQDisabled: Boolean(fusionAccount.disabled),
             }
         }
 
         return {
             _id: originId,
-            _name: String(fusionAccount.name ?? '').trim() || originId,
-            _source: originSource ?? '',
+            source: { name: originSource ?? '' },
+            schema: {
+                name: String(fusionAccount.name ?? '').trim() || originId,
+                id: originId,
+            },
         }
     }
 

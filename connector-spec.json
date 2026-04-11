@@ -520,7 +520,7 @@
                                             "label": "Apache Velocity expression",
                                             "type": "textarea",
                                             "required": true,
-                                            "helpKey": "Velocity template that defines the attribute value. You can reference any mapped attribute by name. Example: #set($i=$firstname.substring(0, 1))$i$lastname produces 'jsmith' from 'John Smith'"
+                                            "helpKey": "Velocity template that defines the attribute value. You can reference any mapped attribute by name. Managed account snapshots in $accounts / $sources / $account include _id, source (id, name), schema (id = native identity, name = display), and IIQDisabled; identity-backed $account rows use source.name = Identities (no source.id). Example: #set($i=$firstname.substring(0, 1))$i$lastname produces 'jsmith' from 'John Smith'"
                                         },
                                         {
                                             "key": "refresh",
@@ -632,7 +632,7 @@
                                             "label": "Apache Velocity expression",
                                             "type": "textarea",
                                             "required": true,
-                                            "helpKey": "Velocity template that defines the unique value. Use $counter for an automatic number suffix (e.g. jsmith1, jsmith2) or $UUID for a random unique ID. Example: #set($i=$firstname.substring(0, 1))$i$lastname$counter"
+                                            "helpKey": "Velocity template that defines the unique value. Use $counter for an automatic number suffix (e.g. jsmith1, jsmith2) or $UUID for a random unique ID. Managed snapshots expose source (id, name) and schema (id, name) on $account / $accounts. Example: #set($i=$firstname.substring(0, 1))$i$lastname$counter"
                                         },
                                         {
                                             "key": "digits",
