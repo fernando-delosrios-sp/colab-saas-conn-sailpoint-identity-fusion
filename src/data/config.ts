@@ -180,7 +180,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     config.getScore = (attribute?: string): number => {
         assert(attribute, 'Attribute is required to get fusion score')
         const score = config.fusionScoreMap!.get(attribute)
-        if (!score) {
+        if (score === undefined) {
             throw new ConnectorError(
                 `Fusion score not found for attribute: ${attribute}`,
                 ConnectorErrorType.NotFound
