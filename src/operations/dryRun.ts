@@ -18,6 +18,7 @@ import {
     streamEnrichedOutputRows,
     streamOrphanDeferredReportRows,
     streamFallbackAnalyzedRows,
+    refreshUniqueAttributesForDryRun,
 } from './helpers/dryRunHelpers'
 import {
     setupPhase,
@@ -121,10 +122,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             const fallbackAnalyzedManagedAccounts = await fusion.analyzeManagedAccounts()
             if (fallbackAnalyzedManagedAccounts.length > 0) {
                 // Ensure they have unique attributes assigned for valid platform representations
-                const dryRunHelpers = require('./helpers/dryRunHelpers')
-                if (dryRunHelpers.refreshUniqueAttributesForDryRun) {
-                    await dryRunHelpers.refreshUniqueAttributesForDryRun(serviceRegistry, fallbackAnalyzedManagedAccounts, runtimeOptions)
-                }
+                await refreshUniqueAttributesForDryRun(serviceRegistry, fallbackAnalyzedManagedAccounts, runtimeOptions)
 
                 sentRows = await streamFallbackAnalyzedRows(
                     serviceRegistry,

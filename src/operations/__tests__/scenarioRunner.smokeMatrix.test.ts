@@ -1,6 +1,5 @@
 import { SmokeMatrixScenario } from './fixtures/scenarioTypes'
-
-const { runPass } = require('../../../test-data/scenarios/scenarioRunner.js')
+import { runPass } from '../../../test-data/scenarios/scenarioRunner.js'
 
 describe('scenarioRunner smoke matrix', () => {
     const baseManagedAccount = {

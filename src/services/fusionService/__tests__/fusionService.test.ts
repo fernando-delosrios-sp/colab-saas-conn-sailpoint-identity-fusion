@@ -376,11 +376,6 @@ describe('FusionService', () => {
             } as IdentityDocument
             jest.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
 
-            // Pre-register the identity
-            const fusionAccount = FusionAccount.fromIdentity(mockIdentity)
-            // We need to access private map or use a public method to set it.
-            // setFusionAccount is private in the class but logically we can simulate it by running processIdentity once
-
             await fusionService.processIdentity(mockIdentity)
             const result = await fusionService.processIdentity(mockIdentity)
 

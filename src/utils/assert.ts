@@ -7,6 +7,7 @@ import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector
  */
 function tryGetServiceRegistry(): any {
     try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- break cycle: ServiceRegistry -> LogService -> assert
         const { ServiceRegistry } = require('../services/serviceRegistry')
         return ServiceRegistry.getCurrent?.()
     } catch {
