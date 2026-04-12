@@ -29,7 +29,7 @@ input.json
 config.json
 .sentryclirc
 .httpyac.json
-.env
+.env*
 
 # Logs
 logs/
