@@ -1,0 +1,68 @@
+# Builds the SailPoint connector package (npm run pack-zip → dist/*.zip) on every push
+# and publishes it as a workflow artifact plus a prerelease GitHub Release per commit.
+
+name: Publish connector zip
+
+on:
+    push:
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+jobs:
+    publish:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: npm
+
+            - name: Pack connector zip
+              run: npm run pack-zip
+
+            - name: Read package metadata
+              id: pkg
+              run: |
+                  echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+                  echo "name=$(jq -r .name package.json)" >> "$GITHUB_OUTPUT"
+
+            - name: Upload workflow artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ steps.pkg.outputs.name }}-${{ steps.pkg.outputs.version }}-${{ github.sha }}
+                  path: dist/*.zip
+                  if-no-files-found: error
+
+            - name: Create prerelease with connector zip
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  PACKAGE_VERSION: ${{ steps.pkg.outputs.version }}
+                  CONNECTOR_NAME: ${{ steps.pkg.outputs.name }}
+              run: |
+                  set -euo pipefail
+                  SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+                  TAG="continuous-${SHORT_SHA}"
+                  ZIP="./dist/${CONNECTOR_NAME}-${PACKAGE_VERSION}.zip"
+                  NOTES_FILE=$(mktemp)
+                  {
+                      echo "## Connector snapshot"
+                      echo ""
+                      echo "Built with \`npm run pack-zip\` (artifact in \`dist/\`)."
+                      echo ""
+                      echo "- **Package version:** \`${PACKAGE_VERSION}\`"
+                      echo "- **Commit:** [\`${SHORT_SHA}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})"
+                      echo "- **Branch:** \`${{ github.ref_name }}\`"
+                  } > "$NOTES_FILE"
+
+                  gh release create "$TAG" "$ZIP" \
+                      --repo "${{ github.repository }}" \
+                      --title "Snapshot ${PACKAGE_VERSION} (${SHORT_SHA})" \
+                      --notes-file "$NOTES_FILE" \
+                      --prerelease \
+                      --target "${{ github.sha }}"
