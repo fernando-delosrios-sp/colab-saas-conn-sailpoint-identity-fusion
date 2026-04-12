@@ -83,7 +83,11 @@ const processSingleValueMerge = (
     const { sourceAttributes, attributeName, attributeMerge, source: specifiedSource } = config
     const attributeNames = Array.from(new Set([...sourceAttributes, attributeName]))
     if (prioritizedAccount) {
-        const prioritizedSource = String(prioritizedAccount._source ?? '')
+        const src = prioritizedAccount.source
+        const prioritizedSource =
+            src && typeof src === 'object' && src !== null && 'name' in src
+                ? String((src as { name?: unknown }).name ?? '')
+                : String(prioritizedAccount._source ?? '')
         const canEvaluatePrioritized =
             attributeMerge !== 'source' || !specifiedSource || prioritizedSource === specifiedSource
         if (canEvaluatePrioritized) {

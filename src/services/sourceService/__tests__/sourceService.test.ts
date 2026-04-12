@@ -62,8 +62,20 @@ describe('SourceService Accounts JMESPath filter', () => {
 
         jest.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* () {
             yield [
-                { id: 'a1', identityId: 'i1', attributes: { department: 'Engineering' } } as any,
-                { id: 'a2', identityId: 'i2', attributes: { department: 'Finance' } } as any,
+                {
+                    id: 'a1',
+                    identityId: 'i1',
+                    sourceId: 'managed-source-id',
+                    nativeIdentity: 'eng-1',
+                    attributes: { department: 'Engineering' },
+                } as any,
+                {
+                    id: 'a2',
+                    identityId: 'i2',
+                    sourceId: 'managed-source-id',
+                    nativeIdentity: 'fin-1',
+                    attributes: { department: 'Finance' },
+                } as any,
             ]
         })
 
@@ -71,8 +83,8 @@ describe('SourceService Accounts JMESPath filter', () => {
         await service.fetchManagedAccounts()
 
         expect(service.managedAccountsById.size).toBe(1)
-        expect(service.managedAccountsById.has('a1')).toBe(true)
-        expect(service.managedAccountsById.has('a2')).toBe(false)
+        expect(service.managedAccountsById.has('managed-source-id::eng-1')).toBe(true)
+        expect(service.managedAccountsById.has('managed-source-id::fin-1')).toBe(false)
     })
 
     it('rejects invalid JMESPath expressions in validation', () => {

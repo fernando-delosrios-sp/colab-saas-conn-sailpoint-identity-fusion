@@ -6,6 +6,7 @@ import { LogService } from './logService'
 import { assert } from '../utils/assert'
 import { wrapConnectorError } from '../utils/error'
 import { FusionAccount } from '../model/account'
+import { SourceService } from './sourceService'
 
 // ============================================================================
 // Constants
@@ -55,7 +56,8 @@ export class IdentityService {
     constructor(
         config: FusionConfig,
         private log: LogService,
-        private client: ClientService
+        private client: ClientService,
+        private sources: SourceService
     ) {
         this.identityScopeQuery = config.identityScopeQuery
         this.includeIdentities = config.includeIdentities ?? true
@@ -255,14 +257,22 @@ export class IdentityService {
 
         const accountIdsToCorrelate = [...targetIds]
 
-        accountIdsToCorrelate.forEach((accountId) => {
+        for (const accountId of accountIdsToCorrelate) {
+            const iscAccountId = this.sources.resolveIscAccountIdForManagedKey(accountId)
+            if (!iscAccountId) {
+                this.log.warn(
+                    `Skipping correlation for managed key "${accountId}": ISC account id not found in loaded source data`
+                )
+                continue
+            }
+
             // Optimistic: mark as correlated before the API call so the account
             // output reflects a successful correlation without waiting for the queue.
             // If the API call fails, the next aggregation will re-detect it as uncorrelated.
             fusionAccount.setCorrelatedAccount(accountId)
 
             const requestParameters: AccountsApiUpdateAccountRequest = {
-                id: accountId,
+                id: iscAccountId,
                 requestBody: [
                     {
                         op: 'replace',
@@ -279,14 +289,16 @@ export class IdentityService {
                     `IdentityService>correlateAccounts ${accountId}`
                 )
                 .then(() => {
-                    this.log.debug(`Successfully correlated account ${accountId} to identity ${identityId}`)
+                    this.log.debug(
+                        `Successfully correlated managed key ${accountId} (ISC id ${iscAccountId}) to identity ${identityId}`
+                    )
                 })
                 .catch((error) => {
-                    this.log.error(`Failed to correlate account ${accountId}: ${error}`)
+                    this.log.error(`Failed to correlate managed key ${accountId}: ${error}`)
                 })
 
             fusionAccount.addCorrelationPromise(accountId, correlationPromise)
-        })
+        }
 
         // Return immediately - correlation happens asynchronously
         return true

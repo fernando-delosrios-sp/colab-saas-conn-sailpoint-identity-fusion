@@ -757,6 +757,19 @@ export class SourceService {
     }
 
     /**
+     * ISC Accounts API expects the platform account id. Internal maps and fusion state use the
+     * composite key (sourceId::nativeIdentity); resolve the loaded Account to obtain `id`.
+     */
+    public resolveIscAccountIdForManagedKey(managedKey: string): string | undefined {
+        const trimmed = String(managedKey ?? '').trim()
+        if (!trimmed) return undefined
+        const account = this.managedAccountsAllById.get(trimmed) ?? this.managedAccountsById.get(trimmed)
+        const raw = account?.id
+        const id = raw != null ? String(raw).trim() : ''
+        return id.length > 0 ? id : undefined
+    }
+
+    /**
      * Fetch a single account for a given source ID and nativeIdentity, applying SourceConfig.accountFilter if present (for managed sources).
      */
     public async fetchSourceAccountByNativeIdentity(
@@ -954,7 +967,7 @@ export class SourceService {
      * @param context - Optional hint for error logs (e.g. "SourceService>saveBatchCumulativeCount")
      */
     public async patchSourceConfig(
-        _id: string,
+        sourceId: string,
         requestParameters: SourcesV2025ApiUpdateSourceRequest,
         context?: string
     ): Promise<Source | undefined> {

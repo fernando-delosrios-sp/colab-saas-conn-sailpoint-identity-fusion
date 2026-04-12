@@ -62,7 +62,7 @@ describe('AttributeService mapping targets for definition context', () => {
                     [
                         {
                             preferredName: 'Neo',
-                            _source: 'HR',
+                            source: { name: 'HR' },
                         },
                     ],
                 ],
@@ -119,7 +119,7 @@ describe('AttributeService mainAccount stale cleanup', () => {
             attributeMaps: [
                 {
                     newAttribute: 'mainAccount',
-                    existingAttributes: ['_id'],
+                    existingAttributes: ['accountKey'],
                     attributeMerge: 'first',
                 },
             ],
@@ -152,7 +152,17 @@ describe('AttributeService mainAccount stale cleanup', () => {
             identity: {},
             accounts: [],
             sources: new Map<string, Record<string, any>[]>([
-                ['HR', [{ _id: 'acct-1', _source: 'HR' }]],
+                [
+                    'HR',
+                    [
+                        {
+                            accountKey: 'src-hr::acct-1',
+                            _id: 'src-hr::acct-1',
+                            source: { id: 'src-hr', name: 'HR' },
+                            schema: { id: 'acct-1', name: 'acct-1' },
+                        },
+                    ],
+                ],
             ]),
         }
         const fusionAccount: any = {
@@ -177,9 +187,9 @@ describe('AttributeService mainAccount stale cleanup', () => {
         })
 
         service.mapAttributes(fusionAccount)
-        expect(fusionAccount.attributes.mainAccount).toBe('acct-1')
+        expect(fusionAccount.attributes.mainAccount).toBe('src-hr::acct-1')
 
-        attributeBag.sources.set('HR', [{ _source: 'HR' }])
+        attributeBag.sources.set('HR', [{ source: { name: 'HR' } }])
         service.mapAttributes(fusionAccount)
         expect(fusionAccount.attributes.mainAccount).toBeUndefined()
     })
@@ -318,7 +328,17 @@ describe('AttributeService mapping undefined behavior', () => {
             identity: {},
             accounts: [],
             sources: new Map<string, Record<string, any>[]>([
-                ['HR', [{ preferredName: 'Neo', _id: 'acct-1', _source: 'HR' }]],
+                [
+                    'HR',
+                    [
+                        {
+                            preferredName: 'Neo',
+                            _id: 'src-hr::acct-1',
+                            source: { id: 'src-hr', name: 'HR' },
+                            schema: { id: 'acct-1', name: 'Neo' },
+                        },
+                    ],
+                ],
             ]),
         }
         const fusionAccount: any = {
@@ -345,7 +365,7 @@ describe('AttributeService mapping undefined behavior', () => {
         service.mapAttributes(fusionAccount)
         expect(fusionAccount.attributes.nickname).toBe('Neo')
 
-        attributeBag.sources.set('HR', [{ _id: 'acct-1', _source: 'HR' }])
+        attributeBag.sources.set('HR', [{ source: { name: 'HR' } }])
         service.mapAttributes(fusionAccount)
         expect(fusionAccount.attributes.nickname).toBeUndefined()
     })
@@ -465,7 +485,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             previous: {},
             identity: {},
             accounts: [],
-            sources: new Map<string, Record<string, any>[]>([['HR', [{ _source: 'HR' }]]]),
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
         const fusionAccount: any = {
@@ -552,7 +572,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             identity: {},
             accounts: [],
             sources: new Map<string, Record<string, any>[]>([
-                ['HR', [{ computed: '${firstname}${lastname}', _source: 'HR' }]],
+                ['HR', [{ computed: '${firstname}${lastname}', source: { name: 'HR' } }]],
             ]),
         }
 
@@ -625,7 +645,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             previous: {},
             identity: {},
             accounts: [],
-            sources: new Map<string, Record<string, any>[]>([['HR', [{ _source: 'HR' }]]]),
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
         const fusionAccount: any = {
@@ -693,7 +713,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             previous: {},
             identity: {},
             accounts: [],
-            sources: new Map<string, Record<string, any>[]>([['HR', [{ _source: 'HR' }]]]),
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
         const fusionAccount: any = {
@@ -798,8 +818,9 @@ describe('AttributeService mainAccount override', () => {
                         {
                             preferredName: 'Neo',
                             employeeId: 'hr-id-001',
-                            _id: 'hr-001',
-                            _source: 'HR',
+                            _id: 'src-hr::ni-hr',
+                            source: { id: 'src-hr', name: 'HR' },
+                            schema: { id: 'ni-hr', name: 'Neo' },
                         },
                     ],
                 ],
@@ -809,8 +830,9 @@ describe('AttributeService mainAccount override', () => {
                         {
                             preferredName: 'Trinity',
                             employeeId: 'erp-id-777',
-                            _id: 'erp-777',
-                            _source: 'ERP',
+                            _id: 'src-erp::ni-erp',
+                            source: { id: 'src-erp', name: 'ERP' },
+                            schema: { id: 'ni-erp', name: 'Trinity' },
                         },
                     ],
                 ],
@@ -843,7 +865,7 @@ describe('AttributeService mainAccount override', () => {
 
     it('uses mainAccount managed account ID as first candidate for first-value mapping', () => {
         const service = createService()
-        const fusionAccount = createFusionAccount('erp-777')
+        const fusionAccount = createFusionAccount('src-erp::ni-erp')
 
         service.mapAttributes(fusionAccount)
 
@@ -852,7 +874,7 @@ describe('AttributeService mainAccount override', () => {
 
     it('does not overwrite fusionIdentityAttribute or fusionDisplayAttribute from mapping', () => {
         const service = createService()
-        const fusionAccount = createFusionAccount('erp-777')
+        const fusionAccount = createFusionAccount('src-erp::ni-erp')
         fusionAccount.isIdentity = true
         fusionAccount.previousAttributes = { id: 'fusion-id-1', name: 'immutable-name' }
 
@@ -865,7 +887,7 @@ describe('AttributeService mainAccount override', () => {
 
     it('allows fusionDisplayAttribute change on reset', () => {
         const service = createService()
-        const fusionAccount = createFusionAccount('erp-777', true)
+        const fusionAccount = createFusionAccount('src-erp::ni-erp', true)
         fusionAccount.isIdentity = true
         fusionAccount.previousAttributes = { id: 'fusion-id-1', name: 'immutable-name' }
 
@@ -889,7 +911,7 @@ describe('AttributeService mainAccount override', () => {
 
     it('places mainAccount managed account at index 0 for definition context', async () => {
         const service = createService()
-        const fusionAccount = createFusionAccount('erp-777')
+        const fusionAccount = createFusionAccount('src-erp::ni-erp')
 
         await service.refreshNormalAttributes(fusionAccount)
 
@@ -958,8 +980,9 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
                     [
                         {
                             preferredName: 'Neo',
-                            _id: 'hr-001',
-                            _source: 'HR',
+                            _id: 'src-hr::ni-hr',
+                            source: { id: 'src-hr', name: 'HR' },
+                            schema: { id: 'ni-hr', name: 'Neo' },
                         },
                     ],
                 ],
@@ -968,9 +991,10 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
                     [
                         {
                             preferredName: 'Trinity',
-                            preferredAccountId: 'erp-777',
-                            _id: 'erp-777',
-                            _source: 'ERP',
+                            preferredAccountId: 'src-erp::ni-erp',
+                            _id: 'src-erp::ni-erp',
+                            source: { id: 'src-erp', name: 'ERP' },
+                            schema: { id: 'ni-erp', name: 'Trinity' },
                         },
                     ],
                 ],
@@ -1001,7 +1025,7 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
         service.mapAttributes(fusionAccount)
 
         expect(fusionAccount.attributes.nicknameBefore).toBe('Neo')
-        expect(fusionAccount.attributes.mainAccount).toBe('erp-777')
+        expect(fusionAccount.attributes.mainAccount).toBe('src-erp::ni-erp')
         expect(fusionAccount.attributes.nicknameAfter).toBe('Trinity')
     })
 })
@@ -1047,7 +1071,7 @@ describe('AttributeService unique identity reset for managed accounts', () => {
             previous: {},
             identity: {},
             accounts: [],
-            sources: new Map<string, Record<string, any>[]>([['HR', [{ _source: 'HR' }]]]),
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
         const fusionAccount: any = {
@@ -1132,7 +1156,7 @@ describe('AttributeService identity immutability by account lifecycle', () => {
             previous: {},
             identity: {},
             accounts: [],
-            sources: new Map<string, Record<string, any>[]>([['HR', [{ _source: 'HR' }]]]),
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
         const fusionAccount: any = {
@@ -1164,7 +1188,7 @@ describe('AttributeService identity immutability by account lifecycle', () => {
             previous: { id: 'persisted-id' },
             identity: {},
             accounts: [],
-            sources: new Map<string, Record<string, any>[]>([['HR', [{ _source: 'HR' }]]]),
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
         const fusionAccount: any = {
@@ -1252,7 +1276,17 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             identity: {},
             accounts: [],
             sources: new Map<string, Record<string, any>[]>([
-                ['HR', [{ preferredName: 'FromHR', _id: 'm-1', _name: 'FromHR', _source: 'HR' }]],
+                [
+                    'HR',
+                    [
+                        {
+                            preferredName: 'FromHR',
+                            _id: 'src-hr::native-m1',
+                            schema: { name: 'FromHR', id: 'native-m1' },
+                            source: { id: 'src-hr', name: 'HR' },
+                        },
+                    ],
+                ],
             ]),
         }
         const fusionAccount: any = {
@@ -1265,7 +1299,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             isIdentity: false,
             sources: ['HR'],
             originSource: 'HR',
-            originAccountId: 'm-1',
+            originAccountId: 'src-hr::native-m1',
             disabled: false,
             history: [],
             importHistory: jest.fn(),
@@ -1276,10 +1310,10 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         expect(fusionAccount.attributes.derived).toBe('FromHR')
     })
 
-    it('exposes _id and _name on managed snapshots for Velocity', async () => {
+    it('exposes origin key via $originAccount and display name on $account for Velocity', async () => {
         const { sourceService, log, locks } = velocityDeps()
         const service = new AttributeService(
-            velocityConfig('$account._id:$account._name', [{ name: 'HR' }]),
+            velocityConfig('$originAccount:$account.schema.name', [{ name: 'HR' }]),
             velocitySchemas,
             sourceService,
             log,
@@ -1295,9 +1329,9 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     'HR',
                     [
                         {
-                            _id: 'managed-42',
-                            _name: 'Contoso Smith',
-                            _source: 'HR',
+                            _id: 'src-h42::managed-42',
+                            schema: { name: 'Contoso Smith', id: 'managed-42' },
+                            source: { id: 'src-h42', name: 'HR' },
                             IIQDisabled: false,
                         },
                     ],
@@ -1314,7 +1348,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             isIdentity: false,
             sources: ['HR'],
             originSource: 'HR',
-            originAccountId: 'managed-42',
+            originAccountId: 'src-h42::managed-42',
             disabled: false,
             history: [],
             importHistory: jest.fn(),
@@ -1322,7 +1356,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBe('managed-42:Contoso Smith')
+        expect(fusionAccount.attributes.derived).toBe('src-h42::managed-42:Contoso Smith')
     })
 
     it('prefers managed $account over identity-backed when originSource is Identities and managed accounts are present', async () => {
@@ -1348,9 +1382,9 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     [
                         {
                             employeeNumber: 'E-MANAGED',
-                            _id: 'same-id',
-                            _name: 'managed',
-                            _source: 'HR',
+                            _id: 'src-h::same-id',
+                            schema: { name: 'managed', id: 'same-id' },
+                            source: { id: 'src-h', name: 'HR' },
                         },
                     ],
                 ],
@@ -1366,7 +1400,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             isIdentity: true,
             sources: ['HR', 'Identities'],
             originSource: 'Identities',
-            originAccountId: 'same-id',
+            originAccountId: 'src-h::same-id',
             disabled: false,
             history: [],
             importHistory: jest.fn(),
@@ -1422,7 +1456,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
     it('synthetic Identities $account when origin is Identities and identity bag empty', async () => {
         const { sourceService, log, locks } = velocityDeps()
         const service = new AttributeService(
-            velocityConfig('$account._source$account._id', [{ name: 'HR' }]),
+            velocityConfig('$account.source.name$account._id', [{ name: 'HR' }]),
             velocitySchemas,
             sourceService,
             log,

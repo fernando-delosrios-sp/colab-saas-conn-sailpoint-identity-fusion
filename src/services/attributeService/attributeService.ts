@@ -21,12 +21,26 @@ import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
 import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
-import { parseManagedAccountKey } from '../../model/managedAccountKey'
+import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
+import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
 /** System-managed provenance id; not mapped or defined via Velocity. */
 const ORIGIN_ACCOUNT_ATTRIBUTE = 'originAccount'
+
+/**
+ * Managed account key for matching `mainAccount` / `$originAccount` — composite `sourceId::nativeIdentity`
+ * from snapshot fields only. Use top-level `$originAccount` in Velocity when you need the origin key.
+ */
+function getManagedAccountSnapshotKey(account: Record<string, any> | undefined): string {
+    if (!account) return ''
+    const key = buildManagedAccountKey({
+        sourceId: velocitySnapshotSourceId(account),
+        nativeIdentity: velocitySnapshotSchemaId(account),
+    })
+    return String(key ?? '').trim()
+}
 
 // ============================================================================
 // AttributeService Class
@@ -680,7 +694,7 @@ export class AttributeService {
 
     /**
      * Velocity `$account`: origin snapshot (managed account shape or identity-backed).
-     * `$originAccount` remains the string id (set on context above).
+     * `$originAccount` remains the origin key string (set on context above).
      *
      * For identity-origin (baseline) accounts that have managed accounts attached,
      * the first managed account is preferred as `$account` so Velocity expressions
@@ -721,19 +735,24 @@ export class AttributeService {
             return {
                 ...identityBag,
                 _id: originId,
-                _name: identityBackedName,
-                _source: 'Identities',
+                source: { name: 'Identities' },
+                schema: {
+                    name: identityBackedName,
+                    id: originId,
+                },
                 IIQDisabled: Boolean(fusionAccount.disabled),
             }
         }
 
         const parsedManagedKey = parseManagedAccountKey(originId)
         const managed = orderedAccounts.find((a) => {
-            const accountId = String(a?._id ?? '').trim()
-            if (accountId === originId) return true
+            const snapshotKey = getManagedAccountSnapshotKey(a)
+            if (snapshotKey === originId) return true
+            const accountRowId = String(a?._id ?? '').trim()
+            if (accountRowId === originId) return true
             if (!parsedManagedKey) return false
-            const sourceId = String(a?._sourceId ?? '').trim()
-            const nativeIdentity = String(a?._nativeIdentity ?? '').trim()
+            const sourceId = velocitySnapshotSourceId(a)
+            const nativeIdentity = velocitySnapshotSchemaId(a)
             return sourceId === parsedManagedKey.sourceId && nativeIdentity === parsedManagedKey.nativeIdentity
         })
         if (managed) return managed
@@ -742,16 +761,22 @@ export class AttributeService {
             return {
                 ...identityBag,
                 _id: originId,
-                _name: identityBackedName,
-                _source: 'Identities',
+                source: { name: 'Identities' },
+                schema: {
+                    name: identityBackedName,
+                    id: originId,
+                },
                 IIQDisabled: Boolean(fusionAccount.disabled),
             }
         }
 
         return {
             _id: originId,
-            _name: String(fusionAccount.name ?? '').trim() || originId,
-            _source: originSource ?? '',
+            source: { name: originSource ?? '' },
+            schema: {
+                name: String(fusionAccount.name ?? '').trim() || originId,
+                id: originId,
+            },
         }
     }
 
@@ -785,7 +810,11 @@ export class AttributeService {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
-        const prioritizedIndex = ordered.findIndex((account) => String(account?._id ?? '').trim() === mainAccountId)
+        const prioritizedIndex = ordered.findIndex(
+            (account) =>
+                getManagedAccountSnapshotKey(account) === mainAccountId ||
+                String(account?._id ?? '').trim() === mainAccountId
+        )
         if (prioritizedIndex <= 0) return ordered
 
         const prioritizedAccount = ordered[prioritizedIndex]
@@ -814,7 +843,11 @@ export class AttributeService {
         accountId: string
     ): Record<string, any> | undefined {
         for (const accounts of sourceAttributeMap.values()) {
-            const match = accounts.find((account) => String(account?._id ?? '').trim() === accountId)
+            const match = accounts.find(
+                (account) =>
+                    getManagedAccountSnapshotKey(account) === accountId ||
+                    String(account?._id ?? '').trim() === accountId
+            )
             if (match) return match
         }
 
