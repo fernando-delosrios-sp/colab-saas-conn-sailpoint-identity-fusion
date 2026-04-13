@@ -494,8 +494,8 @@
                         {
                             "key": "normalAttributeDefinitions",
                             "label": "Normal Attribute Definitions",
-                            "titleKey": "expression",
-                            "subtitleKey": "name",
+                            "titleKey": "name",
+                            "subtitleKey": "expression",
                             "dragNDropEnabled": true,
                             "deleteButton": true,
                             "editButton": true,
@@ -606,8 +606,8 @@
                         {
                             "key": "uniqueAttributeDefinitions",
                             "label": "Unique Attribute Definitions",
-                            "titleKey": "expression",
-                            "subtitleKey": "name",
+                            "titleKey": "name",
+                            "subtitleKey": "expression",
                             "dragNDropEnabled": true,
                             "deleteButton": true,
                             "editButton": true,
