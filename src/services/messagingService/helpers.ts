@@ -14,7 +14,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" align="center" style="width:100%; border-collapse:collapse;">
     <tr>
       <td align="center" style="padding:0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:920px; border-collapse:collapse;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
           <tr>
             <td style="padding:12px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #e6ebf5; border-radius:14px; box-shadow:0 12px 30px rgba(16,24,40,0.12);">
@@ -160,7 +160,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                         {{#if accountEmail}}
                         <tr>
                           <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Email:</td>
-                          <td style="padding:2px 8px; width:150px; max-width:150px;"><div style="display:block; width:150px; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{accountEmail}}">{{accountEmail}}</div></td>
+                          <td style="padding:2px 8px; width:150px; max-width:150px; min-width:0; overflow:hidden;"><div style="display:block; width:100%; max-width:150px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{accountEmail}}">{{accountEmail}}</div></td>
                         </tr>
                         {{/if}}
                       </table>
@@ -360,7 +360,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                                 {{#if accountEmail}}
                                                                 <tr>
                                                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">Email:</td>
-                                                                    <td style="padding:2px 8px; width:150px; max-width:150px;"><div style="display:block; width:150px; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{accountEmail}}">{{accountEmail}}</div></td>
+                                                                    <td style="padding:2px 8px; width:150px; max-width:150px; min-width:0; overflow:hidden;"><div style="display:block; width:100%; max-width:150px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{accountEmail}}">{{accountEmail}}</div></td>
                                                                 </tr>
                                                                 {{/if}}
                                                             </table>
