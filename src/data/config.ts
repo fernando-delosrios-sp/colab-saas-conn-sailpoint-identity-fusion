@@ -114,17 +114,17 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     // ============================================================================
     // Advanced Connection Settings defaults
     // ============================================================================
-    config.enableQueue = config.enableQueue ?? false
-    config.enableRetry = config.enableRetry ?? false
+    config.enableQueue = config.enableQueue ?? true
+    config.enableRetry = config.enableRetry ?? true
 
-    // Defaults from connector-spec.json: maxRetries: 20, requestsPerSecond: 10, maxConcurrentRequests: 10
+    // Defaults from connector-spec.json: maxRetries: 20, requestsPerSecond: 8, maxConcurrentRequests: 10
     config.maxRetries = config.maxRetries ?? internalConfig.retriesConstant
-    config.requestsPerSecond = config.requestsPerSecond ?? 10
+    config.requestsPerSecond = config.requestsPerSecond ?? 8
     config.maxConcurrentRequests = config.maxConcurrentRequests ?? 10
     // retryDelay is configured in milliseconds in connector-spec.json
     config.retryDelay = config.retryDelay ?? 1000 // 1 second base delay (only used as fallback, 429 responses use retry-after header)
     config.pageSize = config.batchSize ?? 250 // Paging size is 250 for all calls
-    config.enableBatching = config.enableBatching ?? false
+    config.enableBatching = config.enableBatching ?? true
     config.enablePriority = config.enablePriority ?? true
     // processingWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
     const processingWaitSeconds =
