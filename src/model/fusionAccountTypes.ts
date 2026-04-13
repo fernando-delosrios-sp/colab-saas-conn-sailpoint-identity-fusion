@@ -1,5 +1,19 @@
 import { Attributes } from '@sailpoint/connector-sdk'
 
+/** Origin / construction kind for a {@link FusionAccount}. */
+export enum FusionAccountKind {
+    Fusion = 'fusion',
+    Identity = 'identity',
+    Managed = 'managed',
+    Decision = 'decision',
+}
+
+/** Source + schema native id stored for reverse correlation on managed account keys. */
+export type FusionManagedAccountInfo = {
+    source: { name: string }
+    schema: { id: string }
+}
+
 /**
  * Container for all attribute layers associated with a fusion account.
  * Tracks current and previous attribute values, identity attributes,

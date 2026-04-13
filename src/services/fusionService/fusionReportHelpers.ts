@@ -60,14 +60,14 @@ export function fusionReportMatchCandidateAccountFields(match: FusionMatch): Pic
 }
 
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {
-    const accountDisplayName = String(fusionAccount.accountDisplayName ?? '').trim()
-    if (accountDisplayName) return accountDisplayName
+    const rowTitle = String(fusionAccount.name ?? '').trim()
+    if (rowTitle) return rowTitle
+
+    const idn = String(fusionAccount.identityDisplayName ?? '').trim()
+    if (idn) return idn
 
     const legacyDisplayName = String(fusionAccount.displayName ?? '').trim()
     if (legacyDisplayName) return legacyDisplayName
-
-    const legacyName = String(fusionAccount.name ?? '').trim()
-    if (legacyName) return legacyName
 
     const uid = String(
         fusionAccount.managedAccountId ??

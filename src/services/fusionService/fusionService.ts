@@ -721,7 +721,6 @@ export class FusionService {
                 .map((a) =>
                     buildManagedAccountKey({
                         sourceId: a.source?.id,
-                        sourceName: a.source?.name,
                         nativeIdentity: (a as any).nativeIdentity,
                     })
                 )

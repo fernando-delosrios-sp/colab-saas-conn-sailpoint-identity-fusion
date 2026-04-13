@@ -282,8 +282,7 @@ describe('FusionService', () => {
             expect(fusionAccount.name).toBe('Jane Identity (from ref)')
             expect(fusionAccount.displayName).toBe('Jane Identity (from ref)')
             expect(fusionAccount.identityDisplayName).toBe('Jane Identity (from ref)')
-            expect(fusionAccount.accountDisplayName).toBe('fusion-identity-1')
-            expect((fusionAccount.attributeBag.identity as any).name).toBe('Jane Identity (from ref)')
+            expect((fusionAccount.attributeBag.identity as any)?.name).toBeUndefined()
         })
 
         it('prefers Identity document name when identity layer is applied', () => {
@@ -1036,7 +1035,7 @@ describe('FusionService', () => {
 
             const result = await fusionService.processFusionAccount(historicalAccount)
 
-            expect(result.name).toBe('Jane Doe')
+            expect(result.name).toBe('Jane Q. Doe')
         })
 
         it('writes history when a newly associated managed account is picked up for an identity', async () => {

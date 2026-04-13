@@ -122,18 +122,16 @@ export const buildFormInput = (
     //
     // Priority for the human-friendly account label used in reports and decision history:
     // 1. identityDisplayName — the correlated identity's full name (most authoritative when attached)
-    // 2. accountDisplayName  — best-effort label derived from the managed account
-    // 3. displayName / name  — legacy / generic fallbacks
-    // 4. accountIdentifier   — last-resort opaque ID
+    // 2. name / displayName — fusion row title (ISC Account.name; displayName aliases name)
+    // 3. accountIdentifier   — last-resort opaque ID
     const preferredAccountLabel =
         fusionAccount.identityDisplayName ||
-        fusionAccount.accountDisplayName ||
-        fusionAccount.displayName ||
         fusionAccount.name ||
+        fusionAccount.displayName ||
         accountIdentifier
-    if (!fusionAccount.identityDisplayName && !fusionAccount.displayName && !fusionAccount.accountDisplayName) {
+    if (!fusionAccount.identityDisplayName && !fusionAccount.name && !fusionAccount.displayName) {
         logger.error(
-            `[formBuilder] Missing identityDisplayName/displayName/accountDisplayName for fusion account. Using fallback value: ${accountIdentifier}`
+            `[formBuilder] Missing identityDisplayName/name for fusion account. Using fallback value: ${accountIdentifier}`
         )
     }
     // `name` is used downstream in reports and decision history messages; prefer human-friendly display labels.
@@ -558,9 +556,9 @@ export const buildFormInputs = (
 
     // Account info
     // IMPORTANT: Use the same label priority as buildFormInput so form definition and instance are consistent.
-    if (!fusionAccount.identityDisplayName && !fusionAccount.displayName && !fusionAccount.accountDisplayName) {
+    if (!fusionAccount.identityDisplayName && !fusionAccount.name && !fusionAccount.displayName) {
         logger.error(
-            `[formBuilder] Missing identityDisplayName/displayName/accountDisplayName for fusion account in form inputs. Using fallback value: ${accountIdentifier}`
+            `[formBuilder] Missing identityDisplayName/name for fusion account in form inputs. Using fallback value: ${accountIdentifier}`
         )
     }
     formInputs.push({
@@ -569,9 +567,8 @@ export const buildFormInputs = (
         label: 'name',
         description:
             fusionAccount.identityDisplayName ||
-            fusionAccount.accountDisplayName ||
-            fusionAccount.displayName ||
             fusionAccount.name ||
+            fusionAccount.displayName ||
             accountIdentifier,
     })
     formInputs.push({
