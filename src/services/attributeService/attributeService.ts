@@ -23,6 +23,7 @@ import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
 import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
 import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
+import { readString } from '../../utils/safeRead'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
@@ -1091,7 +1092,7 @@ export class AttributeService {
             } catch (error) {
                 this.log.error(
                     `Error generating ${kind} attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
-                    (error as any).message
+                    error instanceof Error ? error.message : readString(error, 'message', String(error))
                 )
                 if (kind === 'unique') throw error
             }

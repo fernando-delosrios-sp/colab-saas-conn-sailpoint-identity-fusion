@@ -1,3 +1,5 @@
+import { readUnknown } from './safeRead'
+
 /**
  * Attribute utility functions for picking, filtering, and transforming attributes.
  * Provides a consistent interface for attribute manipulation across services.
@@ -254,9 +256,9 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
             continue
         }
         if (typeof item === 'object') {
-            const id = (item as any).id
-            const value = (item as any).value
-            const name = (item as any).name
+            const id = readUnknown(item, 'id')
+            const value = readUnknown(item, 'value')
+            const name = readUnknown(item, 'name')
             const pick = id ?? value ?? name
             if (pick != null && pick !== '') {
                 normalized.push(String(pick))
@@ -283,9 +285,9 @@ export function normalizeActionTokens(raw: unknown): string[] {
                 continue
             }
             if (typeof item === 'object') {
-                const id = (item as any).id
-                const value = (item as any).value
-                const name = (item as any).name
+                const id = readUnknown(item, 'id')
+                const value = readUnknown(item, 'value')
+                const name = readUnknown(item, 'name')
                 const pick = id ?? value ?? name
                 if (pick != null && pick !== '') out.push(String(pick))
             }
@@ -296,9 +298,9 @@ export function normalizeActionTokens(raw: unknown): string[] {
         return [String(raw)]
     }
     if (typeof raw === 'object') {
-        const id = (raw as any).id
-        const value = (raw as any).value
-        const name = (raw as any).name
+        const id = readUnknown(raw, 'id')
+        const value = readUnknown(raw, 'value')
+        const name = readUnknown(raw, 'name')
         const pick = id ?? value ?? name
         return pick != null && pick !== '' ? [String(pick)] : []
     }

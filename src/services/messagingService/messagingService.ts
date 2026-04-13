@@ -22,6 +22,7 @@ import { SourceService } from '../sourceService'
 import type { FusionAccount } from '../../model/account'
 import { FusionReport } from '../fusionService/types'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
+import { readString } from '../../utils/safeRead'
 import {
     registerHandlebarsHelpers,
     compileEmailTemplates,
@@ -153,7 +154,7 @@ export class MessagingService {
             assert(emailWorkflow, 'Failed to create email workflow object')
 
             // Ensure the workflow is disabled so we can call testWorkflow safely.
-            ;(emailWorkflow as any).enabled = false
+            ;(emailWorkflow as { enabled?: boolean }).enabled = false
 
             this.workflow = await this.createWorkflow(emailWorkflow)
             assert(this.workflow, 'Failed to create workflow')
@@ -197,7 +198,7 @@ export class MessagingService {
             const delayedWorkflow = new DelayedAggregationWorkflow(workflowName, owner, this.apiBaseUrl)
             assert(delayedWorkflow, 'Failed to create delayed aggregation workflow object')
 
-            ;(delayedWorkflow as any).enabled = false
+            ;(delayedWorkflow as { enabled?: boolean }).enabled = false
 
             this.delayedAggregationWorkflow = await this.createWorkflow(delayedWorkflow)
             assert(this.delayedAggregationWorkflow, 'Failed to create delayed aggregation workflow')
@@ -293,11 +294,13 @@ export class MessagingService {
             return
         }
 
-        const accountName =
-            context?.accountName || String((formInput as any)?.name || (formInput as any)?.account || 'Unknown Account')
-        const accountSource = context?.accountSource || String((formInput as any)?.source || 'Unknown')
+        const formInputName = readString(formInput, 'name')
+        const formInputAccount = readString(formInput, 'account')
+        const formInputSource = readString(formInput, 'source')
+        const accountName = context?.accountName || String(formInputName || formInputAccount || 'Unknown Account')
+        const accountSource = context?.accountSource || String(formInputSource || 'Unknown')
         const pickedAccountAttributes = pickAttributes(context?.accountAttributes, this.reportAttributes)
-        const accountId = context?.accountId || String((formInput as any)?.account || '')
+        const accountId = context?.accountId || String(formInputAccount || '')
         const accountUrl = this.urlContext.humanAccount(accountId || undefined)
         const accountEmail = context?.accountEmail
 
@@ -308,7 +311,12 @@ export class MessagingService {
             })) ?? []
 
         const subject = `Identity Fusion Review Required: ${accountName} [${accountSource}]`
-        const sourceType = context?.sourceType ?? (formInput as any)?.sourceType ?? undefined
+        const sourceTypeInput = readString(formInput, 'sourceType')
+        const sourceType =
+            context?.sourceType ??
+            (sourceTypeInput === 'authoritative' || sourceTypeInput === 'record' || sourceTypeInput === 'orphan'
+                ? sourceTypeInput
+                : undefined)
         const emailData: FusionReviewEmailData = {
             headerSubtitle: this.buildEmailHeaderSubtitle(),
             accounts: [

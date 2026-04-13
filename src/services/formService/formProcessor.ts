@@ -4,6 +4,7 @@ import { SourceType } from '../../model/config'
 import { FusionDecision } from '../../model/form'
 import { IdentityService } from '../identityService'
 import { assert } from '../../utils/assert'
+import { readString } from '../../utils/safeRead'
 
 // ============================================================================
 // Form Processing Functions
@@ -192,9 +193,10 @@ export const createFusionDecision = async (
     // Persist correlated identity reference (if the form stored it) for downstream reporting/history.
     // Supports both flat and dictionary formInput structures.
     const correlatedIdentityId =
-        (typeof (formInput as any)?.identityId === 'string' && (formInput as any).identityId.length > 0
-            ? String((formInput as any).identityId)
-            : undefined) ||
+        (() => {
+            const identityId = readString(formInput, 'identityId')
+            return identityId && identityId.length > 0 ? identityId : undefined
+        })() ||
         (() => {
             try {
                 const dict = formInput as Record<string, any>

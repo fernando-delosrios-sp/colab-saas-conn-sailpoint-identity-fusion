@@ -18,6 +18,7 @@ import { IdentityService } from '../identityService'
 import { MessagingService } from '../messagingService'
 import { SourceService } from '../sourceService'
 import { assert, softAssert } from '../../utils/assert'
+import { readString, readUnknown } from '../../utils/safeRead'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
 import {
@@ -307,9 +308,9 @@ export class FormService {
 
         for (const c of candidates) {
             // Already present → nothing to do.
-            const existing = normalizeEmail((c.attributes as any)?.email)
+            const existing = normalizeEmail(readUnknown(c.attributes, 'email'))
             if (existing) {
-                ;(c.attributes as any).email = existing
+                ;(c.attributes as Record<string, unknown>).email = existing
                 continue
             }
 
@@ -324,11 +325,13 @@ export class FormService {
                 }
             }
 
-            const attrs: any = (doc as any)?.attributes ?? {}
-            const hydrated = normalizeEmail(attrs.email ?? attrs.mail ?? attrs.emailAddress)
+            const attrs = readUnknown(doc, 'attributes')
+            const hydrated = normalizeEmail(
+                readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail') ?? readUnknown(attrs, 'emailAddress')
+            )
             if (hydrated) {
                 // Ensure the form SEARCH_V2 sublabel (`attributes.email`) resolves.
-                ;(c.attributes as any).email = hydrated
+                ;(c.attributes as Record<string, unknown>).email = hydrated
             }
         }
     }
@@ -974,7 +977,7 @@ export class FormService {
             id: accountId,
             name: account.name || accountId,
             sourceName: account.sourceName || '',
-            sourceId: (account as any).sourceId ?? undefined,
+            sourceId: readString(account, 'sourceId'),
             nativeIdentity: account.nativeIdentity ?? undefined,
         }
     }

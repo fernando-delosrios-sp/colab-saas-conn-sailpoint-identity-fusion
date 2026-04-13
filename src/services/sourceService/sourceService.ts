@@ -28,6 +28,7 @@ import { LogService } from '../logService'
 import { assert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
 import { getDateFromISOString } from '../../utils/date'
+import { readPathString } from '../../utils/safeRead'
 import { buildSourceConfigPatch } from './helpers'
 import { buildSourceFilter } from './sourceAccountFilterHelpers'
 import {
@@ -317,7 +318,7 @@ export class SourceService {
                 id: fusionSource.owner.id!,
                 type: 'IDENTITY',
             }
-            this._fusionSourceManagementWorkgroupId = (fusionSource as any).managementWorkgroup?.id ?? undefined
+            this._fusionSourceManagementWorkgroupId = readPathString(fusionSource, ['managementWorkgroup', 'id'])
             this._fusionSourceWorkgroupMemberIds = undefined
 
             resolvedSources.push({

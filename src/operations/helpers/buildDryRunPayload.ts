@@ -2,6 +2,7 @@ import { StdAccountListOutput } from '@sailpoint/connector-sdk'
 import { FusionReportAccount, FusionReportMatch, FusionReportStats } from '../../services/fusionService/types'
 import { PendingReviewAccountContext } from '../../services/formService/formService'
 import { createUrlContext } from '../../utils/url'
+import { readPathString } from '../../utils/safeRead'
 
 /**
  * Row-level outcome for the ISC account in this run.
@@ -311,7 +312,7 @@ export const enrichISCAccountWithMatching = (
         relatedReportAccounts.push(...entries)
     }
 
-    const isOrphanStub = typeof (account.key as any)?.simple?.id === 'string' && (account.key as any).simple.id.startsWith('orphan-deferred:')
+    const isOrphanStub = (readPathString(account, ['key', 'simple', 'id']) ?? '').startsWith('orphan-deferred:')
     const matching = buildMatchingPayload(account, relatedReportAccounts, isOrphanStub, baseurl)
     const review = buildReviewPayload(relatedIds, relatedReportAccounts, pendingReviewByAccountId)
 

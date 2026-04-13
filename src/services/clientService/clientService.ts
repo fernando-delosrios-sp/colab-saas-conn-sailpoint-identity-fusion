@@ -20,6 +20,7 @@ import {
     SourcesV2025Api,
     WorkflowsV2025Api,
 } from 'sailpoint-api-client'
+import { readNumber } from '../../utils/safeRead'
 import { createRetriesConfig } from './helpers'
 import { STATS_LOGGING_INTERVAL_MS } from './constants'
 
@@ -330,7 +331,7 @@ export class ClientService {
         const effectivePageSize = Math.min(pageSize, SAILPOINT_LIST_MAX)
 
         const allItems: T[] = []
-        const baseLimit = (baseParameters as any).limit
+        const baseLimit = readNumber(baseParameters, 'limit')
         const hasExplicitLimit = baseLimit !== undefined && baseLimit !== null
         const initialLimit = hasExplicitLimit && baseLimit < effectivePageSize ? baseLimit : effectivePageSize
 

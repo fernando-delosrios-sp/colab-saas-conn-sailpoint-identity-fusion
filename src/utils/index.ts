@@ -20,3 +20,6 @@ export * from './error'
 
 // Numeric utilities
 export * from './numbers'
+
+// Safe read utilities
+export * from './safeRead'

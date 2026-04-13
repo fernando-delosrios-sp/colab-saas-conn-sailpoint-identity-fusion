@@ -7,6 +7,7 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 import { FusionReportAccount } from '../../services/fusionService/types'
 import { isExactAttributeMatchScores } from '../../services/scoringService/exactMatch'
 import { FusionAccount } from '../../model/account'
+import { readArray, readBoolean, readPathString, readUnknown } from '../../utils/safeRead'
 import {
     buildReportAccountIndex,
     DryRunInputOptions,
@@ -47,11 +48,6 @@ export interface FetchResult {
     managedAccountsFoundOrphan: number
 }
 
-export type SafeSender = {
-    send: (payload: any) => void
-    drain: () => Promise<void>
-}
-
 export type DryRunRuntimeOptions = DryRunInputOptions
 
 export type DryRunRowEmitter = {
@@ -65,9 +61,6 @@ export type DryRunRowEmitter = {
 }
 
 const REPORT_DISK_SUBDIR = 'reports'
-
-/** Yield to the pipeline after this many NDJSON rows (spcx `pipeline(out, res)` backpressure). */
-const DRAIN_EVERY_N_ROWS = 20
 
 /** Short host segment for filenames: first DNS label of the baseurl host, or full IP literal (sanitized). */
 export const hostnameSegmentFromBaseurl = (baseurl: string | undefined): string => {
@@ -121,25 +114,17 @@ async function writePrettyJsonArrayElement(stream: WriteStream, obj: unknown, is
  */
 export const createDryRunRowEmitter = async (
     serviceRegistry: ServiceRegistry,
-    sender: SafeSender,
     runtimeOptions: DryRunRuntimeOptions
 ): Promise<DryRunRowEmitter> => {
-    const { log } = serviceRegistry
+    const { log, res } = serviceRegistry
 
     if (!runtimeOptions.writeToDisk) {
-        let rowCount = 0
         return {
             diskOutputPath: undefined,
             emitRow: async (payload: Record<string, unknown>) => {
-                sender.send(payload)
-                rowCount += 1
-                if (rowCount % DRAIN_EVERY_N_ROWS === 0) {
-                    await sender.drain()
-                }
+                res.send(payload)
             },
-            close: async () => {
-                await sender.drain()
-            },
+            close: async () => {},
         }
     }
 
@@ -182,43 +167,6 @@ export const createDryRunRowEmitter = async (
                     await unlink(rowsTempPath)
                 } catch {
                     /* best-effort cleanup */
-                }
-            }
-        },
-    }
-}
-
-/**
- * The SDK's spcx dev server uses `stream.pipeline(out, res)` where `out` is the
- * Transform `ResponseStream._writable`. Many synchronous `send()` calls fill
- * that Transform faster than the pipeline writes to the HTTP response. The
- * server then ends `res` while data is still in flight → `ERR_STREAM_PREMATURE_CLOSE`.
- *
- * `drain()` waits until buffer lengths stay at zero across several event-loop
- * turns so `pipeline(out, res)` can catch up. Callers should also `await drain()`
- * periodically while streaming, not only once at the end.
- */
-export const createSafeSender = (serviceRegistry: ServiceRegistry): SafeSender => {
-    const { res } = serviceRegistry
-    const transform = (res as { _writable?: import('stream').Transform })._writable
-
-    return {
-        send: (payload: any): void => {
-            res.send(payload)
-        },
-        drain: async (): Promise<void> => {
-            const w = transform
-            if (!w || typeof w.readableLength !== 'number') return
-
-            const maxIterations = 100_000
-            for (let i = 0; i < maxIterations; i++) {
-                while (w.readableLength > 0 || w.writableLength > 0) {
-                    await new Promise<void>((resolve) => setImmediate(resolve))
-                }
-                await new Promise<void>((resolve) => setImmediate(resolve))
-                await new Promise<void>((resolve) => setImmediate(resolve))
-                if (w.readableLength === 0 && w.writableLength === 0) {
-                    return
                 }
             }
         },
@@ -403,7 +351,7 @@ type ReportCategory = (typeof CATEGORY_ORDER)[number]
 /** Non-empty value for the fusion schema identity attribute (e.g. correlated ISC identity id). */
 const fusionIdentityAttributeValue = (attributes: any, attributeName: string): string => {
     if (!attributes || typeof attributes !== 'object') return ''
-    const v = attributes[attributeName]
+    const v = readUnknown(attributes, attributeName)
     if (v === undefined || v === null) return ''
     if (Array.isArray(v)) return String(v[0] ?? '').trim()
     return String(v).trim()
@@ -416,12 +364,13 @@ const categorizeRow = (
     fusionIdentityAttribute: string
 ): ReportCategory[] => {
     const categories: ReportCategory[] = []
-    const statuses = new Set<string>(Array.isArray(enrichedAccount?.attributes?.statuses) ? enrichedAccount.attributes.statuses : [])
-    const relatedAccounts = Array.isArray(enrichedAccount?.attributes?.accounts) ? enrichedAccount.attributes.accounts : []
+    const attributes = readUnknown(enrichedAccount, 'attributes')
+    const statuses = new Set<string>(readArray<string>(attributes, 'statuses', []))
+    const relatedAccounts = readArray<string>(attributes, 'accounts', [])
 
     if (statuses.has('baseline')) {
         categories.push('baseline')
-    } else if (fusionIdentityAttributeValue(enrichedAccount?.attributes, fusionIdentityAttribute)) {
+    } else if (fusionIdentityAttributeValue(attributes, fusionIdentityAttribute)) {
         // Correlated fusion accounts usually do not retain the "baseline" entitlement unless they were
         // created from the identity path; they still tie to an identity via the schema identity attribute.
         categories.push('identity-linked')
@@ -439,7 +388,7 @@ const categorizeRow = (
     }
     if (status === 'deferred') categories.push('deferred')
 
-    const reviewPending = Boolean(enrichedAccount?.attributes?.review?.pending)
+    const reviewPending = readBoolean(readUnknown(readUnknown(enrichedAccount, 'attributes'), 'review'), 'pending', false)
     if (reviewPending) categories.push('review')
 
     if (relatedAccounts.some((accountId: string) => decisionAccountIds.has(accountId))) {
@@ -527,10 +476,10 @@ const emitGroupedRows = async (
 
             const includeReview = row.categories.includes('review') || row.categories.includes('decisions')
             const { sourceContext: sourceStatus, correlationContext: correlationStatus, ...matchingStatus } = matching ?? {}
-            const relatedRaw = row.account.attributes?.accounts
+            const relatedRaw = readUnknown(readUnknown(row.account, 'attributes'), 'accounts')
             const relatedIds = Array.isArray(relatedRaw) ? relatedRaw.map((x) => String(x)) : []
             const reviewStatus = {
-                pendingReviews: Boolean(review?.pending),
+                pendingReviews: readBoolean(review, 'pending', false),
                 hasDecisions: relatedIds.some((id) => decisionAccountIds.has(id)),
             }
             await emitRow({
@@ -555,12 +504,15 @@ const emitGroupedRows = async (
 }
 
 const getEmissionKey = (account: any): string => {
-    const keySimple = account?.key?.simple?.id
+    const keySimple = readPathString(account, ['key', 'simple', 'id'])
     if (keySimple) return String(keySimple)
-    if (account?.key) return String(account.key)
-    if (account?.attributes?.id) return String(account.attributes.id)
-    if (account?.attributes?.originAccount) return String(account.attributes.originAccount)
-    return JSON.stringify(account?.attributes?.accounts ?? [])
+    const key = readUnknown(account, 'key')
+    if (key !== undefined && key !== null) return String(key)
+    const attributeId = readPathString(account, ['attributes', 'id'])
+    if (attributeId) return attributeId
+    const originAccount = readPathString(account, ['attributes', 'originAccount'])
+    if (originAccount) return originAccount
+    return JSON.stringify(readUnknown(readUnknown(account, 'attributes'), 'accounts') ?? [])
 }
 
 export const refreshUniqueAttributesForDryRun = async (
@@ -577,8 +529,8 @@ export const refreshUniqueAttributesForDryRun = async (
     // Note: some unit-test mocks provide fusion.refreshUniqueAttributes() but not fusionAccounts/fusionIdentities getters.
     // Fall back to the legacy call in that case to keep tests and mocks stable.
     const batchSize = serviceRegistry.config?.managedAccountsBatchSize ?? 50
-    const fusionAccounts = (fusion as any).fusionAccounts as FusionAccount[] | undefined
-    const fusionIdentities = (fusion as any).fusionIdentities as Iterable<FusionAccount> | undefined
+    const fusionAccounts = readUnknown(fusion, 'fusionAccounts') as FusionAccount[] | undefined
+    const fusionIdentities = readUnknown(fusion, 'fusionIdentities') as Iterable<FusionAccount> | undefined
     if (Array.isArray(fusionAccounts) && fusionIdentities && Symbol.iterator in Object(fusionIdentities)) {
         const shouldIncludeIdentities = runtimeOptions.includeExisting
         const refreshTargets = shouldIncludeIdentities ? [...fusionAccounts, ...fusionIdentities] : [...fusionAccounts]
@@ -593,8 +545,22 @@ export const refreshUniqueAttributesForDryRun = async (
     // Also refresh analyzed managed accounts that may only exist in fallback mode.
     if (analyzedManagedAccounts.length === 0) return
     const stableAnalyzed = [...analyzedManagedAccounts].sort((a: any, b: any) => {
-        const aKey = String(a?.originAccountId ?? a?.attributes?.originAccount ?? a?.nativeIdentity ?? a?.key ?? a?.name ?? '')
-        const bKey = String(b?.originAccountId ?? b?.attributes?.originAccount ?? b?.nativeIdentity ?? b?.key ?? b?.name ?? '')
+        const aKey = String(
+            readUnknown(a, 'originAccountId') ??
+                readPathString(a, ['attributes', 'originAccount']) ??
+                readUnknown(a, 'nativeIdentity') ??
+                readUnknown(a, 'key') ??
+                readUnknown(a, 'name') ??
+                ''
+        )
+        const bKey = String(
+            readUnknown(b, 'originAccountId') ??
+                readPathString(b, ['attributes', 'originAccount']) ??
+                readUnknown(b, 'nativeIdentity') ??
+                readUnknown(b, 'key') ??
+                readUnknown(b, 'name') ??
+                ''
+        )
         return aKey.localeCompare(bKey)
     })
     for (let i = 0; i < stableAnalyzed.length; i += batchSize) {

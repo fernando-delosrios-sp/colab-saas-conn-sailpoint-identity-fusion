@@ -8,6 +8,7 @@ import {
 } from '../../services/fusionService/types'
 import { FusionDecision } from '../../model/form'
 import { createUrlContext } from '../../utils/url'
+import { readString } from '../../utils/safeRead'
 import { setupPhase, fetchPhase, processPhase } from './corePipeline'
 
 const toReportDecision = (
@@ -36,7 +37,7 @@ const toReportDecision = (
     const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
     const reviewerName = decision.submitter.name || resolveReviewerName?.(decision.submitter.id) || decision.submitter.id
     const selectedIdentityName = decision.identityName || selectedIdentityContext.selectedIdentityName || decision.identityId
-    const correlatedIdentityContext = resolveIdentityContext?.((decision as any).correlatedIdentityId) ?? {}
+    const correlatedIdentityContext = resolveIdentityContext?.(readString(decision, 'correlatedIdentityId')) ?? {}
     const correlatedAccountName = correlatedIdentityContext.selectedIdentityName
 
     const reviewerId = decision.submitter.id

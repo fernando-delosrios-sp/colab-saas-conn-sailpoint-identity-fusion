@@ -14,6 +14,7 @@ import {
     parseManagedAccountKey,
     resolveManagedAccountKey,
 } from './managedAccountKey'
+import { readString } from '../utils/safeRead'
 
 /**
  * Core domain model representing a fusion account in the Identity Fusion connector.
@@ -343,8 +344,8 @@ export class FusionAccount {
         const identityDisplayName = decision.identityName || undefined
         const accountName = account.name || account.id || identityDisplayName || undefined
         const managedAccountKey = buildManagedAccountKey({
-            sourceId: (account as any).sourceId,
-            nativeIdentity: (account as any).nativeIdentity,
+            sourceId: readString(account, 'sourceId'),
+            nativeIdentity: readString(account, 'nativeIdentity'),
         })
         if (!managedAccountKey) {
             throw new ConnectorError(
@@ -1045,7 +1046,7 @@ export class FusionAccount {
             if (sourceNames.includes(account.source?.name ?? '')) {
                 const managedAccountKey = buildManagedAccountKey({
                     sourceId: account.source?.id,
-                    nativeIdentity: (account as any).nativeIdentity,
+                    nativeIdentity: readString(account, 'nativeIdentity'),
                 })
                 if (managedAccountKey) {
                     this.setCorrelatedAccount(managedAccountKey)
@@ -1266,7 +1267,7 @@ export class FusionAccount {
                 ...(account.attributes ?? {}),
                 _id: accountId,
                 source: {
-                    id: String((account as any).sourceId ?? '').trim(),
+                    id: String(readString(account, 'sourceId', '')).trim(),
                     name: account.sourceName ?? '',
                 },
                 schema: {

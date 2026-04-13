@@ -1,6 +1,7 @@
 import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { mkdir, writeFile } from 'fs/promises'
 import * as path from 'path'
+import { readArray, readBoolean, readNumber } from '../utils/safeRead'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { sanitizeRecipients } from '../services/messagingService/email'
 import {
@@ -12,7 +13,6 @@ import { buildEmailReportFromFusionReport, hydrateIdentitiesForReportDecisions }
 import {
     buildStatsForDryRun,
     createDryRunRowEmitter,
-    createSafeSender,
     DryRunRuntimeOptions,
     hostnameSegmentFromBaseurl,
     streamEnrichedOutputRows,
@@ -21,6 +21,7 @@ import {
     refreshUniqueAttributesForDryRun,
 } from './helpers/dryRunHelpers'
 import {
+    CorePipelineOptions,
     setupPhase,
     fetchPhase,
     processPhase,
@@ -32,6 +33,20 @@ const buildDryRunHtmlReportPath = (baseurl: string | undefined): string => {
     const hostSeg = hostnameSegmentFromBaseurl(baseurl)
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
     return path.join(process.cwd(), REPORT_DISK_SUBDIR, `custom-report-${hostSeg}-${stamp}.html`)
+}
+
+const buildDryRunRuntimeOptions = (input: StdAccountListInput): DryRunRuntimeOptions => {
+    return {
+        includeExisting: readBoolean(input, 'includeExisting', false),
+        includeNonMatched: readBoolean(input, 'includeNonMatched', false),
+        includeMatched: readBoolean(input, 'includeMatched', false),
+        includeExact: readBoolean(input, 'includeExact', false),
+        includeDeferred: readBoolean(input, 'includeDeferred', false),
+        includeReview: readBoolean(input, 'includeReview', false),
+        includeDecisions: readBoolean(input, 'includeDecisions', false),
+        writeToDisk: readBoolean(input, 'writeToDisk', false),
+        sendReportTo: sanitizeRecipients(readArray(input, 'sendReportTo', [])),
+    }
 }
 
 /**
@@ -48,7 +63,7 @@ const buildDryRunHtmlReportPath = (baseurl: string | undefined): string => {
 export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, sources, fusion, forms } = serviceRegistry
-    const options = { mode: { kind: 'dry-run' } as const }
+    const options: CorePipelineOptions = { mode: { kind: 'dry-run' } }
 
     try {
         const timer = log.timer()
@@ -57,22 +72,9 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         if (typeof res.keepAlive === 'function') {
             res.keepAlive()
         }
-        const sender = createSafeSender(serviceRegistry)
-        const runtimeOptions: DryRunRuntimeOptions = {
-            includeExisting: typeof (input as any).includeExisting === 'boolean' ? (input as any).includeExisting : false,
-            includeNonMatched:
-                typeof (input as any).includeNonMatched === 'boolean' ? (input as any).includeNonMatched : false,
-            includeMatched: typeof (input as any).includeMatched === 'boolean' ? (input as any).includeMatched : false,
-            includeExact: typeof (input as any).includeExact === 'boolean' ? (input as any).includeExact : false,
-            includeDeferred: typeof (input as any).includeDeferred === 'boolean' ? (input as any).includeDeferred : false,
-            includeReview: typeof (input as any).includeReview === 'boolean' ? (input as any).includeReview : false,
-            includeDecisions:
-                typeof (input as any).includeDecisions === 'boolean' ? (input as any).includeDecisions : false,
-            writeToDisk: typeof (input as any).writeToDisk === 'boolean' ? (input as any).writeToDisk : false,
-            sendReportTo: sanitizeRecipients(Array.isArray((input as any).sendReportTo) ? (input as any).sendReportTo : []),
-        }
+        const runtimeOptions = buildDryRunRuntimeOptions(input)
 
-        const rowEmitter = await createDryRunRowEmitter(serviceRegistry, sender, runtimeOptions)
+        const rowEmitter = await createDryRunRowEmitter(serviceRegistry, runtimeOptions)
 
         const shouldContinue = await setupPhase(serviceRegistry, input.schema, options)
         if (!shouldContinue) return
@@ -87,10 +89,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         const issueSummary = log.getAggregationIssueSummary()
         const fusionCounts = {
             fusionAccountsFound: sources.fusionAccountCount,
-            totalFusionAccounts:
-                typeof (fusion as any).totalFusionAccountCount === 'number'
-                    ? (fusion as any).totalFusionAccountCount
-                    : sources.fusionAccountCount,
+            totalFusionAccounts: readNumber(fusion, 'totalFusionAccountCount', sources.fusionAccountCount),
         }
         const dryRunStats = buildStatsForDryRun(fetchResult, issueSummary, timer.totalElapsed(), fusionCounts)
         const report = fusion.generateReport(true, dryRunStats)
@@ -212,8 +211,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             }
         }
 
-        sender.send(summary)
-        await sender.drain()
+        res.send(summary)
         timer.phase('PHASE 5: Building and sending summary')
 
         fusion.clearAnalyzedAccounts()

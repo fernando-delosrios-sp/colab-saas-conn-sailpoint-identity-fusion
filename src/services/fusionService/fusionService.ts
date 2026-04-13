@@ -25,6 +25,7 @@ import {
 } from './fusionReportHelpers'
 import { AttributeOperations } from '../attributeService/types'
 import { buildManagedAccountKey, getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { readString } from '../../utils/safeRead'
 
 // ============================================================================
 // FusionService Class
@@ -721,7 +722,7 @@ export class FusionService {
                 .map((a) =>
                     buildManagedAccountKey({
                         sourceId: a.source?.id,
-                        nativeIdentity: (a as any).nativeIdentity,
+                        nativeIdentity: readString(a, 'nativeIdentity'),
                     })
                 )
                 .filter((value): value is string => Boolean(value))
@@ -1146,7 +1147,7 @@ export class FusionService {
                 id: accountKey,
                 name: fusionAccount.name ?? account.name ?? '',
                 sourceName: fusionAccount.sourceName,
-                sourceId: (account as any).sourceId,
+                sourceId: readString(account, 'sourceId'),
                 nativeIdentity: account.nativeIdentity ?? undefined,
             },
             newIdentity: false,

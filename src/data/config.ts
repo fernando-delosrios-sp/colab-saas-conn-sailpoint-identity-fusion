@@ -6,6 +6,7 @@ import {
     FUSION_MAX_CANDIDATES_FOR_FORM_MIN,
 } from '../services/formService/constants'
 import { assert, softAssert } from '../utils/assert'
+import { readBoolean } from '../utils/safeRead'
 
 const internalConfig = {
     requestsPerSecondConstant: 100,
@@ -69,7 +70,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
             assert(sourceConfig, 'Source configuration is required')
             assert(sourceConfig.name, 'Source name is required')
             // Backward compatibility: migrate forceAggregation to aggregationMode
-            if ((sourceConfig as any).forceAggregation === true && !sourceConfig.aggregationMode) {
+            if (readBoolean(sourceConfig, 'forceAggregation', false) && !sourceConfig.aggregationMode) {
                 sourceConfig.aggregationMode = 'before'
             }
             // taskResultWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
