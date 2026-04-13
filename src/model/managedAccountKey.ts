@@ -5,7 +5,6 @@ const MANAGED_ACCOUNT_KEY_SEPARATOR = '::'
 type ManagedKeyAccountLike = {
     nativeIdentity?: string | null
     sourceId?: string | null
-    sourceName?: string | null
     source?: {
         id?: string | null
         name?: string | null
@@ -69,7 +68,6 @@ export function getManagedAccountKeyFromAccount(
 ): string | undefined {
     const composite = buildManagedAccountKey({
         sourceId: (account as any).sourceId,
-        sourceName: account.sourceName,
         nativeIdentity: account.nativeIdentity,
     })
     if (composite) return composite

@@ -1,2 +1,3 @@
 export { FusionAccount } from './fusionAccount'
-export type { FusionAttributeBag } from './fusionAccountTypes'
+export { FusionAccountKind } from './fusionAccountTypes'
+export type { FusionAttributeBag, FusionManagedAccountInfo } from './fusionAccountTypes'

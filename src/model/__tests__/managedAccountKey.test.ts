@@ -16,11 +16,7 @@ describe('managedAccountKey helpers', () => {
     })
 
     it('returns undefined when composite fields are missing', () => {
-        expect(
-            buildManagedAccountKey({
-                sourceName: 'HR',
-            })
-        ).toBeUndefined()
+        expect(buildManagedAccountKey({})).toBeUndefined()
     })
 
     it('resolves legacy raw id to composite using lookup', () => {
