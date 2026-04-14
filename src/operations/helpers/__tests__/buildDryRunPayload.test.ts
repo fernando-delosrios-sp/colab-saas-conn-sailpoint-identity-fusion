@@ -4,6 +4,7 @@ import {
     createDryRunOptionEmitCounter,
     enrichISCAccountWithMatching,
 } from '../buildDryRunPayload'
+import { SourceType } from '../../../model/config'
 
 describe('buildDryRunPayload', () => {
     it('enriches account rows with matching payload derived from report accounts', () => {
@@ -12,7 +13,7 @@ describe('buildDryRunPayload', () => {
                 accountId: 'acc-1',
                 accountName: 'Alice HR',
                 accountSource: 'HR',
-                sourceType: 'authoritative',
+                sourceType: SourceType.Authoritative,
                 fusionIdentityComparisons: 1,
                 matches: [{ identityName: 'Alice', identityId: 'id-1', isMatch: true, scores: [] }],
             },
@@ -93,7 +94,7 @@ describe('buildDryRunPayload', () => {
                 accountId: 'acc-deferred-1',
                 accountName: 'Deferred Account',
                 accountSource: 'HR',
-                sourceType: 'authoritative',
+                sourceType: SourceType.Authoritative,
                 deferred: true,
                 fusionIdentityComparisons: 2,
                 matches: [{ identityName: 'Unmatched Candidate', isMatch: true, candidateType: 'new-unmatched', scores: [] }],

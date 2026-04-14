@@ -365,6 +365,13 @@ export interface AdvancedConnectionSettingsSection {
      * Enabled by default when queue is enabled.
      */
     enablePriority?: boolean
+
+    /**
+     * Number of pages to fetch concurrently inside paginateParallel.
+     * Defaults to 10 when unset. When the queue is enabled the effective value is
+     * capped at maxConcurrentRequests so it never exceeds the queue's concurrency budget.
+     */
+    parallelBatchSize?: number
 }
 
 // Proxy Settings Section

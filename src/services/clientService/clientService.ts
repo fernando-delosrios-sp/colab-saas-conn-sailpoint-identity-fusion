@@ -41,6 +41,8 @@ export class ClientService {
     protected readonly enableQueue: boolean
     private readonly pageSize: number
     private readonly requestTimeoutMs?: number
+    /** Number of pages to fetch in parallel inside paginateParallel. */
+    private readonly parallelBatchSize: number
 
     // Lazy-loaded API instances
     private _accountsApi?: AccountsV2025Api
@@ -68,7 +70,12 @@ export class ClientService {
 
         // Only enable retry in axios config if enableRetry is true
         const maxRetries = enableRetry ? (fusionConfig.maxRetries ?? fusionConfig.retriesConstant) : 0
-        const retriesConfig = createRetriesConfig(maxRetries)
+        // When the queue is enabled it acts as the sole retry authority (exponential backoff + jitter
+        // via calculateRetryDelay). Enabling axios-retry at the same time would cause a single failed
+        // request to be retried by axios first and then retried again by the queue after axios
+        // exhausts its own budget — multiplying the effective retry count unexpectedly.
+        const axiosRetries = this.enableQueue && enableRetry ? 0 : maxRetries
+        const retriesConfig = createRetriesConfig(axiosRetries)
 
         // Inject https agent with keepAlive: true to reuse TCP connections
         const agent = new https.Agent({ keepAlive: true })
@@ -100,6 +107,13 @@ export class ClientService {
             const requestsPerSecond = fusionConfig.requestsPerSecond ?? fusionConfig.requestsPerSecondConstant
             const maxConcurrentRequests = fusionConfig.maxConcurrentRequests ?? Math.max(10, requestsPerSecond * 2)
 
+            // parallelBatchSize caps concurrent page fetches in paginateParallel at the
+            // smaller of the explicit config value and maxConcurrentRequests, defaulting to 10.
+            this.parallelBatchSize = Math.min(
+                fusionConfig.parallelBatchSize ?? 10,
+                maxConcurrentRequests
+            )
+
             const queueConfig: QueueConfig = {
                 requestsPerSecond,
                 maxConcurrentRequests,
@@ -115,6 +129,7 @@ export class ClientService {
             )
         } else {
             this.queue = null
+            this.parallelBatchSize = fusionConfig.parallelBatchSize ?? 10
             this.log.info('API client ready (direct calls, no queue, keep-alive: true)')
         }
     }
@@ -272,17 +287,6 @@ export class ClientService {
             const statusText = error?.response?.statusText
             const apiMessage = error?.response?.data?.message || error?.response?.data?.detailCode
             const baseMessage = error instanceof Error ? error.message : String(error)
-            if (context?.includes('SourceService>ensureIdentityAttribute')) {
-                // #region agent log
-                fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:'clientExecute-ensureIdentityAttribute',hypothesisId:'H4',location:'clientService.ts:execute:catch',message:'API error for ensureIdentityAttribute context',data:{context,status:status ?? null,statusText:statusText ?? null,apiMessage:apiMessage ?? null,baseMessage,responseDataType:typeof error?.response?.data,responseData:error?.response?.data ?? null},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
-            }
-            if (context?.includes('SourceService>ensureIdentityProfileMapping')) {
-                // #region agent log
-                fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:'clientExecute-ensureIdentityProfileMapping',hypothesisId:'H7',location:'clientService.ts:execute:catch',message:'API error for ensureIdentityProfileMapping context',data:{context,status:status ?? null,statusText:statusText ?? null,apiMessage:apiMessage ?? null,baseMessage,responseDataType:typeof error?.response?.data,responseData:error?.response?.data ?? null},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
-            }
-
             let errorDetail = baseMessage
             if (status) {
                 errorDetail = `HTTP ${status}${statusText ? ` ${statusText}` : ''}${apiMessage ? ` - ${apiMessage}` : ''}`
@@ -599,7 +603,7 @@ export class ClientService {
         const pageSize = this.pageSize
         const SAILPOINT_LIST_MAX = 250
         const effectivePageSize = Math.min(pageSize, SAILPOINT_LIST_MAX)
-        const batchSize = 10 // Concurrent page requests
+        const batchSize = this.parallelBatchSize // Concurrent page requests (configurable)
 
         // Initial request to get total count
         const initialParams = {
