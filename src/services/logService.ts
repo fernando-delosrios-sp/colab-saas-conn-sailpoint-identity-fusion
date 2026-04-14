@@ -73,10 +73,24 @@ export class PhaseTimer {
         return PhaseTimer.formatElapsed(Date.now() - this.operationStart)
     }
 
-    /** Formats milliseconds as "Xms" (<1s) or "X.Ys" (>=1s). */
+    /**
+     * Formats elapsed milliseconds into a compact human-friendly duration.
+     * Examples: "532ms", "1.2s", "54m 52s", "1h 1m 1s".
+     */
     static formatElapsed(ms: number): string {
         if (ms < 1000) return `${ms}ms`
-        return `${(ms / 1000).toFixed(1)}s`
+        if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+
+        const roundedSeconds = Math.round(ms / 1000)
+        const hours = Math.floor(roundedSeconds / 3600)
+        const minutes = Math.floor((roundedSeconds % 3600) / 60)
+        const seconds = roundedSeconds % 60
+
+        const parts: string[] = []
+        if (hours > 0) parts.push(`${hours}h`)
+        if (minutes > 0) parts.push(`${minutes}m`)
+        parts.push(`${seconds}s`)
+        return parts.join(' ')
     }
 }
 

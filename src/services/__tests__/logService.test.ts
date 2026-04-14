@@ -21,7 +21,7 @@ jest.mock('@sailpoint/connector-sdk', () => {
     }
 })
 
-import { LogService } from '../logService'
+import { LogService, PhaseTimer } from '../logService'
 
 describe('LogService aggregation issue summary', () => {
     beforeEach(() => {
@@ -83,5 +83,18 @@ describe('LogService aggregation issue summary', () => {
         expect(summary.errorCount).toBe(1)
         expect(summary.warningSamples).toEqual(['assert warning'])
         expect(summary.errorSamples).toEqual(['assert error'])
+    })
+})
+
+describe('PhaseTimer.formatElapsed', () => {
+    it('keeps short durations in milliseconds or decimal seconds', () => {
+        expect(PhaseTimer.formatElapsed(532)).toBe('532ms')
+        expect(PhaseTimer.formatElapsed(1200)).toBe('1.2s')
+        expect(PhaseTimer.formatElapsed(59_900)).toBe('59.9s')
+    })
+
+    it('formats long durations using minutes and hours', () => {
+        expect(PhaseTimer.formatElapsed(3_291_700)).toBe('54m 52s')
+        expect(PhaseTimer.formatElapsed(3_661_000)).toBe('1h 1m 1s')
     })
 })
