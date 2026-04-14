@@ -134,19 +134,19 @@ export class FusionAccount {
     /** Attribute keys that can be extracted into collection sets. 'accounts' -> _missingAccountIds. */
     private static readonly COLLECTION_KEYS = ['accounts', 'reviews', 'statuses', 'actions'] as const
 
-    /** Identity-side label: displayName (document or attributes) || name || id. */
+    /** Identity-side label: attributes.displayName || displayName || name || id. */
     private static identityLabelFromIdentity(identity: IdentityDocument): string | undefined {
-        const top = (identity as { displayName?: string }).displayName
         const fromAttrs = (identity.attributes as Record<string, unknown> | undefined)?.displayName as
             | string
             | undefined
-        return top || fromAttrs || identity.name || identity.id || undefined
+        const top = (identity as { displayName?: string }).displayName
+        return fromAttrs || top || identity.name || identity.id || undefined
     }
 
-    /** From an ISC account: identity ref name || account.name; account label is account.name. */
+    /** From an ISC account: identity display label comes from account.identity.name only. */
     private static labelsFromAccount(account: Account): { identityDisplayName?: string; accountName?: string } {
         const identityRefName = (account as { identity?: { name?: string } }).identity?.name
-        const identityDisplayName = identityRefName || account.name || undefined
+        const identityDisplayName = identityRefName || undefined
         const accountName = account.name || undefined
         return { identityDisplayName, accountName }
     }

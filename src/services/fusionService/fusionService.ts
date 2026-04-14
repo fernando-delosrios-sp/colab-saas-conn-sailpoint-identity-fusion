@@ -709,8 +709,11 @@ export class FusionService {
             this.attributes.mapAttributes(fusionAccount)
             await this.attributes.refreshNormalAttributes(fusionAccount)
 
-            // Set display attribute using the attributes getter
-            fusionAccount.attributes[fusionDisplayAttribute] = identity.name
+            // Keep fusion display aligned with identity label precedence.
+            const identityDisplayName =
+                String((identity.attributes as Record<string, unknown> | undefined)?.displayName ?? '').trim() ||
+                identity.name
+            fusionAccount.attributes[fusionDisplayAttribute] = identityDisplayName
 
             // Key generation deferred until getISCAccount
             this.setFusionAccount(fusionAccount)
@@ -988,6 +991,7 @@ export class FusionService {
     public async processManagedAccounts(): Promise<void> {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
+        const processManagedAccountsStartedAt = Date.now()
         this.newManagedAccountsCount = map.size
         this.currentRunUnmatchedFusionNativeIdentities.clear()
         this.autoAssignedIdentityIds.clear()
@@ -1015,6 +1019,11 @@ export class FusionService {
             }
         }
         this.log.info('Managed accounts processing completed')
+        this.log.info(
+            `Performance metric: FusionService.processManagedAccounts durationMs=${
+                Date.now() - processManagedAccountsStartedAt
+            } processed=${processed} remaining=${map.size}`
+        )
     }
 
     /**
@@ -1236,6 +1245,7 @@ export class FusionService {
     public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
+        const analyzeUncorrelatedStartedAt = Date.now()
         const results: FusionAccount[] = []
         let processed = 0
         const yieldEveryManaged = this.managedAccountEventLoopYieldEvery()
@@ -1256,6 +1266,11 @@ export class FusionService {
                 await yieldToEventLoop()
             }
         }
+        this.log.info(
+            `Performance metric: FusionService.analyzeUncorrelatedAccounts durationMs=${
+                Date.now() - analyzeUncorrelatedStartedAt
+            } analyzed=${results.length}`
+        )
         return results
     }
 
@@ -1489,24 +1504,36 @@ export class FusionService {
      */
     public async forEachISCAccount(send: (account: StdAccountListOutput) => void): Promise<number> {
         const shouldFilter = this.deleteEmpty
+        const batchSize = this.fusionParallelBatchSize()
+        const forEachStartedAt = Date.now()
         let count = 0
+        const eligibleAccounts: FusionAccount[] = []
 
         for (const account of this.fusionAccountMap.values()) {
             if (shouldFilter && account.isOrphan()) continue
-            const output = await this.getISCAccount(account, false)
-            if (output) {
-                send(output)
-                count++
-            }
+            eligibleAccounts.push(account)
         }
         for (const identity of this.fusionIdentityMap.values()) {
             if (shouldFilter && identity.isOrphan()) continue
-            const output = await this.getISCAccount(identity, false)
-            if (output) {
-                send(output)
-                count++
-            }
+            eligibleAccounts.push(identity)
         }
+
+        for (let i = 0; i < eligibleAccounts.length; i += batchSize) {
+            const batch = eligibleAccounts.slice(i, i + batchSize)
+            const outputBatch = await Promise.all(batch.map((account) => this.getISCAccount(account, false)))
+            for (const output of outputBatch) {
+                if (output) {
+                    send(output)
+                    count++
+                }
+            }
+            await yieldToEventLoop()
+        }
+        this.log.info(
+            `Performance metric: FusionService.forEachISCAccount durationMs=${
+                Date.now() - forEachStartedAt
+            } eligible=${eligibleAccounts.length} sent=${count} batchSize=${batchSize}`
+        )
         return count
     }
 

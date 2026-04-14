@@ -21,6 +21,12 @@ describe('formService helpers', () => {
             expect(label).toBe('From Index')
         })
 
+        it('falls back to identity document name when displayName is missing', () => {
+            const doc = { name: 'identity.name fallback' } as any
+            const label = resolveIdentitiesSelectLabel({}, 'id-4', doc)
+            expect(label).toBe('identity.name fallback')
+        })
+
         it('falls back to identity id when displayName is missing everywhere', () => {
             const label = resolveIdentitiesSelectLabel({}, 'fallback-id')
             expect(label).toBe('fallback-id')

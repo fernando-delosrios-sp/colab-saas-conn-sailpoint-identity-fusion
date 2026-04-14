@@ -219,7 +219,12 @@ export const streamEnrichedOutputRows = async (
     runtimeOptions: DryRunRuntimeOptions
 ): Promise<number> => {
     const { fusion } = serviceRegistry
-    const enrichedRows: Array<{ account: any; status: MatchingStatus }> = []
+    const selectedCategories = buildSelectedCategories(runtimeOptions)
+    if (selectedCategories.size === 0) {
+        return 0
+    }
+    const groupedRows = createGroupedRows()
+    const fusionIdentityAttribute = serviceRegistry.schemas.fusionIdentityAttribute ?? 'id'
 
     await fusion.forEachISCAccount((account) => {
         addCoveredManagedAccountIds(account, coveredManagedAccountIds)
@@ -229,20 +234,22 @@ export const streamEnrichedOutputRows = async (
             pendingReviewByAccountId,
             serviceRegistry.config?.baseurl
         )
-        enrichedRows.push(enriched)
+        addEnrichedRowToGroups(
+            enriched,
+            decisionAccountIds,
+            selectedCategories,
+            groupedRows,
+            emittedRowKeys,
+            fusionIdentityAttribute,
+            true
+        )
     })
 
-    const fusionIdentityAttribute = serviceRegistry.schemas.fusionIdentityAttribute ?? 'id'
-
     return await emitGroupedRows(
-        enrichedRows,
-        decisionAccountIds,
-        emittedRowKeys,
+        groupedRows,
         optionEmitCounter,
         rowEmitter.emitRow,
-        runtimeOptions,
-        fusionIdentityAttribute,
-        true
+        decisionAccountIds
     )
 }
 
@@ -260,8 +267,12 @@ export const streamUncorrelatedAnalyzedRows = async (
     runtimeOptions: DryRunRuntimeOptions
 ): Promise<number> => {
     const { log, fusion } = serviceRegistry
-
-    const enrichedRows: Array<{ account: any; status: MatchingStatus }> = []
+    const selectedCategories = buildSelectedCategories(runtimeOptions)
+    if (selectedCategories.size === 0) {
+        return 0
+    }
+    const groupedRows = createGroupedRows()
+    const fusionIdentityAttribute = serviceRegistry.schemas.fusionIdentityAttribute ?? 'id'
     for (const analyzedAccount of analyzedUncorrelatedAccounts) {
         const output = await fusion.getISCAccount(analyzedAccount, false)
         if (!output) continue
@@ -273,20 +284,22 @@ export const streamUncorrelatedAnalyzedRows = async (
             pendingReviewByAccountId,
             serviceRegistry.config?.baseurl
         )
-        enrichedRows.push(enriched)
+        addEnrichedRowToGroups(
+            enriched,
+            decisionAccountIds,
+            selectedCategories,
+            groupedRows,
+            emittedRowKeys,
+            fusionIdentityAttribute,
+            false
+        )
     }
 
-    const fusionIdentityAttribute = serviceRegistry.schemas.fusionIdentityAttribute ?? 'id'
-
     const emittedRows = await emitGroupedRows(
-        enrichedRows,
-        decisionAccountIds,
-        emittedRowKeys,
+        groupedRows,
         optionEmitCounter,
         rowEmitter.emitRow,
-        runtimeOptions,
-        fusionIdentityAttribute,
-        false
+        decisionAccountIds
     )
     const totalSentRows = sentRows + emittedRows
     log.info(`Uncorrelated managed account streaming emitted ${totalSentRows} row(s)`)
@@ -310,6 +323,11 @@ export const streamOrphanDeferredReportRows = async (
     rowEmitter: DryRunRowEmitter,
     runtimeOptions: DryRunRuntimeOptions
 ): Promise<number> => {
+    const selectedCategories = buildSelectedCategories(runtimeOptions)
+    if (selectedCategories.size === 0) {
+        return 0
+    }
+    const groupedRows = createGroupedRows()
     const stubs: StdAccountListOutput[] = []
     for (const ra of reportAccounts) {
         if (!ra.deferred || !ra.accountId || ra.matches.length === 0) continue
@@ -320,20 +338,25 @@ export const streamOrphanDeferredReportRows = async (
         return 0
     }
 
-    const enrichedRows = stubs.map((stub) =>
-        enrichISCAccountWithMatching(stub, reportIndex, pendingReviewByAccountId, serviceRegistry.config?.baseurl)
-    )
     const fusionIdentityAttribute = serviceRegistry.schemas.fusionIdentityAttribute ?? 'id'
+    for (const stub of stubs) {
+        const enriched = enrichISCAccountWithMatching(stub, reportIndex, pendingReviewByAccountId, serviceRegistry.config?.baseurl)
+        addEnrichedRowToGroups(
+            enriched,
+            decisionAccountIds,
+            selectedCategories,
+            groupedRows,
+            emittedRowKeys,
+            fusionIdentityAttribute,
+            false
+        )
+    }
 
     return await emitGroupedRows(
-        enrichedRows,
-        decisionAccountIds,
-        emittedRowKeys,
+        groupedRows,
         optionEmitCounter,
         rowEmitter.emitRow,
-        runtimeOptions,
-        fusionIdentityAttribute,
-        false
+        decisionAccountIds
     )
 }
 
@@ -350,6 +373,7 @@ const CATEGORY_ORDER = [
     'existing-fusion',
 ] as const
 type ReportCategory = (typeof CATEGORY_ORDER)[number]
+type GroupedRow = { account: any; status: MatchingStatus; categories: ReportCategory[] }
 
 /** Non-empty value for the fusion schema identity attribute (e.g. correlated ISC identity id). */
 const fusionIdentityAttributeValue = (attributes: any, attributeName: string): string => {
@@ -428,56 +452,11 @@ function bumpOptionEmitCountsForRow(
 }
 
 const emitGroupedRows = async (
-    enrichedRows: Array<{ account: any; status: MatchingStatus }>,
-    decisionAccountIds: Set<string>,
-    emittedKeys: Set<string>,
+    groupedRows: Map<ReportCategory, GroupedRow[]>,
     optionEmitCounter: DryRunOptionEmitCounter,
     emitRow: (payload: Record<string, unknown>) => Promise<void>,
-    runtimeOptions: DryRunRuntimeOptions,
-    fusionIdentityAttribute: string,
-    tagFusionSourceListingRows: boolean
+    decisionAccountIds: Set<string>
 ): Promise<number> => {
-    const selectedCategories = new Set<ReportCategory>()
-    if (runtimeOptions.includeExisting) {
-        selectedCategories.add('existing-fusion')
-    }
-    if (runtimeOptions.includeNonMatched) selectedCategories.add('nonMatched')
-    if (runtimeOptions.includeMatched) selectedCategories.add('matched')
-    if (runtimeOptions.includeExact) selectedCategories.add('exact')
-    if (runtimeOptions.includeDeferred) selectedCategories.add('deferred')
-    if (runtimeOptions.includeReview) selectedCategories.add('review')
-    if (runtimeOptions.includeDecisions) selectedCategories.add('decisions')
-
-    if (selectedCategories.size === 0) {
-        return 0
-    }
-
-    const groupedRows = new Map<
-        ReportCategory,
-        Array<{ account: any; status: MatchingStatus; categories: ReportCategory[] }>
-    >()
-    for (const category of CATEGORY_ORDER) groupedRows.set(category, [])
-    for (const enriched of enrichedRows) {
-        let rowCategories = categorizeRow(
-            enriched.account,
-            enriched.status,
-            decisionAccountIds,
-            fusionIdentityAttribute
-        )
-        if (tagFusionSourceListingRows) {
-            rowCategories = [...rowCategories, 'existing-fusion']
-        }
-        rowCategories = rowCategories.filter((category) => selectedCategories.has(category))
-        if (rowCategories.length === 0) continue
-
-        const firstCategory = rowCategories[0]
-        const key = getEmissionKey(enriched.account)
-        if (emittedKeys.has(key)) continue
-
-        groupedRows.get(firstCategory)?.push({ ...enriched, categories: rowCategories })
-        emittedKeys.add(key)
-    }
-
     let emittedRows = 0
     for (const category of CATEGORY_ORDER) {
         const rows = groupedRows.get(category) ?? []
@@ -486,11 +465,7 @@ const emitGroupedRows = async (
             const { matching, review, ...cleanAttributes } = attributes
 
             const includeReview = row.categories.includes('review') || row.categories.includes('decisions')
-            const {
-                sourceContext: sourceStatus,
-                correlationContext: correlationStatus,
-                ...matchingStatus
-            } = matching ?? {}
+            const { sourceContext: sourceStatus, correlationContext: correlationStatus, ...matchingStatus } = matching ?? {}
             const relatedRaw = readUnknown(readUnknown(row.account, 'attributes'), 'accounts')
             const relatedIds = Array.isArray(relatedRaw) ? relatedRaw.map((x) => String(x)) : []
             const reviewStatus = {
@@ -514,8 +489,51 @@ const emitGroupedRows = async (
             emittedRows += 1
         }
     }
-
     return emittedRows
+}
+
+const buildSelectedCategories = (runtimeOptions: DryRunRuntimeOptions): Set<ReportCategory> => {
+    const selectedCategories = new Set<ReportCategory>()
+    if (runtimeOptions.includeExisting) {
+        selectedCategories.add('existing-fusion')
+    }
+    if (runtimeOptions.includeNonMatched) selectedCategories.add('nonMatched')
+    if (runtimeOptions.includeMatched) selectedCategories.add('matched')
+    if (runtimeOptions.includeExact) selectedCategories.add('exact')
+    if (runtimeOptions.includeDeferred) selectedCategories.add('deferred')
+    if (runtimeOptions.includeReview) selectedCategories.add('review')
+    if (runtimeOptions.includeDecisions) selectedCategories.add('decisions')
+    return selectedCategories
+}
+
+const createGroupedRows = (): Map<ReportCategory, GroupedRow[]> => {
+    const groupedRows = new Map<ReportCategory, GroupedRow[]>()
+    for (const category of CATEGORY_ORDER) groupedRows.set(category, [])
+    return groupedRows
+}
+
+const addEnrichedRowToGroups = (
+    enriched: { account: any; status: MatchingStatus },
+    decisionAccountIds: Set<string>,
+    selectedCategories: Set<ReportCategory>,
+    groupedRows: Map<ReportCategory, GroupedRow[]>,
+    emittedKeys: Set<string>,
+    fusionIdentityAttribute: string,
+    tagFusionSourceListingRows: boolean
+): void => {
+    let rowCategories = categorizeRow(enriched.account, enriched.status, decisionAccountIds, fusionIdentityAttribute)
+    if (tagFusionSourceListingRows) {
+        rowCategories = [...rowCategories, 'existing-fusion']
+    }
+    rowCategories = rowCategories.filter((category) => selectedCategories.has(category))
+    if (rowCategories.length === 0) return
+
+    const firstCategory = rowCategories[0]
+    const key = getEmissionKey(enriched.account)
+    if (emittedKeys.has(key)) return
+
+    groupedRows.get(firstCategory)?.push({ ...enriched, categories: rowCategories })
+    emittedKeys.add(key)
 }
 
 const getEmissionKey = (account: any): string => {

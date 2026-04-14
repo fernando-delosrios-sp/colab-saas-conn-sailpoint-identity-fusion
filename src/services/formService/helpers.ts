@@ -28,9 +28,12 @@ export const resolveIdentitiesSelectLabel = (
     const fromFusion = String(fusionAttributes?.displayName ?? '').trim()
     if (fromFusion) return fromFusion
 
+    const fromIdentityName = String(identityDocument?.name ?? '').trim()
+    if (fromIdentityName) return fromIdentityName
+
     logger.error(
         `[formBuilder] Candidate identity ${identityId} has no attributes.displayName for identities SELECT; ` +
-            `form conditions may not match the dropdown. Using identityId as last-resort label.`
+            `form conditions may not match the dropdown. Using identity.name (or identityId) as fallback label.`
     )
     return identityId
 }

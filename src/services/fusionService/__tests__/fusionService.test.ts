@@ -285,7 +285,22 @@ describe('FusionService', () => {
             expect((fusionAccount.attributeBag.identity as any)?.name).toBeUndefined()
         })
 
-        it('prefers Identity document name when identity layer is applied', () => {
+        it('does not derive identity display label from account.name when identity reference is absent', () => {
+            const prior = {
+                nativeIdentity: 'fusion-identity-no-ref',
+                name: 'Managed Account Name',
+                attributes: {
+                    id: 'fusion-identity-no-ref',
+                },
+            } as unknown as Account
+
+            const fusionAccount = FusionAccount.fromFusionAccount(prior)
+
+            expect(fusionAccount.displayName).toBe('Managed Account Name')
+            expect(fusionAccount.identityDisplayName).toBeUndefined()
+        })
+
+        it('prefers Identity attributes.displayName when identity layer is applied', () => {
             const prior = {
                 nativeIdentity: 'fusion-identity-2',
                 name: '',
@@ -304,12 +319,14 @@ describe('FusionService', () => {
             const identityDoc = {
                 id: 'identity-xyz',
                 name: 'Authoritative Identity Name',
-                attributes: {},
+                attributes: {
+                    displayName: 'Authoritative Display Name',
+                },
             } as unknown as IdentityDocument
 
             fusionAccount.addIdentityLayer(identityDoc)
 
-            expect(fusionAccount.name).toBe('Authoritative Identity Name')
+            expect(fusionAccount.name).toBe('Authoritative Display Name')
         })
     })
 
@@ -366,6 +383,24 @@ describe('FusionService', () => {
             expect(result).toBeDefined()
             expect(result?.history).toEqual(expect.arrayContaining([expect.stringContaining('Set Jane Doe [Identities] as baseline')]))
             expect(result?.history.some((entry) => entry.includes('Set identity-12345 [Identities] as baseline'))).toBe(false)
+        })
+
+        it('sets fusion display attribute from identity attributes.displayName when present', async () => {
+            const mockIdentity = {
+                id: 'identity-display-1',
+                name: 'Jane Doe',
+                attributes: {
+                    displayName: 'Jane Q. Doe',
+                },
+            } as unknown as IdentityDocument
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const result = await fusionService.processIdentity(mockIdentity)
+
+            expect(result).toBeDefined()
+            expect(result?.attributes.displayName).toBe('Jane Q. Doe')
         })
 
         it('should skip existing identities', async () => {
@@ -1904,6 +1939,45 @@ describe('FusionService', () => {
                     h.includes('Set Unknown account [Unknown source] as authorized by Unknown reviewer')
                 )
             ).toBe(true)
+        })
+    })
+
+    describe('forEachISCAccount performance behavior', () => {
+        it('uses bounded concurrency while preserving output order', async () => {
+            const sentKeys: string[] = []
+            const accounts = Array.from({ length: 28 }, (_, i) =>
+                FusionAccount.fromManagedAccount({
+                    id: `acct-${i}`,
+                    name: `Account ${i}`,
+                    sourceId: 'src-1',
+                    nativeIdentity: `native-${i}`,
+                    sourceName: 'Source 1',
+                    attributes: {},
+                } as Account)
+            )
+
+            for (const account of accounts) {
+                fusionService.setFusionAccount(account)
+            }
+
+            let inFlight = 0
+            let maxInFlight = 0
+            jest.spyOn(fusionService as any, 'getISCAccount').mockImplementation(async (...args: any[]) => {
+                const account = args[0] as FusionAccount
+                inFlight += 1
+                maxInFlight = Math.max(maxInFlight, inFlight)
+                await new Promise((resolve) => setTimeout(resolve, 1))
+                inFlight -= 1
+                return { key: account.nativeIdentity, attributes: {}, disabled: false }
+            })
+
+            const count = await fusionService.forEachISCAccount((account) => {
+                sentKeys.push(String(account.key))
+            })
+
+            expect(count).toBe(accounts.length)
+            expect(maxInFlight).toBeLessThanOrEqual(12)
+            expect(sentKeys).toEqual(accounts.map((x) => x.nativeIdentity))
         })
     })
 })

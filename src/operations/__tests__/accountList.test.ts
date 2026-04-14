@@ -5,8 +5,8 @@ import { AggregationScenario } from './fixtures/scenarioTypes'
 import { createBaseOperationRegistry, SourceConfigLike } from './harness/mockRegistry'
 
 function createMockRegistry(sourceConfigs: SourceConfigLike[]) {
-    const { registry, schemas, sources } = createBaseOperationRegistry(sourceConfigs)
-    return { registry, schemas, sources }
+    const { registry, schemas, sources, identities, fusion } = createBaseOperationRegistry(sourceConfigs)
+    return { registry, schemas, sources, identities, fusion }
 }
 
 function createTwoPassRegistry(scenario: AggregationScenario) {
@@ -140,6 +140,31 @@ describe('accountList setup phase', () => {
 
         expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledTimes(2)
         expect(maxInFlight).toBe(1)
+    })
+
+    it('hydrates missing global owners with bounded concurrency', async () => {
+        const { registry, sources, identities, fusion } = createMockRegistry([])
+        const input = { schema: { attributes: [] } } as any
+
+        ;(fusion as any).fusionOwnerIsGlobalReviewer = true
+        const globalOwnerIds = Array.from({ length: 61 }, (_, i) => `identity-${i + 1}`)
+        ;(sources as any).fetchGlobalOwnerIdentityIds = jest.fn().mockResolvedValue(globalOwnerIds)
+        identities.getIdentityById.mockReturnValue(undefined)
+
+        let inFlight = 0
+        let maxInFlight = 0
+        identities.fetchIdentityById.mockImplementation(async () => {
+            inFlight += 1
+            maxInFlight = Math.max(maxInFlight, inFlight)
+            await new Promise((resolve) => setTimeout(resolve, 1))
+            inFlight -= 1
+        })
+
+        await accountList(registry, input)
+
+        expect((sources as any).fetchGlobalOwnerIdentityIds).toHaveBeenCalledTimes(1)
+        expect(identities.fetchIdentityById).toHaveBeenCalledTimes(globalOwnerIds.length)
+        expect(maxInFlight).toBeLessThanOrEqual(25)
     })
 
     it('schedules delayed aggregation via workflow callback path', async () => {

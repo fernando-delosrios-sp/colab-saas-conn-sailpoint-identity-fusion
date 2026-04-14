@@ -1,6 +1,7 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
+import { promiseAllBatched } from '../../services/fusionService/collections'
 
 export type PipelineMode =
     | { kind: 'aggregation' } // full persistent run — accountList (includes optional aggregation report)
@@ -17,6 +18,8 @@ export interface FetchResult {
     managedAccountsFoundRecord: number
     managedAccountsFoundOrphan: number
 }
+
+const GLOBAL_OWNER_FETCH_BATCH_SIZE = 25
 
 async function applyPersistentFusionReset(serviceRegistry: ServiceRegistry): Promise<void> {
     const { forms, fusion, sources } = serviceRegistry
@@ -71,7 +74,10 @@ export async function setupPhase(
         sources.clearReverseCorrelationReadinessCache()
         const reverseCorrelationSources = config.sources.filter((sc) => sc.correlationMode === 'reverse')
         if (reverseCorrelationSources.length > 0) {
+            const reverseCorrelationStartedAt = Date.now()
             const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
+            // Reverse-correlation setup mutates shared connector/source state and is kept serial
+            // to preserve deterministic ordering and avoid cross-source readiness races.
             for (const sc of reverseCorrelationSources) {
                 try {
                     await sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
@@ -87,9 +93,16 @@ export async function setupPhase(
             await schemas.setFusionAccountSchema(undefined)
             log.debug('Fusion account schema refreshed after reverse correlation setup')
             log.info(`Reverse correlation setup completed for ${reverseCorrelationSources.length} source(s)`)
+            log.info(
+                `Performance metric: reverseCorrelationSetup durationMs=${Date.now() - reverseCorrelationStartedAt} sources=${reverseCorrelationSources.length}`
+            )
         }
+        const aggregateManagedSourcesStartedAt = Date.now()
         await sources.aggregateManagedSources()
         log.info('Managed sources aggregated')
+        log.info(
+            `Performance metric: aggregateManagedSources durationMs=${Date.now() - aggregateManagedSourcesStartedAt} sources=${sources.managedSources.length}`
+        )
     }
 
     await attributes.initializeCounters()
@@ -117,16 +130,31 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
         fetchTasks.push(messaging.fetchDelayedAggregationSender())
     }
 
+    const fetchAllStartedAt = Date.now()
     await Promise.all(fetchTasks)
+    log.info(`Performance metric: fetchPhase.parallelFetch durationMs=${Date.now() - fetchAllStartedAt} taskCount=${fetchTasks.length}`)
 
     // Form instance processing must run after managed accounts are loaded
     log.info('Processing fetched form data')
+    const processFormDataStartedAt = Date.now()
     await forms.processFetchedFormData()
+    log.info(`Performance metric: fetchPhase.processFormData durationMs=${Date.now() - processFormDataStartedAt}`)
 
     if (fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer) {
+        const globalOwnerFetchStartedAt = Date.now()
         const globalOwnerIds = await sources.fetchGlobalOwnerIdentityIds()
-        await Promise.all(
-            globalOwnerIds.filter((id) => !identities.getIdentityById(id)).map((id) => identities.fetchIdentityById(id))
+        const missingGlobalOwnerIds = globalOwnerIds.filter((id) => !identities.getIdentityById(id))
+        await promiseAllBatched(
+            missingGlobalOwnerIds,
+            async (id) => {
+                await identities.fetchIdentityById(id)
+            },
+            GLOBAL_OWNER_FETCH_BATCH_SIZE
+        )
+        log.info(
+            `Performance metric: fetchPhase.globalOwnerHydration durationMs=${
+                Date.now() - globalOwnerFetchStartedAt
+            } totalIds=${globalOwnerIds.length} fetchedIds=${missingGlobalOwnerIds.length} batchSize=${GLOBAL_OWNER_FETCH_BATCH_SIZE}`
         )
     }
 
@@ -165,19 +193,27 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
     const isPersistent = options.mode.kind === 'aggregation'
 
     log.info('Processing existing fusion accounts')
+    const processFusionAccountsStartedAt = Date.now()
     await fusion.processFusionAccounts()
+    log.info(`Performance metric: processPhase.fusionAccounts durationMs=${Date.now() - processFusionAccountsStartedAt}`)
 
     log.info('Processing identities')
+    const processIdentitiesStartedAt = Date.now()
     await fusion.processIdentities()
+    log.info(`Performance metric: processPhase.identities durationMs=${Date.now() - processIdentitiesStartedAt}`)
 
     log.info('Processing fusion identity decisions (new identity)')
+    const processDecisionsStartedAt = Date.now()
     await fusion.processFusionIdentityDecisions()
+    log.info(`Performance metric: processPhase.fusionDecisions durationMs=${Date.now() - processDecisionsStartedAt}`)
 
     identities.clear()
     log.info('Identities cache cleared from memory')
 
     log.info('Processing managed accounts (Match)')
+    const processManagedAccountsStartedAt = Date.now()
     await fusion.processManagedAccounts()
+    log.info(`Performance metric: processPhase.managedAccounts durationMs=${Date.now() - processManagedAccountsStartedAt}`)
 
     if (isPersistent) {
         log.info('Waiting for pending disable operations')
@@ -240,13 +276,21 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     let count = 0
     if (isPersistent) {
         log.info('Sending accounts to platform')
+        const sendAccountsStartedAt = Date.now()
         count = await fusion.forEachISCAccount((account) => res.send(account))
         log.info(`Sent ${count} account(s) to platform`)
+        log.info(`Performance metric: outputPhase.sendAccounts durationMs=${Date.now() - sendAccountsStartedAt} count=${count}`)
 
+        const saveAttributesStartedAt = Date.now()
         await attributes.saveState()
         log.info('Attribute state saved')
+        log.info(`Performance metric: outputPhase.saveAttributeState durationMs=${Date.now() - saveAttributesStartedAt}`)
+        const saveCumulativeCountStartedAt = Date.now()
         await sources.saveBatchCumulativeCount()
         log.info('Batch cumulative count saved')
+        log.info(
+            `Performance metric: outputPhase.saveBatchCumulativeCount durationMs=${Date.now() - saveCumulativeCountStartedAt}`
+        )
     }
 
     sources.clearFusionAccounts()
