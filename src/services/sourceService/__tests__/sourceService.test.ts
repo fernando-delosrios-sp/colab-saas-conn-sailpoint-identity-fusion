@@ -161,14 +161,14 @@ describe('SourceService reverse correlation setup hardening', () => {
             id: 'fusion-source-id',
             name: 'Fusion Source',
             isManaged: false,
-            sourceType: 'authoritative',
+            sourceType: SourceType.Authoritative,
             config: undefined,
         })
         ;(service as any).sourcesByName.set('HR Source', {
             id: 'managed-source-id',
             name: 'HR Source',
             isManaged: true,
-            sourceType: 'authoritative',
+            sourceType: SourceType.Authoritative,
             config: {
                 name: 'HR Source',
                 correlationMode: 'reverse',
@@ -219,7 +219,7 @@ describe('SourceService reverse correlation setup hardening', () => {
             id: 'managed-source-id',
             name: 'HR Source',
             isManaged: true,
-            sourceType: 'authoritative',
+            sourceType: SourceType.Authoritative,
             config: {
                 name: 'HR Source',
                 correlationMode: 'reverse',
@@ -263,7 +263,7 @@ describe('SourceService reverse correlation setup hardening', () => {
                 id: 'fusion-source-id',
                 name: 'Fusion Source',
                 isManaged: false,
-                sourceType: 'authoritative',
+                sourceType: SourceType.Authoritative,
                 config: undefined,
             })
             const hrConfig = {
@@ -312,7 +312,7 @@ describe('SourceService authoritative reverse correlation identity profile mappi
             id: 'fusion-source-id',
             name: 'Fusion Source',
             isManaged: false,
-            sourceType: 'authoritative',
+            sourceType: SourceType.Authoritative,
             config: undefined,
         }
         const managedSource = (service as any).sourcesByName.get('HR Source')
@@ -345,7 +345,7 @@ describe('SourceService authoritative reverse correlation identity profile mappi
 
         await (service as any).ensureIdentityProfileMapping('reverseNativeIdentity', {
             name: 'HR Source',
-            sourceType: 'authoritative',
+            sourceType: SourceType.Authoritative,
         } as any)
 
         expect(client.identityProfilesApi.updateIdentityProfile).not.toHaveBeenCalled()
@@ -361,7 +361,7 @@ describe('SourceService authoritative reverse correlation identity profile mappi
             id: 'fusion-source-id',
             name: 'Fusion Source',
             isManaged: false,
-            sourceType: 'authoritative',
+            sourceType: SourceType.Authoritative,
             config: undefined,
         }
         const managedSource = (service as any).sourcesByName.get('HR Source')
@@ -385,7 +385,7 @@ describe('SourceService authoritative reverse correlation identity profile mappi
 
         await (service as any).ensureIdentityProfileMapping('reverseNativeIdentity', {
             name: 'HR Source',
-            sourceType: 'authoritative',
+            sourceType: SourceType.Authoritative,
         } as any)
 
         expect(client.identityProfilesApi.updateIdentityProfile).toHaveBeenCalledTimes(1)

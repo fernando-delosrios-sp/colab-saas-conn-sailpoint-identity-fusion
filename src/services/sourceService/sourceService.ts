@@ -586,12 +586,16 @@ export class SourceService {
     }
 
     /**
-     * Fetch and cache fusion accounts
+     * Fetch and cache fusion accounts.
+     * Uses parallel pagination (paginateParallel) for faster loading on large tenants.
      */
     public async fetchFusionAccounts(): Promise<void> {
         this.log.debug('Fetching fusion accounts')
         await wrapConnectorError(async () => {
-            const accounts = await this.fetchAccountsBySourceId(this.fusionSourceId)
+            const accounts: Account[] = []
+            for await (const batch of this.fetchAccountsBySourceIdGenerator(this.fusionSourceId)) {
+                accounts.push(...batch)
+            }
             this.fusionAccountsByNativeIdentity = new Map(accounts.map((account) => [account.nativeIdentity!, account]))
             this.log.debug(`Fetched ${this.fusionAccountsByNativeIdentity.size} fusion account(s)`)
         }, 'Failed to fetch fusion accounts from the fusion source')

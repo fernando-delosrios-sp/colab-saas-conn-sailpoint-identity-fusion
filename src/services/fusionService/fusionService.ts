@@ -123,9 +123,14 @@ export class FusionService {
         return Math.max(1, Math.min(this.managedAccountsBatchSize, 12))
     }
 
-    /** Yield at most this often while draining the managed-account queue (in addition to per-phase yields). */
+    /**
+     * Yield at most this often while draining the managed-account queue (in addition to per-phase yields).
+     * ScoringService already yields every 100 identity comparisons, so the outer loop does not need to
+     * yield as frequently. 25 accounts per outer yield reduces setImmediate overhead without sacrificing
+     * event-loop responsiveness for the SDK keep-alive and logger flush paths.
+     */
     private managedAccountEventLoopYieldEvery(): number {
-        return Math.max(1, Math.min(this.managedAccountsBatchSize, 10))
+        return Math.max(1, Math.min(this.managedAccountsBatchSize, 25))
     }
 
     /**

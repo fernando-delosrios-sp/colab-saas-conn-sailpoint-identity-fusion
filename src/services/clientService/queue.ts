@@ -3,12 +3,24 @@ import { QueueItem, QueueStats, QueueConfig, QueuePriority } from './types'
 import { shouldRetry, calculateRetryDelay } from './helpers'
 import { MAX_STATS_SAMPLES, QUEUE_PROCESSING_INTERVAL_MS } from './constants'
 
+/** Ordered list of priorities from highest to lowest, used when dequeueing. */
+const PRIORITY_ORDER = [QueuePriority.HIGH, QueuePriority.MEDIUM, QueuePriority.LOW] as const
+
 /**
  * Advanced API call queue manager with throttling, retry, and concurrency control.
  * Note: Pagination is handled at the ClientService level, not in the queue.
+ *
+ * Priority is implemented via separate sub-queues (one per level) rather than a
+ * single sorted array. This gives O(1) insertion and O(1) dequeue regardless of
+ * queue depth, avoiding the O(n) findIndex + splice that a sorted array requires.
  */
 export class ApiQueue {
-    private queue: QueueItem[] = []
+    /** Per-priority FIFO queues. Insertion and dequeue are both O(1). */
+    private queues: Map<QueuePriority, QueueItem[]> = new Map([
+        [QueuePriority.HIGH, []],
+        [QueuePriority.MEDIUM, []],
+        [QueuePriority.LOW, []],
+    ])
     private activeRequests: number = 0
     private processing: boolean = false
     private stats: QueueStats = {
@@ -28,6 +40,35 @@ export class ApiQueue {
     constructor(private config: QueueConfig) {
         this.minRequestInterval = 1000 / config.requestsPerSecond
         this.startProcessing()
+    }
+
+    /**
+     * Total number of items waiting across all priority sub-queues.
+     */
+    private totalQueueLength(): number {
+        let total = 0
+        for (const q of this.queues.values()) total += q.length
+        return total
+    }
+
+    /**
+     * Dequeue the highest-priority waiting item, or undefined if all queues are empty.
+     */
+    private dequeueNext(): QueueItem | undefined {
+        for (const priority of PRIORITY_ORDER) {
+            const q = this.queues.get(priority)!
+            if (q.length > 0) return q.shift()
+        }
+        return undefined
+    }
+
+    /**
+     * Push an item onto the appropriate sub-queue.
+     * When priority is disabled all items go to MEDIUM (FIFO behaviour is preserved).
+     */
+    private enqueueItem(item: QueueItem): void {
+        const key = this.config.enablePriority ? item.priority : QueuePriority.MEDIUM
+        this.queues.get(key)!.push(item)
     }
 
     /**
@@ -58,35 +99,30 @@ export class ApiQueue {
             item.resolve = resolve
             item.reject = reject
 
-            if (this.config.enablePriority) {
-                const insertIndex = this.queue.findIndex((q) => q.priority < item.priority)
-                if (insertIndex === -1) {
-                    this.queue.push(item)
-                } else {
-                    this.queue.splice(insertIndex, 0, item)
-                }
-            } else {
-                this.queue.push(item)
-            }
+            this.enqueueItem(item)
 
             // Handle pre-flight abort
             if (options.abortSignal?.aborted) {
-                this.queue = this.queue.filter((q) => q !== item)
+                const subQueue = this.queues.get(item.priority)!
+                const idx = subQueue.indexOf(item)
+                if (idx !== -1) subQueue.splice(idx, 1)
+                this.stats.queueLength = this.totalQueueLength()
                 item.reject(new Error('Aborted'))
                 return
             }
 
             // Handle abort while queued
             options.abortSignal?.addEventListener('abort', () => {
-                const index = this.queue.indexOf(item)
+                const subQueue = this.queues.get(item.priority)!
+                const index = subQueue.indexOf(item)
                 if (index !== -1) {
-                    this.queue.splice(index, 1)
-                    this.stats.queueLength = this.queue.length
+                    subQueue.splice(index, 1)
+                    this.stats.queueLength = this.totalQueueLength()
                     item.reject(new Error('Aborted'))
                 }
             })
 
-            this.stats.queueLength = this.queue.length
+            this.stats.queueLength = this.totalQueueLength()
 
             // Process immediately if not at capacity
             this.processQueue()
@@ -111,9 +147,9 @@ export class ApiQueue {
         if (!this.processing) return
 
         // Process requests up to the concurrency limit
-        while (this.queue.length > 0 && this.activeRequests < this.config.maxConcurrentRequests) {
-            const item = this.queue.shift()!
-            this.stats.queueLength = this.queue.length
+        while (this.totalQueueLength() > 0 && this.activeRequests < this.config.maxConcurrentRequests) {
+            const item = this.dequeueNext()!
+            this.stats.queueLength = this.totalQueueLength()
 
             // Execute the request immediately (it will handle its own throttling)
             // Don't await - let multiple requests run concurrently up to maxConcurrentRequests
@@ -123,7 +159,7 @@ export class ApiQueue {
         }
 
         // Continue processing if there are items in queue and capacity available
-        if (this.queue.length > 0 && this.activeRequests < this.config.maxConcurrentRequests) {
+        if (this.totalQueueLength() > 0 && this.activeRequests < this.config.maxConcurrentRequests) {
             setTimeout(() => this.processQueue(), QUEUE_PROCESSING_INTERVAL_MS)
         }
     }
@@ -184,17 +220,8 @@ export class ApiQueue {
 
                 await this.sleep(delay)
 
-                if (this.config.enablePriority) {
-                    const insertIndex = this.queue.findIndex((q) => q.priority < item.priority)
-                    if (insertIndex === -1) {
-                        this.queue.push(item)
-                    } else {
-                        this.queue.splice(insertIndex, 0, item)
-                    }
-                } else {
-                    this.queue.push(item)
-                }
-                this.stats.queueLength = this.queue.length
+                this.enqueueItem(item)
+                this.stats.queueLength = this.totalQueueLength()
             } else {
                 this.stats.totalFailed++
                 this.updateStats()
@@ -233,10 +260,10 @@ export class ApiQueue {
      * Clear the queue
      */
     clear(): void {
-        this.queue.forEach((item) => {
-            item.reject(new Error('Queue cleared'))
-        })
-        this.queue = []
+        for (const q of this.queues.values()) {
+            q.forEach((item) => item.reject(new Error('Queue cleared')))
+            q.length = 0
+        }
         this.stats.queueLength = 0
     }
 
