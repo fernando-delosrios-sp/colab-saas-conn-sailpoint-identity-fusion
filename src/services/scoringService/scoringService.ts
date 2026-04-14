@@ -79,10 +79,7 @@ export class ScoringService {
             compared += 1
             if (earlyExitOnExactMatch) {
                 const matches = fusionAccount.fusionMatches
-                if (
-                    matches.length > 0 &&
-                    isExactAttributeMatchScores(matches[matches.length - 1].scores)
-                ) {
+                if (matches.length > 0 && isExactAttributeMatchScores(matches[matches.length - 1].scores)) {
                     break
                 }
             }
@@ -131,10 +128,22 @@ export class ScoringService {
                 (identityAttribute ?? '').toString(),
                 matching
             )
+            scores.push(scoreReport)
             if (matching.mandatory && !scoreReport.isMatch) {
                 hasFailedMandatory = true
+                // Push skipped entries for all remaining rules so the scores
+                // array stays structurally complete for report rendering.
+                for (const remaining of this.matchingConfigs.slice(this.matchingConfigs.indexOf(matching) + 1)) {
+                    scores.push({
+                        ...remaining,
+                        skipped: true,
+                        score: 0,
+                        isMatch: false,
+                        comment: 'Rule skipped (mandatory attribute failed)',
+                    })
+                }
+                break
             }
-            scores.push(scoreReport)
         }
 
         let weightedSum = 0
@@ -168,10 +177,10 @@ export class ScoringService {
             comment: combinedPasses
                 ? 'Combined score meets minimum threshold'
                 : hasFailedMandatory
-                ? 'Combined score invalidated by failed mandatory attribute'
-                : !hasContributing
-                ? 'No rules contributed to combined score'
-                : 'Combined score is below minimum threshold',
+                  ? 'Combined score invalidated by failed mandatory attribute'
+                  : !hasContributing
+                    ? 'No rules contributed to combined score'
+                    : 'Combined score is below minimum threshold',
         }
         scores.push(combinedReport)
 

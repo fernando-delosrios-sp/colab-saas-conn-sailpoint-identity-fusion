@@ -221,9 +221,7 @@ function calculateLIG3Similarity(s1: string, s2: string): number {
     const len2 = s2.length
     const maxLen = Math.max(len1, len2)
 
-    const matrix: number[][] = Array(len1 + 1)
-        .fill(null)
-        .map(() => Array(len2 + 1).fill(0))
+    const matrix: number[][] = Array.from({ length: len1 + 1 }, () => new Array(len2 + 1).fill(0))
 
     for (let i = 0; i <= len1; i++) {
         matrix[i][0] = i * 0.8

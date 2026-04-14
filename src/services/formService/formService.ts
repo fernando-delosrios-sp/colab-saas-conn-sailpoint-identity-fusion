@@ -21,14 +21,15 @@ import { assert, softAssert } from '../../utils/assert'
 import { readString, readUnknown } from '../../utils/safeRead'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
-import {
-    Candidate,
-    PendingReviewFormContext,
-    PendingReviewReviewerContext,
-    PendingReviewAccountContext,
-} from './types'
+import { Candidate, PendingReviewFormContext, PendingReviewReviewerContext, PendingReviewAccountContext } from './types'
 import { FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT } from './constants'
-import { buildCandidateList, buildFormName, calculateExpirationDate, getFormOwner, resolveIdentitiesSelectLabel } from './helpers'
+import {
+    buildCandidateList,
+    buildFormName,
+    calculateExpirationDate,
+    getFormOwner,
+    resolveIdentitiesSelectLabel,
+} from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 import {
     createFusionDecision,
@@ -37,11 +38,7 @@ import {
     getReviewerInfo,
 } from './formProcessor'
 
-export type {
-    PendingReviewFormContext,
-    PendingReviewReviewerContext,
-    PendingReviewAccountContext,
-} from './types'
+export type { PendingReviewFormContext, PendingReviewReviewerContext, PendingReviewAccountContext } from './types'
 
 // ============================================================================
 // FormService Class
@@ -92,8 +89,7 @@ export class FormService {
         this.fusionFormNamePattern = config.fusionFormNamePattern
         this.fusionFormExpirationDays = config.fusionFormExpirationDays
         this.fusionFormAttributes = config.fusionFormAttributes
-        this.fusionMaxCandidatesForForm =
-            config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
+        this.fusionMaxCandidatesForForm = config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
     }
 
     // ------------------------------------------------------------------------
@@ -268,7 +264,8 @@ export class FormService {
         await this.enrichCandidateIdentitiesSelectLabels(candidates)
         await this.enrichCandidateIdentityEmails(candidates)
 
-        const sourceType = this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
+        const sourceType =
+            this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
 
         const formName = buildFormName(fusionAccount, this.fusionFormNamePattern)
         assert(formName, 'Form name is required')
@@ -400,6 +397,11 @@ export class FormService {
         existingInstances: FormInstanceResponseV2025[],
         reviewers: Set<FusionAccount>
     ): void {
+        const reviewerByIdentityId = new Map<string, FusionAccount>()
+        for (const r of reviewers) {
+            if (r.identityId) reviewerByIdentityId.set(r.identityId, r)
+        }
+
         for (const instance of existingInstances) {
             if (!instance.state || !instance.recipients || !instance.standAloneFormUrl) continue
             const state = instance.state.toUpperCase()
@@ -412,7 +414,7 @@ export class FormService {
                     continue
                 }
 
-                const reviewer = Array.from(reviewers).find((r) => r.identityId === recipient.id)
+                const reviewer = reviewerByIdentityId.get(recipient.id)
                 if (reviewer) {
                     reviewer.addFusionReview(instance.standAloneFormUrl)
                     this.log.debug(`Added existing form instance ${instance.id} to reviewer ${recipient.id} reviews`)
@@ -921,8 +923,8 @@ export class FormService {
 
         this.log.debug(
             `Form analysis result: shouldDeleteForm=${shouldDeleteForm}, ` +
-            `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
-            `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
+                `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
+                `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
         )
 
         return {
@@ -1042,7 +1044,7 @@ export class FormService {
         const decisionType = decision.newIdentity ? 'new identity' : `link to ${decision.identityId}`
         this.log.debug(
             `Processed fusion decision for account ${decision.account.id}, reviewer ${decision.submitter.id}, ` +
-            `decision: ${decisionType}`
+                `decision: ${decisionType}`
         )
     }
 
@@ -1060,7 +1062,8 @@ export class FormService {
             )
             return
         }
-        const sourceType = this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
+        const sourceType =
+            this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
         const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
         const formInputs = buildFormInputs(fusionAccount, candidates, this.fusionFormAttributes)
         const formConditions = buildFormConditions(candidates, this.fusionFormAttributes)

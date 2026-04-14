@@ -3,8 +3,8 @@ import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
 
 export type PipelineMode =
-    | { kind: 'aggregation' }   // full persistent run — accountList (includes optional aggregation report)
-    | { kind: 'dry-run' }       // non-persistent analysis — customReport, reportAction's mini-pipeline
+    | { kind: 'aggregation' } // full persistent run — accountList (includes optional aggregation report)
+    | { kind: 'dry-run' } // non-persistent analysis — customReport, reportAction's mini-pipeline
 
 export interface CorePipelineOptions {
     mode: PipelineMode
@@ -30,7 +30,11 @@ async function applyPersistentFusionReset(serviceRegistry: ServiceRegistry): Pro
  * Phase 1: Setup and initialization.
  * @returns true if processing should continue, false on reset.
  */
-export async function setupPhase(serviceRegistry: ServiceRegistry, schema: any, options: CorePipelineOptions): Promise<boolean> {
+export async function setupPhase(
+    serviceRegistry: ServiceRegistry,
+    schema: any,
+    options: CorePipelineOptions
+): Promise<boolean> {
     const { log, fusion, schemas, sources, attributes, config } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
 
@@ -73,7 +77,8 @@ export async function setupPhase(serviceRegistry: ServiceRegistry, schema: any, 
                     await sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
                 } catch (error) {
                     log.error(
-                        `Reverse correlation setup failed for source "${sc.name}" (attribute="${sc.correlationAttribute ?? 'unset'}"): ${error instanceof Error ? error.message : String(error)
+                        `Reverse correlation setup failed for source "${sc.name}" (attribute="${sc.correlationAttribute ?? 'unset'}"): ${
+                            error instanceof Error ? error.message : String(error)
                         }`
                     )
                     throw error
@@ -121,9 +126,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
     if (fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer) {
         const globalOwnerIds = await sources.fetchGlobalOwnerIdentityIds()
         await Promise.all(
-            globalOwnerIds
-                .filter((id) => !identities.getIdentityById(id))
-                .map((id) => identities.fetchIdentityById(id))
+            globalOwnerIds.filter((id) => !identities.getIdentityById(id)).map((id) => identities.fetchIdentityById(id))
         )
     }
 
@@ -167,11 +170,11 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
     log.info('Processing identities')
     await fusion.processIdentities()
 
-    identities.clear()
-    log.info('Identities cache cleared from memory')
-
     log.info('Processing fusion identity decisions (new identity)')
     await fusion.processFusionIdentityDecisions()
+
+    identities.clear()
+    log.info('Identities cache cleared from memory')
 
     log.info('Processing managed accounts (Match)')
     await fusion.processManagedAccounts()

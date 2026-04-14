@@ -197,7 +197,6 @@ export class MessagingService {
         await wrapConnectorError(async () => {
             const delayedWorkflow = new DelayedAggregationWorkflow(workflowName, owner, this.apiBaseUrl)
             assert(delayedWorkflow, 'Failed to create delayed aggregation workflow object')
-
             ;(delayedWorkflow as { enabled?: boolean }).enabled = false
 
             this.delayedAggregationWorkflow = await this.createWorkflow(delayedWorkflow)
@@ -304,11 +303,7 @@ export class MessagingService {
         const accountUrl = this.urlContext.humanAccount(accountId || undefined)
         const accountEmail = context?.accountEmail
 
-        const candidates =
-            context?.candidates?.map((c) => ({
-                ...c,
-                identityUrl: this.urlContext.identity(c.id),
-            })) ?? []
+        const candidates = context?.candidates ?? []
 
         const subject = `Identity Fusion Review Required: ${accountName} [${accountSource}]`
         const sourceTypeInput = readString(formInput, 'sourceType')
@@ -333,7 +328,7 @@ export class MessagingService {
                     matches: candidates.map((candidate: any) => ({
                         identityName: candidate.name || 'Unknown',
                         identityId: candidate.id || undefined,
-                        identityUrl: candidate.identityUrl,
+                        identityUrl: this.urlContext.identity(candidate.id),
                         isMatch: true,
                         exact: isExactAttributeMatchScores(candidate.scores),
                         scores: (candidate.scores || []).map((s: any) => ({
@@ -588,14 +583,20 @@ export class MessagingService {
             return bodyWithNotice
         }
 
+        // Pre-compute the constant overhead (subject + recipients + JSON envelope)
+        // so the binary-search loop only measures the variable body bytes.
+        const constantOverheadBytes = this.workflowInputByteLength(subject, '', recipients)
+        const noticeBytes = Buffer.byteLength(notice, 'utf8')
+        const maxBodyBytes = maxSerializedInputBytes - constantOverheadBytes - noticeBytes
+
         let low = 0
         let high = body.length
         let best = ''
         while (low <= high) {
             const mid = Math.floor((low + high) / 2)
-            const candidate = `${body.slice(0, mid)}${notice}`
-            if (this.workflowInputByteLength(subject, candidate, recipients) <= maxSerializedInputBytes) {
-                best = candidate
+            const slice = body.slice(0, mid)
+            if (Buffer.byteLength(slice, 'utf8') <= maxBodyBytes) {
+                best = `${slice}${notice}`
                 low = mid + 1
             } else {
                 high = mid - 1

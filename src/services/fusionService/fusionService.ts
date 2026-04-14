@@ -345,7 +345,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${account.nativeIdentity}), ` +
-            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
@@ -390,7 +390,7 @@ export class FusionService {
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
-            `${fusionAccount.accountIds.length} account(s), ${fusionAccount.missingAccountIds.length} missing`
+                `${fusionAccount.accountIds.length} account(s), ${fusionAccount.missingAccountIds.length} missing`
         )
 
         await yieldToEventLoop()
@@ -416,7 +416,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.setFusionAccount(fusionAccount)
@@ -520,7 +520,7 @@ export class FusionService {
                 fusionAccount.setReverseCorrelationAttribute(sourceConfig.correlationAttribute, info.schema.id)
                 this.log.debug(
                     `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.schema.id}" ` +
-                    `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
+                        `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
                 )
             }
         }
@@ -649,7 +649,7 @@ export class FusionService {
             if (existingAccount) {
                 this.log.debug(
                     `Reusing existing Fusion account ${existingAccount.nativeIdentity} for identity ` +
-                    `${identity.name} (${identityId}) - prevents duplicate baseline creation`
+                        `${identity.name} (${identityId}) - prevents duplicate baseline creation`
                 )
                 // Remove from whichever map currently holds it
                 if (this.fusionAccountMap.get(existingAccount.nativeIdentity) === existingAccount) {
@@ -667,7 +667,9 @@ export class FusionService {
                 existingAccount.setNeedsRefresh(true)
                 // Register under the new identity ID so callers (e.g. getFusionIdentity) can find it
                 this.fusionIdentityMap.set(identityId, existingAccount)
-                this.log.debug(`Re-registered existing Fusion account under new identity: ${identity.name} (${identityId})`)
+                this.log.debug(
+                    `Re-registered existing Fusion account under new identity: ${identity.name} (${identityId})`
+                )
                 return existingAccount
             }
 
@@ -727,19 +729,43 @@ export class FusionService {
 
         // Check uncorrelated accounts first
         for (const account of this.fusionAccountMap.values()) {
-            const allIds = [...account.accountIds, ...account.missingAccountIds]
-            if (allIds.some((id) => identityAccountIds.has(id))) {
-                return account
+            let found = false
+            for (const id of account.accountIds) {
+                if (identityAccountIds.has(id)) {
+                    found = true
+                    break
+                }
             }
+            if (!found) {
+                for (const id of account.missingAccountIds) {
+                    if (identityAccountIds.has(id)) {
+                        found = true
+                        break
+                    }
+                }
+            }
+            if (found) return account
         }
 
         // Check for accounts from stale identity IDs (identity was destroyed and recreated)
         for (const [existingIdentityId, account] of this.fusionIdentityMap.entries()) {
             if (existingIdentityId === identity.id) continue
-            const allIds = [...account.accountIds, ...account.missingAccountIds]
-            if (allIds.some((id) => identityAccountIds.has(id))) {
-                return account
+            let found = false
+            for (const id of account.accountIds) {
+                if (identityAccountIds.has(id)) {
+                    found = true
+                    break
+                }
             }
+            if (!found) {
+                for (const id of account.missingAccountIds) {
+                    if (identityAccountIds.has(id)) {
+                        found = true
+                        break
+                    }
+                }
+            }
+            if (found) return account
         }
 
         return undefined
@@ -831,8 +857,8 @@ export class FusionService {
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
             `${existingIdentityAccount ? 'Reusing' : 'Created'} fusion account from decision: ` +
-            `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
-            `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
+                `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
+                `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
         )
 
         // For authorized decisions (including synthetic perfect-match automatic assignment),
@@ -844,7 +870,8 @@ export class FusionService {
                     // Only make live API calls during real aggregation; customReport is read-only analysis.
                     selectedIdentity =
                         this.commandType === StandardCommand.StdAccountList
-                            ? (cachedForDecision ?? (await this.identities.fetchIdentityById(fusionDecision.identityId)))
+                            ? (cachedForDecision ??
+                              (await this.identities.fetchIdentityById(fusionDecision.identityId)))
                             : cachedForDecision
                 } catch {
                     // Best-effort: if identity fetch fails, continue without immediate correlation.
@@ -902,7 +929,7 @@ export class FusionService {
             this.setFusionAccount(fusionAccount)
             this.log.debug(
                 `Registered decision account as fusion account: ${fusionDecision.account.name} ` +
-                `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`
+                    `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`
             )
         }
         return fusionAccount
@@ -955,7 +982,7 @@ export class FusionService {
                 this._sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                    `Managed accounts from this source will be treated as NonMatched.`
+                        `Managed accounts from this source will be treated as NonMatched.`
                 )
             }
         }
@@ -1060,8 +1087,7 @@ export class FusionService {
                     const formCreated = await this.forms.createFusionForm(fusionAccount, reviewers)
                     if (!formCreated) {
                         const matchCount = fusionAccount.fusionMatches.length
-                        const maxForm =
-                            this.config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
+                        const maxForm = this.config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
                         if (!reviewers || reviewers.size === 0) {
                             this.trackFailedMatching(
                                 fusionAccount,
@@ -1287,24 +1313,25 @@ export class FusionService {
                                 scores: mapScoreReportsForFusionReport(match.scores),
                             }
                         })
-                    this.deferredMatchReportData.push(
-                        {
-                            ...buildMinimalFusionReportAccount(
-                                fusionAccount,
-                                this.urlContext,
-                                this.sourcesByName.get(fusionAccount.sourceName)?.sourceType,
-                                this.reportAttributes
-                            ),
-                            deferred: true,
-                            fusionIdentityComparisons,
-                            matches: deferredMatches,
-                        }
-                    )
+                    this.deferredMatchReportData.push({
+                        ...buildMinimalFusionReportAccount(
+                            fusionAccount,
+                            this.urlContext,
+                            this.sourcesByName.get(fusionAccount.sourceName)?.sourceType,
+                            this.reportAttributes
+                        ),
+                        deferred: true,
+                        fusionIdentityComparisons,
+                        matches: deferredMatches,
+                    })
                 }
             }
         } else {
             this.log.debug(`No match found for managed account: ${name} [${sourceName}]`)
-            if (sourceType === SourceType.Authoritative && this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
+            if (
+                sourceType === SourceType.Authoritative &&
+                this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)
+            ) {
                 // Keep current-run authoritative non-matches available as deferred candidates
                 // for subsequent managed-account analysis in custom:dryrun.
                 this.registerCurrentRunUnmatchedCandidate(fusionAccount)
@@ -1756,10 +1783,12 @@ export class FusionService {
         accounts.set(existingKey, existingAccount.name || existingAccount.displayName || existingKey)
         accounts.set(newKey, newAccount.name || newAccount.displayName || newKey)
 
-        const accountLabels = Array.from(accounts.entries()).map(([nativeIdentity, name]) => `${name} (${nativeIdentity})`)
+        const accountLabels = Array.from(accounts.entries()).map(
+            ([nativeIdentity, name]) => `${name} (${nativeIdentity})`
+        )
         this.log.warn(
             `More than one Fusion account was found for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
-            'This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.'
+                'This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.'
         )
     }
 
@@ -1921,5 +1950,4 @@ export class FusionService {
     private hasNewUnmatchedPeerMatches(fusionAccount: FusionAccount): boolean {
         return fusionAccount.fusionMatches.some((match) => match.candidateType === 'new-unmatched')
     }
-
 }

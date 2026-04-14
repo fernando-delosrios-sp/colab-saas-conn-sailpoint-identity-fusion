@@ -20,7 +20,8 @@ const toReportDecision = (
     resolveAccountUrl?: (accountId?: string) => string | undefined,
     resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string }
 ): FusionReportDecision => {
-    const sourceType = decision.sourceType ?? resolveSourceType?.(decision.account.sourceName) ?? SourceType.Authoritative
+    const sourceType =
+        decision.sourceType ?? resolveSourceType?.(decision.account.sourceName) ?? SourceType.Authoritative
     const isNoMatchSource = sourceType === SourceType.Record || sourceType === SourceType.Orphan
     const decisionType = decision.newIdentity
         ? isNoMatchSource
@@ -36,14 +37,15 @@ const toReportDecision = (
               : 'Confirmed no match'
 
     const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
-    const reviewerName = decision.submitter.name || resolveReviewerName?.(decision.submitter.id) || decision.submitter.id
-    const selectedIdentityName = decision.identityName || selectedIdentityContext.selectedIdentityName || decision.identityId
+    const reviewerName =
+        decision.submitter.name || resolveReviewerName?.(decision.submitter.id) || decision.submitter.id
+    const selectedIdentityName =
+        decision.identityName || selectedIdentityContext.selectedIdentityName || decision.identityId
     const correlatedIdentityContext = resolveIdentityContext?.(readString(decision, 'correlatedIdentityId')) ?? {}
     const correlatedAccountName = correlatedIdentityContext.selectedIdentityName
 
     const reviewerId = decision.submitter.id
-    const reviewerUrl =
-        reviewerId && reviewerId !== 'system' ? resolveReviewerUrl?.(reviewerId) : undefined
+    const reviewerUrl = reviewerId && reviewerId !== 'system' ? resolveReviewerUrl?.(reviewerId) : undefined
 
     return {
         reviewerId,
@@ -116,16 +118,14 @@ export const hydrateIdentitiesForReportDecisions = async (serviceRegistry: Servi
         if (d?.submitter?.id) idsToHydrate.add(d.submitter.id)
         if (d?.identityId) idsToHydrate.add(d.identityId)
     }
-    for (const id of idsToHydrate) {
-        if (!identities.getIdentityById(id)) {
-            try {
+    await Promise.all(
+        [...idsToHydrate]
+            .filter((id) => !identities.getIdentityById(id))
+            .map((id) =>
                 // Best-effort: hydrate display names for reporting
-                await identities.fetchIdentityById(id)
-            } catch {
-                // ignore
-            }
-        }
-    }
+                identities.fetchIdentityById(id).catch(() => {})
+            )
+    )
 }
 
 export const buildFusionReviewDecisions = (serviceRegistry: ServiceRegistry): FusionReportDecision[] => {
@@ -197,8 +197,12 @@ export const buildFusionReportStats = (
     const authoritativeNewIdentities = finishedDecisions.filter(
         (d) => decisionSourceType(d) === SourceType.Authoritative && d.newIdentity
     ).length
-    const recordNoMatches = finishedDecisions.filter((d) => decisionSourceType(d) === SourceType.Record && d.newIdentity).length
-    const orphanNoMatches = finishedDecisions.filter((d) => decisionSourceType(d) === SourceType.Orphan && d.newIdentity).length
+    const recordNoMatches = finishedDecisions.filter(
+        (d) => decisionSourceType(d) === SourceType.Record && d.newIdentity
+    ).length
+    const orphanNoMatches = finishedDecisions.filter(
+        (d) => decisionSourceType(d) === SourceType.Orphan && d.newIdentity
+    ).length
     const memoryUsage = process.memoryUsage()
     return {
         totalFusionAccounts: fusion.totalFusionAccountCount,
@@ -239,7 +243,9 @@ export const buildEmailReportFromFusionReport = (
         const hasMatches = Array.isArray(account.matches) && account.matches.length > 0
         return hasMatches || account.deferred === true || typeof account.error === 'string'
     })
-    const matchAccountCount = accounts.filter((account) => Array.isArray(account.matches) && account.matches.length > 0).length
+    const matchAccountCount = accounts.filter(
+        (account) => Array.isArray(account.matches) && account.matches.length > 0
+    ).length
     return {
         ...baseReport,
         accounts,
@@ -249,7 +255,6 @@ export const buildEmailReportFromFusionReport = (
         fusionReviewDecisions: reportDecisions,
     }
 }
-
 
 /**
  * Builds and sends a fusion report email for the given fusion account.
