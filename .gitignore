@@ -9,6 +9,7 @@
 .history/
 .idea/
 .cline/
+.claude/
 *.iml
 cursor_settings_backup.json
 
