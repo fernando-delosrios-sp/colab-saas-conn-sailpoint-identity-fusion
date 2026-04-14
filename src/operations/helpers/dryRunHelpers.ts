@@ -1,7 +1,7 @@
-import { createWriteStream, type WriteStream } from 'fs'
-import { mkdir, readFile, unlink } from 'fs/promises'
+import { createReadStream, createWriteStream, type WriteStream } from 'fs'
+import { mkdir, unlink } from 'fs/promises'
 import * as path from 'path'
-import { finished } from 'stream/promises'
+import { finished, pipeline } from 'stream/promises'
 import { StdAccountListOutput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { FusionReportAccount } from '../../services/fusionService/types'
@@ -98,13 +98,13 @@ function writeChunk(stream: WriteStream, chunk: string): Promise<void> {
     })
 }
 
+// Regex to prepend 4-space indent to every line in a single pass (avoids split/map/join allocations)
+const INDENT_4_RE = /^/gm
+
 async function writePrettyJsonArrayElement(stream: WriteStream, obj: unknown, isFirst: number): Promise<void> {
     const prefix = isFirst === 0 ? '' : ',\n'
     const body = JSON.stringify(obj, null, 2)
-    const indented = body
-        .split('\n')
-        .map((line) => '    ' + line)
-        .join('\n')
+    const indented = body.replace(INDENT_4_RE, '    ')
     await writeChunk(stream, prefix + indented)
 }
 
@@ -152,12 +152,13 @@ export const createDryRunRowEmitter = async (
             await finished(rowsStream)
             try {
                 const summaryJson = JSON.stringify(diskSummary ?? null, null, 2)
-                const indentedSummary = summaryJson.split('\n').map((line) => '  ' + line).join('\n')
+                // Use regex replace instead of split/map/join for the summary indentation (Fix #23)
+                const indentedSummary = summaryJson.replace(/^/gm, '  ')
                 const out = createWriteStream(diskOutputPath, { flags: 'w' })
                 await writeChunk(out, '{\n  "summary": ' + indentedSummary + ',\n  "rows": [\n')
-                const body = await readFile(rowsTempPath, 'utf8')
-                if (body.length > 0) {
-                    await writeChunk(out, body)
+                // Stream the rows temp file into the output instead of reading it all into memory (Fix #11)
+                if (arrayElementCount > 0) {
+                    await pipeline(createReadStream(rowsTempPath), out, { end: false })
                 }
                 await writeChunk(out, '\n  ]\n}\n')
                 out.end()
@@ -198,7 +199,10 @@ export const buildStatsForDryRun = (
         errorSamples: issueSummary.errorSamples,
         usedMemory: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
         ...(fusionCounts
-            ? { fusionAccountsFound: fusionCounts.fusionAccountsFound, totalFusionAccounts: fusionCounts.totalFusionAccounts }
+            ? {
+                  fusionAccountsFound: fusionCounts.fusionAccountsFound,
+                  totalFusionAccounts: fusionCounts.totalFusionAccounts,
+              }
             : {}),
     }
 }
@@ -241,7 +245,6 @@ export const streamEnrichedOutputRows = async (
         true
     )
 }
-
 
 export const streamUncorrelatedAnalyzedRows = async (
     serviceRegistry: ServiceRegistry,
@@ -382,13 +385,21 @@ const categorizeRow = (
         const matches = Array.isArray(enrichedAccount?.attributes?.matching?.matches)
             ? enrichedAccount.attributes.matching.matches
             : []
-        if (matches.some((m: { scores?: Parameters<typeof isExactAttributeMatchScores>[0] }) => isExactAttributeMatchScores(m.scores))) {
+        if (
+            matches.some((m: { scores?: Parameters<typeof isExactAttributeMatchScores>[0] }) =>
+                isExactAttributeMatchScores(m.scores)
+            )
+        ) {
             categories.push('exact')
         }
     }
     if (status === 'deferred') categories.push('deferred')
 
-    const reviewPending = readBoolean(readUnknown(readUnknown(enrichedAccount, 'attributes'), 'review'), 'pending', false)
+    const reviewPending = readBoolean(
+        readUnknown(readUnknown(enrichedAccount, 'attributes'), 'review'),
+        'pending',
+        false
+    )
     if (reviewPending) categories.push('review')
 
     if (relatedAccounts.some((accountId: string) => decisionAccountIds.has(accountId))) {
@@ -475,7 +486,11 @@ const emitGroupedRows = async (
             const { matching, review, ...cleanAttributes } = attributes
 
             const includeReview = row.categories.includes('review') || row.categories.includes('decisions')
-            const { sourceContext: sourceStatus, correlationContext: correlationStatus, ...matchingStatus } = matching ?? {}
+            const {
+                sourceContext: sourceStatus,
+                correlationContext: correlationStatus,
+                ...matchingStatus
+            } = matching ?? {}
             const relatedRaw = readUnknown(readUnknown(row.account, 'attributes'), 'accounts')
             const relatedIds = Array.isArray(relatedRaw) ? relatedRaw.map((x) => String(x)) : []
             const reviewStatus = {
@@ -570,4 +585,3 @@ export const refreshUniqueAttributesForDryRun = async (
 
     log.info(`Unique attributes refreshed for ${analyzedUncorrelatedAccounts.length} analyzed uncorrelated account(s)`)
 }
-

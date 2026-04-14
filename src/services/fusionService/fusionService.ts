@@ -57,6 +57,8 @@ export class FusionService {
     private readonly urlContext: UrlContext
     private readonly deleteEmpty: boolean
     private readonly pendingDisableOperations: Set<Promise<void>> = new Set()
+    /** Cached set of configured source names — built once in the constructor (config is immutable). */
+    private readonly configSourceNames: Set<string>
     public readonly fusionOwnerIsGlobalReviewer: boolean
     public readonly fusionReportOnAggregation: boolean
     public newManagedAccountsCount: number = 0
@@ -104,6 +106,7 @@ export class FusionService {
         operationContext?: string
     ) {
         FusionAccount.configure(config)
+        this.configSourceNames = new Set(config.sources.map((s) => s.name))
         this.reset = config.reset
         this.fusionOwnerIsGlobalReviewer = config.fusionOwnerIsGlobalReviewer ?? false
         this.fusionReportOnAggregation = config.fusionReportOnAggregation ?? false
@@ -395,7 +398,7 @@ export class FusionService {
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
-                `${fusionAccount.accountIds.length} account(s), ${fusionAccount.missingAccountIds.length} missing`
+                `${fusionAccount.accountIdsSet.size} account(s), ${fusionAccount.missingAccountIdsSet.size} missing`
         )
 
         await yieldToEventLoop()
@@ -457,7 +460,8 @@ export class FusionService {
      */
     private async correlatePerSource(
         fusionAccount: FusionAccount,
-        authorizedLinkDecision?: FusionDecision
+        authorizedLinkDecision?: FusionDecision,
+        forceDirectCorrelation: boolean = false
     ): Promise<void> {
         const missingIds = fusionAccount.missingAccountIds
         const validatedReverseSources = new Set<string>()
@@ -469,6 +473,9 @@ export class FusionService {
         for (const accountId of missingIds) {
             const info = fusionAccount.getManagedAccountInfo(accountId)
             if (!info) {
+                this.log.debug(
+                    `Skipping per-source correlation for missing managed key "${accountId}" on ${fusionAccount.name}: source context not available`
+                )
                 continue
             }
 
@@ -508,6 +515,11 @@ export class FusionService {
         // Direct correlation
         if (directCorrelateIds.length > 0) {
             await this.identities.correlateAccounts(fusionAccount, directCorrelateIds)
+        } else if (forceDirectCorrelation && canDirectCorrelate && missingIds.length > 0) {
+            this.log.debug(
+                `No per-source direct-correlation targets for ${fusionAccount.name}; forcing direct correlation for ${missingIds.length} missing account(s) due to explicit correlated action`
+            )
+            await this.identities.correlateAccounts(fusionAccount, [...missingIds])
         }
 
         // Reverse correlation: set attribute to first missing account nativeIdentity per source
@@ -555,7 +567,7 @@ export class FusionService {
         authorizedLinkDecision?: FusionDecision
     ): Promise<void> {
         if (this.commandType !== StandardCommand.StdAccountList) return
-        if (fusionAccount.missingAccountIds.length === 0) return
+        if (fusionAccount.missingAccountIdsSet.size === 0) return
         await this.correlatePerSource(fusionAccount, authorizedLinkDecision)
     }
 
@@ -564,8 +576,8 @@ export class FusionService {
      * Use when correlation must run outside account-list aggregation (e.g. correlate entitlement action).
      */
     public async correlateMissingAccountsPerSource(fusionAccount: FusionAccount): Promise<void> {
-        if (fusionAccount.missingAccountIds.length === 0) return
-        await this.correlatePerSource(fusionAccount)
+        if (fusionAccount.missingAccountIdsSet.size === 0) return
+        await this.correlatePerSource(fusionAccount, undefined, true)
         fusionAccount.updateCorrelationStatus()
     }
 
@@ -718,7 +730,7 @@ export class FusionService {
      * an ISC identity is recreated with a new ID.
      */
     private findFusionAccountByIdentityManagedAccounts(identity: IdentityDocument): FusionAccount | undefined {
-        const sourceNames = new Set(this.config.sources.map((s) => s.name))
+        const sourceNames = this.configSourceNames
         const identityAccountIds = new Set<string>(
             (identity.accounts ?? [])
                 .filter((a) => sourceNames.has(a.source?.name ?? ''))
@@ -1397,7 +1409,8 @@ export class FusionService {
      */
     private removeMatchAccount(managedAccountId?: string): void {
         if (!managedAccountId) return
-        this.matchAccounts = this.matchAccounts.filter((x) => x.managedAccountId !== managedAccountId)
+        const idx = this.matchAccounts.findIndex((x) => x.managedAccountId === managedAccountId)
+        if (idx !== -1) this.matchAccounts.splice(idx, 1)
     }
 
     // ------------------------------------------------------------------------
@@ -1742,11 +1755,15 @@ export class FusionService {
     }
 
     public get currentRunUnmatchedCandidates(): Iterable<FusionAccount> {
-        return compact(
-            Array.from(this.currentRunUnmatchedFusionNativeIdentities, (nativeIdentity) =>
-                this.fusionAccountMap.get(nativeIdentity)
-            )
-        )
+        return this._currentRunUnmatchedCandidatesIterable()
+    }
+
+    /** Generator that yields unmatched candidates without allocating intermediate arrays. */
+    private *_currentRunUnmatchedCandidatesIterable(): Iterable<FusionAccount> {
+        for (const nativeIdentity of this.currentRunUnmatchedFusionNativeIdentities) {
+            const account = this.fusionAccountMap.get(nativeIdentity)
+            if (account) yield account
+        }
     }
 
     /**
@@ -1897,13 +1914,11 @@ export class FusionService {
             }
         }
 
-        // Include failed matchings (excessive candidates or runtime errors)
-        const failedAccounts = [...this.failedMatchingAccounts]
-        failedAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
+        // Sort in-place — these arrays are cleared just below, so no copy is needed.
+        this.failedMatchingAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
 
-        const deferredAccounts = [...this.deferredMatchReportData]
-        deferredAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
-        for (const deferredAccount of deferredAccounts) {
+        this.deferredMatchReportData.sort((a, b) => a.accountName.localeCompare(b.accountName))
+        for (const deferredAccount of this.deferredMatchReportData) {
             deferredAccount.deferred = true
         }
 
@@ -1914,9 +1929,14 @@ export class FusionService {
         accounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
 
         // Combine: identity-backed matches, deferred matches, failed matchings, then non-matches
-        const allAccounts = [...accounts, ...deferredAccounts, ...failedAccounts, ...nonMatchAccounts]
+        const allAccounts = [
+            ...accounts,
+            ...this.deferredMatchReportData,
+            ...this.failedMatchingAccounts,
+            ...nonMatchAccounts,
+        ]
 
-        const matchAccountCount = accounts.length + deferredAccounts.length
+        const matchAccountCount = accounts.length + this.deferredMatchReportData.length
 
         const report: FusionReport = {
             accounts: allAccounts,

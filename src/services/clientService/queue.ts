@@ -32,8 +32,18 @@ export class ApiQueue {
         queueLength: 0,
         activeRequests: 0,
     }
-    private waitTimes: number[] = []
-    private processingTimes: number[] = []
+    // Circular buffers for rolling wait/processing time windows — O(1) insert + evict.
+    // Each buffer is a fixed-size Float64Array with a write index that wraps modulo MAX_STATS_SAMPLES.
+    private waitTimesBuffer: Float64Array = new Float64Array(MAX_STATS_SAMPLES)
+    private waitTimesIndex: number = 0
+    private waitTimesCount: number = 0
+    private waitTimesSum: number = 0
+
+    private processingTimesBuffer: Float64Array = new Float64Array(MAX_STATS_SAMPLES)
+    private processingTimesIndex: number = 0
+    private processingTimesCount: number = 0
+    private processingTimesSum: number = 0
+
     private lastRequestTime: number = 0
     private minRequestInterval: number
 
@@ -172,10 +182,7 @@ export class ApiQueue {
         this.stats.activeRequests = this.activeRequests
 
         const waitTime = Date.now() - item.createdAt
-        this.waitTimes.push(waitTime)
-        if (this.waitTimes.length > MAX_STATS_SAMPLES) {
-            this.waitTimes.shift()
-        }
+        this.pushStat('wait', waitTime)
 
         // Throttle: ensure minimum time between requests
         const timeSinceLastRequest = Date.now() - this.lastRequestTime
@@ -192,20 +199,14 @@ export class ApiQueue {
             }
             const result = await item.execute()
             const processingTime = Date.now() - startTime
-            this.processingTimes.push(processingTime)
-            if (this.processingTimes.length > MAX_STATS_SAMPLES) {
-                this.processingTimes.shift()
-            }
+            this.pushStat('processing', processingTime)
 
             this.stats.totalProcessed++
             this.updateStats()
             item.resolve(result)
         } catch (error: any) {
             const processingTime = Date.now() - startTime
-            this.processingTimes.push(processingTime)
-            if (this.processingTimes.length > MAX_STATS_SAMPLES) {
-                this.processingTimes.shift()
-            }
+            this.pushStat('processing', processingTime)
 
             // Check if we should retry
             if (shouldRetry(error) && item.retryCount < item.maxRetries) {
@@ -244,15 +245,44 @@ export class ApiQueue {
     }
 
     /**
-     * Update statistics
+     * Push a new sample into the circular buffer for the given stat type.
+     * When the buffer is full, the oldest sample's contribution is subtracted from the running sum
+     * before it is overwritten — making both insertion and eviction O(1).
+     */
+    private pushStat(type: 'wait' | 'processing', value: number): void {
+        if (type === 'wait') {
+            const idx = this.waitTimesIndex % MAX_STATS_SAMPLES
+            if (this.waitTimesCount === MAX_STATS_SAMPLES) {
+                // Evict the oldest sample from the running sum
+                this.waitTimesSum -= this.waitTimesBuffer[idx]
+            } else {
+                this.waitTimesCount++
+            }
+            this.waitTimesBuffer[idx] = value
+            this.waitTimesSum += value
+            this.waitTimesIndex++
+        } else {
+            const idx = this.processingTimesIndex % MAX_STATS_SAMPLES
+            if (this.processingTimesCount === MAX_STATS_SAMPLES) {
+                this.processingTimesSum -= this.processingTimesBuffer[idx]
+            } else {
+                this.processingTimesCount++
+            }
+            this.processingTimesBuffer[idx] = value
+            this.processingTimesSum += value
+            this.processingTimesIndex++
+        }
+    }
+
+    /**
+     * Update statistics — O(1) using running sums maintained by pushStat.
      */
     private updateStats(): void {
-        if (this.waitTimes.length > 0) {
-            this.stats.averageWaitTime = this.waitTimes.reduce((a, b) => a + b, 0) / this.waitTimes.length
+        if (this.waitTimesCount > 0) {
+            this.stats.averageWaitTime = this.waitTimesSum / this.waitTimesCount
         }
-        if (this.processingTimes.length > 0) {
-            this.stats.averageProcessingTime =
-                this.processingTimes.reduce((a, b) => a + b, 0) / this.processingTimes.length
+        if (this.processingTimesCount > 0) {
+            this.stats.averageProcessingTime = this.processingTimesSum / this.processingTimesCount
         }
     }
 

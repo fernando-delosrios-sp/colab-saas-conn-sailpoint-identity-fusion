@@ -4,6 +4,35 @@ import { ScoreReport } from './types'
 import { jaroWinkler, diceCoefficient } from './stringComparison'
 import { match as nameMatch } from './nameMatching'
 
+// Module-level regex constants — compiled once, reused on every call (hot scoring loop)
+const DIACRITICS_RE = /[\u0300-\u036f]/g
+const WHITESPACE_RE = /\s+/g
+
+/**
+ * Build a ScoreReport without spreading the entire MatchingConfig.
+ * Explicit field construction avoids allocating a full object copy per comparison in the hot loop.
+ */
+function makeScoreReport(
+    matching: MatchingConfig,
+    score: number,
+    isMatch: boolean,
+    comment?: string,
+    skipped?: boolean
+): ScoreReport {
+    const r: ScoreReport = {
+        attribute: matching.attribute,
+        algorithm: matching.algorithm,
+        fusionScore: matching.fusionScore,
+        mandatory: matching.mandatory,
+        skipMatchIfMissing: matching.skipMatchIfMissing,
+        score,
+        isMatch,
+    }
+    if (comment !== undefined) r.comment = comment
+    if (skipped !== undefined) r.skipped = skipped
+    return r
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -19,11 +48,7 @@ export const scoreDice = (
     const threshold = matching.fusionScore ?? 0
     const isMatch = score >= threshold
 
-    return {
-        ...matching,
-        score,
-        isMatch,
-    }
+    return makeScoreReport(matching, score, isMatch)
 }
 
 export const scoreDoubleMetaphone = (
@@ -80,12 +105,7 @@ export const scoreDoubleMetaphone = (
     const threshold = matching.fusionScore ?? 0
     const isMatch = score >= threshold
 
-    return {
-        ...matching,
-        score,
-        isMatch,
-        comment,
-    }
+    return makeScoreReport(matching, score, isMatch, comment)
 }
 
 export const scoreJaroWinkler = (
@@ -99,11 +119,7 @@ export const scoreJaroWinkler = (
     const threshold = matching.fusionScore ?? 0
     const isMatch = score >= threshold
 
-    return {
-        ...matching,
-        score,
-        isMatch,
-    }
+    return makeScoreReport(matching, score, isMatch)
 }
 
 export const scoreNameMatcher = (
@@ -118,11 +134,7 @@ export const scoreNameMatcher = (
     const threshold = matching.fusionScore ?? 0
     const isMatch = score >= threshold
 
-    return {
-        ...matching,
-        score,
-        isMatch,
-    }
+    return makeScoreReport(matching, score, isMatch)
 }
 
 /**
@@ -150,9 +162,9 @@ export const scoreLIG3 = (
         return str
             .toLowerCase()
             .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+            .replace(DIACRITICS_RE, '') // Remove diacritics
             .trim()
-            .replace(/\s+/g, ' ') // Normalize whitespace
+            .replace(WHITESPACE_RE, ' ') // Normalize whitespace
     }
 
     const s1 = normalize(accountAttribute)
@@ -160,30 +172,15 @@ export const scoreLIG3 = (
 
     if (s1.length === 0 && s2.length === 0) {
         const threshold = matching.fusionScore ?? 0
-        return {
-            ...matching,
-            score: 0,
-            isMatch: 0 >= threshold,
-            comment: 'Both values empty',
-        }
+        return makeScoreReport(matching, 0, 0 >= threshold, 'Both values empty')
     }
 
     if (s1 === s2) {
-        return {
-            ...matching,
-            score: 100,
-            isMatch: true,
-            comment: 'Exact match',
-        }
+        return makeScoreReport(matching, 100, true, 'Exact match')
     }
 
     if (s1.length === 0 || s2.length === 0) {
-        return {
-            ...matching,
-            score: 0,
-            isMatch: false,
-            comment: 'Empty string comparison',
-        }
+        return makeScoreReport(matching, 0, false, 'Empty string comparison')
     }
 
     const baseScore = calculateLIG3Similarity(s1, s2)
@@ -208,12 +205,7 @@ export const scoreLIG3 = (
         comment = 'Low similarity'
     }
 
-    return {
-        ...matching,
-        score,
-        isMatch,
-        comment,
-    }
+    return makeScoreReport(matching, score, isMatch, comment)
 }
 
 function calculateLIG3Similarity(s1: string, s2: string): number {
@@ -221,37 +213,46 @@ function calculateLIG3Similarity(s1: string, s2: string): number {
     const len2 = s2.length
     const maxLen = Math.max(len1, len2)
 
-    const matrix: number[][] = Array.from({ length: len1 + 1 }, () => new Array(len2 + 1).fill(0))
+    // Rolling 3-row approach: only rows i-2, i-1, and i are needed at any time.
+    // Reduces allocation from O(len1 * len2) to O(3 * len2) per comparison.
+    const cols = len2 + 1
+    let prevPrev = new Float64Array(cols) // row i-2
+    let prev = new Float64Array(cols) // row i-1
+    let curr = new Float64Array(cols) // row i
 
-    for (let i = 0; i <= len1; i++) {
-        matrix[i][0] = i * 0.8
-    }
-    for (let j = 0; j <= len2; j++) {
-        matrix[0][j] = j * 0.8
-    }
+    // Initialize row 0
+    for (let j = 0; j <= len2; j++) prev[j] = j * 0.8
 
     for (let i = 1; i <= len1; i++) {
+        curr[0] = i * 0.8
         for (let j = 1; j <= len2; j++) {
             const cost = s1[i - 1] === s2[j - 1] ? 0 : 1
-            const substitution = matrix[i - 1][j - 1] + cost
-            const insertion = matrix[i][j - 1] + 0.9
-            const deletion = matrix[i - 1][j] + 0.9
-            matrix[i][j] = Math.min(substitution, insertion, deletion)
+            const substitution = prev[j - 1] + cost
+            const insertion = curr[j - 1] + 0.9
+            const deletion = prev[j] + 0.9
+            curr[j] = Math.min(substitution, insertion, deletion)
 
             if (i > 1 && j > 1 && s1[i - 1] === s2[j - 2] && s1[i - 2] === s2[j - 1]) {
-                matrix[i][j] = Math.min(matrix[i][j], matrix[i - 2][j - 2] + 0.5)
+                curr[j] = Math.min(curr[j], prevPrev[j - 2] + 0.5)
             }
         }
+        // Rotate rows: prevPrev ← prev ← curr ← prevPrev (reuse allocation)
+        const tmp = prevPrev
+        prevPrev = prev
+        prev = curr
+        curr = tmp
     }
 
-    const distance = matrix[len1][len2]
+    const distance = prev[len2]
     const similarity = ((maxLen - distance) / maxLen) * 100
     return Math.max(0, similarity)
 }
 
 function calculateTokenBonus(s1: string, s2: string): number {
-    const tokens1 = s1.split(' ').filter((t) => t.length > 0)
-    const tokens2 = s2.split(' ').filter((t) => t.length > 0)
+    // Whitespace is already normalized to single spaces by scoreLIG3.normalize() —
+    // no empty tokens can result from splitting on ' '.
+    const tokens1 = s1.split(' ')
+    const tokens2 = s2.split(' ')
 
     if (tokens1.length <= 1 && tokens2.length <= 1) {
         return 0

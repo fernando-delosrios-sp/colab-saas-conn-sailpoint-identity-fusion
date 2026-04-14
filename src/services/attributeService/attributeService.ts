@@ -27,6 +27,10 @@ import { readString } from '../../utils/safeRead'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
+
+// Module-level regex constants — compiled once (hot attribute-evaluation path)
+const COUNTER_SUFFIX_RE = /\$counter$|\$\{counter\}$/
+const VELOCITY_VAR_RE = /(^|[^\\])\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)/
 /** System-managed provenance id; not mapped or defined via Velocity. */
 const ORIGIN_ACCOUNT_ATTRIBUTE = 'originAccount'
 
@@ -211,7 +215,9 @@ export class AttributeService {
         }
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
-            const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some((accounts) => accounts.length > 0)
+            const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some(
+                (accounts) => accounts.length > 0
+            )
             const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sc) => sc.name)
             let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
@@ -252,7 +258,9 @@ export class AttributeService {
                 if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {
                     const mainAccountId = String(processedValue).trim()
                     prioritizedAccount =
-                        mainAccountId.length > 0 ? this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId) : undefined
+                        mainAccountId.length > 0
+                            ? this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId)
+                            : undefined
                 }
                 if (attribute === 'history') {
                     this.applyHistoryMapping(processedValue, fusionAccount)
@@ -282,12 +290,10 @@ export class AttributeService {
         const { current } = fusionAccount.attributeBag
         const hasExistingValue = isValidAttributeValue(current[attribute])
         const canResetDisplay = fusionAccount.needsReset && attribute === fusionDisplayAttribute
-        const shouldKeepIdentityImmutable =
-            this.isExistingFusionAccount(fusionAccount) && fusionAccount.isIdentity
+        const shouldKeepIdentityImmutable = this.isExistingFusionAccount(fusionAccount) && fusionAccount.isIdentity
         const isImmutableIdentityAttribute =
             attribute === fusionIdentityAttribute && hasExistingValue && shouldKeepIdentityImmutable
-        const isImmutableDisplayAttribute =
-            attribute === fusionDisplayAttribute && hasExistingValue && !canResetDisplay
+        const isImmutableDisplayAttribute = attribute === fusionDisplayAttribute && hasExistingValue && !canResetDisplay
 
         if (isImmutableIdentityAttribute || isImmutableDisplayAttribute) return true
         if (this.uniqueAttributeNames.has(attribute) && current[attribute] !== undefined) return true
@@ -340,9 +346,7 @@ export class AttributeService {
         if (this.normalDefinitions.length === 0) return
 
         const forceRefresh =
-            this.forceAttributeRefresh ||
-            fusionAccount.needsReset ||
-            this.normalDefinitions.some((def) => def.refresh)
+            this.forceAttributeRefresh || fusionAccount.needsReset || this.normalDefinitions.some((def) => def.refresh)
         const shouldRefresh = fusionAccount.needsRefresh || forceRefresh
         if (!shouldRefresh) return
 
@@ -485,7 +489,7 @@ export class AttributeService {
         if (this.skipAccountsWithMissingId && !uniqueId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -605,7 +609,7 @@ export class AttributeService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} raw account(s) ` +
-            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -656,7 +660,8 @@ export class AttributeService {
         fusionAccount: FusionAccount,
         orderedAccounts: Record<string, any>[]
     ): Record<string, any> | undefined {
-        const originIdRaw = fusionAccount.originAccountId ?? fusionAccount.attributeBag.current[ORIGIN_ACCOUNT_ATTRIBUTE]
+        const originIdRaw =
+            fusionAccount.originAccountId ?? fusionAccount.attributeBag.current[ORIGIN_ACCOUNT_ATTRIBUTE]
         const originId =
             originIdRaw != null && String(originIdRaw).trim() !== '' ? String(originIdRaw).trim() : undefined
         if (!originId) return undefined
@@ -830,7 +835,7 @@ export class AttributeService {
         }
 
         // Compare to expression without trailing $counter (UniqueAttributeDefinition may auto-append it)
-        const exprWithoutCounter = expression.replace(/\$counter$|\$\{counter\}$/, '')
+        const exprWithoutCounter = expression.replace(COUNTER_SUFFIX_RE, '')
         const outputMatchesExpression =
             value === expression || (exprWithoutCounter !== expression && value === exprWithoutCounter)
         if (outputMatchesExpression && this.hasVelocityVariableReference(exprWithoutCounter || expression)) {
@@ -855,7 +860,7 @@ export class AttributeService {
      * Examples: $name, ${name}. Excludes escaped tokens like \$name.
      */
     private hasVelocityVariableReference(expression: string): boolean {
-        return /(^|[^\\])\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)/.test(expression)
+        return VELOCITY_VAR_RE.test(expression)
     }
 
     /**
@@ -1213,7 +1218,10 @@ export class AttributeService {
         context[name] = value
     }
 
-    private async seedIncrementalCounterFromExistingValue(definition: UniqueAttributeDefinition, value: string): Promise<void> {
+    private async seedIncrementalCounterFromExistingValue(
+        definition: UniqueAttributeDefinition,
+        value: string
+    ): Promise<void> {
         const match = value.match(/(\d+)\s*$/)
         if (!match) return
         const parsed = Number.parseInt(match[1], 10)

@@ -261,8 +261,7 @@ export class FormService {
         const candidates = buildCandidateList(fusionAccount, this.fusionMaxCandidatesForForm)
         assert(candidates, 'Failed to build candidate list')
 
-        await this.enrichCandidateIdentitiesSelectLabels(candidates)
-        await this.enrichCandidateIdentityEmails(candidates)
+        await this.enrichCandidateIdentities(candidates)
 
         const sourceType =
             this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
@@ -284,30 +283,14 @@ export class FormService {
     }
 
     /**
-     * Align `candidate.name` with the identities SELECT primary label (`attributes.displayName` from search)
-     * so form conditions match what reviewers see in the dropdown when fusion snapshots omit display names.
+     * Enrich all candidates in a single pass:
+     * - Aligns `candidate.name` with the identities SELECT primary label.
+     * - Ensures `attributes.email` is populated for the identities SELECT sublabel.
+     *
+     * Fetches uncached identities in parallel (Promise.all) instead of sequentially,
+     * and fetches each identity only once regardless of which fields are needed.
      */
-    private async enrichCandidateIdentitiesSelectLabels(candidates: Candidate[]): Promise<void> {
-        if (!this.identities) return
-        for (const c of candidates) {
-            let doc = this.identities.getIdentityById(c.id)
-            if (!doc) {
-                try {
-                    doc = await this.identities.fetchIdentityById(c.id)
-                } catch (error) {
-                    const detail = error instanceof Error ? error.message : String(error)
-                    this.log.debug(`Could not load identity ${c.id} for identities SELECT label alignment: ${detail}`)
-                }
-            }
-            c.name = resolveIdentitiesSelectLabel(c.attributes, c.id, doc)
-        }
-    }
-
-    /**
-     * Ensure candidate identity documents have `attributes.email` populated for the identities SELECT sublabel.
-     * This is needed when fusion snapshots omit the identity layer and therefore don't carry email in attributes.
-     */
-    private async enrichCandidateIdentityEmails(candidates: Candidate[]): Promise<void> {
+    private async enrichCandidateIdentities(candidates: Candidate[]): Promise<void> {
         if (!this.identities) return
 
         const normalizeEmail = (value: unknown): string | undefined => {
@@ -323,32 +306,39 @@ export class FormService {
             return str.length > 0 ? str : undefined
         }
 
+        // Collect IDs that are not already in cache so we can fetch them in parallel.
+        const uncachedIds = candidates.filter((c) => !this.identities!.getIdentityById(c.id)).map((c) => c.id)
+
+        if (uncachedIds.length > 0) {
+            await Promise.all(
+                uncachedIds.map((id) =>
+                    this.identities!.fetchIdentityById(id).catch((error) => {
+                        const detail = error instanceof Error ? error.message : String(error)
+                        this.log.debug(`Could not load identity ${id} for candidate enrichment: ${detail}`)
+                    })
+                )
+            )
+        }
+
+        // Single pass: apply both name and email enrichment using the now-cached docs.
         for (const c of candidates) {
-            // Already present → nothing to do.
+            const doc = this.identities.getIdentityById(c.id)
+            c.name = resolveIdentitiesSelectLabel(c.attributes, c.id, doc)
+
             const existing = normalizeEmail(readUnknown(c.attributes, 'email'))
             if (existing) {
                 ;(c.attributes as Record<string, unknown>).email = existing
                 continue
             }
 
-            let doc = this.identities.getIdentityById(c.id)
-            if (!doc) {
-                try {
-                    doc = await this.identities.fetchIdentityById(c.id)
-                } catch (error) {
-                    const detail = error instanceof Error ? error.message : String(error)
-                    this.log.debug(`Could not load identity ${c.id} for candidate email hydration: ${detail}`)
-                    continue
+            if (doc) {
+                const attrs = readUnknown(doc, 'attributes')
+                const hydrated = normalizeEmail(
+                    readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail') ?? readUnknown(attrs, 'emailAddress')
+                )
+                if (hydrated) {
+                    ;(c.attributes as Record<string, unknown>).email = hydrated
                 }
-            }
-
-            const attrs = readUnknown(doc, 'attributes')
-            const hydrated = normalizeEmail(
-                readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail') ?? readUnknown(attrs, 'emailAddress')
-            )
-            if (hydrated) {
-                // Ensure the form SEARCH_V2 sublabel (`attributes.email`) resolves.
-                ;(c.attributes as Record<string, unknown>).email = hydrated
             }
         }
     }

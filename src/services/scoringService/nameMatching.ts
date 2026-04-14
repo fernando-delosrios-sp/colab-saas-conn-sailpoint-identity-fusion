@@ -11,6 +11,11 @@
 import { jaroWinklerSimilarity } from './stringComparison'
 import { doubleMetaphone } from 'double-metaphone'
 
+// Module-level regex constants — compiled once, reused on every normalizeName call (hot scoring loop)
+const NAME_DIACRITICS_RE = /[\u0300-\u036f]/g
+const NAME_SPECIAL_CHARS_RE = /[^a-z0-9\s]/g
+const NAME_WHITESPACE_RE = /\s+/g
+
 /**
  * Match two names and return a similarity score between 0 and 1
  *
@@ -79,9 +84,9 @@ function normalizeName(name: string): string {
     return name
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-        .replace(/[^a-z0-9\s]/g, '') // Remove special chars except spaces
-        .replace(/\s+/g, ' ') // Normalize whitespace
+        .replace(NAME_DIACRITICS_RE, '') // Remove diacritics
+        .replace(NAME_SPECIAL_CHARS_RE, '') // Remove special chars except spaces
+        .replace(NAME_WHITESPACE_RE, ' ') // Normalize whitespace
         .trim()
 }
 

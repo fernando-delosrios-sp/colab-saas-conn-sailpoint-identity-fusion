@@ -43,6 +43,8 @@ export class ClientService {
     private readonly requestTimeoutMs?: number
     /** Number of pages to fetch in parallel inside paginateParallel. */
     private readonly parallelBatchSize: number
+    /** Handle for the stats logging interval so it can be cleared in dispose(). */
+    private statsLoggingInterval?: ReturnType<typeof setInterval>
 
     // Lazy-loaded API instances
     private _accountsApi?: AccountsV2025Api
@@ -109,10 +111,7 @@ export class ClientService {
 
             // parallelBatchSize caps concurrent page fetches in paginateParallel at the
             // smaller of the explicit config value and maxConcurrentRequests, defaulting to 10.
-            this.parallelBatchSize = Math.min(
-                fusionConfig.parallelBatchSize ?? 10,
-                maxConcurrentRequests
-            )
+            this.parallelBatchSize = Math.min(fusionConfig.parallelBatchSize ?? 10, maxConcurrentRequests)
 
             const queueConfig: QueueConfig = {
                 requestsPerSecond,
@@ -552,14 +551,15 @@ export class ClientService {
     }
 
     /**
-     * Start periodic stats logging (only called when queue is enabled)
+     * Start periodic stats logging (only called when queue is enabled).
+     * The interval handle is stored so it can be cleared by dispose().
      */
     protected startStatsLogging(): void {
         if (!this.queue) {
             return
         }
 
-        setInterval(() => {
+        this.statsLoggingInterval = setInterval(() => {
             const stats = this.queue!.getStats()
             if (stats.queueLength > 0 || stats.activeRequests > 0) {
                 this.log.info(
@@ -570,6 +570,18 @@ export class ClientService {
                 )
             }
         }, STATS_LOGGING_INTERVAL_MS)
+    }
+
+    /**
+     * Release resources held by this client (stats logging interval, queue).
+     * Safe to call multiple times.
+     */
+    public dispose(): void {
+        if (this.statsLoggingInterval !== undefined) {
+            clearInterval(this.statsLoggingInterval)
+            this.statsLoggingInterval = undefined
+        }
+        this.queue?.stop()
     }
 
     /**

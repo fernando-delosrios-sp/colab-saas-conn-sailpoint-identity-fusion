@@ -104,6 +104,8 @@ export class FusionAccount {
 
     // Read-only configuration (set in constructor)
     private readonly sourceConfigs: SourceConfig[]
+    /** Cached Set of configured source names for O(1) `.has()` lookups. */
+    private readonly sourceConfigNamesSet: Set<string>
     private readonly fusionAccountRefreshThresholdInSeconds: number
     private readonly maxHistoryMessages: number
 
@@ -120,6 +122,7 @@ export class FusionAccount {
             )
         }
         this.sourceConfigs = config.sources
+        this.sourceConfigNamesSet = new Set(config.sources.map((sc) => sc.name))
         this.fusionAccountRefreshThresholdInSeconds = config.fusionAccountRefreshThresholdInSeconds
         this.maxHistoryMessages = config.maxHistoryMessages
     }
@@ -558,6 +561,27 @@ export class FusionAccount {
         return [...this._history]
     }
 
+    // Zero-copy read-only set accessors — use these in hot loops to avoid per-access array allocation.
+    /** Direct reference to the correlated account IDs set (no copy). */
+    public get accountIdsSet(): ReadonlySet<string> {
+        return this._accountIds
+    }
+
+    /** Direct reference to the missing account IDs set (no copy). */
+    public get missingAccountIdsSet(): ReadonlySet<string> {
+        return this._missingAccountIds
+    }
+
+    /** Direct reference to the statuses set (no copy). */
+    public get statusesSet(): ReadonlySet<string> {
+        return this._statuses
+    }
+
+    /** Direct reference to the fusion matches array (no copy). */
+    public get fusionMatchesRaw(): readonly FusionMatch[] {
+        return this._fusionMatches
+    }
+
     // ============================================================================
     // Accessors - Attributes
     // ============================================================================
@@ -947,7 +971,7 @@ export class FusionAccount {
      */
     public clearFusionIdentityReferences(): void {
         for (const match of this._fusionMatches) {
-            ; (match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
+            ;(match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
         }
     }
 
@@ -1042,9 +1066,8 @@ export class FusionAccount {
             this._needsRefresh = true
         }
 
-        const sourceNames = this.sourceConfigs.map((sc) => sc.name)
         identity.accounts?.forEach((account) => {
-            if (sourceNames.includes(account.source?.name ?? '')) {
+            if (this.sourceConfigNamesSet.has(account.source?.name ?? '')) {
                 const managedAccountKey = buildManagedAccountKey({
                     sourceId: account.source?.id,
                     nativeIdentity: readString(account, 'nativeIdentity'),
@@ -1080,9 +1103,15 @@ export class FusionAccount {
         pruneDeletedManagedAccounts = false,
         addAssociationHistory = true
     ): void {
-        const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> =>
-            new Set(Array.from(input, (value) => normalizeCompositeManagedAccountKey(value)).filter(isDefined))
-        const isDefined = (value: string | undefined): value is string => value !== undefined
+        // Build output set iteratively to avoid the intermediate Array.from + filter allocation.
+        const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> => {
+            const result = new Set<string>()
+            for (const value of input) {
+                const normalized = normalizeCompositeManagedAccountKey(value)
+                if (normalized !== undefined) result.add(normalized)
+            }
+            return result
+        }
 
         this._previousAccountIds = normalizeManagedAccountKeySet(this._previousAccountIds)
         this._missingAccountIds = normalizeManagedAccountKeySet(this._missingAccountIds)
@@ -1141,8 +1170,7 @@ export class FusionAccount {
                 const account = allAccountsById.get(accountId)
                 if (!account?.sourceName) continue
                 const parsed = parseManagedAccountKey(accountId)
-                const nativeId =
-                    String(account.nativeIdentity ?? parsed?.nativeIdentity ?? '').trim() || accountId
+                const nativeId = String(account.nativeIdentity ?? parsed?.nativeIdentity ?? '').trim() || accountId
                 this.setManagedAccountInfo(accountId, account.sourceName, nativeId)
             }
         }
@@ -1248,7 +1276,9 @@ export class FusionAccount {
             if (addAssociationHistory) {
                 const accountLabel = String(account.name ?? account.nativeIdentity ?? accountId).trim() || accountId
                 const sourceLabel = account.sourceName ?? this._sourceName
-                this.addHistory(`Associated managed account ${this.formatHistoryAccountInfo(accountLabel, sourceLabel)}`)
+                this.addHistory(
+                    `Associated managed account ${this.formatHistoryAccountInfo(accountLabel, sourceLabel)}`
+                )
             }
         }
 
@@ -1261,8 +1291,7 @@ export class FusionAccount {
 
         if (account.sourceName) {
             const parsedKey = parseManagedAccountKey(accountId)
-            const schemaNative =
-                String(account.nativeIdentity ?? parsedKey?.nativeIdentity ?? '').trim() || accountId
+            const schemaNative = String(account.nativeIdentity ?? parsedKey?.nativeIdentity ?? '').trim() || accountId
             this.setManagedAccountInfo(accountId, account.sourceName, schemaNative)
 
             const contextAttributes = {

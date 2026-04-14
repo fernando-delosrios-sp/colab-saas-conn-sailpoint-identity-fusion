@@ -6,6 +6,9 @@ import { State, City } from './geoData'
 import parseAddressString from 'parse-address-string'
 import { capitalizeFirst } from '../../utils'
 
+/** Lowercase name particles treated as non-capitalised in proper-case formatting. */
+const NAME_PARTICLES = new Set(['van', 'von', 'de', 'del', 'della', 'di', 'da', 'le', 'la'])
+
 /**
  * Wraps a Normalize helper that may return undefined or throw.
  * Returns '' on failure so Velocity renders nothing instead of the raw expression.
@@ -151,11 +154,7 @@ const isValidDateParts = (year: number, month: number, day: number): boolean => 
     if (day < 1 || day > 31) return false
 
     const utcDate = new Date(Date.UTC(year, month - 1, day))
-    return (
-        utcDate.getUTCFullYear() === year &&
-        utcDate.getUTCMonth() === month - 1 &&
-        utcDate.getUTCDate() === day
-    )
+    return utcDate.getUTCFullYear() === year && utcDate.getUTCMonth() === month - 1 && utcDate.getUTCDate() === day
 }
 
 const asUtcIso = (
@@ -276,9 +275,7 @@ const normalizeDate = (date: string, ambiguousPriority = DEFAULT_AMBIGUOUS_DATE_
     const input = date.trim()
 
     // Preserve timezone-aware ISO inputs as-is (validated).
-    const isoWithTimezone = input.match(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/
-    )
+    const isoWithTimezone = input.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/)
     if (isoWithTimezone) {
         const parsed = new Date(input)
         return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString()
@@ -343,7 +340,7 @@ const properCaseName = (name: string): string => {
             }
 
             // Handle lowercase particles (van, von, de, del, etc.)
-            if (['van', 'von', 'de', 'del', 'della', 'di', 'da', 'le', 'la'].includes(lower)) {
+            if (NAME_PARTICLES.has(lower)) {
                 return lower
             }
 

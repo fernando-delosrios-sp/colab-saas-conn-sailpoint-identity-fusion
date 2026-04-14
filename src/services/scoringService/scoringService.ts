@@ -5,6 +5,21 @@ import { FusionMatch, ScoreReport } from './types'
 import { scoreDice, scoreDoubleMetaphone, scoreJaroWinkler, scoreLIG3, scoreNameMatcher } from './helpers'
 import { isExactAttributeMatchScores } from './exactMatch'
 
+/** Build a skipped ScoreReport without spreading the full MatchingConfig. */
+function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreReport {
+    return {
+        attribute: matching.attribute,
+        algorithm: matching.algorithm,
+        fusionScore: matching.fusionScore,
+        mandatory: matching.mandatory,
+        skipMatchIfMissing: matching.skipMatchIfMissing,
+        score: 0,
+        isMatch: false,
+        skipped: true,
+        comment,
+    }
+}
+
 /** Algorithm id for the synthetic combined score row (excluded from exact-match checks). */
 export const WEIGHTED_MEAN_ALGORITHM = 'weighted-mean'
 
@@ -78,7 +93,7 @@ export class ScoringService {
             this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType)
             compared += 1
             if (earlyExitOnExactMatch) {
-                const matches = fusionAccount.fusionMatches
+                const matches = fusionAccount.fusionMatchesRaw
                 if (matches.length > 0 && isExactAttributeMatchScores(matches[matches.length - 1].scores)) {
                     break
                 }
@@ -105,7 +120,8 @@ export class ScoringService {
         const scores: ScoreReport[] = []
         let hasFailedMandatory = false
 
-        for (const matching of this.matchingConfigs) {
+        for (let i = 0; i < this.matchingConfigs.length; i++) {
+            const matching = this.matchingConfigs[i]
             const accountAttribute = fusionAccount.attributes[matching.attribute]
             const identityAttribute = fusionIdentity.attributes[matching.attribute]
             const skipForMissing = effectiveSkipMatchIfMissing(matching)
@@ -113,13 +129,7 @@ export class ScoringService {
                 this.isMissingMatchValue(accountAttribute) || this.isMissingMatchValue(identityAttribute)
 
             if (skipForMissing && hasMissingValue) {
-                scores.push({
-                    ...matching,
-                    skipped: true,
-                    score: 0,
-                    isMatch: false,
-                    comment: 'Rule skipped (missing value on one or both sides)',
-                })
+                scores.push(makeSkippedReport(matching, 'Rule skipped (missing value on one or both sides)'))
                 continue
             }
 
@@ -133,14 +143,8 @@ export class ScoringService {
                 hasFailedMandatory = true
                 // Push skipped entries for all remaining rules so the scores
                 // array stays structurally complete for report rendering.
-                for (const remaining of this.matchingConfigs.slice(this.matchingConfigs.indexOf(matching) + 1)) {
-                    scores.push({
-                        ...remaining,
-                        skipped: true,
-                        score: 0,
-                        isMatch: false,
-                        comment: 'Rule skipped (mandatory attribute failed)',
-                    })
+                for (let r = i + 1; r < this.matchingConfigs.length; r++) {
+                    scores.push(makeSkippedReport(this.matchingConfigs[r], 'Rule skipped (mandatory attribute failed)'))
                 }
                 break
             }
@@ -242,7 +246,7 @@ export class ScoringService {
             case 'custom':
                 this.log.crash('Custom algorithm not implemented')
         }
-        return { ...matchingConfig, score: 0, isMatch: false }
+        return makeSkippedReport(matchingConfig, 'Unknown algorithm')
     }
 
     /**

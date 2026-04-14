@@ -184,25 +184,26 @@ export const buildFusionReportStats = (
     const finishedDecisions = forms.finishedFusionDecisions ?? []
     const issueSummary = log.getAggregationIssueSummary()
     const decisionSourceType = (d: { sourceType?: SourceType }): SourceType => d.sourceType ?? SourceType.Authoritative
-    const decisionCountByType = finishedDecisions.reduce(
-        (acc, d) => {
-            const sourceType = decisionSourceType(d)
-            if (sourceType === SourceType.Record) acc.record += 1
-            else if (sourceType === SourceType.Orphan) acc.orphan += 1
-            else acc.authoritative += 1
-            return acc
-        },
-        { authoritative: 0, record: 0, orphan: 0 }
-    )
-    const authoritativeNewIdentities = finishedDecisions.filter(
-        (d) => decisionSourceType(d) === SourceType.Authoritative && d.newIdentity
-    ).length
-    const recordNoMatches = finishedDecisions.filter(
-        (d) => decisionSourceType(d) === SourceType.Record && d.newIdentity
-    ).length
-    const orphanNoMatches = finishedDecisions.filter(
-        (d) => decisionSourceType(d) === SourceType.Orphan && d.newIdentity
-    ).length
+    // Single pass over finishedDecisions to compute all five counters at once.
+    const decisionCountByType = { authoritative: 0, record: 0, orphan: 0 }
+    let authoritativeNewIdentities = 0
+    let recordNoMatches = 0
+    let orphanNoMatches = 0
+    let automaticMatches = 0
+    for (const d of finishedDecisions) {
+        const sourceType = decisionSourceType(d)
+        if (sourceType === SourceType.Record) {
+            decisionCountByType.record += 1
+            if (d.newIdentity) recordNoMatches += 1
+        } else if (sourceType === SourceType.Orphan) {
+            decisionCountByType.orphan += 1
+            if (d.newIdentity) orphanNoMatches += 1
+        } else {
+            decisionCountByType.authoritative += 1
+            if (d.newIdentity) authoritativeNewIdentities += 1
+        }
+        if (d.automaticAssignment === true) automaticMatches += 1
+    }
     const memoryUsage = process.memoryUsage()
     return {
         totalFusionAccounts: fusion.totalFusionAccountCount,
@@ -211,7 +212,7 @@ export const buildFusionReportStats = (
         fusionReviewAssignments: forms.formInstancesCreated,
         fusionReviewsFound: forms.formsFound,
         fusionReviewInstancesFound: forms.formInstancesFound,
-        fusionAutomaticMatches: finishedDecisions.filter((d) => d.automaticAssignment === true).length,
+        fusionAutomaticMatches: automaticMatches,
         fusionReviewsProcessed: forms.answeredFormInstancesProcessed,
         fusionReviewNewIdentities: authoritativeNewIdentities,
         fusionReviewNonMatches: recordNoMatches + orphanNoMatches,
