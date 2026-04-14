@@ -1,6 +1,10 @@
+// Must run before `velocityjs` is loaded (ESM `import` is hoisted ahead of this file's body).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+require('./velocityPrototypeGuard.cjs')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const velocityjs = require('velocityjs') as typeof import('velocityjs').default
 import { transliterate } from 'transliteration'
-import velocityjs from 'velocityjs'
-import { RenderContext } from 'velocityjs/dist/src/type'
+import type { RenderContext } from 'velocityjs/dist/src/type'
 import { logger } from '@sailpoint/connector-sdk'
 import { contextHelpers } from './contextHelpers'
 
@@ -54,6 +58,8 @@ export const evaluateVelocityTemplate = (
     maxLength?: number
 ): string | undefined => {
     const extendedContext: RenderContext = { ...context, ...contextHelpers }
+    // Null prototype so `$constructor` / `$__proto__` do not resolve via Object.prototype.
+    const renderContext = Object.assign(Object.create(null), extendedContext) as RenderContext
     logger.debug(`Evaluating velocity template - expression: ${expression}`)
 
     // Check cache for compiled template
@@ -66,10 +72,10 @@ export const evaluateVelocityTemplate = (
         logger.debug(`Compiled and cached new velocity template: ${expression}`)
     }
 
-    let result = velocity.render(extendedContext)
+    let result = velocity.render(renderContext)
 
     if (maxLength && result.length > maxLength) {
-        result = truncateResultToMaxLength(result, expression, extendedContext, maxLength)
+        result = truncateResultToMaxLength(result, expression, renderContext, maxLength)
     }
 
     if (result === '') {

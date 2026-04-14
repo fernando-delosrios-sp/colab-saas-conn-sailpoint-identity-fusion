@@ -27,6 +27,22 @@ describe('evaluateVelocityTemplate', () => {
             const result = evaluateVelocityTemplate('$firstName $lastName', context)
             expect(result).toBe('John $lastName')
         })
+
+        it('does not expose Function via Date.constructor prototype chain (SSTI / RCE)', () => {
+            const context = { d: new Date('2020-01-01T00:00:00.000Z') }
+            const malicious =
+                '#set($f=$d.constructor.constructor("return \\"pwned\\""))$f()'
+            const result = evaluateVelocityTemplate(malicious, context)
+            expect(result).not.toBe('pwned')
+            expect(result == null || String(result).includes('pwned')).toBe(false)
+        })
+
+        it('does not resolve $constructor from Object.prototype on the context root', () => {
+            const context = { x: 'ok' }
+            const expr = '#set($f=$constructor("return \\"pwned\\""))$f()'
+            const result = evaluateVelocityTemplate(expr, context)
+            expect(result).not.toBe('pwned')
+        })
     })
 
     // ========================================================================
