@@ -42,12 +42,17 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         clearManagedAccounts: jest.fn(),
         clearFusionAccounts: jest.fn(),
         getSourceByName: jest.fn(),
+        getSourceByNameSafe: jest.fn(),
         managedSources: [],
         managedAccountsById: new Map(),
         managedAccountsAllById: new Map(),
         fusionAccountCount: 0,
+        hasFusionSource: true,
         fusionSourceOwner: { id: 'fusion-owner' },
     }
+    sources.getSourceByNameSafe.mockImplementation((sourceName?: string | null) =>
+        sourceName ? sources.getSourceByName(sourceName) : undefined
+    )
 
     const identities = {
         fetchIdentities: jest.fn().mockResolvedValue(undefined),
@@ -60,6 +65,8 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
     const forms = {
         deleteExistingForms: jest.fn().mockResolvedValue(undefined),
         fetchFormData: jest.fn().mockResolvedValue(undefined),
+        fetchFormInstancesData: jest.fn().mockResolvedValue(undefined),
+        processFetchedFormData: jest.fn().mockResolvedValue(undefined),
         cleanUpForms: jest.fn().mockResolvedValue(undefined),
     }
 

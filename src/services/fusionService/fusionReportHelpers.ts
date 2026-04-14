@@ -1,4 +1,5 @@
 import { FusionAccount } from '../../model/account'
+import { SourceType } from '../../model/config'
 import { pickAttributes } from '../../utils/attributes'
 import { roundMetric2 } from '../../utils/numbers'
 import { UrlContext } from '../../utils/url'
@@ -71,7 +72,6 @@ export function getFusionReportAccountLabel(fusionAccount: FusionAccount): strin
 
     const uid = String(
         fusionAccount.managedAccountId ??
-            fusionAccount.nativeIdentityOrUndefined ??
             fusionAccount.identityId ??
             ''
     ).trim()
@@ -92,8 +92,8 @@ export function buildMinimalFusionReportAccount(
         accountName: getFusionReportAccountLabel(fusionAccount),
         accountUrl: urlContext.humanAccount(fusionAccount.managedAccountId),
         accountSource: fusionAccount.sourceName,
-        sourceType: (sourceType as FusionReportAccount['sourceType']) ?? 'authoritative',
-        accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
+        sourceType: (sourceType as FusionReportAccount['sourceType']) ?? SourceType.Authoritative,
+        accountId: fusionAccount.managedAccountId,
         accountEmail: fusionAccount.email,
         accountAttributes: pickAttributes(fusionAccount.attributes as any, reportAttributes),
         matches: [],

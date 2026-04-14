@@ -1,3 +1,5 @@
+import { SourceType } from '../../model/config'
+
 // ============================================================================
 // Type Definitions — Fusion Report
 // ============================================================================
@@ -53,7 +55,7 @@ export type FusionReportAccount = {
     /** Name of the source the account belongs to */
     accountSource: string
     /** Source processing type (authoritative, record, or orphan) */
-    sourceType?: 'authoritative' | 'record' | 'orphan'
+    sourceType?: SourceType
     /** ISC account ID */
     accountId?: string
     /** Email address from the account attributes */
@@ -89,7 +91,7 @@ export type FusionReportDecision = {
     /** Managed source name */
     accountSource: string
     /** Source processing type (authoritative, record, or orphan) */
-    sourceType?: 'authoritative' | 'record' | 'orphan'
+    sourceType?: SourceType
     /** Canonical decision identifier used by templates */
     decision: 'assign-existing-identity' | 'create-new-identity' | 'confirm-no-match'
     /** Human-friendly decision text */

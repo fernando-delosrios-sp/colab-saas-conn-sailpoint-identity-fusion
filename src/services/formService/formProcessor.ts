@@ -2,6 +2,7 @@ import { FormInstanceResponseV2025, FormDefinitionInputV2025 } from 'sailpoint-a
 import { logger } from '@sailpoint/connector-sdk'
 import { SourceType } from '../../model/config'
 import { FusionDecision } from '../../model/form'
+import { isCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { IdentityService } from '../identityService'
 import { assert } from '../../utils/assert'
 import { readString } from '../../utils/safeRead'
@@ -265,6 +266,12 @@ export const createFusionDecision = async (
         ...(sourceIdNorm ? { sourceId: sourceIdNorm } : {}),
         ...(nativeIdNorm ? { nativeIdentity: nativeIdNorm } : {}),
     }
+    if (!isCompositeManagedAccountKey(accountInfo.id)) {
+        logger.error(
+            `[formProcessor] Form ${formInstance.id}: account id "${accountInfo.id}" is not a managed account key (sourceId::nativeIdentity). Skipping decision.`
+        )
+        return null
+    }
 
     return {
         submitter: reviewer,
@@ -283,7 +290,9 @@ export const createFusionDecision = async (
 const extractSourceType = (formInput: any): SourceType => {
     if (typeof formInput?.sourceType === 'string') {
         const value = formInput.sourceType as string
-        if (value === 'authoritative' || value === 'record' || value === 'orphan') return value
+        if (value === SourceType.Authoritative || value === SourceType.Record || value === SourceType.Orphan) {
+            return value as SourceType
+        }
     }
-    return 'authoritative'
+    return SourceType.Authoritative
 }

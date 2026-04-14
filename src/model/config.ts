@@ -142,7 +142,11 @@ export interface ScopeSection {
     identityScopeQuery?: string
 }
 
-export type SourceType = 'authoritative' | 'record' | 'orphan'
+export enum SourceType {
+    Authoritative = 'authoritative',
+    Record = 'record',
+    Orphan = 'orphan',
+}
 
 export type CorrelationMode = 'correlate' | 'reverse' | 'none'
 

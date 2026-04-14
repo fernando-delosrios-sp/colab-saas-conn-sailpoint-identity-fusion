@@ -1,6 +1,6 @@
 import { Account, IdentityDocument } from 'sailpoint-api-client'
 import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
-import { FusionConfig } from '../../model/config'
+import { FusionConfig, SourceType } from '../../model/config'
 import { LogService } from '../logService'
 import { FormService } from '../formService'
 import { FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT } from '../formService/constants'
@@ -375,9 +375,7 @@ export class FusionService {
 
             authorizedLinkDecision = this.forms.getFusionAssignmentDecision(identityId)
             if (authorizedLinkDecision) {
-                fusionAccount.addFusionDecisionLayer(authorizedLinkDecision, (raw) =>
-                    this.sources.resolveManagedAccountKey(raw)
-                )
+                fusionAccount.addFusionDecisionLayer(authorizedLinkDecision)
             }
             this.log.debug(`Applied identity layer for ${fusionAccount.name}: identityId=${identityId}`)
         }
@@ -388,7 +386,6 @@ export class FusionService {
             this.sources.managedAccountsById,
             this.sources.managedAccountsByIdentityId,
             this.sources.managedAccountsAllById,
-            this.sources.managedAccountKeysByRawId,
             this.shouldPruneDeletedManagedAccounts()
         )
         this.log.debug(
@@ -508,7 +505,7 @@ export class FusionService {
             await this.identities.correlateAccounts(fusionAccount, directCorrelateIds)
         }
 
-        // Reverse correlation: set attribute to first missing account name per source
+        // Reverse correlation: set attribute to first missing account nativeIdentity per source
         for (const [sourceName, accountIds] of bySource) {
             const sourceConfig = this.sources.getSourceConfig(sourceName)
             if (!sourceConfig?.correlationAttribute) continue
@@ -687,7 +684,6 @@ export class FusionService {
                 this.sources.managedAccountsById,
                 this.sources.managedAccountsByIdentityId,
                 this.sources.managedAccountsAllById,
-                this.sources.managedAccountKeysByRawId,
                 this.shouldPruneDeletedManagedAccounts()
             )
 
@@ -778,7 +774,7 @@ export class FusionService {
      * @returns The fusion account produced or updated, or undefined if the decision was skipped
      */
     public async processFusionIdentityDecision(fusionDecision: FusionDecision): Promise<FusionAccount | undefined> {
-        const sourceType = fusionDecision.sourceType ?? 'authoritative'
+        const sourceType = fusionDecision.sourceType ?? SourceType.Authoritative
         let selectedIdentity: IdentityDocument | undefined
 
         // Enrich submitter and selected identity display names for user-facing output:
@@ -862,13 +858,12 @@ export class FusionService {
         // Only new-identity decisions should force a full reset. Authorized decisions
         // must preserve immutable mapped fields (for example display/account name).
         fusionAccount.setNeedsReset(Boolean(fusionDecision.newIdentity))
-        fusionAccount.addFusionDecisionLayer(fusionDecision, (raw) => this.sources.resolveManagedAccountKey(raw))
+        fusionAccount.addFusionDecisionLayer(fusionDecision)
         const suppressAssociationHistoryForAuthorizedDecision = isAuthorizedDecision
         fusionAccount.addManagedAccountLayer(
             this.sources.managedAccountsById,
             this.sources.managedAccountsByIdentityId,
             this.sources.managedAccountsAllById,
-            this.sources.managedAccountKeysByRawId,
             this.shouldPruneDeletedManagedAccounts(),
             !suppressAssociationHistoryForAuthorizedDecision
         )
@@ -882,18 +877,18 @@ export class FusionService {
         }
 
         if (fusionDecision.newIdentity) {
-            if (sourceType === 'record') {
+            if (sourceType === SourceType.Record) {
                 this.log.debug(
                     `Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`
                 )
                 await this.attributes.registerUniqueAttributes(fusionAccount)
                 return undefined
             }
-            if (sourceType === 'orphan') {
+            if (sourceType === SourceType.Orphan) {
                 this.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
                 const sourceInfo = this.sourcesByName.get(fusionDecision.account.sourceName)
                 if (sourceInfo?.config?.disableNonMatchingAccounts) {
-                    const decisionManagedKey = this.sources.resolveManagedAccountKey(fusionDecision.account.id)
+                    const decisionManagedKey = String(fusionDecision.account.id ?? '').trim()
                     const managedAccount = decisionManagedKey
                         ? this.sources.managedAccountsById.get(decisionManagedKey)
                         : undefined
@@ -1010,18 +1005,18 @@ export class FusionService {
      *          the managed-account work queue for this run; they are expected to be re-fetched next aggregation.
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
-        const sourceInfo = this.sourcesByName.get(account.sourceName ?? '')
-        const sourceType = sourceInfo?.sourceType ?? 'authoritative'
+        const sourceInfo = account.sourceName ? this.sourcesByName.get(account.sourceName) : undefined
+        const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
 
         if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
             const fusionAccount = await this.preProcessManagedAccount(account)
-            if (sourceType !== 'authoritative') {
+            if (sourceType !== SourceType.Authoritative) {
                 this.log.debug(
                     `Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`
                 )
-                if (sourceType === 'record') {
+                if (sourceType === SourceType.Record) {
                     await this.attributes.registerUniqueAttributes(fusionAccount)
-                } else if (sourceType === 'orphan' && sourceInfo?.config?.disableNonMatchingAccounts) {
+                } else if (sourceType === SourceType.Orphan && sourceInfo?.config?.disableNonMatchingAccounts) {
                     this.queueDisableOperation(account)
                 }
                 return undefined
@@ -1095,12 +1090,12 @@ export class FusionService {
             return undefined
         } else {
             // Non-match handling varies by source type
-            if (sourceType === 'record') {
+            if (sourceType === SourceType.Record) {
                 await this.attributes.registerUniqueAttributes(fusionAccount)
                 return undefined
             }
 
-            if (sourceType === 'orphan') {
+            if (sourceType === SourceType.Orphan) {
                 if (sourceInfo?.config?.disableNonMatchingAccounts) {
                     this.queueDisableOperation(account)
                 }
@@ -1188,14 +1183,14 @@ export class FusionService {
     }
 
     /**
-     * Analyze all managed accounts and return an array of FusionAccount.
-     * Used by on-demand report generation (non-StdAccountList path).
-     * Iterates Map directly to avoid materializing a large array.
-     * Runs sequentially to preserve deferred-candidate visibility between managed accounts.
+     * Full sequential scan of every loaded managed account, returning a FusionAccount per entry.
+     * Used when correlating outside the primary fusion-ISC stream (e.g. dry-run emission for
+     * uncorrelated / work-queue remainder). Iterates the map directly; runs sequentially so
+     * deferred-candidate visibility is preserved between managed accounts.
      *
      * @returns Array of FusionAccount with match results populated for each
      */
-    public async analyzeManagedAccounts(): Promise<FusionAccount[]> {
+    public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
         const results: FusionAccount[] = []
@@ -1235,7 +1230,9 @@ export class FusionService {
     public async analyzeManagedAccount(account: Account): Promise<FusionAccount> {
         const { name, sourceName } = account
         const fusionAccount = await this.preProcessManagedAccount(account)
-        const sourceType = this.sourcesByName.get(account.sourceName ?? '')?.sourceType ?? 'authoritative'
+        const sourceType =
+            (account.sourceName ? this.sourcesByName.get(account.sourceName)?.sourceType : undefined) ??
+            SourceType.Authoritative
         // When exact-match auto-assignment is enabled, exclude identities already claimed in
         // this run so a second managed account cannot match against a spoken-for identity.
         const identityPool =
@@ -1307,7 +1304,7 @@ export class FusionService {
             }
         } else {
             this.log.debug(`No match found for managed account: ${name} [${sourceName}]`)
-            if (sourceType === 'authoritative' && this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
+            if (sourceType === SourceType.Authoritative && this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
                 // Keep current-run authoritative non-matches available as deferred candidates
                 // for subsequent managed-account analysis in custom:dryrun.
                 this.registerCurrentRunUnmatchedCandidate(fusionAccount)

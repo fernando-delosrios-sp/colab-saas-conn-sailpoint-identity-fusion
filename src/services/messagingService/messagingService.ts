@@ -6,7 +6,7 @@ import {
     CreateWorkflowRequestV2025,
 } from 'sailpoint-api-client'
 import type { TemplateDelegate as HandlebarsTemplateDelegate } from 'handlebars'
-import { FusionConfig } from '../../model/config'
+import { FusionConfig, SourceType } from '../../model/config'
 import { ClientService } from '../clientService'
 import { LogService } from '../logService'
 import { EmailWorkflow } from '../../model/emailWorkflow'
@@ -269,7 +269,7 @@ export class MessagingService {
         context?: {
             accountName: string
             accountSource: string
-            sourceType?: 'authoritative' | 'record' | 'orphan'
+            sourceType?: SourceType
             accountId?: string
             accountEmail?: string
             accountAttributes: Record<string, any>
@@ -314,8 +314,10 @@ export class MessagingService {
         const sourceTypeInput = readString(formInput, 'sourceType')
         const sourceType =
             context?.sourceType ??
-            (sourceTypeInput === 'authoritative' || sourceTypeInput === 'record' || sourceTypeInput === 'orphan'
-                ? sourceTypeInput
+            (sourceTypeInput === SourceType.Authoritative ||
+            sourceTypeInput === SourceType.Record ||
+            sourceTypeInput === SourceType.Orphan
+                ? (sourceTypeInput as SourceType)
                 : undefined)
         const emailData: FusionReviewEmailData = {
             headerSubtitle: this.buildEmailHeaderSubtitle(),

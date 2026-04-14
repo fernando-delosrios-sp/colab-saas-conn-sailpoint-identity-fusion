@@ -22,7 +22,7 @@ import {
     AttributeDefinitionTypeV2025,
 } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
-import { BaseConfig, FusionConfig, SourceConfig } from '../../model/config'
+import { BaseConfig, FusionConfig, SourceConfig, SourceType } from '../../model/config'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
 import { assert } from '../../utils/assert'
@@ -38,7 +38,7 @@ import {
 } from './sourceReverseCorrelationErrors'
 import { SourceInfo } from './types'
 import { CompiledAccountJmespathFilter, compileAccountJmespathFilter } from './accountJmespathFilter'
-import { getManagedAccountKeyFromAccount, resolveManagedAccountKey } from '../../model/managedAccountKey'
+import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 
 type ReverseCorrelationArtifact =
     | 'fusion_schema_attribute'
@@ -53,7 +53,7 @@ interface ReverseCorrelationSetupStatus {
 
 /** Authoritative sources need fusion schema + identity profile mapping for reverse correlation; record/orphan only identity attribute + managed-source correlation. */
 function requiresFullReverseCorrelationArtifacts(sourceConfig: SourceConfig): boolean {
-    return (sourceConfig.sourceType ?? 'authoritative') === 'authoritative'
+    return (sourceConfig.sourceType ?? SourceType.Authoritative) === SourceType.Authoritative
 }
 
 // ============================================================================
@@ -91,8 +91,6 @@ export class SourceService {
     // Secondary index: identityId → Set of account IDs for O(1) identity-based lookups
     // in addManagedAccountLayer. Kept in sync with managedAccountsById.
     public managedAccountsByIdentityId: Map<string, Set<string>> = new Map()
-    // Compatibility index: raw ISC account id -> managed account key
-    public managedAccountKeysByRawId: Map<string, string> = new Map()
     public fusionAccountsByNativeIdentity?: Map<string, Account>
 
     /**
@@ -108,7 +106,6 @@ export class SourceService {
         this.managedAccountsById.clear()
         this.managedAccountsAllById.clear()
         this.managedAccountsByIdentityId.clear()
-        this.managedAccountKeysByRawId.clear()
         this.log.debug('Managed accounts cache cleared from memory')
     }
 
@@ -299,7 +296,7 @@ export class SourceService {
                 id: apiSource.id!,
                 name: apiSource.name!,
                 isManaged: true,
-                sourceType: sourceConfig.sourceType ?? 'authoritative',
+                sourceType: sourceConfig.sourceType ?? SourceType.Authoritative,
                 config: sourceConfig,
             })
         }
@@ -325,7 +322,7 @@ export class SourceService {
                 id: fusionSource.id!,
                 name: fusionSource.name!,
                 isManaged: false,
-                sourceType: 'authoritative',
+                sourceType: SourceType.Authoritative,
                 config: undefined,
                 owner: this._fusionSourceOwner,
             })
@@ -420,10 +417,19 @@ export class SourceService {
     }
 
     /**
-     * Get source info by name
+     * Get source info by exact name.
      */
     public getSourceByName(name: string): SourceInfo | undefined {
         return this.sourcesByName.get(name)
+    }
+
+    /**
+     * Get source info by optional name.
+     * Missing or blank source names are treated as unresolved.
+     */
+    public getSourceByNameSafe(name?: string | null): SourceInfo | undefined {
+        if (!name?.trim()) return undefined
+        return this.getSourceByName(name)
     }
 
     // ------------------------------------------------------------------------
@@ -635,24 +641,22 @@ export class SourceService {
                                 discardedMachineCount++
                                 continue
                             }
-                            if (account.id) {
-                                const accountKey = getManagedAccountKeyFromAccount(account)
-                                if (!accountKey) {
-                                    continue
-                                }
-                                this.managedAccountsById.set(accountKey, account)
-                                this.managedAccountsAllById.set(accountKey, account)
-                                this.managedAccountKeysByRawId.set(account.id, accountKey)
-                                if (account.identityId) {
-                                    let idSet = this.managedAccountsByIdentityId.get(account.identityId)
-                                    if (!idSet) {
-                                        idSet = new Set()
-                                        this.managedAccountsByIdentityId.set(account.identityId, idSet)
-                                    }
-                                    idSet.add(accountKey)
-                                }
-                                collectedCount++
+
+                            const accountKey = getManagedAccountKeyFromAccount(account)
+                            if (!accountKey) {
+                                continue
                             }
+                            this.managedAccountsById.set(accountKey, account)
+                            this.managedAccountsAllById.set(accountKey, account)
+                            if (account.identityId) {
+                                let idSet = this.managedAccountsByIdentityId.get(account.identityId)
+                                if (!idSet) {
+                                    idSet = new Set()
+                                    this.managedAccountsByIdentityId.set(account.identityId, idSet)
+                                }
+                                idSet.add(accountKey)
+                            }
+                            collectedCount++
                         }
                         if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) {
                             this.log.info(
@@ -716,8 +720,8 @@ export class SourceService {
             this.log.warn(`Managed account not found for id: ${id}`)
             return
         }
-        const sourceName = managedAccount.sourceName ?? ''
-        const sourceInfo = this.getSourceByName(sourceName)
+        const sourceName = managedAccount.sourceName
+        const sourceInfo = this.getSourceByNameSafe(sourceName)
         if (!sourceInfo?.isManaged) {
             this.log.warn(
                 `Discarded account ${id} from non-configured managed source "${sourceName || 'unknown'}" during single-account fetch`
@@ -742,7 +746,6 @@ export class SourceService {
         }
         this.managedAccountsById.set(accountKey, managedAccount)
         this.managedAccountsAllById.set(accountKey, managedAccount)
-        this.managedAccountKeysByRawId.set(managedAccount.id!, accountKey)
         if (managedAccount.identityId) {
             let idSet = this.managedAccountsByIdentityId.get(managedAccount.identityId)
             if (!idSet) {
@@ -751,10 +754,6 @@ export class SourceService {
             }
             idSet.add(accountKey)
         }
-    }
-
-    public resolveManagedAccountKey(value: string | undefined | null): string | undefined {
-        return resolveManagedAccountKey(value, (rawId) => this.managedAccountKeysByRawId.get(rawId))
     }
 
     /**

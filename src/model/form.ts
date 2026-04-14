@@ -1,4 +1,5 @@
 import { Attributes } from '@sailpoint/connector-sdk'
+import { SourceType } from './config'
 
 
 /** Account representation used in fusion review forms, including optional match score. */
@@ -79,7 +80,7 @@ export type FusionDecision = {
      */
     formUrl?: string
     /** Source type of the managed source this decision pertains to. */
-    sourceType?: 'authoritative' | 'record' | 'orphan'
+    sourceType?: SourceType
 }
 /** Data payload for creating a new fusion review form instance. */
 export type FusionRequest = {

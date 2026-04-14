@@ -2,7 +2,6 @@ import {
     buildManagedAccountKey,
     isCompositeManagedAccountKey,
     parseManagedAccountKey,
-    resolveManagedAccountKey,
 } from '../managedAccountKey'
 
 describe('managedAccountKey helpers', () => {
@@ -17,12 +16,6 @@ describe('managedAccountKey helpers', () => {
 
     it('returns undefined when composite fields are missing', () => {
         expect(buildManagedAccountKey({})).toBeUndefined()
-    })
-
-    it('resolves legacy raw id to composite using lookup', () => {
-        expect(resolveManagedAccountKey('raw-1', (rawId) => (rawId === 'raw-1' ? 'source-a::native-1' : undefined))).toBe(
-            'source-a::native-1'
-        )
     })
 
     it('detects and parses composite keys', () => {

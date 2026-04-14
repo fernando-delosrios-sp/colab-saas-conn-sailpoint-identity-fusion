@@ -7,20 +7,21 @@ import {
     FusionReportStats,
 } from '../../services/fusionService/types'
 import { FusionDecision } from '../../model/form'
+import { SourceType } from '../../model/config'
 import { createUrlContext } from '../../utils/url'
 import { readString } from '../../utils/safeRead'
 import { setupPhase, fetchPhase, processPhase } from './corePipeline'
 
 const toReportDecision = (
     decision: FusionDecision,
-    resolveSourceType?: (sourceName?: string) => 'authoritative' | 'record' | 'orphan' | undefined,
+    resolveSourceType?: (sourceName?: string) => SourceType | undefined,
     resolveReviewerName?: (reviewerId?: string) => string | undefined,
     resolveReviewerUrl?: (reviewerId?: string) => string | undefined,
     resolveAccountUrl?: (accountId?: string) => string | undefined,
     resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string }
 ): FusionReportDecision => {
-    const sourceType = decision.sourceType ?? resolveSourceType?.(decision.account.sourceName) ?? 'authoritative'
-    const isNoMatchSource = sourceType === 'record' || sourceType === 'orphan'
+    const sourceType = decision.sourceType ?? resolveSourceType?.(decision.account.sourceName) ?? SourceType.Authoritative
+    const isNoMatchSource = sourceType === SourceType.Record || sourceType === SourceType.Orphan
     const decisionType = decision.newIdentity
         ? isNoMatchSource
             ? 'confirm-no-match'
@@ -131,8 +132,8 @@ export const buildFusionReviewDecisions = (serviceRegistry: ServiceRegistry): Fu
     const { forms, identities, sources } = serviceRegistry
     const finishedDecisions = forms.finishedFusionDecisions ?? []
     const urlContext = createUrlContext(serviceRegistry.config.baseurl)
-    const resolveSourceType = (sourceName?: string): 'authoritative' | 'record' | 'orphan' | undefined =>
-        sourceName ? sources.getSourceByName(sourceName)?.sourceType : undefined
+    const resolveSourceType = (sourceName?: string): SourceType | undefined =>
+        sources.getSourceByNameSafe(sourceName)?.sourceType
     const resolveReviewerName = (reviewerId?: string): string | undefined => {
         if (!reviewerId) return undefined
         const reviewer = identities.getIdentityById(reviewerId)
@@ -182,24 +183,22 @@ export const buildFusionReportStats = (
     const { fusion, forms, log } = serviceRegistry
     const finishedDecisions = forms.finishedFusionDecisions ?? []
     const issueSummary = log.getAggregationIssueSummary()
-    const decisionSourceType = (d: {
-        sourceType?: 'authoritative' | 'record' | 'orphan'
-    }): 'authoritative' | 'record' | 'orphan' => d.sourceType ?? 'authoritative'
+    const decisionSourceType = (d: { sourceType?: SourceType }): SourceType => d.sourceType ?? SourceType.Authoritative
     const decisionCountByType = finishedDecisions.reduce(
         (acc, d) => {
             const sourceType = decisionSourceType(d)
-            if (sourceType === 'record') acc.record += 1
-            else if (sourceType === 'orphan') acc.orphan += 1
+            if (sourceType === SourceType.Record) acc.record += 1
+            else if (sourceType === SourceType.Orphan) acc.orphan += 1
             else acc.authoritative += 1
             return acc
         },
         { authoritative: 0, record: 0, orphan: 0 }
     )
     const authoritativeNewIdentities = finishedDecisions.filter(
-        (d) => decisionSourceType(d) === 'authoritative' && d.newIdentity
+        (d) => decisionSourceType(d) === SourceType.Authoritative && d.newIdentity
     ).length
-    const recordNoMatches = finishedDecisions.filter((d) => decisionSourceType(d) === 'record' && d.newIdentity).length
-    const orphanNoMatches = finishedDecisions.filter((d) => decisionSourceType(d) === 'orphan' && d.newIdentity).length
+    const recordNoMatches = finishedDecisions.filter((d) => decisionSourceType(d) === SourceType.Record && d.newIdentity).length
+    const orphanNoMatches = finishedDecisions.filter((d) => decisionSourceType(d) === SourceType.Orphan && d.newIdentity).length
     const memoryUsage = process.memoryUsage()
     return {
         totalFusionAccounts: fusion.totalFusionAccountCount,

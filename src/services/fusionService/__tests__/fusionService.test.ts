@@ -1256,7 +1256,7 @@ describe('FusionService', () => {
         })
     })
 
-    describe('analyzeManagedAccounts', () => {
+    describe('analyzeUncorrelatedAccounts', () => {
         it('uses first authoritative non-match as deferred candidate for subsequent account analysis', async () => {
             const firstAccount = {
                 id: 'acct-analyze-1',
@@ -1304,7 +1304,7 @@ describe('FusionService', () => {
                 return candidateList.length
             })
 
-            const analyzed = await fusionService.analyzeManagedAccounts()
+            const analyzed = await fusionService.analyzeUncorrelatedAccounts()
 
             expect(analyzed).toHaveLength(2)
             expect(analyzed[1].fusionMatches.some((match) => match.candidateType === 'new-unmatched')).toBe(true)

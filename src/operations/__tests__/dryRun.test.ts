@@ -39,6 +39,9 @@ function createRegistry() {
             getSourceByName: jest.fn((name: string) =>
                 name === 'IT' ? { sourceType: 'record' } : { sourceType: 'authoritative' }
             ),
+            getSourceByNameSafe: jest.fn((name?: string | null) =>
+                name ? (name === 'IT' ? { sourceType: 'record' } : { sourceType: 'authoritative' }) : undefined
+            ),
             clearManagedAccounts: jest.fn(),
             clearFusionAccounts: jest.fn(),
         },
@@ -60,7 +63,7 @@ function createRegistry() {
             processFusionAccounts: jest.fn().mockResolvedValue(undefined),
             processIdentities: jest.fn().mockResolvedValue(undefined),
             processFusionIdentityDecisions: jest.fn().mockResolvedValue(undefined),
-            analyzeManagedAccounts: jest.fn().mockResolvedValue([]),
+            analyzeUncorrelatedAccounts: jest.fn().mockResolvedValue([]),
             refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
             generateReport: jest.fn((_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
                 accounts: [
@@ -134,6 +137,8 @@ function createRegistry() {
         },
         forms: {
             fetchFormData: jest.fn().mockResolvedValue(undefined),
+            fetchFormInstancesData: jest.fn().mockResolvedValue(undefined),
+            processFetchedFormData: jest.fn().mockResolvedValue(undefined),
             pendingReviewContextByAccountId: new Map<string, any>(),
             cleanUpForms: jest.fn(),
         },
@@ -524,32 +529,29 @@ describe('dryRun', () => {
 
         await dryRun(registry, { schema: { attributes: [] }, includeMatched: true, includeDeferred: true } as any)
 
-        expect(registry.forms.fetchFormData).toHaveBeenCalled()
+        expect(registry.forms.fetchFormInstancesData).toHaveBeenCalled()
+        expect(registry.forms.processFetchedFormData).toHaveBeenCalled()
         expect(registry.fusion.refreshUniqueAttributes).toHaveBeenCalled()
         expect(registry.forms.cleanUpForms).not.toHaveBeenCalled()
         expect(registry.attributes.saveState).not.toHaveBeenCalled()
         expect(registry.fusion.processManagedAccounts).toHaveBeenCalled()
     })
 
-    it('continues when fusion source is unavailable', async () => {
+    it('fails when fusion source is unavailable', async () => {
         const registry = createRegistry()
         registry.sources.hasFusionSource = false
 
         await dryRun(registry, { schema: { attributes: [] }, includeMatched: true, includeDeferred: true } as any)
 
+        expect(registry.log.crash).toHaveBeenCalledWith(
+            'Failed to run custom:dryrun',
+            expect.objectContaining({
+                message:
+                    'Fusion source not found. The connector instance could not locate its own source in ISC. Verify the connector is properly deployed.',
+            })
+        )
         expect(registry.sources.fetchFusionAccounts).not.toHaveBeenCalled()
-        expect(registry.res.send).toHaveBeenCalled()
-    })
-
-    it('seeds incremental counters from existing fusion accounts after fetch', async () => {
-        const registry = createRegistry()
-        registry.sources.hasFusionSource = true
-        registry.sources.fusionAccounts = [{ attributes: { id: 'NG015' } }]
-        registry.attributes.seedIncrementalCountersFromRawAccounts = jest.fn().mockResolvedValue(undefined)
-
-        await dryRun(registry, { schema: { attributes: [] }, includeMatched: true } as any)
-
-        expect(registry.attributes.seedIncrementalCountersFromRawAccounts).toHaveBeenCalledWith(registry.sources.fusionAccounts)
+        expect(registry.res.send).not.toHaveBeenCalled()
     })
 
     it('sends report email to explicit recipients even when report candidates have no identityId', async () => {

@@ -1,13 +1,14 @@
 import { SourceService } from '../sourceService'
 import { buildIdentityAttributeCreateErrorMessage } from '../sourceReverseCorrelationErrors'
 import { SourceInfo } from '../types'
+import { SourceType } from '../../../model/config'
 
 const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
     const config: any = {
         sources: [
             {
                 name: 'HR Source',
-                sourceType: 'authoritative',
+                sourceType: SourceType.Authoritative,
                 ...sourceConfigOverrides,
             },
         ],
@@ -44,7 +45,7 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         id: 'managed-source-id',
         name: 'HR Source',
         isManaged: true,
-        sourceType: (sourceConfigOverrides.sourceType as SourceInfo['sourceType']) ?? 'authoritative',
+        sourceType: (sourceConfigOverrides.sourceType as SourceInfo['sourceType']) ?? SourceType.Authoritative,
         config: config.sources[0],
     }
     ;(service as any)._allSources = [sourceInfo]
@@ -133,6 +134,17 @@ describe('SourceService fetchManagedAccount source scoping', () => {
 
         expect(service.managedAccountsById.size).toBe(0)
         expect(service.managedAccountsAllById.size).toBe(0)
+    })
+})
+
+describe('SourceService source lookup boundaries', () => {
+    it('returns undefined for missing or blank source names via safe lookup', () => {
+        const { service } = createService()
+
+        expect(service.getSourceByNameSafe(undefined)).toBeUndefined()
+        expect(service.getSourceByNameSafe(null)).toBeUndefined()
+        expect(service.getSourceByNameSafe('')).toBeUndefined()
+        expect(service.getSourceByNameSafe('   ')).toBeUndefined()
     })
 })
 

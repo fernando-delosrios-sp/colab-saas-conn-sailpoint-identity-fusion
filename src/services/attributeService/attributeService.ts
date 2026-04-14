@@ -609,57 +609,6 @@ export class AttributeService {
         )
     }
 
-    /**
-     * Seed persistent incremental counters from raw Account objects.
-     *
-     * This is a lightweight step used by non-aggregation flows (like custom:report)
-     * to avoid "burning" counter values on collisions when persisted counter state
-     * is missing/out of date but existing accounts already have assigned values.
-     *
-     * For each unique attribute definition with useIncrementalCounter enabled, this
-     * scans raw account attribute values and advances the counter state to at least
-     * the max numeric suffix observed (e.g. NG015 -> 15).
-     */
-    public async seedIncrementalCountersFromRawAccounts(accounts: Account[]): Promise<void> {
-        if (this.uniqueDefinitions.length === 0) return
-        if (!accounts.length) return
-
-        const incrementalDefs = this.uniqueDefinitions.filter((d) => d.useIncrementalCounter)
-        if (incrementalDefs.length === 0) return
-
-        const stateWrapper = this.getStateWrapper()
-
-        for (const def of incrementalDefs) {
-            let maxSeen = 0
-            for (const account of accounts) {
-                const raw = account.attributes?.[def.name]
-                if (raw == null || raw === '') continue
-                const str = String(raw)
-                const match = str.match(/(\d+)\s*$/)
-                if (!match) continue
-                const parsed = Number.parseInt(match[1], 10)
-                if (Number.isFinite(parsed) && parsed > maxSeen) {
-                    maxSeen = parsed
-                }
-            }
-            if (maxSeen <= 0) continue
-
-            const key = def.name
-            const lockKey = `counter:${key}`
-            await this.locks.withLock(lockKey, async () => {
-                const current = stateWrapper.state.get(key)
-                if (current === undefined) {
-                    const start = def.counterStart ?? 1
-                    await stateWrapper.initCounter(key, start)
-                }
-                const nextCurrent = stateWrapper.state.get(key) ?? 0
-                if (maxSeen > nextCurrent) {
-                    stateWrapper.state.set(key, maxSeen)
-                }
-            })
-        }
-    }
-
     private getStateWrapper(): StateWrapper {
         assert(this.stateWrapper, 'State wrapper is not set')
         return this.stateWrapper!

@@ -17,7 +17,7 @@ import {
     hostnameSegmentFromBaseurl,
     streamEnrichedOutputRows,
     streamOrphanDeferredReportRows,
-    streamFallbackAnalyzedRows,
+    streamUncorrelatedAnalyzedRows,
     refreshUniqueAttributesForDryRun,
 } from './helpers/dryRunHelpers'
 import {
@@ -115,17 +115,17 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
                 runtimeOptions
             )
 
-            // Everything else (nonMatched, newly matched, exact) left in the work queue
-            // must manually be processed. We analyze remaining accounts without mutating 
-            // state (like processManagedAccounts does conditionally), and emit them.
-            const fallbackAnalyzedManagedAccounts = await fusion.analyzeManagedAccounts()
-            if (fallbackAnalyzedManagedAccounts.length > 0) {
+            // Uncorrelated managed accounts (nonMatched, newly matched, exact, etc.) still in the
+            // work queue after the report stream: analyze without mutating state (unlike
+            // processManagedAccounts) and emit them.
+            const analyzedUncorrelatedAccounts = await fusion.analyzeUncorrelatedAccounts()
+            if (analyzedUncorrelatedAccounts.length > 0) {
                 // Ensure they have unique attributes assigned for valid platform representations
-                await refreshUniqueAttributesForDryRun(serviceRegistry, fallbackAnalyzedManagedAccounts, runtimeOptions)
+                await refreshUniqueAttributesForDryRun(serviceRegistry, analyzedUncorrelatedAccounts, runtimeOptions)
 
-                sentRows = await streamFallbackAnalyzedRows(
+                sentRows = await streamUncorrelatedAnalyzedRows(
                     serviceRegistry,
-                    fallbackAnalyzedManagedAccounts,
+                    analyzedUncorrelatedAccounts,
                     reportIndex,
                     pendingReviewByAccountId,
                     decisionAccountIds,

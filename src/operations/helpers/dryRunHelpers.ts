@@ -243,9 +243,9 @@ export const streamEnrichedOutputRows = async (
 }
 
 
-export const streamFallbackAnalyzedRows = async (
+export const streamUncorrelatedAnalyzedRows = async (
     serviceRegistry: ServiceRegistry,
-    analyzedManagedAccounts: FusionAccount[],
+    analyzedUncorrelatedAccounts: FusionAccount[],
     reportIndex: ReturnType<typeof buildReportAccountIndex>,
     pendingReviewByAccountId: PendingReviewContextByAccountId,
     decisionAccountIds: Set<string>,
@@ -259,7 +259,7 @@ export const streamFallbackAnalyzedRows = async (
     const { log, fusion } = serviceRegistry
 
     const enrichedRows: Array<{ account: any; status: MatchingStatus }> = []
-    for (const analyzedAccount of analyzedManagedAccounts) {
+    for (const analyzedAccount of analyzedUncorrelatedAccounts) {
         const output = await fusion.getISCAccount(analyzedAccount, false)
         if (!output) continue
 
@@ -286,7 +286,7 @@ export const streamFallbackAnalyzedRows = async (
         false
     )
     const totalSentRows = sentRows + emittedRows
-    log.info(`Fallback streaming emitted ${totalSentRows} analyzed managed account row(s)`)
+    log.info(`Uncorrelated managed account streaming emitted ${totalSentRows} row(s)`)
     return totalSentRows
 }
 
@@ -517,7 +517,7 @@ const getEmissionKey = (account: any): string => {
 
 export const refreshUniqueAttributesForDryRun = async (
     serviceRegistry: ServiceRegistry,
-    analyzedManagedAccounts: FusionAccount[],
+    analyzedUncorrelatedAccounts: FusionAccount[],
     runtimeOptions: DryRunRuntimeOptions
 ): Promise<void> => {
     const { fusion, attributes, log } = serviceRegistry
@@ -542,9 +542,9 @@ export const refreshUniqueAttributesForDryRun = async (
         await fusion.refreshUniqueAttributes()
     }
 
-    // Also refresh analyzed managed accounts that may only exist in fallback mode.
-    if (analyzedManagedAccounts.length === 0) return
-    const stableAnalyzed = [...analyzedManagedAccounts].sort((a: any, b: any) => {
+    // Also refresh analyzed managed accounts that only surface on the uncorrelated-queue path.
+    if (analyzedUncorrelatedAccounts.length === 0) return
+    const stableAnalyzed = [...analyzedUncorrelatedAccounts].sort((a: any, b: any) => {
         const aKey = String(
             readUnknown(a, 'originAccountId') ??
                 readPathString(a, ['attributes', 'originAccount']) ??
@@ -568,6 +568,6 @@ export const refreshUniqueAttributesForDryRun = async (
         await Promise.all(batch.map((account) => attributes.refreshUniqueAttributes(account)))
     }
 
-    log.info(`Unique attributes refreshed for ${analyzedManagedAccounts.length} analyzed managed account(s)`)
+    log.info(`Unique attributes refreshed for ${analyzedUncorrelatedAccounts.length} analyzed uncorrelated account(s)`)
 }
 

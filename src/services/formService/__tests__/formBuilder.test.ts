@@ -1,4 +1,4 @@
-import { buildFormConditions } from '../formBuilder'
+import { buildFormConditions, buildFormInput, buildFormInputs } from '../formBuilder'
 import { buildCandidateList } from '../helpers'
 
 describe('formBuilder conditions', () => {
@@ -73,5 +73,31 @@ describe('candidate list building', () => {
 
         const candidates = buildCandidateList(fusionAccount, 2)
         expect(candidates.map((c) => c.id)).toEqual(['high', 'mid'])
+    })
+})
+
+describe('managed-account key enforcement', () => {
+    it('uses managedAccountId as formInput.account', () => {
+        const fusionAccount = {
+            managedAccountId: 'src-1::native-1',
+            identityDisplayName: 'User One',
+            sourceName: 'HR',
+            attributes: {},
+        } as any
+
+        const input = buildFormInput(fusionAccount, [])
+        expect(input.account).toBe('src-1::native-1')
+    })
+
+    it('throws when managedAccountId is missing', () => {
+        const fusionAccount = {
+            managedAccountId: undefined,
+            name: 'User One',
+            sourceName: 'HR',
+            attributes: {},
+        } as any
+
+        expect(() => buildFormInput(fusionAccount, [])).toThrow('Cannot build review form without managed account key')
+        expect(() => buildFormInputs(fusionAccount, [])).toThrow('Cannot build review form without managed account key')
     })
 })

@@ -1,5 +1,5 @@
 import { FormElementV2025, FormDefinitionInputV2025 } from 'sailpoint-api-client'
-import { logger } from '@sailpoint/connector-sdk'
+import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { SourceType } from '../../model/config'
 import { capitalizeFirst } from '../../utils/attributes'
@@ -10,18 +10,14 @@ import { Candidate } from './types'
 // Shared Helpers
 // ============================================================================
 
-/**
- * Builds a best-effort identifier for a fusion account, trying several fields
- * in priority order before falling back to 'unknown'.
- */
-function getAccountIdentifier(fusionAccount: FusionAccount): string {
-    return (
-        String(fusionAccount.managedAccountId || '').trim() ||
-        String(fusionAccount.nativeIdentityOrUndefined || '').trim() ||
-        String((fusionAccount.attributes as any)?.id || '').trim() ||
-        String((fusionAccount.attributes as any)?.uuid || '').trim() ||
-        String(fusionAccount.identityId || '').trim() ||
-        'unknown'
+function getManagedAccountIdentifier(fusionAccount: FusionAccount): string {
+    const managedKey = String(fusionAccount.managedAccountId ?? '').trim()
+    if (managedKey) {
+        return managedKey
+    }
+    throw new ConnectorError(
+        `Cannot build review form without managed account key for fusion account ${fusionAccount.name || fusionAccount.nativeIdentity}.`,
+        ConnectorErrorType.Generic
     )
 }
 
@@ -76,7 +72,7 @@ function hasRenderableCandidateElements(candidate: Candidate, fusionFormAttribut
  * which varies by source type.
  */
 function getToggleConfig(sourceType: SourceType): Record<string, any> {
-    if (sourceType === 'authoritative') {
+    if (sourceType === SourceType.Authoritative) {
         return {
             label: 'New identity',
             default: false,
@@ -91,7 +87,7 @@ function getToggleConfig(sourceType: SourceType): Record<string, any> {
         trueLabel: 'True',
         falseLabel: 'False',
         helpText:
-            sourceType === 'record'
+            sourceType === SourceType.Record
                 ? 'Select this if the record does not match any existing identity'
                 : 'Select this if the orphan account does not match any existing identity',
     }
@@ -108,12 +104,12 @@ export const buildFormInput = (
     fusionAccount: FusionAccount,
     candidates: Candidate[],
     fusionFormAttributes?: string[],
-    sourceType: SourceType = 'authoritative'
+    sourceType: SourceType = SourceType.Authoritative
 ): Record<string, any> => {
     const formInput: Record<string, any> = {}
     formInput.sourceType = sourceType
 
-    const accountIdentifier = getAccountIdentifier(fusionAccount)
+    const managedAccountIdentifier = getManagedAccountIdentifier(fusionAccount)
 
     // NOTE: formInput must match the form definition input types.
     // Keep values primitive (STRING/BOOLEAN/NUMBER) to avoid Custom Forms payload issues.
@@ -123,20 +119,20 @@ export const buildFormInput = (
     // Priority for the human-friendly account label used in reports and decision history:
     // 1. identityDisplayName — the correlated identity's full name (most authoritative when attached)
     // 2. name / displayName — fusion row title (ISC Account.name; displayName aliases name)
-    // 3. accountIdentifier   — last-resort opaque ID
+    // 3. managedAccountIdentifier — managed account key when labels are unavailable
     const preferredAccountLabel =
         fusionAccount.identityDisplayName ||
         fusionAccount.name ||
         fusionAccount.displayName ||
-        accountIdentifier
+        managedAccountIdentifier
     if (!fusionAccount.identityDisplayName && !fusionAccount.name && !fusionAccount.displayName) {
         logger.error(
-            `[formBuilder] Missing identityDisplayName/name for fusion account. Using fallback value: ${accountIdentifier}`
+            `[formBuilder] Missing identityDisplayName/name for fusion account. Using managed account key fallback: ${managedAccountIdentifier}`
         )
     }
     // `name` is used downstream in reports and decision history messages; prefer human-friendly display labels.
     formInput.name = preferredAccountLabel
-    formInput.account = accountIdentifier
+    formInput.account = managedAccountIdentifier
     formInput.source = fusionAccount.sourceName
     // Persist correlated identity reference for downstream resolution (reports/history),
     // even when identity layer is not in scope at decision processing time.
@@ -195,7 +191,7 @@ export const buildFormFields = (
     fusionAccount: FusionAccount,
     candidates: Candidate[],
     fusionFormAttributes?: string[],
-    sourceType: SourceType = 'authoritative'
+    sourceType: SourceType = SourceType.Authoritative
 ): FormElementV2025[] => {
     const formFields: FormElementV2025[] = []
 
@@ -221,10 +217,12 @@ export const buildFormFields = (
 
     if (topSectionElements.length > 0) {
         const sectionDescriptions: Record<SourceType, string> = {
-            authoritative:
+            [SourceType.Authoritative]:
                 'A potential matching identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
-            record: 'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
-            orphan: 'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
+            [SourceType.Record]:
+                'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
+            [SourceType.Orphan]:
+                'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
         }
 
         formFields.push({
@@ -552,13 +550,13 @@ export const buildFormInputs = (
 ): FormDefinitionInputV2025[] => {
     const formInputs: FormDefinitionInputV2025[] = []
 
-    const accountIdentifier = getAccountIdentifier(fusionAccount)
+    const managedAccountIdentifier = getManagedAccountIdentifier(fusionAccount)
 
     // Account info
     // IMPORTANT: Use the same label priority as buildFormInput so form definition and instance are consistent.
     if (!fusionAccount.identityDisplayName && !fusionAccount.name && !fusionAccount.displayName) {
         logger.error(
-            `[formBuilder] Missing identityDisplayName/name for fusion account in form inputs. Using fallback value: ${accountIdentifier}`
+            `[formBuilder] Missing identityDisplayName/name for fusion account in form inputs. Using managed account key fallback: ${managedAccountIdentifier}`
         )
     }
     formInputs.push({
@@ -569,13 +567,13 @@ export const buildFormInputs = (
             fusionAccount.identityDisplayName ||
             fusionAccount.name ||
             fusionAccount.displayName ||
-            accountIdentifier,
+            managedAccountIdentifier,
     })
     formInputs.push({
         id: 'account',
         type: 'STRING',
         label: 'account',
-        description: accountIdentifier,
+        description: managedAccountIdentifier,
     })
     formInputs.push({
         id: 'source',

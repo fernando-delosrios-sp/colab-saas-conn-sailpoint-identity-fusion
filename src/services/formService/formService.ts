@@ -11,7 +11,7 @@ import {
     CustomFormsV2025ApiPatchFormInstanceRequest,
     CustomFormsV2025ApiSearchFormInstancesByTenantRequest,
 } from 'sailpoint-api-client'
-import { FusionConfig } from '../../model/config'
+import { FusionConfig, SourceType } from '../../model/config'
 import { ClientService } from '../clientService'
 import { LogService } from '../logService'
 import { IdentityService } from '../identityService'
@@ -71,6 +71,7 @@ export class FormService {
     private _formsFound: number = 0
     private _formInstancesFound: number = 0
     private _answeredFormInstancesProcessed: number = 0
+    private _fetchedFormInstances: FormInstanceResponseV2025[][] = []
     private readonly fusionFormNamePattern: string
     private readonly fusionFormExpirationDays: number
     private readonly fusionFormAttributes?: string[]
@@ -103,25 +104,23 @@ export class FormService {
      * Fetch and process form data from completed form instances
      */
     public async fetchFormData(): Promise<void> {
+        await this.fetchFormInstancesData()
+        await this.processFetchedFormData()
+    }
+
+    /**
+     * Fetch form definitions and their instances, deferring decision processing.
+     */
+    public async fetchFormInstancesData(): Promise<void> {
         this.log.debug('Fetching form data')
         assert(this.fusionFormNamePattern, 'Fusion form name pattern is required')
-
-        this._fusionIdentityDecisions = []
-        this.fusionAssignmentDecisionMap = new Map()
-        this._pendingReviewUrlsByReviewerId = new Map()
-        this._pendingReviewContextByAccountId = new Map()
-        this._pendingCandidateIdentityIds = new Set()
-        this._finishedFusionDecisions = []
-        this._formsFound = 0
-        this._formInstancesFound = 0
-        this._answeredFormInstancesProcessed = 0
+        this.resetFormDataState()
 
         const forms = await this.fetchFormsByName(this.fusionFormNamePattern)
         this._formsFound = forms.length
         this.log.debug(`Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern}`)
 
-        // Fetch all instances in parallel for better performance
-        const formInstancesResults = await Promise.all(
+        this._fetchedFormInstances = await Promise.all(
             forms.map(async (form) => {
                 this.log.debug(`Fetching instances for form definition: ${form.id} (${form.name || 'unknown'})`)
                 const instances = await this.fetchFormInstancesByDefinitionId(form.id)
@@ -129,6 +128,13 @@ export class FormService {
                 return instances
             })
         )
+    }
+
+    /**
+     * Process form instances that were fetched by fetchFormInstancesData.
+     */
+    public async processFetchedFormData(): Promise<void> {
+        const formInstancesResults = this._fetchedFormInstances
 
         // Process all instances (single pass) to:
         // - extract assignment/new-identity decisions
@@ -141,9 +147,23 @@ export class FormService {
                 await this.processFusionFormInstances(instances)
             }
         }
+        this._fetchedFormInstances = []
 
         const fusionDecisionsCount = this._fusionIdentityDecisions?.length ?? 0
         this.log.debug(`Form data fetch completed - ${fusionDecisionsCount} fusion decision(s)`)
+    }
+
+    private resetFormDataState(): void {
+        this._fusionIdentityDecisions = []
+        this.fusionAssignmentDecisionMap = new Map()
+        this._pendingReviewUrlsByReviewerId = new Map()
+        this._pendingReviewContextByAccountId = new Map()
+        this._pendingCandidateIdentityIds = new Set()
+        this._finishedFusionDecisions = []
+        this._formsFound = 0
+        this._formInstancesFound = 0
+        this._answeredFormInstancesProcessed = 0
+        this._fetchedFormInstances = []
     }
 
     public async deleteExistingForms(): Promise<void> {
@@ -248,7 +268,7 @@ export class FormService {
         await this.enrichCandidateIdentitiesSelectLabels(candidates)
         await this.enrichCandidateIdentityEmails(candidates)
 
-        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'authoritative'
+        const sourceType = this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
 
         const formName = buildFormName(fusionAccount, this.fusionFormNamePattern)
         assert(formName, 'Form name is required')
@@ -506,8 +526,8 @@ export class FormService {
             await this.messaging.sendFusionEmail(formInstance, {
                 accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
                 accountSource: fusionAccount.sourceName,
-                sourceType: this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType,
-                accountId: fusionAccount.managedAccountId ?? fusionAccount.nativeIdentityOrUndefined,
+                sourceType: this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType,
+                accountId: fusionAccount.managedAccountId,
                 accountEmail: fusionAccount.email,
                 accountAttributes: fusionAccount.attributes as any,
                 candidates: candidates.map((c) => ({
@@ -1040,7 +1060,7 @@ export class FormService {
             )
             return
         }
-        const sourceType = this.sources.getSourceByName(fusionAccount.sourceName)?.sourceType ?? 'authoritative'
+        const sourceType = this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
         const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
         const formInputs = buildFormInputs(fusionAccount, candidates, this.fusionFormAttributes)
         const formConditions = buildFormConditions(candidates, this.fusionFormAttributes)

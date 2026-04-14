@@ -39,7 +39,7 @@ function createTwoPassRegistry(scenario: AggregationScenario) {
         identities.identityCount = dataByPass[currentPass.value].identitiesFound
     })
 
-    forms.fetchFormData.mockImplementation(async () => {
+    forms.processFetchedFormData.mockImplementation(async () => {
         decisionHistory.push([...dataByPass[currentPass.value].decisions])
     })
 
@@ -201,7 +201,8 @@ describe('accountList two-pass aggregation lifecycle', () => {
         setPass('pass1')
         await accountList(registry, input)
 
-        expect(forms.fetchFormData).toHaveBeenCalledTimes(1)
+        expect(forms.fetchFormInstancesData).toHaveBeenCalledTimes(1)
+        expect(forms.processFetchedFormData).toHaveBeenCalledTimes(1)
         expect(fusion.processFusionIdentityDecisions).toHaveBeenCalledTimes(1)
         expect(sources.releaseProcessLock).toHaveBeenCalledTimes(1)
         expect(res.send).toHaveBeenCalledTimes(scenario.passData.pass1.outputAccounts.length)
@@ -210,7 +211,8 @@ describe('accountList two-pass aggregation lifecycle', () => {
         setPass('pass2')
         await accountList(registry, input)
 
-        expect(forms.fetchFormData).toHaveBeenCalledTimes(2)
+        expect(forms.fetchFormInstancesData).toHaveBeenCalledTimes(2)
+        expect(forms.processFetchedFormData).toHaveBeenCalledTimes(2)
         expect(fusion.processFusionIdentityDecisions).toHaveBeenCalledTimes(2)
         expect(sources.releaseProcessLock).toHaveBeenCalledTimes(2)
         expect(decisionHistory).toEqual([scenario.passData.pass1.decisions, scenario.passData.pass2.decisions])

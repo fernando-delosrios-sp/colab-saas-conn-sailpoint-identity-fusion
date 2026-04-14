@@ -2,7 +2,7 @@ import { Account, IdentityDocument } from 'sailpoint-api-client'
 import { isNewerThan } from '../utils/date'
 import { toSetFromAttribute as attributeToSet } from '../utils/attributes'
 import { FusionDecision } from './form'
-import { FusionConfig, SourceConfig } from './config'
+import { FusionConfig, SourceConfig, SourceType } from './config'
 import { Attributes, ConnectorError, ConnectorErrorType, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { FusionMatch } from '../services/scoringService'
 import { attrConcat, attrSplit } from '../services/attributeService/helpers'
@@ -11,8 +11,9 @@ import type { FusionAttributeBag, FusionManagedAccountInfo } from './fusionAccou
 import {
     buildManagedAccountKey,
     getManagedAccountKeyFromAccount,
+    isCompositeManagedAccountKey,
+    normalizeCompositeManagedAccountKey,
     parseManagedAccountKey,
-    resolveManagedAccountKey,
 } from './managedAccountKey'
 import { readString } from '../utils/safeRead'
 
@@ -1076,22 +1077,18 @@ export class FusionAccount {
         accountsById: Map<string, Account>,
         accountsByIdentityId: Map<string, Set<string>>,
         allAccountsById?: Map<string, Account>,
-        managedAccountKeysByRawId?: Map<string, string>,
         pruneDeletedManagedAccounts = false,
         addAssociationHistory = true
     ): void {
-        const resolveKey = (value: string | undefined | null): string | undefined =>
-            resolveManagedAccountKey(value, (rawId) => managedAccountKeysByRawId?.get(rawId))
-        this._previousAccountIds = new Set(
-            Array.from(this._previousAccountIds, (value) => resolveKey(value)).filter((value): value is string => !!value)
-        )
-        this._missingAccountIds = new Set(
-            Array.from(this._missingAccountIds, (value) => resolveKey(value)).filter((value): value is string => !!value)
-        )
-        this._accountIds = new Set(
-            Array.from(this._accountIds, (value) => resolveKey(value)).filter((value): value is string => !!value)
-        )
-        const resolvedOriginAccountId = resolveKey(this._originAccount)
+        const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> =>
+            new Set(Array.from(input, (value) => normalizeCompositeManagedAccountKey(value)).filter(isDefined))
+        const isDefined = (value: string | undefined): value is string => value !== undefined
+
+        this._previousAccountIds = normalizeManagedAccountKeySet(this._previousAccountIds)
+        this._missingAccountIds = normalizeManagedAccountKeySet(this._missingAccountIds)
+        this._accountIds = normalizeManagedAccountKeySet(this._accountIds)
+
+        const resolvedOriginAccountId = normalizeCompositeManagedAccountKey(this._originAccount)
         if (resolvedOriginAccountId) {
             this._originAccount = resolvedOriginAccountId
         }
@@ -1201,14 +1198,19 @@ export class FusionAccount {
      *
      * @param decision - The fusion decision from the review form
      */
-    public addFusionDecisionLayer(decision: FusionDecision, resolveManagedKey?: (rawId: string) => string | undefined): void {
-        const raw = decision.account.id!
-        const managedKey = resolveManagedKey?.(raw) ?? raw
+    public addFusionDecisionLayer(decision: FusionDecision): void {
+        const managedKey = String(decision.account.id ?? '').trim()
+        if (!isCompositeManagedAccountKey(managedKey)) {
+            throw new ConnectorError(
+                `Fusion decision account id must be a managed account key (sourceId::nativeIdentity), received: "${managedKey || 'empty'}".`,
+                ConnectorErrorType.Generic
+            )
+        }
         this.setUncorrelatedAccount(managedKey)
-        const sourceType = decision.sourceType ?? 'authoritative'
+        const sourceType = decision.sourceType ?? SourceType.Authoritative
 
         if (decision.newIdentity) {
-            if (sourceType === 'authoritative') {
+            if (sourceType === SourceType.Authoritative) {
                 this.setManual(decision)
             }
         } else {
@@ -1355,7 +1357,7 @@ export class FusionAccount {
             'Unknown reviewer'
         )
         const accountInfo = this.formatHistoryAccountInfo(decision.account.name, decision.account.sourceName)
-        const sourceType = decision.sourceType ?? 'authoritative'
+        const sourceType = decision.sourceType ?? SourceType.Authoritative
 
         if (action === 'manual') {
             return `Set ${accountInfo} as new account by ${submitterName}`
@@ -1364,10 +1366,10 @@ export class FusionAccount {
         if (decision.automaticAssignment === true) {
             return `Auto-assigned ${accountInfo} to existing identity`
         }
-        if (sourceType === 'record') {
+        if (sourceType === SourceType.Record) {
             return `Assigned record ${accountInfo} to existing identity by ${submitterName}`
         }
-        if (sourceType === 'orphan') {
+        if (sourceType === SourceType.Orphan) {
             return `Assigned orphan account ${accountInfo} to existing identity by ${submitterName}`
         }
         return `Set ${accountInfo} as authorized by ${submitterName}`

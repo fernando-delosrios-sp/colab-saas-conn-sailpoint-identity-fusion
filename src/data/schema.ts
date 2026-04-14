@@ -39,14 +39,14 @@ export const fusionAccountSchemaAttributes: SchemaAttribute[] = [
     },
     {
         name: 'accounts',
-        description: 'Managed account keys (sourceId::nativeIdentity; legacy raw IDs supported)',
+        description: 'Managed account keys (sourceId::nativeIdentity)',
         type: 'string',
         multi: true,
         entitlement: false,
     },
     {
         name: 'missing-accounts',
-        description: 'Missing managed account keys (sourceId::nativeIdentity; legacy raw IDs supported)',
+        description: 'Missing managed account keys (sourceId::nativeIdentity)',
         type: 'string',
         multi: true,
         entitlement: false,
@@ -81,7 +81,7 @@ export const fusionAccountSchemaAttributes: SchemaAttribute[] = [
     },
     {
         name: 'originAccount',
-        description: 'Origin identity ID or managed account key (sourceId::nativeIdentity; legacy raw IDs supported)',
+        description: 'Origin identity ID or managed account key (sourceId::nativeIdentity)',
         type: 'string',
         multi: false,
         entitlement: false,

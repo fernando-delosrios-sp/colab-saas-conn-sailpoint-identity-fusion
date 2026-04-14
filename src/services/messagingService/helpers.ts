@@ -1,6 +1,7 @@
 import Handlebars from 'handlebars'
 import type { TemplateDelegate as HandlebarsTemplateDelegate } from 'handlebars'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
+import { SourceType } from '../../model/config'
 
 export { registerHandlebarsHelpers } from './messagingHandlebarsRegistration'
 
@@ -517,7 +518,7 @@ export type FusionReportEmailData = {
     accountName: string
     accountUrl?: string
     accountSource: string
-    sourceType?: 'authoritative' | 'record' | 'orphan'
+    sourceType?: SourceType
     deferred?: boolean
     accountId?: string
     accountEmail?: string
@@ -551,7 +552,7 @@ export type FusionReportEmailData = {
     accountName: string
     accountUrl?: string
     accountSource: string
-    sourceType?: 'authoritative' | 'record' | 'orphan'
+    sourceType?: SourceType
     decision: 'assign-existing-identity' | 'create-new-identity' | 'confirm-no-match'
     decisionLabel: string
     selectedIdentityId?: string

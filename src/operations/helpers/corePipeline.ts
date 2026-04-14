@@ -1,4 +1,5 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
+import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
 
 export type PipelineMode =
@@ -35,6 +36,11 @@ export async function setupPhase(serviceRegistry: ServiceRegistry, schema: any, 
 
     await sources.fetchAllSources(isPersistent)
     log.info(`Loaded ${sources.managedSources.length} managed source(s)`)
+    if (!sources.hasFusionSource) {
+        throw new Error(
+            'Fusion source not found. The connector instance could not locate its own source in ISC. Verify the connector is properly deployed.'
+        )
+    }
 
     if (isPersistent) {
         await sources.setProcessLock()
@@ -89,7 +95,7 @@ export async function setupPhase(serviceRegistry: ServiceRegistry, schema: any, 
 
 /** Phase 2: Fetch all data in parallel. */
 export async function fetchPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<FetchResult> {
-    const { log, identities, sources, messaging, forms, fusion, attributes } = serviceRegistry
+    const { log, identities, sources, messaging, forms, fusion } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
 
     log.info('Fetching identities, managed accounts, and dependencies')
@@ -97,6 +103,8 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
     const fetchTasks: Array<Promise<void>> = [
         identities.fetchIdentities(),
         sources.fetchManagedAccounts(),
+        sources.fetchFusionAccounts(),
+        forms.fetchFormInstancesData(),
     ]
 
     if (isPersistent) {
@@ -104,34 +112,19 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
         fetchTasks.push(messaging.fetchDelayedAggregationSender())
     }
 
-    if (sources.hasFusionSource) {
-        fetchTasks.push(sources.fetchFusionAccounts())
-    } else {
-        log.info('Fusion source not found; custom:dryrun will run without existing fusion accounts')
-    }
-
     await Promise.all(fetchTasks)
 
-    // Form processing must run after managed accounts are loaded
-    log.info('Fetching form data')
-    await forms.fetchFormData()
+    // Form instance processing must run after managed accounts are loaded
+    log.info('Processing fetched form data')
+    await forms.processFetchedFormData()
 
-    // Seed counters for custom report style operations (safe for both)
-    if (sources.hasFusionSource && Array.isArray(sources.fusionAccounts) && sources.fusionAccounts.length > 0) {
-        if (typeof attributes.seedIncrementalCountersFromRawAccounts === 'function') {
-            await attributes.seedIncrementalCountersFromRawAccounts(sources.fusionAccounts)
-        }
-    }
-
-    if (sources.hasFusionSource) {
-        if (fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer) {
-            const globalOwnerIds = await sources.fetchGlobalOwnerIdentityIds()
-            await Promise.all(
-                globalOwnerIds
-                    .filter((id) => !identities.getIdentityById(id))
-                    .map((id) => identities.fetchIdentityById(id))
-            )
-        }
+    if (fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer) {
+        const globalOwnerIds = await sources.fetchGlobalOwnerIdentityIds()
+        await Promise.all(
+            globalOwnerIds
+                .filter((id) => !identities.getIdentityById(id))
+                .map((id) => identities.fetchIdentityById(id))
+        )
     }
 
     const identitiesFound = identities.identityCount
@@ -141,10 +134,10 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
     let managedAccountsFoundOrphan = 0
 
     for (const account of sources.managedAccountsById.values()) {
-        const sourceType = sources.getSourceByName(account.sourceName ?? '')?.sourceType ?? 'authoritative'
-        if (sourceType === 'record') {
+        const sourceType = sources.getSourceByNameSafe(account.sourceName)?.sourceType ?? SourceType.Authoritative
+        if (sourceType === SourceType.Record) {
             managedAccountsFoundRecord++
-        } else if (sourceType === 'orphan') {
+        } else if (sourceType === SourceType.Orphan) {
             managedAccountsFoundOrphan++
         } else {
             managedAccountsFoundAuthoritative++
