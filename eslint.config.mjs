@@ -7,7 +7,7 @@ export default [
         ignores: ['dist/', 'log-server.js', 'babel.config.cjs', 'jest.config.js'],
     },
     { files: ['**/*.{js,mjs,cjs,ts}'] },
-    { languageOptions: { globals: globals.browser } },
+    { languageOptions: { globals: globals.node } },
     pluginJs.configs.recommended,
     ...tseslint.configs.recommended,
     {
@@ -21,6 +21,13 @@ export default [
             'no-explicit-any': 'off',
             '@typescript-eslint/no-explicit-any': 'off',
             'no-case-declarations': 'off',
+        },
+    },
+    // CommonJS entrypoints and test utilities use require(); keep TypeScript sources on ESM/import style.
+    {
+        files: ['**/*.cjs', 'test-data/**/*.js'],
+        rules: {
+            '@typescript-eslint/no-require-imports': 'off',
         },
     },
 ]
