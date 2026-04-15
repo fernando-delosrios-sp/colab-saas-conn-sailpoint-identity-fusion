@@ -28,7 +28,7 @@
         "enableQueue": true,
         "enableRetry": true,
         "maxRetries": 20,
-        "requestsPerSecond": 8,
+        "requestsPerSecond": 9,
         "maxConcurrentRequests": 10,
         "processingWait": 60,
         "retryDelay": 1000,
@@ -47,7 +47,6 @@
         "trim": false,
         "force": false,
         "algorithm": "name-matcher",
-        "enableBatching": true,
         "enablePriority": true,
         "aggregationMode": "none",
         "correlationMode": "none"
@@ -1038,18 +1037,9 @@
                             "helpKey": "Time to wait (in milliseconds) before retrying a failed request. The server may override this with its own recommended wait time. Default: 1000"
                         },
                         {
-                            "key": "enableBatching",
-                            "label": "Enable batching?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Group multiple requests together to improve performance during large operations"
-                        },
-                        {
                             "key": "batchSize",
                             "label": "Batch size",
                             "type": "number",
-                            "parentKey": "enableBatching",
-                            "parentValue": "true",
                             "required": true,
                             "min": "1",
                             "max": "250",

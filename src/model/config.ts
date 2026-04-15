@@ -351,11 +351,6 @@ export interface AdvancedConnectionSettingsSection {
     retryDelay?: number
 
     /**
-     * Enable batching of requests in the queue for better efficiency.
-     */
-    enableBatching?: boolean
-
-    /**
      * Number of requests to include in a single processing batch.
      */
     batchSize?: number

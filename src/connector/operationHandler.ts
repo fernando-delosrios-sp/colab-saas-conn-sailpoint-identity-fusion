@@ -3,8 +3,14 @@ import { FusionConfig } from '../model/config'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { ProxyService } from '../services/proxyService'
 
-type RunMode = 'custom' | 'proxy' | 'default'
+/** Operation execution route selected at runtime. */
+enum RunMode {
+    Custom = 'custom',
+    Proxy = 'proxy',
+    Default = 'default',
+}
 
+/** Keep-alive signal style during long-running operations. */
 type KeepAliveMode = 'memory' | 'simple'
 
 export interface OperationHandlerOptions {
@@ -18,7 +24,7 @@ function resolveRunMode(context: any, proxy: ProxyService, operationName: string
     const isProxyServer = proxy.isProxyService()
     const isCustom = context[operationName] !== undefined
     const isProxyClient = !isProxyServer && proxy.isProxyMode()
-    const runMode: RunMode = isCustom ? 'custom' : isProxyClient ? 'proxy' : 'default'
+    const runMode: RunMode = isCustom ? RunMode.Custom : isProxyClient ? RunMode.Proxy : RunMode.Default
     return { runMode, isProxyServer }
 }
 
@@ -44,7 +50,7 @@ function scheduleKeepAlive(
         }, everyMs)
     }
 
-    if (handlerOptions.keepAlive === 'simple' && runMode !== 'proxy') {
+    if (handlerOptions.keepAlive === 'simple' && runMode !== RunMode.Proxy) {
         return setInterval(() => {
             res.keepAlive()
         }, everyMs)
@@ -62,10 +68,10 @@ async function runOperation(
     defaultFn: (...args: any[]) => Promise<void>
 ): Promise<void> {
     switch (runMode) {
-        case 'custom':
+        case RunMode.Custom:
             await context[operationName](serviceRegistry, input)
             return
-        case 'proxy':
+        case RunMode.Proxy:
             await serviceRegistry.proxy.execute(input)
             return
         default:

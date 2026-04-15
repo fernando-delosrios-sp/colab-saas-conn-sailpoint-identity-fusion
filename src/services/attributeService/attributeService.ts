@@ -21,7 +21,7 @@ import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
 import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
-import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
+import { buildManagedAccountKey } from '../../model/managedAccountKey'
 import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
 import { readString } from '../../utils/safeRead'
 
@@ -489,7 +489,7 @@ export class AttributeService {
         if (this.skipAccountsWithMissingId && !uniqueId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -609,7 +609,7 @@ export class AttributeService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} raw account(s) ` +
-                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -627,7 +627,7 @@ export class AttributeService {
      * The context includes current attributes plus referenceable objects from attributeBag
      */
     private buildVelocityContext(fusionAccount: FusionAccount): Record<string, any> {
-        const context: { [key: string]: any } = { ...fusionAccount.attributeBag.current }
+        const context: Record<string, any> = { ...fusionAccount.attributeBag.current }
         const orderedAccounts = this.getOrderedAccountsForContext(fusionAccount)
 
         context.identity = fusionAccount.attributeBag.identity
@@ -649,90 +649,102 @@ export class AttributeService {
     /**
      * Velocity `$account`: origin snapshot (managed account shape or identity-backed).
      * `$originAccount` remains the origin key string (set on context above).
-     *
-     * For identity-origin (baseline) accounts that have managed accounts attached,
-     * the first managed account is preferred as `$account` so Velocity expressions
-     * referencing managed-account attributes (e.g. `$account.employeeId`) resolve
-     * correctly. `$identity` always carries identity-specific attributes regardless.
-     * When no managed accounts are present, falls back to the identity object.
      */
     private resolveOriginAccountObjectForVelocity(
         fusionAccount: FusionAccount,
         orderedAccounts: Record<string, any>[]
     ): Record<string, any> | undefined {
         const originIdRaw =
-            fusionAccount.originAccountId ?? fusionAccount.attributeBag.current[ORIGIN_ACCOUNT_ATTRIBUTE]
+            fusionAccount.originAccountId ?? fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE]
         const originId =
             originIdRaw != null && String(originIdRaw).trim() !== '' ? String(originIdRaw).trim() : undefined
         if (!originId) return undefined
 
         const { originSource } = fusionAccount
-        const identityBag = fusionAccount.attributeBag.identity ?? {}
+        const identityBag = (fusionAccount.attributeBag.identity ?? {}) as Record<string, unknown>
         const identityHasData = Object.keys(identityBag).length > 0
+        const { fusionDisplayAttribute, fusionIdentityAttribute } = this.schemas
 
-        const identityBackedName =
-            String(
-                fusionAccount.name ??
-                    (identityBag as Record<string, unknown>).name ??
-                    (identityBag as Record<string, unknown>).displayName ??
-                    ''
-            ).trim() || originId
+        const configuredSchemaName = this.readAccountAttributeString(fusionAccount, fusionDisplayAttribute)
+        const configuredSchemaId = this.readAccountAttributeString(fusionAccount, fusionIdentityAttribute)
+        const identityName = this.hostingIdentityName(fusionAccount)
+        const identityId = this.hostingIdentityId(fusionAccount, identityBag)
 
-        // For baseline accounts with managed accounts already attached, prefer the first
-        // managed account as $account so attribute expressions resolve managed-source data.
-        // This covers the common case where a baseline Fusion account has one or more
-        // managed accounts added after initial creation.
-        if (originSource === 'Identities' && orderedAccounts.length > 0) {
-            return orderedAccounts[0]
-        }
+        const schemaName = configuredSchemaName ?? identityName ?? originId
+        const schemaId = configuredSchemaId ?? identityId ?? originId
 
         if (originSource === 'Identities' && identityHasData) {
             return {
                 ...identityBag,
-                _id: originId,
                 source: { name: 'Identities' },
                 schema: {
-                    name: identityBackedName,
-                    id: originId,
+                    name: schemaName,
+                    id: schemaId,
                 },
                 IIQDisabled: Boolean(fusionAccount.disabled),
             }
         }
 
-        const parsedManagedKey = parseManagedAccountKey(originId)
-        const managed = orderedAccounts.find((a) => {
-            const snapshotKey = getManagedAccountSnapshotKey(a)
-            if (snapshotKey === originId) return true
-            const accountRowId = String(a?._id ?? '').trim()
-            if (accountRowId === originId) return true
-            if (!parsedManagedKey) return false
-            const sourceId = velocitySnapshotSourceId(a)
-            const nativeIdentity = velocitySnapshotSchemaId(a)
-            return sourceId === parsedManagedKey.sourceId && nativeIdentity === parsedManagedKey.nativeIdentity
-        })
+        const managed = orderedAccounts.find((account) => getManagedAccountSnapshotKey(account) === originId)
         if (managed) return managed
 
         if (originSource === 'Identities') {
             return {
                 ...identityBag,
-                _id: originId,
                 source: { name: 'Identities' },
                 schema: {
-                    name: identityBackedName,
-                    id: originId,
+                    name: schemaName,
+                    id: schemaId,
                 },
                 IIQDisabled: Boolean(fusionAccount.disabled),
             }
         }
 
         return {
-            _id: originId,
             source: { name: originSource ?? '' },
             schema: {
-                name: String(fusionAccount.name ?? '').trim() || originId,
-                id: originId,
+                name: schemaName,
+                id: schemaId,
             },
         }
+    }
+
+    private readAccountAttributeString(fusionAccount: FusionAccount, attributeName: string): string | undefined {
+        const value = fusionAccount.attributes[attributeName]
+        if (!isValidAttributeValue(value)) return undefined
+        const asString = String(value).trim()
+        return asString === '' ? undefined : asString
+    }
+
+    private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
+        const identity = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
+        const identityName = identity?.name
+        if (typeof identityName === 'string' && identityName.trim() !== '') {
+            return identityName.trim()
+        }
+
+        if (fusionAccount.identityDisplayName && fusionAccount.identityDisplayName.trim() !== '') {
+            return fusionAccount.identityDisplayName.trim()
+        }
+
+        if (fusionAccount.name && fusionAccount.name.trim() !== '') {
+            return fusionAccount.name.trim()
+        }
+
+        return undefined
+    }
+
+    private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
+        if (fusionAccount.identityId && fusionAccount.identityId.trim() !== '') {
+            return fusionAccount.identityId.trim()
+        }
+
+        const bagId = identity.id
+        if (typeof bagId === 'string' && bagId.trim() !== '') {
+            return bagId.trim()
+        }
+
+        return undefined
     }
 
     /**
@@ -869,7 +881,7 @@ export class AttributeService {
     private async generateNormalAttributeValue(
         definition: NormalAttributeDefinition,
         fusionAccount: FusionAccount,
-        context: { [key: string]: any }
+        context: Record<string, any>
     ): Promise<string | undefined> {
         return this.evaluateTemplate(definition, context, fusionAccount.name)
     }
@@ -885,7 +897,7 @@ export class AttributeService {
     private async generateUniqueAttributeValue(
         definition: UniqueAttributeDefinition,
         fusionAccount: FusionAccount,
-        context: { [key: string]: any }
+        context: Record<string, any>
     ): Promise<string | undefined> {
         const lockKey = `unique:${definition.name}`
 
@@ -919,7 +931,7 @@ export class AttributeService {
     private async generateWithIncrementalCounter(
         definition: UniqueAttributeDefinition,
         fusionAccount: FusionAccount,
-        context: { [key: string]: any },
+        context: Record<string, any>,
         registeredValues: Set<string>,
         maxAttempts: number
     ): Promise<string | undefined> {
@@ -956,7 +968,7 @@ export class AttributeService {
     private async generateWithCollisionDisambiguation(
         definition: UniqueAttributeDefinition,
         fusionAccount: FusionAccount,
-        context: { [key: string]: any },
+        context: Record<string, any>,
         registeredValues: Set<string>,
         maxAttempts: number
     ): Promise<string | undefined> {
@@ -1003,7 +1015,7 @@ export class AttributeService {
      * If the expression references $UUID or ${UUID}, generate a fresh v4 UUID
      * and inject it into the Velocity context.
      */
-    private injectUUIDIfNeeded(definition: UniqueAttributeDefinition, context: { [key: string]: any }): void {
+    private injectUUIDIfNeeded(definition: UniqueAttributeDefinition, context: Record<string, any>): void {
         if (
             definition.expression &&
             (definition.expression.includes('$UUID') || definition.expression.includes('${UUID}'))
@@ -1034,7 +1046,7 @@ export class AttributeService {
     private async refreshDefinitions<T extends AnyDefinition>(
         fusionAccount: FusionAccount,
         definitions: T[],
-        processor: (definition: T, fusionAccount: FusionAccount, context: { [key: string]: any }) => Promise<void>,
+        processor: (definition: T, fusionAccount: FusionAccount, context: Record<string, any>) => Promise<void>,
         kind: 'normal' | 'unique'
     ): Promise<void> {
         if (definitions.length === 0) return
@@ -1057,7 +1069,7 @@ export class AttributeService {
      * Process a single normal attribute definition for an account.
      *
      * Immutability guards for identity-linked accounts:
-     * - **nativeIdentity** (fusionIdentityAttribute): skipped entirely to prevent
+     * - **id** (fusionIdentityAttribute): skipped entirely to prevent
      *   disconnection between the existing Fusion account and subsequent updates.
      * - **name** (fusionDisplayAttribute): locked to the hosting identity's name to
      *   prevent destruction of the identity linkage.
@@ -1065,29 +1077,10 @@ export class AttributeService {
      * Generated values are written to both the account's attribute bag and the shared
      * Velocity context, making them available to subsequent definitions in the same run.
      */
-    /**
-     * Best-effort display label for the correlated ISC identity (not persisted fusion account.name,
-     * which may still hold a managed native id when the identity layer was skipped).
-     */
-    private hostingIdentityDisplayLabel(fusionAccount: FusionAccount): string | undefined {
-        const trim = (v: unknown) => {
-            const s = String(v ?? '').trim()
-            return s.length > 0 ? s : undefined
-        }
-        const idn = trim(fusionAccount.identityDisplayName)
-        if (idn) return idn
-        const bag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
-        if (bag) {
-            const fromBag = trim(bag.displayName) ?? trim(bag.name)
-            if (fromBag) return fromBag
-        }
-        return trim(fusionAccount.name)
-    }
-
     private async processNormalDefinition(
         definition: NormalAttributeDefinition,
         fusionAccount: FusionAccount,
-        context: { [key: string]: any }
+        context: Record<string, any>
     ): Promise<void> {
         const { name, refresh } = definition
         if (name === ORIGIN_ACCOUNT_ATTRIBUTE) return
@@ -1113,7 +1106,7 @@ export class AttributeService {
         }
 
         if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
-            const label = this.hostingIdentityDisplayLabel(fusionAccount)
+            const label = this.hostingIdentityName(fusionAccount)
             if (label) {
                 this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
                 fusionAccount.attributes[name] = label
@@ -1153,7 +1146,7 @@ export class AttributeService {
     private async processUniqueDefinition(
         definition: UniqueAttributeDefinition,
         fusionAccount: FusionAccount,
-        context: { [key: string]: any }
+        context: Record<string, any>
     ): Promise<void> {
         const { name } = definition
         if (name === ORIGIN_ACCOUNT_ATTRIBUTE) return
@@ -1183,7 +1176,7 @@ export class AttributeService {
 
         // Set identity name for display attribute if the account is an identity
         if (fusionAccount.fromIdentity && isFusionDisplayAttribute) {
-            const label = this.hostingIdentityDisplayLabel(fusionAccount)
+            const label = this.hostingIdentityName(fusionAccount)
             if (label) {
                 this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
                 fusionAccount.attributes[name] = label
@@ -1193,22 +1186,6 @@ export class AttributeService {
 
         const value = await this.generateUniqueAttributeValue(definition, fusionAccount, context)
         if (value === undefined) {
-            // For identity-origin (baseline) accounts with managed accounts available,
-            // retry generation with the first managed account as $account. This covers
-            // the case where Fix 4 did not apply (e.g. no managed accounts at context
-            // build time) or as a safety net when $account differs from $accounts[0].
-            if (fusionAccount.fromIdentity) {
-                const orderedAccounts = context.accounts as Record<string, any>[] | undefined
-                if (orderedAccounts && orderedAccounts.length > 0 && context.account !== orderedAccounts[0]) {
-                    const retryContext = { ...context, account: orderedAccounts[0] }
-                    const retryValue = await this.generateUniqueAttributeValue(definition, fusionAccount, retryContext)
-                    if (retryValue !== undefined) {
-                        fusionAccount.attributes[name] = retryValue
-                        context[name] = retryValue
-                        return
-                    }
-                }
-            }
             // Clear attribute when expression fails (e.g. unresolved variables)
             delete fusionAccount.attributes[name]
             delete context[name]

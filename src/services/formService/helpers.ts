@@ -31,10 +31,14 @@ export const resolveIdentitiesSelectLabel = (
     const fromIdentityName = String(identityDocument?.name ?? '').trim()
     if (fromIdentityName) return fromIdentityName
 
-    logger.error(
-        `[formBuilder] Candidate identity ${identityId} has no attributes.displayName for identities SELECT; ` +
-            `form conditions may not match the dropdown. Using identity.name (or identityId) as fallback label.`
-    )
+    // During initial candidate build we may not have hydrated identity documents yet.
+    // Only emit this warning once we've actually attempted identity lookup.
+    if (identityDocument) {
+        logger.error(
+            `[formBuilder] Candidate identity ${identityId} has no attributes.displayName for identities SELECT; ` +
+                `form conditions may not match the dropdown. Using identity.name (or identityId) as fallback label.`
+        )
+    }
     return identityId
 }
 

@@ -124,7 +124,6 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     // retryDelay is configured in milliseconds in connector-spec.json
     config.retryDelay = config.retryDelay ?? 1000 // 1 second base delay (only used as fallback, 429 responses use retry-after header)
     config.pageSize = config.batchSize ?? 250 // Paging size is 250 for all calls
-    config.enableBatching = config.enableBatching ?? true
     config.enablePriority = config.enablePriority ?? true
     // processingWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
     const processingWaitSeconds =
