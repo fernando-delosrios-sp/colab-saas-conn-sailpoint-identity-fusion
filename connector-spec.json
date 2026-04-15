@@ -200,7 +200,7 @@
                                             "value": "true",
                                             "parentKey": "sourceType",
                                             "parentValue": "record",
-                                            "helpKey": "When on (default), record accounts are scored in the Match phase against identities (and same-aggregation peers when enabled). When off, Match scoring is skipped; attributes are still mapped and unique attributes are still registered—useful when records only supply third-party identifiers for reservation."
+                                            "helpKey": "Enable when record accounts should be matched against Fusion identities. Disable to skip Match; Map & Define and unique attributes still run."
                                         },
                                         {
                                             "key": "accountFilter",
