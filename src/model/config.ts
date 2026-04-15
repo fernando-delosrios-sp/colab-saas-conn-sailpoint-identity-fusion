@@ -67,11 +67,17 @@ export interface NormalAttributeDefinition {
  * Value must be unique across all accounts. Supports `$UUID` in the expression
  * (auto-generates a v4 UUID injected into the Velocity context) and an optional
  * incremental counter for sequential numbering or collision disambiguation.
+ *
+ * Unique expressions also receive `$isUnique(value)`, which returns whether `value`
+ * (after the same trim/case/spaces/normalize/maxLength rules as the generated value)
+ * is not already registered for this attribute, or matches this account's current value.
+ * When using Velocity directives (`#if`, `#set`, …), put each directive on its own line;
+ * velocity.js does not treat single-line `#if…#else…#end` as separate blocks.
  */
 export interface UniqueAttributeDefinition {
     /** The target attribute name */
     name: string
-    /** Apache Velocity template expression. Use $UUID for auto-generated UUIDs, $counter for counter values. */
+    /** Apache Velocity template expression. Use $UUID for auto-generated UUIDs, $counter for counter values, $isUnique(...) to test candidates against registered values. */
     expression: string
     /** Case transformation to apply after generation */
     case?: 'same' | 'lower' | 'upper' | 'capitalize'
