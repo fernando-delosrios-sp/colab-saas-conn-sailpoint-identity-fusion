@@ -1291,19 +1291,29 @@ export class FusionService {
         const sourceType =
             (account.sourceName ? this.sourcesByName.get(account.sourceName)?.sourceType : undefined) ??
             SourceType.Authoritative
-        // When exact-match auto-assignment is enabled, exclude identities already claimed in
-        // this run so a second managed account cannot match against a spoken-for identity.
-        const identityPool =
-            this.config.fusionMergingExactMatch && this.autoAssignedIdentityIds.size > 0
-                ? this.fusionIdentitiesExcluding(this.autoAssignedIdentityIds)
-                : this.fusionIdentities
-        let fusionIdentityComparisons = await this.scoring.scoreFusionAccount(fusionAccount, identityPool, 'identity')
-        const hasIdentityBackedMatches = this.hasIdentityBackedMatches(fusionAccount)
-        if (!hasIdentityBackedMatches && this.isDeferredMatchingEnabledForSource(account.sourceName ?? undefined)) {
-            fusionIdentityComparisons += await this.scoring.scoreFusionAccount(
-                fusionAccount,
-                this.currentRunUnmatchedCandidates,
-                'new-unmatched'
+        const recordMatchingEnabled = this.isRecordMatchingEnabledForSource(account.sourceName ?? undefined)
+        let fusionIdentityComparisons = 0
+        let hasIdentityBackedMatches = false
+        if (recordMatchingEnabled) {
+            // When exact-match auto-assignment is enabled, exclude identities already claimed in
+            // this run so a second managed account cannot match against a spoken-for identity.
+            const identityPool =
+                this.config.fusionMergingExactMatch && this.autoAssignedIdentityIds.size > 0
+                    ? this.fusionIdentitiesExcluding(this.autoAssignedIdentityIds)
+                    : this.fusionIdentities
+            fusionIdentityComparisons = await this.scoring.scoreFusionAccount(fusionAccount, identityPool, 'identity')
+            hasIdentityBackedMatches = this.hasIdentityBackedMatches(fusionAccount)
+            if (!hasIdentityBackedMatches && this.isDeferredMatchingEnabledForSource(account.sourceName ?? undefined)) {
+                fusionIdentityComparisons += await this.scoring.scoreFusionAccount(
+                    fusionAccount,
+                    this.currentRunUnmatchedCandidates,
+                    'new-unmatched'
+                )
+            }
+        } else {
+            this.log.debug(
+                `Skipping Match scoring for record source account: ${name} [${sourceName}] ` +
+                    `(includeRecordAccountsForMatching=false)`
             )
         }
         this.fusionIdentityComparisonsByAccount.set(fusionAccount, fusionIdentityComparisons)
@@ -1396,6 +1406,21 @@ export class FusionService {
         const info = this.sourcesByName.get(sourceName)
         if (!info?.config) return true
         return info.config.deferredMatching !== false
+    }
+
+    /**
+     * Record sources: Match scoring (identity + optional deferred peers). Default true.
+     * When false, record accounts skip scoring but still participate in Map & Define and
+     * unique-attribute registration.
+     */
+    private isRecordMatchingEnabledForSource(sourceName: string | undefined): boolean {
+        if (!sourceName) return true
+        const info = this.sourcesByName.get(sourceName)
+        const sourceType = info?.sourceType ?? SourceType.Authoritative
+        if (sourceType !== SourceType.Record) {
+            return true
+        }
+        return info?.config?.includeRecordAccountsForMatching !== false
     }
 
     /**

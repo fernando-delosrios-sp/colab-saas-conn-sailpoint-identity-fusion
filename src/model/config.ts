@@ -183,6 +183,13 @@ export interface SourceConfig {
      * appear as multiple accounts in a single aggregation.
      */
     deferredMatching?: boolean
+    /**
+     * Record sources only: when true (default), record accounts are scored in the Match
+     * phase against identities (and deferred peers when enabled). When false, Match
+     * scoring is skipped; the account still maps attributes and contributes to unique
+     * attribute registration (for example reserving third-party identifiers).
+     */
+    includeRecordAccountsForMatching?: boolean
 }
 
 /** Configuration for all managed sources and aggregation behavior. */

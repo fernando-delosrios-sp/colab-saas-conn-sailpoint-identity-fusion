@@ -505,6 +505,57 @@ describe('FusionService', () => {
             expect(mockScoring.scoreFusionAccount).toHaveBeenCalledWith(expect.any(FusionAccount), expect.anything(), 'identity')
         })
 
+        it('skips Match scoring for record sources when includeRecordAccountsForMatching is false', async () => {
+            const mockManagedAccount = {
+                id: 'acct-record-skip-match-1',
+                nativeIdentity: 'native-record-skip-match-1',
+                name: 'Record Only User',
+                sourceId: 'src-record-skip',
+                sourceName: 'Record Skip Match Source',
+                attributes: {},
+            } as Account
+
+            ;(fusionService as any).sourcesByName.set('Record Skip Match Source', {
+                id: 'src-record-skip',
+                name: 'Record Skip Match Source',
+                sourceType: 'record',
+                config: { includeRecordAccountsForMatching: false },
+            })
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            await fusionService.analyzeManagedAccount(mockManagedAccount)
+
+            expect(mockScoring.scoreFusionAccount).not.toHaveBeenCalled()
+        })
+
+        it('runs Match scoring for record sources when includeRecordAccountsForMatching is omitted (default)', async () => {
+            const mockManagedAccount = {
+                id: 'acct-record-default-match-1',
+                nativeIdentity: 'native-record-default-match-1',
+                name: 'Record Default User',
+                sourceId: 'src-record-default',
+                sourceName: 'Record Default Source',
+                attributes: {},
+            } as Account
+
+            ;(fusionService as any).sourcesByName.set('Record Default Source', {
+                id: 'src-record-default',
+                name: 'Record Default Source',
+                sourceType: 'record',
+                config: {},
+            })
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockScoring.scoreFusionAccount.mockResolvedValue(0)
+
+            await fusionService.analyzeManagedAccount(mockManagedAccount)
+
+            expect(mockScoring.scoreFusionAccount).toHaveBeenCalled()
+        })
+
         it('logs deferred matches and suppresses output for new-unmatched candidate matches', async () => {
             const mockManagedAccount = {
                 id: 'acct-deferred-1',
