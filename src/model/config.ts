@@ -70,7 +70,9 @@ export interface NormalAttributeDefinition {
  *
  * Unique expressions also receive `$isUnique(value)`, which returns whether `value`
  * (after the same trim/case/spaces/normalize/maxLength rules as the generated value)
- * is not already registered for this attribute, or matches this account's current value.
+ * is not already present in the in-use registry for this attribute. On reset, existing
+ * values for the account are unregistered before the template runs, so candidates can
+ * be tested without relying on `$counter` disambiguation.
  * When using Velocity directives (`#if`, `#set`, …), put each directive on its own line;
  * velocity.js does not treat single-line `#if…#else…#end` as separate blocks.
  */

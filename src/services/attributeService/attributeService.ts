@@ -1152,7 +1152,7 @@ export class AttributeService {
         context: Record<string, any>
     ): Promise<void> {
         const prevIsUnique = context.isUnique
-        context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value, fusionAccount)
+        context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value)
         try {
             await this.processUniqueDefinitionCore(definition, fusionAccount, context)
         } finally {
@@ -1165,14 +1165,14 @@ export class AttributeService {
     }
 
     /**
-     * Velocity helper for unique attribute templates: true if the candidate value is
-     * available (not registered for another account), or equals this account's current value.
+     * Velocity helper for unique attribute templates: true if the transformed candidate
+     * is not in the registered-in-use set for this attribute.
+     *
+     * Unique values are only (re)generated when missing or on reset; on reset,
+     * {@link unregisterUniqueAttributes} removes this account's prior value from the set
+     * before evaluation, so the registry reflects other accounts only during generation.
      */
-    private isUniqueTemplateValue(
-        definition: UniqueAttributeDefinition,
-        value: unknown,
-        fusionAccount: FusionAccount
-    ): boolean {
+    private isUniqueTemplateValue(definition: UniqueAttributeDefinition, value: unknown): boolean {
         if (value === undefined || value === null) return false
         const raw = String(value)
         if (raw === '') return false
@@ -1180,13 +1180,7 @@ export class AttributeService {
         const transformed = this.applyUniqueValueOutputTransforms(definition, raw)
         if (transformed === '') return false
 
-        const registered = this.getUniqueValues(definition.name)
-        if (!registered.has(transformed)) return true
-
-        const current = fusionAccount.attributes[definition.name]
-        if (!isValidAttributeValue(current)) return false
-        const currentTransformed = this.applyUniqueValueOutputTransforms(definition, String(current))
-        return currentTransformed === transformed
+        return !this.getUniqueValues(definition.name).has(transformed)
     }
 
     /** Match {@link evaluateTemplate} post-velocity transforms for a unique definition (including maxLength). */
