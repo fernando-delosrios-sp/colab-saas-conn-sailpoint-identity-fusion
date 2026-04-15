@@ -1162,6 +1162,10 @@ export class FusionAccount {
             this.pruneDeletedManagedAccounts(allAccountsById)
         }
 
+        if (allAccountsById) {
+            this.successionOriginAccountIfStale(allAccountsById)
+        }
+
         // Preserve source/nativeIdentity context for missing accounts even if they were
         // not claimed from the current work queue (e.g. still missing from previous runs).
         if (allAccountsById) {
@@ -1214,6 +1218,32 @@ export class FusionAccount {
             // Force a refresh so dependent attributes are recomputed in the same run.
             this.setNeedsRefresh(true)
         }
+    }
+
+    /**
+     * When the persisted origin is a managed account key that no longer exists in inventory
+     * but this fusion account still has correlated managed accounts, rebase originAccount
+     * (and originSource) to a remaining account so provenance stays consistent.
+     */
+    private successionOriginAccountIfStale(allAccountsById: Map<string, Account>): void {
+        const normalizedOrigin = normalizeCompositeManagedAccountKey(this._originAccount)
+        if (!normalizedOrigin) return
+        if (allAccountsById.has(normalizedOrigin)) return
+        if (this._originSource === 'Identities') return
+        if (this._accountIds.size === 0) return
+
+        const successor = Array.from(this._accountIds).sort()[0]
+        const successorAccount = allAccountsById.get(successor)
+        const sourceName =
+            (successorAccount?.sourceName && String(successorAccount.sourceName).trim()) ||
+            this.getManagedAccountInfo(successor)?.source.name
+
+        this._originAccount = successor
+        if (sourceName) {
+            this._originSource = sourceName
+        }
+        this.addHistory(`Origin account succession: ${normalizedOrigin} -> ${successor}`)
+        this.setNeedsRefresh(true)
     }
 
     /**
