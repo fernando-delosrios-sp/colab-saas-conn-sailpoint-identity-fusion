@@ -1242,6 +1242,91 @@ describe('FusionService', () => {
             )
         })
 
+        it('succession: rebases originAccount and originSource when origin managed account no longer exists', async () => {
+            const historicalAccount = {
+                nativeIdentity: 'fusion-1',
+                identityId: 'identity-1',
+                name: 'Fusion Account',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {
+                    accounts: ['source-a-id::native-existing-1', 'source-a-id::native-other-1'],
+                    originSource: 'Source A',
+                    originAccount: 'source-a-id::native-deleted-origin',
+                },
+            } as unknown as Account
+
+            const workQueue = new Map([
+                [
+                    'source-a-id::native-existing-1',
+                    {
+                        id: 'acct-existing-1',
+                        nativeIdentity: 'native-existing-1',
+                        sourceId: 'source-a-id',
+                        sourceName: 'Source A',
+                        identityId: 'identity-1',
+                        attributes: {},
+                    } as unknown as Account,
+                ],
+                [
+                    'source-a-id::native-other-1',
+                    {
+                        id: 'acct-other-1',
+                        nativeIdentity: 'native-other-1',
+                        sourceId: 'source-a-id',
+                        sourceName: 'Source A',
+                        identityId: 'identity-1',
+                        attributes: {},
+                    } as unknown as Account,
+                ],
+            ])
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
+                new Map([['identity-1', new Set(['source-a-id::native-existing-1', 'source-a-id::native-other-1'])]])
+            )
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+                new Map([
+                    [
+                        'source-a-id::native-existing-1',
+                        {
+                            id: 'acct-existing-1',
+                            nativeIdentity: 'native-existing-1',
+                            sourceId: 'source-a-id',
+                            sourceName: 'Source A',
+                            identityId: 'identity-1',
+                            attributes: {},
+                        } as unknown as Account,
+                    ],
+                    [
+                        'source-a-id::native-other-1',
+                        {
+                            id: 'acct-other-1',
+                            nativeIdentity: 'native-other-1',
+                            sourceId: 'source-a-id',
+                            sourceName: 'Source A',
+                            identityId: 'identity-1',
+                            attributes: {},
+                        } as unknown as Account,
+                    ],
+                ])
+            )
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockAttributes.registerUniqueAttributes.mockResolvedValue()
+
+            const result = await fusionService.processFusionAccount(historicalAccount)
+
+            expect(result.originAccountId).toBe('source-a-id::native-existing-1')
+            expect(result.originSource).toBe('Source A')
+            expect(result.history).toEqual(
+                expect.arrayContaining([
+                    expect.stringContaining(
+                        'Origin account succession: source-a-id::native-deleted-origin -> source-a-id::native-existing-1'
+                    ),
+                ])
+            )
+        })
+
         it('should not clear reverse attribute when missing account source info is unresolved', async () => {
             ; (fusionService as any).config.sources = [
                 {
