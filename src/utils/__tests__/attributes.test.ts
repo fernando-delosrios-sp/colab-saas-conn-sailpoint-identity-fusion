@@ -240,6 +240,10 @@ describe('attributes', () => {
             expect(coerceMultiValuedAttributeInput('a\nb')).toEqual(['a', 'b'])
         })
 
+        it('splits bracket token strings like [a] [b]', () => {
+            expect(coerceMultiValuedAttributeInput('[a] [b]')).toEqual(['a', 'b'])
+        })
+
         it('parses JSON array strings and stringifies object elements', () => {
             const s = '[{"key": "a"}, {"key": "b"}]'
             expect(coerceMultiValuedAttributeInput(s)).toEqual(['{"key":"a"}', '{"key":"b"}'])

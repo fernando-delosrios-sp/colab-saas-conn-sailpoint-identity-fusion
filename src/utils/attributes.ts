@@ -272,6 +272,7 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
 /**
  * For multi-valued schema attributes: interpret a scalar or nested strings as multiple elements.
  * - Comma- and newline-separated lists: `"a, b"`, `"a\\nb"`
+ * - Bracket tokens: `"[a] [b]"` → `["a", "b"]` (whole string must be only `[...]` groups and whitespace)
  * - JSON arrays: `'[{"key":"a"},{"key":"b"}]'` → stringified object elements; primitives stay typed for casting
  */
 export function coerceMultiValuedAttributeInput(value: unknown): unknown[] {
@@ -315,12 +316,37 @@ function splitCommaOrNewlineList(s: string): string[] {
         .filter((x) => x.length > 0)
 }
 
+/** e.g. `[a] [b]` → `['a','b']` when the entire string is only bracket groups (and whitespace). */
+function splitBracketTokenList(s: string): string[] | null {
+    const t = s.trim()
+    if (!/^\[[^\]]*\]/.test(t)) {
+        return null
+    }
+    if (!/^(\[[^\]]*\]\s*)+$/.test(t)) {
+        return null
+    }
+    const re = /\[([^\]]*)\]/g
+    const out: string[] = []
+    let m: RegExpExecArray | null
+    while ((m = re.exec(t)) !== null) {
+        const inner = m[1].trim()
+        if (inner.length > 0) {
+            out.push(inner)
+        }
+    }
+    return out.length > 0 ? out : null
+}
+
 function coerceStringToMultiValuedElements(s: string): unknown[] {
     const fromJson = tryParseJsonArrayString(s)
     if (fromJson) {
         return fromJson.map((el) =>
             el !== null && typeof el === 'object' ? JSON.stringify(el) : el
         )
+    }
+    const fromBrackets = splitBracketTokenList(s)
+    if (fromBrackets) {
+        return fromBrackets
     }
     const split = splitCommaOrNewlineList(s)
     return split.length > 0 ? split : [s]

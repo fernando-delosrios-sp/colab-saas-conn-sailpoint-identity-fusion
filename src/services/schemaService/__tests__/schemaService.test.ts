@@ -41,6 +41,11 @@ describe('SchemaService', () => {
             expect(out.tags).toEqual(['a', 'b'])
         })
 
+        it('coerces bracket token strings into multi-valued string attributes', () => {
+            const out = schemaService.getFusionAttributeSubset({ tags: '[a] [b]' })
+            expect(out.tags).toEqual(['a', 'b'])
+        })
+
         it('coerces JSON array strings with objects into string elements', () => {
             const raw = '[{"key": "a"}, {"key": "b"}]'
             const out = schemaService.getFusionAttributeSubset({ tags: raw })
