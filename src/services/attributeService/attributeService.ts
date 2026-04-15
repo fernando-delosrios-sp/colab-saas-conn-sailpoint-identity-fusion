@@ -978,13 +978,16 @@ export class AttributeService {
         // Ensure expression has $counter for disambiguation fallback (local only; do not mutate config).
         // Skip auto-append for UUID-based expressions because UUID already
         // provides uniqueness and appending counter can mutate intent.
+        // Skip when the template uses Velocity directives (#if, #set, …): appending `$counter`
+        // after `#end` breaks parsing and would defeat $isUnique-based expressions.
         let effectiveExpression = definition.expression ?? ''
         if (
             effectiveExpression &&
             !effectiveExpression.includes('$counter') &&
             !effectiveExpression.includes('${counter}') &&
             !effectiveExpression.includes('$UUID') &&
-            !effectiveExpression.includes('${UUID}')
+            !effectiveExpression.includes('${UUID}') &&
+            !effectiveExpression.includes('#')
         ) {
             effectiveExpression = `${effectiveExpression}$counter`
         }
@@ -1144,6 +1147,56 @@ export class AttributeService {
      * Velocity context, making them available to subsequent unique definitions.
      */
     private async processUniqueDefinition(
+        definition: UniqueAttributeDefinition,
+        fusionAccount: FusionAccount,
+        context: Record<string, any>
+    ): Promise<void> {
+        const prevIsUnique = context.isUnique
+        context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value)
+        try {
+            await this.processUniqueDefinitionCore(definition, fusionAccount, context)
+        } finally {
+            if (prevIsUnique !== undefined) {
+                context.isUnique = prevIsUnique
+            } else {
+                delete context.isUnique
+            }
+        }
+    }
+
+    /**
+     * Velocity helper for unique attribute templates: true if the transformed candidate
+     * is not in the registered-in-use set for this attribute.
+     *
+     * Unique values are only (re)generated when missing or on reset; on reset,
+     * {@link unregisterUniqueAttributes} removes this account's prior value from the set
+     * before evaluation, so the registry reflects other accounts only during generation.
+     */
+    private isUniqueTemplateValue(definition: UniqueAttributeDefinition, value: unknown): boolean {
+        if (value === undefined || value === null) return false
+        const raw = String(value)
+        if (raw === '') return false
+
+        const transformed = this.applyUniqueValueOutputTransforms(definition, raw)
+        if (transformed === '') return false
+
+        return !this.getUniqueValues(definition.name).has(transformed)
+    }
+
+    /** Match {@link evaluateTemplate} post-velocity transforms for a unique definition (including maxLength). */
+    private applyUniqueValueOutputTransforms(definition: UniqueAttributeDefinition, raw: string): string {
+        let s = raw
+        if (definition.maxLength && s.length > definition.maxLength) {
+            s = s.substring(0, definition.maxLength)
+        }
+        if (definition.trim) s = s.trim()
+        if (definition.case) s = switchCase(s, definition.case)
+        if (definition.spaces) s = removeSpaces(s)
+        if (definition.normalize) s = normalize(s)
+        return s
+    }
+
+    private async processUniqueDefinitionCore(
         definition: UniqueAttributeDefinition,
         fusionAccount: FusionAccount,
         context: Record<string, any>

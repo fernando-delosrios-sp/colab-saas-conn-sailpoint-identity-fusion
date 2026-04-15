@@ -745,6 +745,150 @@ describe('AttributeService template evaluation fallback behavior', () => {
     })
 })
 
+describe('AttributeService $isUnique in unique attribute expressions', () => {
+    const baseLocks = {
+        withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+        waitForAllPendingOperations: jest.fn(async () => undefined),
+    } as any
+
+    it('picks the else branch when $isUnique is false for a registered value', async () => {
+        const uniqueDefinition = {
+            name: 'login',
+            expression: `#if($isUnique("candidate"))
+candidate
+#else
+fallback
+#end`,
+            useIncrementalCounter: false,
+            normalize: false,
+            spaces: false,
+            trim: true,
+        }
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [uniqueDefinition],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'login']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'login' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const service = new AttributeService(config, schemas, sourceService, log, baseLocks)
+        service.registerExistingValues('login', ['candidate'])
+
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.login).toBe('fallback')
+    })
+
+    it('returns true from $isUnique when the value is not yet registered', async () => {
+        const uniqueDefinition = {
+            name: 'login',
+            expression: `#if($isUnique("fresh"))
+fresh
+#else
+used
+#end`,
+            useIncrementalCounter: false,
+            normalize: false,
+            spaces: false,
+            trim: true,
+        }
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [uniqueDefinition],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'login']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'login' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const service = new AttributeService(config, schemas, sourceService, log, baseLocks)
+
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.login).toBe('fresh')
+    })
+})
+
 describe('AttributeService mainAccount override', () => {
     const createService = () => {
         const config = {
