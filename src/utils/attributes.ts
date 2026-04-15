@@ -270,6 +270,63 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
 }
 
 /**
+ * For multi-valued schema attributes: interpret a scalar or nested strings as multiple elements.
+ * - Comma- and newline-separated lists: `"a, b"`, `"a\\nb"`
+ * - JSON arrays: `'[{"key":"a"},{"key":"b"}]'` → stringified object elements; primitives stay typed for casting
+ */
+export function coerceMultiValuedAttributeInput(value: unknown): unknown[] {
+    if (value === null || value === undefined) {
+        return []
+    }
+    if (Array.isArray(value)) {
+        const out: unknown[] = []
+        for (const item of value) {
+            if (typeof item === 'string') {
+                out.push(...coerceStringToMultiValuedElements(item))
+            } else {
+                out.push(item)
+            }
+        }
+        return out
+    }
+    if (typeof value === 'string') {
+        return coerceStringToMultiValuedElements(value)
+    }
+    return [value]
+}
+
+function tryParseJsonArrayString(s: string): unknown[] | null {
+    const t = s.trim()
+    if (!t.startsWith('[')) {
+        return null
+    }
+    try {
+        const parsed = JSON.parse(t) as unknown
+        return Array.isArray(parsed) ? parsed : null
+    } catch {
+        return null
+    }
+}
+
+function splitCommaOrNewlineList(s: string): string[] {
+    return s
+        .split(/\r\n|\n|\r|,/)
+        .map((x) => x.trim())
+        .filter((x) => x.length > 0)
+}
+
+function coerceStringToMultiValuedElements(s: string): unknown[] {
+    const fromJson = tryParseJsonArrayString(s)
+    if (fromJson) {
+        return fromJson.map((el) =>
+            el !== null && typeof el === 'object' ? JSON.stringify(el) : el
+        )
+    }
+    const split = splitCommaOrNewlineList(s)
+    return split.length > 0 ? split : [s]
+}
+
+/**
  * Normalizes `actions` (or similar multi-valued entitlement input) from account create payloads.
  * ISC may send a single string (e.g. `"report"`) instead of `["report"]`; spreading a string
  * into an array would yield per-character tokens and break action dispatch.

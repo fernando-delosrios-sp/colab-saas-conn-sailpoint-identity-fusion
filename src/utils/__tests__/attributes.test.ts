@@ -15,6 +15,7 @@ import {
     extractArray,
     toSetFromAttribute,
     normalizeActionTokens,
+    coerceMultiValuedAttributeInput,
     getDisplayName,
     getFirstValidAttribute,
     buildAccountIdentifier,
@@ -230,6 +231,22 @@ describe('attributes', () => {
 
         it('should return empty Set for null attributes', () => {
             expect(toSetFromAttribute(null, 'tags')).toEqual(new Set())
+        })
+    })
+
+    describe('coerceMultiValuedAttributeInput', () => {
+        it('splits comma-separated and newline-separated strings', () => {
+            expect(coerceMultiValuedAttributeInput('a, b')).toEqual(['a', 'b'])
+            expect(coerceMultiValuedAttributeInput('a\nb')).toEqual(['a', 'b'])
+        })
+
+        it('parses JSON array strings and stringifies object elements', () => {
+            const s = '[{"key": "a"}, {"key": "b"}]'
+            expect(coerceMultiValuedAttributeInput(s)).toEqual(['{"key":"a"}', '{"key":"b"}'])
+        })
+
+        it('flattens nested string elements in arrays', () => {
+            expect(coerceMultiValuedAttributeInput(['a, b'])).toEqual(['a', 'b'])
         })
     })
 

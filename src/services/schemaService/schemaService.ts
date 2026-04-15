@@ -9,6 +9,7 @@ import {
 import { LogService } from '../logService'
 import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
+import { coerceMultiValuedAttributeInput } from '../../utils/attributes'
 import { fusionAccountSchemaAttributes } from '../../data/schema'
 import { isAccountSchema, apiSchemaToAccountSchema } from './helpers'
 
@@ -77,9 +78,9 @@ export class SchemaService {
         const type = (schemaDef.type ?? 'string').toLowerCase()
 
         if (isMulti) {
-            // Multi-valued: ensure the value is an array, then cast each element
-            const arr = Array.isArray(value) ? value : [value]
-            return arr.map((v) => this.castScalar(v, type)) as string[] | number[]
+            // Multi-valued: coerce strings (comma/newline/JSON array) into elements, then cast each
+            const arr = coerceMultiValuedAttributeInput(value)
+            return arr.map((v) => this.castScalar(v as boolean | string | number, type)) as string[] | number[]
         } else {
             // Single-valued: if value is an array, join it into a string
             const scalar = Array.isArray(value) ? value.join(', ') : value
