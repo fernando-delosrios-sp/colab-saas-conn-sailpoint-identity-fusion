@@ -193,6 +193,16 @@
                                             "helpKey": "After identity matching, also compare to other new unmatched accounts from this aggregation. If the only strong match is one of those peers, defer instead of creating another Fusion identity until a later run. Off: skip that check and use normal unmatched handling. Turn on when the same person might appear as multiple accounts in one run."
                                         },
                                         {
+                                            "key": "includeRecordAccountsForMatching",
+                                            "label": "Include record accounts in Match",
+                                            "type": "toggle",
+                                            "required": false,
+                                            "value": "true",
+                                            "parentKey": "sourceType",
+                                            "parentValue": "record",
+                                            "helpKey": "Enable when record accounts should be matched against Fusion identities. Disable to skip Match; Map & Define and unique attributes still run."
+                                        },
+                                        {
                                             "key": "accountFilter",
                                             "label": "Accounts API filter",
                                             "type": "text",
