@@ -1003,8 +1003,7 @@ export class FusionService {
                 this._sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                        `Authoritative accounts still run Match scoring, but review forms cannot be created. ` +
-                        `Record and orphan accounts skip Match-style processing for this source.`
+                        `Managed accounts from this source will be treated as NonMatched.`
                 )
             }
         }
@@ -1063,11 +1062,8 @@ export class FusionService {
         const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
 
         if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
-            // Record/orphan: no Match review path — preprocess only (unique attrs / optional disable).
-            // Authoritative: still run Match scoring so reports and dry-run analysis see identity
-            // candidates; finalize below handles the no-reviewer non-match outcome.
+            const fusionAccount = await this.preProcessManagedAccount(account)
             if (sourceType !== SourceType.Authoritative) {
-                const fusionAccount = await this.preProcessManagedAccount(account)
                 this.log.debug(
                     `Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`
                 )
@@ -1078,6 +1074,7 @@ export class FusionService {
                 }
                 return undefined
             }
+            return await this.finalizeAuthoritativeUnmatched(fusionAccount)
         }
 
         const fusionAccount = await this.analyzeManagedAccount(account)
