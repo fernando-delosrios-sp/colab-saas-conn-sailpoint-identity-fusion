@@ -2,7 +2,8 @@ import { FusionAccount } from '../../model/account'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing } from '../../model/config'
 import { LogService } from '../logService'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
-import { scoreDice, scoreDoubleMetaphone, scoreJaroWinkler, scoreLIG3, scoreNameMatcher } from './helpers'
+import { normalizeLIG3, scoreDice, scoreDoubleMetaphone, scoreJaroWinkler, scoreLIG3, scoreLIG3Normalized, scoreNameMatcher } from './helpers'
+import { TrigramIndex, buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
 import { isExactAttributeMatchScores } from './exactMatch'
 
 /** Build a skipped ScoreReport without spreading the full MatchingConfig. */
@@ -43,6 +44,25 @@ export class ScoringService {
     private readonly fusionMergingExactMatch: boolean
 
     /**
+     * Per-account cache of LIG3-normalized attribute values.
+     * WeakMap keyed by FusionAccount so entries are GC'd when the account is released.
+     * Eliminates O(n×m) repeated normalization: each identity attribute is normalized once,
+     * each managed account attribute is normalized once — total O(n+m) normalizations.
+     */
+    private readonly normalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
+
+    /**
+     * Trigram blocking index — built once per pipeline run over the full identity pool.
+     * Maps each mandatory attribute name to its inverted trigram index.
+     * Reduces O(n×m) identity comparisons to O(n×k) where k << m.
+     *
+     * Memory note: ~40 MB per indexed attribute for 50k identities with ~8-char average value length.
+     */
+    private trigramIndexByAttribute: Map<string, TrigramIndex> = new Map()
+    private indexedMandatoryAttributes: string[] = []
+    private trigramIndexBuilt = false
+
+    /**
      * @param config - Fusion configuration containing matching rules and score thresholds
      * @param log - Logger instance
      */
@@ -61,6 +81,122 @@ export class ScoringService {
     static blendWeight(fusionScore?: number): number {
         const t = fusionScore ?? 0
         return t <= 0 ? 1 : t
+    }
+
+    /**
+     * Return the LIG3-normalized form of `rawValue` for `account`, computing and caching on first access.
+     * Cache is keyed by (FusionAccount, attributeName) so each (identity, attribute) pair is normalized once
+     * regardless of how many managed accounts are scored against it.
+     */
+    private getNormalized(account: FusionAccount, attrName: string, rawValue: string): string {
+        let byAttr = this.normalizedCache.get(account)
+        if (!byAttr) {
+            byAttr = new Map()
+            this.normalizedCache.set(account, byAttr)
+        }
+        let cached = byAttr.get(attrName)
+        if (cached === undefined) {
+            cached = normalizeLIG3(rawValue)
+            byAttr.set(attrName, cached)
+        }
+        return cached
+    }
+
+    /**
+     * Conservative upper bound on the LIG3 similarity score for a pair of already-normalized strings.
+     * LIG3 gap penalties (0.8–0.9) mean the similarity can never exceed `min(len1,len2)/max(len1,len2)*100`.
+     * If this bound is below the required threshold, the full DP can be skipped entirely.
+     */
+    private static lig3UpperBound(normA: string, normB: string): number {
+        const lenA = normA.length
+        const lenB = normB.length
+        if (lenA === 0 || lenB === 0) return 0
+        return (Math.min(lenA, lenB) / Math.max(lenA, lenB)) * 100
+    }
+
+    /**
+     * Build the trigram blocking index over all fusion identities for their mandatory matching attributes.
+     * Must be called once before {@link getCandidates} is used.
+     *
+     * The index maps each mandatory attribute to an inverted trigram map so that a managed account
+     * can retrieve only the identity candidates that share at least one trigram with its attribute value,
+     * reducing the scoring candidate pool from O(m) to O(k) where k << m.
+     *
+     * Only mandatory attributes are indexed: non-mandatory attributes cannot be used to safely eliminate
+     * candidates, since a missing or non-matching non-mandatory attribute does not disqualify a pair.
+     *
+     * @param identities - All fusion identities to index (pass `fusionIdentityMap.values()` — collected
+     *   internally into an array so generators can be reused across multiple attribute passes)
+     */
+    public buildTrigramIndex(identities: Iterable<FusionAccount>): void {
+        this.trigramIndexByAttribute.clear()
+        this.indexedMandatoryAttributes = []
+        this.trigramIndexBuilt = false
+
+        const mandatoryConfigs = this.matchingConfigs.filter((c) => c.mandatory === true)
+        if (mandatoryConfigs.length === 0) return
+
+        // Collect once; generators can only be iterated once but we need one pass per attribute.
+        const identityArray = Array.from(identities)
+        for (const config of mandatoryConfigs) {
+            const idx = buildAttributeIndex(identityArray, config.attribute)
+            this.trigramIndexByAttribute.set(config.attribute, idx)
+            this.indexedMandatoryAttributes.push(config.attribute)
+        }
+        this.trigramIndexBuilt = true
+    }
+
+    /**
+     * Return a pre-filtered candidate set for `account` using the trigram blocking index,
+     * or `undefined` if no filtering was possible (index not built, no mandatory attributes,
+     * or account has no value for any mandatory attribute).
+     *
+     * When `undefined` is returned the caller must fall back to a full identity scan.
+     *
+     * The returned Set already has `excludeIds` applied, so the caller can iterate it directly.
+     *
+     * @param account - The managed account being scored
+     * @param excludeIds - Identity IDs to exclude from the candidate set (e.g. auto-assigned identities)
+     */
+    public getCandidates(account: FusionAccount, excludeIds?: ReadonlySet<string>): Set<FusionAccount> | undefined {
+        if (!this.trigramIndexBuilt || this.indexedMandatoryAttributes.length === 0) return undefined
+
+        let resultSet: Set<FusionAccount> | undefined
+
+        for (const attrName of this.indexedMandatoryAttributes) {
+            const raw = account.attributes[attrName]
+            if (raw === null || raw === undefined || String(raw).trim().length === 0) {
+                // Account has no value for this mandatory attribute — cannot filter by it.
+                continue
+            }
+            const idx = this.trigramIndexByAttribute.get(attrName)!
+            const attrCandidates = queryAttributeIndex(idx, String(raw))
+
+            if (resultSet === undefined) {
+                resultSet = attrCandidates
+            } else {
+                // Intersection: keep only identities present in BOTH sets.
+                for (const identity of resultSet) {
+                    if (!attrCandidates.has(identity)) resultSet.delete(identity)
+                }
+            }
+        }
+
+        if (resultSet === undefined) {
+            // All mandatory attributes were missing on this account — fall back to full scan.
+            return undefined
+        }
+
+        // Apply auto-assigned exclusions within the candidate set.
+        if (excludeIds && excludeIds.size > 0) {
+            for (const identity of resultSet) {
+                if (identity.identityId && excludeIds.has(identity.identityId)) {
+                    resultSet.delete(identity)
+                }
+            }
+        }
+
+        return resultSet
     }
 
     /**
@@ -170,11 +306,33 @@ export class ScoringService {
                 continue
             }
 
-            const scoreReport: ScoreReport = this.scoreAttribute(
-                (accountAttribute ?? '').toString(),
-                (identityAttribute ?? '').toString(),
-                matching
-            )
+            // For LIG3: use pre-normalized cached values to avoid repeated normalization in the hot loop,
+            // and apply a conservative length-ratio upper-bound check before running the full DP.
+            let scoreReport: ScoreReport
+            if (matching.algorithm === 'lig3') {
+                const normAccount = this.getNormalized(fusionAccount, matching.attribute, (accountAttribute ?? '').toString())
+                const normIdentity = this.getNormalized(fusionIdentity, matching.attribute, (identityAttribute ?? '').toString())
+                if (ScoringService.lig3UpperBound(normAccount, normIdentity) < (matching.fusionScore ?? 0)) {
+                    // Score is mathematically unreachable — skip as if the rule failed.
+                    scoreReport = makeSkippedReport(matching, 'Length ratio upper bound below threshold')
+                    scores.push(scoreReport)
+                    if (matching.mandatory) {
+                        hasFailedMandatory = true
+                        for (let r = i + 1; r < this.matchingConfigs.length; r++) {
+                            scores.push(makeSkippedReport(this.matchingConfigs[r], 'Rule skipped (mandatory attribute failed)'))
+                        }
+                        break
+                    }
+                    continue
+                }
+                scoreReport = scoreLIG3Normalized(normAccount, normIdentity, matching)
+            } else {
+                scoreReport = this.scoreAttribute(
+                    (accountAttribute ?? '').toString(),
+                    (identityAttribute ?? '').toString(),
+                    matching
+                )
+            }
             scores.push(scoreReport)
             if (matching.mandatory && !scoreReport.isMatch) {
                 hasFailedMandatory = true
