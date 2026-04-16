@@ -193,27 +193,19 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
     const isPersistent = options.mode.kind === 'aggregation'
 
     log.info('Processing existing fusion accounts')
-    const processFusionAccountsStartedAt = Date.now()
     await fusion.processFusionAccounts()
-    log.info(`Performance metric: processPhase.fusionAccounts durationMs=${Date.now() - processFusionAccountsStartedAt}`)
 
     log.info('Processing identities')
-    const processIdentitiesStartedAt = Date.now()
     await fusion.processIdentities()
-    log.info(`Performance metric: processPhase.identities durationMs=${Date.now() - processIdentitiesStartedAt}`)
 
     log.info('Processing fusion identity decisions (new identity)')
-    const processDecisionsStartedAt = Date.now()
     await fusion.processFusionIdentityDecisions()
-    log.info(`Performance metric: processPhase.fusionDecisions durationMs=${Date.now() - processDecisionsStartedAt}`)
 
     identities.clear()
     log.info('Identities cache cleared from memory')
 
     log.info('Processing managed accounts (Match)')
-    const processManagedAccountsStartedAt = Date.now()
     await fusion.processManagedAccounts()
-    log.info(`Performance metric: processPhase.managedAccounts durationMs=${Date.now() - processManagedAccountsStartedAt}`)
 
     if (isPersistent) {
         log.info('Waiting for pending disable operations')
