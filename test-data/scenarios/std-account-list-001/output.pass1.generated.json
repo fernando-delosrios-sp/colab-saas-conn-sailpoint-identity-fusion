@@ -1,0 +1,193 @@
+{
+    "pass": "pass1",
+    "summary": {
+        "includeIdentities": true,
+        "threshold": 50,
+        "managedAccountsCount": 17,
+        "identitiesCount": 4,
+        "formDecisionsCount": 0,
+        "matchesCount": 3,
+        "correlatedCount": 0,
+        "unmatchedCount": 17,
+        "disablePlannedCount": 0
+    },
+    "matches": [
+        {
+            "accountId": "07f15e74e03e4ccdbcdc25c25daa5360",
+            "accountName": "C. Oliveira",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": {
+                "identityId": "id-carlos-oliveira-001",
+                "identityName": "Carlos Oliveira",
+                "score": 85,
+                "reason": "lastName+firstInitial"
+            },
+            "candidates": [
+                {
+                    "identityId": "id-carlos-oliveira-001",
+                    "identityName": "Carlos Oliveira",
+                    "score": 85,
+                    "reason": "lastName+firstInitial"
+                }
+            ]
+        },
+        {
+            "accountId": "0c406dbcdc5f44fbaab2d5eead744666",
+            "accountName": "N. Ginovaef",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "0e7ccfc0ef86456b96deb451c6a85b46",
+            "accountName": "J. Marcus",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "0fdf488504c5483c8c16eba831203fc5",
+            "accountName": "Oswell Spencer",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "12256a7259354810b76fdc4b09ce4729",
+            "accountName": "A. Wong",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": {
+                "identityId": "id-ada-wong-001",
+                "identityName": "Ada Wong",
+                "score": 85,
+                "reason": "lastName+firstInitial"
+            },
+            "candidates": [
+                {
+                    "identityId": "id-ada-wong-001",
+                    "identityName": "Ada Wong",
+                    "score": 85,
+                    "reason": "lastName+firstInitial"
+                }
+            ]
+        },
+        {
+            "accountId": "1982c7260a6e424fbaeb790fbf4b632a",
+            "accountName": "A. Birkin",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": {
+                "identityId": "id-annette-birkin-001",
+                "identityName": "Annette Birkin",
+                "score": 85,
+                "reason": "lastName+firstInitial"
+            },
+            "candidates": [
+                {
+                    "identityId": "id-annette-birkin-001",
+                    "identityName": "Annette Birkin",
+                    "score": 85,
+                    "reason": "lastName+firstInitial"
+                }
+            ]
+        },
+        {
+            "accountId": "1a3a3c8070834b96aadc9c0466fdedd2",
+            "accountName": "Mikhail Viktor",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "34570dde743d48c48d70297c1789e449",
+            "accountName": "Alfred Ashford",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "3fb9983467624652a9541604b8738d9c",
+            "accountName": "S. Vladimir",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "46ba711548954dcfba5b4ddcf94bf93e",
+            "accountName": "Edward Ashford",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "495a04c9adc446d99a8bf4192e80b17b",
+            "accountName": "HUNK Unknown",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "548796040c124c86ae91e26c82c0a2fe",
+            "accountName": "Javier Hidalgo",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "62d29153514e453188d630a9174be33d",
+            "accountName": "Alexander Ashford",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "636f4fd520ad48e8b27b5483e3818938",
+            "accountName": "O.E. Spencer",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "6d6910d3e305474da5f3a68adbff2de7",
+            "accountName": "Carla Radames",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "6da14707d13644ea824f1b579f8cb955",
+            "accountName": "Spencer Reed",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        },
+        {
+            "accountId": "7df49fe2e0504eea8137977da370dae3",
+            "accountName": "A. Ashford",
+            "sourceName": "Umbrella Corporation",
+            "topCandidate": null,
+            "candidates": []
+        }
+    ],
+    "correlatedAccounts": [],
+    "unmatchedAccountIds": [
+        "07f15e74e03e4ccdbcdc25c25daa5360",
+        "0c406dbcdc5f44fbaab2d5eead744666",
+        "0e7ccfc0ef86456b96deb451c6a85b46",
+        "0fdf488504c5483c8c16eba831203fc5",
+        "12256a7259354810b76fdc4b09ce4729",
+        "1982c7260a6e424fbaeb790fbf4b632a",
+        "1a3a3c8070834b96aadc9c0466fdedd2",
+        "34570dde743d48c48d70297c1789e449",
+        "3fb9983467624652a9541604b8738d9c",
+        "46ba711548954dcfba5b4ddcf94bf93e",
+        "495a04c9adc446d99a8bf4192e80b17b",
+        "548796040c124c86ae91e26c82c0a2fe",
+        "62d29153514e453188d630a9174be33d",
+        "636f4fd520ad48e8b27b5483e3818938",
+        "6d6910d3e305474da5f3a68adbff2de7",
+        "6da14707d13644ea824f1b579f8cb955",
+        "7df49fe2e0504eea8137977da370dae3"
+    ],
+    "disablePlannedAccountIds": [],
+    "decisionsApplied": []
+}

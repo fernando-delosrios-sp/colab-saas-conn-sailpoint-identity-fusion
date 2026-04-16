@@ -1,0 +1,40 @@
+[
+    {
+        "id": "id-carlos-oliveira-001",
+        "name": "Carlos Oliveira",
+        "attributes": {
+            "displayName": "Carlos Oliveira",
+            "email": "carlos.oliveira@umbrellacorp.com",
+            "firstname": "Carlos",
+            "lastname": "Oliveira"
+        }
+    },
+    {
+        "id": "id-ada-wong-001",
+        "name": "Ada Wong",
+        "attributes": {
+            "displayName": "Ada Wong",
+            "email": "ada.wong@umbrellacorp.com",
+            "firstname": "Ada",
+            "lastname": "Wong"
+        }
+    },
+    {
+        "id": "id-annette-birkin-001",
+        "name": "Annette Birkin",
+        "attributes": {
+            "displayName": "Annette Birkin",
+            "email": "annette.birkin@umbrellacorp.com",
+            "firstname": "Annette",
+            "lastname": "Birkin"
+        }
+    },
+    {
+        "id": "id-reviewer-001",
+        "name": "Fusion Reviewer",
+        "attributes": {
+            "displayName": "Fusion Reviewer",
+            "email": "fusion.reviewer@umbrellacorp.com"
+        }
+    }
+]

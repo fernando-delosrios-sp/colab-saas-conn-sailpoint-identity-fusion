@@ -1,0 +1,26 @@
+{
+    "$schema": "../schemas/scenario.manifest.schema.json",
+    "name": "std:account:list-001",
+    "description": "Two-pass account list scenario with data-file references",
+    "operation": "std:account:list",
+    "configFile": "config.json",
+    "dataFiles": {
+        "identities": "identities.json",
+        "pass1": {
+            "managedAccounts": "managedAccounts.pass1.json",
+            "forms": "forms.pass1.json"
+        },
+        "pass2": {
+            "managedAccounts": "managedAccounts.pass2.json",
+            "forms": "forms.pass2.json"
+        }
+    },
+    "outputFiles": {
+        "pass1Expected": "output.pass1.expected.json",
+        "pass1Generated": "output.pass1.generated.json",
+        "pass2Expected": "output.pass2.expected.json",
+        "pass2Generated": "output.pass2.generated.json",
+        "pass1SideEffectsGenerated": "sideEffects.pass1.generated.json",
+        "pass2SideEffectsGenerated": "sideEffects.pass2.generated.json"
+    }
+}

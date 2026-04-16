@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE settings
+.vscode/
+.cursor/
+.history/
+.idea/
+.cline/
+.claude/
+*.iml
+cursor_settings_backup.json
+
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+coverage/
+reports/
+exportedObjects/
+
+# Test artifacts
+test/
+
+# Local configs
+input.json
+config.json
+.sentryclirc
+.httpyac.json
+.env*
+
+# Logs
+logs/
+

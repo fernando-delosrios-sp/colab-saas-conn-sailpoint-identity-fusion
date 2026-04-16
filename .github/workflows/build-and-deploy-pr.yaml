@@ -1,0 +1,142 @@
+name: 'build and push connector to dev tennant'
+
+env:
+    SAIL_BASE_URL: ${{ secrets.FUSION_TEST_TENANT_BASE_URL }}
+    SAIL_CLIENT_ID: ${{ secrets.FUSION_CLIENT_ID }}
+    SAIL_CLIENT_SECRET: ${{ secrets.FUSION_CLIENT_SECRET }}
+    CLI_VERSION: '2.2.5'
+    STACK: 'identity-fusion-39'
+
+on:
+    pull_request:
+        branches:
+            - main
+    push:
+        branches:
+            - main # assuming you're using the 'main' branch; adjust if you use 'master' or another
+    workflow_dispatch:
+
+concurrency:
+    group: fusion-connector-integration
+    cancel-in-progress: false
+
+jobs:
+    build_connector:
+        name: Build the connector
+        runs-on: ubuntu-latest
+        steps:
+            # Checkout the master branch request to run rsync
+            - name: Set up Node
+              uses: actions/setup-node@v3
+              with:
+                  node-version: '18'
+            # Checkout the master branch request to run rsync
+            - name: Checkout PR branch
+              uses: actions/checkout@v3
+              with:
+                  ref: ${{ github.ref }}
+                  fetch-depth: 0
+
+            - name: Run npm install and build connector
+              id: buildConnector
+              run: |
+                  npm ci
+                  npm run pack-zip
+            - name: Extract version from package.json
+              run: |
+                  echo "PACKAGE_VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
+                  echo "CONNECTOR_NAME=$(jq -r .name package.json)" >> $GITHUB_ENV
+            - name: Download and install sailpoint-cli
+              run: |
+                  set -e
+                  echo "Downloading SailPoint CLI version ${{ env.CLI_VERSION }}..."
+                  wget https://github.com/sailpoint-oss/sailpoint-cli/releases/download/${{ env.CLI_VERSION }}/sail_${{ env.CLI_VERSION }}_linux_amd64.deb
+
+                  echo "Installing SailPoint CLI..."
+                  sudo dpkg -i sail_${{ env.CLI_VERSION }}_linux_amd64.deb
+
+                  echo "Verifying installation and locating binary..."
+                  SAIL_PATH=$(which sail 2>/dev/null || find /usr -name sail -type f 2>/dev/null | head -1)
+
+                  if [ -z "$SAIL_PATH" ]; then
+                    echo "ERROR: sail binary not found after installation"
+                    echo "Package contents:"
+                    dpkg -L sail 2>/dev/null || echo "Package 'sail' not listed"
+                    exit 1
+                  fi
+
+                  echo "Found sail at: $SAIL_PATH"
+
+                  # Ensure binary is executable
+                  sudo chmod +x "$SAIL_PATH"
+
+                  # Add to GitHub Actions PATH for subsequent steps
+                  SAIL_DIR=$(dirname "$SAIL_PATH")
+                  echo "$SAIL_DIR" >> $GITHUB_PATH
+
+                  # Verify it works
+                  "$SAIL_PATH" --version
+                  echo "SailPoint CLI v${{ env.CLI_VERSION }} installed successfully"
+
+            - name: Validate SailPoint configuration
+              run: |
+                  set -e
+                  if [ -z "$SAIL_BASE_URL" ]; then
+                    echo "ERROR: SAIL_BASE_URL is not set"
+                    exit 1
+                  fi
+                  if [ -z "$SAIL_CLIENT_ID" ]; then
+                    echo "ERROR: SAIL_CLIENT_ID is not set"
+                    exit 1
+                  fi
+                  if [ -z "$SAIL_CLIENT_SECRET" ]; then
+                    echo "ERROR: SAIL_CLIENT_SECRET is not set"
+                    exit 1
+                  fi
+                  echo "SailPoint configuration validated successfully"
+                  echo "Base URL: $SAIL_BASE_URL"
+                  echo "Using connector: ${{ env.STACK }}"
+
+            - name: Use sailpoint-cli to upload connector to existing stack
+              run: |
+                  set -e
+                  sail conn upload -c "${{ env.STACK }}" -f ./dist/${{ env.CONNECTOR_NAME }}-${{ env.PACKAGE_VERSION }}.zip
+
+            - name: Run integration tests for connector
+              if: github.event_name == 'pull_request'
+              id: integrationTests
+              env:
+                  AIRTABLE_TOKEN: ${{ secrets.AIRTABLE_TOKEN }}
+                  AIRTABLE_PRIMARY_BASE: ${{ secrets.AIRTABLE_PRIMARY_BASE }}
+                  AIRTABLE_SECONDARY_BASE: ${{ secrets.AIRTABLE_SECONDARY_BASE }}
+              run: |
+                  npm run test
+            # deploy connector if push to main branch
+            - name: Check version change
+              if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+              run: |
+                  VERSION_CHANGED=$(git diff HEAD^ HEAD -- "package.json" | grep '\"version\"')
+                  if [ -z "$VERSION_CHANGED" ]; then
+                    echo "package.json version has not changed."
+                    exit 1
+                  fi
+            - name: Get Commits since last Release
+              if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+              id: changes
+              uses: simbo/changes-since-last-release-action@v1
+            - name: Create GitHub release
+              if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+              run: |
+                  gh release create v${{ env.PACKAGE_VERSION }} \
+                    --title "Release v${{ env.PACKAGE_VERSION }}" \
+                    --notes "${{ steps.changes.outputs.log }}" \
+                    --target main \
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Upload file to release
+              if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+              run: |
+                  gh release upload v${{ env.PACKAGE_VERSION }} ./dist/${{ env.CONNECTOR_NAME }}-${{ env.PACKAGE_VERSION }}.zip --clobber
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
