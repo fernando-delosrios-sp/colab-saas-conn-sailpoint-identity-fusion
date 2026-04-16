@@ -617,13 +617,12 @@ export class FusionService {
         if (this.fusionOwnerIsGlobalReviewer) {
             const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
             for (const reviewerId of globalOwnerIds) {
-                const reviewer = this.fusionIdentityMap.get(reviewerId)
-                if (reviewer) {
-                    managedSources.forEach((source) => {
-                        this.setReviewerForSource(reviewer, source.id!)
-                    })
-                    this.populateReviewerFusionReviewsFromPending(reviewer)
-                }
+                const reviewer = this.getOrCreateGlobalReviewer(reviewerId)
+                if (!reviewer) continue
+                managedSources.forEach((source) => {
+                    this.setReviewerForSource(reviewer, source.id!)
+                })
+                this.populateReviewerFusionReviewsFromPending(reviewer)
             }
         }
         this.log.info('Identities processing completed')
@@ -1003,8 +1002,7 @@ export class FusionService {
                 this._sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                        `Authoritative accounts still run Match scoring, but review forms cannot be created. ` +
-                        `Record and orphan accounts skip Match-style processing for this source.`
+                        `Managed accounts from this source will be treated as NonMatched.`
                 )
             }
         }
@@ -1063,11 +1061,8 @@ export class FusionService {
         const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
 
         if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
-            // Record/orphan: no Match review path — preprocess only (unique attrs / optional disable).
-            // Authoritative: still run Match scoring so reports and dry-run analysis see identity
-            // candidates; finalize below handles the no-reviewer non-match outcome.
+            const fusionAccount = await this.preProcessManagedAccount(account)
             if (sourceType !== SourceType.Authoritative) {
-                const fusionAccount = await this.preProcessManagedAccount(account)
                 this.log.debug(
                     `Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`
                 )
@@ -1078,6 +1073,7 @@ export class FusionService {
                 }
                 return undefined
             }
+            return await this.finalizeAuthoritativeUnmatched(fusionAccount)
         }
 
         const fusionAccount = await this.analyzeManagedAccount(account)
@@ -1756,6 +1752,21 @@ export class FusionService {
         const reviewers: Set<FusionAccount> = this.reviewersBySourceId.get(sourceId) ?? new Set()
         reviewers.add(fusionAccount)
         this.reviewersBySourceId.set(sourceId, reviewers)
+    }
+
+    /** Resolve a global reviewer account, creating a minimal identity-backed entry if needed. */
+    private getOrCreateGlobalReviewer(reviewerId: string): FusionAccount | undefined {
+        const existing = this.fusionIdentityMap.get(reviewerId)
+        if (existing) return existing
+        const identity = this.identities.getIdentityById(reviewerId)
+        if (!identity) {
+            this.log.warn(`Skipping global reviewer ${reviewerId}: identity is not loaded`)
+            return undefined
+        }
+        const reviewer = FusionAccount.fromIdentity(identity)
+        reviewer.addIdentityLayer(identity)
+        this.setFusionAccount(reviewer)
+        return reviewer
     }
 
     /**
