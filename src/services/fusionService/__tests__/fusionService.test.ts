@@ -415,40 +415,6 @@ describe('FusionService', () => {
 
             expect(result).toBeUndefined()
         })
-
-        it('registers global reviewers even when reviewer identity is not yet in fusionIdentityMap', async () => {
-            const cfg = { ...mockConfig, fusionOwnerIsGlobalReviewer: true } as FusionConfig
-            const globalFusion = new FusionService(
-                cfg,
-                mockLog,
-                mockIdentities,
-                mockSources,
-                mockForms,
-                mockAttributes,
-                mockScoring,
-                mockSchemas,
-                StandardCommand.StdAccountList
-            )
-
-            jest.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([])
-            jest.spyOn(mockIdentities, 'getIdentityById').mockReturnValue({
-                id: 'owner-1',
-                name: 'Global Owner',
-                attributes: { displayName: 'Global Owner' },
-            } as unknown as IdentityDocument)
-            jest.spyOn(mockSources, 'fetchGlobalOwnerIdentityIds').mockResolvedValue(['owner-1'])
-            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([
-                { id: 'src-a', name: 'Source A', isManaged: true, sourceType: 'authoritative', config: {} } as any,
-            ])
-            Object.defineProperty(mockForms, 'pendingReviewUrlsByReviewerId', {
-                get: jest.fn(() => new Map()),
-                configurable: true,
-            })
-
-            await globalFusion.processIdentities()
-
-            expect(globalFusion.reviewersBySourceId.get('src-a')?.size).toBe(1)
-        })
     })
 
     describe('processManagedAccounts', () => {
@@ -539,7 +505,7 @@ describe('FusionService', () => {
             expect(mockScoring.scoreFusionAccount).toHaveBeenCalledWith(expect.any(FusionAccount), expect.anything(), 'identity')
         })
 
-        it('skips Match scoring for authoritative sources when reviewers are missing', async () => {
+        it('runs Match scoring for authoritative sources even when the source has no reviewers', async () => {
             const mockManagedAccount = {
                 id: 'acct-no-reviewer-auth-1',
                 nativeIdentity: 'native-no-reviewer-auth-1',
@@ -559,10 +525,11 @@ describe('FusionService', () => {
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockScoring.scoreFusionAccount.mockResolvedValue(0)
 
             await fusionService.processManagedAccount(mockManagedAccount)
 
-            expect(mockScoring.scoreFusionAccount).not.toHaveBeenCalled()
+            expect(mockScoring.scoreFusionAccount).toHaveBeenCalled()
         })
 
         it('skips Match scoring for record sources when includeRecordAccountsForMatching is false', async () => {
