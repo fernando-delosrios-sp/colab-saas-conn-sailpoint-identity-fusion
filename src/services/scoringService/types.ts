@@ -5,6 +5,11 @@ import { MatchingConfig } from '../../model/config'
 // Type Definitions — Scoring
 // ============================================================================
 
+export enum MatchCandidateType {
+    Identity = 'identity',
+    NewUnmatched = 'new-unmatched',
+}
+
 /**
  * Result of scoring a single attribute comparison. Extends the matching config
  * with the calculated score and match result.
@@ -37,7 +42,7 @@ export type FusionMatch = {
     /** Display name for report - always present */
     identityName: string
     /** Candidate origin used by downstream workflow routing. */
-    candidateType?: 'identity' | 'new-unmatched'
+    candidateType?: MatchCandidateType
     /** Score reports for each matching rule evaluated */
     scores: ScoreReport[]
 }

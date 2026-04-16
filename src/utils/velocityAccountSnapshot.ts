@@ -36,5 +36,5 @@ export function velocitySnapshotSchemaId(account: Record<string, any> | undefine
     if (nested && typeof nested === 'object' && nested !== null && 'id' in nested) {
         return String((nested as { id?: unknown }).id ?? '').trim()
     }
-    return String(account._nativeIdentity ?? '').trim()
+    return String(account._managedKey ?? '').trim()
 }

@@ -4,4 +4,5 @@ export { isExactAttributeMatchScores } from './exactMatch'
 export type { ExactMatchScoreRow } from './exactMatch'
 
 // Re-export types
+export { MatchCandidateType } from './types'
 export type { FusionMatch, ScoreReport } from './types'

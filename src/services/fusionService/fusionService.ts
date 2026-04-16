@@ -12,7 +12,7 @@ import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
 import { mapValuesToArray, forEachBatched, promiseAllBatched, compact, yieldToEventLoop } from './collections'
 import { FusionDecision } from '../../model/form'
-import { FusionMatch, ScoringService } from '../scoringService'
+import { FusionMatch, MatchCandidateType, ScoringService } from '../scoringService'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import { SchemaService } from '../schemaService'
 import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
@@ -1301,13 +1301,17 @@ export class FusionService {
                 this.config.fusionMergingExactMatch && this.autoAssignedIdentityIds.size > 0
                     ? this.fusionIdentitiesExcluding(this.autoAssignedIdentityIds)
                     : this.fusionIdentities
-            fusionIdentityComparisons = await this.scoring.scoreFusionAccount(fusionAccount, identityPool, 'identity')
+            fusionIdentityComparisons = await this.scoring.scoreFusionAccount(
+                fusionAccount,
+                identityPool,
+                MatchCandidateType.Identity
+            )
             hasIdentityBackedMatches = this.hasIdentityBackedMatches(fusionAccount)
             if (!hasIdentityBackedMatches && this.isDeferredMatchingEnabledForSource(account.sourceName ?? undefined)) {
                 fusionIdentityComparisons += await this.scoring.scoreFusionAccount(
                     fusionAccount,
                     this.currentRunUnmatchedCandidates,
-                    'new-unmatched'
+                    MatchCandidateType.NewUnmatched
                 )
             }
         } else {

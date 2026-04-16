@@ -1,5 +1,6 @@
 import { COMBINED_SCORE_ROW_ATTRIBUTE, ScoringService, WEIGHTED_MEAN_ALGORITHM } from '../scoringService'
 import { effectiveSkipMatchIfMissing } from '../../../model/config'
+import { MatchCandidateType } from '../types'
 
 describe('ScoringService mandatory matching behavior', () => {
     const baseMatchingConfigs = [
@@ -301,6 +302,84 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
         await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
 
         expect(fusionAccount.addFusionMatch).not.toHaveBeenCalled()
+    })
+})
+
+describe('ScoringService deferred candidate matching', () => {
+    it('does not compare a managed account against itself for deferred candidates', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'email',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 90,
+                    },
+                ],
+                fusionAverageScore: 80,
+            } as any,
+            { crash: jest.fn() } as any
+        )
+
+        const managedCandidate = {
+            attributes: { email: 'self@example.com' },
+            managedAccountId: 'source-id::self@example.com',
+            nativeIdentityOrUndefined: 'source-id::self@example.com',
+            addFusionMatch: jest.fn(),
+        } as any
+
+        const compared = await service.scoreFusionAccount(
+            managedCandidate,
+            [managedCandidate],
+            MatchCandidateType.NewUnmatched
+        )
+
+        expect(compared).toBe(0)
+        expect(managedCandidate.addFusionMatch).not.toHaveBeenCalled()
+    })
+
+    it('does not compare against persisted unmatched candidate representing the same managed account', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'email',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 90,
+                    },
+                ],
+                fusionAverageScore: 80,
+            } as any,
+            { crash: jest.fn() } as any
+        )
+
+        const managedKey = 'source-id::self@example.com'
+        const analyzedManagedCandidate = {
+            attributes: { email: 'self@example.com' },
+            managedAccountId: managedKey,
+            nativeIdentityOrUndefined: managedKey,
+            addFusionMatch: jest.fn(),
+        } as any
+
+        // Simulates a previously persisted unmatched fusion account shape where
+        // managedAccountId may not be present but the same managed key is retained.
+        const persistedUnmatchedCandidate = {
+            attributes: { email: 'self@example.com' },
+            managedAccountId: undefined,
+            nativeIdentityOrUndefined: 'fusion-simple-key',
+            originAccountId: managedKey,
+            accountIdsSet: new Set<string>(),
+            missingAccountIdsSet: new Set<string>([managedKey]),
+        } as any
+
+        const compared = await service.scoreFusionAccount(
+            analyzedManagedCandidate,
+            [persistedUnmatchedCandidate],
+            MatchCandidateType.NewUnmatched
+        )
+
+        expect(compared).toBe(0)
+        expect(analyzedManagedCandidate.addFusionMatch).not.toHaveBeenCalled()
     })
 })
 

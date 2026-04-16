@@ -1,7 +1,7 @@
 import { FusionAccount } from '../../model/account'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing } from '../../model/config'
 import { LogService } from '../logService'
-import { FusionMatch, ScoreReport } from './types'
+import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
 import { scoreDice, scoreDoubleMetaphone, scoreJaroWinkler, scoreLIG3, scoreNameMatcher } from './helpers'
 import { isExactAttributeMatchScores } from './exactMatch'
 
@@ -76,7 +76,7 @@ export class ScoringService {
     public async scoreFusionAccount(
         fusionAccount: FusionAccount,
         fusionIdentities: Iterable<FusionAccount>,
-        candidateType: 'identity' | 'new-unmatched' = 'identity'
+        candidateType: MatchCandidateType = MatchCandidateType.Identity
     ): Promise<number> {
         // No matching configs → no scoring possible; skip entirely to avoid
         // false positives (empty scores would otherwise mark every identity as a match).
@@ -86,10 +86,16 @@ export class ScoringService {
         // continuing to score after a perfect match is found: the first exact match
         // wins and all subsequent comparisons would be discarded. Early exit here
         // avoids O(n) identity comparisons for every exact-match account.
-        const earlyExitOnExactMatch = this.fusionMergingExactMatch && candidateType === 'identity'
+        const earlyExitOnExactMatch = this.fusionMergingExactMatch && candidateType === MatchCandidateType.Identity
 
         let compared = 0
         for (const fusionIdentity of fusionIdentities) {
+            if (
+                candidateType === MatchCandidateType.NewUnmatched &&
+                this.isSameDeferredCandidate(fusionAccount, fusionIdentity)
+            ) {
+                continue
+            }
             this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType)
             compared += 1
             if (earlyExitOnExactMatch) {
@@ -106,6 +112,37 @@ export class ScoringService {
     }
 
     /**
+     * Deferred matching compares a managed account against current-run unmatched peers.
+     * Guard against accidental self-comparison to prevent a perfect self-match.
+     */
+    private isSameDeferredCandidate(fusionAccount: FusionAccount, fusionIdentity: FusionAccount): boolean {
+        if (fusionAccount === fusionIdentity) return true
+
+        const managedAccountId = fusionAccount.managedAccountId
+        if (!managedAccountId) {
+            return fusionAccount.nativeIdentityOrUndefined === fusionIdentity.nativeIdentityOrUndefined
+        }
+
+        if (managedAccountId === fusionIdentity.managedAccountId) {
+            return true
+        }
+
+        if (managedAccountId === fusionIdentity.nativeIdentityOrUndefined) {
+            return true
+        }
+
+        if (managedAccountId === fusionIdentity.originAccountId) {
+            return true
+        }
+
+        if (fusionIdentity.accountIdsSet?.has(managedAccountId) || fusionIdentity.missingAccountIdsSet?.has(managedAccountId)) {
+            return true
+        }
+
+        return false
+    }
+
+    /**
      * Compares two fusion accounts across all configured matching rules and records
      * a match if the weighted combined score and mandatory rules pass.
      *
@@ -115,7 +152,7 @@ export class ScoringService {
     private compareFusionAccounts(
         fusionAccount: FusionAccount,
         fusionIdentity: FusionAccount,
-        candidateType: 'identity' | 'new-unmatched'
+        candidateType: MatchCandidateType
     ): void {
         const scores: ScoreReport[] = []
         let hasFailedMandatory = false

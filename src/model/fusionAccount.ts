@@ -52,7 +52,7 @@ export class FusionAccount {
     // Core identity fields
     private _type: FusionAccountKind = FusionAccountKind.Fusion
     private _identityId?: string
-    private _nativeIdentity?: string
+    private _managedKey?: string
     private _key?: SimpleKeyType
 
     // Basic account information
@@ -175,7 +175,7 @@ export class FusionAccount {
         if (config.type) this._type = config.type
         if (config.name) this._name = config.name
         else if (config.displayName) this._name = config.displayName
-        if (config.nativeIdentity) this._nativeIdentity = config.nativeIdentity
+        if (config.nativeIdentity) this._managedKey = config.nativeIdentity
         if (config.sourceName) this._sourceName = config.sourceName
         if (config.identityDisplayName) this._identityDisplayName = config.identityDisplayName
         if (config.disabled !== undefined) this._disabled = config.disabled
@@ -388,21 +388,21 @@ export class FusionAccount {
 
     /** The native identity (unique key) for this fusion account. Asserts non-null. */
     public get nativeIdentity(): string {
-        return this._nativeIdentity!
+        return this._managedKey!
     }
 
     /**
      * Safe nativeIdentity accessor (may be undefined until key is set)
      */
     public get nativeIdentityOrUndefined(): string | undefined {
-        return this._nativeIdentity
+        return this._managedKey
     }
 
     /**
      * Managed account key (sourceId::nativeIdentity) when this fusion account represents an uncorrelated managed account.
      */
     public get managedAccountId(): string | undefined {
-        return this._type === FusionAccountKind.Managed ? this._nativeIdentity : undefined
+        return this._type === FusionAccountKind.Managed ? this._managedKey : undefined
     }
 
     /** The SDK simple key used for account output. Asserts non-null. */
@@ -640,7 +640,7 @@ export class FusionAccount {
     /** Sets the SDK key and updates the native identity to match. */
     public setKey(key: SimpleKeyType): void {
         this._key = key
-        this._nativeIdentity = key.simple.id
+        this._managedKey = key.simple.id
     }
 
     // ============================================================================

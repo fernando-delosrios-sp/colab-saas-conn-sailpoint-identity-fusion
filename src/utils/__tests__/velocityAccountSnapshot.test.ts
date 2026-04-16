@@ -6,7 +6,7 @@ import {
 } from '../velocityAccountSnapshot'
 
 describe('velocityAccountSnapshot', () => {
-    it('reads nested source and schema with legacy fallbacks', () => {
+    it('reads nested source and schema with flat-key fallbacks', () => {
         const modern = {
             source: { id: 's1', name: 'HR' },
             schema: { id: 'ni', name: 'Jane' },
@@ -16,10 +16,11 @@ describe('velocityAccountSnapshot', () => {
         expect(velocitySnapshotSchemaName(modern)).toBe('Jane')
         expect(velocitySnapshotSchemaId(modern)).toBe('ni')
 
-        const legacy = { _source: 'L', _sourceId: 'sid', _name: 'N', _nativeIdentity: 'nid' }
+        const legacy = { _source: 'L', _sourceId: 'sid', _name: 'N', _managedKey: 'nid' }
         expect(velocitySnapshotSourceName(legacy)).toBe('L')
         expect(velocitySnapshotSourceId(legacy)).toBe('sid')
         expect(velocitySnapshotSchemaName(legacy)).toBe('N')
         expect(velocitySnapshotSchemaId(legacy)).toBe('nid')
+
     })
 })
