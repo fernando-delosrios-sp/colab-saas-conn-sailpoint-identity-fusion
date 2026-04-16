@@ -2,6 +2,10 @@
 
 > **Disclaimer:** Identity Fusion NG is the newest Identity Fusion version and supersedes any Identity Fusion v1.x previous release. Version 1.x is now **deprecated**. For those needing to upgrade an existing deployment, please refer to the [migration guide](docs/guides/migration-from-previous-fusion.md).
 
+**Documentation**
+- Full documentation site: [GitHub Pages](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/)
+- Source docs in this repository: [`docs/`](docs/)
+
 Identity Fusion NG is an Identity Security Cloud (ISC) connector that addresses the complex challenge of identity and account data aggregation through a streamlined **map-define-match framework**. This concept represents the high-level operation of the connector, which can execute all three steps or just one, but always in this logical sequence:
 
 ### The Map, Define, Match Framework
@@ -382,6 +386,19 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
 - Order always matters. Sources are evaluated in the configured order, attribute mappings, attribute definitions, and matching settings. Everything.
 - Account for your manager correlation when dealing with multiple managed sources. A Fusion account with managed accounts from two sources may have a manager on either source, both, or none. If you want to use source manager correlation, you must persist the original manager correlation value pair in your Fusion schema, but the manager will never change. It is best to use a correlation rule in combination with a transform to implement dynamic manager correlation.
 - When no identity matching is needed, Identity Fusion can be set as a non-authoritative source to create unique and/or derived attributes. It's usual to have Fusion create unique identifiers associated with one or more authoritative sources. One can configure those sources and the desired attribute definition, and force managed source aggregation before processing, so identifiers are created right after managed sources are aggregated under the same schedule, all controlled by Fusion.
+
+---
+
+## Documentation site (MkDocs)
+
+This repository now uses MkDocs for documentation publishing.
+
+- Install docs dependencies: `npm run docs:install`
+- Sync homepage from root README: `npm run docs:sync-home`
+- Build the site locally: `npm run docs:build`
+- Serve docs locally: `npm run docs:serve`
+
+The published documentation site is deployed from `main` using the GitHub Actions workflow at `.github/workflows/deploy-docs-pages.yml`.
 
 ---
 
