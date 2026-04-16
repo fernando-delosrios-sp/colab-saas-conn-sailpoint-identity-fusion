@@ -75,11 +75,12 @@ export class PhaseTimer {
 
     /**
      * Formats elapsed milliseconds into a compact human-friendly duration.
-     * Examples: "532ms", "1.2s", "54m 52s", "1h 1m 1s".
+     * Unit suffixes are uppercase (MS, S, H, M) so durations stand out in logs.
+     * Examples: "532MS", "1.2S", "54M 52S", "1H 1M 1S".
      */
     static formatElapsed(ms: number): string {
-        if (ms < 1000) return `${ms}ms`
-        if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+        if (ms < 1000) return `${ms}MS`
+        if (ms < 60_000) return `${(ms / 1000).toFixed(1)}S`
 
         const roundedSeconds = Math.round(ms / 1000)
         const hours = Math.floor(roundedSeconds / 3600)
@@ -87,9 +88,9 @@ export class PhaseTimer {
         const seconds = roundedSeconds % 60
 
         const parts: string[] = []
-        if (hours > 0) parts.push(`${hours}h`)
-        if (minutes > 0) parts.push(`${minutes}m`)
-        parts.push(`${seconds}s`)
+        if (hours > 0) parts.push(`${hours}H`)
+        if (minutes > 0) parts.push(`${minutes}M`)
+        parts.push(`${seconds}S`)
         return parts.join(' ')
     }
 }
