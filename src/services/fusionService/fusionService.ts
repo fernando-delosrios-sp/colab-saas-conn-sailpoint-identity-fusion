@@ -1062,6 +1062,11 @@ export class FusionService {
             }
         }
 
+        // Build the trigram blocking index over all currently-loaded fusion identities so that
+        // each managed account can skip the vast majority of identity comparisons.
+        // The index is rebuilt each run (identity pool may change between runs).
+        this.scoring.buildTrigramIndex(this.fusionIdentities)
+
         this.currentRunMatchScoringMs = 0
         const initialQueueSize = map.size
         this.log.info(
@@ -1365,10 +1370,19 @@ export class FusionService {
         if (recordMatchingEnabled) {
             // When exact-match auto-assignment is enabled, exclude identities already claimed in
             // this run so a second managed account cannot match against a spoken-for identity.
-            const identityPool =
+            const excludeIds =
                 this.config.fusionMergingExactMatch && this.autoAssignedIdentityIds.size > 0
-                    ? this.fusionIdentitiesExcluding(this.autoAssignedIdentityIds)
-                    : this.fusionIdentities
+                    ? this.autoAssignedIdentityIds
+                    : undefined
+
+            // Use the trigram blocking index to narrow the candidate pool when possible.
+            // getCandidates returns undefined when no mandatory attributes are configured or the
+            // account has no values for them — in that case fall back to the full identity scan.
+            const candidateSet = this.scoring.getCandidates(fusionAccount, excludeIds)
+            const identityPool: Iterable<FusionAccount> = candidateSet
+                ?? (excludeIds
+                    ? this.fusionIdentitiesExcluding(excludeIds)
+                    : this.fusionIdentities)
             const identityScoringStarted = Date.now()
             fusionIdentityComparisons = await this.scoring.scoreFusionAccount(
                 fusionAccount,

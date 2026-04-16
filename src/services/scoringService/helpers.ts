@@ -9,6 +9,14 @@ const DIACRITICS_RE = /[\u0300-\u036f]/g
 const WHITESPACE_RE = /\s+/g
 
 /**
+ * Normalize a string for LIG3 scoring: lowercase, remove diacritics, trim, collapse whitespace.
+ * Exported so callers can pre-normalize and cache the result before entering the O(n×m) scoring loop.
+ */
+export function normalizeLIG3(str: string): string {
+    return str.toLowerCase().normalize('NFD').replace(DIACRITICS_RE, '').trim().replace(WHITESPACE_RE, ' ')
+}
+
+/**
  * Build a ScoreReport without spreading the entire MatchingConfig.
  * Explicit field construction avoids allocating a full object copy per comparison in the hot loop.
  */
@@ -152,23 +160,17 @@ export const scoreNameMatcher = (
  * - Fields with extra whitespace or formatting differences
  * - Strings with minor typos or transpositions
  * - Multi-word attributes where order matters but gaps are common
+ *
+ * Use {@link scoreLIG3Normalized} when both sides are already normalized (e.g., from a cache).
  */
-export const scoreLIG3 = (
-    accountAttribute: string,
-    identityAttribute: string,
-    matching: MatchingConfig
-): ScoreReport => {
-    const normalize = (str: string): string => {
-        return str
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(DIACRITICS_RE, '') // Remove diacritics
-            .trim()
-            .replace(WHITESPACE_RE, ' ') // Normalize whitespace
-    }
 
-    const s1 = normalize(accountAttribute)
-    const s2 = normalize(identityAttribute)
+/**
+ * LIG3 scoring on already-normalized strings. Called by the ScoringService cache layer
+ * after it has pre-normalized both sides; avoids repeated normalization in the O(n×m) loop.
+ */
+export function scoreLIG3Normalized(normA: string, normB: string, matching: MatchingConfig): ScoreReport {
+    const s1 = normA
+    const s2 = normB
 
     if (s1.length === 0 && s2.length === 0) {
         const threshold = matching.fusionScore ?? 0
@@ -207,6 +209,13 @@ export const scoreLIG3 = (
 
     return makeScoreReport(matching, score, isMatch, comment)
 }
+
+/** Public entry point: normalizes both sides then delegates to {@link scoreLIG3Normalized}. */
+export const scoreLIG3 = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => scoreLIG3Normalized(normalizeLIG3(accountAttribute), normalizeLIG3(identityAttribute), matching)
 
 function calculateLIG3Similarity(s1: string, s2: string): number {
     const len1 = s1.length
