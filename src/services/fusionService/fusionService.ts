@@ -1,7 +1,7 @@
 import { Account, IdentityDocument } from 'sailpoint-api-client'
 import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceType } from '../../model/config'
-import { LogService } from '../logService'
+import { LogService, PhaseTimer } from '../logService'
 import { FormService } from '../formService'
 import { FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT } from '../formService/constants'
 import { IdentityService } from '../identityService'
@@ -76,6 +76,8 @@ export class FusionService {
     private readonly autoAssignedIdentityIds: Set<string> = new Set()
     /** Per analyzed managed-account fusion object: how many identity comparisons ran (for report rows). */
     private readonly fusionIdentityComparisonsByAccount = new WeakMap<FusionAccount, number>()
+    /** Accumulates Match scoring duration within a single managed-account analysis pass. */
+    private currentRunMatchScoringMs = 0
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -200,13 +202,19 @@ export class FusionService {
      */
     public async preProcessFusionAccounts(): Promise<FusionAccount[]> {
         const { fusionAccounts } = this.sources
-        this.log.debug(`Pre-processing ${fusionAccounts.length} fusion account(s)`)
+        const startedAt = Date.now()
+        this.log.info(`Pre-processing ${fusionAccounts.length} fusion account(s)`)
         const results: FusionAccount[] = []
         await forEachBatched(fusionAccounts, async (x: Account) => {
             const fusionAccount = FusionAccount.fromFusionAccount(x)
             this.setFusionAccount(fusionAccount)
             results.push(fusionAccount)
         })
+        this.log.info(
+            `Pre-processing fusion accounts completed: ${results.length} account(s) in ${PhaseTimer.formatElapsed(
+                Date.now() - startedAt
+            )}`
+        )
         return results
     }
 
@@ -232,6 +240,7 @@ export class FusionService {
      */
     public async processFusionAccounts(): Promise<FusionAccount[]> {
         const { fusionAccounts } = this.sources
+        const startedAt = Date.now()
         this.log.info(`Processing ${fusionAccounts.length} fusion account(s)`)
         const results = await promiseAllBatched(
             fusionAccounts,
@@ -240,7 +249,11 @@ export class FusionService {
             },
             this.fusionParallelBatchSize()
         )
-        this.log.info('Fusion accounts processing completed')
+        this.log.info(
+            `Fusion accounts processing completed: ${results.length} account(s) in ${PhaseTimer.formatElapsed(
+                Date.now() - startedAt
+            )}`
+        )
         return results
     }
 
@@ -306,13 +319,34 @@ export class FusionService {
      * Refresh unique attributes for all fusion accounts and identities in batches.
      */
     public async refreshUniqueAttributes(): Promise<void> {
-        this.log.info('Refreshing unique attributes for all fusion accounts')
         const batchSize = this.managedAccountsBatchSize
         const allAccounts = [...this.fusionAccounts, ...this.fusionIdentities]
+        const total = allAccounts.length
+        const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
+        const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
+        const startedAt = Date.now()
+        this.log.info(
+            `Refreshing unique attributes for ${total} fusion account(s) and identity account(s) (batch size ${batchSize})`
+        )
+        let batchIndex = 0
         while (allAccounts.length > 0) {
+            batchIndex += 1
             const batch = allAccounts.splice(0, batchSize)
+            const batchStarted = Date.now()
             await Promise.all(batch.map((account) => this.attributes.refreshUniqueAttributes(account)))
+            const done = total - allAccounts.length
+            if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || allAccounts.length === 0) {
+                this.log.info(
+                    `Unique attributes: ${done}/${total} account(s) processed — batch ${batchIndex}/${totalBatches} ` +
+                        `(${PhaseTimer.formatElapsed(Date.now() - batchStarted)} this batch, ${PhaseTimer.formatElapsed(
+                            Date.now() - startedAt
+                        )} elapsed)`
+                )
+            }
         }
+        this.log.info(
+            `Unique attribute refresh completed: ${total} account(s) in ${PhaseTimer.formatElapsed(Date.now() - startedAt)}`
+        )
     }
 
     /**
@@ -603,6 +637,7 @@ export class FusionService {
     public async processIdentities(): Promise<FusionAccount[]> {
         const { identities } = this.identities
         this.identitiesProcessedCount = identities.length
+        const startedAt = Date.now()
         this.log.info(`Processing ${identities.length} identities`)
         const results = await promiseAllBatched(
             identities,
@@ -626,7 +661,11 @@ export class FusionService {
                 }
             }
         }
-        this.log.info('Identities processing completed')
+        this.log.info(
+            `Identities processing completed: ${identities.length} identity document(s) in ${PhaseTimer.formatElapsed(
+                Date.now() - startedAt
+            )}`
+        )
         return compact(results)
     }
 
@@ -800,10 +839,15 @@ export class FusionService {
      */
     public async processFusionIdentityDecisions(): Promise<FusionAccount[]> {
         const { fusionIdentityDecisions } = this.forms
+        const startedAt = Date.now()
         this.log.info(`Processing ${fusionIdentityDecisions.length} fusion identity decision(s)`)
 
         const results = await promiseAllBatched(fusionIdentityDecisions, (x) => this.processFusionIdentityDecision(x))
-        this.log.info('Fusion identity decisions processing completed')
+        this.log.info(
+            `Fusion identity decisions processing completed: ${fusionIdentityDecisions.length} decision(s) in ${PhaseTimer.formatElapsed(
+                Date.now() - startedAt
+            )}`
+        )
         return compact(results)
     }
 
@@ -1008,21 +1052,31 @@ export class FusionService {
             }
         }
 
-        this.log.info(`Processing ${map.size} managed account(s)`)
+        this.currentRunMatchScoringMs = 0
+        const initialQueueSize = map.size
+        this.log.info(`Processing ${initialQueueSize} managed account(s)`)
         let processed = 0
         const yieldEveryManaged = this.managedAccountEventLoopYieldEvery()
+        const logProgressEvery = Math.max(1, Math.min(50, Math.ceil(initialQueueSize / 20) || 1))
         for (const account of map.values()) {
             await this.processManagedAccount(account)
             processed += 1
+            if (processed === 1 || processed % logProgressEvery === 0 || processed === initialQueueSize) {
+                this.log.info(
+                    `Managed accounts: ${processed}/${initialQueueSize} processed (${PhaseTimer.formatElapsed(
+                        Date.now() - processManagedAccountsStartedAt
+                    )} elapsed)`
+                )
+            }
             if (processed % yieldEveryManaged === 0) {
                 await yieldToEventLoop()
             }
         }
-        this.log.info('Managed accounts processing completed')
+        const totalElapsed = Date.now() - processManagedAccountsStartedAt
         this.log.info(
-            `Performance metric: FusionService.processManagedAccounts durationMs=${
-                Date.now() - processManagedAccountsStartedAt
-            } processed=${processed} remaining=${map.size}`
+            `Managed accounts processing completed: ${processed} account(s) in ${PhaseTimer.formatElapsed(
+                totalElapsed
+            )} (Match scoring: ${PhaseTimer.formatElapsed(this.currentRunMatchScoringMs)})`
         )
     }
 
@@ -1245,6 +1299,7 @@ export class FusionService {
     public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
+        this.currentRunMatchScoringMs = 0
         const analyzeUncorrelatedStartedAt = Date.now()
         const results: FusionAccount[] = []
         let processed = 0
@@ -1266,10 +1321,11 @@ export class FusionService {
                 await yieldToEventLoop()
             }
         }
+        const totalMs = Date.now() - analyzeUncorrelatedStartedAt
         this.log.info(
-            `Performance metric: FusionService.analyzeUncorrelatedAccounts durationMs=${
-                Date.now() - analyzeUncorrelatedStartedAt
-            } analyzed=${results.length}`
+            `Performance metric: FusionService.analyzeUncorrelatedAccounts durationMs=${totalMs} analyzed=${
+                results.length
+            } matchScoringMs=${this.currentRunMatchScoringMs}`
         )
         return results
     }
@@ -1301,18 +1357,22 @@ export class FusionService {
                 this.config.fusionMergingExactMatch && this.autoAssignedIdentityIds.size > 0
                     ? this.fusionIdentitiesExcluding(this.autoAssignedIdentityIds)
                     : this.fusionIdentities
+            const identityScoringStarted = Date.now()
             fusionIdentityComparisons = await this.scoring.scoreFusionAccount(
                 fusionAccount,
                 identityPool,
                 MatchCandidateType.Identity
             )
+            this.currentRunMatchScoringMs += Date.now() - identityScoringStarted
             hasIdentityBackedMatches = this.hasIdentityBackedMatches(fusionAccount)
             if (!hasIdentityBackedMatches && this.isDeferredMatchingEnabledForSource(account.sourceName ?? undefined)) {
+                const deferredScoringStarted = Date.now()
                 fusionIdentityComparisons += await this.scoring.scoreFusionAccount(
                     fusionAccount,
                     this.currentRunUnmatchedCandidates,
                     MatchCandidateType.NewUnmatched
                 )
+                this.currentRunMatchScoringMs += Date.now() - deferredScoringStarted
             }
         } else {
             this.log.debug(
