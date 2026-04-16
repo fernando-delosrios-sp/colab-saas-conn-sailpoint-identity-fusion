@@ -5,15 +5,12 @@
  */
 'use strict'
 
-const path = require('path')
-
-require('velocityjs')
+const velocityjs = require('velocityjs')
 
 const DANGEROUS_PROPERTY_KEYS = new Set(['constructor', '__proto__'])
 
 // velocityjs applies mixins onto `Compile.prototype` (not `Velocity.prototype`); see compile/index.cjs.
-const baseCompilePath = path.join(path.dirname(require.resolve('velocityjs')), 'compile', 'base-compile.cjs')
-const { Compile } = require(baseCompilePath)
+const { Compile } = velocityjs
 
 const origGetAttributes = Compile.prototype.getAttributes
 Compile.prototype.getAttributes = function velocitySafeGetAttributes(property, baseRef, ast) {

@@ -21,6 +21,7 @@ dist/
 coverage/
 reports/
 exportedObjects/
+site/
 
 # Test artifacts
 test/
@@ -31,6 +32,8 @@ config.json
 .sentryclirc
 .httpyac.json
 .env*
+.venv/
+docs/home.md
 
 # Logs
 logs/
