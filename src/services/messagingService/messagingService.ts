@@ -401,10 +401,14 @@ export class MessagingService {
     }
 
     /** Build fusion report HTML without sending (used by dry-run disk persistence). */
-    public renderFusionReportHtml(report: FusionReport, _reportType: 'aggregation' | 'fusion'): string {
+    public renderFusionReportHtml(
+        report: FusionReport,
+        _reportType: 'aggregation' | 'fusion',
+        reportTitleOverride?: string
+    ): string {
         const totalAccounts = report.totalAccounts ?? report.accounts.length
         const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
-        const reportTitle = MessagingService.FUSION_REPORT_EMAIL_TITLE
+        const reportTitle = reportTitleOverride || MessagingService.FUSION_REPORT_EMAIL_TITLE
         const emailData: FusionReportEmailData = {
             ...report,
             totalAccounts,
@@ -419,12 +423,12 @@ export class MessagingService {
     /** Send report email to explicit recipients, independent from fusion account resolution. */
     public async sendReportTo(
         report: FusionReport,
-        args: { recipients: string[]; reportType: 'aggregation' | 'fusion' }
+        args: { recipients: string[]; reportType: 'aggregation' | 'fusion'; reportTitle?: string }
     ): Promise<void> {
         const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
-        const reportTitle = MessagingService.FUSION_REPORT_EMAIL_TITLE
+        const reportTitle = args.reportTitle || MessagingService.FUSION_REPORT_EMAIL_TITLE
         const subject = `${reportTitle} - ${matchAccountCount} Match(es) Found`
-        const body = this.renderFusionReportHtml(report, args.reportType)
+        const body = this.renderFusionReportHtml(report, args.reportType, reportTitle)
         await this.sendEmail(args.recipients, subject, body)
         const sentRecipientCount = sanitizeRecipients(args.recipients).length
         this.log.info(`Sent fusion report email to ${sentRecipientCount} recipient(s)`)

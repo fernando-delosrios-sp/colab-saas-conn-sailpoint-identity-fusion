@@ -139,6 +139,16 @@ export class FusionService {
     }
 
     /**
+     * Keep managed-account analysis under the platform command-expiration window.
+     * Derive a conservative budget from keep-alive cadence to preserve a safety buffer.
+     */
+    private managedAccountPhaseBudgetMs(): number {
+        const keepAliveMs = this.config.processingWait ?? 60 * 1000
+        const derivedBudgetMs = keepAliveMs * 20
+        return Math.max(10 * 60 * 1000, Math.min(25 * 60 * 1000, derivedBudgetMs))
+    }
+
+    /**
      * Populate match / deferred / non-match report slices during managed-account analysis.
      * SDKs may report `commandType` as account list for custom commands; `custom:dryrun` must still capture slices.
      */
@@ -342,9 +352,9 @@ export class FusionService {
             if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || allAccounts.length === 0) {
                 this.log.info(
                     `Unique-attribute generation progress: ${done}/${total} account(s) done — batch ${batchIndex}/${totalBatches} ` +
-                        `| LAST BATCH ${PhaseTimer.formatElapsed(Date.now() - batchStarted)} | RUN ELAPSED ${PhaseTimer.formatElapsed(
-                            Date.now() - startedAt
-                        )}`
+                    `| LAST BATCH ${PhaseTimer.formatElapsed(Date.now() - batchStarted)} | RUN ELAPSED ${PhaseTimer.formatElapsed(
+                        Date.now() - startedAt
+                    )}`
                 )
             }
         }
@@ -393,7 +403,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${account.nativeIdentity}), ` +
-                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
@@ -438,7 +448,7 @@ export class FusionService {
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
-                `${fusionAccount.accountIdsSet.size} account(s), ${fusionAccount.missingAccountIdsSet.size} missing`
+            `${fusionAccount.accountIdsSet.size} account(s), ${fusionAccount.missingAccountIdsSet.size} missing`
         )
 
         await yieldToEventLoop()
@@ -464,7 +474,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.setFusionAccount(fusionAccount)
@@ -577,7 +587,7 @@ export class FusionService {
                 fusionAccount.setReverseCorrelationAttribute(sourceConfig.correlationAttribute, info.schema.id)
                 this.log.debug(
                     `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.schema.id}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
+                    `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
                 )
             }
         }
@@ -713,7 +723,7 @@ export class FusionService {
             if (existingAccount) {
                 this.log.debug(
                     `Reusing existing Fusion account ${existingAccount.nativeIdentity} for identity ` +
-                        `${identity.name} (${identityId}) - prevents duplicate baseline creation`
+                    `${identity.name} (${identityId}) - prevents duplicate baseline creation`
                 )
                 // Remove from whichever map currently holds it
                 if (this.fusionAccountMap.get(existingAccount.nativeIdentity) === existingAccount) {
@@ -931,8 +941,8 @@ export class FusionService {
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
             `${existingIdentityAccount ? 'Reusing' : 'Created'} fusion account from decision: ` +
-                `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
-                `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
+            `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
+            `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
         )
 
         // For authorized decisions (including synthetic perfect-match automatic assignment),
@@ -945,7 +955,7 @@ export class FusionService {
                     selectedIdentity =
                         this.commandType === StandardCommand.StdAccountList
                             ? (cachedForDecision ??
-                              (await this.identities.fetchIdentityById(fusionDecision.identityId)))
+                                (await this.identities.fetchIdentityById(fusionDecision.identityId)))
                             : cachedForDecision
                 } catch {
                     // Best-effort: if identity fetch fails, continue without immediate correlation.
@@ -1003,7 +1013,7 @@ export class FusionService {
             this.setFusionAccount(fusionAccount)
             this.log.debug(
                 `Registered decision account as fusion account: ${fusionDecision.account.name} ` +
-                    `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`
+                `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`
             )
         }
         return fusionAccount
@@ -1046,6 +1056,7 @@ export class FusionService {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
         const processManagedAccountsStartedAt = Date.now()
+        const phaseBudgetMs = this.managedAccountPhaseBudgetMs()
         this.newManagedAccountsCount = map.size
         this.currentRunUnmatchedFusionNativeIdentities.clear()
         this.autoAssignedIdentityIds.clear()
@@ -1057,7 +1068,7 @@ export class FusionService {
                 this._sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                        `Managed accounts from this source will be treated as NonMatched.`
+                    `Managed accounts from this source will be treated as NonMatched.`
                 )
             }
         }
@@ -1069,13 +1080,23 @@ export class FusionService {
         )
         let processed = 0
         const yieldEveryManaged = this.managedAccountEventLoopYieldEvery()
-        const logProgressEvery = Math.max(1, Math.min(50, Math.ceil(initialQueueSize / 20) || 1))
+        const logProgressEvery = Math.max(1, Math.min(this.managedAccountsBatchSize, initialQueueSize))
         for (const account of map.values()) {
+            const elapsedBeforeNextAccount = Date.now() - processManagedAccountsStartedAt
+            if (processed > 0 && elapsedBeforeNextAccount >= phaseBudgetMs) {
+                const remaining = Math.max(0, initialQueueSize - processed)
+                this.log.warn(
+                    `Managed accounts phase reached soft time budget (${PhaseTimer.formatElapsed(
+                        phaseBudgetMs
+                    )}). Pausing with ${processed}/${initialQueueSize} analyzed and ${remaining} still queued for the next aggregation run.`
+                )
+                break
+            }
             await this.processManagedAccount(account)
             processed += 1
             if (processed === 1 || processed % logProgressEvery === 0 || processed === initialQueueSize) {
                 this.log.info(
-                    `Managed accounts progress: ${processed}/${initialQueueSize} uncorrelated account(s) analyzed | RUN ELAPSED ${PhaseTimer.formatElapsed(
+                    `Managed accounts progress: ${processed}/${initialQueueSize} analyzed | RUN ELAPSED ${PhaseTimer.formatElapsed(
                         Date.now() - processManagedAccountsStartedAt
                     )}`
                 )
@@ -1086,7 +1107,7 @@ export class FusionService {
         }
         const totalElapsed = Date.now() - processManagedAccountsStartedAt
         this.log.info(
-            `Managed accounts phase finished: ${processed} uncorrelated account(s) analyzed (matching workflow complete) | SECTION DURATION ${PhaseTimer.formatElapsed(
+            `Managed accounts phase finished: ${processed} analyzed (matching workflow complete) | SECTION DURATION ${PhaseTimer.formatElapsed(
                 totalElapsed
             )} | MATCH SCORING TIME ${PhaseTimer.formatElapsed(this.currentRunMatchScoringMs)} (similarity scoring vs candidate identities)`
         )
@@ -1335,8 +1356,7 @@ export class FusionService {
         }
         const totalMs = Date.now() - analyzeUncorrelatedStartedAt
         this.log.info(
-            `Performance metric: FusionService.analyzeUncorrelatedAccounts durationMs=${totalMs} analyzed=${
-                results.length
+            `Performance metric: FusionService.analyzeUncorrelatedAccounts durationMs=${totalMs} analyzed=${results.length
             } matchScoringMs=${this.currentRunMatchScoringMs}`
         )
         return results
@@ -1389,7 +1409,7 @@ export class FusionService {
         } else {
             this.log.debug(
                 `Skipping Match scoring for record source account: ${name} [${sourceName}] ` +
-                    `(includeRecordAccountsForMatching=false)`
+                `(includeRecordAccountsForMatching=false)`
             )
         }
         this.fusionIdentityComparisonsByAccount.set(fusionAccount, fusionIdentityComparisons)
@@ -1619,6 +1639,9 @@ export class FusionService {
             eligibleAccounts.push(identity)
         }
 
+        const totalEligible = eligibleAccounts.length
+        const totalBatches = Math.ceil(totalEligible / batchSize)
+        const logProgressEveryBatch = Math.max(1, Math.min(50, Math.ceil(totalBatches / 20) || 1))
         for (let i = 0; i < eligibleAccounts.length; i += batchSize) {
             const batch = eligibleAccounts.slice(i, i + batchSize)
             const outputBatch = await Promise.all(batch.map((account) => this.getISCAccount(account, false)))
@@ -1628,12 +1651,25 @@ export class FusionService {
                     count++
                 }
             }
+            const processedInLoop = Math.min(i + batch.length, totalEligible)
+            const currentBatch = Math.floor(i / batchSize) + 1
+            if (
+                currentBatch === 1 ||
+                currentBatch % logProgressEveryBatch === 0 ||
+                currentBatch === totalBatches ||
+                processedInLoop === totalEligible
+            ) {
+                this.log.info(
+                    `Sending accounts progress: batches ${currentBatch}/${totalBatches} | eligible processed ${processedInLoop}/${totalEligible} | sent ${count} | RUN ELAPSED ${PhaseTimer.formatElapsed(
+                        Date.now() - forEachStartedAt
+                    )}`
+                )
+            }
             await yieldToEventLoop()
         }
         this.log.info(
-            `Performance metric: FusionService.forEachISCAccount durationMs=${
-                Date.now() - forEachStartedAt
-            } eligible=${eligibleAccounts.length} sent=${count} batchSize=${batchSize}`
+            `Performance metric: FusionService.forEachISCAccount durationMs=${Date.now() - forEachStartedAt
+            } eligible=${totalEligible} sent=${count} batchSize=${batchSize}`
         )
         return count
     }
@@ -1938,7 +1974,7 @@ export class FusionService {
         )
         this.log.warn(
             `More than one Fusion account was found for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
-                'This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.'
+            'This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.'
         )
     }
 

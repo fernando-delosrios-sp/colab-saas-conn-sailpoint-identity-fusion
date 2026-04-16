@@ -5,15 +5,13 @@
  */
 'use strict'
 
-const path = require('path')
-
 require('velocityjs')
 
 const DANGEROUS_PROPERTY_KEYS = new Set(['constructor', '__proto__'])
 
 // velocityjs applies mixins onto `Compile.prototype` (not `Velocity.prototype`); see compile/index.cjs.
-const baseCompilePath = path.join(path.dirname(require.resolve('velocityjs')), 'compile', 'base-compile.cjs')
-const { Compile } = require(baseCompilePath)
+// Compile is exported from the package root and is safe for ncc bundling/runtime.
+const { Compile } = require('velocityjs')
 
 const origGetAttributes = Compile.prototype.getAttributes
 Compile.prototype.getAttributes = function velocitySafeGetAttributes(property, baseRef, ast) {

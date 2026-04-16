@@ -170,7 +170,11 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         if (shouldWriteHtmlReport || shouldSendReportEmail) {
             await hydrateIdentitiesForReportDecisions(serviceRegistry)
             const emailReport = buildEmailReportFromFusionReport(serviceRegistry, report, dryRunStats)
-            const htmlReportBody = serviceRegistry.messaging.renderFusionReportHtml(emailReport, 'aggregation')
+            const htmlReportBody = serviceRegistry.messaging.renderFusionReportHtml(
+                emailReport,
+                'aggregation',
+                'Identity Fusion Dry Run Report'
+            )
 
             if (shouldWriteHtmlReport) {
                 const htmlPath = buildDryRunHtmlReportPath(serviceRegistry.config?.baseurl)
@@ -185,6 +189,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
                 await serviceRegistry.messaging.sendReportTo(emailReport, {
                     recipients: runtimeOptions.sendReportTo ?? [],
                     reportType: 'aggregation',
+                    reportTitle: 'Identity Fusion Dry Run Report',
                 })
             }
         }
