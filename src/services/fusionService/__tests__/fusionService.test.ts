@@ -505,6 +505,33 @@ describe('FusionService', () => {
             expect(mockScoring.scoreFusionAccount).toHaveBeenCalledWith(expect.any(FusionAccount), expect.anything(), 'identity')
         })
 
+        it('runs Match scoring for authoritative sources even when the source has no reviewers', async () => {
+            const mockManagedAccount = {
+                id: 'acct-no-reviewer-auth-1',
+                nativeIdentity: 'native-no-reviewer-auth-1',
+                name: 'No Reviewer Auth User',
+                sourceId: 'src-no-reviewer',
+                sourceName: 'No Reviewer Auth Source',
+                attributes: {},
+            } as Account
+
+            ;(fusionService as any).sourcesByName.set('No Reviewer Auth Source', {
+                id: 'src-no-reviewer',
+                name: 'No Reviewer Auth Source',
+                sourceType: 'authoritative',
+                config: {},
+            })
+            ;(fusionService as any)._sourcesWithoutReviewers = new Set(['No Reviewer Auth Source'])
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockScoring.scoreFusionAccount.mockResolvedValue(0)
+
+            await fusionService.processManagedAccount(mockManagedAccount)
+
+            expect(mockScoring.scoreFusionAccount).toHaveBeenCalled()
+        })
+
         it('skips Match scoring for record sources when includeRecordAccountsForMatching is false', async () => {
             const mockManagedAccount = {
                 id: 'acct-record-skip-match-1',
