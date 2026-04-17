@@ -43,8 +43,12 @@ import {
 export class MessagingService {
     /** ISC: workflow definition + test input must stay under this combined size (bytes). */
     private static readonly WORKFLOW_COMBINED_LIMIT_BYTES = 1_500_000
-    /** Room for serialization differences vs the platform measurement. */
-    private static readonly WORKFLOW_COMBINED_SAFETY_MARGIN_BYTES = 131_072
+    /**
+     * Room for differences vs ISC's combined-size measurement (definition + input).
+     * Client-side JSON.stringify(getWorkflow) can be tens of kilobytes smaller than the platform,
+     * which previously allowed payloads that still failed with ~1.56MB reported totals.
+     */
+    private static readonly WORKFLOW_COMBINED_SAFETY_MARGIN_BYTES = 200_000
     /**
      * When getWorkflow fails, cap test `input` JSON this small so we do not assume the definition is tiny
      * (listWorkflows summaries are often incomplete; underestimating definition size caused oversized payloads).
