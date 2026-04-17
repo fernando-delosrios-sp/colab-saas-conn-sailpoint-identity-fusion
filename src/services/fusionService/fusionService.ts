@@ -253,15 +253,28 @@ export class FusionService {
     public async processFusionAccounts(): Promise<FusionAccount[]> {
         const { fusionAccounts } = this.sources
         const startedAt = Date.now()
+        const total = fusionAccounts.length
+        const batchSize = this.fusionParallelBatchSize()
+        const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
+        const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
+        let batchIndex = 0
         this.log.info(
-            `Processing fusion accounts: for each of ${fusionAccounts.length} fusion account(s), match managed accounts from the work queue and build fusion layers`
+            `Processing fusion accounts: for each of ${total} fusion account(s), match managed accounts from the work queue and build fusion layers`
         )
         const results = await promiseAllBatched(
             fusionAccounts,
             async (x: Account) => {
                 return await this.processFusionAccount(x)
             },
-            this.fusionParallelBatchSize()
+            batchSize,
+            (processed, ttl) => {
+                batchIndex++
+                if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
+                    this.log.info(
+                        `Fusion accounts progress: ${processed}/${ttl} processed | RUN ELAPSED ${PhaseTimer.formatElapsed(Date.now() - startedAt)}`
+                    )
+                }
+            }
         )
         this.log.info(
             `Fusion accounts phase finished: ${results.length} fusion account(s) processed (managed accounts matched and layered) | SECTION DURATION ${PhaseTimer.formatElapsed(
@@ -654,13 +667,26 @@ export class FusionService {
         const { identities } = this.identities
         this.identitiesProcessedCount = identities.length
         const startedAt = Date.now()
+        const total = identities.length
+        const batchSize = this.fusionParallelBatchSize()
+        const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
+        const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
+        let batchIndex = 0
         this.log.info(
-            `Processing identity documents: creating or merging fusion accounts for ${identities.length} ISC identity document(s)`
+            `Processing identity documents: creating or merging fusion accounts for ${total} ISC identity document(s)`
         )
         const results = await promiseAllBatched(
             identities,
             (x) => this.processIdentity(x),
-            this.fusionParallelBatchSize()
+            batchSize,
+            (processed, ttl) => {
+                batchIndex++
+                if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
+                    this.log.info(
+                        `Identity documents progress: ${processed}/${ttl} processed | RUN ELAPSED ${PhaseTimer.formatElapsed(Date.now() - startedAt)}`
+                    )
+                }
+            }
         )
         const { managedSources } = this.sources
         managedSources.forEach((source) => {

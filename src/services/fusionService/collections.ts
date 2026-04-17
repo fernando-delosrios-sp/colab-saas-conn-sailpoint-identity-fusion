@@ -220,13 +220,16 @@ export function yieldToEventLoop(): Promise<void> {
 export async function promiseAllBatched<T, R>(
     items: T[],
     fn: (item: T) => Promise<R>,
-    batchSize: number = 50
+    batchSize: number = 50,
+    onBatchComplete?: (processed: number, total: number) => void
 ): Promise<R[]> {
     const results: R[] = []
+    const total = items.length
     for (let i = 0; i < items.length; i += batchSize) {
         const batch = items.slice(i, i + batchSize)
         results.push(...(await Promise.all(batch.map(fn))))
         await yieldToEventLoop()
+        onBatchComplete?.(Math.min(i + batchSize, total), total)
     }
     return results
 }
