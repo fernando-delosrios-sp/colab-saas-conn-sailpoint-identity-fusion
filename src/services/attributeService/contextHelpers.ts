@@ -434,4 +434,35 @@ const Normalize = {
     address: withNormalizeFallback('address', normalizeAddress),
 }
 
-export const contextHelpers = { Datefns, Math, AddressParse, Normalize }
+/**
+ * Serialize / deserialize JSON in Velocity templates. stringify returns '' on failure;
+ * parse returns undefined for invalid input, non-strings, or empty trimmed text.
+ */
+const JSON = {
+    stringify(value: unknown): string {
+        try {
+            const s = globalThis.JSON.stringify(value)
+            if (s === undefined) return ''
+            return s
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error)
+            logger.debug(`JSON.stringify failed: ${msg}`)
+            return ''
+        }
+    },
+    parse(text: unknown): unknown {
+        if (text === null || text === undefined) return undefined
+        if (typeof text !== 'string') return undefined
+        const trimmed = text.trim()
+        if (!trimmed) return undefined
+        try {
+            return globalThis.JSON.parse(trimmed)
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error)
+            logger.debug(`JSON.parse failed for input ${JSON.stringify(trimmed)}: ${msg}`)
+            return undefined
+        }
+    },
+}
+
+export const contextHelpers = { Datefns, Math, AddressParse, Normalize, JSON }

@@ -462,6 +462,42 @@ describe('evaluateVelocityTemplate', () => {
     })
 
     // ========================================================================
+    // JSON - stringify / parse for structured values
+    // ========================================================================
+
+    describe('JSON helper', () => {
+        it('should stringify objects and arrays', () => {
+            const context = { firstName: 'Ann', lastName: 'Lee' }
+            const result = evaluateVelocityTemplate(
+                '#set($o={"first":$firstName,"last":$lastName})$JSON.stringify($o)',
+                context
+            )
+            expect(result).toBe('{"first":"Ann","last":"Lee"}')
+        })
+
+        it('should parse JSON and allow downstream use via #set', () => {
+            const context = { raw: '{"role":"admin","id":7}' }
+            const result = evaluateVelocityTemplate(
+                '#set($p=$JSON.parse($raw))$p.role:$p.id',
+                context
+            )
+            expect(result).toBe('admin:7')
+        })
+
+        it('should yield no output when stringify throws (e.g. BigInt)', () => {
+            const context = { n: BigInt(1) }
+            const result = evaluateVelocityTemplate('$JSON.stringify($n)', context)
+            expect(result).toBeUndefined()
+        })
+
+        it('should treat invalid parse input as empty when re-serialized', () => {
+            const context = { raw: 'not json' }
+            const result = evaluateVelocityTemplate('#set($p=$JSON.parse($raw))$JSON.stringify($p)', context)
+            expect(result).toBeUndefined()
+        })
+    })
+
+    // ========================================================================
     // maxLength - Truncation
     // ========================================================================
 
