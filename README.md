@@ -4,7 +4,7 @@
 
 **Documentation**
 - Full documentation site: [GitHub Pages](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/)
-- Source docs in this repository: [`docs/`](docs/)
+- Source docs in this repository: [documentation folder](docs/README.md)
 
 Identity Fusion NG is an Identity Security Cloud (ISC) connector that addresses the complex challenge of identity and account data aggregation through a streamlined **map-define-match framework**. This concept represents the high-level operation of the connector, which can execute all three steps or just one, but always in this logical sequence:
 
@@ -270,7 +270,7 @@ Advanced Settings - Proxy
 
 ---
 
-For detailed field-by-field guidance and usage patterns, see the [usage guides](docs/guides/) linked above.
+For detailed field-by-field guidance and usage patterns, see the [usage guides](docs/guides/index.md) linked above.
 
 ---
 
