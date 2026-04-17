@@ -658,7 +658,7 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 | **Usage guides**       | This docs folder                                                                       | Detailed feature guides   |
 | **SailPoint ISC docs** | [https://documentation.sailpoint.com/saas/](https://documentation.sailpoint.com/saas/) | General ISC documentation |
 | **SailPoint API docs** | [https://developer.sailpoint.com/docs/](https://developer.sailpoint.com/docs/)         | API reference             |
-| **Connector docs**     | README.md                                                                              | Overview, quick start     |
+| **Connector docs**     | [Documentation home](../home.md)                                                       | Overview, quick start     |
 
 ### Support channels
 
