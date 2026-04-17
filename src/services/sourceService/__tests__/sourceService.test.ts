@@ -148,6 +148,42 @@ describe('SourceService source lookup boundaries', () => {
     })
 })
 
+describe('SourceService account pagination sorter stability', () => {
+    it('uses sorters=id for paginated fetch by source id', async () => {
+        const { service, client } = createService()
+        client.paginate.mockResolvedValue([])
+
+        await service.fetchAccountsBySourceId('managed-source-id')
+
+        expect(client.paginate).toHaveBeenCalledWith(
+            expect.any(Function),
+            expect.objectContaining({ sorters: 'id' }),
+            expect.anything(),
+            expect.any(String)
+        )
+    })
+
+    it('uses sorters=id for generator-based fetch by source id', async () => {
+        const { service, client } = createService()
+        client.paginateParallel.mockImplementation(async function* () {
+            yield []
+        })
+
+        for await (const _batch of service.fetchAccountsBySourceIdGenerator('managed-source-id')) {
+            // consume generator
+        }
+
+        expect(client.paginateParallel).toHaveBeenCalledWith(
+            expect.any(Function),
+            expect.objectContaining({ sorters: 'id' }),
+            expect.anything(),
+            expect.any(String),
+            undefined,
+            undefined
+        )
+    })
+})
+
 describe('SourceService reverse correlation setup hardening', () => {
     it('attempts one repair pass and succeeds when consistency is restored', async () => {
         const { service } = createService({
@@ -468,3 +504,4 @@ describe('SourceService identity attribute create error mapping', () => {
         expect(message).toContain('blackmesa-id')
     })
 })
+

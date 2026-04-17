@@ -1176,6 +1176,15 @@ export class FusionService {
      *          the managed-account work queue for this run; they are expected to be re-fetched next aggregation.
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
+        const managedAccountKey = getManagedAccountKeyFromAccount(account)
+        if (account.identityId) {
+            this.log.info(
+                `Dropping correlated managed account from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
+            )
+            this.removeManagedAccountFromWorkQueue(account)
+            return undefined
+        }
+
         const sourceInfo = account.sourceName ? this.sourcesByName.get(account.sourceName) : undefined
         const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
 

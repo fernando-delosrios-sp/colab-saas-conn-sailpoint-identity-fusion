@@ -525,7 +525,9 @@ export class SourceService {
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
         const filters = buildSourceFilter(sourceInfo)
-        const sorters = 'created'
+        // Use a stable unique sorter to avoid offset boundary drift when many records
+        // share the same created timestamp.
+        const sorters = 'id'
 
         const requestParameters: AccountsApiListAccountsRequest = {
             filters,
@@ -564,7 +566,9 @@ export class SourceService {
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
         const filters = buildSourceFilter(sourceInfo)
-        const sorters = 'created'
+        // Use a stable unique sorter to avoid offset boundary drift when many records
+        // share the same created timestamp.
+        const sorters = 'id'
 
         const requestParameters: AccountsApiListAccountsRequest = {
             filters,
