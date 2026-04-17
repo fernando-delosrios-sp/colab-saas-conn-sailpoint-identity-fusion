@@ -1237,6 +1237,10 @@ export class AttributeService {
             return
         }
 
+        if (hasValue) {
+            this.getUniqueValues(name).delete(String(existingValue))
+        }
+
         const value = await this.generateUniqueAttributeValue(definition, fusionAccount, context)
         if (value === undefined) {
             // Clear attribute when expression fails (e.g. unresolved variables)

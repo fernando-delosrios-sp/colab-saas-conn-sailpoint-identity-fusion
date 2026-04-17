@@ -161,6 +161,11 @@ export class SchemaService {
         }
     }
 
+    /** Fetches the fusion account schema from the fusion source and sets internal lookup maps. */
+    public async loadFusionAccountSchemaFromSource(): Promise<void> {
+        await this.setFusionAccountSchema(undefined)
+    }
+
     /**
      * Get schema - build dynamically if not loaded
      */

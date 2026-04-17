@@ -23,6 +23,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
 
     const schemas = {
         setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
+        loadFusionAccountSchemaFromSource: jest.fn().mockResolvedValue(undefined),
         getManagedSourceSchemaAttributeNames: jest.fn().mockResolvedValue(new Set<string>()),
     }
 

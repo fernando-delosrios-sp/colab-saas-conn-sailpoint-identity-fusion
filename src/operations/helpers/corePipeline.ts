@@ -64,9 +64,8 @@ export async function setupPhase(
     if (schema) {
         await schemas.setFusionAccountSchema(schema)
     } else {
-        const dynamicSchema = await schemas.buildDynamicSchema()
-        await schemas.setFusionAccountSchema(dynamicSchema)
-        log.info('Input schema not provided; using dynamically built fusion account schema')
+        await schemas.loadFusionAccountSchemaFromSource()
+        log.info('Input schema not provided; loaded fusion account schema from source')
     }
     log.info('Fusion account schema set successfully')
 

@@ -1177,7 +1177,7 @@ export class FusionService {
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
-        if (account.identityId) {
+        if (!account.uncorrelated) {
             this.log.info(
                 `Dropping correlated managed account from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
             )
@@ -1764,18 +1764,33 @@ export class FusionService {
         }
 
         const attributes = this.schemas.getFusionAttributeSubset(fusionAccount.attributes)
+        const schemaAttributes = new Set(this.schemas.listSchemaAttributeNames())
         const disabled = fusionAccount.disabled
-        attributes.sources = attrConcat(Array.from(fusionAccount.sources))
-        attributes.accounts = Array.from(fusionAccount.accountIds)
-        attributes.history = fusionAccount.history
-        attributes['missing-accounts'] = Array.from(fusionAccount.missingAccountIds)
-        attributes.reviews = Array.from(fusionAccount.reviews)
-        attributes.statuses = Array.from(fusionAccount.statuses)
-        attributes.actions = Array.from(fusionAccount.actions)
-        if (fusionAccount.originSource) {
+        if (schemaAttributes.has('sources')) {
+            attributes.sources = attrConcat(Array.from(fusionAccount.sources))
+        }
+        if (schemaAttributes.has('accounts')) {
+            attributes.accounts = Array.from(fusionAccount.accountIds)
+        }
+        if (schemaAttributes.has('history')) {
+            attributes.history = fusionAccount.history
+        }
+        if (schemaAttributes.has('missing-accounts')) {
+            attributes['missing-accounts'] = Array.from(fusionAccount.missingAccountIds)
+        }
+        if (schemaAttributes.has('reviews')) {
+            attributes.reviews = Array.from(fusionAccount.reviews)
+        }
+        if (schemaAttributes.has('statuses')) {
+            attributes.statuses = Array.from(fusionAccount.statuses)
+        }
+        if (schemaAttributes.has('actions')) {
+            attributes.actions = Array.from(fusionAccount.actions)
+        }
+        if (fusionAccount.originSource && schemaAttributes.has('originSource')) {
             attributes.originSource = fusionAccount.originSource
         }
-        if (fusionAccount.originAccountId) {
+        if (fusionAccount.originAccountId && schemaAttributes.has('originAccount')) {
             attributes.originAccount = fusionAccount.originAccountId
         }
 
