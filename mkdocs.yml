@@ -8,7 +8,9 @@ theme:
 
 nav:
   - Home: home.md
+  - Documentation README: README.md
   - Guides:
+      - Guides index: guides/index.md
       - Map: guides/map.md
       - Define: guides/define.md
       - Match: guides/match.md

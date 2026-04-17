@@ -1,6 +1,6 @@
 # Identity Fusion NG — Documentation
 
-This folder contains the **usage guides** linked from the [main README](../README.md).
+This folder contains the **usage guides** linked from the [repository overview](home.md).
 
 ## Guide index
 

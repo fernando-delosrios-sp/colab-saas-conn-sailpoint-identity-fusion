@@ -497,4 +497,4 @@ Track these metrics to assess Match effectiveness:
 
 - For algorithm selection and tuning, see [Effective use of matching algorithms](matching-algorithms.md).
 - For attribute merging strategies, see [Effective use of Map](map.md).
-- For ISC setup (connection, schema, identity profile), see the [main README](../../README.md#quick-start).
+- For ISC setup (connection, schema, identity profile), see the [repository README](../home.md#quick-start).

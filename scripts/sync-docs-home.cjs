@@ -8,6 +8,6 @@ const rootReadme = fs.readFileSync(rootReadmePath, 'utf8')
 
 const docsHome = rootReadme
     .replace(/\]\(docs\//g, '](./')
-    .replace(/\]\(LICENSE\.txt\)/g, '](../LICENSE.txt)')
+    .replace(/\]\(LICENSE\.txt\)/g, '](./LICENSE.txt)')
 
 fs.writeFileSync(docsHomePath, docsHome)
