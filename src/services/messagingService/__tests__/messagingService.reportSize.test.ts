@@ -109,4 +109,32 @@ describe('MessagingService report size limits', () => {
         expect(definitionBytes + payloadBytes).toBeLessThanOrEqual(1_500_000)
         expect(sentInput.body.length).toBeLessThan(hugeText.length)
     })
+
+    it('accounts for JSON escaping when trimming report body', async () => {
+        const largeDefinition = 'D'.repeat(1_150_000)
+        const { service, workflowsApi } = createMessagingService({ padding: largeDefinition })
+        const escapeHeavyText = '\\"\\n'.repeat(350_000)
+        const report = {
+            accounts: [{ accountName: escapeHeavyText, accountSource: 'HR', matches: [{ identityName: 'x', isMatch: true }] }],
+            totalAccounts: 1,
+            matches: 1,
+        } as any
+
+        await service.sendReportTo(report, { recipients: ['reviewer@example.com'], reportType: 'aggregation' })
+
+        const fullWorkflow = {
+            id: 'wf-email-1',
+            name: 'Fusion Email Sender (Test Tenant)',
+            enabled: false,
+            padding: largeDefinition,
+        }
+        const definitionBytes = Buffer.byteLength(JSON.stringify(fullWorkflow), 'utf8')
+        const sentInput = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input
+        const payloadBytes = Buffer.byteLength(
+            JSON.stringify({ input: { subject: sentInput.subject, body: sentInput.body, recipients: sentInput.recipients } }),
+            'utf8'
+        )
+        expect(definitionBytes + payloadBytes).toBeLessThanOrEqual(1_500_000)
+        expect(sentInput.body).toContain('Report content was truncated to fit ISC workflow input size limits')
+    })
 })

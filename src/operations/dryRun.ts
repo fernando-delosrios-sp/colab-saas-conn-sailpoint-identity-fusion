@@ -32,7 +32,7 @@ const REPORT_DISK_SUBDIR = 'reports'
 const buildDryRunHtmlReportPath = (baseurl: string | undefined): string => {
     const hostSeg = hostnameSegmentFromBaseurl(baseurl)
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-    return path.join(process.cwd(), REPORT_DISK_SUBDIR, `custom-report-${hostSeg}-${stamp}.html`)
+    return path.join(process.cwd(), REPORT_DISK_SUBDIR, `dry-run-${hostSeg}-${stamp}.html`)
 }
 
 const buildDryRunRuntimeOptions = (input: StdAccountListInput): DryRunRuntimeOptions => {
@@ -181,7 +181,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
                 await mkdir(path.dirname(htmlPath), { recursive: true })
                 await writeFile(htmlPath, htmlReportBody, 'utf8')
                 reportHtmlOutputPath = htmlPath
-                log.info(`custom:report wrote HTML report to ${htmlPath}`)
+                log.info(`dry-run wrote HTML report to ${htmlPath}`)
             }
 
             if (shouldSendReportEmail) {

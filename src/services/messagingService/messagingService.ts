@@ -582,25 +582,15 @@ export class MessagingService {
         }
 
         const notice = MessagingService.TRUNCATION_NOTICE_HTML
-        const bodyWithNotice = `${body}${notice}`
-        if (this.workflowInputByteLength(subject, bodyWithNotice, recipients) <= maxSerializedInputBytes) {
-            return bodyWithNotice
-        }
-
-        // Pre-compute the constant overhead (subject + recipients + JSON envelope)
-        // so the binary-search loop only measures the variable body bytes.
-        const constantOverheadBytes = this.workflowInputByteLength(subject, '', recipients)
-        const noticeBytes = Buffer.byteLength(notice, 'utf8')
-        const maxBodyBytes = maxSerializedInputBytes - constantOverheadBytes - noticeBytes
 
         let low = 0
         let high = body.length
         let best = ''
         while (low <= high) {
             const mid = Math.floor((low + high) / 2)
-            const slice = body.slice(0, mid)
-            if (Buffer.byteLength(slice, 'utf8') <= maxBodyBytes) {
-                best = `${slice}${notice}`
+            const candidate = `${body.slice(0, mid)}${notice}`
+            if (this.workflowInputByteLength(subject, candidate, recipients) <= maxSerializedInputBytes) {
+                best = candidate
                 low = mid + 1
             } else {
                 high = mid - 1
