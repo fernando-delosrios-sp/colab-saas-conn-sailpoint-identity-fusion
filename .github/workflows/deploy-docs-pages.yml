@@ -35,8 +35,8 @@ jobs:
             - name: Install docs dependencies
               run: python3 -m pip install -r requirements-docs.txt
 
-            - name: Sync home page from root README
-              run: node scripts/sync-docs-home.cjs
+            - name: Prepare docs (sync README to site home, copy license)
+              run: node scripts/prepare-docs.cjs
 
             - name: Build docs
               run: python3 -m mkdocs build

@@ -658,7 +658,7 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 | **Usage guides**       | This docs folder                                                                       | Detailed feature guides   |
 | **SailPoint ISC docs** | [https://documentation.sailpoint.com/saas/](https://documentation.sailpoint.com/saas/) | General ISC documentation |
 | **SailPoint API docs** | [https://developer.sailpoint.com/docs/](https://developer.sailpoint.com/docs/)         | API reference             |
-| **Connector docs**     | README.md                                                                              | Overview, quick start     |
+| **Connector docs**     | [Documentation home](../home.md)                                                       | Overview, quick start     |
 
 ### Support channels
 
@@ -692,10 +692,10 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 | Aggregation hangs        | Timeout too low              | Increase timeout                      | [2.1](#issue-21-aggregation-hangs-or-times-out)                     |
 | No accounts              | Source name mismatch         | Fix source names                      | [2.2](#issue-22-no-accounts-or-fewer-accounts-than-expected)        |
 | Accounts disabled        | By design                    | Configure provisioning plan           | [2.3](#issue-23-aggregation-succeeds-but-accounts-are-disabled)     |
-| Unique generation fails  | Expression always same       | Add variable parts                    | [3.1](#issue-31-unique-attribute-generation-fails-or-loops)         |
+| Unique generation fails  | Expression always same       | Add variable parts                    | [3.1](#issue-31-unique-defines-fail-or-loop)         |
 | Wrong schema             | Config not saved             | Save, re-discover                     | [3.2](#issue-32-schema-discovery-shows-wrong-or-missing-attributes) |
 | Velocity error           | Null value                   | Add null checks                       | [3.3](#issue-33-velocity-expression-errors)                         |
-| No duplicates found      | Threshold too high           | Lower thresholds                      | [4.1](#issue-41-no-potential-duplicates-found-expected-some)        |
+| No duplicates found      | Threshold too high           | Lower thresholds                      | [4.1](#issue-41-no-potential-matches-found-expected-some)        |
 | Too many false positives | Threshold too low            | Raise thresholds; add mandatory       | [4.2](#issue-42-too-many-false-positives-wrong-matches)             |
 | No review emails         | Access profile not assigned  | Assign reviewer access                | [4.3](#issue-43-reviewers-not-receiving-forms)                      |
 | Proxy connection fails   | Server not reachable         | Check URL, firewall                   | [5.1](#issue-51-connection-to-proxy-fails)                          |

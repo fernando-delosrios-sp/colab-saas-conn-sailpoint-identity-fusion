@@ -4,9 +4,26 @@
 
 **Documentation**
 - Full documentation site: [GitHub Pages](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/)
-- Source docs in this repository: [`docs/`](docs/)
+- Source docs in this repository: [documentation folder](docs/README.md)
 
-Identity Fusion NG is an Identity Security Cloud (ISC) connector that addresses the complex challenge of identity and account data aggregation through a streamlined **map-define-match framework**. This concept represents the high-level operation of the connector, which can execute all three steps or just one, but always in this logical sequence:
+Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consolidates account data from one or more managed sources, lets you **map** attributes into a single Fusion account schema, **define** derived and unique values (including Velocity-based computation), and optionally **match** new or changed accounts to existing identities so you can avoid duplicate identities without brittle exact-match correlation alone.
+
+**When to use it**
+
+- You need **consistent attributes** across messy or multi-source account data before correlation.
+- You need **generated or normalized identifiers** (unique IDs, UUIDs, counters, formatted strings) that standard sources do not provide.
+- You need **similarity-based matching** and optional **manual review** when authoritative correlation rules are not enough.
+
+**Read next**
+
+| Step | Resource |
+| ---- | -------- |
+| Shortest path to a first aggregation | [Get started](docs/get-started.md) |
+| How Map → Define → Match fits together | [Concepts: map, define, and match](docs/concepts/map-define-match.md) |
+| Full guide list | [Guides overview](docs/guides/index.md) |
+| Connector operations (APIs ISC calls) | Use **Operations reference** in the [documentation site](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/) navigation |
+
+Identity Fusion NG addresses the complex challenge of identity and account data aggregation through a streamlined **map-define-match framework**. This concept represents the high-level operation of the connector, which can execute all three steps or just one, but always in this logical sequence:
 
 ### The Map, Define, Match Framework
 
@@ -37,7 +54,7 @@ You can use the **map**, **define**, and **match** capabilities independently or
 
 ---
 
-## Configuration at a glance
+## Reference: configuration at a glance
 
 Configuration is grouped into menus in the connector source in ISC. Each menu contains multiple sections with specific settings.
 
@@ -270,7 +287,7 @@ Advanced Settings - Proxy
 
 ---
 
-For detailed field-by-field guidance and usage patterns, see the [usage guides](docs/guides/) linked above.
+For detailed field-by-field guidance and usage patterns, see the [usage guides](docs/guides/index.md) linked above.
 
 ---
 
@@ -391,14 +408,7 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
 
 ## Documentation site (MkDocs)
 
-This repository now uses MkDocs for documentation publishing.
-
-- Install docs dependencies: `npm run docs:install`
-- Sync homepage from root README: `npm run docs:sync-home`
-- Build the site locally: `npm run docs:build`
-- Serve docs locally: `npm run docs:serve`
-
-The published documentation site is deployed from `main` using the GitHub Actions workflow at `.github/workflows/deploy-docs-pages.yml`.
+The documentation site is built with MkDocs and published from the `main` branch by GitHub Actions (`.github/workflows/deploy-docs-pages.yml`). If you contribute to docs, see [Contributing to documentation](docs/contributing/documentation.md) for how generated files and optional local builds work.
 
 ---
 
