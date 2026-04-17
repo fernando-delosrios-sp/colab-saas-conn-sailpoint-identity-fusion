@@ -393,12 +393,10 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
 
 This repository now uses MkDocs for documentation publishing.
 
-- Install docs dependencies: `npm run docs:install`
-- Sync homepage from root README: `npm run docs:sync-home`
-- Build the site locally: `npm run docs:build`
-- Serve docs locally: `npm run docs:serve`
+- Documentation publishing is handled only through GitHub Actions.
+- The published site is deployed from `main` using `.github/workflows/deploy-docs-pages.yml`.
 
-The published documentation site is deployed from `main` using the GitHub Actions workflow at `.github/workflows/deploy-docs-pages.yml`.
+- If the home page content needs refresh, run `npm run docs:sync-home` to sync `README.md` into `docs/home.md`.
 
 ---
 
