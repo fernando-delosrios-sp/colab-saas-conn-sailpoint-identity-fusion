@@ -1,6 +1,6 @@
 import { FusionAccount } from '../../model/account'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing } from '../../model/config'
-import { FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT } from '../formService/constants'
+import { defaultFusionMaxCandidatesForForm } from '../../data/connectorSpecDefaults'
 import { countIdentityBackedFusionMatches } from '../formService/helpers'
 import { LogService } from '../logService'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
@@ -76,7 +76,7 @@ export class ScoringService {
         this.matchingConfigs = config.matchingConfigs ?? []
         this.fusionAverageScore = config.fusionAverageScore ?? 0
         this.fusionMergingExactMatch = config.fusionMergingExactMatch ?? false
-        this.fusionMaxIdentityMatchCandidates = config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
+        this.fusionMaxIdentityMatchCandidates = config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
     }
 
     /**

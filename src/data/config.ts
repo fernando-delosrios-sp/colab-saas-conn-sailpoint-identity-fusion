@@ -1,10 +1,7 @@
 import { ConnectorError, ConnectorErrorType, readConfig, logger } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceConfig } from '../model/config'
-import {
-    FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT,
-    FUSION_MAX_CANDIDATES_FOR_FORM_MAX,
-    FUSION_MAX_CANDIDATES_FOR_FORM_MIN,
-} from '../services/formService/constants'
+import { FUSION_MAX_CANDIDATES_FOR_FORM_MAX, FUSION_MAX_CANDIDATES_FOR_FORM_MIN } from '../services/formService/constants'
+import { defaultFusionMaxCandidatesForForm } from './connectorSpecDefaults'
 import { assert, softAssert } from '../utils/assert'
 import { readBoolean } from '../utils/safeRead'
 
@@ -138,7 +135,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     const rawMaxCandidates =
         config.fusionMaxCandidatesForForm !== undefined
             ? Number(config.fusionMaxCandidatesForForm)
-            : FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
+            : defaultFusionMaxCandidatesForForm()
     assert(
         Number.isFinite(rawMaxCandidates) &&
             rawMaxCandidates >= FUSION_MAX_CANDIDATES_FOR_FORM_MIN &&
