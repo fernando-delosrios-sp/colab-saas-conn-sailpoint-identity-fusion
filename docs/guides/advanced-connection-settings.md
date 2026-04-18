@@ -32,7 +32,7 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 | ------------------------------------------ | -------- | ------------------------------------------------- | ------- | --------------------------------------------- |
 | **Reset accounts?**                        | Boolean  | Force rebuild of all Fusion accounts from scratch | No      | ⚠️ **HIGH** — Deletes all Fusion account data |
 | **Managed accounts batch size**            | Number   | Number of uncorrelated managed accounts per batch | 50      | Low                                           |
-| **Max match candidates per review form**   | Number   | Limit of potential matches shown on review form   | 10      | Low                                           |
+| **Max match candidates per review form**   | Number   | Limit of potential matches shown on review form   | From `connector-spec.json` `sourceConfigInitialValues` | Low                                           |
 | **Force attribute refresh on each aggregation?** | Boolean | Recalculate Normal-type attributes every run    | No      | Medium                                        |
 | **Enable concurrency check?**              | Boolean  | Prevent concurrent aggregations                   | Yes     | Low                                           |
 | **Enable external logging?**               | Boolean  | Send connector logs to external endpoint          | No      | Low                                           |

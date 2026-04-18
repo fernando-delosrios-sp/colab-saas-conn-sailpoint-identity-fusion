@@ -3,7 +3,7 @@ import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceType } from '../../model/config'
 import { LogService, PhaseTimer } from '../logService'
 import { FormService } from '../formService'
-import { FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT } from '../formService/constants'
+import { defaultFusionMaxCandidatesForForm } from '../../data/connectorSpecDefaults'
 import { IdentityService } from '../identityService'
 import { SourceInfo, SourceService, buildSourceConfigPatch } from '../sourceService'
 import { FusionAccount } from '../../model/account'
@@ -1305,7 +1305,7 @@ export class FusionService {
             const formCreated = await this.forms.createFusionForm(fusionAccount, reviewers)
             if (!formCreated) {
                 const matchCount = fusionAccount.fusionMatches.length
-                const maxForm = this.config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
+                const maxForm = this.config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
                 const message =
                     !reviewers || reviewers.size === 0
                         ? 'Match review form was not created: no reviewers available for this source'
@@ -1463,7 +1463,8 @@ export class FusionService {
             fusionIdentityComparisons = await this.scoring.scoreFusionAccount(
                 fusionAccount,
                 identityPool,
-                MatchCandidateType.Identity
+                MatchCandidateType.Identity,
+                this.config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
             )
             this.currentRunMatchScoringMs += Date.now() - identityScoringStarted
             hasIdentityBackedMatches = this.hasIdentityBackedMatches(fusionAccount)

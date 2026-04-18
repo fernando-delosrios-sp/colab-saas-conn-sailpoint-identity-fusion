@@ -20,7 +20,7 @@
         "fusionAverageScore": 80,
         "provisioningTimeout": 300,
         "managedAccountsBatchSize": 100,
-        "fusionMaxCandidatesForForm": 10,
+        "fusionMaxCandidatesForForm": 3,
         "includeIdentities": true,
         "identityScopeQuery": "*",
         "maxHistoryMessages": 10,
@@ -862,7 +862,7 @@
                             "label": "Maximum candidates per review form",
                             "type": "number",
                             "required": false,
-                            "helpKey": "Maximum number of potential identity matches shown on each manual review form. If more identities qualify, only the highest-scoring candidates are included (combined match score, then stable tie-break). Valid range: 1–15. Default: 10"
+                            "helpKey": "Maximum number of potential identity matches shown on each manual review form. If more identities qualify, only the highest-scoring candidates are included (combined match score, then stable tie-break). Valid range: 1–15. Default: 3"
                         },
                         {
                             "key": "fusionFormExpirationDays",

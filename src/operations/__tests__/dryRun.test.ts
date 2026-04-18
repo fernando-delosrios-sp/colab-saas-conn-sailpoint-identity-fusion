@@ -583,6 +583,7 @@ describe('dryRun', () => {
         expect(registry.messaging.sendReportTo).toHaveBeenCalledWith(expect.any(Object), {
             recipients: ['reviewer.one@example.com', 'reviewer.two@example.com'],
             reportType: 'aggregation',
+            reportTitle: 'Identity Fusion Dry Run Report',
         })
     })
 
@@ -603,7 +604,7 @@ describe('dryRun', () => {
             /reports[\\/]custom-report-tenant-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/
         )
         expect(String(summary.reportHtmlOutputPath)).toMatch(
-            /reports[\\/]custom-report-tenant-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.html$/
+            /reports[\\/]dry-run-tenant-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.html$/
         )
 
         const raw = fs.readFileSync(summary.reportOutputPath, 'utf8')

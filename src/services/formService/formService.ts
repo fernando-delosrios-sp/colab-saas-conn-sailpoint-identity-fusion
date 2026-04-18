@@ -22,7 +22,7 @@ import { readString, readUnknown } from '../../utils/safeRead'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
 import { Candidate, PendingReviewFormContext, PendingReviewReviewerContext, PendingReviewAccountContext } from './types'
-import { FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT } from './constants'
+import { defaultFusionMaxCandidatesForForm } from '../../data/connectorSpecDefaults'
 import {
     buildCandidateList,
     buildFormName,
@@ -89,7 +89,7 @@ export class FormService {
         this.fusionFormNamePattern = config.fusionFormNamePattern
         this.fusionFormExpirationDays = config.fusionFormExpirationDays
         this.fusionFormAttributes = config.fusionFormAttributes
-        this.fusionMaxCandidatesForForm = config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
+        this.fusionMaxCandidatesForForm = config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
     }
 
     // ------------------------------------------------------------------------

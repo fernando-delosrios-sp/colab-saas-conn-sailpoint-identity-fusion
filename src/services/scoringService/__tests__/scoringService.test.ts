@@ -1,5 +1,6 @@
 import { COMBINED_SCORE_ROW_ATTRIBUTE, ScoringService, WEIGHTED_MEAN_ALGORITHM } from '../scoringService'
 import { effectiveSkipMatchIfMissing } from '../../../model/config'
+import { FusionAccount } from '../../../model/account'
 import { MatchCandidateType } from '../types'
 import * as scoringHelpers from '../helpers'
 
@@ -158,6 +159,54 @@ describe('ScoringService mandatory matching behavior', () => {
         expect(combined).toBeDefined()
         const sumWeighted = rules.reduce((acc: number, s: any) => acc + (s.weightedScore ?? 0), 0)
         expect(Math.round(sumWeighted * 100) / 100).toBe(combined.score)
+    })
+})
+
+describe('ScoringService max identity match candidates', () => {
+    beforeAll(() => {
+        FusionAccount.configure({ sources: [] } as any)
+    })
+
+    it('stops comparing further identities once max threshold-passing identity matches are recorded', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'email',
+                        algorithm: 'jaro-winkler' as const,
+                        fusionScore: 80,
+                    },
+                ],
+                fusionAverageScore: 80,
+            } as any,
+            { crash: jest.fn() } as any
+        )
+
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'acct-1',
+            nativeIdentity: 'native-1',
+            name: 'Managed One',
+            sourceId: 'src-1',
+            sourceName: 'Source A',
+            attributes: { email: 'same@example.com' },
+        } as any)
+
+        const mkIdentity = (id: string) =>
+            FusionAccount.fromIdentity({
+                id,
+                name: id,
+                attributes: { email: 'same@example.com' },
+            } as any)
+
+        const compared = await service.scoreFusionAccount(
+            fusionAccount,
+            [mkIdentity('id-a'), mkIdentity('id-b'), mkIdentity('id-c'), mkIdentity('id-d')],
+            MatchCandidateType.Identity,
+            2
+        )
+
+        expect(fusionAccount.fusionMatches.filter((m) => (m.candidateType ?? 'identity') === 'identity')).toHaveLength(2)
+        expect(compared).toBe(2)
     })
 })
 

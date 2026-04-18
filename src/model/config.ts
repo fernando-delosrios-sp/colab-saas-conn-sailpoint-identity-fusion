@@ -308,7 +308,7 @@ export interface DeveloperSettingsSection {
     /**
      * Maximum number of potential identity matches included on each fusion review form.
      * When there are more candidates than this cap, the highest-scoring matches are kept (see form builder).
-     * Valid range: 1–15. Default: 10.
+     * Valid range: 1–15. Default for new sources: `sourceConfigInitialValues.fusionMaxCandidatesForForm` in connector-spec.json.
      */
     fusionMaxCandidatesForForm?: number
     externalLoggingEnabled: boolean

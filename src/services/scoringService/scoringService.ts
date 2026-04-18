@@ -1,5 +1,7 @@
 import { FusionAccount } from '../../model/account'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing } from '../../model/config'
+import { defaultFusionMaxCandidatesForForm } from '../../data/connectorSpecDefaults'
+import { countIdentityBackedFusionMatches } from '../formService/helpers'
 import { LogService } from '../logService'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
 import { normalizeLIG3, scoreDice, scoreDoubleMetaphone, scoreJaroWinkler, scoreLIG3, scoreLIG3Normalized, scoreNameMatcher } from './helpers'
@@ -42,6 +44,7 @@ export class ScoringService {
     private readonly matchingConfigs: MatchingConfig[]
     private readonly fusionAverageScore: number
     private readonly fusionMergingExactMatch: boolean
+    private readonly fusionMaxIdentityMatchCandidates: number
 
     /**
      * Per-account cache of LIG3-normalized attribute values.
@@ -73,6 +76,7 @@ export class ScoringService {
         this.matchingConfigs = config.matchingConfigs ?? []
         this.fusionAverageScore = config.fusionAverageScore ?? 0
         this.fusionMergingExactMatch = config.fusionMergingExactMatch ?? false
+        this.fusionMaxIdentityMatchCandidates = config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
     }
 
     /**
@@ -229,11 +233,15 @@ export class ScoringService {
      *
      * @param fusionAccount - The account to score (typically a new/unmatched account)
      * @param fusionIdentities - The set of existing fusion identities to compare against
+     * @param maxIdentityMatches - When set, stop scoring against further identities once this many
+     *   threshold-passing identity-backed matches are recorded (same cap as the review form).
+     *   Omitted or undefined disables this early exit (e.g. tests).
      */
     public async scoreFusionAccount(
         fusionAccount: FusionAccount,
         fusionIdentities: Iterable<FusionAccount>,
-        candidateType: MatchCandidateType = MatchCandidateType.Identity
+        candidateType: MatchCandidateType = MatchCandidateType.Identity,
+        maxIdentityMatches?: number
     ): Promise<number> {
         // No matching configs → no scoring possible; skip entirely to avoid
         // false positives (empty scores would otherwise mark every identity as a match).
@@ -244,6 +252,10 @@ export class ScoringService {
         // wins and all subsequent comparisons would be discarded. Early exit here
         // avoids O(n) identity comparisons for every exact-match account.
         const earlyExitOnExactMatch = this.fusionMergingExactMatch && candidateType === MatchCandidateType.Identity
+        const maxIdentity =
+            candidateType === MatchCandidateType.Identity
+                ? (maxIdentityMatches ?? this.fusionMaxIdentityMatchCandidates)
+                : undefined
 
         let compared = 0
         for (const fusionIdentity of fusionIdentities) {
@@ -260,6 +272,9 @@ export class ScoringService {
                 if (matches.length > 0 && isExactAttributeMatchScores(matches[matches.length - 1].scores)) {
                     break
                 }
+            }
+            if (maxIdentity !== undefined && countIdentityBackedFusionMatches(fusionAccount.fusionMatchesRaw) >= maxIdentity) {
+                break
             }
             if (compared % SCORING_IDENTITY_YIELD_INTERVAL === 0) {
                 await new Promise<void>((resolve) => setImmediate(resolve))
