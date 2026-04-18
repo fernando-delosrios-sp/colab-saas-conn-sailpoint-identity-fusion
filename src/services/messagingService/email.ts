@@ -24,7 +24,7 @@
  * normalizeEmailValue({ value: 'user@example.com' })
  * // Returns: ['user@example.com']
  */
-export function normalizeEmailValue(value: any): string[] {
+export function normalizeEmailValue(value: unknown): string[] {
     if (!value) return []
 
     // Handle string values
@@ -43,8 +43,9 @@ export function normalizeEmailValue(value: any): string[] {
     }
 
     // Handle object values (check common email property names)
-    if (typeof value === 'object') {
-        const maybe = value.value ?? value.email ?? value.mail ?? value.emailAddress
+    if (typeof value === 'object' && value !== null) {
+        const obj = value as Record<string, unknown>
+        const maybe = obj.value ?? obj.email ?? obj.mail ?? obj.emailAddress
         return normalizeEmailValue(maybe)
     }
 

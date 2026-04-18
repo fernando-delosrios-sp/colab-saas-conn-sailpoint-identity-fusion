@@ -15,7 +15,7 @@ export interface QueueItem<T = any> {
     priority: QueuePriority
     execute: () => Promise<T>
     resolve: (value: T) => void
-    reject: (error: any) => void
+    reject: (reason: unknown) => void
     retryCount: number
     maxRetries: number
     createdAt: number

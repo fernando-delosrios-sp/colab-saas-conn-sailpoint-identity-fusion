@@ -204,7 +204,7 @@ export class ApiQueue {
             this.stats.totalProcessed++
             this.updateStats()
             item.resolve(result)
-        } catch (error: any) {
+        } catch (error: unknown) {
             const processingTime = Date.now() - startTime
             this.pushStat('processing', processingTime)
 

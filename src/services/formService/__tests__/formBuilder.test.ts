@@ -21,8 +21,8 @@ describe('formBuilder conditions', () => {
         )
 
         expect(hideCondition).toBeDefined()
-        const identityRule = hideCondition.rules.find((rule: any) => rule.source === 'identities')
-        expect(identityRule.value).toBe('Alice Doe')
+        const identityRule = hideCondition!.rules.find((rule: any) => rule.source === 'identities')
+        expect(identityRule!.value).toBe('Alice Doe')
     })
 
     it('skips candidate conditions when candidate has no renderable elements', () => {

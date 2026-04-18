@@ -29,7 +29,7 @@ export const registerHandlebarsHelpers = (): void => {
         return `${year}/${month}/${day}`
     }
 
-    Handlebars.registerHelper('formatAttribute', (value: any) => {
+    Handlebars.registerHelper('formatAttribute', (value: unknown) => {
         if (value === null || value === undefined) {
             return 'N/A'
         }
@@ -43,7 +43,7 @@ export const registerHandlebarsHelpers = (): void => {
     const accountAttrMaxChars = maxDisplayCharsForAccountAttributeValue()
 
     /** Renders attribute values; long text is shortened with a character budget; emails become mailto links (triple braces in templates). */
-    Handlebars.registerHelper('formatAccountAttributeValue', (_attributeKey: any, value: any) => {
+    Handlebars.registerHelper('formatAccountAttributeValue', (_attributeKey: unknown, value: unknown) => {
         if (value === null || value === undefined) {
             return 'N/A'
         }
@@ -87,31 +87,31 @@ export const registerHandlebarsHelpers = (): void => {
             .join(', ')
     })
 
-    Handlebars.registerHelper('formatPercent', (value: any) => {
+    Handlebars.registerHelper('formatPercent', (value: unknown) => {
         const num = typeof value === 'number' ? value : Number.parseFloat(String(value))
         if (Number.isNaN(num)) return '0'
         return String(Math.round(num))
     })
 
-    Handlebars.registerHelper('isFiniteNumber', (value: any) => typeof value === 'number' && Number.isFinite(value))
+    Handlebars.registerHelper('isFiniteNumber', (value: unknown) => typeof value === 'number' && Number.isFinite(value))
 
-    Handlebars.registerHelper('multiply', (a: any, b: any) => {
+    Handlebars.registerHelper('multiply', (a: unknown, b: unknown) => {
         const left = typeof a === 'number' ? a : Number.parseFloat(String(a))
         const right = typeof b === 'number' ? b : Number.parseFloat(String(b))
         if (Number.isNaN(left) || Number.isNaN(right)) return 0
         return Math.round(left * right)
     })
 
-    Handlebars.registerHelper('exists', (value: any) => {
+    Handlebars.registerHelper('exists', (value: unknown) => {
         return value !== null && value !== undefined && value !== ''
     })
 
-    Handlebars.registerHelper('anyExists', (...args: any[]) => {
+    Handlebars.registerHelper('anyExists', (...args: unknown[]) => {
         const values = args.slice(0, -1)
         return values.some((value) => value !== null && value !== undefined && value !== '')
     })
 
-    Handlebars.registerHelper('decisionAssigned', (decisions: any, outcome: any) => {
+    Handlebars.registerHelper('decisionAssigned', (decisions: unknown, outcome: unknown) => {
         const decisionValue = Number.parseInt(String(decisions ?? ''), 10)
         if (!Number.isFinite(decisionValue)) return '-'
         const outcomeValue = Number.parseInt(String(outcome ?? '0'), 10)

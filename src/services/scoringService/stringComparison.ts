@@ -100,11 +100,6 @@ export function diceCoefficientSimilarity(s1: string, s2: string): number {
     const freq1 = getBigramFrequency(s1)
     const freq2 = getBigramFrequency(s2)
 
-    const total1 = freq1.size
-    const total2 = freq2.size
-    if (total1 === 0 && total2 === 0) return 1.0
-    if (total1 === 0 || total2 === 0) return 0.0
-
     // Count intersections using multiset (min of frequencies)
     let intersection = 0
     for (const [bigram, count1] of freq1) {

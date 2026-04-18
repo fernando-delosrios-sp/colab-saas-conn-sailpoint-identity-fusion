@@ -8,6 +8,46 @@ import { assert } from '../../utils/assert'
 import { readString } from '../../utils/safeRead'
 
 // ============================================================================
+// Internal Helpers
+// ============================================================================
+
+/**
+ * Coerces any scalar or object value to a plain string, extracting a `.value`
+ * or display field from objects so templates never render "[object Object]".
+ */
+function normalizeScalar(value: unknown): string {
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value)
+    if (typeof value === 'object') {
+        const v = value as Record<string, unknown>
+        if (typeof v.value === 'string') return v.value
+        const display = v.displayName ?? v.name ?? v.id
+        if (typeof display === 'string') return display
+    }
+    return String(value)
+}
+
+/**
+ * Reads the correlated identity ID from either a flat or dictionary form input structure.
+ */
+function readCorrelatedIdentityId(formInput: any): string | undefined {
+    // Try flat structure first (as sent in createFormInstance)
+    const flat = readString(formInput, 'identityId')
+    if (flat) return flat
+
+    // Fall back to dictionary structure
+    try {
+        const dict = formInput as Record<string, any>
+        const inputObj = Object.values(dict ?? {}).find((x: any) => x?.id === 'identityId' && (x.value || x.description))
+        const value = inputObj?.value || inputObj?.description
+        return typeof value === 'string' && value.length > 0 ? value : undefined
+    } catch {
+        return undefined
+    }
+}
+
+// ============================================================================
 // Form Processing Functions
 // ============================================================================
 
@@ -193,21 +233,7 @@ export const createFusionDecision = async (
 
     // Persist correlated identity reference (if the form stored it) for downstream reporting/history.
     // Supports both flat and dictionary formInput structures.
-    const correlatedIdentityId =
-        (() => {
-            const identityId = readString(formInput, 'identityId')
-            return identityId && identityId.length > 0 ? identityId : undefined
-        })() ||
-        (() => {
-            try {
-                const dict = formInput as Record<string, any>
-                const inputObj = Object.values(dict ?? {}).find((x: any) => x?.id === 'identityId' && (x.value || x.description))
-                const value = inputObj?.value || inputObj?.description
-                return typeof value === 'string' && value.length > 0 ? value : undefined
-            } catch {
-                return undefined
-            }
-        })()
+    const correlatedIdentityId = readCorrelatedIdentityId(formInput)
 
     // Prefer correlated identity display name for downstream reporting/history.
     // This is especially important for "new identity" decisions where there's no selected match,
@@ -241,20 +267,6 @@ export const createFusionDecision = async (
           selectedIdentity?.name ||
           existingIdentity
         : undefined
-
-    const normalizeScalar = (value: unknown): string => {
-        if (value === null || value === undefined) return ''
-        if (typeof value === 'string') return value
-        if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value)
-        if (typeof value === 'object') {
-            const anyVal: any = value as any
-            const maybeValue = anyVal?.value
-            if (typeof maybeValue === 'string') return maybeValue
-            const maybeDisplay = anyVal?.displayName ?? anyVal?.name ?? anyVal?.id
-            if (typeof maybeDisplay === 'string') return maybeDisplay
-        }
-        return String(value)
-    }
 
     // Defensive: ensure decision.account fields are strings so templates never render "[object Object]".
     const sourceIdNorm = normalizeScalar((accountInfo as any)?.sourceId)
