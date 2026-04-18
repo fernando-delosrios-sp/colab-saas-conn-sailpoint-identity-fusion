@@ -1,6 +1,7 @@
 import { COMBINED_SCORE_ROW_ATTRIBUTE, ScoringService, WEIGHTED_MEAN_ALGORITHM } from '../scoringService'
 import { effectiveSkipMatchIfMissing } from '../../../model/config'
 import { MatchCandidateType } from '../types'
+import * as scoringHelpers from '../helpers'
 
 describe('ScoringService mandatory matching behavior', () => {
     const baseMatchingConfigs = [
@@ -302,6 +303,42 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
         await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
 
         expect(fusionAccount.addFusionMatch).not.toHaveBeenCalled()
+    })
+})
+
+describe('ScoringService combined-score early exit', () => {
+    const log = { crash: jest.fn() } as any
+
+    it('does not evaluate later rules when perfect future scores cannot reach fusionAverageScore', async () => {
+        const scoreDiceSpy = jest.spyOn(scoringHelpers, 'scoreDice')
+
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    { attribute: 'a', algorithm: 'dice', fusionScore: 10, mandatory: false },
+                    { attribute: 'b', algorithm: 'dice', fusionScore: 10, mandatory: false },
+                ],
+                fusionAverageScore: 90,
+            } as any,
+            log
+        )
+
+        const fusionAccount = {
+            attributes: { a: 'x', b: 'y' },
+            addFusionMatch: jest.fn(),
+        } as any
+        const fusionIdentity = {
+            attributes: { a: 'z', b: 'y' },
+            identityId: 'id-1',
+            displayName: 'One',
+        } as any
+
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+
+        expect(fusionAccount.addFusionMatch).not.toHaveBeenCalled()
+        expect(scoreDiceSpy).toHaveBeenCalledTimes(1)
+
+        scoreDiceSpy.mockRestore()
     })
 })
 
