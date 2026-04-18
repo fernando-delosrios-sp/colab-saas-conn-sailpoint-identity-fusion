@@ -115,6 +115,27 @@ export class ScoringService {
     }
 
     /**
+     * Best-case weighted combined score if all rules from `fromIndex` onward
+     * contributed at raw score 100 (same weights as {@link blendWeight}).
+     * Safe upper bound for early non-match: actual combined can only be lower when
+     * some rules are skipped or score below 100.
+     */
+    private static maxAchievableCombinedScore(
+        weightedSumSoFar: number,
+        weightTotalSoFar: number,
+        fromIndex: number,
+        configs: MatchingConfig[]
+    ): number {
+        let wRem = 0
+        for (let j = fromIndex; j < configs.length; j++) {
+            wRem += ScoringService.blendWeight(configs[j].fusionScore)
+        }
+        const denom = weightTotalSoFar + wRem
+        if (denom <= 0) return 0
+        return (weightedSumSoFar + 100 * wRem) / denom
+    }
+
+    /**
      * Build the trigram blocking index over all fusion identities for their mandatory matching attributes.
      * Must be called once before {@link getCandidates} is used.
      *
@@ -292,6 +313,8 @@ export class ScoringService {
     ): void {
         const scores: ScoreReport[] = []
         let hasFailedMandatory = false
+        let weightedSum = 0
+        let weightTotal = 0
 
         for (let i = 0; i < this.matchingConfigs.length; i++) {
             const matching = this.matchingConfigs[i]
@@ -334,6 +357,11 @@ export class ScoringService {
                 )
             }
             scores.push(scoreReport)
+            if (!scoreReport.skipped) {
+                const w = ScoringService.blendWeight(scoreReport.fusionScore)
+                weightedSum += w * scoreReport.score
+                weightTotal += w
+            }
             if (matching.mandatory && !scoreReport.isMatch) {
                 hasFailedMandatory = true
                 // Push skipped entries for all remaining rules so the scores
@@ -343,15 +371,19 @@ export class ScoringService {
                 }
                 break
             }
-        }
-
-        let weightedSum = 0
-        let weightTotal = 0
-        for (const s of scores) {
-            if (s.skipped) continue
-            const w = ScoringService.blendWeight(s.fusionScore)
-            weightedSum += w * s.score
-            weightTotal += w
+            if (
+                !hasFailedMandatory &&
+                i + 1 < this.matchingConfigs.length &&
+                ScoringService.maxAchievableCombinedScore(weightedSum, weightTotal, i + 1, this.matchingConfigs) <
+                    this.fusionAverageScore
+            ) {
+                for (let r = i + 1; r < this.matchingConfigs.length; r++) {
+                    scores.push(
+                        makeSkippedReport(this.matchingConfigs[r], 'Rule skipped (combined score cannot reach threshold)')
+                    )
+                }
+                break
+            }
         }
 
         const combinedScore = weightTotal > 0 ? weightedSum / weightTotal : 0
