@@ -146,25 +146,6 @@ export const scoreNameMatcher = (
 }
 
 /**
- * LIG3 (Levenshtein with Intelligent Gapping - v3) Algorithm
- *
- * An advanced string similarity algorithm optimized for identity matching that combines:
- * - Levenshtein distance for edit operations
- * - Intelligent gap penalties for missing/extra characters
- * - Token-based preprocessing for multi-word fields
- * - Case-insensitive comparison with accent normalization
- * - Positional weighting (prefix matches score higher)
- *
- * This algorithm is particularly effective for:
- * - Names with middle initials or missing components
- * - Fields with extra whitespace or formatting differences
- * - Strings with minor typos or transpositions
- * - Multi-word attributes where order matters but gaps are common
- *
- * Use {@link scoreLIG3Normalized} when both sides are already normalized (e.g., from a cache).
- */
-
-/**
  * LIG3 scoring on already-normalized strings. Called by the ScoringService cache layer
  * after it has pre-normalized both sides; avoids repeated normalization in the O(n×m) loop.
  */

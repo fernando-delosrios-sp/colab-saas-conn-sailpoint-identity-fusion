@@ -1403,19 +1403,12 @@ export class SourceService {
      */
     private async ensureIdentityAttribute(attributeName: string, displayName: string): Promise<void> {
         const { identityAttributesApi } = this.client
-        const debugRunId = `ensureIdentityAttribute-${attributeName}`
-        // #region agent log
-        fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:debugRunId,hypothesisId:'H1',location:'sourceService.ts:ensureIdentityAttribute:entry',message:'Entering ensureIdentityAttribute',data:{attributeName,displayName,displayNameLength:displayName?.length ?? 0},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
 
         const existing = await this.client.execute(
             () => identityAttributesApi.getIdentityAttribute({ name: attributeName }).then((r) => r.data),
             QueuePriority.HIGH,
             `SourceService>ensureIdentityAttribute get ${attributeName}`
         )
-        // #region agent log
-        fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:debugRunId,hypothesisId:'H2',location:'sourceService.ts:ensureIdentityAttribute:after-get',message:'Identity attribute get result',data:{attributeName,found:!!existing,searchable:existing?.searchable ?? null,type:existing?.type ?? null,multi:existing?.multi ?? null,standard:existing?.standard ?? null,system:existing?.system ?? null},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
 
         if (existing) {
             if (existing.searchable) {
@@ -1462,9 +1455,6 @@ export class SourceService {
                 system: false,
             },
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:debugRunId,hypothesisId:'H3',location:'sourceService.ts:ensureIdentityAttribute:before-create',message:'Creating identity attribute payload summary',data:{attributeName,payloadKeys:Object.keys(createPayload.identityAttributeV2025),payloadType:createPayload.identityAttributeV2025.type,searchable:createPayload.identityAttributeV2025.searchable,multi:createPayload.identityAttributeV2025.multi,standard:createPayload.identityAttributeV2025.standard,system:createPayload.identityAttributeV2025.system,displayNameLength:displayName?.length ?? 0},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         let created: any
         try {
             created = await this.client.execute(
@@ -1513,9 +1503,6 @@ export class SourceService {
                 ConnectorErrorType.Generic
             )
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:debugRunId,hypothesisId:'H3',location:'sourceService.ts:ensureIdentityAttribute:after-create',message:'Identity attribute create result',data:{attributeName,created:!!created,returnedName:(created as any)?.name ?? null,returnedType:(created as any)?.type ?? null},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         if (!created) {
             throw new ConnectorError(
                 `Failed to create searchable identity attribute "${attributeName}".`,
@@ -1588,7 +1575,6 @@ export class SourceService {
             },
         }
         for (const profile of matchingProfiles) {
-            const profileDebugRunId = `ensureIdentityProfileMapping-${attributeName}-${profile.id}`
             const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
             const existingIndex = transforms.findIndex((t) => t.identityAttributeName === attributeName)
 
@@ -1627,9 +1613,6 @@ export class SourceService {
                         },
                     },
                 ]
-            // #region agent log
-            await fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:profileDebugRunId,hypothesisId:'H5',location:'sourceService.ts:ensureIdentityProfileMapping:before-upsert',message:'Identity profile upsert payload summary',data:{profileId:profile.id,attributeName,hasIdentityAttributeConfig,existingIndex,transformCount:transforms.length,nextTransformCount:nextTransforms.length,operation:hasIdentityAttributeConfig?'replace':'add',newTransformType:newTransform.transformDefinition.type,newTransformAttributeName:newTransform.transformDefinition.attributes.attributeName,newTransformSourceName:newTransform.transformDefinition.attributes.sourceName,hasSourceId:!!newTransform.transformDefinition.attributes.sourceId},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
 
             let updatedProfile: any
             try {
@@ -1652,9 +1635,6 @@ export class SourceService {
                     ConnectorErrorType.Generic
                 )
             }
-            // #region agent log
-            await fetch('http://127.0.0.1:7485/ingest/e6c4a850-ef71-49cc-b189-2148905b4372',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'64ec16'},body:JSON.stringify({sessionId:'64ec16',runId:profileDebugRunId,hypothesisId:'H6',location:'sourceService.ts:ensureIdentityProfileMapping:after-upsert',message:'Identity profile upsert result',data:{profileId:profile.id,updatedProfile:!!updatedProfile,returnedId:(updatedProfile as any)?.id ?? null},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
             if (!updatedProfile) {
                 throw new ConnectorError(
                     `Failed to update identity profile ${profile.id} for reverse correlation attribute "${attributeName}". ` +

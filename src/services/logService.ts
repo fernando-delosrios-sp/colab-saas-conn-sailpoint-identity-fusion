@@ -344,39 +344,18 @@ export class LogService {
         }
     }
 
-    /**
-     * Logs an informational message. Used for significant operational milestones.
-     * @param message - The log message
-     * @param data - Optional structured data to attach
-     */
     info(message: string, data?: any): void {
         this.log('info', message, data)
     }
 
-    /**
-     * Logs a debug message. Only output when log level is "debug".
-     * Used for detailed diagnostic information during development.
-     * @param message - The log message
-     * @param data - Optional structured data to attach
-     */
     debug(message: string, data?: any): void {
         this.log('debug', message, data)
     }
 
-    /**
-     * Logs a warning message. Used for recoverable issues that deserve attention.
-     * @param message - The log message
-     * @param data - Optional structured data to attach
-     */
     warn(message: string, data?: any): void {
         this.log('warn', message, data)
     }
 
-    /**
-     * Logs an error message. Used for failures that don't warrant an exception.
-     * @param message - The log message
-     * @param data - Optional structured data to attach
-     */
     error(message: string, data?: any): void {
         this.log('error', message, data)
     }
@@ -450,38 +429,23 @@ export class LogService {
         return new PhaseTimer(this)
     }
 
-    /**
-     * Gets the currently configured log level
-     */
     getLogLevel(): LogLevel {
         return this.configuredLevel
     }
 
-    /**
-     * Sets the log level at runtime
-     */
     setLogLevel(level: LogLevel): void {
         this.configuredLevel = level
         this.logger.level = level
     }
 
-    /**
-     * Gets the external logging level threshold
-     */
     getExternalLogLevel(): LogLevel {
         return this.externalLoggingLevel
     }
 
-    /**
-     * Sets the external logging level threshold at runtime
-     */
     setExternalLogLevel(level: LogLevel): void {
         this.externalLoggingLevel = level
     }
 
-    /**
-     * Checks if external logging is enabled
-     */
     isExternalLoggingEnabled(): boolean {
         return this.externalLoggingEnabled && !!this.externalLoggingUrl
     }

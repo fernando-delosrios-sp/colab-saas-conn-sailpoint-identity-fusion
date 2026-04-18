@@ -22,7 +22,7 @@ import {
 } from 'sailpoint-api-client'
 import { readNumber } from '../../utils/safeRead'
 import { createRetriesConfig } from './helpers'
-import { STATS_LOGGING_INTERVAL_MS } from './constants'
+import { STATS_LOGGING_INTERVAL_MS, SAILPOINT_LIST_MAX } from './constants'
 
 /**
  * ClientService provides a lean, centralized client for API operations.
@@ -138,87 +138,51 @@ export class ClientService {
     // -------------------------------------------------------------------------
 
     public get accountsApi(): AccountsV2025Api {
-        if (!this._accountsApi) {
-            this._accountsApi = new AccountsV2025Api(this.config)
-        }
-        return this._accountsApi
+        return (this._accountsApi ??= new AccountsV2025Api(this.config))
     }
 
     public get identitiesApi(): IdentitiesV2025Api {
-        if (!this._identitiesApi) {
-            this._identitiesApi = new IdentitiesV2025Api(this.config)
-        }
-        return this._identitiesApi
+        return (this._identitiesApi ??= new IdentitiesV2025Api(this.config))
     }
 
     public get searchApi(): SearchApi {
-        if (!this._searchApi) {
-            this._searchApi = new SearchApi(this.config)
-        }
-        return this._searchApi
+        return (this._searchApi ??= new SearchApi(this.config))
     }
 
     public get sourcesApi(): SourcesV2025Api {
-        if (!this._sourcesApi) {
-            this._sourcesApi = new SourcesV2025Api(this.config)
-        }
-        return this._sourcesApi
+        return (this._sourcesApi ??= new SourcesV2025Api(this.config))
     }
 
     public get customFormsApi(): CustomFormsV2025Api {
-        if (!this._customFormsApi) {
-            this._customFormsApi = new CustomFormsV2025Api(this.config)
-        }
-        return this._customFormsApi
+        return (this._customFormsApi ??= new CustomFormsV2025Api(this.config))
     }
 
     public get workflowsApi(): WorkflowsV2025Api {
-        if (!this._workflowsApi) {
-            this._workflowsApi = new WorkflowsV2025Api(this.config)
-        }
-        return this._workflowsApi
+        return (this._workflowsApi ??= new WorkflowsV2025Api(this.config))
     }
 
     public get entitlementsApi(): EntitlementsV2025Api {
-        if (!this._entitlementsApi) {
-            this._entitlementsApi = new EntitlementsV2025Api(this.config)
-        }
-        return this._entitlementsApi
+        return (this._entitlementsApi ??= new EntitlementsV2025Api(this.config))
     }
 
     public get transformsApi(): TransformsApi {
-        if (!this._transformsApi) {
-            this._transformsApi = new TransformsApi(this.config)
-        }
-        return this._transformsApi
+        return (this._transformsApi ??= new TransformsApi(this.config))
     }
 
     public get governanceGroupsApi(): GovernanceGroupsV2025Api {
-        if (!this._governanceGroupsApi) {
-            this._governanceGroupsApi = new GovernanceGroupsV2025Api(this.config)
-        }
-        return this._governanceGroupsApi
+        return (this._governanceGroupsApi ??= new GovernanceGroupsV2025Api(this.config))
     }
 
     public get taskManagementApi(): TaskManagementV2025Api {
-        if (!this._taskManagementApi) {
-            this._taskManagementApi = new TaskManagementV2025Api(this.config)
-        }
-        return this._taskManagementApi
+        return (this._taskManagementApi ??= new TaskManagementV2025Api(this.config))
     }
 
     public get identityProfilesApi(): IdentityProfilesV2025Api {
-        if (!this._identityProfilesApi) {
-            this._identityProfilesApi = new IdentityProfilesV2025Api(this.config)
-        }
-        return this._identityProfilesApi
+        return (this._identityProfilesApi ??= new IdentityProfilesV2025Api(this.config))
     }
 
     public get identityAttributesApi(): IdentityAttributesV2025Api {
-        if (!this._identityAttributesApi) {
-            this._identityAttributesApi = new IdentityAttributesV2025Api(this.config)
-        }
-        return this._identityAttributesApi
+        return (this._identityAttributesApi ??= new IdentityAttributesV2025Api(this.config))
     }
 
     /**
@@ -280,11 +244,12 @@ export class ClientService {
             }
 
             return await fn()
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Extract meaningful details from API errors (axios-style responses)
-            const status = error?.response?.status
-            const statusText = error?.response?.statusText
-            const apiMessage = error?.response?.data?.message || error?.response?.data?.detailCode
+            const err = error as { response?: { status?: number; statusText?: string; data?: { message?: string; detailCode?: string } } }
+            const status = err.response?.status
+            const statusText = err.response?.statusText
+            const apiMessage = err.response?.data?.message || err.response?.data?.detailCode
             const baseMessage = error instanceof Error ? error.message : String(error)
             let errorDetail = baseMessage
             if (status) {
@@ -330,7 +295,6 @@ export class ClientService {
         const pageSize = this.pageSize
         // SailPoint list endpoints (e.g. list-accounts) max 250/request; always pass explicit limit
         // to avoid API-default behavior that can stop pagination early (e.g. cap at 500).
-        const SAILPOINT_LIST_MAX = 250
         const effectivePageSize = Math.min(pageSize, SAILPOINT_LIST_MAX)
 
         const allItems: T[] = []
@@ -489,7 +453,7 @@ export class ClientService {
             sort: ['id'], // Ensure sort by id for searchAfter
         }
 
-        let searchAfter: any[] | undefined
+        let searchAfter: string[] | undefined
         let isFirstPage = true
         let hasMore = true
         let pageNum = 1
@@ -498,7 +462,7 @@ export class ClientService {
             if (abortSignal?.aborted) return
 
             const pageContext = context ? `${context} [page ${pageNum}]` : `search [page ${pageNum}]`
-            const response = await this.execute<any>(
+            const response = await this.execute<{ data: unknown[] }>(
                 () =>
                     this.searchApi.searchPost({
                         search: searchAfter ? { ...baseSearch, searchAfter } : baseSearch,
@@ -510,7 +474,7 @@ export class ClientService {
                 abortSignal
             )
 
-            const items = (response?.data || []) as T[]
+            const items = (response?.data ?? []) as T[]
             if (items.length > 0) {
                 yield items
             }
@@ -518,8 +482,7 @@ export class ClientService {
             if (items.length < pageSize) {
                 hasMore = false
             } else {
-                const lastItem: any = items[items.length - 1]
-                const lastId = lastItem?.id
+                const lastId = (items[items.length - 1] as { id?: string }).id
                 if (!lastId) {
                     hasMore = false
                 } else {
@@ -613,7 +576,6 @@ export class ClientService {
         limit?: number
     ): AsyncGenerator<T[], void, unknown> {
         const pageSize = this.pageSize
-        const SAILPOINT_LIST_MAX = 250
         const effectivePageSize = Math.min(pageSize, SAILPOINT_LIST_MAX)
         const batchSize = this.parallelBatchSize // Concurrent page requests (configurable)
 

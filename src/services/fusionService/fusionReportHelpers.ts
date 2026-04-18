@@ -41,10 +41,6 @@ export function getFusionIdentityConflictTrackingKey(fusionAccount: FusionAccoun
     return `name:${name}`
 }
 
-/**
- * User-facing account label for fusion report rows.
- * Prefer displayName/name, then fall back to uid-like identifiers.
- */
 /** Fusion candidate keys for report / dry-run rows (works after `fusionIdentity` refs are cleared). */
 export function fusionReportMatchCandidateAccountFields(match: FusionMatch): Pick<FusionReportMatch, 'accountId' | 'accountName'> {
     const fi = match.fusionIdentity

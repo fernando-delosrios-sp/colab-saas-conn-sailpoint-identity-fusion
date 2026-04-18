@@ -94,28 +94,24 @@ export function createThrottleConfig(requestsPerSecond?: number) {
 /**
  * Determine if an error should trigger a retry
  */
-export function shouldRetry(error: any): boolean {
+export function shouldRetry(error: unknown): boolean {
     if (!error) return false
+    const err = error as { response?: { status?: number }; code?: string }
 
     // Network errors
-    if (axiosRetry.isNetworkError(error) || axiosRetry.isRetryableError(error)) {
+    if (axiosRetry.isNetworkError(error as any) || axiosRetry.isRetryableError(error as any)) {
         return true
     }
 
     // Rate limiting
-    if (error.response?.status === 429) {
-        return true
-    }
+    if (err.response?.status === 429) return true
 
     // Server errors (5xx)
-    if (error.response?.status >= 500 && error.response?.status < 600) {
-        return true
-    }
+    const status = err.response?.status
+    if (status !== undefined && status >= 500 && status < 600) return true
 
     // Timeout errors
-    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-        return true
-    }
+    if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') return true
 
     return false
 }
@@ -125,10 +121,11 @@ export function shouldRetry(error: any): boolean {
  * For 429 responses, uses the retry-after header with jitter.
  * For other retryable errors, uses exponential backoff with a sensible base delay.
  */
-export function calculateRetryDelay(retryCount: number, error: any): number {
+export function calculateRetryDelay(retryCount: number, error: unknown): number {
+    const err = error as { response?: { status?: number; headers?: Record<string, string> } }
     // If 429, check for retry-after header and add jitter
-    if (error.response?.status === 429) {
-        const retryAfter = error.response.headers['retry-after']
+    if (err.response?.status === 429) {
+        const retryAfter = err.response.headers?.['retry-after']
         if (retryAfter) {
             const delay = parseInt(retryAfter, 10)
             if (!isNaN(delay)) {

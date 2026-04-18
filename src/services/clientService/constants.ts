@@ -42,3 +42,8 @@ export const MAX_STATS_SAMPLES = 1000
  * Queue processing check interval (in milliseconds)
  */
 export const QUEUE_PROCESSING_INTERVAL_MS = 10
+
+/**
+ * SailPoint list endpoint hard cap (items per request)
+ */
+export const SAILPOINT_LIST_MAX = 250

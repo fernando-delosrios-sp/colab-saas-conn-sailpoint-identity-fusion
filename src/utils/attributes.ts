@@ -100,7 +100,7 @@ export function setAttributeValue(
 /**
  * Checks if an attribute value is valid (not null, undefined, or empty string)
  */
-export function isValidAttributeValue(value: any): boolean {
+export function isValidAttributeValue(value: unknown): boolean {
     return value !== undefined && value !== null && value !== ''
 }
 

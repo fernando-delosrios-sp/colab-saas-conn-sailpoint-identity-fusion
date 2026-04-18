@@ -1,4 +1,5 @@
 import { Attributes } from '@sailpoint/connector-sdk'
+import { AttributeMap } from '../../model/config'
 import { AttributeMappingConfig } from './types'
 
 // ============================================================================
@@ -156,12 +157,9 @@ const processMultiValueMerge = (
 
     if (attributeMerge === 'list') {
         return uniqueSorted
-    } else if (attributeMerge === 'concatenate') {
-        // Pass true to skip redundant uniqueness filtering/sorting since we already did it above
-        return attrConcat(uniqueSorted, true)
     }
-
-    return undefined
+    // Pass true to skip redundant uniqueness filtering/sorting since we already did it above
+    return attrConcat(uniqueSorted, true)
 }
 
 /**
@@ -217,7 +215,7 @@ const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: strin
  */
 export const buildAttributeMappingConfig = (
     attributeName: string,
-    attributeMaps: any[] | undefined,
+    attributeMaps: AttributeMap[] | undefined,
     defaultAttributeMerge: 'first' | 'list' | 'concatenate'
 ): AttributeMappingConfig => {
     // Check if attribute has specific configuration in attributeMaps

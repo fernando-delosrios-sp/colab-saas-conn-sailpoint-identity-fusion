@@ -4,11 +4,47 @@ import { FusionAccount } from '../../model/account'
 import { SourceType } from '../../model/config'
 import { capitalizeFirst } from '../../utils/attributes'
 import { ALGORITHM_LABELS } from './constants'
-import { Candidate } from './types'
+import { Candidate, Score } from './types'
+
+// ============================================================================
+// Local Types
+// ============================================================================
+
+type ToggleConfig = {
+    label: string
+    default: boolean
+    trueLabel: string
+    falseLabel: string
+    helpText: string
+}
+
+type FormRule = {
+    sourceType: 'ELEMENT'
+    source: string
+    operator: 'EQ' | 'NE' | 'NOT_EM'
+    valueType: 'BOOLEAN' | 'STRING'
+    value: string
+}
+
+type FormEffect = {
+    effectType: 'DISABLE' | 'HIDE'
+    config: { element: string }
+}
+
+type FormCondition = {
+    ruleOperator: 'AND' | 'OR'
+    rules: FormRule[]
+    effects: FormEffect[]
+}
 
 // ============================================================================
 // Shared Helpers
 // ============================================================================
+
+const lowerFirst = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1)
+
+const getAttrValue = (attrs: Record<string, any> | undefined, name: string): string =>
+    String(attrs?.[name] ?? attrs?.[lowerFirst(name)] ?? '')
 
 function getManagedAccountIdentifier(fusionAccount: FusionAccount): string {
     const managedKey = String(fusionAccount.managedAccountId ?? '').trim()
@@ -24,13 +60,7 @@ function getManagedAccountIdentifier(fusionAccount: FusionAccount): string {
 /**
  * Formats match score rows for form defaults: Value (raw) and Score (weighted partial), or combined row.
  */
-function formatScoreDisplay(score: {
-    score?: number
-    fusionScore?: number
-    weightedScore?: number
-    skipped?: boolean
-    algorithm?: string
-}): string {
+function formatScoreDisplay(score: Score): string {
     if (score.skipped) return 'Skipped (missing value)'
     const algo = String(score.algorithm ?? '')
     if (algo === 'weighted-mean' || algo === 'average') {
@@ -58,12 +88,8 @@ function formatScoreDisplay(score: {
  * This keeps condition generation aligned with form field generation.
  */
 function hasRenderableCandidateElements(candidate: Candidate, fusionFormAttributes?: string[]): boolean {
-    const hasAttributes = Boolean(fusionFormAttributes && fusionFormAttributes.length > 0)
-    const hasScores = Boolean(
-        candidate.scores &&
-        Array.isArray(candidate.scores) &&
-        candidate.scores.some((score: any) => score && score.attribute && score.score !== undefined)
-    )
+    const hasAttributes = (fusionFormAttributes?.length ?? 0) > 0
+    const hasScores = candidate.scores.some((score) => score.attribute != null && score.score !== undefined)
     return hasAttributes || hasScores
 }
 
@@ -71,7 +97,7 @@ function hasRenderableCandidateElements(candidate: Candidate, fusionFormAttribut
  * Returns the TOGGLE element config for the "New identity" / "No match" decision,
  * which varies by source type.
  */
-function getToggleConfig(sourceType: SourceType): Record<string, any> {
+function getToggleConfig(sourceType: SourceType): ToggleConfig {
     if (sourceType === SourceType.Authoritative) {
         return {
             label: 'New identity',
@@ -105,10 +131,7 @@ export const buildFormInput = (
     candidates: Candidate[],
     fusionFormAttributes?: string[],
     sourceType: SourceType = SourceType.Authoritative
-): Record<string, any> => {
-    const formInput: Record<string, any> = {}
-    formInput.sourceType = sourceType
-
+): Record<string, string> => {
     const managedAccountIdentifier = getManagedAccountIdentifier(fusionAccount)
 
     // NOTE: formInput must match the form definition input types.
@@ -130,56 +153,48 @@ export const buildFormInput = (
             `[formBuilder] Missing identityDisplayName/name for fusion account. Using managed account key fallback: ${managedAccountIdentifier}`
         )
     }
-    // `name` is used downstream in reports and decision history messages; prefer human-friendly display labels.
-    formInput.name = preferredAccountLabel
-    formInput.account = managedAccountIdentifier
-    formInput.source = fusionAccount.sourceName
+
+    const formInput: Record<string, string> = {
+        sourceType,
+        // `name` is used downstream in reports and decision history messages; prefer human-friendly display labels.
+        name: preferredAccountLabel,
+        account: managedAccountIdentifier,
+        source: fusionAccount.sourceName ?? '',
+        // Keep as string for newIdentity to align with TOGGLE element.
+        newIdentity: 'false',
+        // Store candidate identity IDs for tracking candidate status on subsequent aggregations.
+        // This allows extracting candidate IDs from pending form instances without parsing keys.
+        candidates: candidates.map((c) => c.id).join(','),
+    }
+
     // Persist correlated identity reference for downstream resolution (reports/history),
     // even when identity layer is not in scope at decision processing time.
     if (fusionAccount.identityId) {
         formInput.identityId = fusionAccount.identityId
     }
-    // Defaults for interactive decision fields
-    // Keep as string for newIdentity to align with TOGGLE element.
-    formInput.newIdentity = 'false'
 
     // New identity attributes (flat keys for form elements)
-    if (fusionFormAttributes && fusionFormAttributes.length > 0) {
-        fusionFormAttributes.forEach((attrName) => {
-            const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
-            const attrValue = fusionAccount.attributes?.[attrName] || fusionAccount.attributes?.[attrKey] || ''
-            formInput[`newidentity.${attrKey}`] = String(attrValue)
-        })
-    }
-
-    // Store candidate identity IDs for tracking candidate status on subsequent aggregations.
-    // This allows extracting candidate IDs from pending form instances without parsing keys.
-    formInput.candidates = candidates.map((c) => c.id).join(',')
+    fusionFormAttributes?.forEach((attrName) => {
+        formInput[`newidentity.${lowerFirst(attrName)}`] = getAttrValue(fusionAccount.attributes, attrName)
+    })
 
     // Candidate attributes and scores (flat keys for form elements)
-    candidates.forEach((candidate) => {
-        if (!candidate || !candidate.id) return
+    for (const candidate of candidates) {
+        if (!candidate?.id) continue
         const candidateId = candidate.id
 
-        if (fusionFormAttributes && fusionFormAttributes.length > 0) {
-            fusionFormAttributes.forEach((attrName) => {
-                const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
-                const attrValue = candidate.attributes?.[attrName] || candidate.attributes?.[attrKey] || ''
-                formInput[`${candidateId}.${attrKey}`] = String(attrValue)
-            })
-        }
+        fusionFormAttributes?.forEach((attrName) => {
+            formInput[`${candidateId}.${lowerFirst(attrName)}`] = getAttrValue(candidate.attributes, attrName)
+        })
 
-        if (candidate.scores && Array.isArray(candidate.scores) && candidate.scores.length > 0) {
-            candidate.scores.forEach((score: any) => {
-                if (!score || typeof score !== 'object') return
-                if (score.attribute && score.score !== undefined) {
-                    const attrKey = String(score.attribute).charAt(0).toLowerCase() + String(score.attribute).slice(1)
-                    const algorithmKey = String(score.algorithm ?? 'unknown')
-                    formInput[`${candidateId}.${attrKey}.${algorithmKey}.score`] = formatScoreDisplay(score)
-                }
-            })
+        for (const score of candidate.scores) {
+            if (score.attribute && score.score !== undefined) {
+                const attrKey = lowerFirst(String(score.attribute))
+                const algorithmKey = String(score.algorithm ?? 'unknown')
+                formInput[`${candidateId}.${attrKey}.${algorithmKey}.score`] = formatScoreDisplay(score)
+            }
         }
-    })
+    }
 
     return formInput
 }
@@ -197,23 +212,20 @@ export const buildFormFields = (
 
     // Top section: Fusion review required header
     const topSectionElements: FormElementV2025[] = []
-    if (fusionFormAttributes && fusionFormAttributes.length > 0) {
-        fusionFormAttributes.forEach((attrName) => {
-            const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
-            const attrValue = fusionAccount.attributes?.[attrName] ?? fusionAccount.attributes?.[attrKey] ?? ''
-            topSectionElements.push({
-                id: `newidentity.${attrKey}`,
-                key: `newidentity.${attrKey}`,
-                elementType: 'TEXT',
-                config: {
-                    label: capitalizeFirst(attrName),
-                    // Prefill visible values at definition-time so instances don't render blank.
-                    default: String(attrValue),
-                },
-                validations: [],
-            })
+    fusionFormAttributes?.forEach((attrName) => {
+        const attrKey = lowerFirst(attrName)
+        topSectionElements.push({
+            id: `newidentity.${attrKey}`,
+            key: `newidentity.${attrKey}`,
+            elementType: 'TEXT',
+            config: {
+                label: capitalizeFirst(attrName),
+                // Prefill visible values at definition-time so instances don't render blank.
+                default: getAttrValue(fusionAccount.attributes, attrName),
+            },
+            validations: [],
         })
-    }
+    })
 
     if (topSectionElements.length > 0) {
         const sectionDescriptions: Record<SourceType, string> = {
@@ -242,8 +254,7 @@ export const buildFormFields = (
     }
 
     // Build search query for identities: id:xxx OR id:yyy OR id:zzz
-    const identityIds = candidates.map((candidate) => candidate.id)
-    const identitySearchQuery = identityIds.map((id) => `id:${id}`).join(' OR ')
+    const identitySearchQuery = candidates.map((c) => `id:${c.id}`).join(' OR ')
 
     // Fusion decision section: New identity toggle and identities select in a COLUMN_SET
     formFields.push({
@@ -313,39 +324,28 @@ export const buildFormFields = (
     })
 
     // Candidate sections: one per candidate
-    candidates.forEach((candidate) => {
-        if (!candidate || !candidate.id || !candidate.name) return
+    for (const candidate of candidates) {
+        if (!candidate?.id || !candidate.name) continue
         const candidateId = candidate.id
-
-        // Validate that candidate has displayName for form conditions
-        if (!candidate.name) {
-            logger.error(
-                `[formBuilder] Candidate ${candidateId} is missing name/displayName. This may cause form condition issues.`
-            )
-        }
-
         const candidateElements: FormElementV2025[] = []
 
-        if (fusionFormAttributes && fusionFormAttributes.length > 0) {
-            fusionFormAttributes.forEach((attrName) => {
-                const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
-                const attrValue = candidate.attributes?.[attrName] ?? candidate.attributes?.[attrKey] ?? ''
-                candidateElements.push({
-                    id: `${candidateId}.${attrKey}`,
-                    key: `${candidateId}.${attrKey}`,
-                    elementType: 'TEXT',
-                    config: {
-                        label: capitalizeFirst(attrName),
-                        default: String(attrValue),
-                    },
-                    validations: [],
-                })
+        fusionFormAttributes?.forEach((attrName) => {
+            const attrKey = lowerFirst(attrName)
+            candidateElements.push({
+                id: `${candidateId}.${attrKey}`,
+                key: `${candidateId}.${attrKey}`,
+                elementType: 'TEXT',
+                config: {
+                    label: capitalizeFirst(attrName),
+                    default: getAttrValue(candidate.attributes, attrName),
+                },
+                validations: [],
             })
-        }
+        })
 
         // Add score details header and individual score display fields per check
         // Each field shows: label = "AttributeName", helpText = "Algorithm", value = "Score: X [Y]"
-        if (candidate.scores && Array.isArray(candidate.scores) && candidate.scores.length > 0) {
+        if (candidate.scores.length > 0) {
             candidateElements.push({
                 id: `${candidateId}.scoreDetailsHeader`,
                 key: `${candidateId}.scoreDetailsHeader`,
@@ -359,27 +359,25 @@ export const buildFormFields = (
                 validations: [],
             })
 
-            candidate.scores.forEach((score: any) => {
-                if (!score || typeof score !== 'object') return
-                if (score.attribute && score.score !== undefined) {
-                    const attrName = String(score.attribute)
-                    const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
-                    const algorithmKey = String(score.algorithm ?? 'unknown')
-                    const algorithm = ALGORITHM_LABELS[algorithmKey] ?? algorithmKey
+            for (const score of candidate.scores) {
+                if (!score.attribute || score.score === undefined) continue
+                const attrName = String(score.attribute)
+                const attrKey = lowerFirst(attrName)
+                const algorithmKey = String(score.algorithm ?? 'unknown')
+                const algorithm = ALGORITHM_LABELS[algorithmKey] ?? algorithmKey
 
-                    candidateElements.push({
-                        id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
-                        key: `${candidateId}.${attrKey}.${algorithmKey}.score`,
-                        elementType: 'TEXT',
-                        config: {
-                            label: capitalizeFirst(attrName),
-                            helpText: algorithm,
-                            default: formatScoreDisplay(score),
-                        },
-                        validations: [],
-                    })
-                }
-            })
+                candidateElements.push({
+                    id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
+                    key: `${candidateId}.${attrKey}.${algorithmKey}.score`,
+                    elementType: 'TEXT',
+                    config: {
+                        label: capitalizeFirst(attrName),
+                        helpText: algorithm,
+                        default: formatScoreDisplay(score),
+                    },
+                    validations: [],
+                })
+            }
         }
 
         if (candidateElements.length > 0) {
@@ -397,7 +395,7 @@ export const buildFormFields = (
                 validations: [],
             })
         }
-    })
+    }
 
     return formFields
 }
@@ -409,17 +407,14 @@ export const buildFormFields = (
  * 2. When newIdentity is true OR identities is not this candidate → HIDE that candidate's selection section.
  * 3. When newIdentity is false AND identities is empty → DISABLE all attribute fields (to prevent interaction before decision).
  */
-export const buildFormConditions = (candidates: Candidate[], fusionFormAttributes?: string[]): any[] => {
-    const formConditions: any[] = []
+export const buildFormConditions = (candidates: Candidate[], fusionFormAttributes?: string[]): FormCondition[] => {
+    if (!Array.isArray(candidates)) return []
 
-    // Validate inputs to prevent malformed conditions
-    if (!candidates || !Array.isArray(candidates)) {
-        return formConditions
-    }
+    const formConditions: FormCondition[] = []
 
-    candidates.forEach((candidate) => {
-        if (!candidate || !candidate.id || !candidate.name) return
-        if (!hasRenderableCandidateElements(candidate, fusionFormAttributes)) return
+    for (const candidate of candidates) {
+        if (!candidate?.id || !candidate.name) continue
+        if (!hasRenderableCandidateElements(candidate, fusionFormAttributes)) continue
         const selectionSectionId = `${candidate.id}.selectionsection`
 
         // When "New identity" is selected, disable this candidate's details section
@@ -437,9 +432,7 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
             effects: [
                 {
                     effectType: 'DISABLE',
-                    config: {
-                        element: selectionSectionId,
-                    },
+                    config: { element: selectionSectionId },
                 },
             ],
         })
@@ -468,53 +461,42 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
             effects: [
                 {
                     effectType: 'HIDE',
-                    config: {
-                        element: selectionSectionId,
-                    },
+                    config: { element: selectionSectionId },
                 },
             ],
         })
-    })
+    }
 
     // Disable every element (except newIdentity and identities) if it is not empty.
     // Each element gets a self-referencing condition: if element X is NOT_EM → disable element X.
     const allAttributeElements: string[] = []
 
     // Collect new identity attribute fields
-    if (fusionFormAttributes && fusionFormAttributes.length > 0) {
-        fusionFormAttributes.forEach((attrName) => {
-            const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
-            allAttributeElements.push(`newidentity.${attrKey}`)
-        })
-    }
-
-    // Collect candidate attribute and score fields
-    candidates.forEach((candidate) => {
-        if (!candidate || !candidate.id || !candidate.name) return
-        if (!hasRenderableCandidateElements(candidate, fusionFormAttributes)) return
-        const candidateId = candidate.id
-
-        if (fusionFormAttributes && fusionFormAttributes.length > 0) {
-            fusionFormAttributes.forEach((attrName) => {
-                const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
-                allAttributeElements.push(`${candidateId}.${attrKey}`)
-            })
-        }
-
-        // Score fields
-        if (candidate.scores && Array.isArray(candidate.scores)) {
-            candidate.scores.forEach((score: any) => {
-                if (score && score.attribute) {
-                    const attrKey = String(score.attribute).charAt(0).toLowerCase() + String(score.attribute).slice(1)
-                    const algorithmKey = String(score.algorithm ?? 'unknown')
-                    allAttributeElements.push(`${candidateId}.${attrKey}.${algorithmKey}.score`)
-                }
-            })
-        }
+    fusionFormAttributes?.forEach((attrName) => {
+        allAttributeElements.push(`newidentity.${lowerFirst(attrName)}`)
     })
 
+    // Collect candidate attribute and score fields
+    for (const candidate of candidates) {
+        if (!candidate?.id || !candidate.name) continue
+        if (!hasRenderableCandidateElements(candidate, fusionFormAttributes)) continue
+        const candidateId = candidate.id
+
+        fusionFormAttributes?.forEach((attrName) => {
+            allAttributeElements.push(`${candidateId}.${lowerFirst(attrName)}`)
+        })
+
+        for (const score of candidate.scores) {
+            if (score.attribute) {
+                const attrKey = lowerFirst(String(score.attribute))
+                const algorithmKey = String(score.algorithm ?? 'unknown')
+                allAttributeElements.push(`${candidateId}.${attrKey}.${algorithmKey}.score`)
+            }
+        }
+    }
+
     // For each element: if it has a value, disable it
-    allAttributeElements.forEach((elementId) => {
+    for (const elementId of allAttributeElements) {
         formConditions.push({
             ruleOperator: 'AND',
             rules: [
@@ -529,13 +511,11 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
             effects: [
                 {
                     effectType: 'DISABLE',
-                    config: {
-                        element: elementId,
-                    },
+                    config: { element: elementId },
                 },
             ],
         })
-    })
+    }
 
     return formConditions
 }
@@ -548,8 +528,6 @@ export const buildFormInputs = (
     candidates: Candidate[],
     fusionFormAttributes?: string[]
 ): FormDefinitionInputV2025[] => {
-    const formInputs: FormDefinitionInputV2025[] = []
-
     const managedAccountIdentifier = getManagedAccountIdentifier(fusionAccount)
 
     // Account info
@@ -559,38 +537,40 @@ export const buildFormInputs = (
             `[formBuilder] Missing identityDisplayName/name for fusion account in form inputs. Using managed account key fallback: ${managedAccountIdentifier}`
         )
     }
-    formInputs.push({
-        id: 'name',
-        type: 'STRING',
-        label: 'name',
-        description:
-            fusionAccount.identityDisplayName ||
-            fusionAccount.name ||
-            fusionAccount.displayName ||
-            managedAccountIdentifier,
-    })
-    formInputs.push({
-        id: 'account',
-        type: 'STRING',
-        label: 'account',
-        description: managedAccountIdentifier,
-    })
-    formInputs.push({
-        id: 'source',
-        type: 'STRING',
-        label: 'source',
-        description: fusionAccount.sourceName,
-    })
 
-    // Decision inputs (bound to interactive elements)
-    // NOTE: SDK only supports STRING / ARRAY for definition inputs. Toggle still binds to this key.
-    // SELECT elements with dataSource don't need an input definition - they populate dynamically.
-    formInputs.push({
-        id: 'newIdentity',
-        type: 'STRING',
-        label: 'newIdentity',
-        description: 'false',
-    })
+    const formInputs: FormDefinitionInputV2025[] = [
+        {
+            id: 'name',
+            type: 'STRING',
+            label: 'name',
+            description:
+                fusionAccount.identityDisplayName ||
+                fusionAccount.name ||
+                fusionAccount.displayName ||
+                managedAccountIdentifier,
+        },
+        {
+            id: 'account',
+            type: 'STRING',
+            label: 'account',
+            description: managedAccountIdentifier,
+        },
+        {
+            id: 'source',
+            type: 'STRING',
+            label: 'source',
+            description: fusionAccount.sourceName,
+        },
+        // NOTE: SDK only supports STRING / ARRAY for definition inputs. Toggle still binds to this key.
+        // SELECT elements with dataSource don't need an input definition - they populate dynamically.
+        {
+            id: 'newIdentity',
+            type: 'STRING',
+            label: 'newIdentity',
+            description: 'false',
+        },
+    ]
+
     if (fusionAccount.identityId) {
         formInputs.push({
             id: 'identityId',
@@ -601,54 +581,43 @@ export const buildFormInputs = (
     }
 
     // New identity attributes
-    if (fusionFormAttributes && fusionFormAttributes.length > 0) {
-        fusionFormAttributes.forEach((attrName) => {
-            const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
-            const attrValue = fusionAccount.attributes?.[attrName] || fusionAccount.attributes?.[attrKey] || ''
-            formInputs.push({
-                id: `newidentity.${attrKey}`,
-                type: 'STRING',
-                label: `newidentity.${attrKey}`,
-                description: String(attrValue),
-            })
+    fusionFormAttributes?.forEach((attrName) => {
+        const attrKey = lowerFirst(attrName)
+        formInputs.push({
+            id: `newidentity.${attrKey}`,
+            type: 'STRING',
+            label: `newidentity.${attrKey}`,
+            description: getAttrValue(fusionAccount.attributes, attrName),
         })
-    }
+    })
 
     // Candidate attributes and scores
-    candidates.forEach((candidate) => {
-        if (!candidate || !candidate.id) return
+    for (const candidate of candidates) {
+        if (!candidate?.id) continue
         const candidateId = candidate.id
 
-        if (fusionFormAttributes && fusionFormAttributes.length > 0) {
-            fusionFormAttributes.forEach((attrName) => {
-                const attrKey = attrName.charAt(0).toLowerCase() + attrName.slice(1)
-                const attrValue = candidate.attributes?.[attrName] || candidate.attributes?.[attrKey] || ''
-                formInputs.push({
-                    id: `${candidateId}.${attrKey}`,
-                    type: 'STRING',
-                    label: `${candidateId}.${attrKey}`,
-                    description: String(attrValue),
-                })
+        fusionFormAttributes?.forEach((attrName) => {
+            const attrKey = lowerFirst(attrName)
+            formInputs.push({
+                id: `${candidateId}.${attrKey}`,
+                type: 'STRING',
+                label: `${candidateId}.${attrKey}`,
+                description: getAttrValue(candidate.attributes, attrName),
+            })
+        })
+
+        for (const score of candidate.scores) {
+            if (!score.attribute || score.score === undefined) continue
+            const attrKey = lowerFirst(String(score.attribute))
+            const algorithmKey = String(score.algorithm ?? 'unknown')
+            formInputs.push({
+                id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
+                type: 'STRING',
+                label: `${candidateId}.${attrKey}.${algorithmKey}.score`,
+                description: formatScoreDisplay(score),
             })
         }
-
-        if (candidate.scores && Array.isArray(candidate.scores) && candidate.scores.length > 0) {
-            candidate.scores.forEach((score: any) => {
-                if (!score || typeof score !== 'object') return
-                if (score.attribute && score.score !== undefined) {
-                    const attrKey = String(score.attribute).charAt(0).toLowerCase() + String(score.attribute).slice(1)
-                    const algorithmKey = String(score.algorithm ?? 'unknown')
-
-                    formInputs.push({
-                        id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
-                        type: 'STRING',
-                        label: `${candidateId}.${attrKey}.${algorithmKey}.score`,
-                        description: formatScoreDisplay(score),
-                    })
-                }
-            })
-        }
-    })
+    }
 
     return formInputs
 }

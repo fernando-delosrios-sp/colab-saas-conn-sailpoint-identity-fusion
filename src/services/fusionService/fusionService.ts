@@ -1189,19 +1189,7 @@ export class FusionService {
         const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
 
         if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
-            const fusionAccount = await this.preProcessManagedAccount(account)
-            if (sourceType !== SourceType.Authoritative) {
-                this.log.debug(
-                    `Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`
-                )
-                if (sourceType === SourceType.Record) {
-                    await this.attributes.registerUniqueAttributes(fusionAccount)
-                } else if (sourceType === SourceType.Orphan && sourceInfo?.config?.disableNonMatchingAccounts) {
-                    this.queueDisableOperation(account)
-                }
-                return undefined
-            }
-            return await this.finalizeAuthoritativeUnmatched(fusionAccount)
+            return this.handleNoReviewerAccount(account, sourceType, sourceInfo)
         }
 
         const fusionAccount = await this.analyzeManagedAccount(account)
@@ -1209,86 +1197,25 @@ export class FusionService {
         const hasNewUnmatchedPeerMatches = this.hasNewUnmatchedPeerMatches(fusionAccount)
 
         if (hasIdentityBackedMatches) {
-            const perfectMatch = fusionAccount.fusionMatches.find((m) => FusionService.hasAllAttributeScoresPerfect(m))
-            const identityId = perfectMatch?.identityId
-            if (this.config.fusionMergingExactMatch && identityId) {
-                if (this.commandType !== StandardCommand.StdAccountList) {
-                    // Analysis-only runs (e.g. custom:dryrun): keep match report data but do not
-                    // register decisions or mutate fusion state as in a real aggregation.
-                    this.flagCandidatesWithStatus(fusionAccount)
-                    fusionAccount.clearFusionIdentityReferences()
-                    return undefined
-                }
-                this.removeMatchAccount(fusionAccount.managedAccountId)
-                this.log.debug(
-                    `Account ${account.name} [${fusionAccount.sourceName}] has all scores 100, automatic assignment to identity ${identityId}`
-                )
-                // Prevent subsequent managed accounts from scoring against this identity
-                this.autoAssignedIdentityIds.add(identityId)
-                const syntheticDecision = this.createAutomaticAssignmentDecision(fusionAccount, account, identityId)
-                this.forms.registerFinishedDecision(syntheticDecision)
-                return await this.processFusionIdentityDecision(syntheticDecision)
-            } else {
-                assert(sourceInfo, 'Source info not found')
-                const reviewers = this.reviewersBySourceId.get(sourceInfo.id!)
-                if (this.commandType !== StandardCommand.StdAccountList) {
-                    this.flagCandidatesWithStatus(fusionAccount)
-                    fusionAccount.clearFusionIdentityReferences()
-                    return undefined
-                }
-                try {
-                    const formCreated = await this.forms.createFusionForm(fusionAccount, reviewers)
-                    if (!formCreated) {
-                        const matchCount = fusionAccount.fusionMatches.length
-                        const maxForm = this.config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
-                        if (!reviewers || reviewers.size === 0) {
-                            this.trackFailedMatching(
-                                fusionAccount,
-                                'Match review form was not created: no reviewers available for this source'
-                            )
-                        } else {
-                            this.trackFailedMatching(
-                                fusionAccount,
-                                `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
-                            )
-                        }
-                    }
-                } catch (error) {
-                    const message = error instanceof Error ? error.message : String(error)
-                    this.trackFailedMatching(fusionAccount, `Form creation failed: ${message}`)
-                }
+            // Analysis-only runs (e.g. custom:dryrun): keep match report data but do not
+            // register decisions or mutate fusion state as in a real aggregation.
+            if (this.commandType !== StandardCommand.StdAccountList) {
                 this.flagCandidatesWithStatus(fusionAccount)
                 fusionAccount.clearFusionIdentityReferences()
                 return undefined
             }
-        } else if (hasNewUnmatchedPeerMatches) {
-            const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'new-unmatched')
-            const { headline, summary } = FusionService.formatFusionMatchDiscoveryLog(deferredMatches, true)
-            this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}; skipping account for now`)
-            this.removeManagedAccountFromWorkQueue(account)
-            return undefined
-        } else {
-            // Non-match handling varies by source type
-            if (sourceType === SourceType.Record) {
-                await this.attributes.registerUniqueAttributes(fusionAccount)
-                return undefined
+            const perfectMatch = fusionAccount.fusionMatches.find((m) => FusionService.hasAllAttributeScoresPerfect(m))
+            if (this.config.fusionMergingExactMatch && perfectMatch?.identityId) {
+                return this.handleExactMatch(fusionAccount, account, perfectMatch.identityId)
             }
-
-            if (sourceType === SourceType.Orphan) {
-                if (sourceInfo?.config?.disableNonMatchingAccounts) {
-                    this.queueDisableOperation(account)
-                }
-                return undefined
-            }
-
-            // authoritative (default)
-            await this.finalizeAuthoritativeUnmatched(fusionAccount)
-            const mk = getManagedAccountKeyFromAccount(account)
-            this.log.debug(
-                `Registered managed account as fusion account: ${account.name} [${account.sourceName}] (${mk ?? 'no-key'})`
-            )
-            return fusionAccount
+            return this.handlePartialMatch(fusionAccount, sourceInfo)
         }
+
+        if (hasNewUnmatchedPeerMatches) {
+            return this.handleDeferredMatch(fusionAccount, account)
+        }
+
+        return this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
     }
 
     /**
@@ -1330,6 +1257,100 @@ export class FusionService {
             finished: true,
             automaticAssignment: true,
         }
+    }
+
+    private async handleNoReviewerAccount(
+        account: Account,
+        sourceType: SourceType,
+        sourceInfo: SourceInfo | undefined
+    ): Promise<FusionAccount | undefined> {
+        const fusionAccount = await this.preProcessManagedAccount(account)
+        if (sourceType !== SourceType.Authoritative) {
+            this.log.debug(
+                `Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`
+            )
+            if (sourceType === SourceType.Record) {
+                await this.attributes.registerUniqueAttributes(fusionAccount)
+            } else if (sourceType === SourceType.Orphan && sourceInfo?.config?.disableNonMatchingAccounts) {
+                this.queueDisableOperation(account)
+            }
+            return undefined
+        }
+        return this.finalizeAuthoritativeUnmatched(fusionAccount)
+    }
+
+    private async handleExactMatch(
+        fusionAccount: FusionAccount,
+        account: Account,
+        identityId: string
+    ): Promise<FusionAccount | undefined> {
+        this.removeMatchAccount(fusionAccount.managedAccountId)
+        this.log.debug(
+            `Account ${account.name} [${fusionAccount.sourceName}] has all scores 100, automatic assignment to identity ${identityId}`
+        )
+        // Prevent subsequent managed accounts from scoring against this identity
+        this.autoAssignedIdentityIds.add(identityId)
+        const syntheticDecision = this.createAutomaticAssignmentDecision(fusionAccount, account, identityId)
+        this.forms.registerFinishedDecision(syntheticDecision)
+        return this.processFusionIdentityDecision(syntheticDecision)
+    }
+
+    private async handlePartialMatch(
+        fusionAccount: FusionAccount,
+        sourceInfo: SourceInfo | undefined
+    ): Promise<undefined> {
+        assert(sourceInfo, 'Source info not found')
+        const reviewers = this.reviewersBySourceId.get(sourceInfo.id!)
+        try {
+            const formCreated = await this.forms.createFusionForm(fusionAccount, reviewers)
+            if (!formCreated) {
+                const matchCount = fusionAccount.fusionMatches.length
+                const maxForm = this.config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
+                const message =
+                    !reviewers || reviewers.size === 0
+                        ? 'Match review form was not created: no reviewers available for this source'
+                        : `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
+                this.trackFailedMatching(fusionAccount, message)
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            this.trackFailedMatching(fusionAccount, `Form creation failed: ${message}`)
+        }
+        this.flagCandidatesWithStatus(fusionAccount)
+        fusionAccount.clearFusionIdentityReferences()
+        return undefined
+    }
+
+    private handleDeferredMatch(fusionAccount: FusionAccount, account: Account): undefined {
+        const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'new-unmatched')
+        const { headline, summary } = FusionService.formatFusionMatchDiscoveryLog(deferredMatches, true)
+        this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}; skipping account for now`)
+        this.removeManagedAccountFromWorkQueue(account)
+        return undefined
+    }
+
+    private async handleNonMatch(
+        fusionAccount: FusionAccount,
+        account: Account,
+        sourceType: SourceType,
+        sourceInfo: SourceInfo | undefined
+    ): Promise<FusionAccount | undefined> {
+        if (sourceType === SourceType.Record) {
+            await this.attributes.registerUniqueAttributes(fusionAccount)
+            return undefined
+        }
+        if (sourceType === SourceType.Orphan) {
+            if (sourceInfo?.config?.disableNonMatchingAccounts) {
+                this.queueDisableOperation(account)
+            }
+            return undefined
+        }
+        await this.finalizeAuthoritativeUnmatched(fusionAccount)
+        const mk = getManagedAccountKeyFromAccount(account)
+        this.log.debug(
+            `Registered managed account as fusion account: ${account.name} [${account.sourceName}] (${mk ?? 'no-key'})`
+        )
+        return fusionAccount
     }
 
     /**

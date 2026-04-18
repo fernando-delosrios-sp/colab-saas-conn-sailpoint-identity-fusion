@@ -2,6 +2,15 @@
 // Type Definitions
 // ============================================================================
 
+export type Score = {
+    attribute?: string
+    score?: number
+    fusionScore?: number
+    weightedScore?: number
+    skipped?: boolean
+    algorithm?: string
+}
+
 /**
  * Candidate identity structure for form building
  */
@@ -9,7 +18,7 @@ export type Candidate = {
     id: string
     name: string
     attributes: Record<string, any>
-    scores: any[]
+    scores: Score[]
 }
 
 export type PendingReviewFormContext = {

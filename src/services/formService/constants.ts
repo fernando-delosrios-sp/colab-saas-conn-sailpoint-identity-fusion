@@ -1,8 +1,4 @@
 /**
- * FormService constants
- */
-
-/**
  * Friendly algorithm names (aligned with connector-spec.json)
  */
 export const ALGORITHM_LABELS: Record<string, string> = {
