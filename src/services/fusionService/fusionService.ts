@@ -1107,7 +1107,7 @@ export class FusionService {
         this.currentRunMatchScoringMs = 0
         const initialQueueSize = map.size
         this.log.info(
-            `Processing managed accounts: analyzing ${initialQueueSize} uncorrelated managed account(s) from the work queue (matching and scoring vs identities)`
+            `Processing ${initialQueueSize} managed account(s): analyzing uncorrelated work-queue entries (matching and scoring vs identities)`
         )
         let processed = 0
         const yieldEveryManaged = this.managedAccountEventLoopYieldEvery()
@@ -1177,7 +1177,7 @@ export class FusionService {
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
-        if (!account.uncorrelated) {
+        if (account.uncorrelated === false) {
             this.log.info(
                 `Dropping correlated managed account from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
             )
