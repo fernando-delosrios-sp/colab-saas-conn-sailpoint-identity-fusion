@@ -238,7 +238,7 @@ Configure **Attribute Matching Settings → Review Settings** for the manual rev
 | **Owner is global reviewer?**                      | Add Fusion source owner to all review forms | Yes (ensures at least one reviewer)                           |
 | **Send report to owner on aggregation?**           | Email report after each aggregation         | Yes (useful for monitoring)                                   |
 
-> **Note:** The maximum number of candidate identities shown on a single review form is controlled by **Max match candidates per review form** in **Advanced Settings → Developer Settings** (default is 10, max 15). Only the highest-scoring potential matches are included if the limit is exceeded.
+> **Note:** The maximum number of candidate identities shown on a single review form is controlled by **Max match candidates per review form** in **Advanced Settings → Developer Settings** (default is 3, max 15). Only the highest-scoring potential matches are included if the limit is exceeded.
 
 ### What the aggregation report includes
 

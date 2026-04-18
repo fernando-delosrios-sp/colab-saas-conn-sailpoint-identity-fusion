@@ -3,7 +3,7 @@ import { IdentityDocument, OwnerDto } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
-import { FusionMatch } from '../scoringService/types'
+import { FusionMatch, MatchCandidateType } from '../scoringService/types'
 import { Candidate } from './types'
 import { FUSION_MAX_CANDIDATES_FOR_FORM_MAX } from './constants'
 
@@ -65,6 +65,18 @@ const compareMatchesForForm = (a: FusionMatch, b: FusionMatch): number => {
     const ida = String(a.fusionIdentity?.identityId ?? a.identityId ?? '')
     const idb = String(b.fusionIdentity?.identityId ?? b.identityId ?? '')
     return ida.localeCompare(idb)
+}
+
+/** Matches counted toward the review-form cap (excludes deferred same-run peer candidates). */
+export const countIdentityBackedFusionMatches = (matches: readonly FusionMatch[] | undefined): number => {
+    if (!matches) return 0
+    let n = 0
+    for (const m of matches) {
+        if ((m.candidateType ?? MatchCandidateType.Identity) === MatchCandidateType.Identity) {
+            n += 1
+        }
+    }
+    return n
 }
 
 /**

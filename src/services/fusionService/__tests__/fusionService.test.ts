@@ -426,6 +426,7 @@ describe('FusionService', () => {
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
+                uncorrelated: true,
             } as Account
             const secondAccount = {
                 id: 'acct-seq-2',
@@ -434,6 +435,7 @@ describe('FusionService', () => {
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
+                uncorrelated: true,
             } as Account
 
             const workQueue = new Map([
@@ -502,7 +504,12 @@ describe('FusionService', () => {
             await fusionService.analyzeManagedAccount(mockManagedAccount)
 
             expect(mockScoring.scoreFusionAccount).toHaveBeenCalledTimes(1)
-            expect(mockScoring.scoreFusionAccount).toHaveBeenCalledWith(expect.any(FusionAccount), expect.anything(), 'identity')
+            expect(mockScoring.scoreFusionAccount).toHaveBeenCalledWith(
+                expect.any(FusionAccount),
+                expect.anything(),
+                'identity',
+                3
+            )
         })
 
         it('skips Match scoring for record sources when includeRecordAccountsForMatching is false', async () => {
@@ -564,6 +571,7 @@ describe('FusionService', () => {
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
+                uncorrelated: true,
             } as Account
 
                 ; (fusionService as any).sourcesByName.set('Source A', {
@@ -740,6 +748,7 @@ describe('FusionService', () => {
                 sourceId: 'src-nerm',
                 sourceName: 'NERM',
                 attributes: {},
+                uncorrelated: true,
             } as Account
 
                 ; (fusionService as any).sourcesByName.set('NERM', {
@@ -767,6 +776,7 @@ describe('FusionService', () => {
                 sourceId: 'src-lh2',
                 sourceName: 'LH2',
                 attributes: {},
+                uncorrelated: true,
             } as Account
 
             const analyzed = FusionAccount.fromManagedAccount(account)
@@ -796,6 +806,7 @@ describe('FusionService', () => {
                 sourceId: 'src-lh2',
                 sourceName: 'LH2',
                 attributes: {},
+                uncorrelated: true,
             } as Account
 
             const analyzed = FusionAccount.fromManagedAccount(account)
@@ -841,6 +852,7 @@ describe('FusionService', () => {
                 sourceId: 'src-lh2',
                 sourceName: 'LH2',
                 attributes: {},
+                uncorrelated: true,
             } as Account
 
             const analyzed = FusionAccount.fromManagedAccount(account)
@@ -887,6 +899,7 @@ describe('FusionService', () => {
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
+                uncorrelated: true,
             } as Account
             const analyzed = FusionAccount.fromManagedAccount(account)
             analyzed.addFusionMatch({
@@ -931,6 +944,7 @@ describe('FusionService', () => {
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
+                uncorrelated: true,
             } as Account
             const analyzed = FusionAccount.fromManagedAccount(account)
             analyzed.addFusionMatch({
@@ -978,6 +992,7 @@ describe('FusionService', () => {
                 sourceId: 'orphan-src-id',
                 sourceName: 'OrphanSrc',
                 attributes: {},
+                uncorrelated: true,
             } as Account
             const analyzed = FusionAccount.fromManagedAccount(account)
             jest.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
@@ -996,6 +1011,7 @@ describe('FusionService', () => {
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
+                uncorrelated: true,
             } as Account
 
             const managedAccountsMap = new Map<string, Account>()
@@ -1009,7 +1025,9 @@ describe('FusionService', () => {
             await fusionService.processManagedAccounts()
 
             // Verify log called or side effects
-            expect(mockLog.info).toHaveBeenCalledWith(expect.stringContaining('Processing 1 managed account'))
+            expect(mockLog.info).toHaveBeenCalledWith(
+                expect.stringContaining('analyzing 1 uncorrelated managed account(s) from the work queue')
+            )
         })
 
         it('should set reverse correlation attribute for first-run unmatched authoritative accounts', async () => {
@@ -1020,6 +1038,7 @@ describe('FusionService', () => {
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
+                uncorrelated: true,
             } as Account
 
             const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
@@ -1316,6 +1335,7 @@ describe('FusionService', () => {
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
+                uncorrelated: true,
             } as Account
 
             const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)

@@ -1463,7 +1463,8 @@ export class FusionService {
             fusionIdentityComparisons = await this.scoring.scoreFusionAccount(
                 fusionAccount,
                 identityPool,
-                MatchCandidateType.Identity
+                MatchCandidateType.Identity,
+                this.config.fusionMaxCandidatesForForm ?? FUSION_MAX_CANDIDATES_FOR_FORM_DEFAULT
             )
             this.currentRunMatchScoringMs += Date.now() - identityScoringStarted
             hasIdentityBackedMatches = this.hasIdentityBackedMatches(fusionAccount)

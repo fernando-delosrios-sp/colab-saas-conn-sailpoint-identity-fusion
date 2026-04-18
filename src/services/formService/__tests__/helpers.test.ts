@@ -1,6 +1,19 @@
-import { buildFormName, calculateExpirationDate, resolveIdentitiesSelectLabel } from '../helpers'
+import { buildFormName, calculateExpirationDate, countIdentityBackedFusionMatches, resolveIdentitiesSelectLabel } from '../helpers'
+import { MatchCandidateType } from '../../scoringService/types'
 
 describe('formService helpers', () => {
+    describe('countIdentityBackedFusionMatches', () => {
+        it('counts identity candidates and excludes deferred new-unmatched', () => {
+            expect(
+                countIdentityBackedFusionMatches([
+                    { identityId: 'a', identityName: 'A', scores: [] } as any,
+                    { identityId: 'b', identityName: 'B', candidateType: MatchCandidateType.NewUnmatched, scores: [] } as any,
+                    { identityId: 'c', identityName: 'C', scores: [] } as any,
+                ])
+            ).toBe(2)
+        })
+    })
+
     describe('resolveIdentitiesSelectLabel', () => {
         it('prefers attributes.displayName from the identity document (matches search index label)', () => {
             const doc = {
