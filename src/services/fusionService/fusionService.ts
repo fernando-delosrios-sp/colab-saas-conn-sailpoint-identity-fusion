@@ -1162,7 +1162,9 @@ export class FusionService {
     }
 
     /**
-     * Processes a single uncorrelated managed account through the Match workflow.
+     * Processes a single managed account through the Match workflow (or a correlated
+     * orphan shortcut when the account is correlated on the source but not linked to
+     * any loaded Fusion row).
      * After scoring, the account is either assigned automatically to the matched identity
      * (perfect scores when enabled), sent for manual review (partial match), or handled
      * based on the source type:
@@ -1170,7 +1172,7 @@ export class FusionService {
      * - record: unique attributes registered but not output as ISC account
      * - orphan: dropped immediately; optionally fires a disable operation
      *
-     * @param account - The uncorrelated ISC account from a managed source
+     * @param account - The ISC account from a managed source (typically uncorrelated on the work queue)
      * @returns The fusion account produced or updated, or undefined if skipped or sent for manual review.
      *          Same-aggregation deferred matches (peer is another new unmatched account) are removed from
      *          the managed-account work queue for this run; they are expected to be re-fetched next aggregation.
@@ -1178,11 +1180,23 @@ export class FusionService {
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
         if (account.uncorrelated === false) {
+            if (this.isCorrelatedManagedAccountLinkedInFusion(account)) {
+                this.log.info(
+                    `Dropping correlated managed account from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
+                )
+                this.removeManagedAccountFromWorkQueue(account)
+                return undefined
+            }
             this.log.info(
-                `Dropping correlated managed account from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
+                `Correlated managed account not linked to Fusion; treating as non-match: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
             )
-            this.removeManagedAccountFromWorkQueue(account)
-            return undefined
+            const fusionAccount = await this.preProcessManagedAccount(account)
+            const sourceInfo = account.sourceName ? this.sourcesByName.get(account.sourceName) : undefined
+            const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
+            if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
+                return this.handleNoReviewerAccount(account, sourceType, sourceInfo)
+            }
+            return this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
         }
 
         const sourceInfo = account.sourceName ? this.sourcesByName.get(account.sourceName) : undefined
@@ -1852,6 +1866,32 @@ export class FusionService {
                 }
             }
         }
+    }
+
+    /**
+     * True when this managed account is already represented on a loaded Fusion account
+     * (platform Fusion row or identity-backed Fusion row), or when its identityId matches
+     * a loaded identity-backed Fusion account.
+     */
+    private isCorrelatedManagedAccountLinkedInFusion(account: Account): boolean {
+        const key = getManagedAccountKeyFromAccount(account)
+        if (key) {
+            for (const fa of this.fusionAccountMap.values()) {
+                if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) {
+                    return true
+                }
+            }
+            for (const fa of this.fusionIdentityMap.values()) {
+                if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) {
+                    return true
+                }
+            }
+        }
+        const identityId = account.identityId
+        if (identityId && identityId.trim() !== '' && this.fusionIdentityMap.has(identityId)) {
+            return true
+        }
+        return false
     }
 
     private queueDisableOperation(account: Account): void {
