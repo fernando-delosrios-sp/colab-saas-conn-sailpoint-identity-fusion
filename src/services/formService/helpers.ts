@@ -5,7 +5,7 @@ import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
 import { FusionMatch, MatchCandidateType } from '../scoringService/types'
 import { Candidate } from './types'
-import { FUSION_MAX_CANDIDATES_FOR_FORM_MAX } from '../../data/connectorConstants'
+import { internalConfig } from '../../data/connectorDefaults'
 
 // ============================================================================
 // Helper Functions
@@ -87,8 +87,8 @@ export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: 
     assert(fusionAccount, 'Fusion account is required')
     assert(fusionAccount.fusionMatches, 'Fusion matches are required')
     assert(
-        maxCandidates >= 1 && maxCandidates <= FUSION_MAX_CANDIDATES_FOR_FORM_MAX,
-        `maxCandidates must be between 1 and ${FUSION_MAX_CANDIDATES_FOR_FORM_MAX}`
+        maxCandidates >= 1 && maxCandidates <= internalConfig.fusionMaxCandidatesForFormMax,
+        `maxCandidates must be between 1 and ${internalConfig.fusionMaxCandidatesForFormMax}`
     )
 
     const ordered = [...fusionAccount.fusionMatches].sort(compareMatchesForForm).slice(0, maxCandidates)

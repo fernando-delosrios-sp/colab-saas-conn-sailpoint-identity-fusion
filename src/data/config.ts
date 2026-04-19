@@ -1,6 +1,5 @@
 import { ConnectorError, ConnectorErrorType, readConfig, logger } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceConfig } from '../model/config'
-import { FUSION_MAX_CANDIDATES_FOR_FORM_MAX, FUSION_MAX_CANDIDATES_FOR_FORM_MIN } from './connectorConstants'
 import { defaults, internalConfig, defaultFusionMaxCandidatesForForm } from './connectorDefaults'
 import { assert, softAssert } from '../utils/assert'
 import { readBoolean } from '../utils/safeRead'
@@ -89,9 +88,9 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
             : defaultFusionMaxCandidatesForForm()
     assert(
         Number.isFinite(rawMaxCandidates) &&
-            rawMaxCandidates >= FUSION_MAX_CANDIDATES_FOR_FORM_MIN &&
-            rawMaxCandidates <= FUSION_MAX_CANDIDATES_FOR_FORM_MAX,
-        `fusionMaxCandidatesForForm must be between ${FUSION_MAX_CANDIDATES_FOR_FORM_MIN} and ${FUSION_MAX_CANDIDATES_FOR_FORM_MAX}`
+            rawMaxCandidates >= internalConfig.fusionMaxCandidatesForFormMin &&
+            rawMaxCandidates <= internalConfig.fusionMaxCandidatesForFormMax,
+        `fusionMaxCandidatesForForm must be between ${internalConfig.fusionMaxCandidatesForFormMin} and ${internalConfig.fusionMaxCandidatesForFormMax}`
     )
     config.fusionMaxCandidatesForForm = Math.trunc(rawMaxCandidates)
     config.concurrencyCheckEnabled = config.concurrencyCheckEnabled ?? defaults.concurrencyCheckEnabled

@@ -22,8 +22,6 @@ import {
 } from 'sailpoint-api-client'
 import { readNumber } from '../../utils/safeRead'
 import { createRetriesConfig } from './helpers'
-import { SAILPOINT_LIST_MAX, STATS_LOGGING_INTERVAL_MS } from '../../data/connectorConstants'
-
 /**
  * ClientService provides a lean, centralized client for API operations.
  *
@@ -40,6 +38,8 @@ export class ClientService {
     public readonly config: Configuration
     protected readonly enableQueue: boolean
     private readonly pageSize: number
+    private readonly sailPointListMax: number
+    private readonly statsLoggingIntervalMs: number
     private readonly requestTimeoutMs?: number
     /** Number of pages to fetch in parallel inside paginateParallel. */
     private readonly parallelBatchSize: number
@@ -103,6 +103,8 @@ export class ClientService {
 
         // Store pageSize for pagination
         this.pageSize = fusionConfig.pageSize
+        this.sailPointListMax = fusionConfig.sailPointListMax
+        this.statsLoggingIntervalMs = fusionConfig.statsLoggingIntervalMs
 
         // Only initialize the queue if enableQueue is true
         if (this.enableQueue) {
@@ -295,7 +297,7 @@ export class ClientService {
         const pageSize = this.pageSize
         // SailPoint list endpoints (e.g. list-accounts) max 250/request; always pass explicit limit
         // to avoid API-default behavior that can stop pagination early (e.g. cap at 500).
-        const effectivePageSize = Math.min(pageSize, SAILPOINT_LIST_MAX)
+        const effectivePageSize = Math.min(pageSize, this.sailPointListMax)
 
         const allItems: T[] = []
         const baseLimit = readNumber(baseParameters, 'limit')
@@ -532,7 +534,7 @@ export class ClientService {
                         `avg process: ${stats.averageProcessingTime.toFixed(0)}ms`
                 )
             }
-        }, STATS_LOGGING_INTERVAL_MS)
+        }, this.statsLoggingIntervalMs)
     }
 
     /**
@@ -576,7 +578,7 @@ export class ClientService {
         limit?: number
     ): AsyncGenerator<T[], void, unknown> {
         const pageSize = this.pageSize
-        const effectivePageSize = Math.min(pageSize, SAILPOINT_LIST_MAX)
+        const effectivePageSize = Math.min(pageSize, this.sailPointListMax)
         const batchSize = this.parallelBatchSize // Concurrent page requests (configurable)
 
         // Initial request to get total count

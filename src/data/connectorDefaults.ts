@@ -1,6 +1,47 @@
-import connectorSpecInitialValues from './connectorSpecInitialValues.json'
+/**
+ * Single source of truth: connector-spec `sourceConfigInitialValues`, runtime defaults,
+ * and internal constants (merged into config by `safeReadConfig`).
+ */
 
-/** Defaults for new sources and for runtime when keys are absent (aligned with connector-spec initial values). */
+/** Same keys as `connector-spec.json` → `sourceConfigInitialValues` (sync script copies this into the spec). */
+export const connectorSpecInitialValues = {
+    fusionFormExpirationDays: 7,
+    fusionAverageScore: 80,
+    provisioningTimeout: 300,
+    managedAccountsBatchSize: 100,
+    fusionMaxCandidatesForForm: 3,
+    includeIdentities: true,
+    identityScopeQuery: '*',
+    maxHistoryMessages: 10,
+    attributeMerge: 'first' as const,
+    enableQueue: true,
+    enableRetry: true,
+    maxRetries: 20,
+    requestsPerSecond: 10,
+    maxConcurrentRequests: 10,
+    processingWait: 60,
+    retryDelay: 1000,
+    batchSize: 250,
+    externalLoggingLevel: 'info' as const,
+    proxyEnabled: false,
+    proxyUrl: '',
+    proxyPassword: '',
+    maxAttempts: 20,
+    digits: 1,
+    counterStart: 1,
+    case: 'same' as const,
+    expression: '#set($initial = $firstname.substring(0, 1))$initial$lastname',
+    useIncrementalCounter: false,
+    refresh: false,
+    trim: false,
+    force: false,
+    algorithm: 'name-matcher' as const,
+    enablePriority: true,
+    aggregationMode: 'none' as const,
+    correlationMode: 'none' as const,
+}
+
+/** Defaults for new sources and for runtime when keys are absent. */
 export const defaults = {
     ...connectorSpecInitialValues,
     /** Per-source aggregation task poll interval (seconds) when not set on the source */
@@ -46,6 +87,25 @@ export const internalConfig = {
         correlateAccounts: 25,
     },
     fusionAccountRefreshThresholdInSeconds: 60,
+
+    /** Minimum configurable match candidates on a single fusion review form. */
+    fusionMaxCandidatesForFormMin: 1,
+    /** Maximum configurable match candidates on a single fusion review form (platform/UI limit). */
+    fusionMaxCandidatesForFormMax: 15,
+    /** Maximum retry delay cap (milliseconds). */
+    maxRetryDelayMs: 60000,
+    /** Jitter factor for exponential retry delays (fraction of exponential delay). */
+    retryJitterFactor: 0.3,
+    /** Jitter factor for 429 retry-after delays (fraction of base delay). */
+    rateLimitJitterFactor: 0.1,
+    /** Stats logging interval (milliseconds). */
+    statsLoggingIntervalMs: 30000,
+    /** Rolling stats sample window size. */
+    maxStatsSamples: 1000,
+    /** Queue processing poll interval (milliseconds). */
+    queueProcessingIntervalMs: 10,
+    /** SailPoint list endpoint hard cap (items per request). */
+    sailPointListMax: 250,
 } as const
 
 /** Default for `fusionMaxCandidatesForForm` when absent from resolved runtime config. */

@@ -1,7 +1,7 @@
 import { logger } from '@sailpoint/connector-sdk'
 import { QueueItem, QueueStats, QueueConfig, QueuePriority } from './types'
 import { shouldRetry, calculateRetryDelay } from './helpers'
-import { MAX_STATS_SAMPLES, QUEUE_PROCESSING_INTERVAL_MS } from '../../data/connectorConstants'
+import { internalConfig } from '../../data/connectorDefaults'
 
 /** Ordered list of priorities from highest to lowest, used when dequeueing. */
 const PRIORITY_ORDER = [QueuePriority.HIGH, QueuePriority.MEDIUM, QueuePriority.LOW] as const
@@ -33,13 +33,13 @@ export class ApiQueue {
         activeRequests: 0,
     }
     // Circular buffers for rolling wait/processing time windows — O(1) insert + evict.
-    // Each buffer is a fixed-size Float64Array with a write index that wraps modulo MAX_STATS_SAMPLES.
-    private waitTimesBuffer: Float64Array = new Float64Array(MAX_STATS_SAMPLES)
+    // Each buffer is a fixed-size Float64Array with a write index that wraps modulo maxStatsSamples.
+    private waitTimesBuffer: Float64Array = new Float64Array(internalConfig.maxStatsSamples)
     private waitTimesIndex: number = 0
     private waitTimesCount: number = 0
     private waitTimesSum: number = 0
 
-    private processingTimesBuffer: Float64Array = new Float64Array(MAX_STATS_SAMPLES)
+    private processingTimesBuffer: Float64Array = new Float64Array(internalConfig.maxStatsSamples)
     private processingTimesIndex: number = 0
     private processingTimesCount: number = 0
     private processingTimesSum: number = 0
@@ -170,7 +170,7 @@ export class ApiQueue {
 
         // Continue processing if there are items in queue and capacity available
         if (this.totalQueueLength() > 0 && this.activeRequests < this.config.maxConcurrentRequests) {
-            setTimeout(() => this.processQueue(), QUEUE_PROCESSING_INTERVAL_MS)
+            setTimeout(() => this.processQueue(), internalConfig.queueProcessingIntervalMs)
         }
     }
 
@@ -251,8 +251,8 @@ export class ApiQueue {
      */
     private pushStat(type: 'wait' | 'processing', value: number): void {
         if (type === 'wait') {
-            const idx = this.waitTimesIndex % MAX_STATS_SAMPLES
-            if (this.waitTimesCount === MAX_STATS_SAMPLES) {
+            const idx = this.waitTimesIndex % internalConfig.maxStatsSamples
+            if (this.waitTimesCount === internalConfig.maxStatsSamples) {
                 // Evict the oldest sample from the running sum
                 this.waitTimesSum -= this.waitTimesBuffer[idx]
             } else {
@@ -262,8 +262,8 @@ export class ApiQueue {
             this.waitTimesSum += value
             this.waitTimesIndex++
         } else {
-            const idx = this.processingTimesIndex % MAX_STATS_SAMPLES
-            if (this.processingTimesCount === MAX_STATS_SAMPLES) {
+            const idx = this.processingTimesIndex % internalConfig.maxStatsSamples
+            if (this.processingTimesCount === internalConfig.maxStatsSamples) {
                 this.processingTimesSum -= this.processingTimesBuffer[idx]
             } else {
                 this.processingTimesCount++
