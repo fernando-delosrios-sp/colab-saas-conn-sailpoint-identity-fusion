@@ -1065,6 +1065,73 @@ describe('FusionService', () => {
             expect(mockSources.assertReverseCorrelationReady).toHaveBeenCalledTimes(1)
         })
 
+        it('registers correlated managed accounts not linked to Fusion as authoritative non-matches', async () => {
+            const mockManagedAccount = {
+                id: 'acct-corr-orphan-1',
+                nativeIdentity: 'native-corr-orphan-1',
+                name: 'Correlated Orphan',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                identityId: 'identity-not-in-fusion',
+                attributes: {},
+                uncorrelated: false,
+            } as Account
+
+                ; (fusionService as any).sourcesByName.set('Source A', {
+                    id: 'source-a-id',
+                    name: 'Source A',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
+
+            mockAttributes.mapAttributes.mockImplementation((a) => a)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const spyFinalize = jest.spyOn(fusionService as any, 'finalizeAuthoritativeUnmatched')
+
+            const result = await fusionService.processManagedAccount(mockManagedAccount)
+
+            expect(spyFinalize).toHaveBeenCalledTimes(1)
+            expect(result).toBeDefined()
+            expect(result?.statuses).toContain('nonMatched')
+            expect(fusionService.getFusionAccountByNativeIdentity('source-a-id::native-corr-orphan-1')).toBe(result)
+        })
+
+        it('drops correlated managed accounts when their identity already has a fusion identity row', async () => {
+            const identityId = 'identity-linked-1'
+            const existing = FusionAccount.fromIdentity({
+                id: identityId,
+                name: 'Linked',
+                attributes: {},
+            } as any)
+            fusionService.setFusionAccount(existing)
+
+            const mockManagedAccount = {
+                id: 'acct-already-linked',
+                nativeIdentity: 'native-linked',
+                name: 'Already',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                identityId,
+                attributes: {},
+                uncorrelated: false,
+            } as Account
+
+                ; (fusionService as any).sourcesByName.set('Source A', {
+                    id: 'source-a-id',
+                    name: 'Source A',
+                    sourceType: 'authoritative',
+                    config: {},
+                })
+
+            const spyFinalize = jest.spyOn(fusionService as any, 'finalizeAuthoritativeUnmatched')
+
+            const result = await fusionService.processManagedAccount(mockManagedAccount)
+
+            expect(result).toBeUndefined()
+            expect(spyFinalize).not.toHaveBeenCalled()
+        })
+
         it('should hydrate missing account info during managed-account layer for historical missing accounts', async () => {
             const historicalAccount = {
                 nativeIdentity: 'fusion-1',
