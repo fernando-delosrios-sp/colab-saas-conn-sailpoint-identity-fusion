@@ -3,7 +3,7 @@ import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceType } from '../../model/config'
 import { LogService, PhaseTimer } from '../logService'
 import { FormService } from '../formService'
-import { defaultFusionMaxCandidatesForForm } from '../../data/connectorSpecDefaults'
+import { defaultFusionMaxCandidatesForForm, defaults } from '../../data/connectorDefaults'
 import { IdentityService } from '../identityService'
 import { SourceInfo, SourceService, buildSourceConfigPatch } from '../sourceService'
 import { FusionAccount } from '../../model/account'
@@ -117,7 +117,7 @@ export class FusionService {
         this.commandType = commandType
         this.operationContext = operationContext
         this.deleteEmpty = config.deleteEmpty
-        this.managedAccountsBatchSize = config.managedAccountsBatchSize ?? 50
+        this.managedAccountsBatchSize = config.managedAccountsBatchSize ?? defaults.managedAccountsBatchSize
     }
 
     /**

@@ -24,6 +24,7 @@ import { StateWrapper } from './stateWrapper'
 import { buildManagedAccountKey } from '../../model/managedAccountKey'
 import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
 import { readString } from '../../utils/safeRead'
+import { defaults } from '../../data/connectorDefaults'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
@@ -903,7 +904,7 @@ export class AttributeService {
 
         return await this.locks.withLock(lockKey, async () => {
             const registeredValues = this.getUniqueValues(definition.name)
-            const maxAttempts = this.maxAttempts ?? 100
+            const maxAttempts = this.maxAttempts ?? defaults.maxAttempts
 
             if (definition.useIncrementalCounter) {
                 return await this.generateWithIncrementalCounter(

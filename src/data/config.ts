@@ -1,34 +1,11 @@
 import { ConnectorError, ConnectorErrorType, readConfig, logger } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceConfig } from '../model/config'
-import { FUSION_MAX_CANDIDATES_FOR_FORM_MAX, FUSION_MAX_CANDIDATES_FOR_FORM_MIN } from '../services/formService/constants'
-import { defaultFusionMaxCandidatesForForm } from './connectorSpecDefaults'
+import { defaults, internalConfig, defaultFusionMaxCandidatesForForm } from './connectorDefaults'
 import { assert, softAssert } from '../utils/assert'
 import { readBoolean } from '../utils/safeRead'
 
-const internalConfig = {
-    requestsPerSecondConstant: 100,
-    pageSize: 250,
-    tokenUrlPath: '/oauth/token',
-    processingWaitConstant: 60 * 1000,
-    retriesConstant: 20,
-    workflowName: 'Fusion Email Sender',
-    delayedAggregationWorkflowName: 'Fusion Delayed Aggregation',
-    padding: '   ',
-    msDay: 86400000,
-    identityNotFoundWait: 5000,
-    identityNotFoundRetries: 5,
-    separator: ' | ',
-    fusionFormNamePattern: 'Fusion Review',
-    nonAggregableTypes: ['DelimitedFile'],
-    concurrency: {
-        uncorrelatedAccounts: 500,
-        processAccounts: 50,
-        correlateAccounts: 25,
-    },
-    fusionAccountRefreshThresholdInSeconds: 60,
-}
+export { defaults, internalConfig, defaultFusionMaxCandidatesForForm } from './connectorDefaults'
 
-// NOTE: Don't add defaults from connector-spec.json here. Instead, add them to the connector-spec.json file.
 export const safeReadConfig = async (): Promise<FusionConfig> => {
     logger.debug('Reading connector configuration')
     const sourceConfig = await readConfig()
@@ -36,10 +13,9 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
 
     const config = {
         ...sourceConfig,
-        ...internalConfig, // Internal constants always take precedence
+        ...internalConfig,
     }
 
-    // Validate required connection settings
     assert(config.baseurl, 'Base URL is required in configuration')
     assert(config.clientId, 'Client ID is required in configuration')
     assert(config.clientSecret, 'Client secret is required in configuration')
@@ -47,109 +23,81 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
 
     logger.debug('Configuration loaded, applying defaults')
 
-    // ============================================================================
-    // Array defaults - ensure arrays are never undefined
-    // ============================================================================
     config.attributeMaps = config.attributeMaps ?? []
     config.normalAttributeDefinitions = config.normalAttributeDefinitions ?? []
     config.uniqueAttributeDefinitions = config.uniqueAttributeDefinitions ?? []
     config.sources = config.sources ?? []
     config.fusionFormAttributes = config.fusionFormAttributes ?? []
     config.matchingConfigs = config.matchingConfigs ?? []
-    config.trim = config.trim ?? false
+    config.trim = config.trim ?? defaults.trim
 
-    // ============================================================================
-    // Source Settings defaults
-    // ============================================================================
-    // Set defaults for each source configuration
     config.sources = config.sources
         .map((sourceConfig: SourceConfig) => {
             assert(sourceConfig, 'Source configuration is required')
             assert(sourceConfig.name, 'Source name is required')
-            // Backward compatibility: migrate forceAggregation to aggregationMode
             if (readBoolean(sourceConfig, 'forceAggregation', false) && !sourceConfig.aggregationMode) {
                 sourceConfig.aggregationMode = 'before'
             }
-            // taskResultWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
-            const taskResultWaitSeconds = sourceConfig.taskResultWait ?? 60
+            const taskResultWaitSeconds = sourceConfig.taskResultWait ?? defaults.taskResultWaitSeconds
             return {
                 ...sourceConfig,
-                enabled: sourceConfig.enabled ?? true,
-                aggregationMode: sourceConfig.aggregationMode ?? 'none',
-                taskResultRetries: sourceConfig.taskResultRetries ?? 5,
+                enabled: sourceConfig.enabled ?? defaults.source.enabled,
+                aggregationMode: sourceConfig.aggregationMode ?? defaults.source.aggregationMode,
+                taskResultRetries: sourceConfig.taskResultRetries ?? defaults.source.taskResultRetries,
                 taskResultWait: taskResultWaitSeconds * 1000,
-                aggregationDelay: sourceConfig.aggregationDelay ?? 5,
-                optimizedAggregation: sourceConfig.optimizedAggregation ?? true,
+                aggregationDelay: sourceConfig.aggregationDelay ?? defaults.source.aggregationDelay,
+                optimizedAggregation: sourceConfig.optimizedAggregation ?? defaults.source.optimizedAggregation,
                 accountFilter: sourceConfig.accountFilter ?? undefined,
                 accountJmespathFilter: sourceConfig.accountJmespathFilter ?? undefined,
-                correlationMode: sourceConfig.correlationMode ?? 'none',
-                deferredMatching: sourceConfig.deferredMatching ?? true,
+                correlationMode: sourceConfig.correlationMode ?? defaults.source.correlationMode,
+                deferredMatching: sourceConfig.deferredMatching ?? defaults.source.deferredMatching,
             }
         })
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)
 
     softAssert(config.sources.length > 0, 'No sources configured - no Match will be performed', 'warn')
-    config.deleteEmpty = config.deleteEmpty ?? false
-    config.forceAttributeRefresh = config.forceAttributeRefresh ?? false
-    config.skipAccountsWithMissingId = config.skipAccountsWithMissingId ?? false
-    config.maxHistoryMessages = config.maxHistoryMessages ?? 10
+    config.deleteEmpty = config.deleteEmpty ?? defaults.deleteEmpty
+    config.forceAttributeRefresh = config.forceAttributeRefresh ?? defaults.forceAttributeRefresh
+    config.skipAccountsWithMissingId = config.skipAccountsWithMissingId ?? defaults.skipAccountsWithMissingId
+    config.maxHistoryMessages = config.maxHistoryMessages ?? defaults.maxHistoryMessages
 
-    // ============================================================================
-    // Attribute Definition Settings defaults
-    // ============================================================================
-    config.maxAttempts = config.maxAttempts ?? 100
+    config.maxAttempts = config.maxAttempts ?? defaults.maxAttempts
 
-    // ============================================================================
-    // Attribute Matching Settings defaults
-    // ============================================================================
-    // Default from connector-spec.json: fusionExpirationDays: 7
-    config.fusionFormExpirationDays = config.fusionFormExpirationDays ?? 7
-    config.fusionMergingExactMatch = config.fusionMergingExactMatch ?? false
-    // Minimum weighted combined match score (0-100); default aligned with connector-spec
-    config.fusionAverageScore = config.fusionAverageScore ?? 80
+    config.fusionFormExpirationDays = config.fusionFormExpirationDays ?? defaults.fusionFormExpirationDays
+    config.fusionMergingExactMatch = config.fusionMergingExactMatch ?? defaults.fusionMergingExactMatch
+    config.fusionAverageScore = config.fusionAverageScore ?? defaults.fusionAverageScore
 
-    // ============================================================================
-    // Advanced Connection Settings defaults
-    // ============================================================================
-    config.enableQueue = config.enableQueue ?? true
-    config.enableRetry = config.enableRetry ?? true
+    config.enableQueue = config.enableQueue ?? defaults.enableQueue
+    config.enableRetry = config.enableRetry ?? defaults.enableRetry
 
-    // Defaults from connector-spec.json: maxRetries: 20, requestsPerSecond: 8, maxConcurrentRequests: 10
     config.maxRetries = config.maxRetries ?? internalConfig.retriesConstant
-    config.requestsPerSecond = config.requestsPerSecond ?? 8
-    config.maxConcurrentRequests = config.maxConcurrentRequests ?? 10
-    // retryDelay is configured in milliseconds in connector-spec.json
-    config.retryDelay = config.retryDelay ?? 1000 // 1 second base delay (only used as fallback, 429 responses use retry-after header)
-    config.pageSize = config.batchSize ?? 250 // Paging size is 250 for all calls
-    config.enablePriority = config.enablePriority ?? true
-    // processingWait is configured in seconds in connector-spec.json; convert to milliseconds for internal use
+    config.requestsPerSecond = config.requestsPerSecond ?? defaults.requestsPerSecond
+    config.maxConcurrentRequests = config.maxConcurrentRequests ?? defaults.maxConcurrentRequests
+    config.retryDelay = config.retryDelay ?? defaults.retryDelay
+    config.pageSize = config.batchSize ?? internalConfig.pageSize
+    config.enablePriority = config.enablePriority ?? defaults.enablePriority
     const processingWaitSeconds =
         config.processingWait !== undefined ? config.processingWait : internalConfig.processingWaitConstant / 1000
     config.processingWait = processingWaitSeconds * 1000
 
-    // ============================================================================
-    // Developer Settings defaults
-    // ============================================================================
-    config.reset = config.reset ?? false
-    config.managedAccountsBatchSize = config.managedAccountsBatchSize ?? 50
+    config.reset = config.reset ?? defaults.reset
+    config.managedAccountsBatchSize = config.managedAccountsBatchSize ?? defaults.managedAccountsBatchSize
     const rawMaxCandidates =
         config.fusionMaxCandidatesForForm !== undefined
             ? Number(config.fusionMaxCandidatesForForm)
             : defaultFusionMaxCandidatesForForm()
     assert(
         Number.isFinite(rawMaxCandidates) &&
-            rawMaxCandidates >= FUSION_MAX_CANDIDATES_FOR_FORM_MIN &&
-            rawMaxCandidates <= FUSION_MAX_CANDIDATES_FOR_FORM_MAX,
-        `fusionMaxCandidatesForForm must be between ${FUSION_MAX_CANDIDATES_FOR_FORM_MIN} and ${FUSION_MAX_CANDIDATES_FOR_FORM_MAX}`
+            rawMaxCandidates >= internalConfig.fusionMaxCandidatesForFormMin &&
+            rawMaxCandidates <= internalConfig.fusionMaxCandidatesForFormMax,
+        `fusionMaxCandidatesForForm must be between ${internalConfig.fusionMaxCandidatesForFormMin} and ${internalConfig.fusionMaxCandidatesForFormMax}`
     )
     config.fusionMaxCandidatesForForm = Math.trunc(rawMaxCandidates)
-    config.concurrencyCheckEnabled = config.concurrencyCheckEnabled ?? true
-    // Default from connector-spec.json: provisioningTimeout: 300
-    config.provisioningTimeout = config.provisioningTimeout ?? 300
-    config.externalLoggingEnabled = config.externalLoggingEnabled ?? false
+    config.concurrencyCheckEnabled = config.concurrencyCheckEnabled ?? defaults.concurrencyCheckEnabled
+    config.provisioningTimeout = config.provisioningTimeout ?? defaults.provisioningTimeout
+    config.externalLoggingEnabled = config.externalLoggingEnabled ?? defaults.externalLoggingEnabled
     config.externalLoggingUrl = config.externalLoggingUrl ?? undefined
-    // Default to 'info' level for external logging if enabled but level not specified
-    config.externalLoggingLevel = config.externalLoggingLevel ?? 'info'
+    config.externalLoggingLevel = config.externalLoggingLevel ?? defaults.externalLoggingLevel
 
     assert(
         config.fusionAverageScore >= 0 && config.fusionAverageScore <= 100,
@@ -189,7 +137,6 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
         `Minimum combined match score: ${config.fusionAverageScore}; per-attribute thresholds mapped: ${config.fusionScoreMap.size}`
     )
 
-    // Validate external logging configuration if enabled
     if (config.externalLoggingEnabled) {
         assert(config.externalLoggingUrl, 'External logging URL is required when external logging is enabled')
         assert(

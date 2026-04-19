@@ -435,6 +435,15 @@ export interface InternalConfig {
     readonly nonAggregableTypes: readonly string[]
     readonly pageSize: number
     readonly fusionAccountRefreshThresholdInSeconds: number
+    readonly fusionMaxCandidatesForFormMin: number
+    readonly fusionMaxCandidatesForFormMax: number
+    readonly maxRetryDelayMs: number
+    readonly retryJitterFactor: number
+    readonly rateLimitJitterFactor: number
+    readonly statsLoggingIntervalMs: number
+    readonly maxStatsSamples: number
+    readonly queueProcessingIntervalMs: number
+    readonly sailPointListMax: number
     readonly concurrency: {
         readonly uncorrelatedAccounts: number
         readonly processAccounts: number
