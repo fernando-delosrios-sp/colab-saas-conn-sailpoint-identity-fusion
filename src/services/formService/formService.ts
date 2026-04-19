@@ -22,7 +22,7 @@ import { readString, readUnknown } from '../../utils/safeRead'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
 import { Candidate, PendingReviewFormContext, PendingReviewReviewerContext, PendingReviewAccountContext } from './types'
-import { defaultFusionMaxCandidatesForForm } from '../../data/connectorSpecDefaults'
+import { defaultFusionMaxCandidatesForForm } from '../../data/connectorDefaults'
 import {
     buildCandidateList,
     buildFormName,

@@ -1,49 +1,33 @@
-/**
- * Default number of retry attempts for API requests
- */
-export const DEFAULT_RETRIES = 20
+import { defaults, internalConfig } from '../../data/connectorDefaults'
+import {
+    MAX_RETRY_DELAY_MS,
+    MAX_STATS_SAMPLES,
+    QUEUE_PROCESSING_INTERVAL_MS,
+    RATE_LIMIT_JITTER_FACTOR,
+    RETRY_JITTER_FACTOR,
+    STATS_LOGGING_INTERVAL_MS,
+} from '../../data/connectorConstants'
 
 /**
- * Default requests per second for throttling
+ * Default number of retry attempts for API requests (aligned with connector defaults)
  */
-export const DEFAULT_REQUESTS_PER_SECOND = 10
+export const DEFAULT_RETRIES = internalConfig.retriesConstant
+
+/**
+ * Default requests per second for throttling (aligned with connector defaults)
+ */
+export const DEFAULT_REQUESTS_PER_SECOND = defaults.requestsPerSecond
 
 /**
  * Base delay for exponential backoff (in milliseconds)
  */
-export const BASE_RETRY_DELAY_MS = 1000
+export const BASE_RETRY_DELAY_MS = defaults.retryDelay
 
-/**
- * Maximum retry delay cap (in milliseconds)
- */
-export const MAX_RETRY_DELAY_MS = 60000
-
-/**
- * Jitter factor for retry delays (30% of exponential delay)
- */
-export const RETRY_JITTER_FACTOR = 0.3
-
-/**
- * Jitter factor for 429 retry-after header delays (10% of base delay)
- */
-export const RATE_LIMIT_JITTER_FACTOR = 0.1
-
-/**
- * Interval for stats logging (in milliseconds)
- */
-export const STATS_LOGGING_INTERVAL_MS = 30000
-
-/**
- * Maximum number of samples to keep for statistics
- */
-export const MAX_STATS_SAMPLES = 1000
-
-/**
- * Queue processing check interval (in milliseconds)
- */
-export const QUEUE_PROCESSING_INTERVAL_MS = 10
-
-/**
- * SailPoint list endpoint hard cap (items per request)
- */
-export const SAILPOINT_LIST_MAX = 250
+export {
+    MAX_RETRY_DELAY_MS,
+    MAX_STATS_SAMPLES,
+    QUEUE_PROCESSING_INTERVAL_MS,
+    RATE_LIMIT_JITTER_FACTOR,
+    RETRY_JITTER_FACTOR,
+    STATS_LOGGING_INTERVAL_MS,
+}

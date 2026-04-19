@@ -11,8 +11,3 @@ export const ALGORITHM_LABELS: Record<string, string> = {
     average: 'Combined match score (legacy)',
     'weighted-mean': 'Combined score',
 }
-
-/** Minimum configurable match candidates shown on a single fusion review form. */
-export const FUSION_MAX_CANDIDATES_FOR_FORM_MIN = 1
-/** Maximum configurable match candidates shown on a single fusion review form (platform/UI limit). */
-export const FUSION_MAX_CANDIDATES_FOR_FORM_MAX = 15

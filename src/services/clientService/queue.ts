@@ -1,7 +1,7 @@
 import { logger } from '@sailpoint/connector-sdk'
 import { QueueItem, QueueStats, QueueConfig, QueuePriority } from './types'
 import { shouldRetry, calculateRetryDelay } from './helpers'
-import { MAX_STATS_SAMPLES, QUEUE_PROCESSING_INTERVAL_MS } from './constants'
+import { MAX_STATS_SAMPLES, QUEUE_PROCESSING_INTERVAL_MS } from '../../data/connectorConstants'
 
 /** Ordered list of priorities from highest to lowest, used when dequeueing. */
 const PRIORITY_ORDER = [QueuePriority.HIGH, QueuePriority.MEDIUM, QueuePriority.LOW] as const

@@ -2,17 +2,17 @@ import { IAxiosRetryConfig } from 'axios-retry'
 import { logger } from '@sailpoint/connector-sdk'
 import axiosRetry from 'axios-retry'
 import {
-    DEFAULT_RETRIES,
     BASE_RETRY_DELAY_MS,
-    MAX_RETRY_DELAY_MS,
-    RETRY_JITTER_FACTOR,
-    RATE_LIMIT_JITTER_FACTOR,
+    DEFAULT_RETRIES,
     DEFAULT_REQUESTS_PER_SECOND,
+    MAX_RETRY_DELAY_MS,
+    RATE_LIMIT_JITTER_FACTOR,
+    RETRY_JITTER_FACTOR,
 } from './constants'
 
 /**
  * Creates an axios retry configuration from the provided parameters
- * @param retries - Maximum number of retry attempts (defaults to DEFAULT_RETRIES constant)
+ * @param retries - Maximum number of retry attempts (defaults to connector default maxRetries)
  * @returns IAxiosRetryConfig configuration object
  */
 export function createRetriesConfig(retries?: number): IAxiosRetryConfig {
@@ -78,7 +78,7 @@ export function createRetriesConfig(retries?: number): IAxiosRetryConfig {
 
 /**
  * Creates an axios throttle configuration from the provided parameters
- * @param requestsPerSecond - Maximum number of requests per second (defaults to DEFAULT_REQUESTS_PER_SECOND constant)
+ * @param requestsPerSecond - Maximum number of requests per second (defaults to connector default requestsPerSecond)
  * @returns Throttle configuration object
  */
 export function createThrottleConfig(requestsPerSecond?: number) {

@@ -5,7 +5,7 @@ import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
 import { FusionMatch, MatchCandidateType } from '../scoringService/types'
 import { Candidate } from './types'
-import { FUSION_MAX_CANDIDATES_FOR_FORM_MAX } from './constants'
+import { FUSION_MAX_CANDIDATES_FOR_FORM_MAX } from '../../data/connectorConstants'
 
 // ============================================================================
 // Helper Functions

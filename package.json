@@ -4,7 +4,7 @@
     "main": "dist/index.js",
     "scripts": {
         "clean": "shx rm -rf ./dist",
-        "prebuild": "npm run clean",
+        "prebuild": "npm run clean && node scripts/sync-connector-spec-initial-values.cjs",
         "build": "npx ncc build ./src/index.ts -o ./dist -m -C",
         "docs:install": "node scripts/docs-venv.cjs install",
         "docs:prepare": "node scripts/prepare-docs.cjs",

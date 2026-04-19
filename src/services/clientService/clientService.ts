@@ -22,7 +22,7 @@ import {
 } from 'sailpoint-api-client'
 import { readNumber } from '../../utils/safeRead'
 import { createRetriesConfig } from './helpers'
-import { STATS_LOGGING_INTERVAL_MS, SAILPOINT_LIST_MAX } from './constants'
+import { SAILPOINT_LIST_MAX, STATS_LOGGING_INTERVAL_MS } from '../../data/connectorConstants'
 
 /**
  * ClientService provides a lean, centralized client for API operations.
