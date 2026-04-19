@@ -1026,7 +1026,9 @@ describe('FusionService', () => {
 
             // Verify log called or side effects
             expect(mockLog.info).toHaveBeenCalledWith(
-                expect.stringContaining('Processing 1 managed account(s): analyzing uncorrelated work-queue entries')
+                expect.stringContaining(
+                    'Processing 1 managed account(s): analyzing uncorrelated work-queue entries (matching and scoring vs identities)'
+                )
             )
         })
 
