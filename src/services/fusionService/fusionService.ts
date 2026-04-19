@@ -78,6 +78,12 @@ export class FusionService {
     private readonly fusionIdentityComparisonsByAccount = new WeakMap<FusionAccount, number>()
     /** Accumulates Match scoring duration within a single managed-account analysis pass. */
     private currentRunMatchScoringMs = 0
+    /**
+     * One-shot index of all account keys already linked in loaded Fusion rows.
+     * Built once at the start of processManagedAccounts and cleared after the correlated pre-pass
+     * so isCorrelatedManagedAccountLinkedInFusion can do O(1) lookups instead of O(A+I) scans.
+     */
+    private _linkedAccountKeyIndex: Set<string> | undefined
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -1104,7 +1110,37 @@ export class FusionService {
         // The index is rebuilt each run (identity pool may change between runs).
         this.scoring.buildTrigramIndex(this.fusionIdentities)
 
+        // Build a one-shot flat index of every account key already linked in a loaded Fusion row.
+        // isCorrelatedManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
+        // of scanning fusionAccountMap + fusionIdentityMap (O(A+I)) for every correlated account.
+        this._linkedAccountKeyIndex = new Set<string>()
+        for (const fa of this.fusionAccountMap.values()) {
+            for (const key of fa.accountIdsSet) this._linkedAccountKeyIndex.add(key)
+            for (const key of fa.missingAccountIdsSet) this._linkedAccountKeyIndex.add(key)
+        }
+        for (const fa of this.fusionIdentityMap.values()) {
+            for (const key of fa.accountIdsSet) this._linkedAccountKeyIndex.add(key)
+            for (const key of fa.missingAccountIdsSet) this._linkedAccountKeyIndex.add(key)
+        }
+
         this.currentRunMatchScoringMs = 0
+
+        // Pre-pass: resolve all correlated managed accounts before uncorrelated scoring begins.
+        // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion row)
+        // are registered as non-matches in fusionIdentityMap here, so they are immediately visible
+        // as deferred-match candidates when uncorrelated accounts are scored in the main pass.
+        const correlatedAccounts = [...map.values()].filter((a) => a.uncorrelated === false)
+        if (correlatedAccounts.length > 0) {
+            this.log.info(
+                `Pre-pass: resolving ${correlatedAccounts.length} correlated managed account(s) before uncorrelated scoring`
+            )
+            for (const account of correlatedAccounts) {
+                await this.processManagedAccount(account)
+            }
+            this.log.info(`Pre-pass complete: ${map.size} uncorrelated account(s) queued for scoring`)
+        }
+        this._linkedAccountKeyIndex = undefined
+
         const initialQueueSize = map.size
         this.log.info(
             `Processing ${initialQueueSize} managed account(s): analyzing uncorrelated work-queue entries (matching and scoring vs identities)`
@@ -1193,6 +1229,7 @@ export class FusionService {
             const fusionAccount = await this.preProcessManagedAccount(account)
             const sourceInfo = account.sourceName ? this.sourcesByName.get(account.sourceName) : undefined
             const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
+            this.removeManagedAccountFromWorkQueue(account)
             if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
                 return this.handleNoReviewerAccount(account, sourceType, sourceInfo)
             }
@@ -1872,18 +1909,22 @@ export class FusionService {
      * True when this managed account is already represented on a loaded Fusion account
      * (platform Fusion row or identity-backed Fusion row), or when its identityId matches
      * a loaded identity-backed Fusion account.
+     *
+     * Uses _linkedAccountKeyIndex (O(1)) when available (set by processManagedAccounts pre-pass),
+     * falling back to a linear scan of fusionAccountMap + fusionIdentityMap for standalone calls.
      */
     private isCorrelatedManagedAccountLinkedInFusion(account: Account): boolean {
         const key = getManagedAccountKeyFromAccount(account)
         if (key) {
-            for (const fa of this.fusionAccountMap.values()) {
-                if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) {
-                    return true
+            const index = this._linkedAccountKeyIndex
+            if (index) {
+                if (index.has(key)) return true
+            } else {
+                for (const fa of this.fusionAccountMap.values()) {
+                    if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) return true
                 }
-            }
-            for (const fa of this.fusionIdentityMap.values()) {
-                if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) {
-                    return true
+                for (const fa of this.fusionIdentityMap.values()) {
+                    if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) return true
                 }
             }
         }
