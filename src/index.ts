@@ -8,7 +8,7 @@ import { createConnector } from '@sailpoint/connector-sdk'
 import { safeReadConfig } from './data/config'
 
 import { FusionConfig } from './model/config'
-import { createOperationHandler } from './connector/operationHandler'
+import { createOperationHandler } from './utils/operationHandler'
 import { testConnection } from './operations/testConnection'
 import { accountList } from './operations/accountList'
 import { accountRead } from './operations/accountRead'
