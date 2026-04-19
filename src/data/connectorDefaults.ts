@@ -3,11 +3,6 @@ import connectorSpecInitialValues from './connectorSpecInitialValues.json'
 /** Defaults for new sources and for runtime when keys are absent (aligned with connector-spec initial values). */
 export const defaults = {
     ...connectorSpecInitialValues,
-    /**
-     * Unique-attribute generation attempts when not set in connector config.
-     * Higher than the spec form default so generation is more robust at runtime.
-     */
-    maxAttempts: 100,
     /** Per-source aggregation task poll interval (seconds) when not set on the source */
     taskResultWaitSeconds: 60,
     /** Per-source defaults (not represented in sourceConfigInitialValues) */
