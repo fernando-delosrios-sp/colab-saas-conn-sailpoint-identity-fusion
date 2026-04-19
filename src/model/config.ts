@@ -107,7 +107,13 @@ export interface MatchingConfig {
     attribute: string
     /** The similarity algorithm to use for comparison */
     algorithm?: 'name-matcher' | 'jaro-winkler' | 'lig3' | 'dice' | 'double-metaphone' | 'average' | 'weighted-mean' | 'custom'
-    /** Minimum similarity score (0-1) required to consider this attribute a match */
+    /**
+     * When `algorithm` is `custom`, Apache Velocity template evaluated per pair.
+     * Context includes `$accountValue`, `$identityValue`, and `$attribute` (rule attribute name).
+     * Rendered output must parse as a number in 0–100 (used as similarity score).
+     */
+    customVelocityExpression?: string
+    /** Minimum similarity score (0-100) required to consider this attribute a match */
     fusionScore?: number
     /** If true, this rule must pass its minimum similarity for the pair to be a potential match */
     mandatory?: boolean

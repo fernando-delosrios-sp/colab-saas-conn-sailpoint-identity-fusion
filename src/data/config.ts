@@ -113,6 +113,13 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     config.fusionScoreMap = new Map<string, number>()
     for (const matchingConfig of config.matchingConfigs) {
         assert(matchingConfig.attribute, 'Matching config attribute is required')
+        if (matchingConfig.algorithm === 'custom') {
+            const expr = (matchingConfig.customVelocityExpression ?? '').trim()
+            assert(
+                expr.length > 0,
+                `Custom matching algorithm requires a Velocity expression for attribute ${matchingConfig.attribute}`
+            )
+        }
         if (matchingConfig.fusionScore !== undefined) {
             assert(
                 matchingConfig.fusionScore >= 0 && matchingConfig.fusionScore <= 100,

@@ -3,6 +3,8 @@ import { MatchingConfig } from '../../model/config'
 import { ScoreReport } from './types'
 import { jaroWinkler, diceCoefficient } from './stringComparison'
 import { match as nameMatch } from './nameMatching'
+import { evaluateVelocityTemplate } from '../attributeService/formatting'
+import type { RenderContext } from 'velocityjs/dist/src/type'
 
 // Module-level regex constants — compiled once, reused on every call (hot scoring loop)
 const DIACRITICS_RE = /[\u0300-\u036f]/g
@@ -278,4 +280,41 @@ function calculatePrefixBonus(s1: string, s2: string): number {
     }
     const prefixWeight = Math.min(commonPrefix, 5)
     return (prefixWeight / 5) * 100
+}
+
+/**
+ * Similarity from a user-defined Velocity template. Template is compiled once per process (shared cache).
+ * Context: $accountValue, $identityValue, $attribute.
+ */
+export const scoreCustomVelocity = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => {
+    const expression = (matching.customVelocityExpression ?? '').trim()
+    const threshold = matching.fusionScore ?? 0
+
+    if (!expression) {
+        return makeScoreReport(matching, 0, false, 'Custom Velocity expression is empty')
+    }
+
+    const context = Object.assign(Object.create(null), {
+        accountValue: accountAttribute,
+        identityValue: identityAttribute,
+        attribute: matching.attribute,
+    }) as RenderContext
+
+    const rendered = evaluateVelocityTemplate(expression, context)
+    if (rendered === undefined || rendered === '') {
+        return makeScoreReport(matching, 0, false, 'Velocity template produced no numeric output')
+    }
+
+    const n = Number(String(rendered).trim())
+    if (!Number.isFinite(n)) {
+        return makeScoreReport(matching, 0, false, 'Velocity output is not a valid number')
+    }
+
+    const score = Math.round(Math.max(0, Math.min(100, n)))
+    const isMatch = score >= threshold
+    return makeScoreReport(matching, score, isMatch)
 }

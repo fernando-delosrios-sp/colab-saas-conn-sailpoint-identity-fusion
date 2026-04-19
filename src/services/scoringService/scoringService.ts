@@ -4,7 +4,16 @@ import { defaultFusionMaxCandidatesForForm } from '../../data/connectorDefaults'
 import { countIdentityBackedFusionMatches } from '../formService/helpers'
 import { LogService } from '../logService'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
-import { normalizeLIG3, scoreDice, scoreDoubleMetaphone, scoreJaroWinkler, scoreLIG3, scoreLIG3Normalized, scoreNameMatcher } from './helpers'
+import {
+    normalizeLIG3,
+    scoreCustomVelocity,
+    scoreDice,
+    scoreDoubleMetaphone,
+    scoreJaroWinkler,
+    scoreLIG3,
+    scoreLIG3Normalized,
+    scoreNameMatcher,
+} from './helpers'
 import { TrigramIndex, buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
 import { isExactAttributeMatchScores } from './exactMatch'
 
@@ -486,7 +495,7 @@ export class ScoringService {
             case 'lig3':
                 return scoreLIG3(accountAttribute, identityAttribute, matchingConfig)
             case 'custom':
-                this.log.crash('Custom algorithm not implemented')
+                return scoreCustomVelocity(accountAttribute, identityAttribute, matchingConfig)
         }
         return makeSkippedReport(matchingConfig, 'Unknown algorithm')
     }

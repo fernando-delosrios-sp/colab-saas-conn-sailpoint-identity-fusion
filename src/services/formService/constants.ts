@@ -7,7 +7,7 @@ export const ALGORITHM_LABELS: Record<string, string> = {
     lig3: 'LIG3',
     dice: 'Dice',
     'double-metaphone': 'Double Metaphone',
-    custom: 'Custom Algorithm (from SaaS customizer)',
+    custom: 'Custom Algorithm (Velocity)',
     average: 'Combined match score (legacy)',
     'weighted-mean': 'Combined score',
 }
