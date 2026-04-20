@@ -1192,7 +1192,7 @@
             },
             {
                 "name": "originAccount",
-                "description": "Origin identity ID or managed account key (sourceId::nativeIdentity; legacy raw IDs supported)",
+                "description": "Origin identity ID or managed account key (set on creation, immutable, persisted even if missing; legacy raw IDs supported)",
                 "type": "string",
                 "multi": false,
                 "entitlement": false

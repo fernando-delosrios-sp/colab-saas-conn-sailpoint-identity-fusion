@@ -1503,7 +1503,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         expect(fusionAccount.attributes.derived).toBe('src-h42::managed-42:Contoso Smith')
     })
 
-    it('keeps identity-backed $account when originSource is Identities and managed accounts are present', async () => {
+    it('uses origin managed $account when originSource is Identities and managed origin snapshot exists', async () => {
         const { sourceService, log, locks } = velocityDeps()
         const service = new AttributeService(
             velocityConfig('$account.employeeNumber', [{ name: 'HR' }]),
@@ -1549,12 +1549,10 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBe('E-ID')
+        expect(fusionAccount.attributes.derived).toBe('E-MANAGED')
     })
 
-    it('falls back to identity-backed $account when originSource is Identities and no managed accounts are present', async () => {
-        // When a baseline Fusion account has no managed accounts yet, $account should
-        // fall back to the identity-backed object so identity attributes remain accessible.
+    it('keeps $account undefined when originSource is Identities and origin snapshot is missing', async () => {
         const { sourceService, log, locks } = velocityDeps()
         const service = new AttributeService(
             velocityConfig('$account.employeeNumber', [{ name: 'HR' }]),
@@ -1588,11 +1586,10 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        // No managed accounts → falls back to identity bag, so $account.employeeNumber = 'E-ID'
-        expect(fusionAccount.attributes.derived).toBe('E-ID')
+        expect(fusionAccount.attributes.derived).toBeUndefined()
     })
 
-    it('synthetic Identities $account when origin is Identities and identity bag empty', async () => {
+    it('keeps $account undefined when origin is Identities and identity bag is empty', async () => {
         const { sourceService, log, locks } = velocityDeps()
         const service = new AttributeService(
             velocityConfig('$account.source.name$account.schema.id', [{ name: 'HR' }]),
@@ -1626,7 +1623,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBe('Identitiesid-only')
+        expect(fusionAccount.attributes.derived).toBeUndefined()
     })
 
     it('does not resolve managed $account by transient account.id fallback', async () => {
@@ -1675,10 +1672,10 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBe('E-ID')
+        expect(fusionAccount.attributes.derived).toBeUndefined()
     })
 
-    it('uses fusion display/id attributes for synthetic identity-backed schema values', async () => {
+    it('does not synthesize identity-backed schema values when origin snapshot is missing', async () => {
         const { sourceService, log, locks } = velocityDeps()
         const service = new AttributeService(
             velocityConfig('$account.schema.name:$account.schema.id', [{ name: 'HR' }]),
@@ -1712,10 +1709,10 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBe('Fusion Name:Fusion ID')
+        expect(fusionAccount.attributes.derived).toBeUndefined()
     })
 
-    it('uses identity.name instead of identity.attributes.displayName for identity-backed schema name fallback', async () => {
+    it('keeps schema-name expressions undefined when identity origin snapshot is missing', async () => {
         const { sourceService, log, locks } = velocityDeps()
         const service = new AttributeService(
             velocityConfig('$account.schema.name', [{ name: 'HR' }]),
@@ -1749,7 +1746,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBe('Identity Name')
+        expect(fusionAccount.attributes.derived).toBeUndefined()
     })
 
     it('uses $originAccount id string in expressions', async () => {

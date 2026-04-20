@@ -69,6 +69,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         fetchFormInstancesData: jest.fn().mockResolvedValue(undefined),
         processFetchedFormData: jest.fn().mockResolvedValue(undefined),
         cleanUpForms: jest.fn().mockResolvedValue(undefined),
+        awaitPendingDeleteOperations: jest.fn().mockResolvedValue(undefined),
     }
 
     const fusion = {

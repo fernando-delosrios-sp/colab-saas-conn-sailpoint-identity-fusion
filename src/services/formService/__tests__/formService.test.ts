@@ -57,3 +57,86 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
         )
     })
 })
+
+describe('FormService stale-form cleanup queue', () => {
+    it('queues stale forms for deletion and skips instance fetch for those definitions', async () => {
+        const now = Date.now()
+        const staleDate = new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString()
+        const freshDate = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString()
+        const searchFormInstancesByTenant = jest.fn().mockResolvedValue({ data: [] })
+        const deleteFormDefinition = jest.fn().mockResolvedValue(undefined)
+
+        const service = new FormService(
+            {
+                fusionFormNamePattern: 'Fusion',
+                fusionFormExpirationDays: 7,
+            } as any,
+            { warn: jest.fn(), info: jest.fn(), debug: jest.fn() } as any,
+            {
+                customFormsApi: {
+                    searchFormInstancesByTenant,
+                    deleteFormDefinition,
+                },
+                execute: async (fn: () => Promise<any>) => fn(),
+                paginate: jest.fn().mockResolvedValue([
+                    { id: 'form-stale', name: 'Fusion stale', created: staleDate },
+                    { id: 'form-fresh', name: 'Fusion fresh', created: freshDate },
+                ]),
+            } as any,
+            {} as any
+        )
+
+        await service.fetchFormInstancesData(true)
+        await service.cleanUpForms()
+        await service.awaitPendingDeleteOperations()
+
+        expect(searchFormInstancesByTenant).toHaveBeenCalledTimes(1)
+        expect(searchFormInstancesByTenant).toHaveBeenCalledWith({
+            filters: 'formDefinitionId eq "form-fresh"',
+        })
+        expect(deleteFormDefinition).toHaveBeenCalledTimes(1)
+        expect(deleteFormDefinition).toHaveBeenCalledWith({ formDefinitionID: 'form-stale' })
+    })
+
+    it('does not block while queued deletions are still running', async () => {
+        let resolveDelete: (() => void) | undefined
+        const deleteFormDefinition = jest.fn().mockImplementation(
+            () =>
+                new Promise<void>((resolve) => {
+                    resolveDelete = resolve
+                })
+        )
+
+        const service = new FormService(
+            {
+                fusionFormNamePattern: 'Fusion',
+                fusionFormExpirationDays: 7,
+            } as any,
+            { warn: jest.fn(), info: jest.fn(), debug: jest.fn() } as any,
+            {
+                customFormsApi: {
+                    deleteFormDefinition,
+                    searchFormInstancesByTenant: jest.fn().mockResolvedValue({ data: [] }),
+                },
+                execute: async (fn: () => Promise<any>) => fn(),
+            } as any,
+            {} as any
+        )
+
+        ;(service as any).addFormToDelete('form-stale')
+
+        await service.cleanUpForms()
+        expect(deleteFormDefinition).toHaveBeenCalledTimes(1)
+
+        let drained = false
+        const drainPromise = service.awaitPendingDeleteOperations().then(() => {
+            drained = true
+        })
+        await Promise.resolve()
+        expect(drained).toBe(false)
+
+        resolveDelete?.()
+        await drainPromise
+        expect(drained).toBe(true)
+    })
+})

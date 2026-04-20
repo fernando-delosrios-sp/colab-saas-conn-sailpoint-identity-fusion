@@ -121,7 +121,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
         identities.fetchIdentities(),
         sources.fetchManagedAccounts(),
         sources.fetchFusionAccounts(),
-        forms.fetchFormInstancesData(),
+        forms.fetchFormInstancesData(isPersistent),
     ]
 
     if (isPersistent) {
@@ -256,12 +256,11 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     const { log, fusion, forms, sources, attributes, messaging, res } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
 
-    fusion.clearAnalyzedAccounts()
     sources.clearManagedAccounts()
 
     if (isPersistent) {
         await forms.cleanUpForms()
-        log.info('Form cleanup completed')
+        log.info('Form cleanup queued')
     }
 
     let count = 0
@@ -295,6 +294,9 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
                 disableOptimization,
             })
         })
+
+        await forms.awaitPendingDeleteOperations()
+        log.info('Queued form deletions completed')
     }
 
     return count

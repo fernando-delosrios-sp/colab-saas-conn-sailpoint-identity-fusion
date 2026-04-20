@@ -152,6 +152,35 @@ export class FusionAccount {
     }
 
     /**
+     * Resolve composite managed account key candidates from persisted fusion-account attributes.
+     * Keeps legacy nativeIdentity as fallback when no composite can be recovered.
+     */
+    private static resolveCompositeKeyFromFusionRecord(account: Account): string | undefined {
+        const attrs = (account.attributes ?? {}) as Record<string, unknown>
+        const findComposite = (...candidates: Array<unknown>): string | undefined => {
+            for (const candidate of candidates) {
+                if (Array.isArray(candidate)) {
+                    for (const item of candidate) {
+                        const normalized = normalizeCompositeManagedAccountKey(String(item))
+                        if (normalized) return normalized
+                    }
+                    continue
+                }
+                const normalized = normalizeCompositeManagedAccountKey(String(candidate ?? ''))
+                if (normalized) return normalized
+            }
+            return undefined
+        }
+
+        return findComposite(
+            readString(attrs, 'originAccount'),
+            readString(attrs, 'mainAccount'),
+            attrs.accounts,
+            attrs['missing-accounts']
+        )
+    }
+
+    /**
      * Common initialization logic for factory methods.
      * Handles default values internally to avoid repetitive null coalescing in callers.
      * Use explicit undefined checks for booleans so `disabled: false` / `needsRefresh: false` apply.
@@ -228,11 +257,12 @@ export class FusionAccount {
         const statuses = attributeToSet(account.attributes, 'statuses')
         const { identityDisplayName, accountName } = FusionAccount.labelsFromAccount(account)
         const accountDisplayName = accountName || identityDisplayName || undefined
+        const resolvedCompositeManagedKey = FusionAccount.resolveCompositeKeyFromFusionRecord(account)
         if (statuses.has('baseline')) sourceSet.add('Identities')
 
         fusionAccount.initializeBasicProperties({
             type: FusionAccountKind.Fusion,
-            nativeIdentity: account.nativeIdentity as string,
+            nativeIdentity: resolvedCompositeManagedKey ?? (account.nativeIdentity as string),
             name: accountDisplayName,
             sourceName: account.sourceName,
             identityDisplayName,
@@ -1117,10 +1147,6 @@ export class FusionAccount {
         this._missingAccountIds = normalizeManagedAccountKeySet(this._missingAccountIds)
         this._accountIds = normalizeManagedAccountKeySet(this._accountIds)
 
-        const resolvedOriginAccountId = normalizeCompositeManagedAccountKey(this._originAccount)
-        if (resolvedOriginAccountId) {
-            this._originAccount = resolvedOriginAccountId
-        }
         // Phase 1: Identity-based matching via index (O(1) lookup)
         if (this._identityId !== undefined) {
             const matchedIds = accountsByIdentityId.get(this._identityId)

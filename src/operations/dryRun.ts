@@ -91,8 +91,8 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             fusionAccountsFound: sources.fusionAccountCount,
             totalFusionAccounts: readNumber(fusion, 'totalFusionAccountCount', sources.fusionAccountCount),
         }
-        const dryRunStats = buildStatsForDryRun(fetchResult, issueSummary, timer.totalElapsed(), fusionCounts)
-        const report = fusion.generateReport(true, dryRunStats)
+        const preStreamingStats = buildStatsForDryRun(fetchResult, issueSummary, timer.totalElapsed(), fusionCounts)
+        const report = fusion.generateReport(true, preStreamingStats)
         const reportIndex = buildReportAccountIndex(report.accounts)
         const pendingReviewByAccountId = forms.pendingReviewContextByAccountId
         const decisionAccountIds = new Set((report.fusionReviewDecisions ?? []).map((decision) => decision.accountId))
@@ -164,12 +164,19 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         }
 
         timer.phase('PHASE 4: Streaming enriched ISC account rows')
+        const canonicalTotalProcessingTime = timer.totalElapsed()
+        const finalDryRunStats = buildStatsForDryRun(
+            fetchResult,
+            issueSummary,
+            canonicalTotalProcessingTime,
+            fusionCounts
+        )
         let reportHtmlOutputPath: string | undefined
         const shouldWriteHtmlReport = runtimeOptions.writeToDisk
         const shouldSendReportEmail = (runtimeOptions.sendReportTo?.length ?? 0) > 0
         if (shouldWriteHtmlReport || shouldSendReportEmail) {
             await hydrateIdentitiesForReportDecisions(serviceRegistry)
-            const emailReport = buildEmailReportFromFusionReport(serviceRegistry, report, dryRunStats)
+            const emailReport = buildEmailReportFromFusionReport(serviceRegistry, report, finalDryRunStats)
             const htmlReportBody = serviceRegistry.messaging.renderFusionReportHtml(
                 emailReport,
                 'aggregation',
@@ -200,7 +207,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             reportOptions: runtimeOptions,
             reportAccounts: report.accounts,
             issueSummary,
-            totalProcessingTime: timer.totalElapsed(),
+            totalProcessingTime: canonicalTotalProcessingTime,
             stats: report.stats,
             fusionReviewDecisionsCount: (report.fusionReviewDecisions ?? []).length,
             writeToDisk: runtimeOptions.writeToDisk,

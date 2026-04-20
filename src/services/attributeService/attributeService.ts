@@ -34,6 +34,8 @@ const COUNTER_SUFFIX_RE = /\$counter$|\$\{counter\}$/
 const VELOCITY_VAR_RE = /(^|[^\\])\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)/
 /** System-managed provenance id; not mapped or defined via Velocity. */
 const ORIGIN_ACCOUNT_ATTRIBUTE = 'originAccount'
+/** System-managed provenance source; not mapped or defined via Velocity. */
+const ORIGIN_SOURCE_ATTRIBUTE = 'originSource'
 
 /**
  * Managed account key for matching `mainAccount` / `$originAccount` — composite `sourceId::nativeIdentity`
@@ -287,7 +289,7 @@ export class AttributeService {
         fusionIdentityAttribute: string,
         fusionDisplayAttribute: string
     ): boolean {
-        if (attribute === ORIGIN_ACCOUNT_ATTRIBUTE) return true
+        if (attribute === ORIGIN_ACCOUNT_ATTRIBUTE || attribute === ORIGIN_SOURCE_ATTRIBUTE) return true
         const { current } = fusionAccount.attributeBag
         const hasExistingValue = isValidAttributeValue(current[attribute])
         const canResetDisplay = fusionAccount.needsReset && attribute === fusionDisplayAttribute
@@ -674,7 +676,9 @@ export class AttributeService {
         const schemaName = configuredSchemaName ?? identityName ?? originId
         const schemaId = configuredSchemaId ?? identityId ?? originId
 
-        if (originSource === 'Identities' && identityHasData) {
+        const identityMatchesOrigin =
+            identityId !== undefined && identityId.trim() !== '' && identityId.trim() === originId
+        if (originSource === 'Identities' && identityHasData && identityMatchesOrigin) {
             return {
                 ...identityBag,
                 source: { name: 'Identities' },
@@ -689,25 +693,7 @@ export class AttributeService {
         const managed = orderedAccounts.find((account) => getManagedAccountSnapshotKey(account) === originId)
         if (managed) return managed
 
-        if (originSource === 'Identities') {
-            return {
-                ...identityBag,
-                source: { name: 'Identities' },
-                schema: {
-                    name: schemaName,
-                    id: schemaId,
-                },
-                IIQDisabled: Boolean(fusionAccount.disabled),
-            }
-        }
-
-        return {
-            source: { name: originSource ?? '' },
-            schema: {
-                name: schemaName,
-                id: schemaId,
-            },
-        }
+        return undefined
     }
 
     private readAccountAttributeString(fusionAccount: FusionAccount, attributeName: string): string | undefined {
@@ -1087,7 +1073,7 @@ export class AttributeService {
         context: Record<string, any>
     ): Promise<void> {
         const { name, refresh } = definition
-        if (name === ORIGIN_ACCOUNT_ATTRIBUTE) return
+        if (name === ORIGIN_ACCOUNT_ATTRIBUTE || name === ORIGIN_SOURCE_ATTRIBUTE) return
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
         const needsRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || refresh
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
@@ -1203,7 +1189,7 @@ export class AttributeService {
         context: Record<string, any>
     ): Promise<void> {
         const { name } = definition
-        if (name === ORIGIN_ACCOUNT_ATTRIBUTE) return
+        if (name === ORIGIN_ACCOUNT_ATTRIBUTE || name === ORIGIN_SOURCE_ATTRIBUTE) return
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
         const existingValue = fusionAccount.attributes[name]
         const hasValue = isValidAttributeValue(existingValue)

@@ -208,6 +208,19 @@ describe('accountList setup phase', () => {
             disableOptimization: true,
         })
     })
+
+    it('clears analyzed accounts after output rows are sent', async () => {
+        const { registry, fusion } = createMockRegistry([])
+        const input = { schema: { attributes: [] } } as any
+
+        await accountList(registry, input)
+
+        expect(registry.fusion.forEachISCAccount).toHaveBeenCalled()
+        expect(registry.fusion.clearAnalyzedAccounts).toHaveBeenCalled()
+        expect(registry.fusion.forEachISCAccount.mock.invocationCallOrder[0]).toBeLessThan(
+            registry.fusion.clearAnalyzedAccounts.mock.invocationCallOrder[0]
+        )
+    })
 })
 
 describe('accountList two-pass aggregation lifecycle', () => {

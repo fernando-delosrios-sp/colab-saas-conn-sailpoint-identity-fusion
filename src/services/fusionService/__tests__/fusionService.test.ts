@@ -1280,6 +1280,8 @@ describe('FusionService', () => {
                 uncorrelated: false,
                 attributes: {
                     accounts: ['source-a-id::native-existing-1', 'source-a-id::native-deleted-1'],
+                    originSource: 'Source A',
+                    originAccount: 'source-a-id::native-deleted-1',
                 },
             } as unknown as Account
 
@@ -1322,6 +1324,8 @@ describe('FusionService', () => {
             expect(result.accountIds).not.toContain('source-a-id::native-deleted-1')
             expect(result.missingAccountIds).toContain('source-a-id::native-existing-1')
             expect(result.missingAccountIds).not.toContain('source-a-id::native-deleted-1')
+            expect(result.originSource).toBe('Source A')
+            expect(result.originAccountId).toBe('source-a-id::native-deleted-1')
             expect(result.needsRefresh).toBe(true)
             expect(result.history).toEqual(
                 expect.arrayContaining([
@@ -1524,6 +1528,22 @@ describe('FusionService', () => {
 
             const inAccountMap = fusionService.getFusionAccountByNativeIdentity('fusion-noident-1')
             expect(inAccountMap).toBe(account)
+        })
+
+        it('prefers managed composite key over legacy nativeIdentity for unmatched persisted accounts', () => {
+            const account = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'legacy-native-id',
+                name: 'Legacy Unmatched',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    originAccount: 'source-a-id::shared-native-id',
+                },
+            } as unknown as Account)
+
+            fusionService.setFusionAccount(account)
+
+            expect(fusionService.getFusionAccountByNativeIdentity('source-a-id::shared-native-id')).toBe(account)
+            expect(fusionService.getFusionAccountByNativeIdentity('legacy-native-id')).toBeUndefined()
         })
     })
 

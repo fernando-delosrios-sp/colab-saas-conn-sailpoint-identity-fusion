@@ -556,6 +556,12 @@ describe('dryRun', () => {
 
     it('sends report email to explicit recipients even when report candidates have no identityId', async () => {
         const registry = createRegistry()
+        const totalElapsed = jest.fn().mockReturnValueOnce('14M 56S').mockReturnValue('28M 8S')
+        registry.log.timer.mockReturnValue({
+            phase: jest.fn(),
+            end: jest.fn(),
+            totalElapsed,
+        })
         registry.fusion.generateReport.mockImplementation((_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
             accounts: [
                 {
@@ -585,6 +591,11 @@ describe('dryRun', () => {
             reportType: 'aggregation',
             reportTitle: 'Identity Fusion Dry Run Report',
         })
+        const sentReport = registry.messaging.sendReportTo.mock.calls[0][0]
+        expect(sentReport.stats?.totalProcessingTime).toBe('28M 8S')
+
+        const summary = registry.res.send.mock.calls.at(-1)?.[0]
+        expect(summary.totalProcessingTime).toBe('28M 8S')
     })
 
 

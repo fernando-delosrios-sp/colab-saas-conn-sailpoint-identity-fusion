@@ -50,6 +50,11 @@ export type { PendingReviewFormContext, PendingReviewReviewerContext, PendingRev
  */
 export class FormService {
     private formsToDelete: string[] = []
+    private readonly formDeleteQueueConcurrency = 1
+    private readonly pendingFormDeleteTasks: Set<Promise<void>> = new Set()
+    private readonly queuedFormDeleteIds: Set<string> = new Set()
+    private readonly formDeleteQueue: string[] = []
+    private activeFormDeleteWorkers = 0
     private _fusionIdentityDecisions?: FusionDecision[]
     private fusionAssignmentDecisionMap: Map<string, FusionDecision> = new Map()
     /** Pending (unanswered) form instance URLs by recipient identityId, populated during fetchFormData. */
@@ -107,17 +112,45 @@ export class FormService {
     /**
      * Fetch form definitions and their instances, deferring decision processing.
      */
-    public async fetchFormInstancesData(): Promise<void> {
+    public async fetchFormInstancesData(enableStaleFormCleanup: boolean = false): Promise<void> {
         this.log.debug('Fetching form data')
         assert(this.fusionFormNamePattern, 'Fusion form name pattern is required')
         this.resetFormDataState()
 
         const forms = await this.fetchFormsByName(this.fusionFormNamePattern)
-        this._formsFound = forms.length
-        this.log.debug(`Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern}`)
+        let activeForms = forms
+        if (enableStaleFormCleanup) {
+            const staleForms: FormDefinitionResponseV2025[] = []
+            activeForms = []
+            for (const form of forms) {
+                if (this.isFormDefinitionStale(form)) {
+                    staleForms.push(form)
+                } else {
+                    activeForms.push(form)
+                }
+            }
+            this.log.debug(
+                `Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern} ` +
+                    `(active=${activeForms.length}, stale=${staleForms.length})`
+            )
+            for (const staleForm of staleForms) {
+                const staleFormId = staleForm.id
+                if (!staleFormId) continue
+                this.log.info(
+                    `Form definition ${staleFormId} is older than ${this.fusionFormExpirationDays} day(s), queuing deletion`
+                )
+                this.addFormToDelete(staleFormId)
+            }
+        } else {
+            this.log.debug(
+                `Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern} ` +
+                    '(stale cleanup disabled for this run)'
+            )
+        }
+        this._formsFound = activeForms.length
 
         this._fetchedFormInstances = await Promise.all(
-            forms.map(async (form) => {
+            activeForms.map(async (form) => {
                 this.log.debug(`Fetching instances for form definition: ${form.id} (${form.name || 'unknown'})`)
                 const instances = await this.fetchFormInstancesByDefinitionId(form.id)
                 this.log.debug(`Fetched ${instances.length} instance(s) for form definition: ${form.id}`)
@@ -176,10 +209,46 @@ export class FormService {
             return
         }
 
-        this.log.info(`Cleaning up ${this.formsToDelete.length} form(s)`)
-        await Promise.all(this.formsToDelete.map((formId) => this.deleteForm(formId)))
+        const formIdsToQueue = [...new Set(this.formsToDelete)]
         this.formsToDelete = []
-        this.log.debug('Form cleanup completed')
+
+        let queuedCount = 0
+        for (const formId of formIdsToQueue) {
+            if (this.queuedFormDeleteIds.has(formId)) {
+                continue
+            }
+            this.queuedFormDeleteIds.add(formId)
+            this.formDeleteQueue.push(formId)
+            queuedCount++
+        }
+
+        if (queuedCount === 0) {
+            this.log.debug('No new forms were queued for cleanup')
+            return
+        }
+
+        this.log.info(`Queued ${queuedCount} form(s) for low-priority cleanup`)
+        this.kickoffFormDeleteWorkers()
+    }
+
+    /**
+     * Wait for all queued form-deletion work to complete.
+     * Called at the end of the pipeline so process flow remains non-blocking mid-run.
+     */
+    public async awaitPendingDeleteOperations(): Promise<void> {
+        if (this.pendingFormDeleteTasks.size === 0 && this.formDeleteQueue.length === 0) {
+            this.log.debug('No pending form deletions to await')
+            return
+        }
+
+        this.log.info('Waiting for queued form deletions to complete')
+        while (this.pendingFormDeleteTasks.size > 0 || this.formDeleteQueue.length > 0) {
+            this.kickoffFormDeleteWorkers()
+            if (this.pendingFormDeleteTasks.size > 0) {
+                await Promise.all(Array.from(this.pendingFormDeleteTasks))
+            }
+        }
+        this.log.debug('All queued form deletions completed')
     }
 
     /**
@@ -1098,6 +1167,68 @@ export class FormService {
         if (!this.formsToDelete.includes(formDefinitionId)) {
             this.formsToDelete.push(formDefinitionId)
         }
+    }
+
+    private kickoffFormDeleteWorkers(): void {
+        while (
+            this.activeFormDeleteWorkers < this.formDeleteQueueConcurrency &&
+            this.formDeleteQueue.length > 0
+        ) {
+            let trackedPromise!: Promise<void>
+            this.activeFormDeleteWorkers++
+            const workerPromise = this.runFormDeleteWorker()
+            trackedPromise = workerPromise.finally(() => {
+                this.activeFormDeleteWorkers--
+                this.pendingFormDeleteTasks.delete(trackedPromise)
+                if (this.formDeleteQueue.length > 0) {
+                    this.kickoffFormDeleteWorkers()
+                }
+            })
+            this.pendingFormDeleteTasks.add(trackedPromise)
+        }
+    }
+
+    private async runFormDeleteWorker(): Promise<void> {
+        while (this.formDeleteQueue.length > 0) {
+            const formId = this.formDeleteQueue.shift()
+            if (!formId) {
+                continue
+            }
+            try {
+                await this.deleteForm(formId)
+            } finally {
+                this.queuedFormDeleteIds.delete(formId)
+            }
+        }
+    }
+
+    private isFormDefinitionStale(form: FormDefinitionResponseV2025): boolean {
+        const timestamp = this.readFormDefinitionTimestamp(form)
+        if (!timestamp) return false
+
+        const cutoffMs = Date.now() - this.fusionFormExpirationDays * 24 * 60 * 60 * 1000
+        return timestamp.getTime() < cutoffMs
+    }
+
+    private readFormDefinitionTimestamp(form: FormDefinitionResponseV2025): Date | undefined {
+        const rawTimestamp =
+            readUnknown(form, 'modified') ??
+            readUnknown(form, 'modifiedAt') ??
+            readUnknown(form, 'created') ??
+            readUnknown(form, 'createdAt')
+
+        if (!rawTimestamp) {
+            this.log.warn(`Form definition ${form.id || 'unknown'} missing timestamp fields; skipping stale check`)
+            return undefined
+        }
+
+        const parsed = new Date(String(rawTimestamp))
+        if (Number.isNaN(parsed.getTime())) {
+            this.log.warn(`Form definition ${form.id || 'unknown'} has invalid timestamp "${String(rawTimestamp)}"`)
+            return undefined
+        }
+
+        return parsed
     }
 
     // ------------------------------------------------------------------------

@@ -41,10 +41,14 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         await processPhase(serviceRegistry, options)
         timer.phase('PHASE 3: Work queue depletion and form reconciliation')
 
-        await reportPhase(serviceRegistry, fetchResult, timer, options)
-        timer.phase('PHASE 4: Generating fusion report')
-
         const count = await outputPhase(serviceRegistry, options)
+        timer.phase('PHASE 4: Sending accounts and persisting state')
+
+        await reportPhase(serviceRegistry, fetchResult, timer, options)
+        timer.phase('PHASE 5: Generating fusion report')
+
+        // Report generation consumes analyzed-account slices; clear them after report/output complete.
+        serviceRegistry.fusion.clearAnalyzedAccounts()
         timer.end(`✓ Account list operation completed successfully - ${count} account(s) processed`)
     } catch (error) {
         if (error instanceof ConnectorError) throw error
