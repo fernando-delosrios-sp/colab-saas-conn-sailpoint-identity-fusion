@@ -284,7 +284,7 @@ function calculatePrefixBonus(s1: string, s2: string): number {
 
 /**
  * Similarity from a user-defined Velocity template. Template is compiled once per process (shared cache).
- * Context: $accountValue, $identityValue, $attribute.
+ * Context: $accountValue, $candidateValue, $attribute.
  */
 export const scoreCustomVelocity = (
     accountAttribute: string,
@@ -300,7 +300,7 @@ export const scoreCustomVelocity = (
 
     const context = Object.assign(Object.create(null), {
         accountValue: accountAttribute,
-        identityValue: identityAttribute,
+        candidateValue: identityAttribute,
         attribute: matching.attribute,
     }) as RenderContext
 

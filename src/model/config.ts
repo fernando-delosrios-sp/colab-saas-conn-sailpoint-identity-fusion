@@ -109,7 +109,7 @@ export interface MatchingConfig {
     algorithm?: 'name-matcher' | 'jaro-winkler' | 'lig3' | 'dice' | 'double-metaphone' | 'average' | 'weighted-mean' | 'custom'
     /**
      * When `algorithm` is `custom`, Apache Velocity template evaluated per pair.
-     * Context includes `$accountValue`, `$identityValue`, and `$attribute` (rule attribute name).
+     * Context includes `$accountValue`, `$candidateValue`, and `$attribute` (rule attribute name).
      * Rendered output must parse as a number in 0–100 (used as similarity score).
      */
     customVelocityExpression?: string

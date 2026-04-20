@@ -825,7 +825,7 @@
                                             "required": true,
                                             "parentKey": "algorithm",
                                             "parentValue": "custom",
-                                            "helpKey": "Apache Velocity template evaluated for each account/identity pair. Context: $accountValue (managed candidate), $identityValue (existing identity), $attribute (this rule's attribute name). Output must be a number from 0 to 100 (similarity score). Same Velocity helpers as attribute definitions ($Math, $Normalize, etc.). Keep expressions efficient; this runs in the hot matching loop."
+                                            "helpKey": "Apache Velocity template evaluated for each account/identity pair. Context: $accountValue (managed account attribute), $candidateValue (fusion identity attribute), $attribute (this rule's attribute name). Output must be a number from 0 to 100 (similarity score). Same Velocity helpers as attribute definitions ($Math, $Normalize, etc.). Keep expressions efficient; this runs in the hot matching loop."
                                         },
                                         {
                                             "key": "fusionScore",

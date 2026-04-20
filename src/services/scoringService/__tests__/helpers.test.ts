@@ -152,6 +152,15 @@ describe('scoringService helpers', () => {
             expect(result.score).toBe(5)
         })
 
+        it('exposes $candidateValue (fusion identity side)', () => {
+            const result = scoreCustomVelocity('a', 'bb', {
+                ...customBase,
+                customVelocityExpression: '$candidateValue.length',
+                fusionScore: 1,
+            })
+            expect(result.score).toBe(2)
+        })
+
         it('returns 0 with comment when output is not a number', () => {
             const result = scoreCustomVelocity('a', 'b', {
                 ...customBase,
