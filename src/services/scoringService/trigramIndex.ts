@@ -55,8 +55,13 @@ export function buildAttributeIndex(identities: FusionAccount[], attribute: stri
 export function queryAttributeIndex(index: TrigramIndex, accountValue: string): Set<FusionAccount> {
     const normalized = normalizeLIG3(accountValue)
     const candidates = new Set<FusionAccount>()
-    for (const trigram of extractTrigrams(normalized)) {
-        const bucket = index.get(trigram)
+    // Iterate the padded string directly rather than building an intermediate Set<string>.
+    // Duplicate trigrams are harmless: candidates.add() is idempotent, and typical names
+    // have few repeated 3-char windows, so the savings from skipping the Set allocation outweigh
+    // the rare duplicate bucket lookup.
+    const padded = `  ${normalized} `
+    for (let i = 0; i <= padded.length - 3; i++) {
+        const bucket = index.get(padded.slice(i, i + 3))
         if (bucket) {
             for (const identity of bucket) {
                 candidates.add(identity)
