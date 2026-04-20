@@ -16,7 +16,7 @@ This page is the shortest path from “new Fusion source” to a working aggrega
     - **Define:** [Attribute definitions](guides/define.md) (Velocity, unique IDs, UUIDs, counters).
     - **Match (if used):** [Matching and review](guides/match.md) after sources and baseline are correct.
 4. **Discover schema** — Run **Discover Schema** so ISC loads the Fusion account schema.
-5. **Identity profile and aggregation** — Attach an identity profile and provisioning plan as required, then run entitlement and account aggregation.
+5. **Aggregation** — Run entitlement aggregation and then account aggregation. If Fusion is **authoritative** and **Match** is configured, also create and attach an identity profile so ISC can build identities from Fusion accounts.
 
 ## Where to go next
 

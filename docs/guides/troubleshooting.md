@@ -36,11 +36,7 @@ This comprehensive troubleshooting guide helps you diagnose and resolve common i
 
 **Symptom:** "Test Connection" in ISC fails or times out.
 
-**Screenshot placeholder:** Test connection interface.
 
-![Test connection - Interface](../assets/images/troubleshooting-test-connection.png)
-
-<!-- PLACEHOLDER: Screenshot of Connection Settings and Review and Test. Save as docs/assets/images/troubleshooting-test-connection.png -->
 
 **Possible causes:**
 
@@ -156,11 +152,7 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
 | **Stuck processing state**           | Check account history for "processing" status | Simply retry the aggregation; the connector auto-resets the flag and asks you to run again |
 | **Configuration error**              | Review all configuration fields               | Validate configuration                                                                     |
 
-**Screenshot placeholder:** Source configuration.
 
-![Source configuration - Settings](../assets/images/troubleshooting-sources.png)
-
-<!-- PLACEHOLDER: Screenshot of Source Settings showing source names. Save as docs/assets/images/troubleshooting-sources.png -->
 
 **Diagnostic steps:**
 
@@ -573,11 +565,7 @@ Advanced Settings → Developer Settings:
 - External logging level: Debug (for troubleshooting; Info for production)
 ```
 
-**Screenshot placeholder:** External logging configuration.
 
-![External logging - Configuration](../assets/images/troubleshooting-external-logging.png)
-
-<!-- PLACEHOLDER: Screenshot of Developer Settings with external logging. Save as docs/assets/images/troubleshooting-external-logging.png -->
 
 ### Log levels
 

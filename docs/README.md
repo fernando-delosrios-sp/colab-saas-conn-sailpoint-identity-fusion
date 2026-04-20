@@ -1,7 +1,5 @@
 # Identity Fusion NG — Documentation
 
-This folder is the MkDocs **`docs_dir`**. The published site is built in CI from `main` (see `.github/workflows/deploy-docs-pages.yml`).
-
 ## Start here
 
 | Page | Description |
@@ -24,15 +22,6 @@ The [home page](home.md) mirrors the repository README (generated before build).
 | [Advanced connection settings](guides/advanced-connection-settings.md) | Queue, retry, batch sizing, timeouts, and external logging. |
 | [Proxy mode](guides/proxy-mode.md) | Run connector logic on an external server and connect ISC via proxy. |
 | [Troubleshooting](guides/troubleshooting.md) | Common issues, checks, and recovery steps. |
-
-## Assets (screenshots and videos)
-
-Placeholder paths used in the guides:
-
-- **Screenshots:** `docs/assets/images/` — add the image files referenced in the HTML comments in each guide (for example `attribute-generation-source-settings.png`).
-- **Videos:** `docs/assets/videos/` — add the video files referenced in the guides (for example `identity-fusion-migration.mov`, `attribute-generation-unique-id.mp4`, `match-flow.mp4`).
-
-After adding a file, the markdown image or video link in the guide works when the filename matches. From `docs/guides/`, image paths use `../assets/images/...`.
 
 ## Contributing to docs
 

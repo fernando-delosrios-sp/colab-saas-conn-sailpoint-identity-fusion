@@ -4,8 +4,6 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
 
 #### Scope Section
 
-![Source Settings - Scope](../assets/images/config-source-scope.png)
-
 | Field                                | Description                                                                | Required                              | Notes                                                                                                                                                                                     |
 | ------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Include identities in the scope?** | Include identities in addition to managed accounts from configured sources | No                                    | Enable for identity-only Defines or to define the baseline for Match (sources scope = managed accounts from configured sources).                                                          |
@@ -15,15 +13,11 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
 
 #### Sources Section
 
-![Source Settings - Sources](../assets/images/config-source-sources.png)
-
 | Field                             | Description                                                 | Required | Notes                                         |
 | --------------------------------- | ----------------------------------------------------------- | -------- | --------------------------------------------- |
 | **Authoritative account sources** | List of sources whose accounts will be merged and evaluated | Yes      | Each source has sub-configuration (see below) |
 
 **Per-source configuration:**
-
-![Source Settings - Per-source configuration](../assets/images/config-source-single.png)
 
 | Field                                           | Description                                                           | Required               | Notes                                                                                                                                                                                                                                                                                                    |
 | ----------------------------------------------- | --------------------------------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -103,8 +97,6 @@ flowchart TD
 </details>
 
 #### Processing Control Section
-
-![Source Settings - Processing Control](../assets/images/config-source-processing.png)
 
 | Field                                              | Description                                                              | Required | Notes                                                                                                  |
 | -------------------------------------------------- | ------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------ |

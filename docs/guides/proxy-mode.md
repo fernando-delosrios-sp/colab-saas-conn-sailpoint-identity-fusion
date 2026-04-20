@@ -18,12 +18,6 @@ Proxy mode allows the Identity Fusion NG connector to **delegate all processing*
 | **Proxy client** | Request forwarder | ISC SaaS Connector  | Receives commands from ISC; sends to proxy server; streams back results |
 | **Proxy server** | Request processor | Your infrastructure | Implements connector logic; processes accounts; returns results         |
 
-**Diagram placeholder:** Proxy mode architecture.
-
-![Proxy mode flow - Architecture](../assets/images/proxy-mode-flow.png)
-
-<!-- PLACEHOLDER: Diagram: ISC connector (client) → Proxy URL → Your server. Save as docs/assets/images/proxy-mode-flow.png -->
-
 ### When to use proxy mode
 
 | Use case                     | Why proxy mode?                                            | Example                                                    |
@@ -149,11 +143,7 @@ In the Identity Fusion NG connector source in ISC:
 | **Proxy URL**          | `https://your-server.example.com/fusion` | Full URL to your proxy endpoint  |
 | **Proxy password**     | `<strong-secret>`                        | Shared secret for authentication |
 
-**Screenshot placeholder:** Proxy Settings in ISC.
 
-![Proxy Settings - ISC configuration](../assets/images/proxy-mode-settings.png)
-
-<!-- PLACEHOLDER: Screenshot of Advanced Settings > Proxy Settings. Save as docs/assets/images/proxy-mode-settings.png -->
 
 ### Proxy URL requirements
 

@@ -14,12 +14,6 @@ Advanced Settings are organized into three sections:
 | **Advanced Connection Settings** | API behavior: queue, retry, batch sizing, timeouts, concurrency | Production tuning, rate limit management, performance optimization |
 | **Proxy Settings**               | Delegate processing to external server                      | Custom deployment requirements (see [Proxy mode](proxy-mode.md))   |
 
-**Screenshot placeholder:** Advanced Settings menu interface.
-
-![Advanced Settings menu - Overview](../assets/images/advanced-settings-menu.png)
-
-<!-- PLACEHOLDER: Screenshot of Advanced Settings with Developer and Advanced Connection sections. Save as docs/assets/images/advanced-settings-menu.png -->
-
 ---
 
 ## Part 1: Developer Settings
@@ -38,12 +32,6 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 | **Enable external logging?**               | Boolean  | Send connector logs to external endpoint          | No      | Low                                           |
 | **External logging URL**                   | URL      | Endpoint for external log aggregation             | None    | Low (if endpoint secured)                     |
 | **External logging level**                 | Dropdown | Minimum log level to send                         | None    | Low                                           |
-
-**Screenshot placeholder:** Developer Settings interface.
-
-![Developer Settings - Configuration](../assets/images/advanced-settings-developer.png)
-
-<!-- PLACEHOLDER: Screenshot of Developer Settings. Save as docs/assets/images/advanced-settings-developer.png -->
 
 ### Reset accounts
 
@@ -158,11 +146,7 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 | **Batch sizing**          | Batch size                                                  | Tune page size and throughput balance |
 | **Priority**              | Enable priority processing                                 | Prioritize important requests         |
 
-**Screenshot placeholder:** Advanced Connection Settings interface.
 
-![Advanced Connection Settings - Configuration](../assets/images/advanced-settings-connection.png)
-
-<!-- PLACEHOLDER: Screenshot of Advanced Connection Settings. Save as docs/assets/images/advanced-settings-connection.png -->
 
 ### Provisioning and timing
 

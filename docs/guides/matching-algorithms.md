@@ -16,12 +16,6 @@ Matching algorithms calculate **similarity scores** (0–100) between attribute 
 | **Minimum combined match score**  | Global floor for the weighted combined score                  | Matching Settings (0–100)                                                 |
 | **Mandatory match**               | Rule must pass its minimum for a potential match              | Per attribute (Yes/No)                                                    |
 
-**Screenshot placeholder:** Fusion attribute matches configuration.
-
-![Fusion attribute matches - Configuration interface](../assets/images/matching-algorithms-config.png)
-
-<!-- PLACEHOLDER: Screenshot of Attribute Matching Settings > Fusion attribute matches. Save as docs/assets/images/matching-algorithms-config.png -->
-
 ---
 
 ## Algorithm selection guide
@@ -35,7 +29,7 @@ Matching algorithms calculate **similarity scores** (0–100) between attribute 
 | **Dice**                  | Longer text (addresses, job titles, descriptions) | Robust for substring matching; handles reordering well                 | Can miss phonetic variations; requires adequate text length      | Medium             |
 | **Double Metaphone**      | Names with spelling variations, phonetic matching | Catches "Catherine"/"Katherine", "John"/"Jon", "Smith"/"Smyth"         | May generate false positives for short names; language-dependent | Low                |
 | **LIG3**                  | Compound identifiers, names with missing parts    | Excellent with international accents and compound gap handling         | Heavily punishes transpositions (e.g. inverted dates/names)      | High               |
-| **Custom**                | Domain-specific requirements                      | Your own logic via SaaS customizer                                     | Requires development and testing                                 | Variable           |
+| **Custom**                | Domain-specific requirements                      | Velocity expression; no external development needed                    | Runs in the hot matching loop — keep expressions efficient       | Variable           |
 
 ### Decision tree: Which algorithm to use?
 
@@ -60,7 +54,7 @@ What type of attribute are you comparing?
 │  └─ After normalization → Jaro-Winkler
 │
 └─ Custom business logic
-   └─ Custom (from SaaS customizer)
+   └─ Custom (Velocity)
 ```
 
 ---
@@ -277,28 +271,50 @@ What type of attribute are you comparing?
 - You expect transpositions (e.g. swapped DOBs, or swapped first/last names). LIG3 heavily penalizes misordered data.
 - Short substrings or pure typographical error matching—Jaro-Winkler handles typos better.
 
-### Custom (from SaaS customizer)
+### Custom (Velocity template)
 
-**Purpose:** Domain-specific matching logic implemented in a [SailPoint SaaS Connectivity Customizer](https://developer.sailpoint.com/docs/connectivity/saas-connectivity/customizers).
+**Purpose:** Domain-specific matching logic written as an Apache Velocity template, evaluated inline by the connector for every account/identity pair.
 
 **When to use:**
 
 - None of the built-in algorithms fit your needs
-- You have proprietary matching logic (e.g., industry-specific identifiers)
-- You need to call external APIs for matching (e.g., third-party identity resolution service)
+- You have proprietary matching logic (e.g., industry-specific identifiers, structured codes)
 - Complex business rules (e.g., "match if first 3 chars + last 2 chars identical")
 
-**Implementation:**
+**Configuration:**
 
-- Develop custom algorithm in a [Connectivity Customizer](https://developer.sailpoint.com/docs/connectivity/saas-connectivity/customizers)
-- Return similarity score 0–100
-- Configure as "Custom" in Fusion attribute match
+Set **Matching algorithm** to `Custom Algorithm (Velocity)` and fill in the **Custom match score (Velocity)** field with a Velocity template that returns a number from 0 to 100.
+
+**Context variables:**
+
+| Variable | Description |
+|---|---|
+| `$accountValue` | Attribute value from the managed account being evaluated |
+| `$candidateValue` | Attribute value from the Fusion identity candidate |
+| `$attribute` | Name of the rule's attribute |
+
+The same helpers available in attribute definitions are also available here: `$Math`, `$Normalize`, `$Datefns`, `$AddressParse`, `$JSON`.
+
+**Behavior:**
+
+- `skipMatchIfMissing` applies normally: when enabled (default), the rule is skipped if either value is null or empty.
+- The expression runs in the hot matching loop — keep it efficient; avoid heavy computation or branching that scales with dataset size.
 
 **Examples:**
 
-- Parse and compare structured employee IDs (e.g., "EMP-2024-001234")
-- Call external identity verification service
-- Apply industry-specific matching rules (healthcare NPI, financial institution codes)
+```velocity
+## Match structured employee IDs — compare prefix only (first 6 chars)
+#set($a = $accountValue.substring(0, 6))
+#set($b = $candidateValue.substring(0, 6))
+#if($a == $b)100#{else}0#end
+```
+
+```velocity
+## Numeric range proximity — scores 100 if within 10%, 0 otherwise
+#set($diff = $Math.abs($accountValue - $candidateValue))
+#set($threshold = $Math.abs($candidateValue * 0.1))
+#if($diff <= $threshold)100#{else}0#end
+```
 
 ---
 
@@ -411,12 +427,6 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 | **High false positives** | Many forms for obvious non-duplicates | Raise thresholds; add mandatory matches for critical attributes                                 |
 | **High false negatives** | Missing obvious matches            | Lower thresholds; add more attributes; try different algorithms                                 |
 | **Borderline cases**     | Many ambiguous matches                | Enable **Automatically assign on exact match?** for obvious ones; manual review for borderline |
-
-**Screenshot placeholder:** Review form showing per-attribute similarity scores.
-
-![Similarity scores on review form - Detail view](../assets/images/matching-algorithms-scores-form.png)
-
-<!-- PLACEHOLDER: Screenshot of review form showing per-attribute similarity scores. Save as docs/assets/images/matching-algorithms-scores-form.png -->
 
 ---
 

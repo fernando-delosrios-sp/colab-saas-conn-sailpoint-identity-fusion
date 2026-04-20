@@ -49,9 +49,6 @@ For each attribute you want to generate, add an **Attribute Definition**:
 | **Refresh on each aggregation?**  | Boolean             | Recalculate every run (Normal type only) | Yes if dynamic; No if stable                                          |
 
 
-**Screenshot placeholder:** Attribute Definition with examples.
-Attribute definition example
-
 ---
 
 ## Attribute types explained
