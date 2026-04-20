@@ -3,7 +3,7 @@ import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceType } from '../../model/config'
 import { LogService, PhaseTimer } from '../logService'
 import { FormService } from '../formService'
-import { defaultFusionMaxCandidatesForForm, defaults } from '../../data/connectorDefaults'
+import { defaultFusionMaxCandidatesForForm, defaults } from '../../data/config'
 import { IdentityService } from '../identityService'
 import { SourceInfo, SourceService, buildSourceConfigPatch } from '../sourceService'
 import { FusionAccount } from '../../model/account'
@@ -1152,7 +1152,7 @@ export class FusionService {
             const elapsedBeforeNextAccount = Date.now() - processManagedAccountsStartedAt
             if (processed > 0 && elapsedBeforeNextAccount >= phaseBudgetMs) {
                 const remaining = Math.max(0, initialQueueSize - processed)
-                this.log.warn(
+                this.log.info(
                     `Managed accounts phase reached soft time budget (${PhaseTimer.formatElapsed(
                         phaseBudgetMs
                     )}). Pausing with ${processed}/${initialQueueSize} analyzed and ${remaining} still queued for the next aggregation run.`
