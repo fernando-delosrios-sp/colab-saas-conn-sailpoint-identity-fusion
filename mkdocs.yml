@@ -29,6 +29,7 @@ nav:
   - Run and troubleshoot:
       - Troubleshooting: guides/troubleshooting.md
   - Operations reference:
+      - Connector operations (APIs ISC calls): operations/index.md
       - Connectivity:
           - Test connection: operations/test-connection.md
           - Dry run (custom): operations/custom-dryrun.md
