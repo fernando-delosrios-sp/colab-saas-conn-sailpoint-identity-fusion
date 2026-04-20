@@ -1,6 +1,7 @@
 import {
     buildManagedAccountKey,
     isCompositeManagedAccountKey,
+    normalizeCompositeManagedAccountKey,
     parseManagedAccountKey,
 } from '../managedAccountKey'
 
@@ -22,5 +23,9 @@ describe('managedAccountKey helpers', () => {
         const key = 'source-a::native-1'
         expect(isCompositeManagedAccountKey(key)).toBe(true)
         expect(parseManagedAccountKey(key)).toEqual({ sourceId: 'source-a', nativeIdentity: 'native-1' })
+    })
+
+    it('normalizes whitespace inside composite key parts', () => {
+        expect(normalizeCompositeManagedAccountKey(' source-a :: native-1 ')).toBe('source-a::native-1')
     })
 })

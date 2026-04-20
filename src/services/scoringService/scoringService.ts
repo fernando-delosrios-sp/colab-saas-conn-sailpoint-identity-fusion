@@ -18,6 +18,7 @@ import {
 import { normalizeName as normalizeNameForMatcher } from './nameMatching'
 import { TrigramIndex, buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
 import { isExactAttributeMatchScores } from './exactMatch'
+import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 
 /** Build a skipped ScoreReport without spreading the full MatchingConfig. */
 function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreReport {
@@ -322,22 +323,44 @@ export class ScoringService {
             return fusionAccount.nativeIdentityOrUndefined === fusionIdentity.nativeIdentityOrUndefined
         }
 
-        if (managedAccountId === fusionIdentity.managedAccountId) {
+        if (ScoringService.sameManagedAccountKey(managedAccountId, fusionIdentity.managedAccountId)) {
             return true
         }
 
-        if (managedAccountId === fusionIdentity.nativeIdentityOrUndefined) {
+        if (ScoringService.sameManagedAccountKey(managedAccountId, fusionIdentity.nativeIdentityOrUndefined)) {
             return true
         }
 
-        if (managedAccountId === fusionIdentity.originAccountId) {
+        if (ScoringService.sameManagedAccountKey(managedAccountId, fusionIdentity.originAccountId)) {
             return true
         }
 
-        if (fusionIdentity.accountIdsSet?.has(managedAccountId) || fusionIdentity.missingAccountIdsSet?.has(managedAccountId)) {
+        if (
+            ScoringService.hasEquivalentManagedAccountId(fusionIdentity.accountIdsSet, managedAccountId) ||
+            ScoringService.hasEquivalentManagedAccountId(fusionIdentity.missingAccountIdsSet, managedAccountId)
+        ) {
             return true
         }
 
+        return false
+    }
+
+    private static sameManagedAccountKey(a: string | undefined, b: string | undefined): boolean {
+        if (!a || !b) return false
+        if (a === b) return true
+        const normalizedA = normalizeCompositeManagedAccountKey(a)
+        const normalizedB = normalizeCompositeManagedAccountKey(b)
+        return normalizedA !== undefined && normalizedA === normalizedB
+    }
+
+    private static hasEquivalentManagedAccountId(values: ReadonlySet<string> | undefined, key: string): boolean {
+        if (!values) return false
+        if (values.has(key)) return true
+        const normalizedKey = normalizeCompositeManagedAccountKey(key)
+        if (!normalizedKey) return false
+        for (const value of values) {
+            if (normalizeCompositeManagedAccountKey(value) === normalizedKey) return true
+        }
         return false
     }
 

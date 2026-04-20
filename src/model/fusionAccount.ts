@@ -277,7 +277,9 @@ export class FusionAccount {
             fusionAccount._originSource = account.attributes.originSource
         }
         if (typeof account.attributes?.originAccount === 'string') {
-            fusionAccount._originAccount = account.attributes.originAccount
+            const normalizedOriginAccount = normalizeCompositeManagedAccountKey(account.attributes.originAccount)
+            const trimmedOriginAccount = account.attributes.originAccount.trim()
+            fusionAccount._originAccount = normalizedOriginAccount ?? (trimmedOriginAccount || undefined)
         }
         // Capture the previously stored account IDs so we can later rebuild
         // the current and missing account sets based on which managed accounts

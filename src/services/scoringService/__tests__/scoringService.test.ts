@@ -543,6 +543,48 @@ describe('ScoringService deferred candidate matching', () => {
         expect(compared).toBe(0)
         expect(analyzedManagedCandidate.addFusionMatch).not.toHaveBeenCalled()
     })
+
+    it('does not compare when persisted origin account differs only by composite-key whitespace', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'email',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 90,
+                    },
+                ],
+                fusionAverageScore: 80,
+            } as any,
+            { crash: jest.fn() } as any
+        )
+
+        const managedKey = 'source-id::self@example.com'
+        const analyzedManagedCandidate = {
+            attributes: { email: 'self@example.com' },
+            managedAccountId: managedKey,
+            nativeIdentityOrUndefined: managedKey,
+            addFusionMatch: jest.fn(),
+        } as any
+
+        const persistedUnmatchedCandidate = {
+            attributes: { email: 'self@example.com' },
+            managedAccountId: undefined,
+            nativeIdentityOrUndefined: 'fusion-simple-key',
+            originAccountId: ' source-id :: self@example.com ',
+            accountIdsSet: new Set<string>(),
+            missingAccountIdsSet: new Set<string>(),
+        } as any
+
+        const compared = await service.scoreFusionAccount(
+            analyzedManagedCandidate,
+            [persistedUnmatchedCandidate],
+            MatchCandidateType.NewUnmatched
+        )
+
+        expect(compared).toBe(0)
+        expect(analyzedManagedCandidate.addFusionMatch).not.toHaveBeenCalled()
+    })
 })
 
 describe('effectiveSkipMatchIfMissing', () => {

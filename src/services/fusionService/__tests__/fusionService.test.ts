@@ -1545,6 +1545,23 @@ describe('FusionService', () => {
             expect(fusionService.getFusionAccountByNativeIdentity('source-a-id::shared-native-id')).toBe(account)
             expect(fusionService.getFusionAccountByNativeIdentity('legacy-native-id')).toBeUndefined()
         })
+
+        it('normalizes persisted origin composite key when restoring unmatched accounts', () => {
+            const account = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'legacy-native-id',
+                name: 'Legacy Unmatched',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    originAccount: ' source-a-id :: shared-native-id ',
+                },
+            } as unknown as Account)
+
+            fusionService.setFusionAccount(account)
+
+            expect(account.originAccountId).toBe('source-a-id::shared-native-id')
+            expect(fusionService.getFusionAccountByNativeIdentity('source-a-id::shared-native-id')).toBe(account)
+            expect(fusionService.getFusionAccountByNativeIdentity('legacy-native-id')).toBeUndefined()
+        })
     })
 
     describe('identity conflict warnings', () => {

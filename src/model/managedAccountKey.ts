@@ -44,7 +44,11 @@ export function isCompositeManagedAccountKey(value: string | undefined | null): 
 export function normalizeCompositeManagedAccountKey(value: string | undefined | null): string | undefined {
     const normalized = normalizePart(value)
     if (!normalized || !isCompositeManagedAccountKey(normalized)) return undefined
-    return normalized
+    const separatorIndex = normalized.indexOf(MANAGED_ACCOUNT_KEY_SEPARATOR)
+    const sourceId = normalizePart(normalized.slice(0, separatorIndex))
+    const nativeIdentity = normalizePart(normalized.slice(separatorIndex + MANAGED_ACCOUNT_KEY_SEPARATOR.length))
+    if (!sourceId || !nativeIdentity) return undefined
+    return `${sourceId}${MANAGED_ACCOUNT_KEY_SEPARATOR}${nativeIdentity}`
 }
 
 export function parseManagedAccountKey(
