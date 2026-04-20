@@ -2,9 +2,13 @@
 
 > **Disclaimer:** Identity Fusion NG is the newest Identity Fusion version and supersedes any Identity Fusion v1.x previous release. Version 1.x is now **deprecated**. For those needing to upgrade an existing deployment, please refer to the [migration guide](docs/guides/migration-from-previous-fusion.md).
 
+![Identity Fusion NG Framework](docs/assets/images/Identity_Fusion_NG_Framework.png)
+
 **Documentation**
+
 - Full documentation site: [GitHub Pages](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/)
 - Source docs in this repository: [documentation folder](docs/README.md)
+- Start here for the core concepts and architecture: [Identity Fusion NG Framework](docs/collateral/Identity_Fusion_NG_Framework.pdf)
 
 Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consolidates account data from one or more managed sources, lets you **map** attributes into a single Fusion account schema, **define** derived and unique values (including Velocity-based computation), and optionally **match** new or changed accounts to existing identities so you can avoid duplicate identities without brittle exact-match correlation alone.
 
@@ -16,12 +20,12 @@ Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consol
 
 **Read next**
 
-| Step | Resource |
-| ---- | -------- |
-| Shortest path to a first aggregation | [Get started](docs/get-started.md) |
-| How Map → Define → Match fits together | [Concepts: map, define, and match](docs/concepts/map-define-match.md) |
-| Full guide list | [Guides overview](docs/guides/index.md) |
-| Connector operations (APIs ISC calls) | Use **Operations reference** in the [documentation site](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/) navigation |
+| Step                                   | Resource                                                                                                                                                |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shortest path to a first aggregation   | [Get started](docs/get-started.md)                                                                                                                      |
+| How Map → Define → Match fits together | [Concepts: map, define, and match](docs/concepts/map-define-match.md)                                                                                   |
+| Full guide list                        | [Guides overview](docs/guides/index.md)                                                                                                                 |
+| Connector operations (APIs ISC calls)  | Use **Operations reference** in the [documentation site](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/) navigation |
 
 Identity Fusion NG addresses the complex challenge of identity and account data aggregation through a streamlined **map-define-match framework**. This concept represents the high-level operation of the connector, which can execute all three steps or just one, but always in this logical sequence:
 
@@ -31,11 +35,11 @@ Identity Fusion NG addresses the complex challenge of identity and account data 
 Map your attributes from different sources and accounts to align with your identity schema. Define new attributes from the existing ones, like unique identifiers, normalised versions of the original attributes and other powerful transformations. Finally, match your new accounts with existing identities to avoid creating duplicates, using all the previously processed attributes with a series of comparison algorithms to pick and choose.
 
 1. **Map (Consolidation)**
-  Map your attributes from different sources and accounts to align with your identity schema. Strict correlation often fails when data is inconsistent. Creating, normalizing, and combining attributes from multiple sources is complex. The connector provides flexible merging strategies when multiple sources contribute to the same attribute (first found, list, concatenate, or source preference).
+   Map your attributes from different sources and accounts to align with your identity schema. Strict correlation often fails when data is inconsistent. Creating, normalizing, and combining attributes from multiple sources is complex. The connector provides flexible merging strategies when multiple sources contribute to the same attribute (first found, list, concatenate, or source preference).
 2. **Define (Unique identifiers / Computation)**
-  Define new attributes from the existing ones, like unique identifiers, normalised versions of the original attributes and other powerful transformations. ISC has no built-in way to generate unique identifiers and handle value collision. The connector provides powerful attribute definition using Apache Velocity templates, unique ID generation with disambiguation counters, immutable UUID assignment, and computed attributes.
+   Define new attributes from the existing ones, like unique identifiers, normalised versions of the original attributes and other powerful transformations. ISC has no built-in way to generate unique identifiers and handle value collision. The connector provides powerful attribute definition using Apache Velocity templates, unique ID generation with disambiguation counters, immutable UUID assignment, and computed attributes.
 3. **Match (Matching / Correlation)**
-  Match your new accounts with existing identities to avoid creating duplicates, using all the previously processed attributes with a series of comparison algorithms to pick and choose. The connector provides similarity-based match detection comparing the resulting mapped and defined Fusion accounts against your identity baseline. It offers optional manual review workflows and configurable merging of account attributes.
+   Match your new accounts with existing identities to avoid creating duplicates, using all the previously processed attributes with a series of comparison algorithms to pick and choose. The connector provides similarity-based match detection comparing the resulting mapped and defined Fusion accounts against your identity baseline. It offers optional manual review workflows and configurable merging of account attributes.
 
 Map, Define, Match Framework
 
@@ -64,7 +68,6 @@ Authentication and connectivity to the ISC APIs.
 
 Connection Settings
 
-
 | Field                               | Description                                    | Required                         | Notes                                                                                 |
 | ----------------------------------- | ---------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------- |
 | **Identity Security Cloud API URL** | Base URL of your ISC tenant                    | Yes                              | Format: `https://<tenant>.api.identitynow.com`                                        |
@@ -72,7 +75,6 @@ Connection Settings
 | **Personal Access Token secret**    | Client secret from your PAT                    | Yes                              | Keep secure; rotate as needed                                                         |
 | **API request retries**             | Maximum retry attempts for failed API requests | No (shown when retry is enabled) | Default: 20; also configurable from Advanced Settings                                 |
 | **Requests per second**             | Maximum API requests per second (throttling)   | No (shown when queue is enabled) | Default: 8; also configurable from Advanced Settings                                  |
-
 
 > **Note:** **API request retries** and **Requests per second** also appear in **Advanced Settings → Advanced Connection Settings**. They control the same underlying settings; Connection Settings provides quick access, while Advanced Settings groups them with related queue and retry options.
 
@@ -84,13 +86,11 @@ Controls which identities and sources are in scope and how processing is managed
 
 For an in-depth explanation of source types, aggregation rules, correlation modes, and account lifecycle, see the [Source configuration](docs/guides/source-configuration.md) guide.
 
-
 | Section                | Description                                                                                                                                                                                               |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Scope**              | Determines if identities are included in the processing scope and defines an optional identity filter query.                                                                                              |
 | **Sources**            | Configures authoritative sources, source behavior, aggregation/correlation modes, plus dual account filters: `Accounts API filter` (server-side) and `Accounts JMESPath filter` (client-side, page-wise). |
 | **Processing Control** | Manages history retention, empty account deletion, and behavior when unique identifiers are missing.                                                                                                      |
-
 
 > **Note:** Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion NG. The connector skips them during managed-account ingestion and logs warning messages with discarded counts.
 >
@@ -106,17 +106,14 @@ Attribute Mapping Settings
 
 #### Attribute Mapping Definitions Section
 
-
 | Field                                             | Description                                                | Required | Notes                                                                                                                                                                                |
 | ------------------------------------------------- | ---------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Default attribute merge from multiple sources** | Default method for combining values from different sources | Yes      | Options: **First found** (first value by source order), **Keep a list of values** (distinct values as array), **Concatenate different values** (distinct values as `[a] [b]` string) |
 | **Attribute Mapping**                             | List of attribute mappings                                 | No       | Each mapping defines how source attributes feed a Fusion attribute                                                                                                                   |
 
-
 **Per-attribute mapping configuration:**
 
 Attribute Mapping Settings - Per-attribute mapping configuration
-
 
 | Field                                                        | Description                                             | Required                | Notes                                                                          |
 | ------------------------------------------------------------ | ------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------ |
@@ -124,7 +121,6 @@ Attribute Mapping Settings - Per-attribute mapping configuration
 | **Existing attributes**                                      | List of source attribute names that feed this attribute | Yes                     | Names must match source account schema (case-sensitive)                        |
 | **Default attribute merge from multiple sources** (override) | Override default merge for this specific mapping        | No                      | Same options as default, plus **Source name** (use value from specific source) |
 | **Source name**                                              | Specific source to use for this attribute               | Yes (when merge=source) | Takes precedence when multiple sources have values                             |
-
 
 > **Tip:** You can use mapping settings to predefine an attribute and redefine the same attribute using attribute definition. The mapped value is available to the definition expression.
 
@@ -140,32 +136,28 @@ Attribute Definition Settings
 
 #### Attribute Definition Settings Section
 
-
-| Field                                             | Description                                                | Required | Notes                                                        |
-| ------------------------------------------------- | ---------------------------------------------------------- | -------- | ------------------------------------------------------------ |
+| Field                                      | Description                                                | Required | Notes                                                        |
+| ------------------------------------------ | ---------------------------------------------------------- | -------- | ------------------------------------------------------------ |
 | **Maximum attempts for unique definition** | Maximum attempts to define a unique value before giving up | No       | Default: 100; prevents infinite loops with unique/UUID types |
-| **Attribute Definitions**                         | List of attribute definition rules                         | No       | Each definition specifies how an attribute is built          |
-
+| **Attribute Definitions**                  | List of attribute definition rules                         | No       | Each definition specifies how an attribute is built          |
 
 **Per-attribute definition configuration:**
 
 Attribute Definition Settings - Per-attribute definition
 
-
-| Field                                 | Description                                         | Required                   | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ------------------------------------- | --------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field                                 | Description                                       | Required                   | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------- | ------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Attribute Name**                    | Name of the account attribute to define           | Yes                        | Will appear in the discovered schema                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **Apache Velocity expression**        | Template expression to define the attribute value | No                         | Context includes: mapped account attributes, `$accounts`, `$sources`, `$previous`, optional `$identity`, `$originSource`, `$originAccount` (id), `$account` (origin snapshot object), plus `$Math`, `$Datefns` (format, parse, add/sub days/months/years, isBefore, isAfter, differenceInDays, etc.), `$AddressParse` (getCityState, getCityStateCode, parse), and `$Normalize` (date, phone, name, fullName, ssn, address). Example: `#set($initial = $firstname.substring(0, 1))$initial$lastname` |
-| **Case selection**                    | Case transformation to apply                        | Yes                        | Options: **Do not change**, **Lower case**, **Upper case**, **Capitalize**                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **Attribute Type**                    | Type of attribute                                   | Yes                        | **Normal** (standard attribute), **Unique** (must be unique across accounts; counter added if collision), **UUID** (generates immutable UUID), **Counter-based** (increments with each use)                                                                                                                                                                                                                                                                                                          |
-| **Counter start value**               | Starting value for counter                          | Yes (counter type)         | Example: 1, 1000, etc.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| **Minimum counter digits ($counter)** | Minimum digits for counter (zero-padded)            | Yes (counter/unique types) | Example: 3 → `001`, `002`; for unique type, counter is appended on collision                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **Case selection**                    | Case transformation to apply                      | Yes                        | Options: **Do not change**, **Lower case**, **Upper case**, **Capitalize**                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **Attribute Type**                    | Type of attribute                                 | Yes                        | **Normal** (standard attribute), **Unique** (must be unique across accounts; counter added if collision), **UUID** (generates immutable UUID), **Counter-based** (increments with each use)                                                                                                                                                                                                                                                                                                          |
+| **Counter start value**               | Starting value for counter                        | Yes (counter type)         | Example: 1, 1000, etc.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **Minimum counter digits ($counter)** | Minimum digits for counter (zero-padded)          | Yes (counter/unique types) | Example: 3 → `001`, `002`; for unique type, counter is appended on collision                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **Maximum length**                    | Maximum length for defined value                  | No                         | Truncates to this length; for unique/counter types, counter is preserved at end                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **Normalize special characters?**     | Remove special characters and quotes                | No                         | Useful for IDs and usernames                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **Remove spaces?**                    | Remove all spaces from value                        | No                         | Useful for IDs and usernames                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **Trim leading and trailing spaces?** | Remove leading/trailing whitespace from value       | No                         | Cleans up extra whitespace from source data                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **Refresh on each aggregation?**      | Recalculate value every aggregation                 | No                         | Only available for **Normal** type; unique/UUID/counter preserve state                                                                                                                                                                                                                                                                                                                                                                                                                               |
-
+| **Normalize special characters?**     | Remove special characters and quotes              | No                         | Useful for IDs and usernames                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **Remove spaces?**                    | Remove all spaces from value                      | No                         | Useful for IDs and usernames                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **Trim leading and trailing spaces?** | Remove leading/trailing whitespace from value     | No                         | Cleans up extra whitespace from source data                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Refresh on each aggregation?**      | Recalculate value every aggregation               | No                         | Only available for **Normal** type; unique/UUID/counter preserve state                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 **Note:** When an account is **enabled**, all attributes (including unique) are force refreshed and recalculated (internal mechanism to reset unique attributes).
 
@@ -191,27 +183,23 @@ Controls Match behavior, including similarity matching and manual review workflo
 
 Attribute Matching Settings - Matching
 
-
-| Field                                     | Description                                                    | Required | Notes                                                                                                                                                                                                 |
-| ----------------------------------------- | -------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Minimum combined match score [0-100]** | Global floor for the weighted **combined match score**         | Yes      | Typical range: 70-90; higher = stricter. The combined score is a weighted blend of per-attribute similarities; each rule’s **minimum similarity** is also its weight (higher minimum = more influence). |
-| **Automatically assign on exact match?**   | Assign to the matched identity without review when every real rule scores 100 and none were skipped | No    | Skips manual review only for an **exact attribute match**: all configured rules evaluated at 100% similarity with **no** rules skipped for missing values.                                                                 |
-| **Fusion attribute matches**             | List of identity attributes to compare for match detection     | Yes      | At least one attribute match required; each match specifies an attribute and algorithm                                                                                                                |
-
+| Field                                    | Description                                                                                         | Required | Notes                                                                                                                                                                                                   |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Minimum combined match score [0-100]** | Global floor for the weighted **combined match score**                                              | Yes      | Typical range: 70-90; higher = stricter. The combined score is a weighted blend of per-attribute similarities; each rule’s **minimum similarity** is also its weight (higher minimum = more influence). |
+| **Automatically assign on exact match?** | Assign to the matched identity without review when every real rule scores 100 and none were skipped | No       | Skips manual review only for an **exact attribute match**: all configured rules evaluated at 100% similarity with **no** rules skipped for missing values.                                              |
+| **Fusion attribute matches**             | List of identity attributes to compare for match detection                                          | Yes      | At least one attribute match required; each match specifies an attribute and algorithm                                                                                                                  |
 
 **Per-attribute match configuration:**
 
 Attribute Matching Settings - Matching - Per attribute matching
 
-
-| Field                        | Description                                                   | Required | Notes                                                                                                                                                                                                                                                                                                                                                                                  |
-| ---------------------------- | ------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Attribute**                | Identity attribute name to compare                            | Yes      | Must exist on identities in scope                                                                                                                                                                                                                                                                                                                                                      |
-| **Matching algorithm**       | Algorithm for similarity calculation                          | Yes      | **Enhanced Name Matcher** (person names, handles variations), **Jaro-Winkler** (short strings with typos, emphasizes beginning), **LIG3** (Levenshtein-based with intelligent gap penalties, excellent for international names and multi-word fields), **Dice** (longer text, bigram-based), **Double Metaphone** (phonetic, similar pronunciation), **Custom** (from SaaS customizer) |
-| **Similarity threshold & weight [0-100]** | Per-rule similarity threshold and blend weight             | Yes      | Values must meet this minimum for the rule to **pass**. The same value weights the rule in the **combined match score** (stricter rules count more). Use 0 only if you need minimal weight; it is treated as weight 1 in the blend. |
-| **Mandatory match**           | Rule must pass for a potential match                      | No       | When Yes: similarity must be ≥ this rule’s minimum or the candidate is rejected, regardless of combined score. Passing mandatory rules still contribute to the weighted combined score like other rules.                           |
-| **Skip match if missing**      | Skip rule when one side is missing                         | No       | Default: Yes. Skipped rules do not affect the combined score. Automatic assignment on exact match requires **no** skipped rules and every evaluated score at 100.                                                                        |
-
+| Field                                     | Description                                    | Required | Notes                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------- | ---------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Attribute**                             | Identity attribute name to compare             | Yes      | Must exist on identities in scope                                                                                                                                                                                                                                                                                                                                                      |
+| **Matching algorithm**                    | Algorithm for similarity calculation           | Yes      | **Enhanced Name Matcher** (person names, handles variations), **Jaro-Winkler** (short strings with typos, emphasizes beginning), **LIG3** (Levenshtein-based with intelligent gap penalties, excellent for international names and multi-word fields), **Dice** (longer text, bigram-based), **Double Metaphone** (phonetic, similar pronunciation), **Custom** (from SaaS customizer) |
+| **Similarity threshold & weight [0-100]** | Per-rule similarity threshold and blend weight | Yes      | Values must meet this minimum for the rule to **pass**. The same value weights the rule in the **combined match score** (stricter rules count more). Use 0 only if you need minimal weight; it is treated as weight 1 in the blend.                                                                                                                                                    |
+| **Mandatory match**                       | Rule must pass for a potential match           | No       | When Yes: similarity must be ≥ this rule’s minimum or the candidate is rejected, regardless of combined score. Passing mandatory rules still contribute to the weighted combined score like other rules.                                                                                                                                                                               |
+| **Skip match if missing**                 | Skip rule when one side is missing             | No       | Default: Yes. Skipped rules do not affect the combined score. Automatic assignment on exact match requires **no** skipped rules and every evaluated score at 100.                                                                                                                                                                                                                      |
 
 > **Tip:** Use Fusion reports to fine-tune your matching thresholds and algorithms.
 
@@ -223,14 +211,12 @@ Attribute Matching Settings - Matching - Per attribute matching
 
 Attribute Matching Settings - Review
 
-
 | Field                                              | Description                                      | Required | Notes                                                                                                                                                                                                                                                                                                                   |
 | -------------------------------------------------- | ------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **List of identity attributes to include in form** | Attributes shown on manual review form           | No       | Helps reviewers make informed decisions; examples: name, email, department, hire date                                                                                                                                                                                                                                   |
 | **Manual review expiration days**                  | Days before review form expires                  | Yes      | Default: 7; ensures timely resolution                                                                                                                                                                                                                                                                                   |
 | **Owner is global reviewer?**                      | Add Fusion source owner as reviewer to all forms | No       | Ensures at least one global reviewer is always assigned alongside dedicated reviewer entitlements for managed sources. For migration scenarios, it is recommended **not** to enable this until after the initial validation run has succeeded, so that review workflows cannot interfere with the first migration pass. |
 | **Send report to owner on aggregation?**           | Email report to owner after each aggregation     | No       | Includes potential matches and processing summary                                                                                                                                                                                                                                                                       |
-
 
 ### Advanced Settings
 
@@ -240,18 +226,16 @@ Fine-tuning for API behavior, resilience, debugging, and proxy mode.
 
 Advanced Settings - Developer
 
-
-| Field                         | Description                                                   | Required                                    | Notes                                                                                                                                                                                         |
-| ----------------------------- | ------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Reset accounts?**           | Force rebuild of all Fusion accounts from scratch on next run | No                                          | **Use with caution in production**; useful for testing config changes; disable after one run                                                                                                  |
-| **Managed accounts batch size** | Number of uncorrelated managed accounts per batch       | No                                          | Controls memory usage during match detection. Default 50. Lower for constrained environments; raise for throughput. |
-| **Maximum candidates per review form** | Limit of potential matches shown on review form      | No                                          | Limits how many highest-scoring identity candidates are included on manual review forms. Valid range 1-15. Default for new sources: `fusionMaxCandidatesForForm` in `connector-spec.json` → `sourceConfigInitialValues`. |
-| **Force attribute refresh on each aggregation?** | Recalculate Normal-type attributes every run | No | Applies only to Normal-type attributes. Can be expensive for large datasets. |
-| **Enable concurrency check?** | Prevent concurrent account aggregations via a processing lock | No                                          | Default: true. When enabled, a lock is set at the start of each aggregation. If a prior run left the lock stuck, it is auto-reset and an error asks you to retry. Disable only for debugging. |
-| **Enable external logging?**  | Send connector logs to external endpoint                      | No                                          | For centralized monitoring and analysis                                                                                                                                                       |
-| **External logging URL**      | Endpoint URL for external logs                                | No (required when external logging enabled) | HTTPS recommended                                                                                                                                                                             |
-| **External logging level**    | Minimum log level to send externally                          | No (required when external logging enabled) | Options: **Error**, **Warn**, **Info**, **Debug**                                                                                                                                             |
-
+| Field                                            | Description                                                   | Required                                    | Notes                                                                                                                                                                                                                    |
+| ------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Reset accounts?**                              | Force rebuild of all Fusion accounts from scratch on next run | No                                          | **Use with caution in production**; useful for testing config changes; disable after one run                                                                                                                             |
+| **Managed accounts batch size**                  | Number of uncorrelated managed accounts per batch             | No                                          | Controls memory usage during match detection. Default 50. Lower for constrained environments; raise for throughput.                                                                                                      |
+| **Maximum candidates per review form**           | Limit of potential matches shown on review form               | No                                          | Limits how many highest-scoring identity candidates are included on manual review forms. Valid range 1-15. Default for new sources: `fusionMaxCandidatesForForm` in `connector-spec.json` → `sourceConfigInitialValues`. |
+| **Force attribute refresh on each aggregation?** | Recalculate Normal-type attributes every run                  | No                                          | Applies only to Normal-type attributes. Can be expensive for large datasets.                                                                                                                                             |
+| **Enable concurrency check?**                    | Prevent concurrent account aggregations via a processing lock | No                                          | Default: true. When enabled, a lock is set at the start of each aggregation. If a prior run left the lock stuck, it is auto-reset and an error asks you to retry. Disable only for debugging.                            |
+| **Enable external logging?**                     | Send connector logs to external endpoint                      | No                                          | For centralized monitoring and analysis                                                                                                                                                                                  |
+| **External logging URL**                         | Endpoint URL for external logs                                | No (required when external logging enabled) | HTTPS recommended                                                                                                                                                                                                        |
+| **External logging level**                       | Minimum log level to send externally                          | No (required when external logging enabled) | Options: **Error**, **Warn**, **Info**, **Debug**                                                                                                                                                                        |
 
 > **Tip:** You can use the built-in remote log server from the project to send your logs to your computer and save them to a file. Just use `npm run remote-log-server` from the connector's Node project folder and use the generated URL as your remote log server.
 
@@ -259,31 +243,27 @@ Advanced Settings - Developer
 
 Advanced Settings - Connection
 
-
-| Field                              | Description                                                        | Required                         | Notes                                                                             |
-| ---------------------------------- | ------------------------------------------------------------------ | -------------------------------- | --------------------------------------------------------------------------------- |
-| **Provisioning timeout (seconds)** | Maximum wait time for provisioning operations                      | Yes                              | Default: 300; increase for large batches or slow APIs                             |
-| **Enable queue?**                  | Enable queue management for API requests                           | No                               | Enables rate limiting and concurrency control                                     |
-| **Maximum concurrent requests**    | Maximum simultaneous API requests                                  | No (required when queue enabled) | Default: 10; adjust based on API capacity and tenant limits                       |
+| Field                              | Description                                                        | Required                         | Notes                                                                                 |
+| ---------------------------------- | ------------------------------------------------------------------ | -------------------------------- | ------------------------------------------------------------------------------------- |
+| **Provisioning timeout (seconds)** | Maximum wait time for provisioning operations                      | Yes                              | Default: 300; increase for large batches or slow APIs                                 |
+| **Enable queue?**                  | Enable queue management for API requests                           | No                               | Enables rate limiting and concurrency control                                         |
+| **Maximum concurrent requests**    | Maximum simultaneous API requests                                  | No (required when queue enabled) | Default: 10; adjust based on API capacity and tenant limits                           |
 | **Requests per second**            | Maximum API requests per second (throttling)                       | No (required when queue enabled) | Default: 8; reduce if rate-limited (HTTP 429), increase only when tenant limits allow |
-| **Enable retry?**                  | Enable automatic retry for failed API requests                     | No                               | Recommended for production; handles transient failures                            |
-| **Processing wait time (seconds)** | Interval between keep-alive signals during long-running operations | Yes                              | Default: 60; used for account list and account update to prevent timeouts         |
-| **Retry delay (milliseconds)**     | Base delay between retry attempts                                  | Yes                              | Default: 1000; for HTTP 429, uses `Retry-After` header when present               |
-| **Batch size**                     | API page size used for account retrieval and queue throughput      | Yes                              | Default: 250; valid range 1-250                                                   |
-| **Enable priority processing?**    | Prioritize important requests in queue                             | No                               | Default: enabled when queue is enabled; ensures critical operations process first |
-
+| **Enable retry?**                  | Enable automatic retry for failed API requests                     | No                               | Recommended for production; handles transient failures                                |
+| **Processing wait time (seconds)** | Interval between keep-alive signals during long-running operations | Yes                              | Default: 60; used for account list and account update to prevent timeouts             |
+| **Retry delay (milliseconds)**     | Base delay between retry attempts                                  | Yes                              | Default: 1000; for HTTP 429, uses `Retry-After` header when present                   |
+| **Batch size**                     | API page size used for account retrieval and queue throughput      | Yes                              | Default: 250; valid range 1-250                                                       |
+| **Enable priority processing?**    | Prioritize important requests in queue                             | No                               | Default: enabled when queue is enabled; ensures critical operations process first     |
 
 #### Proxy Settings Section
 
 Advanced Settings - Proxy
-
 
 | Field                  | Description                                  | Required                         | Notes                                                                                |
 | ---------------------- | -------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------ |
 | **Enable proxy mode?** | Delegate all processing to external endpoint | No                               | For running connector logic on your own infrastructure                               |
 | **Proxy URL**          | URL of external proxy endpoint               | No (required when proxy enabled) | Must accept POST with command type, input, and config                                |
 | **Proxy password**     | Secret for proxy authentication              | Yes (when proxy enabled)         | Set same value as `PROXY_PASSWORD` environment variable on proxy server; keep secure |
-
 
 ---
 
@@ -292,7 +272,6 @@ For detailed field-by-field guidance and usage patterns, see the [usage guides](
 ---
 
 ## Overview
-
 
 | Topic                                                                                    | Description                                                                                                  |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -305,7 +284,6 @@ For detailed field-by-field guidance and usage patterns, see the [usage guides](
 | [Proxy mode](docs/guides/proxy-mode.md)                                                  | Run connector logic on an external server and connect ISC to it via proxy.                                   |
 | [Troubleshooting](docs/guides/troubleshooting.md)                                        | Common issues, logs, and recovery steps.                                                                     |
 
-
 ---
 
 ## Quick start
@@ -314,8 +292,10 @@ For detailed field-by-field guidance and usage patterns, see the [usage guides](
 2. **Create a source** — In Admin → Connections → Sources, create a new source using the Identity Fusion NG connector. Mark it **Authoritative** when you need Match (so Fusion decides which incoming accounts create new identities vs. correlate to existing ones). For Map & Define only, Fusion is rarely authoritative.
 3. **Configure connection** — Set Identity Security Cloud API URL and Personal Access Token (ID and secret). Use **Review and Test** to verify connectivity.
 4. **Configure the connector** — Depending on your goal:
-  - **Map & Define only:** Set [Source Settings](docs/guides/source-configuration.md) (identity scope and/or sources), [Attribute Mapping Settings](docs/guides/map.md) for the **Map** step, and [Attribute Definition Settings](docs/guides/define.md) for the **Define** step.
+
+- **Map & Define only:** Set [Source Settings](docs/guides/source-configuration.md) (identity scope and/or sources), [Attribute Mapping Settings](docs/guides/map.md) for the **Map** step, and [Attribute Definition Settings](docs/guides/define.md) for the **Define** step.
     - **Match:** Configure [sources and baseline](docs/guides/source-configuration.md), then [Attribute Matching Settings](docs/guides/match.md) (matching and review) for the **Match** step.
+
 5. **Discover schema** — Run **Discover Schema** so ISC has the combined account schema.
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 
@@ -347,15 +327,15 @@ All `include*` options default to `false`. If none are enabled, no account rows 
 
 - Unless `writeToDisk` is `true`, streams final ISC account rows (`key`, `attributes`, `disabled`) like account list output. With `writeToDisk`, those row objects are stored under the `rows` array in the report file (not over HTTP).
 - Adds root-level `matchingStatus` (and related context) to every streamed row with:
-  - `status`: `matched`, `deferred`, `non-matched`, `review-error`, or `not-analyzed`
-  - `matchAttempts`: how many managed accounts had Match run for this row in this report
-  - `matches`: candidate identities and per-attribute scores when available
+    - `status`: `matched`, `deferred`, `non-matched`, `review-error`, or `not-analyzed`
+    - `matchAttempts`: how many managed accounts had Match run for this row in this report
+    - `matches`: candidate identities and per-attribute scores when available
 - Adds root-level `sourceStatus` and `correlationStatus` (source provenance and linked account context: `accounts`, `missing-accounts`, `reviews`, `statuses`, etc.)
 - Adds root-level `review` only for rows categorized as `review` or `decisions`:
-  - `pending`: whether there is an active pending form instance linked to any account id in `attributes.accounts`
-  - `forms`: pending form references (`formInstanceId`, `url`)
-  - `reviewers`: resolved reviewer identities (`id`, `name`, `email`)
-  - `candidates`: candidate identity details (`id`, `name`, `scores`, `attributes`)
+    - `pending`: whether there is an active pending form instance linked to any account id in `attributes.accounts`
+    - `forms`: pending form references (`formInstanceId`, `url`)
+    - `reviewers`: resolved reviewer identities (`id`, `name`, `email`)
+    - `candidates`: candidate identity details (`id`, `name`, `scores`, `attributes`)
 - Adds root-level `reportCategories` to every streamed row, listing all matched output categories for that row.
 - Sends a final summary object with `type: custom:dryrun:summary` containing: `options` (the `include*` / `writeToDisk` flags used for the run), `emitted` (per **emitted** row, how often each report category appeared—filtered by your `include*` flags, so e.g. `includeDeferred` can stay `0` while `totals.deferredMatches` is non-zero if you did not enable `includeDeferred`), `totals` (run-wide analysis: Fusion account counts from the loaded source, custom-report Match-attempt slice counts such as `matchAttempts`, `matches`, `deferredMatches`, `nonMatches`, etc.), diagnostics, optional report `stats`, and processing time.
 
@@ -371,7 +351,6 @@ All `include*` options default to `false`. If none are enabled, no account rows 
 
 Every Identity Fusion NG account exposes the following built-in attributes. These are always present regardless of Attribute Mapping or Attribute Definition configuration.
 
-
 | Attribute            | Type                 | Multi | Description                                                                                                                                                                                                                                                                                          |
 | -------------------- | -------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **id**               | string               | No    | Unique account identifier (native identity)                                                                                                                                                                                                                                                          |
@@ -385,8 +364,7 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
 | **sources**          | string               | No    | Comma-separated list of managed source names currently contributing to this account                                                                                                                                                                                                                  |
 | **mainAccount**      | string               | No    | Managed account ID evaluated first when present. If populated with a valid managed account ID, that managed account is evaluated first for mapping and definition context.                                                                                                                           |
 | **originSource**     | string               | No    | Name of the source that originally created this account. Set once at creation and never modified. Equals the managed account source name when the account originates from a source account, or `Identities` when it originates from an identity. Useful for auditing and tracing account provenance. |
-| **originAccount**    | string               | No    | Identity ID or managed account key (`sourceId::nativeIdentity`) that originally created this Fusion account. Set once at creation and never modified. Legacy raw account IDs are supported for backwards compatibility. Pairs with `**$account`** in Velocity for the origin snapshot object.        |
-
+| **originAccount**    | string               | No    | Identity ID or managed account key (`sourceId::nativeIdentity`) that originally created this Fusion account. Set once at creation and never modified. Legacy raw account IDs are supported for backwards compatibility. Pairs with `**$account`\*\* in Velocity for the origin snapshot object.      |
 
 > **Note:** In addition to these standard attributes, the discovered schema includes any attributes defined via **Attribute Mapping** and **Attribute Definition** settings.
 

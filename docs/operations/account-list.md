@@ -52,7 +52,7 @@ flowchart TD
         - Managed account layer is applied to match collected managed accounts with Fusion accounts.
         - Assignment decision layer is applied to match Fusion reviews that resulted in identity assignment.
         - Attribute mapping is applied first, then **normal** attribute definitions are evaluated. Normal attribute values feed into the Velocity context and are available for Fusion matching/scoring.
-    - **Optimistic correlation**: When `correlateOnAggregation` is enabled, missing accounts are marked as correlated _immediately_ before the API call is enqueued, so the account output reflects a successful correlation without waiting for the queue to drain. Correlation API calls proceed as fire-and-forget in the background; any failures are logged and will be re-detected on the next aggregation.
+    - **Optimistic correlation**: For sources configured with **Correlation mode = Correlate missing accounts on aggregation** (`correlationMode: correlate`), missing accounts are marked as correlated _immediately_ before the API call is enqueued, so the account output reflects a successful correlation without waiting for the queue to drain. Correlation API calls proceed as fire-and-forget in the background; any failures are logged and will be re-detected on the next aggregation.
 
 4.  **Identity Processing** (attribute mapping + normal definitions):
     - Processes all identities. This creates new fusion identities for identities that don't yet have a fusion account but should. This step also "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
@@ -173,7 +173,7 @@ Attribute mapping can be used in conjunction with unique attribute definitions t
 
 ### Optimistic correlation provisioning
 
-When `correlateOnAggregation` is enabled, correlations are applied optimistically: each missing account is marked as correlated before the API call is submitted to the queue. This allows the connector to return accounts reflecting a successful correlation without waiting for the queue to process all requests. The correlation API calls continue in the background after the handler returns. If a correlation fails, the error is logged and the next aggregation will re-detect the account as uncorrelated from ISC source data.
+When a source is configured with `correlationMode: correlate`, correlations are applied optimistically: each missing account is marked as correlated before the API call is submitted to the queue. This allows the connector to return accounts reflecting a successful correlation without waiting for the queue to process all requests. The correlation API calls continue in the background after the handler returns. If a correlation fails, the error is logged and the next aggregation will re-detect the account as uncorrelated from ISC source data.
 
 ### Reviewer validation for managed account scoring
 

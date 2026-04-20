@@ -31,6 +31,7 @@ nav:
   - Operations reference:
       - Connectivity:
           - Test connection: operations/test-connection.md
+          - Dry run (custom): operations/custom-dryrun.md
       - Schema and reads:
           - Account discover schema: operations/account-discover-schema.md
           - Account list: operations/account-list.md

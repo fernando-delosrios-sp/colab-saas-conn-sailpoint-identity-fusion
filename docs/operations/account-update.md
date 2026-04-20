@@ -11,10 +11,10 @@ The Account Update operation applies changes to a fusion account. Currently, it 
     - Loads sources and schema.
 
 2.  **Fusion Account Rebuild**:
-    - Rebuilds the fusion account to ensure we are operating on the latest state.
+    - Rebuilds the fusion account to ensure we are operating on the latest persisted account state.
     - **Configuration**:
-        - `refreshMapping`: False (uses existing mappings).
-        - `refreshDefinition`: False (uses existing definition).
+        - `refreshMapping`: False (does not recompute mapped values).
+        - `refreshDefinition`: False (does not recompute definition values).
         - `resetDefinition`: False.
 
 3.  **Change Processing**:
