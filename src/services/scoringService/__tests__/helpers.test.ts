@@ -1,4 +1,11 @@
-import { scoreDice, scoreJaroWinkler, scoreDoubleMetaphone, scoreNameMatcher, scoreLIG3 } from '../helpers'
+import {
+    scoreCustomVelocity,
+    scoreDice,
+    scoreDoubleMetaphone,
+    scoreJaroWinkler,
+    scoreLIG3,
+    scoreNameMatcher,
+} from '../helpers'
 
 const baseMatching = {
     attribute: 'displayName',
@@ -100,6 +107,69 @@ describe('scoringService helpers', () => {
         it('should be case insensitive', () => {
             const result = scoreLIG3('JOHN', 'john', baseMatching)
             expect(result.score).toBe(100)
+        })
+    })
+
+    describe('scoreCustomVelocity', () => {
+        const customBase = {
+            ...baseMatching,
+            algorithm: 'custom' as const,
+            attribute: 'email',
+        }
+
+        it('parses numeric literal output from Velocity', () => {
+            const result = scoreCustomVelocity('x', 'y', {
+                ...customBase,
+                customVelocityExpression: '77',
+                fusionScore: 70,
+            })
+            expect(result.score).toBe(77)
+            expect(result.isMatch).toBe(true)
+        })
+
+        it('clamps score to 0–100', () => {
+            const hi = scoreCustomVelocity('a', 'b', {
+                ...customBase,
+                customVelocityExpression: '150',
+                fusionScore: 0,
+            })
+            expect(hi.score).toBe(100)
+
+            const lo = scoreCustomVelocity('a', 'b', {
+                ...customBase,
+                customVelocityExpression: '-40',
+                fusionScore: 0,
+            })
+            expect(lo.score).toBe(0)
+        })
+
+        it('exposes $attribute in context', () => {
+            const result = scoreCustomVelocity('x', 'y', {
+                ...customBase,
+                customVelocityExpression: '$attribute.length',
+                fusionScore: 1,
+            })
+            expect(result.score).toBe(5)
+        })
+
+        it('exposes $candidateValue (fusion identity side)', () => {
+            const result = scoreCustomVelocity('a', 'bb', {
+                ...customBase,
+                customVelocityExpression: '$candidateValue.length',
+                fusionScore: 1,
+            })
+            expect(result.score).toBe(2)
+        })
+
+        it('returns 0 with comment when output is not a number', () => {
+            const result = scoreCustomVelocity('a', 'b', {
+                ...customBase,
+                customVelocityExpression: 'not-a-number',
+                fusionScore: 50,
+            })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+            expect(result.comment).toContain('not a valid number')
         })
     })
 })

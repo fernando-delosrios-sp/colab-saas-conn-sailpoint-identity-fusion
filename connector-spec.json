@@ -780,7 +780,7 @@
                                             "label": "Matching algorithm",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Algorithm used to compare values. 'Enhanced Name Matcher' excels at strict formatting and accents. 'Jaro-Winkler' is highly tolerant of typographical errors. 'LIG3' balances gaps, missing fragments, and character variations. 'Dice' is forgiving of total word reordering. 'Double Metaphone' captures English phonetic similarity",
+                                            "helpKey": "Algorithm used to compare values. 'Enhanced Name Matcher' excels at strict formatting and accents. 'Jaro-Winkler' is highly tolerant of typographical errors. 'LIG3' balances gaps, missing fragments, and character variations. 'Dice' is forgiving of total word reordering. 'Double Metaphone' captures English phonetic similarity. 'Custom Algorithm (Velocity)' runs your Velocity template once per comparison; it must output a numeric score from 0 to 100",
                                             "options": [
                                                 {
                                                     "label": "Enhanced Name Matcher",
@@ -813,10 +813,19 @@
                                                     "docLinkLabel": "Evaluates strings based on their English pronunciation"
                                                 },
                                                 {
-                                                    "label": "Custom Algorithm (from SaaS customizer)",
+                                                    "label": "Custom Algorithm (Velocity)",
                                                     "value": "custom"
                                                 }
                                             ]
+                                        },
+                                        {
+                                            "key": "customVelocityExpression",
+                                            "label": "Custom match score (Velocity)",
+                                            "type": "textarea",
+                                            "required": true,
+                                            "parentKey": "algorithm",
+                                            "parentValue": "custom",
+                                            "helpKey": "Apache Velocity template evaluated for each account/identity pair. Context: $accountValue (managed account attribute), $candidateValue (fusion identity attribute), $attribute (this rule's attribute name). Output must be a number from 0 to 100 (similarity score). Same Velocity helpers as attribute definitions ($Math, $Normalize, etc.). Keep expressions efficient; this runs in the hot matching loop."
                                         },
                                         {
                                             "key": "fusionScore",
