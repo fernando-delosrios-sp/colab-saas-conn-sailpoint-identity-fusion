@@ -386,13 +386,9 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
 
 ## Documentation site (MkDocs)
 
-The documentation site is built with MkDocs and published from the `main` branch by GitHub Actions (`.github/workflows/deploy-docs-pages.yml`). If you contribute to docs, see [Contributing to documentation](docs/contributing/documentation.md) for how generated files and optional local builds work.
+The documentation site is built with MkDocs and published from the `main` branch by GitHub Actions (`.github/workflows/deploy-docs-pages.yml`).
 
 ---
-
-## Contributing
-
-Contributions are welcome. Please open an issue or pull request in the repository. Do not forget to add or update tests and documentation as needed.
 
 ## License
 
