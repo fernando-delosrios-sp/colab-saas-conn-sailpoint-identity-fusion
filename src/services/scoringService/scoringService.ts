@@ -13,7 +13,9 @@ import {
     scoreLIG3,
     scoreLIG3Normalized,
     scoreNameMatcher,
+    scoreNameMatcherNormalized,
 } from './helpers'
+import { normalizeName as normalizeNameForMatcher } from './nameMatching'
 import { TrigramIndex, buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
 import { isExactAttributeMatchScores } from './exactMatch'
 
@@ -62,6 +64,7 @@ export class ScoringService {
      * each managed account attribute is normalized once — total O(n+m) normalizations.
      */
     private readonly normalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
+    private readonly nameNormalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
 
     /**
      * Trigram blocking index — built once per pipeline run over the full identity pool.
@@ -110,6 +113,21 @@ export class ScoringService {
         let cached = byAttr.get(attrName)
         if (cached === undefined) {
             cached = normalizeLIG3(rawValue)
+            byAttr.set(attrName, cached)
+        }
+        return cached
+    }
+
+    /** Return the name-normalized form of `rawValue` for `account`, computing and caching on first access. */
+    private getNameNormalized(account: FusionAccount, attrName: string, rawValue: string): string {
+        let byAttr = this.nameNormalizedCache.get(account)
+        if (!byAttr) {
+            byAttr = new Map()
+            this.nameNormalizedCache.set(account, byAttr)
+        }
+        let cached = byAttr.get(attrName)
+        if (cached === undefined) {
+            cached = normalizeNameForMatcher(rawValue)
             byAttr.set(attrName, cached)
         }
         return cached
@@ -353,8 +371,8 @@ export class ScoringService {
                 continue
             }
 
-            // For LIG3: use pre-normalized cached values to avoid repeated normalization in the hot loop,
-            // and apply a conservative length-ratio upper-bound check before running the full DP.
+            // For LIG3 and name-matcher: use pre-normalized cached values to avoid repeated
+            // normalization in the hot loop. LIG3 also applies a length-ratio upper-bound check.
             let scoreReport: ScoreReport
             if (matching.algorithm === 'lig3') {
                 const normAccount = this.getNormalized(fusionAccount, matching.attribute, (accountAttribute ?? '').toString())
@@ -373,6 +391,10 @@ export class ScoringService {
                     continue
                 }
                 scoreReport = scoreLIG3Normalized(normAccount, normIdentity, matching)
+            } else if (matching.algorithm === 'name-matcher') {
+                const normAccount = this.getNameNormalized(fusionAccount, matching.attribute, (accountAttribute ?? '').toString())
+                const normIdentity = this.getNameNormalized(fusionIdentity, matching.attribute, (identityAttribute ?? '').toString())
+                scoreReport = scoreNameMatcherNormalized(normAccount, normIdentity, matching)
             } else {
                 scoreReport = this.scoreAttribute(
                     (accountAttribute ?? '').toString(),

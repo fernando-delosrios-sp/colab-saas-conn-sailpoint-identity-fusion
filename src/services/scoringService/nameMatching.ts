@@ -45,9 +45,9 @@ export function match(name1: string, name2: string): number {
 
     if (normalized1 === normalized2) return 1.0
 
-    // Split names into tokens and filter empty tokens
-    const tokens1 = normalized1.split(/\s+/).filter((t) => t.length > 0)
-    const tokens2 = normalized2.split(/\s+/).filter((t) => t.length > 0)
+    // normalizeName guarantees trimmed single-space separation — no empty tokens possible.
+    const tokens1 = normalized1.split(' ')
+    const tokens2 = normalized2.split(' ')
 
     // No valid tokens to compare
     if (tokens1.length === 0 || tokens2.length === 0) return 0
@@ -78,9 +78,31 @@ export function isMatch(name1: string, name2: string, threshold: number = 0.85):
 }
 
 /**
- * Normalize a name for comparison
+ * Compare two already-normalized names (output of {@link normalizeName}).
+ * Skips the normalization step so the caller can cache normalized values and avoid
+ * re-normalizing in the O(n×m) scoring loop — mirrors the scoreLIG3Normalized pattern.
  */
-function normalizeName(name: string): string {
+export function matchNormalized(normalized1: string, normalized2: string): number {
+    if (!normalized1 || !normalized2) return 0
+    if (normalized1 === normalized2) return 1.0
+
+    // normalizeName guarantees single-space separation and no leading/trailing whitespace,
+    // so splitting on ' ' is safe and avoids the regex overhead.
+    const tokens1 = normalized1.split(' ')
+    const tokens2 = normalized2.split(' ')
+
+    const tokenScore = calculateTokenSimilarity(tokens1, tokens2)
+    const stringSimilarity = jaroWinklerSimilarity(normalized1, normalized2)
+    const phoneticScore = calculatePhoneticSimilarity(tokens1, tokens2)
+
+    return tokenScore * 0.5 + phoneticScore * 0.3 + stringSimilarity * 0.2
+}
+
+/**
+ * Normalize a name for comparison.
+ * Exported so callers can pre-normalize and cache the result before the O(n×m) scoring loop.
+ */
+export function normalizeName(name: string): string {
     return name
         .toLowerCase()
         .normalize('NFD')
@@ -166,6 +188,10 @@ function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): numb
         return jaroWinklerSimilarity(a, b)
     }
 
+    // Pre-compute phonetic codes for validTokens2 so doubleMetaphone is called O(n1+n2)
+    // times instead of O(n1*n2) — each code pair is computed once and reused across all token1s.
+    const codes2List = validTokens2.map((t) => doubleMetaphone(t))
+
     // Compare phonetic codes for each token pair.
     // Keep exact matches as full credit, but allow partial credit for near matches.
     const MIN_CODE_SIMILARITY = 0.65
@@ -175,18 +201,14 @@ function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): numb
         const codes1 = doubleMetaphone(token1)
         let bestForToken = 0
 
-        for (const token2 of validTokens2) {
-            const codes2 = doubleMetaphone(token2)
-
-            const similarities = [
-                codeSimilarity(codes1[0], codes2[0]),
-                codeSimilarity(codes1[0], codes2[1]),
-                codeSimilarity(codes1[1], codes2[0]),
-                codeSimilarity(codes1[1], codes2[1]),
-            ]
-            const bestPair = Math.max(...similarities)
+        for (const codes2 of codes2List) {
+            const s00 = codeSimilarity(codes1[0], codes2[0])
+            const s01 = codeSimilarity(codes1[0], codes2[1])
+            const s10 = codeSimilarity(codes1[1], codes2[0])
+            const s11 = codeSimilarity(codes1[1], codes2[1])
+            const bestPair = s00 > s01 ? (s00 > s10 ? (s00 > s11 ? s00 : s11) : (s10 > s11 ? s10 : s11)) : (s01 > s10 ? (s01 > s11 ? s01 : s11) : (s10 > s11 ? s10 : s11))
             if (bestPair >= MIN_CODE_SIMILARITY) {
-                bestForToken = Math.max(bestForToken, bestPair)
+                bestForToken = bestForToken > bestPair ? bestForToken : bestPair
             }
         }
 

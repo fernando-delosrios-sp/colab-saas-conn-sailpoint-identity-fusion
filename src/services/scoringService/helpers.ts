@@ -2,7 +2,7 @@ import { doubleMetaphone } from 'double-metaphone'
 import { MatchingConfig, effectiveSkipMatchIfMissing } from '../../model/config'
 import { ScoreReport } from './types'
 import { jaroWinkler, diceCoefficient } from './stringComparison'
-import { match as nameMatch } from './nameMatching'
+import { match as nameMatch, matchNormalized as nameMatchNormalized } from './nameMatching'
 import { evaluateVelocityTemplate } from '../attributeService/formatting'
 import type { RenderContext } from 'velocityjs/dist/src/type'
 
@@ -145,6 +145,18 @@ export const scoreNameMatcher = (
     const isMatch = score >= threshold
 
     return makeScoreReport(matching, score, isMatch)
+}
+
+/**
+ * Name matching on already-normalized strings (output of {@link normalizeName}).
+ * Called by the ScoringService cache layer after pre-normalizing both sides;
+ * avoids repeated normalization in the O(n×m) loop — mirrors the scoreLIG3Normalized pattern.
+ */
+export function scoreNameMatcherNormalized(normA: string, normB: string, matching: MatchingConfig): ScoreReport {
+    const similarity = nameMatchNormalized(normA, normB)
+    const score = Math.round(similarity * 100)
+    const threshold = matching.fusionScore ?? 0
+    return makeScoreReport(matching, score, score >= threshold)
 }
 
 /**
