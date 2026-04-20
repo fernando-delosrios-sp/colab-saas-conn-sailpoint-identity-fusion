@@ -12,8 +12,6 @@ Identity Fusion NG Framework
 | [Guides overview](guides/index.md)                     | Full list of configuration guides.            |
 
 
-The [home page](home.md) mirrors the repository README (generated before build).
-
 ## Guide index
 
 

@@ -25,7 +25,7 @@ Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consol
 | Shortest path to a first aggregation   | [Get started](docs/get-started.md)                                                                                                                      |
 | How Map → Define → Match fits together | [Concepts: map, define, and match](docs/concepts/map-define-match.md)                                                                                   |
 | Full guide list                        | [Guides overview](docs/guides/index.md)                                                                                                                 |
-| Connector operations (APIs ISC calls)  | Use **Operations reference** in the [documentation site](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/) navigation |
+| Connector operations (APIs ISC calls)  | [Connector operations reference](docs/operations/index.md) |
 
 Identity Fusion NG addresses the complex challenge of identity and account data aggregation through a streamlined **map-define-match framework**. This concept represents the high-level operation of the connector, which can execute all three steps or just one, but always in this logical sequence:
 
