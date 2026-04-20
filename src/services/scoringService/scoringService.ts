@@ -1,6 +1,6 @@
 import { FusionAccount } from '../../model/account'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing } from '../../model/config'
-import { defaultFusionMaxCandidatesForForm } from '../../data/connectorDefaults'
+import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { countIdentityBackedFusionMatches } from '../formService/helpers'
 import { LogService } from '../logService'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'

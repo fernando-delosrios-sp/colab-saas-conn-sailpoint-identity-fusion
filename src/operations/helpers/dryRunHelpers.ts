@@ -17,7 +17,7 @@ import {
     MatchingStatus,
     PendingReviewContextByAccountId,
 } from './buildDryRunPayload'
-import { defaults } from '../../data/connectorDefaults'
+import { defaults } from '../../data/config'
 
 /** Record managed source account ids present on a streamed fusion ISC row (drives report join coverage). */
 export const addCoveredManagedAccountIds = (account: StdAccountListOutput, into: Set<string>): void => {

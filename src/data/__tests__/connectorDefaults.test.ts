@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 import * as path from 'path'
-import { connectorSpecInitialValues, defaultFusionMaxCandidatesForForm } from '../connectorDefaults'
+import { connectorSpecInitialValues, defaultFusionMaxCandidatesForForm } from '../config'
 
 describe('connector defaults alignment', () => {
     it('defaultFusionMaxCandidatesForForm matches connectorSpecInitialValues', () => {

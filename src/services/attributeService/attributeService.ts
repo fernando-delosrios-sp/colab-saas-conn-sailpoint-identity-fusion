@@ -24,7 +24,7 @@ import { StateWrapper } from './stateWrapper'
 import { buildManagedAccountKey } from '../../model/managedAccountKey'
 import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
 import { readString } from '../../utils/safeRead'
-import { defaults } from '../../data/connectorDefaults'
+import { defaults } from '../../data/config'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'

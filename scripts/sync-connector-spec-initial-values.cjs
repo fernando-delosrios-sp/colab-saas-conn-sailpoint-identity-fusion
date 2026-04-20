@@ -1,24 +1,25 @@
 /**
- * Writes connector-spec.json → sourceConfigInitialValues from `connectorSpecInitialValues`
- * in src/data/connectorDefaults.ts (parsed as the object literal only; no TypeScript execution).
+ * Writes connector-spec.json -> sourceConfigInitialValues from per-settings modules under
+ * `src/data/config/settings`, each exporting a flat `connectorSpecInitialValues` object.
+ * Composition mirrors `src/data/config/defaults.ts` exactly.
  */
 const fs = require('fs')
 const path = require('path')
 
 const repoRoot = path.join(__dirname, '..')
 const specPath = path.join(repoRoot, 'connector-spec.json')
-const defaultsTsPath = path.join(repoRoot, 'src', 'data', 'connectorDefaults.ts')
+const settingsDir = path.join(repoRoot, 'src', 'data', 'config', 'settings')
 
-function extractConnectorSpecInitialValuesObject(source) {
-    const marker = 'export const connectorSpecInitialValues = '
+function extractExportConstObjectLiteral(source, exportName) {
+    const marker = `export const ${exportName} = `
     const start = source.indexOf(marker)
     if (start === -1) {
-        throw new Error(`Could not find ${marker.trim()} in ${defaultsTsPath}`)
+        throw new Error(`Could not find ${marker.trim()} in source`)
     }
     let i = start + marker.length
     while (i < source.length && /\s/.test(source[i])) i++
     if (source[i] !== '{') {
-        throw new Error('Expected `{` after connectorSpecInitialValues =')
+        throw new Error(`Expected \`{\` after export const ${exportName} =`)
     }
     const objStart = i
     let depth = 0
@@ -27,22 +28,14 @@ function extractConnectorSpecInitialValuesObject(source) {
         if (c === '{') depth++
         else if (c === '}') {
             depth--
-            if (depth === 0) {
-                return source.slice(objStart, i + 1)
-            }
+            if (depth === 0) return source.slice(objStart, i + 1)
         }
     }
-    throw new Error('Unclosed `{` in connectorSpecInitialValues')
+    throw new Error(`Unclosed \`{\` in ${exportName}`)
 }
 
 function stripTrailingCommas(tsObjectLiteral) {
-    // Remove trailing commas before `}` or `]` so JSON.parse accepts the slice.
     return tsObjectLiteral.replace(/,(\s*[}\]])/g, '$1')
-}
-
-function tsStringToJsonKey(key) {
-    if (/^[a-zA-Z_$][\w$]*$/.test(key)) return JSON.stringify(key)
-    return JSON.stringify(key)
 }
 
 function tsValueToJson(valueSlice) {
@@ -50,15 +43,11 @@ function tsValueToJson(valueSlice) {
     if (v === 'true' || v === 'false' || v === 'null') return v
     if (/^-?\d+(\.\d+)?$/.test(v)) return v
     if ((v.startsWith("'") && v.endsWith("'")) || (v.startsWith('"') && v.endsWith('"'))) {
-        const inner = v.slice(1, -1)
-        return JSON.stringify(inner)
+        return JSON.stringify(v.slice(1, -1))
     }
-    throw new Error(`Unsupported literal in connectorSpecInitialValues: ${v.slice(0, 80)}`)
+    throw new Error(`Unsupported literal in connector spec fragment: ${v.slice(0, 80)}`)
 }
 
-/**
- * Minimal parser: top-level `key: value` pairs only; values are bool, number, or quoted string.
- */
 function objectLiteralToJson(tsObjectLiteral) {
     const inner = tsObjectLiteral.trim().slice(1, -1)
     const out = {}
@@ -81,6 +70,7 @@ function objectLiteralToJson(tsObjectLiteral) {
             while (keyEnd < inner.length && /[\w$]/.test(inner[keyEnd])) keyEnd++
             var key = inner.slice(pos, keyEnd)
         }
+
         while (keyEnd < inner.length && /\s/.test(inner[keyEnd])) keyEnd++
         if (inner[keyEnd] !== ':') {
             throw new Error(`Expected ':' after key near: ${inner.slice(pos, pos + 40)}`)
@@ -100,8 +90,8 @@ function objectLiteralToJson(tsObjectLiteral) {
         } else {
             while (valEnd < inner.length && !/[\s,]/.test(inner[valEnd])) valEnd++
         }
-        let rawVal = inner.slice(keyEnd, valEnd)
-        // Allow TypeScript `as const` after a value
+
+        const rawVal = inner.slice(keyEnd, valEnd)
         let tail = valEnd
         while (tail < inner.length && /\s/.test(inner[tail])) tail++
         if (inner.slice(tail, tail + 2) === 'as') {
@@ -110,18 +100,64 @@ function objectLiteralToJson(tsObjectLiteral) {
         }
         while (tail < inner.length && /\s/.test(inner[tail])) tail++
         if (inner[tail] === ',') tail++
-        const jsonKey = tsStringToJsonKey(key)
-        const jsonVal = tsValueToJson(rawVal)
-        out[JSON.parse(jsonKey)] = JSON.parse(jsonVal)
+
+        out[key] = JSON.parse(tsValueToJson(rawVal))
         pos = tail
     }
     return out
 }
 
-const source = fs.readFileSync(defaultsTsPath, 'utf8')
-const literal = stripTrailingCommas(extractConnectorSpecInitialValuesObject(source))
-const initial = objectLiteralToJson(literal)
+const parsedCache = new Map()
+function loadInitialValues(fileName) {
+    if (parsedCache.has(fileName)) return parsedCache.get(fileName)
+    const tsPath = path.join(settingsDir, fileName)
+    const source = fs.readFileSync(tsPath, 'utf8')
+    const literal = stripTrailingCommas(extractExportConstObjectLiteral(source, 'connectorSpecInitialValues'))
+    const parsed = objectLiteralToJson(literal)
+    parsedCache.set(fileName, parsed)
+    return parsed
+}
+
+const connection = loadInitialValues('connectionSettings.ts')
+const review = loadInitialValues('reviewSettings.ts')
+const matching = loadInitialValues('matchingSettings.ts')
+const advancedConnection = loadInitialValues('advancedConnectionSettings.ts')
+const scope = loadInitialValues('scopeSettings.ts')
+const processing = loadInitialValues('processingControlSettings.ts')
+const attributeMapping = loadInitialValues('attributeMappingDefinitionsSettings.ts')
+const developer = loadInitialValues('developerSettings.ts')
+const proxy = loadInitialValues('proxySettings.ts')
+const uniqueDefs = loadInitialValues('uniqueAttributeDefinitionsSettings.ts')
+const normalDefs = loadInitialValues('normalAttributeDefinitionsSettings.ts')
+const sources = loadInitialValues('sourcesSettings.ts')
+
+const merged = {
+    ...connection,
+    fusionFormExpirationDays: review.fusionFormExpirationDays,
+    fusionAverageScore: matching.fusionAverageScore,
+    provisioningTimeout: advancedConnection.provisioningTimeout,
+    managedAccountsBatchSize: advancedConnection.managedAccountsBatchSize,
+    fusionMaxCandidatesForForm: review.fusionMaxCandidatesForForm,
+    ...scope,
+    ...processing,
+    ...attributeMapping,
+    enableQueue: advancedConnection.enableQueue,
+    enableRetry: advancedConnection.enableRetry,
+    maxRetries: advancedConnection.maxRetries,
+    requestsPerSecond: advancedConnection.requestsPerSecond,
+    maxConcurrentRequests: advancedConnection.maxConcurrentRequests,
+    processingWait: advancedConnection.processingWait,
+    retryDelay: advancedConnection.retryDelay,
+    batchSize: advancedConnection.batchSize,
+    ...developer,
+    ...proxy,
+    ...uniqueDefs,
+    ...normalDefs,
+    algorithm: matching.algorithm,
+    enablePriority: matching.enablePriority,
+    ...sources,
+}
 
 const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'))
-spec.sourceConfigInitialValues = initial
+spec.sourceConfigInitialValues = merged
 fs.writeFileSync(specPath, JSON.stringify(spec, null, 4) + '\n', 'utf8')
