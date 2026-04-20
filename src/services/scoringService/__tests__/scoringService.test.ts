@@ -353,6 +353,82 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
 
         expect(fusionAccount.addFusionMatch).not.toHaveBeenCalled()
     })
+
+    it('skips custom Velocity rule with empty output by default and matches on remaining rule', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'name',
+                        algorithm: 'custom',
+                        customVelocityExpression: '#if(false)1#end',
+                        fusionScore: 80,
+                    },
+                    {
+                        attribute: 'email',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 80,
+                    },
+                ],
+                fusionAverageScore: 80,
+            } as any,
+            log
+        )
+
+        const fusionAccount = {
+            attributes: { name: 'John Smith', email: 'person@example.com' },
+            addFusionMatch: jest.fn(),
+        } as any
+        const fusionIdentity = {
+            attributes: { name: 'John Smith', email: 'person@example.com' },
+            identityId: 'identity-5',
+            displayName: 'Identity Five',
+        } as any
+
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+
+        expect(fusionAccount.addFusionMatch).toHaveBeenCalledTimes(1)
+        const fusionMatch = fusionAccount.addFusionMatch.mock.calls[0][0]
+        const customRule = fusionMatch.scores.find((s: any) => s.algorithm === 'custom')
+        expect(customRule?.skipped).toBe(true)
+    })
+
+    it('does not skip custom Velocity empty output when skip is disabled and can fail combined score', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'name',
+                        algorithm: 'custom',
+                        customVelocityExpression: '#if(false)1#end',
+                        fusionScore: 80,
+                        skipMatchIfMissing: false,
+                    },
+                    {
+                        attribute: 'email',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 80,
+                    },
+                ],
+                fusionAverageScore: 80,
+            } as any,
+            log
+        )
+
+        const fusionAccount = {
+            attributes: { name: 'John Smith', email: 'person@example.com' },
+            addFusionMatch: jest.fn(),
+        } as any
+        const fusionIdentity = {
+            attributes: { name: 'John Smith', email: 'person@example.com' },
+            identityId: 'identity-6',
+            displayName: 'Identity Six',
+        } as any
+
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+
+        expect(fusionAccount.addFusionMatch).not.toHaveBeenCalled()
+    })
 })
 
 describe('ScoringService combined-score early exit', () => {

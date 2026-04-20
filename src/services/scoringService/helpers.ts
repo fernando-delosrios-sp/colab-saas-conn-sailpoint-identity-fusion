@@ -1,5 +1,5 @@
 import { doubleMetaphone } from 'double-metaphone'
-import { MatchingConfig } from '../../model/config'
+import { MatchingConfig, effectiveSkipMatchIfMissing } from '../../model/config'
 import { ScoreReport } from './types'
 import { jaroWinkler, diceCoefficient } from './stringComparison'
 import { match as nameMatch } from './nameMatching'
@@ -305,8 +305,11 @@ export const scoreCustomVelocity = (
     }) as RenderContext
 
     const rendered = evaluateVelocityTemplate(expression, context)
-    if (rendered === undefined || rendered === '') {
-        return makeScoreReport(matching, 0, false, 'Velocity template produced no numeric output')
+    if (rendered === undefined || rendered === null || String(rendered).trim() === '') {
+        if (effectiveSkipMatchIfMissing(matching)) {
+            return makeScoreReport(matching, 0, false, 'Rule skipped (custom Velocity returned no value)', true)
+        }
+        return makeScoreReport(matching, 0, false, 'Custom Velocity returned no value')
     }
 
     const n = Number(String(rendered).trim())

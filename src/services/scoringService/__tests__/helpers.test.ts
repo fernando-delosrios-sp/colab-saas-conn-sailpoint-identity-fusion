@@ -171,5 +171,43 @@ describe('scoringService helpers', () => {
             expect(result.isMatch).toBe(false)
             expect(result.comment).toContain('not a valid number')
         })
+
+        it('marks as skipped when Velocity output is empty and skip behavior is defaulted', () => {
+            const result = scoreCustomVelocity('a', 'b', {
+                ...customBase,
+                customVelocityExpression: '#if(false)1#end',
+                fusionScore: 50,
+            })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+            expect(result.skipped).toBe(true)
+            expect(result.comment).toContain('returned no value')
+        })
+
+        it('does not skip when Velocity output is empty and skipMatchIfMissing is false', () => {
+            const result = scoreCustomVelocity('a', 'b', {
+                ...customBase,
+                customVelocityExpression: '#if(false)1#end',
+                fusionScore: 50,
+                skipMatchIfMissing: false,
+            })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+            expect(result.skipped).toBeUndefined()
+            expect(result.comment).toContain('returned no value')
+        })
+
+        it('does not skip when Velocity output is empty for mandatory rules', () => {
+            const result = scoreCustomVelocity('a', 'b', {
+                ...customBase,
+                customVelocityExpression: '#if(false)1#end',
+                fusionScore: 50,
+                mandatory: true,
+            })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+            expect(result.skipped).toBeUndefined()
+            expect(result.comment).toContain('returned no value')
+        })
     })
 })
