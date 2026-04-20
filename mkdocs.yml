@@ -44,6 +44,3 @@ nav:
           - Account disable: operations/account-disable.md
       - Entitlements:
           - Entitlement list: operations/entitlement-list.md
-  - Contributing:
-      - Docs folder overview: README.md
-      - Documentation: contributing/documentation.md
