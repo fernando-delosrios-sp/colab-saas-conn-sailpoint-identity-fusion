@@ -9,14 +9,14 @@ import type { FusionConfigBuild } from '../types'
 export const connectorSpecInitialValues = {
     aggregationMode: 'none' as const,
     correlationMode: 'none' as const,
+    aggregationTimeout: 10,
 } as const
 
 export const runtimeDefaults = {
-    taskResultWaitSeconds: 60,
     source: {
         enabled: true,
         aggregationMode: 'none' as const,
-        taskResultRetries: 5,
+        aggregationTimeoutMinutes: 10,
         aggregationDelay: 5,
         optimizedAggregation: true,
         correlationMode: 'none' as const,
@@ -34,13 +34,17 @@ export function applySettings(config: FusionConfigBuild): void {
             if (readBoolean(sourceConfig, 'forceAggregation', false) && !sourceConfig.aggregationMode) {
                 sourceConfig.aggregationMode = 'before'
             }
-            const taskResultWaitSeconds = sourceConfig.taskResultWait ?? runtimeDefaults.taskResultWaitSeconds
+            const rawTimeout =
+                sourceConfig.aggregationTimeout ?? runtimeDefaults.source.aggregationTimeoutMinutes
+            const aggregationTimeout =
+                typeof rawTimeout === 'number' && Number.isFinite(rawTimeout) && rawTimeout >= 0
+                    ? rawTimeout
+                    : runtimeDefaults.source.aggregationTimeoutMinutes
             return {
                 ...sourceConfig,
                 enabled: sourceConfig.enabled ?? runtimeDefaults.source.enabled,
                 aggregationMode: sourceConfig.aggregationMode ?? runtimeDefaults.source.aggregationMode,
-                taskResultRetries: sourceConfig.taskResultRetries ?? runtimeDefaults.source.taskResultRetries,
-                taskResultWait: taskResultWaitSeconds * 1000,
+                aggregationTimeout,
                 aggregationDelay: sourceConfig.aggregationDelay ?? runtimeDefaults.source.aggregationDelay,
                 optimizedAggregation:
                     sourceConfig.optimizedAggregation ?? runtimeDefaults.source.optimizedAggregation,

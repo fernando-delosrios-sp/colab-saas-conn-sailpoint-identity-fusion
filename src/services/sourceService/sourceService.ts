@@ -2021,18 +2021,20 @@ export class SourceService {
             return
         }
 
-        const taskResultRetries = sourceInfo?.config?.taskResultRetries ?? 5
-        const taskResultWait = sourceInfo?.config?.taskResultWait ?? 60000
+        const timeoutMinutes = sourceInfo?.config?.aggregationTimeout ?? 10
+        const pollIntervalMs = 30_000
+        const deadlineMs = Date.now() + timeoutMinutes * 60_000
         const taskId = loadAccountsTask?.task?.id
         let pollsExecuted = 0
         let lastTaskStatus: any = undefined
 
-        let count = taskResultRetries
-        while (--count > 0) {
-            if (!taskId) {
-                this.log.warn(`Aggregation task ID not found for source ${sourceName} (${id})`)
-                break
-            }
+        if (!taskId) {
+            this.log.warn(`Aggregation task ID not found for source ${sourceName} (${id})`)
+        }
+
+        let firstPoll = true
+        while (!completed && taskId && (firstPoll || Date.now() < deadlineMs)) {
+            firstPoll = false
             const requestParameters: TaskManagementV2025ApiGetTaskStatusRequest = {
                 id: taskId,
             }
@@ -2051,9 +2053,12 @@ export class SourceService {
             if (taskStatus?.completed) {
                 completed = true
                 break
-            } else {
-                await new Promise((resolve) => setTimeout(resolve, taskResultWait))
             }
+            const remainingMs = deadlineMs - Date.now()
+            if (remainingMs <= 0) {
+                break
+            }
+            await new Promise((resolve) => setTimeout(resolve, Math.min(pollIntervalMs, remainingMs)))
         }
         if (!completed) {
             const lastStatusSummary = lastTaskStatus
@@ -2066,7 +2071,7 @@ export class SourceService {
                 })
                 : 'none'
             this.log.warn(
-                `Failed to aggregate managed accounts for source ${sourceName} (${id}). taskId=${taskId ?? 'unknown'}, pollsExecuted=${pollsExecuted}, maxPolls=${Math.max(taskResultRetries - 1, 0)}, pollWaitMs=${taskResultWait}, lastTaskStatus=${lastStatusSummary}`
+                `Failed to aggregate managed accounts for source ${sourceName} (${id}). taskId=${taskId ?? 'unknown'}, timeoutMinutes=${timeoutMinutes}, pollIntervalMs=${pollIntervalMs}, pollsExecuted=${pollsExecuted}, lastTaskStatus=${lastStatusSummary}`
             )
         }
     }
