@@ -17,7 +17,6 @@ import {
     fetchPhase,
     refreshPhase,
     processPhase,
-    uniqueAttributesPhase,
 } from './helpers/corePipeline'
 import { PhaseTimer } from '../services/logService'
 
@@ -75,9 +74,6 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         await processPhase(serviceRegistry, options)
         timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
 
-        await uniqueAttributesPhase(serviceRegistry, options)
-        timer.phase('PHASE 5: Unique attributes', 'info', 'Unique attributes')
-
         const issueSummary = log.getAggregationIssueSummary()
         const fusionCounts = {
             fusionAccountsFound: sources.fusionAccountCount,
@@ -94,8 +90,9 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         const report = fusion.generateReport(true, preStreamingStats)
         const outputPreparationStartedAt = Date.now()
         const preparedOutputData = await prepareDryRunOutputData(serviceRegistry, runtimeOptions)
+        timer.recordElapsed('Unique attributes', preparedOutputData.uniqueAttributesElapsedMs)
         log.info(
-            `PHASE 6: Output preparation — finalize dry-run analysis (${PhaseTimer.formatElapsed(
+            `PHASE 5: Output preparation — finalize dry-run analysis (${PhaseTimer.formatElapsed(
                 Date.now() - outputPreparationStartedAt
             )})`
         )
@@ -113,7 +110,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
                 streamElapsedMs
             )})`
         )
-        timer.recordElapsed('Output', Date.now() - outputPreparationStartedAt)
+        timer.recordElapsed('Output', streamElapsedMs)
 
         const canonicalTotalProcessingTime = timer.totalElapsed()
         const phaseBreakdownThroughOutput = timer.getPhaseBreakdown()
@@ -164,6 +161,6 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         timer.end(doneMsg)
     } catch (error) {
         if (error instanceof ConnectorError) throw error
-        console.error(error); log.crash('Failed to run custom:dryrun', error)
+        log.crash('Failed to run custom:dryrun', error)
     }
 }

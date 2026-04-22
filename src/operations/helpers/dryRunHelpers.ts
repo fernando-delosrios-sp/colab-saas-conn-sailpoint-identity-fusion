@@ -77,6 +77,7 @@ type DryRunStreamingContext = {
 
 export type PreparedDryRunOutputData = {
     analyzedUncorrelatedAccounts: FusionAccount[]
+    uniqueAttributesElapsedMs: number
 }
 
 type DryRunFinalizationInput = {
@@ -339,10 +340,10 @@ export const prepareDryRunOutputData = async (
 ): Promise<PreparedDryRunOutputData> => {
     const { fusion } = serviceRegistry
     const analyzedUncorrelatedAccounts = await fusion.analyzeUncorrelatedAccounts()
-    if (analyzedUncorrelatedAccounts.length > 0) {
-        await refreshUniqueAttributesForDryRun(serviceRegistry, analyzedUncorrelatedAccounts, runtimeOptions)
-    }
-    return { analyzedUncorrelatedAccounts }
+    const uniqueRefreshStartedAt = Date.now()
+    await refreshUniqueAttributesForDryRun(serviceRegistry, analyzedUncorrelatedAccounts, runtimeOptions)
+    const uniqueAttributesElapsedMs = Date.now() - uniqueRefreshStartedAt
+    return { analyzedUncorrelatedAccounts, uniqueAttributesElapsedMs }
 }
 
 export const writeAndSendDryRunReport = async (
