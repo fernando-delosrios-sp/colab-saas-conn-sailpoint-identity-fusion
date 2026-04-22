@@ -112,8 +112,8 @@ export class ClientService {
             const maxConcurrentRequests = fusionConfig.maxConcurrentRequests ?? Math.max(10, requestsPerSecond * 2)
 
             // parallelBatchSize caps concurrent page fetches in paginateParallel at the
-            // smaller of the explicit config value and maxConcurrentRequests, defaulting to 10.
-            this.parallelBatchSize = Math.min(fusionConfig.parallelBatchSize ?? 10, maxConcurrentRequests)
+            // smaller of the configured value and maxConcurrentRequests.
+            this.parallelBatchSize = Math.min(fusionConfig.parallelBatchSize, maxConcurrentRequests)
 
             const queueConfig: QueueConfig = {
                 requestsPerSecond,
@@ -130,7 +130,7 @@ export class ClientService {
             )
         } else {
             this.queue = null
-            this.parallelBatchSize = fusionConfig.parallelBatchSize ?? 10
+            this.parallelBatchSize = fusionConfig.parallelBatchSize
             this.log.info('API client ready (direct calls, no queue, keep-alive: true)')
         }
     }

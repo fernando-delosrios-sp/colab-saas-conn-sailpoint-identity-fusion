@@ -134,13 +134,13 @@ export const createDryRunRowEmitter = async (
     await mkdir(dir, { recursive: true })
     const hostSeg = hostnameSegmentFromBaseurl(serviceRegistry.config?.baseurl)
     const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const fileName = `custom-report-${hostSeg}-${stamp}.json`
+    const fileName = `dry-run-${hostSeg}-${stamp}.json`
     const diskOutputPath = path.join(dir, fileName)
     const rowsTempPath = `${diskOutputPath}.rows.tmp`
     const rowsStream = createWriteStream(rowsTempPath, { flags: 'w' })
     let arrayElementCount = 0
 
-    log.info(`custom:report writing detail rows to ${diskOutputPath} (rows buffer: ${rowsTempPath})`)
+    log.info(`custom:dryrun writing detail rows to ${diskOutputPath} (rows buffer: ${rowsTempPath})`)
 
     return {
         diskOutputPath,

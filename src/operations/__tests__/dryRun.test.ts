@@ -612,7 +612,7 @@ describe('dryRun', () => {
         expect(summary.reportOutputPath).toBeDefined()
         expect(summary.reportHtmlOutputPath).toBeDefined()
         expect(String(summary.reportOutputPath)).toMatch(
-            /reports[\\/]custom-report-tenant-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/
+            /reports[\\/]dry-run-tenant-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/
         )
         expect(String(summary.reportHtmlOutputPath)).toMatch(
             /reports[\\/]dry-run-tenant-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.html$/

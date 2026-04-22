@@ -77,7 +77,7 @@ export type DryRunSummary = {
     totals: {
         fusionAccountsTotal: number
         fusionAccountsExisting: number
-        /** Managed accounts for which Match was attempted in this custom-report run (size of the report account slice). */
+        /** Managed accounts for which Match was attempted in this dry-run (size of the report account slice). */
         matchAttempts: number
         /** Non-deferred match attempts with at least one match. */
         matches: number
@@ -428,7 +428,7 @@ export const buildDryRunSummary = (params: {
         (x) => Boolean(x.deferred) && x.matches.length > 0
     ).length
 
-    // Run-wide totals (custom-report account slice + fusion stats)
+    // Run-wide totals (dry-run account slice + fusion stats)
     const stats = params.stats ?? {}
     const totalFusionAccounts = stats.totalFusionAccounts ?? stats.fusionAccountsFound ?? 0
     /** Same value as `totals.fusionAccountsExisting` — authoritative fusion account inventory for this run. */

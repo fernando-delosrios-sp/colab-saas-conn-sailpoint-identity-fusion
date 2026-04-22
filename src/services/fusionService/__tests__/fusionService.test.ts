@@ -419,6 +419,7 @@ describe('FusionService', () => {
 
     describe('processManagedAccounts', () => {
         it('uses newly unmatched current-run accounts as deferred candidates for subsequent managed accounts', async () => {
+            ;(fusionService as any).managedAccountsBatchSize = 1
             const firstAccount = {
                 id: 'acct-seq-1',
                 nativeIdentity: 'native-seq-1',
@@ -467,6 +468,62 @@ describe('FusionService', () => {
             expect(fusionService.fusionAccounts).toHaveLength(1)
             expect(workQueue.has('source-a-id::native-seq-2')).toBe(false)
             expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
+        })
+
+        it('resolves all correlated accounts in pre-pass before uncorrelated batch processing', async () => {
+            ;(fusionService as any).managedAccountsBatchSize = 2
+            const correlatedA = {
+                id: 'acct-corr-a',
+                nativeIdentity: 'native-corr-a',
+                name: 'Correlated A',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                identityId: 'identity-a',
+                attributes: {},
+                uncorrelated: false,
+            } as Account
+            const uncorrelated = {
+                id: 'acct-unc-1',
+                nativeIdentity: 'native-unc-1',
+                name: 'Uncorrelated 1',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+            const correlatedB = {
+                id: 'acct-corr-b',
+                nativeIdentity: 'native-corr-b',
+                name: 'Correlated B',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                identityId: 'identity-b',
+                attributes: {},
+                uncorrelated: false,
+            } as Account
+
+            const workQueue = new Map([
+                ['source-a-id::native-corr-a', correlatedA],
+                ['source-a-id::native-unc-1', uncorrelated],
+                ['source-a-id::native-corr-b', correlatedB],
+            ])
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+
+            const callOrder: string[] = []
+            jest.spyOn(fusionService, 'processManagedAccount').mockImplementation(async (account: Account) => {
+                callOrder.push(account.id ?? '')
+                const key = `${account.sourceId}::${account.nativeIdentity}`
+                workQueue.delete(key)
+                return undefined
+            })
+
+            await fusionService.processManagedAccounts()
+
+            expect(callOrder).toHaveLength(3)
+            expect(new Set(callOrder.slice(0, 2))).toEqual(new Set(['acct-corr-a', 'acct-corr-b']))
+            expect(callOrder[2]).toBe('acct-unc-1')
         })
 
         it('short-circuits duplicate checks when an identity-backed match already exists', async () => {
@@ -689,8 +746,8 @@ describe('FusionService', () => {
             )
 
             const mockManagedAccount = {
-                id: 'acct-custom-report-def',
-                nativeIdentity: 'native-custom-report-def',
+                id: 'acct-dry-run-def',
+                nativeIdentity: 'native-dry-run-def',
                 name: 'Custom Report Deferred',
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
@@ -736,7 +793,7 @@ describe('FusionService', () => {
             await customReportFusion.analyzeManagedAccount(mockManagedAccount)
             const report = customReportFusion.generateReport(true)
             expect(
-                report.accounts.some((a) => a.deferred && a.accountId === 'source-a-id::native-custom-report-def')
+                report.accounts.some((a) => a.deferred && a.accountId === 'source-a-id::native-dry-run-def')
             ).toBe(true)
         })
 

@@ -1074,13 +1074,11 @@ export class FusionService {
      * - Clear ownership (each account is processed exactly once)
      *
      * Memory Efficiency:
-     * - Iterates Map directly (no 60k+ array allocation)
+     * - Uses per-phase snapshots to avoid iterator invalidation while work-queue entries are removed
      * - Configurable batch size (managedAccountsBatchSize, default 50) limits concurrent in-flight objects
      * - Non-matches store minimal report data; full FusionAccount only for matches
      * - Arrays cleared by generateReport() or clearAnalyzedAccounts() after use
-     * - Processes managed accounts sequentially so newly-unmatched accounts from the
-     *   same run are immediately available as deferred-match candidates for subsequent
-     *   managed accounts.
+     * - Processes bounded batches to improve throughput while preserving shared-state updates.
      *
      * @returns Empty array (side effects register accounts in fusionAccountMap/fusionIdentityMap)
      */
@@ -1129,28 +1127,31 @@ export class FusionService {
         // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion row)
         // are registered as non-matches in fusionIdentityMap here, so they are immediately visible
         // as deferred-match candidates when uncorrelated accounts are scored in the main pass.
+        const batchSize = Math.max(1, this.managedAccountsBatchSize)
         const correlatedAccounts = [...map.values()].filter((a) => a.uncorrelated === false)
         if (correlatedAccounts.length > 0) {
             this.log.info(
                 `Pre-pass: resolving ${correlatedAccounts.length} correlated managed account(s) before uncorrelated scoring`
             )
-            for (const account of correlatedAccounts) {
-                await this.processManagedAccount(account)
+            for (let i = 0; i < correlatedAccounts.length; i += batchSize) {
+                const batch = correlatedAccounts.slice(i, i + batchSize)
+                await Promise.all(batch.map((account) => this.processManagedAccount(account)))
+                await yieldToEventLoop()
             }
             this.log.info(`Pre-pass complete: ${map.size} uncorrelated account(s) queued for scoring`)
         }
         this._linkedAccountKeyIndex = undefined
 
-        const initialQueueSize = map.size
+        const queuedAccounts = [...map.values()]
+        const initialQueueSize = queuedAccounts.length
         this.log.info(
             `Processing ${initialQueueSize} managed account(s): analyzing uncorrelated work-queue entries (matching and scoring vs identities)`
         )
         let processed = 0
-        const yieldEveryManaged = this.managedAccountEventLoopYieldEvery()
         const logProgressEvery = Math.max(1, Math.min(this.managedAccountsBatchSize, initialQueueSize))
-        for (const account of map.values()) {
-            const elapsedBeforeNextAccount = Date.now() - processManagedAccountsStartedAt
-            if (processed > 0 && elapsedBeforeNextAccount >= phaseBudgetMs) {
+        for (let i = 0; i < queuedAccounts.length; i += batchSize) {
+            const elapsedBeforeNextBatch = Date.now() - processManagedAccountsStartedAt
+            if (processed > 0 && elapsedBeforeNextBatch >= phaseBudgetMs) {
                 const remaining = Math.max(0, initialQueueSize - processed)
                 this.log.info(
                     `Managed accounts phase reached soft time budget (${PhaseTimer.formatElapsed(
@@ -1159,8 +1160,9 @@ export class FusionService {
                 )
                 break
             }
-            await this.processManagedAccount(account)
-            processed += 1
+            const batch = queuedAccounts.slice(i, i + batchSize)
+            await Promise.all(batch.map((account) => this.processManagedAccount(account)))
+            processed += batch.length
             if (processed === 1 || processed % logProgressEvery === 0 || processed === initialQueueSize) {
                 this.log.info(
                     `Managed accounts progress: ${processed}/${initialQueueSize} analyzed | RUN ELAPSED ${PhaseTimer.formatElapsed(
@@ -1168,9 +1170,7 @@ export class FusionService {
                     )}`
                 )
             }
-            if (processed % yieldEveryManaged === 0) {
-                await yieldToEventLoop()
-            }
+            await yieldToEventLoop()
         }
         const totalElapsed = Date.now() - processManagedAccountsStartedAt
         this.log.info(

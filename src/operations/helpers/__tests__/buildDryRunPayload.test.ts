@@ -274,11 +274,11 @@ describe('buildDryRunPayload', () => {
             },
             totalProcessingTime: '0s',
             writeToDisk: true,
-            reportOutputPath: '/tmp/identity-fusion-custom-report/custom-report.json',
+            reportOutputPath: '/tmp/identity-fusion-dry-run/dry-run.json',
         })
 
         expect(summary.writeToDisk).toBe(true)
-        expect(summary.reportOutputPath).toBe('/tmp/identity-fusion-custom-report/custom-report.json')
+        expect(summary.reportOutputPath).toBe('/tmp/identity-fusion-dry-run/dry-run.json')
         expect(summary.totals.fusionAccountsTotal).toBe(0)
         expect(summary.totals.existingFusionDecisions).toBe(0)
     })
