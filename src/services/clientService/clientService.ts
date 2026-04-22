@@ -87,7 +87,6 @@ export class ClientService {
         this.pageSize = fusionConfig.pageSize
         this.sailPointListMax = fusionConfig.sailPointListMax
         this.statsLoggingIntervalMs = fusionConfig.statsLoggingIntervalMs
-
         const apiMax = fusionConfig.apiMaxConcurrent ?? 10
         const objectMax = fusionConfig.objectMaxConcurrent ?? 25
 

@@ -82,14 +82,16 @@ export function buildMinimalFusionReportAccount(
     urlContext: UrlContext,
     sourceType: string | undefined,
     reportAttributes: string[],
-    error?: string
+    error?: string,
+    accountIdOverride?: string
 ): FusionReportAccount {
+    const reportAccountId = accountIdOverride ?? fusionAccount.managedAccountId
     const row: FusionReportAccount = {
         accountName: getFusionReportAccountLabel(fusionAccount),
-        accountUrl: urlContext.humanAccount(fusionAccount.managedAccountId),
+        accountUrl: urlContext.humanAccount(reportAccountId),
         accountSource: fusionAccount.sourceName,
         sourceType: (sourceType as FusionReportAccount['sourceType']) ?? SourceType.Authoritative,
-        accountId: fusionAccount.managedAccountId,
+        accountId: reportAccountId,
         accountEmail: fusionAccount.email,
         accountAttributes: pickAttributes(fusionAccount.attributes as any, reportAttributes),
         matches: [],

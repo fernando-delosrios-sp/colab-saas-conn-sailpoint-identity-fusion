@@ -325,18 +325,30 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to refresh attributes for
      */
     public async refreshAllAttributes(fusionAccount: FusionAccount): Promise<void> {
-        await this.refreshDefinitions(
-            fusionAccount,
-            this.normalDefinitions,
-            (d, fa, ctx) => this.processNormalDefinition(d, fa, ctx),
-            'normal'
-        )
-        await this.refreshDefinitions(
-            fusionAccount,
-            this.uniqueDefinitions,
-            (d, fa, ctx) => this.processUniqueDefinition(d, fa, ctx),
-            'unique'
-        )
+        const context = this.buildVelocityContext(fusionAccount)
+
+        for (const definition of this.normalDefinitions) {
+            try {
+                await this.processNormalDefinition(definition, fusionAccount, context)
+            } catch (error) {
+                this.log.error(
+                    `Error generating normal attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
+                    error instanceof Error ? error.message : readString(error, 'message', String(error))
+                )
+            }
+        }
+
+        for (const definition of this.uniqueDefinitions) {
+            try {
+                await this.processUniqueDefinition(definition, fusionAccount, context)
+            } catch (error) {
+                this.log.error(
+                    `Error generating unique attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
+                    error instanceof Error ? error.message : readString(error, 'message', String(error))
+                )
+                throw error
+            }
+        }
     }
 
     /**
@@ -354,12 +366,18 @@ export class AttributeService {
         if (!shouldRefresh) return
 
         this.log.debug(`Refreshing normal attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`)
-        await this.refreshDefinitions(
-            fusionAccount,
-            this.normalDefinitions,
-            (d, fa, ctx) => this.processNormalDefinition(d, fa, ctx),
-            'normal'
-        )
+        const context = this.buildVelocityContext(fusionAccount)
+
+        for (const definition of this.normalDefinitions) {
+            try {
+                await this.processNormalDefinition(definition, fusionAccount, context)
+            } catch (error) {
+                this.log.error(
+                    `Error generating normal attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
+                    error instanceof Error ? error.message : readString(error, 'message', String(error))
+                )
+            }
+        }
     }
 
     /**
@@ -399,49 +417,18 @@ export class AttributeService {
             await this.unregisterUniqueAttributes(fusionAccount)
         }
 
-        await this.refreshDefinitions(
-            fusionAccount,
-            this.uniqueDefinitions,
-            (d, fa, ctx) => this.processUniqueDefinition(d, fa, ctx),
-            'unique'
-        )
-    }
+        const context = this.buildVelocityContext(fusionAccount)
 
-    /**
-     * Process unique attribute values for a fusion account (register or unregister)
-     */
-    private async processUniqueAttributeValues(
-        fusionAccount: FusionAccount,
-        operation: 'register' | 'unregister'
-    ): Promise<void> {
-        const { fusionIdentityAttribute } = this.schemas
-        const logMessage = operation === 'register' ? 'Registering' : 'Unregistering'
-        this.log.debug(`${logMessage} unique attributes for account: ${fusionAccount.nativeIdentity}`)
-
-        for (const def of this.uniqueDefinitions) {
-            if (operation === 'unregister' && def.name === fusionIdentityAttribute) {
-                continue
+        for (const definition of this.uniqueDefinitions) {
+            try {
+                await this.processUniqueDefinition(definition, fusionAccount, context)
+            } catch (error) {
+                this.log.error(
+                    `Error generating unique attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
+                    error instanceof Error ? error.message : readString(error, 'message', String(error))
+                )
+                throw error
             }
-
-            const value = fusionAccount.attributes[def.name]
-            const isEmpty = value === undefined || value === null || value === ''
-            if (!isEmpty && !fusionAccount.needsReset) continue
-
-            const valueStr = String(value)
-            const lockKey = `unique:${def.name}`
-            await this.locks.withLock(lockKey, async () => {
-                const valuesSet = this.getUniqueValues(def.name)
-                if (operation === 'register') {
-                    assert(
-                        this.uniqueDefinitionByName.has(def.name),
-                        `Attribute ${def.name} not found in unique attribute definition config`
-                    )
-                    valuesSet.add(valueStr)
-                    return
-                }
-                if (!valuesSet.delete(valueStr)) return
-                this.log.debug(`Unregistered unique value '${valueStr}' for attribute ${def.name}`)
-            })
         }
     }
 
@@ -452,7 +439,23 @@ export class AttributeService {
      * @param fusionAccount - The fusion account whose unique values to register
      */
     public async registerUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
-        await this.processUniqueAttributeValues(fusionAccount, 'register')
+        this.log.debug(`Registering unique attributes for account: ${fusionAccount.nativeIdentity}`)
+
+        for (const definition of this.uniqueDefinitions) {
+            const value = fusionAccount.attributes[definition.name]
+            const isEmpty = value === undefined || value === null || value === ''
+            if (isEmpty) continue
+
+            const valueStr = String(value)
+            const lockKey = `unique:${definition.name}`
+            await this.locks.withLock(lockKey, async () => {
+                assert(
+                    this.uniqueDefinitionByName.has(definition.name),
+                    `Attribute ${definition.name} not found in unique attribute definition config`
+                )
+                this.getUniqueValues(definition.name).add(valueStr)
+            })
+        }
     }
 
     /**
@@ -462,7 +465,23 @@ export class AttributeService {
      * @param fusionAccount - The fusion account whose unique values to release
      */
     public async unregisterUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
-        await this.processUniqueAttributeValues(fusionAccount, 'unregister')
+        const { fusionIdentityAttribute } = this.schemas
+        this.log.debug(`Unregistering unique attributes for account: ${fusionAccount.nativeIdentity}`)
+
+        for (const definition of this.uniqueDefinitions) {
+            if (definition.name === fusionIdentityAttribute) continue
+
+            const value = fusionAccount.attributes[definition.name]
+            const isEmpty = value === undefined || value === null || value === ''
+            if (isEmpty) continue
+
+            const valueStr = String(value)
+            const lockKey = `unique:${definition.name}`
+            await this.locks.withLock(lockKey, async () => {
+                if (!this.getUniqueValues(definition.name).delete(valueStr)) return
+                this.log.debug(`Unregistered unique value '${valueStr}' for attribute ${definition.name}`)
+            })
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -863,17 +882,6 @@ export class AttributeService {
     }
 
     /**
-     * Generate a normal attribute value (template evaluation only)
-     */
-    private async generateNormalAttributeValue(
-        definition: NormalAttributeDefinition,
-        fusionAccount: FusionAccount,
-        context: Record<string, any>
-    ): Promise<string | undefined> {
-        return this.evaluateTemplate(definition, context, fusionAccount.name)
-    }
-
-    /**
      * Generate a unique attribute value with uniqueness enforcement.
      *
      * Handles three modes via the same definition type:
@@ -1027,35 +1035,6 @@ export class AttributeService {
     // ------------------------------------------------------------------------
 
     /**
-     * Apply a definition list to a fusion account using the provided processor.
-     *
-     * Builds the Velocity context once per account and reuses it across all definitions.
-     * When an attribute value is generated, it is also set on the shared context so
-     * subsequent definitions can reference it. Definition order matters.
-     */
-    private async refreshDefinitions<T extends AnyDefinition>(
-        fusionAccount: FusionAccount,
-        definitions: T[],
-        processor: (definition: T, fusionAccount: FusionAccount, context: Record<string, any>) => Promise<void>,
-        kind: 'normal' | 'unique'
-    ): Promise<void> {
-        if (definitions.length === 0) return
-        const context = this.buildVelocityContext(fusionAccount)
-
-        for (const definition of definitions) {
-            try {
-                await processor(definition, fusionAccount, context)
-            } catch (error) {
-                this.log.error(
-                    `Error generating ${kind} attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
-                    error instanceof Error ? error.message : readString(error, 'message', String(error))
-                )
-                if (kind === 'unique') throw error
-            }
-        }
-    }
-
-    /**
      * Process a single normal attribute definition for an account.
      *
      * Immutability guards for identity-linked accounts:
@@ -1104,7 +1083,7 @@ export class AttributeService {
             return
         }
 
-        const value = await this.generateNormalAttributeValue(definition, fusionAccount, context)
+        const value = this.evaluateTemplate(definition, context, fusionAccount.name)
         if (value === undefined) {
             // Clear attribute when expression fails (e.g. unresolved variables), so we do not
             // retain a literal template string that may have come from attribute mapping.
@@ -1138,10 +1117,59 @@ export class AttributeService {
         fusionAccount: FusionAccount,
         context: Record<string, any>
     ): Promise<void> {
+        const { name } = definition
+        if (name === ORIGIN_ACCOUNT_ATTRIBUTE || name === ORIGIN_SOURCE_ATTRIBUTE) return
+
+        const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
+        const existingValue = fusionAccount.attributes[name]
+        const hasValue = isValidAttributeValue(existingValue)
+        const isFusionIdentityAttribute = name === fusionIdentityAttribute
+        const isFusionDisplayAttribute = name === fusionDisplayAttribute
+        const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
+        const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
+
         const prevIsUnique = context.isUnique
         context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value)
         try {
-            await this.processUniqueDefinitionCore(definition, fusionAccount, context)
+            // Don't regenerate unique values if the account is not being reset
+            if (hasValue && !fusionAccount.needsReset) {
+                const valueStr = String(existingValue)
+                this.getUniqueValues(name).add(valueStr)
+                if (definition.useIncrementalCounter) {
+                    await this.seedIncrementalCounterFromExistingValue(definition, valueStr)
+                }
+                return
+            }
+
+            // Don't regenerate Fusion identity attribute if the account is an existing identity
+            if (hasValue && isFusionIdentityAttribute && isExistingIdentity) {
+                this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
+                return
+            }
+
+            // Set identity name for display attribute if the account is an identity
+            if (fusionAccount.fromIdentity && isFusionDisplayAttribute) {
+                const label = this.hostingIdentityName(fusionAccount)
+                if (label) {
+                    this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
+                    fusionAccount.attributes[name] = label
+                }
+                return
+            }
+
+            if (hasValue) {
+                this.getUniqueValues(name).delete(String(existingValue))
+            }
+
+            const value = await this.generateUniqueAttributeValue(definition, fusionAccount, context)
+            if (value === undefined) {
+                // Clear attribute when expression fails (e.g. unresolved variables)
+                delete fusionAccount.attributes[name]
+                delete context[name]
+                return
+            }
+            fusionAccount.attributes[name] = value
+            context[name] = value
         } finally {
             if (prevIsUnique !== undefined) {
                 context.isUnique = prevIsUnique
@@ -1181,62 +1209,6 @@ export class AttributeService {
         if (definition.spaces) s = removeSpaces(s)
         if (definition.normalize) s = normalize(s)
         return s
-    }
-
-    private async processUniqueDefinitionCore(
-        definition: UniqueAttributeDefinition,
-        fusionAccount: FusionAccount,
-        context: Record<string, any>
-    ): Promise<void> {
-        const { name } = definition
-        if (name === ORIGIN_ACCOUNT_ATTRIBUTE || name === ORIGIN_SOURCE_ATTRIBUTE) return
-        const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
-        const existingValue = fusionAccount.attributes[name]
-        const hasValue = isValidAttributeValue(existingValue)
-        const isFusionIdentityAttribute = name === fusionIdentityAttribute
-        const isFusionDisplayAttribute = name === fusionDisplayAttribute
-        const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
-        const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
-
-        // Don't regenerate unique values if the account is not being reset
-        if (hasValue && !fusionAccount.needsReset) {
-            const valueStr = String(existingValue)
-            this.getUniqueValues(name).add(valueStr)
-            if (definition.useIncrementalCounter) {
-                await this.seedIncrementalCounterFromExistingValue(definition, valueStr)
-            }
-            return
-        }
-
-        // Don't regenerate Fusion identity attribute if the account is an existing identity
-        if (hasValue && isFusionIdentityAttribute && isExistingIdentity) {
-            this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
-            return
-        }
-
-        // Set identity name for display attribute if the account is an identity
-        if (fusionAccount.fromIdentity && isFusionDisplayAttribute) {
-            const label = this.hostingIdentityName(fusionAccount)
-            if (label) {
-                this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
-                fusionAccount.attributes[name] = label
-            }
-            return
-        }
-
-        if (hasValue) {
-            this.getUniqueValues(name).delete(String(existingValue))
-        }
-
-        const value = await this.generateUniqueAttributeValue(definition, fusionAccount, context)
-        if (value === undefined) {
-            // Clear attribute when expression fails (e.g. unresolved variables)
-            delete fusionAccount.attributes[name]
-            delete context[name]
-            return
-        }
-        fusionAccount.attributes[name] = value
-        context[name] = value
     }
 
     private async seedIncrementalCounterFromExistingValue(

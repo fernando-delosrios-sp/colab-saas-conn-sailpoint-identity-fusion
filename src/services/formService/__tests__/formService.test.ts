@@ -123,7 +123,7 @@ describe('FormService stale-form cleanup queue', () => {
             {} as any
         )
 
-        ;(service as any).addFormToDelete('form-stale')
+            ; (service as any).addFormToDelete('form-stale')
 
         await service.cleanUpForms()
         expect(deleteFormDefinition).toHaveBeenCalledTimes(1)
@@ -138,5 +138,49 @@ describe('FormService stale-form cleanup queue', () => {
         resolveDelete?.()
         await drainPromise
         expect(drained).toBe(true)
+    })
+})
+
+describe('FormService managed work queue synchronization', () => {
+    it('removes account from managedAccountsByIdentityId when account is removed from managedAccountsById', () => {
+        const managedKey = 'source-a-id::native-sync-1'
+        const identityId = 'identity-sync-1'
+        const managedAccount = {
+            id: 'acct-sync-1',
+            sourceId: 'source-a-id',
+            sourceName: 'Source A',
+            nativeIdentity: 'native-sync-1',
+            identityId,
+            name: 'Sync User',
+        } as any
+
+        const managedAccountsById = new Map([[managedKey, managedAccount]])
+        const managedAccountsAllById = new Map([[managedKey, managedAccount]])
+        const managedAccountsByIdentityId = new Map([[identityId, new Set([managedKey])]])
+
+        const sources = {
+            managedAccountsById,
+            managedAccountsAllById,
+            managedAccountsByIdentityId,
+        } as any
+
+        const service = new FormService(
+            {} as any,
+            { warn: jest.fn(), info: jest.fn(), debug: jest.fn() } as any,
+            {} as any,
+            sources
+        )
+
+        const accountInfo = (service as any).extractAccountInfoOverride(managedKey, true)
+
+        expect(accountInfo).toEqual({
+            id: managedKey,
+            name: 'Sync User',
+            sourceName: 'Source A',
+            sourceId: 'source-a-id',
+            nativeIdentity: 'native-sync-1',
+        })
+        expect(managedAccountsById.has(managedKey)).toBe(false)
+        expect(managedAccountsByIdentityId.has(identityId)).toBe(false)
     })
 })

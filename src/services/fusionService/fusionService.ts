@@ -150,6 +150,14 @@ export class FusionService {
     }
 
     /**
+     * Runtime commandType is not always populated by host environments.
+     * Treat the standard account-list operation context as aggregation mode.
+     */
+    private isAggregationAccountListMode(): boolean {
+        return this.commandType === StandardCommand.StdAccountList || this.operationContext === 'accountList'
+    }
+
+    /**
      * Keep managed-account analysis under the platform command-expiration window.
      * Derive a conservative budget from keep-alive cadence to preserve a safety buffer.
      */
@@ -166,7 +174,7 @@ export class FusionService {
     private shouldCaptureManagedAccountReportData(): boolean {
         return (
             this.fusionReportOnAggregation ||
-            this.commandType !== StandardCommand.StdAccountList ||
+            !this.isAggregationAccountListMode() ||
             this.operationContext === 'custom:dryrun'
         )
     }
@@ -569,6 +577,8 @@ export class FusionService {
             // mode === 'none': skip
         }
 
+        // Recovery path: if decision payload has source context but account metadata is missing
+        // from the managed-account map, still include that assigned key for direct correlation.
         if (authorizedLinkDecision && !authorizedLinkDecision.newIdentity && canDirectCorrelate) {
             const assignedKey = authorizedLinkDecision.account.id
             const assignedSource = authorizedLinkDecision.account.sourceName
@@ -638,7 +648,7 @@ export class FusionService {
         fusionAccount: FusionAccount,
         authorizedLinkDecision?: FusionDecision
     ): Promise<void> {
-        if (this.commandType !== StandardCommand.StdAccountList) return
+        if (!this.isAggregationAccountListMode()) return
         if (fusionAccount.missingAccountIdsSet.size === 0) return
         await this.correlatePerSource(fusionAccount, authorizedLinkDecision)
     }
@@ -933,10 +943,9 @@ export class FusionService {
                 try {
                     const cached = this.identities.getIdentityById(submitterId)
                     // Only make live API calls during real aggregation; customReport is read-only analysis.
-                    const identity =
-                        this.commandType === StandardCommand.StdAccountList
-                            ? (cached ?? (await this.identities.fetchIdentityById(submitterId)))
-                            : cached
+                    const identity = this.isAggregationAccountListMode()
+                        ? (cached ?? (await this.identities.fetchIdentityById(submitterId)))
+                        : cached
                     const label = identity?.displayName || identity?.name
                     if (label) {
                         fusionDecision.submitter.name = label
@@ -951,11 +960,9 @@ export class FusionService {
         if (fusionDecision.identityId && !fusionDecision.identityName) {
             try {
                 const cached = this.identities.getIdentityById(fusionDecision.identityId)
-                // Only make live API calls during real aggregation; customReport is read-only analysis.
-                const identity =
-                    this.commandType === StandardCommand.StdAccountList
-                        ? (cached ?? (await this.identities.fetchIdentityById(fusionDecision.identityId)))
-                        : cached
+                // In account-list aggregation, rely on candidate account identity fields;
+                // if not cached, skip identity-layer retrieval.
+                const identity = cached
                 selectedIdentity = identity
                 const label = identity?.displayName || identity?.name
                 if (label) {
@@ -988,11 +995,10 @@ export class FusionService {
                 try {
                     const cachedForDecision = this.identities.getIdentityById(fusionDecision.identityId)
                     // Only make live API calls during real aggregation; customReport is read-only analysis.
-                    selectedIdentity =
-                        this.commandType === StandardCommand.StdAccountList
-                            ? (cachedForDecision ??
-                                (await this.identities.fetchIdentityById(fusionDecision.identityId)))
-                            : cachedForDecision
+                    selectedIdentity = this.isAggregationAccountListMode()
+                        ? (cachedForDecision ??
+                            (await this.identities.fetchIdentityById(fusionDecision.identityId)))
+                        : cachedForDecision
                 } catch {
                     // Best-effort: if identity fetch fails, continue without immediate correlation.
                 }
@@ -1017,12 +1023,15 @@ export class FusionService {
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)
 
+        // Authorized decisions update/merge an existing identity-backed fusion account in-place.
         if (isAuthorizedDecision) {
             await this.applyPerSourceCorrelationIfNeeded(fusionAccount, fusionDecision)
             fusionAccount.updateCorrelationStatus()
             this.setFusionAccount(fusionAccount)
         }
 
+        // New-identity decisions branch by source policy: record keeps uniqueness reservation only,
+        // orphan may queue disable action, authoritative emits a new fusion account.
         if (fusionDecision.newIdentity) {
             if (sourceType === SourceType.Record) {
                 this.log.debug(
@@ -1089,12 +1098,51 @@ export class FusionService {
     public async processManagedAccounts(): Promise<void> {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
+        const { processManagedAccountsStartedAt, phaseBudgetMs, batchSize } = this.initializeManagedAccountPhase(map)
+        await this.runCorrelatedManagedAccountPrePass(map, batchSize)
+        this._linkedAccountKeyIndex = undefined
+
+        const queuedAccounts = [...map.values()]
+        const initialQueueSize = queuedAccounts.length
+        this.log.info(
+            `Processing ${initialQueueSize} managed account(s): analyzing uncorrelated work-queue entries (matching and scoring vs identities)`
+        )
+        const processed = await this.runUncorrelatedManagedAccountPass(
+            queuedAccounts,
+            batchSize,
+            phaseBudgetMs,
+            processManagedAccountsStartedAt
+        )
+        this.logManagedAccountsPhaseSummary(processed, processManagedAccountsStartedAt)
+    }
+
+    private initializeManagedAccountPhase(map: Map<string, Account>): {
+        processManagedAccountsStartedAt: number
+        phaseBudgetMs: number
+        batchSize: number
+    } {
         const processManagedAccountsStartedAt = Date.now()
         const phaseBudgetMs = this.managedAccountPhaseBudgetMs()
+        const batchSize = this.fusionParallelBatchSize()
+
         this.newManagedAccountsCount = map.size
         this.currentRunUnmatchedFusionNativeIdentities.clear()
         this.autoAssignedIdentityIds.clear()
+        this.currentRunMatchScoringMs = 0
 
+        this.validateManagedSourceReviewers()
+
+        // Build the trigram blocking index over all currently-loaded fusion identities so that
+        // each managed account can skip the vast majority of identity comparisons.
+        // The index is rebuilt each run (identity pool may change between runs).
+        this.scoring.buildTrigramIndex(this.fusionIdentities)
+
+        this.buildLinkedAccountKeyIndex()
+
+        return { processManagedAccountsStartedAt, phaseBudgetMs, batchSize }
+    }
+
+    private validateManagedSourceReviewers(): void {
         this._sourcesWithoutReviewers = new Set()
         for (const source of this.sources.managedSources) {
             const reviewers = this._reviewersBySourceId.get(source.id)
@@ -1106,12 +1154,9 @@ export class FusionService {
                 )
             }
         }
+    }
 
-        // Build the trigram blocking index over all currently-loaded fusion identities so that
-        // each managed account can skip the vast majority of identity comparisons.
-        // The index is rebuilt each run (identity pool may change between runs).
-        this.scoring.buildTrigramIndex(this.fusionIdentities)
-
+    private buildLinkedAccountKeyIndex(): void {
         // Build a one-shot flat index of every account key already linked in a loaded Fusion row.
         // isCorrelatedManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
         // of scanning fusionAccountMap + fusionIdentityMap (O(A+I)) for every correlated account.
@@ -1124,35 +1169,42 @@ export class FusionService {
             for (const key of fa.accountIdsSet) this._linkedAccountKeyIndex.add(key)
             for (const key of fa.missingAccountIdsSet) this._linkedAccountKeyIndex.add(key)
         }
+    }
 
-        this.currentRunMatchScoringMs = 0
-
+    private async runCorrelatedManagedAccountPrePass(map: Map<string, Account>, batchSize: number): Promise<void> {
         // Pre-pass: resolve all correlated managed accounts before uncorrelated scoring begins.
         // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion row)
         // are registered as non-matches in fusionIdentityMap here, so they are immediately visible
         // as deferred-match candidates when uncorrelated accounts are scored in the main pass.
-        const batchSize = Math.max(1, this.objectMaxConcurrent)
         const correlatedAccounts = [...map.values()].filter((a) => a.uncorrelated === false)
-        if (correlatedAccounts.length > 0) {
-            this.log.info(
-                `Pre-pass: resolving ${correlatedAccounts.length} correlated managed account(s) before uncorrelated scoring`
-            )
-            for (let i = 0; i < correlatedAccounts.length; i += batchSize) {
-                const batch = correlatedAccounts.slice(i, i + batchSize)
-                await this.limiters.runAll(batch, (account) => this.processManagedAccount(account))
-                await yieldToEventLoop()
-            }
-            this.log.info(`Pre-pass complete: ${map.size} uncorrelated account(s) queued for scoring`)
+        if (correlatedAccounts.length === 0) {
+            return
         }
-        this._linkedAccountKeyIndex = undefined
 
-        const queuedAccounts = [...map.values()]
-        const initialQueueSize = queuedAccounts.length
         this.log.info(
-            `Processing ${initialQueueSize} managed account(s): analyzing uncorrelated work-queue entries (matching and scoring vs identities)`
+            `Pre-pass: resolving ${correlatedAccounts.length} correlated managed account(s) before uncorrelated scoring`
         )
+        for (let i = 0; i < correlatedAccounts.length; i += batchSize) {
+            const batch = correlatedAccounts.slice(i, i + batchSize)
+            await this.limiters.runAll(batch, (account) => this.processManagedAccount(account))
+            await yieldToEventLoop()
+        }
+        this.log.info(`Pre-pass complete: ${map.size} uncorrelated account(s) queued for scoring`)
+    }
+
+    /**
+     * Main pass: drains the remaining uncorrelated managed-account queue after the
+     * correlated pre-pass has claimed linked/correlated entries.
+     */
+    private async runUncorrelatedManagedAccountPass(
+        queuedAccounts: Account[],
+        batchSize: number,
+        phaseBudgetMs: number,
+        processManagedAccountsStartedAt: number
+    ): Promise<number> {
+        const initialQueueSize = queuedAccounts.length
+        const logProgressEvery = Math.max(1, Math.min(batchSize, initialQueueSize))
         let processed = 0
-        const logProgressEvery = Math.max(1, Math.min(this.objectMaxConcurrent, initialQueueSize))
         for (let i = 0; i < queuedAccounts.length; i += batchSize) {
             const elapsedBeforeNextBatch = Date.now() - processManagedAccountsStartedAt
             if (processed > 0 && elapsedBeforeNextBatch >= phaseBudgetMs) {
@@ -1176,6 +1228,11 @@ export class FusionService {
             }
             await yieldToEventLoop()
         }
+
+        return processed
+    }
+
+    private logManagedAccountsPhaseSummary(processed: number, processManagedAccountsStartedAt: number): void {
         const totalElapsed = Date.now() - processManagedAccountsStartedAt
         this.log.info(
             `Managed accounts phase finished: ${processed} analyzed (matching workflow complete) | SECTION DURATION ${PhaseTimer.formatElapsed(
@@ -1219,14 +1276,14 @@ export class FusionService {
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
+        if (this.isCorrelatedManagedAccountLinkedInFusion(account)) {
+            this.log.info(
+                `Dropping managed account already linked in Fusion from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
+            )
+            this.removeManagedAccountFromWorkQueue(account)
+            return undefined
+        }
         if (account.uncorrelated === false) {
-            if (this.isCorrelatedManagedAccountLinkedInFusion(account)) {
-                this.log.info(
-                    `Dropping correlated managed account from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
-                )
-                this.removeManagedAccountFromWorkQueue(account)
-                return undefined
-            }
             this.log.info(
                 `Correlated managed account not linked to Fusion; treating as non-match: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
             )
@@ -1254,7 +1311,7 @@ export class FusionService {
         if (hasIdentityBackedMatches) {
             // Analysis-only runs (e.g. custom:dryrun): keep match report data but do not
             // register decisions or mutate fusion state as in a real aggregation.
-            if (this.commandType !== StandardCommand.StdAccountList) {
+            if (!this.isAggregationAccountListMode()) {
                 this.flagCandidatesWithStatus(fusionAccount)
                 fusionAccount.clearFusionIdentityReferences()
                 return undefined
@@ -1551,6 +1608,7 @@ export class FusionService {
 
             // Keep full FusionAccount for report when reporting is enabled (aggregation), on-demand analysis, or custom:dryrun
             if (this.shouldCaptureManagedAccountReportData()) {
+                const reportAccountId = this.resolveReportAccountId(fusionAccount)
                 if (hasIdentityBackedMatches) {
                     this.matchAccounts.push(fusionAccount)
                 } else {
@@ -1582,7 +1640,9 @@ export class FusionService {
                             fusionAccount,
                             this.urlContext,
                             this.sourcesByName.get(fusionAccount.sourceName)?.sourceType,
-                            this.reportAttributes
+                            this.reportAttributes,
+                            undefined,
+                            reportAccountId
                         ),
                         deferred: true,
                         fusionIdentityComparisons,
@@ -1607,7 +1667,9 @@ export class FusionService {
                         fusionAccount,
                         this.urlContext,
                         this.sourcesByName.get(fusionAccount.sourceName)?.sourceType,
-                        this.reportAttributes
+                        this.reportAttributes,
+                        undefined,
+                        this.resolveReportAccountId(fusionAccount)
                     ),
                     fusionIdentityComparisons,
                 })
@@ -1658,7 +1720,8 @@ export class FusionService {
                     this.urlContext,
                     this.sourcesByName.get(fusionAccount.sourceName)?.sourceType,
                     this.reportAttributes,
-                    error
+                    error,
+                    this.resolveReportAccountId(fusionAccount)
                 ),
                 fusionIdentityComparisons: this.fusionIdentityComparisonsByAccount.get(fusionAccount) ?? 0,
             })
@@ -1673,6 +1736,16 @@ export class FusionService {
         if (!managedAccountId) return
         const idx = this.matchAccounts.findIndex((x) => x.managedAccountId === managedAccountId)
         if (idx !== -1) this.matchAccounts.splice(idx, 1)
+    }
+
+    /**
+     * Reports should link to the ISC account id (not managed key).
+     * Fall back to managed key when the account isn't present in source caches.
+     */
+    private resolveReportAccountId(fusionAccount: FusionAccount): string | undefined {
+        const managedKey = fusionAccount.managedAccountId
+        if (!managedKey) return undefined
+        return this.sources.resolveIscAccountIdForManagedKey(managedKey) ?? managedKey
     }
 
     // ------------------------------------------------------------------------
@@ -1940,7 +2013,7 @@ export class FusionService {
     }
 
     private queueDisableOperation(account: Account): void {
-        if (this.commandType !== StandardCommand.StdAccountList) {
+        if (!this.isAggregationAccountListMode()) {
             return
         }
         const op = this.fireDisableOperation(account)
@@ -1997,7 +2070,7 @@ export class FusionService {
      */
     private shouldPruneDeletedManagedAccounts(): boolean {
         return (
-            this.commandType === StandardCommand.StdAccountList ||
+            this.isAggregationAccountListMode() ||
             this.commandType === StandardCommand.StdAccountRead ||
             this.commandType === StandardCommand.StdAccountUpdate ||
             this.commandType === StandardCommand.StdAccountEnable ||
@@ -2241,7 +2314,9 @@ export class FusionService {
                         fusionAccount,
                         this.urlContext,
                         sourceInfo?.sourceType,
-                        this.reportAttributes
+                        this.reportAttributes,
+                        undefined,
+                        this.resolveReportAccountId(fusionAccount)
                     ),
                     fusionIdentityComparisons: this.fusionIdentityComparisonsByAccount.get(fusionAccount) ?? 0,
                     matches,

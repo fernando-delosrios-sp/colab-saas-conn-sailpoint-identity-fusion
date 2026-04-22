@@ -303,7 +303,10 @@ export class MessagingService {
         const accountName = context?.accountName || String(formInputName || formInputAccount || 'Unknown Account')
         const accountSource = context?.accountSource || String(formInputSource || 'Unknown')
         const pickedAccountAttributes = pickAttributes(context?.accountAttributes, this.reportAttributes)
-        const accountId = context?.accountId || String(formInputAccount || '')
+        const rawAccountId = context?.accountId || String(formInputAccount || '')
+        const accountId =
+            this.sources.resolveIscAccountIdForManagedKey(rawAccountId) ||
+            rawAccountId
         const accountUrl = this.urlContext.humanAccount(accountId || undefined)
         const accountEmail = context?.accountEmail
 
@@ -431,7 +434,7 @@ export class MessagingService {
     ): Promise<void> {
         const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
         const reportTitle = args.reportTitle || MessagingService.FUSION_REPORT_EMAIL_TITLE
-        const subject = `${reportTitle} - ${matchAccountCount} Match(es) Found`
+        const subject = `${reportTitle} - ${matchAccountCount} Match(es) require(s) your attention`
         const body = this.renderFusionReportHtml(report, args.reportType, reportTitle)
         await this.sendEmail(args.recipients, subject, body)
         const sentRecipientCount = sanitizeRecipients(args.recipients).length
@@ -590,6 +593,8 @@ export class MessagingService {
         let low = 0
         let high = body.length
         let best = ''
+        // Binary-search the largest prefix that still fits once the truncation notice is appended.
+        // This avoids repeated full-template regeneration while maximizing retained report content.
         while (low <= high) {
             const mid = Math.floor((low + high) / 2)
             const candidate = `${body.slice(0, mid)}${notice}`
