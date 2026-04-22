@@ -1,24 +1,14 @@
 import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
-import { mkdir, writeFile } from 'fs/promises'
-import * as path from 'path'
 import { readArray, readBoolean, readNumber } from '../utils/safeRead'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { sanitizeRecipients } from '../services/messagingService/email'
 import {
-    buildDryRunSummary,
-    buildReportAccountIndex,
-    createDryRunOptionEmitCounter,
-} from './helpers/buildDryRunPayload'
-import { buildEmailReportFromFusionReport, hydrateIdentitiesForReportDecisions } from './helpers/generateReport'
-import {
+    DryRunRuntimeOptions,
     buildStatsForDryRun,
     createDryRunRowEmitter,
-    DryRunRuntimeOptions,
-    hostnameSegmentFromBaseurl,
-    streamEnrichedOutputRows,
-    streamOrphanDeferredReportRows,
-    streamUncorrelatedAnalyzedRows,
-    refreshUniqueAttributesForDryRun,
+    finalizeDryRun,
+    streamDryRunRows,
+    writeAndSendDryRunReport,
 } from './helpers/dryRunHelpers'
 import {
     CorePipelineOptions,
@@ -26,14 +16,6 @@ import {
     fetchPhase,
     processPhase,
 } from './helpers/corePipeline'
-
-const REPORT_DISK_SUBDIR = 'reports'
-
-const buildDryRunHtmlReportPath = (baseurl: string | undefined): string => {
-    const hostSeg = hostnameSegmentFromBaseurl(baseurl)
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-    return path.join(process.cwd(), REPORT_DISK_SUBDIR, `dry-run-${hostSeg}-${stamp}.html`)
-}
 
 const buildDryRunRuntimeOptions = (input: StdAccountListInput): DryRunRuntimeOptions => {
     return {
@@ -62,7 +44,7 @@ const buildDryRunRuntimeOptions = (input: StdAccountListInput): DryRunRuntimeOpt
  */
 export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, sources, fusion, forms } = serviceRegistry
+    const { log, sources, fusion } = serviceRegistry
     const options: CorePipelineOptions = { mode: { kind: 'dry-run' } }
 
     try {
@@ -93,75 +75,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         }
         const preStreamingStats = buildStatsForDryRun(fetchResult, issueSummary, timer.totalElapsed(), fusionCounts)
         const report = fusion.generateReport(true, preStreamingStats)
-        const reportIndex = buildReportAccountIndex(report.accounts)
-        const pendingReviewByAccountId = forms.pendingReviewContextByAccountId
-        const decisionAccountIds = new Set((report.fusionReviewDecisions ?? []).map((decision) => decision.accountId))
-        const coveredManagedAccountIds = new Set<string>()
-        const emittedRowKeys = new Set<string>()
-        const optionEmitCounter = createDryRunOptionEmitCounter()
-
-        let sentRows = 0
-        try {
-            // Baseline + identity-linked items found via existing records
-            sentRows = await streamEnrichedOutputRows(
-                serviceRegistry,
-                reportIndex,
-                pendingReviewByAccountId,
-                decisionAccountIds,
-                coveredManagedAccountIds,
-                emittedRowKeys,
-                optionEmitCounter,
-                rowEmitter,
-                runtimeOptions
-            )
-
-            // Uncorrelated managed accounts (nonMatched, newly matched, exact, etc.) still in the
-            // work queue after the report stream: analyze without mutating state (unlike
-            // processManagedAccounts) and emit them.
-            const analyzedUncorrelatedAccounts = await fusion.analyzeUncorrelatedAccounts()
-            if (analyzedUncorrelatedAccounts.length > 0) {
-                // Ensure they have unique attributes assigned for valid platform representations
-                await refreshUniqueAttributesForDryRun(serviceRegistry, analyzedUncorrelatedAccounts, runtimeOptions)
-
-                sentRows = await streamUncorrelatedAnalyzedRows(
-                    serviceRegistry,
-                    analyzedUncorrelatedAccounts,
-                    reportIndex,
-                    pendingReviewByAccountId,
-                    decisionAccountIds,
-                    coveredManagedAccountIds,
-                    emittedRowKeys,
-                    optionEmitCounter,
-                    rowEmitter,
-                    sentRows,
-                    runtimeOptions
-                )
-            }
-
-            // Deferred same-aggregation matches do not create a fusion account in the run, so 
-            // the managed account id never appears on any `forEachISCAccount` row. Emit synthetic 
-            // ISC-shaped stubs so we keep the deferred tracking aligning with original categories.
-            sentRows += await streamOrphanDeferredReportRows(
-                serviceRegistry,
-                report.accounts,
-                reportIndex,
-                pendingReviewByAccountId,
-                decisionAccountIds,
-                coveredManagedAccountIds,
-                emittedRowKeys,
-                optionEmitCounter,
-                rowEmitter,
-                runtimeOptions
-            )
-        } finally {
-            if (!runtimeOptions.writeToDisk) {
-                try {
-                    await rowEmitter.close()
-                } catch {
-                    /* ignore close errors after a failed run */
-                }
-            }
-        }
+        const { sentRows, optionEmitCounter } = await streamDryRunRows(serviceRegistry, report, runtimeOptions, rowEmitter)
 
         timer.phase('PHASE 4: Streaming enriched ISC account rows')
         const canonicalTotalProcessingTime = timer.totalElapsed()
@@ -171,68 +85,23 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             canonicalTotalProcessingTime,
             fusionCounts
         )
-        let reportHtmlOutputPath: string | undefined
-        const shouldWriteHtmlReport = runtimeOptions.writeToDisk
-        const shouldSendReportEmail = (runtimeOptions.sendReportTo?.length ?? 0) > 0
-        if (shouldWriteHtmlReport || shouldSendReportEmail) {
-            await hydrateIdentitiesForReportDecisions(serviceRegistry)
-            const emailReport = buildEmailReportFromFusionReport(serviceRegistry, report, finalDryRunStats)
-            const htmlReportBody = serviceRegistry.messaging.renderFusionReportHtml(
-                emailReport,
-                'aggregation',
-                'Identity Fusion Dry Run Report'
-            )
+        const reportHtmlOutputPath = await writeAndSendDryRunReport(serviceRegistry, report, finalDryRunStats, runtimeOptions)
 
-            if (shouldWriteHtmlReport) {
-                const htmlPath = buildDryRunHtmlReportPath(serviceRegistry.config?.baseurl)
-                await mkdir(path.dirname(htmlPath), { recursive: true })
-                await writeFile(htmlPath, htmlReportBody, 'utf8')
-                reportHtmlOutputPath = htmlPath
-                log.info(`dry-run wrote HTML report to ${htmlPath}`)
-            }
-
-            if (shouldSendReportEmail) {
-                await serviceRegistry.messaging.fetchSender()
-                await serviceRegistry.messaging.sendReportTo(emailReport, {
-                    recipients: runtimeOptions.sendReportTo ?? [],
-                    reportType: 'aggregation',
-                    reportTitle: 'Identity Fusion Dry Run Report',
-                })
-            }
-        }
-
-        const summary = buildDryRunSummary({
+        const { sentRows: completedRows } = await finalizeDryRun(serviceRegistry, {
             sentRows,
             optionEmitCounter,
-            reportOptions: runtimeOptions,
-            reportAccounts: report.accounts,
+            runtimeOptions,
+            rowEmitter,
+            report,
             issueSummary,
-            totalProcessingTime: canonicalTotalProcessingTime,
-            stats: report.stats,
-            fusionReviewDecisionsCount: (report.fusionReviewDecisions ?? []).length,
-            writeToDisk: runtimeOptions.writeToDisk,
-            reportOutputPath: rowEmitter.diskOutputPath,
+            canonicalTotalProcessingTime,
             reportHtmlOutputPath,
         })
-
-        if (runtimeOptions.writeToDisk) {
-            try {
-                await rowEmitter.close(summary)
-            } catch {
-                /* ignore close errors after a failed run */
-            }
-        }
-
-        res.send(summary)
         timer.phase('PHASE 5: Building and sending summary')
 
-        fusion.clearAnalyzedAccounts()
-        sources.clearManagedAccounts()
-        sources.clearFusionAccounts()
-
         const doneMsg = runtimeOptions.writeToDisk
-            ? `✓ custom:dryrun completed successfully - ${sentRows} account row(s) written to disk; summary sent (${rowEmitter.diskOutputPath ?? 'n/a'})`
-            : `✓ custom:dryrun completed successfully - ${sentRows} account row(s) sent`
+            ? `✓ custom:dryrun completed successfully - ${completedRows} account row(s) written to disk; summary sent (${rowEmitter.diskOutputPath ?? 'n/a'})`
+            : `✓ custom:dryrun completed successfully - ${completedRows} account row(s) sent`
         timer.end(doneMsg)
     } catch (error) {
         if (error instanceof ConnectorError) throw error
