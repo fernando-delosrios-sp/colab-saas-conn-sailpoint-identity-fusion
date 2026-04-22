@@ -418,6 +418,136 @@ describe('FusionService', () => {
     })
 
     describe('processManagedAccounts', () => {
+        it('drops uncorrelated managed accounts that are already linked in Fusion', async () => {
+            const linkedAccount = {
+                id: 'acct-linked-1',
+                nativeIdentity: 'native-linked-1',
+                name: 'Linked Account',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                identityId: 'identity-linked',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+            const key = 'source-a-id::native-linked-1'
+            const workQueue = new Map([[key, linkedAccount]])
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
+                new Map([['identity-linked', new Set([key])]])
+            )
+            jest.spyOn(fusionService as any, 'isCorrelatedManagedAccountLinkedInFusion').mockReturnValue(true)
+            const analyzeSpy = jest.spyOn(fusionService, 'analyzeManagedAccount')
+
+            const result = await fusionService.processManagedAccount(linkedAccount)
+
+            expect(result).toBeUndefined()
+            expect(analyzeSpy).not.toHaveBeenCalled()
+            expect(workQueue.has(key)).toBe(false)
+            expect(mockSources.managedAccountsByIdentityId.has('identity-linked')).toBe(false)
+        })
+
+        it('removes exact-match auto-assigned managed accounts from both work queue maps', async () => {
+            mockConfig.fusionMergingExactMatch = true
+            const account = {
+                id: 'acct-exact-queue-1',
+                nativeIdentity: 'native-exact-queue-1',
+                name: 'Exact Queue User',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                identityId: 'identity-exact',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+            const key = 'source-a-id::native-exact-queue-1'
+            const workQueue = new Map([[key, account]])
+            const byIdentity = new Map([['identity-exact', new Set([key])]])
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(byIdentity)
+            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+            mockIdentities.getIdentityById.mockReturnValue(undefined)
+            mockIdentities.fetchIdentityById.mockResolvedValue({ id: 'identity-exact', name: 'Exact Identity' } as any)
+            mockAttributes.mapAttributes.mockImplementation((fusionAccount) => fusionAccount)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const analyzed = FusionAccount.fromManagedAccount(account as any)
+            analyzed.addFusionMatch({
+                identityId: 'identity-exact',
+                identityName: 'Exact Identity',
+                candidateType: 'identity',
+                scores: [{ attribute: 'name', algorithm: 'exact', score: 100, isMatch: true }] as any,
+            } as any)
+            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            jest.spyOn(fusionService as any, 'isCorrelatedManagedAccountLinkedInFusion').mockReturnValue(false)
+
+            const result = await fusionService.processManagedAccount(account)
+
+            expect(result).toBeDefined()
+            expect(workQueue.has(key)).toBe(false)
+            expect(byIdentity.has('identity-exact')).toBe(false)
+        })
+
+        it('processes only remaining managed accounts on the next run after budget pause', async () => {
+            ;(fusionService as any).managedAccountsBatchSize = 1
+            const accountA = {
+                id: 'acct-next-run-a',
+                nativeIdentity: 'native-next-run-a',
+                name: 'Next Run A',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+            const accountB = {
+                id: 'acct-next-run-b',
+                nativeIdentity: 'native-next-run-b',
+                name: 'Next Run B',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+            const accountC = {
+                id: 'acct-next-run-c',
+                nativeIdentity: 'native-next-run-c',
+                name: 'Next Run C',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+            const workQueue = new Map([
+                ['source-a-id::native-next-run-a', accountA],
+                ['source-a-id::native-next-run-b', accountB],
+                ['source-a-id::native-next-run-c', accountC],
+            ])
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+
+            const budgetSpy = jest.spyOn(fusionService as any, 'managedAccountPhaseBudgetMs')
+            budgetSpy.mockReturnValueOnce(0)
+            budgetSpy.mockReturnValue(60_000)
+
+            const processedAccountIds: string[] = []
+            jest.spyOn(fusionService, 'processManagedAccount').mockImplementation(async (account: Account) => {
+                processedAccountIds.push(String(account.id))
+                const managedKey = `${account.sourceId}::${account.nativeIdentity}`
+                workQueue.delete(managedKey)
+                return undefined
+            })
+
+            await fusionService.processManagedAccounts()
+            expect(processedAccountIds).toHaveLength(1)
+            expect(workQueue.size).toBe(2)
+
+            await fusionService.processManagedAccounts()
+            expect(processedAccountIds).toHaveLength(3)
+            expect(workQueue.size).toBe(0)
+            expect(new Set(processedAccountIds)).toEqual(
+                new Set(['acct-next-run-a', 'acct-next-run-b', 'acct-next-run-c'])
+            )
+        })
+
         it('uses newly unmatched current-run accounts as deferred candidates for subsequent managed accounts', async () => {
             ;(fusionService as any).managedAccountsBatchSize = 1
             const firstAccount = {
@@ -889,6 +1019,53 @@ describe('FusionService', () => {
                     automaticAssignment: true,
                 })
             )
+        })
+
+        it('applies exact-match automatic assignment in accountList context even when commandType is missing', async () => {
+            const cfg = { ...mockConfig, fusionMergingExactMatch: true } as unknown as FusionConfig
+            const accountListFusion = new FusionService(
+                cfg,
+                mockLog,
+                mockIdentities,
+                mockSources,
+                mockForms,
+                mockAttributes,
+                mockScoring,
+                mockSchemas,
+                undefined,
+                'accountList'
+            )
+            const account = {
+                id: 'acct-perfect-opctx-1',
+                nativeIdentity: 'acct-perfect-opctx-1',
+                name: 'Perfect OpCtx User',
+                sourceId: 'src-lh2',
+                sourceName: 'LH2',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+            const analyzed = FusionAccount.fromManagedAccount(account)
+            analyzed.addFusionMatch({
+                identityId: 'identity-perfect-opctx-1',
+                identityName: 'Perfect OpCtx Identity',
+                scores: [
+                    { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
+                    { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
+                ],
+            } as any)
+            jest.spyOn(accountListFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            const processDecision = jest.spyOn(accountListFusion, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
+
+            await accountListFusion.processManagedAccount(account)
+
+            expect(mockForms.registerFinishedDecision).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    newIdentity: false,
+                    identityId: 'identity-perfect-opctx-1',
+                    automaticAssignment: true,
+                })
+            )
+            expect(processDecision).toHaveBeenCalled()
         })
 
         it('does not assign automatically when a rule was skipped (missing)', async () => {

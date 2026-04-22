@@ -36,7 +36,7 @@ export const resolveIdentitiesSelectLabel = (
     if (identityDocument) {
         logger.error(
             `[formBuilder] Candidate identity ${identityId} has no attributes.displayName for identities SELECT; ` +
-                `form conditions may not match the dropdown. Using identity.name (or identityId) as fallback label.`
+            `form conditions may not match the dropdown. Using identity.name (or identityId) as fallback label.`
         )
     }
     return identityId

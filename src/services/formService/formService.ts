@@ -131,7 +131,7 @@ export class FormService {
             }
             this.log.debug(
                 `Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern} ` +
-                    `(active=${activeForms.length}, stale=${staleForms.length})`
+                `(active=${activeForms.length}, stale=${staleForms.length})`
             )
             for (const staleForm of staleForms) {
                 const staleFormId = staleForm.id
@@ -144,7 +144,7 @@ export class FormService {
         } else {
             this.log.debug(
                 `Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern} ` +
-                    '(stale cleanup disabled for this run)'
+                '(stale cleanup disabled for this run)'
             )
         }
         this._formsFound = activeForms.length
@@ -209,6 +209,8 @@ export class FormService {
             return
         }
 
+        // Snapshot and clear the transient list up front so producers can keep enqueueing
+        // while this cleanup pass deduplicates and schedules the current batch.
         const formIdsToQueue = [...new Set(this.formsToDelete)]
         this.formsToDelete = []
 
@@ -396,7 +398,7 @@ export class FormService {
 
             const existing = normalizeEmail(readUnknown(c.attributes, 'email'))
             if (existing) {
-                ;(c.attributes as Record<string, unknown>).email = existing
+                ; (c.attributes as Record<string, unknown>).email = existing
                 continue
             }
 
@@ -406,7 +408,7 @@ export class FormService {
                     readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail') ?? readUnknown(attrs, 'emailAddress')
                 )
                 if (hydrated) {
-                    ;(c.attributes as Record<string, unknown>).email = hydrated
+                    ; (c.attributes as Record<string, unknown>).email = hydrated
                 }
             }
         }
@@ -584,11 +586,15 @@ export class FormService {
         }
 
         try {
+            const managedAccountKey = fusionAccount.managedAccountId
+            const reportAccountId = managedAccountKey
+                ? this.sources.resolveIscAccountIdForManagedKey(managedAccountKey) ?? managedAccountKey
+                : undefined
             await this.messaging.sendFusionEmail(formInstance, {
                 accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
                 accountSource: fusionAccount.sourceName,
                 sourceType: this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType,
-                accountId: fusionAccount.managedAccountId,
+                accountId: reportAccountId,
                 accountEmail: fusionAccount.email,
                 accountAttributes: fusionAccount.attributes as any,
                 candidates: candidates.map((c) => ({
@@ -982,8 +988,8 @@ export class FormService {
 
         this.log.debug(
             `Form analysis result: shouldDeleteForm=${shouldDeleteForm}, ` +
-                `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
-                `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
+            `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
+            `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
         )
 
         return {
@@ -1023,9 +1029,9 @@ export class FormService {
      *
      * The removal behaviour is controlled by shouldRemoveAccountFromMap,
      * which is derived from the instance analysis rules:
-     * - Response instance present  -> remove account from map
+     * - No response and pending/open instances -> remove account from map
      * - All instances cancelled    -> keep account
-     * - No response instance       -> keep account
+     * - Response instance present  -> keep account
      */
     private extractAccountInfoOverride(
         accountId: string | undefined,
@@ -1049,9 +1055,19 @@ export class FormService {
         }
 
         if (shouldRemoveAccountFromMap) {
-            // We have a response instance for this form, so remove the managed
-            // account from the work queue to avoid re-processing it on subsequent runs.
+            // Form is still pending (no response and not all cancelled), so remove
+            // the managed account from this run's work queue to avoid duplicate processing.
             workQueue.delete(accountId)
+            const identityId = account.identityId
+            if (identityId) {
+                const accountIdsForIdentity = this.sources.managedAccountsByIdentityId.get(identityId)
+                if (accountIdsForIdentity) {
+                    accountIdsForIdentity.delete(accountId)
+                    if (accountIdsForIdentity.size === 0) {
+                        this.sources.managedAccountsByIdentityId.delete(identityId)
+                    }
+                }
+            }
         }
 
         return {
@@ -1103,7 +1119,7 @@ export class FormService {
         const decisionType = decision.newIdentity ? 'new identity' : `link to ${decision.identityId}`
         this.log.debug(
             `Processed fusion decision for account ${decision.account.id}, reviewer ${decision.submitter.id}, ` +
-                `decision: ${decisionType}`
+            `decision: ${decisionType}`
         )
     }
 
@@ -1178,6 +1194,8 @@ export class FormService {
             this.activeFormDeleteWorkers++
             const workerPromise = this.runFormDeleteWorker()
             trackedPromise = workerPromise.finally(() => {
+                // Keep worker accounting + task tracking in one finally block so awaitPendingDeleteOperations
+                // always observes a consistent view, even when deletion throws.
                 this.activeFormDeleteWorkers--
                 this.pendingFormDeleteTasks.delete(trackedPromise)
                 if (this.formDeleteQueue.length > 0) {

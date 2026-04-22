@@ -1786,3 +1786,76 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         expect(fusionAccount.attributes.derived).toBe('prefix-acc-99')
     })
 })
+
+describe('AttributeService unique value registration', () => {
+    it('registers existing non-empty unique values', async () => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [
+                {
+                    name: 'id',
+                    expression: '$account.id',
+                    useIncrementalCounter: false,
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                },
+            ],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+
+        const attributeBag = {
+            current: { id: 'persisted-id-1' },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: false,
+            needsReset: false,
+            name: 'persisted-user',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        await service.registerUniqueAttributes(fusionAccount)
+
+        const uniqueValues = (service as any).uniqueValuesByAttribute.get('id') as Set<string>
+        expect(uniqueValues.has('persisted-id-1')).toBe(true)
+    })
+})

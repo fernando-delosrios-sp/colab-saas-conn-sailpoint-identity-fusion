@@ -105,6 +105,7 @@ export class ClientService {
         this.pageSize = fusionConfig.pageSize
         this.sailPointListMax = fusionConfig.sailPointListMax
         this.statsLoggingIntervalMs = fusionConfig.statsLoggingIntervalMs
+        const parallelBatchSize = fusionConfig.parallelBatchSize ?? 8
 
         // Only initialize the queue if enableQueue is true
         if (this.enableQueue) {
@@ -113,7 +114,7 @@ export class ClientService {
 
             // parallelBatchSize caps concurrent page fetches in paginateParallel at the
             // smaller of the configured value and maxConcurrentRequests.
-            this.parallelBatchSize = Math.min(fusionConfig.parallelBatchSize, maxConcurrentRequests)
+            this.parallelBatchSize = Math.min(parallelBatchSize, maxConcurrentRequests)
 
             const queueConfig: QueueConfig = {
                 requestsPerSecond,
@@ -130,7 +131,7 @@ export class ClientService {
             )
         } else {
             this.queue = null
-            this.parallelBatchSize = fusionConfig.parallelBatchSize
+            this.parallelBatchSize = parallelBatchSize
             this.log.info('API client ready (direct calls, no queue, keep-alive: true)')
         }
     }
