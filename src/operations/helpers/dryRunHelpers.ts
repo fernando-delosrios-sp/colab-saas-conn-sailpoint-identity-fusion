@@ -20,7 +20,8 @@ import {
     PendingReviewContextByAccountId,
 } from './buildDryRunPayload'
 import { defaults } from '../../data/config'
-import { sanitizeRecipients } from '../../services/messagingService/email'
+import { PhaseTimer } from '../../services/logService'
+import type { PhaseTimingBreakdownEntry } from '../../services/fusionService/types'
 import { buildEmailReportFromFusionReport, hydrateIdentitiesForReportDecisions } from './generateReport'
 
 /** Record managed source account ids present on a streamed fusion ISC row (drives report join coverage). */
@@ -86,6 +87,11 @@ type DryRunStreamingContext = {
     coveredManagedAccountIds: Set<string>
     emittedRowKeys: Set<string>
     optionEmitCounter: ReturnType<typeof createDryRunOptionEmitCounter>
+}
+
+export type PreparedDryRunOutputData = {
+    analyzedUncorrelatedAccounts: FusionAccount[]
+    uniqueAttributesElapsedMs: number
 }
 
 type DryRunFinalizationInput = {
@@ -238,7 +244,8 @@ export const buildStatsForDryRun = (
         errorSamples: string[]
     },
     totalProcessingTime: string,
-    fusionCounts?: { fusionAccountsFound: number; totalFusionAccounts: number }
+    fusionCounts?: { fusionAccountsFound: number; totalFusionAccounts: number },
+    phaseTiming?: PhaseTimingBreakdownEntry[]
 ) => {
     const memoryUsage = process.memoryUsage()
     return {
@@ -248,6 +255,7 @@ export const buildStatsForDryRun = (
         managedAccountsFoundRecord: fetchResult.managedAccountsFoundRecord,
         managedAccountsFoundOrphan: fetchResult.managedAccountsFoundOrphan,
         totalProcessingTime,
+        ...(phaseTiming && phaseTiming.length > 0 ? { phaseTiming } : {}),
         aggregationWarnings: issueSummary.warningCount,
         aggregationErrors: issueSummary.errorCount,
         warningSamples: issueSummary.warningSamples,
@@ -280,10 +288,10 @@ const initializeDryRunStreamingContext = (
 export const streamDryRunRows = async (
     serviceRegistry: ServiceRegistry,
     report: ReturnType<ServiceRegistry['fusion']['generateReport']>,
+    preparedOutputData: PreparedDryRunOutputData,
     runtimeOptions: DryRunRuntimeOptions,
     rowEmitter: DryRunRowEmitter
 ) => {
-    const { fusion } = serviceRegistry
     const streamContext = initializeDryRunStreamingContext(serviceRegistry, report)
     let sentRows = 0
 
@@ -300,13 +308,10 @@ export const streamDryRunRows = async (
             runtimeOptions
         )
 
-        const analyzedUncorrelatedAccounts = await fusion.analyzeUncorrelatedAccounts()
-        if (analyzedUncorrelatedAccounts.length > 0) {
-            await refreshUniqueAttributesForDryRun(serviceRegistry, analyzedUncorrelatedAccounts, runtimeOptions)
-
+        if (preparedOutputData.analyzedUncorrelatedAccounts.length > 0) {
             sentRows = await streamUncorrelatedAnalyzedRows(
                 serviceRegistry,
-                analyzedUncorrelatedAccounts,
+                preparedOutputData.analyzedUncorrelatedAccounts,
                 streamContext.reportIndex,
                 streamContext.pendingReviewByAccountId,
                 streamContext.decisionAccountIds,
@@ -343,12 +348,31 @@ export const streamDryRunRows = async (
     }
 }
 
+export const prepareDryRunOutputData = async (
+    serviceRegistry: ServiceRegistry,
+    runtimeOptions: DryRunRuntimeOptions
+): Promise<PreparedDryRunOutputData> => {
+    const { fusion } = serviceRegistry
+    const analyzedUncorrelatedAccounts = await fusion.analyzeUncorrelatedAccounts()
+    const uniqueRefreshStartedAt = Date.now()
+    await refreshUniqueAttributesForDryRun(serviceRegistry, analyzedUncorrelatedAccounts, runtimeOptions)
+    const uniqueAttributesElapsedMs = Date.now() - uniqueRefreshStartedAt
+    return { analyzedUncorrelatedAccounts, uniqueAttributesElapsedMs }
+}
+
 export const writeAndSendDryRunReport = async (
     serviceRegistry: ServiceRegistry,
     report: ReturnType<ServiceRegistry['fusion']['generateReport']>,
     finalDryRunStats: ReturnType<typeof buildStatsForDryRun>,
-    runtimeOptions: DryRunRuntimeOptions
-) => {
+    runtimeOptions: DryRunRuntimeOptions,
+    reportPhaseStartedAt?: number
+): Promise<
+    | undefined
+    | {
+          reportHtmlOutputPath?: string
+          statsWithPhaseTiming: ReturnType<typeof buildStatsForDryRun>
+      }
+> => {
     const { log } = serviceRegistry
     const shouldWriteHtmlReport = runtimeOptions.writeToDisk
     const shouldSendReportEmail = (runtimeOptions.sendReportTo?.length ?? 0) > 0
@@ -356,7 +380,21 @@ export const writeAndSendDryRunReport = async (
     if (!shouldWriteHtmlReport && !shouldSendReportEmail) return undefined
 
     await hydrateIdentitiesForReportDecisions(serviceRegistry)
-    const emailReport = buildEmailReportFromFusionReport(serviceRegistry, report, finalDryRunStats)
+    const baseTiming = finalDryRunStats.phaseTiming ?? []
+    const reportElapsedMs =
+        typeof reportPhaseStartedAt === 'number' ? Date.now() - reportPhaseStartedAt : 0
+    const statsForRender: ReturnType<typeof buildStatsForDryRun> = {
+        ...finalDryRunStats,
+        phaseTiming:
+            typeof reportPhaseStartedAt === 'number'
+                ? [...baseTiming, { phase: 'Report', elapsed: PhaseTimer.formatElapsed(reportElapsedMs) }]
+                : baseTiming,
+    }
+    if (typeof reportPhaseStartedAt === 'number') {
+        log.info(`PHASE 7: Report — HTML/email and stats (${PhaseTimer.formatElapsed(reportElapsedMs)})`)
+    }
+
+    const emailReport = buildEmailReportFromFusionReport(serviceRegistry, report, statsForRender)
     const htmlReportBody = serviceRegistry.messaging.renderFusionReportHtml(
         emailReport,
         DRY_RUN_REPORT_TYPE,
@@ -381,7 +419,7 @@ export const writeAndSendDryRunReport = async (
         })
     }
 
-    return reportHtmlOutputPath
+    return { reportHtmlOutputPath, statsWithPhaseTiming: statsForRender }
 }
 
 export const finalizeDryRun = async (

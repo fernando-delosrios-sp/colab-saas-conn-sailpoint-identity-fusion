@@ -196,4 +196,32 @@ export const registerHandlebarsHelpers = (): void => {
 
         return cards
     })
+
+    const PIPELINE_PHASE_ORDER = [
+        'Setup',
+        'Fetch',
+        'Refresh',
+        'Process',
+        'Unique attributes',
+        'Output',
+    ] as const
+
+    /** Ordered phase tiles for HTML; missing phases show an em dash. */
+    Handlebars.registerHelper('orderedPhaseTimingEntries', (stats: Record<string, unknown> | null | undefined) => {
+        const raw = stats?.phaseTiming
+        const byPhase = new Map<string, string>()
+        if (Array.isArray(raw)) {
+            for (const e of raw) {
+                if (e && typeof e === 'object' && typeof (e as { phase?: string }).phase === 'string') {
+                    const phase = (e as { phase: string }).phase
+                    const elapsed = (e as { elapsed?: unknown }).elapsed
+                    byPhase.set(phase, elapsed !== undefined && elapsed !== null ? String(elapsed) : '—')
+                }
+            }
+        }
+        return PIPELINE_PHASE_ORDER.map((phase) => ({
+            phase,
+            elapsed: byPhase.get(phase) ?? '—',
+        }))
+    })
 }
