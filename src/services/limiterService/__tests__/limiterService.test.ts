@@ -31,4 +31,23 @@ describe('LimiterService', () => {
         expect(calls).toBe(2)
         lim.dispose()
     })
+
+    it('runAll schedules all items while respecting object limiter concurrency and order', async () => {
+        const lim = new LimiterService({ apiMaxConcurrent: 10, objectMaxConcurrent: 2 })
+        let active = 0
+        let maxActive = 0
+
+        const items = [0, 1, 2, 3, 4, 5]
+        const results = await lim.runAll(items, async (item) => {
+            active += 1
+            maxActive = Math.max(maxActive, active)
+            await new Promise((resolve) => setTimeout(resolve, 10))
+            active -= 1
+            return item * 10
+        })
+
+        expect(results).toEqual(items.map((v) => v * 10))
+        expect(maxActive).toBeLessThanOrEqual(2)
+        lim.dispose()
+    })
 })

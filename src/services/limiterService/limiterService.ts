@@ -1,7 +1,6 @@
 import Bottleneck from 'bottleneck'
 import { shouldRetry, calculateRetryDelay } from '../clientService/helpers'
 import { internalConfig } from '../../data/config'
-import { Priority } from './types'
 
 export { Priority } from './types'
 
@@ -11,47 +10,36 @@ export type LimiterStats = {
 }
 
 export class LimiterService {
-    private readonly group: Bottleneck.Group
     readonly api: Bottleneck
     readonly objects: Bottleneck
     private totalRetries = 0
     private readonly maxRetries: number
-    private readonly objectMaxConcurrent: number
     private disposed = false
 
     constructor(private readonly config: { apiMaxConcurrent: number; objectMaxConcurrent: number }) {
-        this.objectMaxConcurrent = config.objectMaxConcurrent
+        const safeApiMaxConcurrent = Math.max(1, config.apiMaxConcurrent || 0)
+        const safeObjectMaxConcurrent = Math.max(1, config.objectMaxConcurrent || 0)
         const ics = internalConfig.clientService
+        const reservoirAmount = Math.max(1, ics.reservoirAmount || 0)
+        const reservoirWindowMs = Math.max(250, ics.reservoirWindowMs || 0)
         this.maxRetries = ics.maxLimiterRetries
 
-        const baseOpts: Bottleneck.ConstructorOptions = {
+        const apiOpts: Bottleneck.ConstructorOptions = {
             minTime: 0,
-            highWater: null,
-            strategy: Bottleneck.strategy.LEAK,
-            maxConcurrent: config.apiMaxConcurrent,
-            reservoir: ics.reservoirAmount,
-            reservoirRefreshAmount: ics.reservoirAmount,
-            reservoirRefreshInterval: ics.reservoirWindowMs,
+            maxConcurrent: safeApiMaxConcurrent,
+            reservoir: reservoirAmount,
+            reservoirRefreshAmount: reservoirAmount,
+            reservoirRefreshInterval: reservoirWindowMs,
+            trackDoneStatus: true,
+        }
+        const objectOpts: Bottleneck.ConstructorOptions = {
+            minTime: 0,
+            maxConcurrent: safeObjectMaxConcurrent,
             trackDoneStatus: true,
         }
 
-        this.group = new Bottleneck.Group(baseOpts)
-        this.api = this.group.key('api')
-        this.objects = this.group.key('objects')
-
-        this.api.updateSettings({
-            ...baseOpts,
-            id: 'api',
-            maxConcurrent: config.apiMaxConcurrent,
-        })
-        this.objects.updateSettings({
-            minTime: 0,
-            highWater: null,
-            strategy: Bottleneck.strategy.LEAK,
-            maxConcurrent: config.objectMaxConcurrent,
-            trackDoneStatus: true,
-            id: 'objects',
-        })
+        this.api = new Bottleneck(apiOpts)
+        this.objects = new Bottleneck(objectOpts)
 
         this.api.on('failed', async (error, info) => {
             if (this.disposed) return
@@ -79,27 +67,22 @@ export class LimiterService {
      */
     async runAll<T, R>(items: T[], fn: (item: T, index: number) => Promise<R>, scheduleOpts?: { priority?: number }): Promise<R[]> {
         const p = scheduleOpts?.priority
-        const out: R[] = new Array(items.length)
-        for (let s = 0; s < items.length; s += this.objectMaxConcurrent) {
-            const end = Math.min(s + this.objectMaxConcurrent, items.length)
-            const batch = await Promise.all(
-                items.slice(s, end).map((item, j) => {
-                    const index = s + j
-                    return p !== undefined
-                        ? this.objects.schedule({ priority: p }, () => fn(item, index))
-                        : this.objects.schedule({}, () => fn(item, index))
-                })
+        return Promise.all(
+            items.map((item, index) =>
+                p !== undefined
+                    ? this.objects.schedule({ priority: p }, () => fn(item, index))
+                    : this.objects.schedule({}, () => fn(item, index))
             )
-            for (let k = 0; k < batch.length; k++) out[s + k] = batch[k]
-        }
-        return out
+        )
     }
 
     dispose(): void {
         this.disposed = true
-        this.group.removeAllListeners()
+        this.api.removeAllListeners()
+        this.objects.removeAllListeners()
         void this.api.stop({ dropWaitingJobs: true })
         void this.objects.stop({ dropWaitingJobs: true })
-        void this.group.disconnect()
+        void this.api.disconnect()
+        void this.objects.disconnect()
     }
 }

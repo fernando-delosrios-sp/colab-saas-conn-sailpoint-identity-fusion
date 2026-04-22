@@ -42,6 +42,7 @@ export class ClientService {
     private readonly sailPointListMax: number
     private readonly statsLoggingIntervalMs: number
     private readonly requestTimeoutMs?: number
+    private readonly paginateParallelWindowSize: number
     private statsLoggingInterval?: ReturnType<typeof setInterval>
 
     // Lazy-loaded API instances
@@ -88,7 +89,8 @@ export class ClientService {
         this.sailPointListMax = fusionConfig.sailPointListMax
         this.statsLoggingIntervalMs = fusionConfig.statsLoggingIntervalMs
         const apiMax = fusionConfig.apiMaxConcurrent ?? 10
-        const objectMax = fusionConfig.objectMaxConcurrent ?? 25
+        const objectMax = fusionConfig.objectMaxConcurrent ?? 50
+        this.paginateParallelWindowSize = Math.max(1, apiMax * 2)
 
         this.limiter = limiter ?? new LimiterService({ apiMaxConcurrent: apiMax, objectMaxConcurrent: objectMax })
 
@@ -306,7 +308,7 @@ export class ClientService {
                 const ctx = context ?? 'paginate'
                 throw new Error(
                     `Pagination failed at offset ${offset} (${ctx}). ` +
-                        `${allItems.length} item(s) collected before failure.`
+                    `${allItems.length} item(s) collected before failure.`
                 )
             }
             const pageData = pageResponse.data || []
@@ -404,9 +406,16 @@ export class ClientService {
     protected startStatsLogging(): void {
         this.statsLoggingInterval = setInterval(() => {
             const s = this.getLimiterStats()
-            if (s.api.QUEUED > 0 || s.api.RECEIVED > 0 || s.api.RUNNING > 0) {
+            // Bottleneck's RUNNING state is often very brief between polling intervals.
+            // Infer "active" API work by combining running + executing snapshots.
+            const inferredActive = s.api.RUNNING + s.api.EXECUTING
+            if (s.api.QUEUED > 0 || s.api.RECEIVED > 0 || inferredActive > 0) {
+                const memoryUsage = process.memoryUsage()
                 this.log.info(
-                    `API limiter: ${s.api.RUNNING} running, ${s.api.QUEUED} queued, totalRetries=${this.limiter.getTotalRetries()}`
+                    `API limiter: ${inferredActive} running, ${s.api.QUEUED} queued, totalRetries=${this.limiter.getTotalRetries()}, ` +
+                    `memory RSS=${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB, ` +
+                    `heapUsed=${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB, ` +
+                    `heapTotal=${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`
                 )
             }
         }, this.statsLoggingIntervalMs)
@@ -469,19 +478,51 @@ export class ClientService {
 
         if (abortSignal?.aborted) return
 
-        const pagePromises = offsets.map((offset) => {
+        const windowSize = Math.min(this.paginateParallelWindowSize, offsets.length)
+        let nextToSchedule = 0
+        let nextToYield = 0
+        const inFlight = new Map<number, Promise<{ index: number; response: { data: T[] } | undefined }>>()
+        const completed = new Map<number, { data: T[] } | undefined>()
+
+        const scheduleByIndex = (index: number): void => {
+            const offset = offsets[index]
             const params = {
                 ...baseParameters,
                 limit: effectivePageSize,
                 offset,
             } as TRequestParams
             const ctx = context ? `${context} [offset ${offset}]` : `list [offset ${offset}]`
-            return this.execute<{ data: T[] }>(() => callFunction(params), priority, ctx, abortSignal)
-        })
-        const responses = await Promise.all(pagePromises)
-        for (const response of responses) {
-            if (response?.data && response.data.length > 0) {
-                yield response.data
+            const request = this.execute<{ data: T[] }>(() => callFunction(params), priority, ctx, abortSignal).then((response) => ({
+                index,
+                response,
+            }))
+            inFlight.set(index, request)
+        }
+
+        while (nextToSchedule < windowSize) {
+            scheduleByIndex(nextToSchedule)
+            nextToSchedule += 1
+        }
+
+        while (inFlight.size > 0) {
+            const settled = await Promise.race(inFlight.values())
+            inFlight.delete(settled.index)
+            completed.set(settled.index, settled.response)
+
+            while (completed.has(nextToYield)) {
+                const response = completed.get(nextToYield)
+                completed.delete(nextToYield)
+                nextToYield += 1
+                if (response?.data && response.data.length > 0) {
+                    yield response.data
+                }
+            }
+
+            if (abortSignal?.aborted) return
+
+            if (nextToSchedule < offsets.length) {
+                scheduleByIndex(nextToSchedule)
+                nextToSchedule += 1
             }
         }
     }

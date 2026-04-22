@@ -6,7 +6,7 @@ import type { FusionConfigBuild } from '../types'
 
 export const connectorSpecInitialValues = {
     provisioningTimeout: 300,
-    objectMaxConcurrent: 25,
+    objectMaxConcurrent: 50,
     apiMaxConcurrent: 10,
     processingWait: 60,
 } as const

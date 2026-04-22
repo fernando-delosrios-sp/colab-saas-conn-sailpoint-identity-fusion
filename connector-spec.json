@@ -19,7 +19,7 @@
         "fusionFormExpirationDays": 7,
         "fusionAverageScore": 80,
         "provisioningTimeout": 300,
-        "objectMaxConcurrent": 25,
+        "objectMaxConcurrent": 50,
         "apiMaxConcurrent": 10,
         "fusionMaxCandidatesForForm": 3,
         "includeIdentities": true,
@@ -914,7 +914,7 @@
                             "required": false,
                             "min": "1",
                             "max": "100",
-                            "helpKey": "Maximum number of in-process fusion and attribute tasks to run in parallel. Lower values reduce memory; higher values can improve throughput. Default: 25"
+                            "helpKey": "Maximum number of in-process fusion and attribute tasks to run in parallel. Lower values reduce memory; higher values can improve throughput. Default: 50"
                         },
                         {
                             "key": "forceAttributeRefresh",
@@ -1003,7 +1003,7 @@
                             "required": false,
                             "min": "1",
                             "max": "100",
-                            "helpKey": "Maximum in-process tasks (fusion phases, large loops) to run in parallel, separate from API throttling. Default: 25. Same setting as in Developer Settings."
+                            "helpKey": "Maximum in-process tasks (fusion phases, large loops) to run in parallel, separate from API throttling. Default: 50. Same setting as in Developer Settings."
                         },
                         {
                             "key": "processingWait",
