@@ -1,9 +1,8 @@
 import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
-import { readArray, readBoolean, readNumber } from '../utils/safeRead'
+import { readNumber } from '../utils/safeRead'
 import { ServiceRegistry } from '../services/serviceRegistry'
-import { sanitizeRecipients } from '../services/messagingService/email'
 import {
-    DryRunRuntimeOptions,
+    buildDryRunRuntimeOptions,
     buildStatsForDryRun,
     createDryRunRowEmitter,
     finalizeDryRun,
@@ -19,20 +18,6 @@ import {
     processPhase,
 } from './helpers/corePipeline'
 import { PhaseTimer } from '../services/logService'
-
-const buildDryRunRuntimeOptions = (input: StdAccountListInput): DryRunRuntimeOptions => {
-    return {
-        includeExisting: readBoolean(input, 'includeExisting', false),
-        includeNonMatched: readBoolean(input, 'includeNonMatched', false),
-        includeMatched: readBoolean(input, 'includeMatched', false),
-        includeExact: readBoolean(input, 'includeExact', false),
-        includeDeferred: readBoolean(input, 'includeDeferred', false),
-        includeReview: readBoolean(input, 'includeReview', false),
-        includeDecisions: readBoolean(input, 'includeDecisions', false),
-        writeToDisk: readBoolean(input, 'writeToDisk', false),
-        sendReportTo: sanitizeRecipients(readArray(input, 'sendReportTo', [])),
-    }
-}
 
 /**
  * custom:dryrun command - non-persistent aggregation analysis output.
