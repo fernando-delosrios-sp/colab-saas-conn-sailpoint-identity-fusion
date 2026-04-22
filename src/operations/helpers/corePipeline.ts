@@ -191,7 +191,7 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry, options: Co
     void options
     const { log, fusion, sources } = serviceRegistry
 
-    log.info('Processing existing fusion accounts')
+    log.info('Refreshing Fusion accounts')
     await fusion.processFusionAccounts()
 
     log.info(`Refresh phase complete - ${sources.managedAccountsById.size} unprocessed account(s) remaining`)

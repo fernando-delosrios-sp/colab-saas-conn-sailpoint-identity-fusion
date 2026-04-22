@@ -75,6 +75,10 @@ type DryRunStreamingContext = {
     optionEmitCounter: ReturnType<typeof createDryRunOptionEmitCounter>
 }
 
+export type PreparedDryRunOutputData = {
+    analyzedUncorrelatedAccounts: FusionAccount[]
+}
+
 type DryRunFinalizationInput = {
     sentRows: number
     optionEmitCounter: ReturnType<typeof createDryRunOptionEmitCounter>
@@ -269,10 +273,10 @@ const initializeDryRunStreamingContext = (
 export const streamDryRunRows = async (
     serviceRegistry: ServiceRegistry,
     report: ReturnType<ServiceRegistry['fusion']['generateReport']>,
+    preparedOutputData: PreparedDryRunOutputData,
     runtimeOptions: DryRunRuntimeOptions,
     rowEmitter: DryRunRowEmitter
 ) => {
-    const { fusion } = serviceRegistry
     const streamContext = initializeDryRunStreamingContext(serviceRegistry, report)
     let sentRows = 0
 
@@ -289,13 +293,10 @@ export const streamDryRunRows = async (
             runtimeOptions
         )
 
-        const analyzedUncorrelatedAccounts = await fusion.analyzeUncorrelatedAccounts()
-        if (analyzedUncorrelatedAccounts.length > 0) {
-            await refreshUniqueAttributesForDryRun(serviceRegistry, analyzedUncorrelatedAccounts, runtimeOptions)
-
+        if (preparedOutputData.analyzedUncorrelatedAccounts.length > 0) {
             sentRows = await streamUncorrelatedAnalyzedRows(
                 serviceRegistry,
-                analyzedUncorrelatedAccounts,
+                preparedOutputData.analyzedUncorrelatedAccounts,
                 streamContext.reportIndex,
                 streamContext.pendingReviewByAccountId,
                 streamContext.decisionAccountIds,
@@ -330,6 +331,18 @@ export const streamDryRunRows = async (
         sentRows,
         optionEmitCounter: streamContext.optionEmitCounter,
     }
+}
+
+export const prepareDryRunOutputData = async (
+    serviceRegistry: ServiceRegistry,
+    runtimeOptions: DryRunRuntimeOptions
+): Promise<PreparedDryRunOutputData> => {
+    const { fusion } = serviceRegistry
+    const analyzedUncorrelatedAccounts = await fusion.analyzeUncorrelatedAccounts()
+    if (analyzedUncorrelatedAccounts.length > 0) {
+        await refreshUniqueAttributesForDryRun(serviceRegistry, analyzedUncorrelatedAccounts, runtimeOptions)
+    }
+    return { analyzedUncorrelatedAccounts }
 }
 
 export const writeAndSendDryRunReport = async (

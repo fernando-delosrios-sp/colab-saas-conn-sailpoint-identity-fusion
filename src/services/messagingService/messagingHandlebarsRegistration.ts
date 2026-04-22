@@ -204,7 +204,6 @@ export const registerHandlebarsHelpers = (): void => {
         'Process',
         'Unique attributes',
         'Output',
-        'Report',
     ] as const
 
     /** Ordered phase tiles for HTML; missing phases show an em dash. */

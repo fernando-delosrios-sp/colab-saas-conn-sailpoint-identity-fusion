@@ -7,6 +7,7 @@ import {
     buildStatsForDryRun,
     createDryRunRowEmitter,
     finalizeDryRun,
+    prepareDryRunOutputData,
     streamDryRunRows,
     writeAndSendDryRunReport,
 } from './helpers/dryRunHelpers'
@@ -91,13 +92,28 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             prePipelinePhaseBreakdown
         )
         const report = fusion.generateReport(true, preStreamingStats)
+        const outputPreparationStartedAt = Date.now()
+        const preparedOutputData = await prepareDryRunOutputData(serviceRegistry, runtimeOptions)
+        log.info(
+            `PHASE 6: Output preparation — finalize dry-run analysis (${PhaseTimer.formatElapsed(
+                Date.now() - outputPreparationStartedAt
+            )})`
+        )
         const streamStartedAt = Date.now()
-        const { sentRows, optionEmitCounter } = await streamDryRunRows(serviceRegistry, report, runtimeOptions, rowEmitter)
+        const { sentRows, optionEmitCounter } = await streamDryRunRows(
+            serviceRegistry,
+            report,
+            preparedOutputData,
+            runtimeOptions,
+            rowEmitter
+        )
         const streamElapsedMs = Date.now() - streamStartedAt
         log.info(
-            `PHASE 6: Output — streaming enriched ISC account rows (${PhaseTimer.formatElapsed(streamElapsedMs)})`
+            `PHASE 6: Output — streaming enriched ISC account rows (${PhaseTimer.formatElapsed(
+                streamElapsedMs
+            )})`
         )
-        timer.recordElapsed('Output', streamElapsedMs)
+        timer.recordElapsed('Output', Date.now() - outputPreparationStartedAt)
 
         const canonicalTotalProcessingTime = timer.totalElapsed()
         const phaseBreakdownThroughOutput = timer.getPhaseBreakdown()
