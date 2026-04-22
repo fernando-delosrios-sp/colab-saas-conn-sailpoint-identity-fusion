@@ -2,7 +2,7 @@ import { createReadStream, createWriteStream, type WriteStream } from 'fs'
 import { mkdir, unlink, writeFile } from 'fs/promises'
 import * as path from 'path'
 import { finished, pipeline } from 'stream/promises'
-import { StdAccountListOutput } from '@sailpoint/connector-sdk'
+import { StdAccountListInput, StdAccountListOutput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { FusionReportAccount } from '../../services/fusionService/types'
 import { isExactAttributeMatchScores } from '../../services/scoringService/exactMatch'
@@ -20,6 +20,7 @@ import {
     PendingReviewContextByAccountId,
 } from './buildDryRunPayload'
 import { defaults } from '../../data/config'
+import { sanitizeRecipients } from '../../services/messagingService/email'
 import { buildEmailReportFromFusionReport, hydrateIdentitiesForReportDecisions } from './generateReport'
 
 /** Record managed source account ids present on a streamed fusion ISC row (drives report join coverage). */
@@ -53,6 +54,20 @@ export interface FetchResult {
 }
 
 export type DryRunRuntimeOptions = DryRunInputOptions
+
+export const buildDryRunRuntimeOptions = (input: StdAccountListInput): DryRunRuntimeOptions => {
+    return {
+        includeExisting: readBoolean(input, 'includeExisting', false),
+        includeNonMatched: readBoolean(input, 'includeNonMatched', false),
+        includeMatched: readBoolean(input, 'includeMatched', false),
+        includeExact: readBoolean(input, 'includeExact', false),
+        includeDeferred: readBoolean(input, 'includeDeferred', false),
+        includeReview: readBoolean(input, 'includeReview', false),
+        includeDecisions: readBoolean(input, 'includeDecisions', false),
+        writeToDisk: readBoolean(input, 'writeToDisk', false),
+        sendReportTo: sanitizeRecipients(readArray(input, 'sendReportTo', [])),
+    }
+}
 
 export type DryRunRowEmitter = {
     emitRow: (payload: Record<string, unknown>) => Promise<void>
