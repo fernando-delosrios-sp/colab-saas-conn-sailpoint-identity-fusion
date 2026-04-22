@@ -45,7 +45,6 @@ export const connectorSpecInitialValues = {
 
 export const defaults = {
     ...connectorSpecInitialValues,
-    taskResultWaitSeconds: sourcesSettings.runtimeDefaults.taskResultWaitSeconds,
     source: sourcesSettings.runtimeDefaults.source,
     ...processingControlSettings.runtimeDefaults,
     ...matchingSettings.runtimeDefaults,

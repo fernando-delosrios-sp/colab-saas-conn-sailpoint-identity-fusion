@@ -100,11 +100,15 @@ describe('SourceService Accounts JMESPath filter', () => {
 })
 
 describe('SourceService per-source aggregation polling', () => {
-    it('uses per-source retries and wait for before aggregation polling', async () => {
+    afterEach(() => {
+        jest.useRealTimers()
+    })
+
+    it('on zero-minute timeout performs one status check then warns with timeout fields', async () => {
+        jest.useFakeTimers({ now: 0 })
         const { service, client } = createService({
             aggregationMode: 'before',
-            taskResultRetries: 2,
-            taskResultWait: 0,
+            aggregationTimeout: 0,
         })
 
         client.sourcesApi.importAccounts.mockResolvedValue({
@@ -114,11 +118,70 @@ describe('SourceService per-source aggregation polling', () => {
             data: { completed: false, completionStatus: 'IN_PROGRESS' },
         })
 
-        await (service as any).aggregateManagedSource('managed-source-id', false, true)
+        const promise = (service as any).aggregateManagedSource('managed-source-id', false, true)
+        await Promise.resolve()
+        await promise
 
         expect(client.taskManagementApi.getTaskStatus).toHaveBeenCalledTimes(1)
-        expect((service as any).log.warn).toHaveBeenCalledWith(expect.stringContaining('pollWaitMs=0'))
-        expect((service as any).log.warn).toHaveBeenCalledWith(expect.stringContaining('maxPolls=1'))
+        expect((service as any).log.warn).toHaveBeenCalledWith(
+            expect.stringMatching(/timeoutMinutes=0, pollIntervalMs=30000, pollsExecuted=1/)
+        )
+    })
+
+    it('after one poll interval hits timeout with two polls executed', async () => {
+        jest.useFakeTimers({ now: 0 })
+        const { service, client } = createService({
+            aggregationMode: 'before',
+            aggregationTimeout: 1,
+        })
+
+        client.sourcesApi.importAccounts.mockResolvedValue({
+            data: { task: { id: 'task-1' } },
+        })
+        client.taskManagementApi.getTaskStatus.mockResolvedValue({
+            data: { completed: false, completionStatus: 'IN_PROGRESS' },
+        })
+
+        const promise = (service as any).aggregateManagedSource('managed-source-id', false, true)
+        await Promise.resolve()
+        await jest.advanceTimersByTimeAsync(30_000)
+        await Promise.resolve()
+        await jest.advanceTimersByTimeAsync(30_000)
+        await Promise.resolve()
+        await promise
+
+        expect(client.taskManagementApi.getTaskStatus).toHaveBeenCalledTimes(2)
+        expect((service as any).log.warn).toHaveBeenCalledWith(
+            expect.stringMatching(/timeoutMinutes=1, pollIntervalMs=30000, pollsExecuted=2/)
+        )
+    })
+
+    it('stops polling when task completes before timeout', async () => {
+        jest.useFakeTimers({ now: 0 })
+        const { service, client } = createService({
+            aggregationMode: 'before',
+            aggregationTimeout: 10,
+        })
+
+        client.sourcesApi.importAccounts.mockResolvedValue({
+            data: { task: { id: 'task-1' } },
+        })
+        client.taskManagementApi.getTaskStatus
+            .mockResolvedValueOnce({
+                data: { completed: false, completionStatus: 'IN_PROGRESS' },
+            })
+            .mockResolvedValueOnce({
+                data: { completed: true, completionStatus: 'SUCCESS' },
+            })
+
+        const promise = (service as any).aggregateManagedSource('managed-source-id', false, true)
+        await Promise.resolve()
+        await jest.advanceTimersByTimeAsync(30_000)
+        await Promise.resolve()
+        await promise
+
+        expect(client.taskManagementApi.getTaskStatus).toHaveBeenCalledTimes(2)
+        expect((service as any).log.warn).not.toHaveBeenCalled()
     })
 })
 

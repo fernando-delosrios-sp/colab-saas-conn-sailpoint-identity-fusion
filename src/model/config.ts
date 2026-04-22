@@ -172,15 +172,11 @@ export interface SourceConfig {
     disableNonMatchingAccounts?: boolean
     aggregationMode?: 'none' | 'before' | 'delayed'
     /**
-     * Number of times to poll the aggregation task result for this source
-     * when `aggregationMode` is `before`.
+     * Maximum time (minutes) to poll aggregation task status for this source when
+     * `aggregationMode` is `before`. Status is checked every 30 seconds until the task
+     * completes or this deadline is reached.
      */
-    taskResultRetries?: number
-    /**
-     * Wait time (in milliseconds) between aggregation task status polls for
-     * this source when `aggregationMode` is `before`.
-     */
-    taskResultWait?: number
+    aggregationTimeout?: number
     aggregationDelay?: number
     optimizedAggregation?: boolean
     accountFilter?: string
