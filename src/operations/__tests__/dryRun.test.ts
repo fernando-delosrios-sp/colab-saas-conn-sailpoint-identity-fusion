@@ -1,12 +1,16 @@
 import { dryRun } from '../dryRun'
 import { ServiceRegistry } from '../../services/serviceRegistry'
+import { LogService } from '../../services/logService'
+import type { FusionReport } from '../../services/fusionService/types'
+import {
+    compileEmailTemplates,
+    registerHandlebarsHelpers,
+    renderFusionReport,
+} from '../../services/messagingService/helpers'
 
 function createRegistry() {
-    const timer = {
-        phase: jest.fn(),
-        end: jest.fn(),
-        totalElapsed: jest.fn(() => '1.2s'),
-    }
+    const logForTimer = new LogService({ spConnDebugLoggingEnabled: false })
+    const timer = logForTimer.timer()
 
     return {
         config: {
@@ -15,7 +19,7 @@ function createRegistry() {
         log: {
             info: jest.fn(),
             crash: jest.fn(),
-            timer: jest.fn(() => timer),
+            timer: jest.fn().mockImplementation(() => timer),
             getAggregationIssueSummary: jest.fn(() => ({
                 warningCount: 1,
                 errorCount: 0,
@@ -557,10 +561,14 @@ describe('dryRun', () => {
     it('sends report email to explicit recipients even when report candidates have no identityId', async () => {
         const registry = createRegistry()
         const totalElapsed = jest.fn().mockReturnValueOnce('14M 56S').mockReturnValue('28M 8S')
+        const logForTimer = new LogService({ spConnDebugLoggingEnabled: false })
+        const timer = logForTimer.timer()
         registry.log.timer.mockReturnValue({
-            phase: jest.fn(),
-            end: jest.fn(),
+            phase: timer.phase.bind(timer),
+            end: timer.end.bind(timer),
             totalElapsed,
+            getPhaseBreakdown: timer.getPhaseBreakdown.bind(timer),
+            recordElapsed: timer.recordElapsed.bind(timer),
         })
         registry.fusion.generateReport.mockImplementation((_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
             accounts: [
@@ -593,15 +601,47 @@ describe('dryRun', () => {
         })
         const sentReport = registry.messaging.sendReportTo.mock.calls[0][0]
         expect(sentReport.stats?.totalProcessingTime).toBe('28M 8S')
+        expect(sentReport.stats?.phaseTiming?.map((e: { phase: string }) => e.phase)).toEqual([
+            'Setup',
+            'Fetch',
+            'Refresh',
+            'Process',
+            'Unique attributes',
+            'Output',
+            'Report',
+        ])
 
         const summary = registry.res.send.mock.calls.at(-1)?.[0]
         expect(summary.totalProcessingTime).toBe('28M 8S')
+        expect(summary.stats?.phaseTiming?.map((e: { phase: string }) => e.phase)).toEqual([
+            'Setup',
+            'Fetch',
+            'Refresh',
+            'Process',
+            'Unique attributes',
+            'Output',
+            'Report',
+        ])
     })
 
 
     it('writes a pretty JSON array detail file and returns only the summary when writeToDisk is true', async () => {
         const fs = await import('fs')
         const registry = createRegistry()
+        registerHandlebarsHelpers()
+        const fusionReportTemplates = compileEmailTemplates()
+        registry.messaging.renderFusionReportHtml.mockImplementation((report: FusionReport) => {
+            const totalAccounts = report.totalAccounts ?? report.accounts.length
+            const matchAccountCount =
+                report.matches ?? report.accounts.filter((a) => (a.matches?.length ?? 0) > 0).length
+            return renderFusionReport(fusionReportTemplates, {
+                ...report,
+                totalAccounts,
+                matches: matchAccountCount,
+                reportDate: report.reportDate || new Date(),
+                reportTitle: 'Identity Fusion Dry Run Report',
+            })
+        })
 
         await dryRun(registry, { schema: { attributes: [] }, includeNonMatched: true, writeToDisk: true } as any)
 
@@ -626,7 +666,9 @@ describe('dryRun', () => {
         expect((body.rows[0] as any).account).toBeDefined()
         expect(body.summary?.type).toBe('custom:dryrun:summary')
         expect(body.summary).toMatchObject({ emitted: expect.any(Object), totals: expect.any(Object) })
-        expect(fs.readFileSync(summary.reportHtmlOutputPath, 'utf8')).toContain('dry-run report')
+        const html = fs.readFileSync(summary.reportHtmlOutputPath, 'utf8')
+        expect(html).toContain('Identity Fusion Dry Run Report')
+        expect(html).toContain('Phase timing')
 
         fs.unlinkSync(summary.reportOutputPath)
         fs.unlinkSync(summary.reportHtmlOutputPath)

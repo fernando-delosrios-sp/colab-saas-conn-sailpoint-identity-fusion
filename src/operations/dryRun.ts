@@ -14,8 +14,11 @@ import {
     CorePipelineOptions,
     setupPhase,
     fetchPhase,
+    refreshPhase,
     processPhase,
+    uniqueAttributesPhase,
 } from './helpers/corePipeline'
+import { PhaseTimer } from '../services/logService'
 
 const buildDryRunRuntimeOptions = (input: StdAccountListInput): DryRunRuntimeOptions => {
     return {
@@ -60,32 +63,73 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
 
         const shouldContinue = await setupPhase(serviceRegistry, input.schema, options)
         if (!shouldContinue) return
-        timer.phase('PHASE 1: Setup and initialization')
+        timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
 
         const fetchResult = await fetchPhase(serviceRegistry, options)
-        timer.phase('PHASE 2: Fetching data in parallel')
+        timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
+
+        await refreshPhase(serviceRegistry, options)
+        timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
 
         await processPhase(serviceRegistry, options)
-        timer.phase('PHASE 3: Work queue depletion and form reconciliation')
+        timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
+
+        await uniqueAttributesPhase(serviceRegistry, options)
+        timer.phase('PHASE 5: Unique attributes', 'info', 'Unique attributes')
 
         const issueSummary = log.getAggregationIssueSummary()
         const fusionCounts = {
             fusionAccountsFound: sources.fusionAccountCount,
             totalFusionAccounts: readNumber(fusion, 'totalFusionAccountCount', sources.fusionAccountCount),
         }
-        const preStreamingStats = buildStatsForDryRun(fetchResult, issueSummary, timer.totalElapsed(), fusionCounts)
+        const prePipelinePhaseBreakdown = timer.getPhaseBreakdown()
+        const preStreamingStats = buildStatsForDryRun(
+            fetchResult,
+            issueSummary,
+            timer.totalElapsed(),
+            fusionCounts,
+            prePipelinePhaseBreakdown
+        )
         const report = fusion.generateReport(true, preStreamingStats)
+        const streamStartedAt = Date.now()
         const { sentRows, optionEmitCounter } = await streamDryRunRows(serviceRegistry, report, runtimeOptions, rowEmitter)
+        const streamElapsedMs = Date.now() - streamStartedAt
+        log.info(
+            `PHASE 6: Output — streaming enriched ISC account rows (${PhaseTimer.formatElapsed(streamElapsedMs)})`
+        )
+        timer.recordElapsed('Output', streamElapsedMs)
 
-        timer.phase('PHASE 4: Streaming enriched ISC account rows')
         const canonicalTotalProcessingTime = timer.totalElapsed()
+        const phaseBreakdownThroughOutput = timer.getPhaseBreakdown()
         const finalDryRunStats = buildStatsForDryRun(
             fetchResult,
             issueSummary,
             canonicalTotalProcessingTime,
-            fusionCounts
+            fusionCounts,
+            phaseBreakdownThroughOutput
         )
-        const reportHtmlOutputPath = await writeAndSendDryRunReport(serviceRegistry, report, finalDryRunStats, runtimeOptions)
+        const reportPhaseStartedAt = Date.now()
+        const writeResult = await writeAndSendDryRunReport(
+            serviceRegistry,
+            report,
+            finalDryRunStats,
+            runtimeOptions,
+            reportPhaseStartedAt
+        )
+        let reportHtmlOutputPath: string | undefined
+        if (writeResult) {
+            reportHtmlOutputPath = writeResult.reportHtmlOutputPath
+            Object.assign(finalDryRunStats, { phaseTiming: writeResult.statsWithPhaseTiming.phaseTiming })
+            report.stats = { ...report.stats, ...writeResult.statsWithPhaseTiming }
+        } else {
+            const reportOnlyElapsedMs = Date.now() - reportPhaseStartedAt
+            const fullBreakdown = [
+                ...phaseBreakdownThroughOutput,
+                { phase: 'Report', elapsed: PhaseTimer.formatElapsed(reportOnlyElapsedMs) },
+            ]
+            Object.assign(finalDryRunStats, { phaseTiming: fullBreakdown })
+            report.stats = { ...report.stats, phaseTiming: fullBreakdown }
+        }
 
         const { sentRows: completedRows } = await finalizeDryRun(serviceRegistry, {
             sentRows,
@@ -97,7 +141,6 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             canonicalTotalProcessingTime,
             reportHtmlOutputPath,
         })
-        timer.phase('PHASE 5: Building and sending summary')
 
         const doneMsg = runtimeOptions.writeToDisk
             ? `✓ custom:dryrun completed successfully - ${completedRows} account row(s) written to disk; summary sent (${rowEmitter.diskOutputPath ?? 'n/a'})`

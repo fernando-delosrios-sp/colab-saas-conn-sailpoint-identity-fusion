@@ -1,4 +1,4 @@
-import { fetchPhase, outputPhase } from '../corePipeline'
+import { fetchPhase, outputPhase, refreshPhase, processPhase, uniqueAttributesPhase } from '../corePipeline'
 
 function createRegistry() {
     const forms = {
@@ -42,6 +42,54 @@ function createRegistry() {
         fusion,
     }
 }
+
+describe('corePipeline phase split', () => {
+    it('runs refresh before process before unique attributes with correct side-effect order', async () => {
+        const callOrder: string[] = []
+        const fusion = {
+            processFusionAccounts: jest.fn(async () => {
+                callOrder.push('processFusionAccounts')
+            }),
+            processIdentities: jest.fn(async () => {
+                callOrder.push('processIdentities')
+            }),
+            processFusionIdentityDecisions: jest.fn(async () => {
+                callOrder.push('processFusionIdentityDecisions')
+            }),
+            processManagedAccounts: jest.fn(async () => {
+                callOrder.push('processManagedAccounts')
+            }),
+            awaitPendingDisableOperations: jest.fn(async () => {
+                callOrder.push('awaitPendingDisableOperations')
+            }),
+            reconcilePendingFormState: jest.fn(() => {
+                callOrder.push('reconcilePendingFormState')
+            }),
+            refreshUniqueAttributes: jest.fn(async () => {
+                callOrder.push('refreshUniqueAttributes')
+            }),
+        }
+        const identities = { clear: jest.fn(() => callOrder.push('identities.clear')) }
+        const sources = { managedAccountsById: new Map() }
+        const log = { info: jest.fn() }
+        const registry = { fusion, identities, sources, log } as any
+
+        await refreshPhase(registry, { mode: { kind: 'aggregation' } })
+        await processPhase(registry, { mode: { kind: 'aggregation' } })
+        await uniqueAttributesPhase(registry, { mode: { kind: 'aggregation' } })
+
+        expect(callOrder).toEqual([
+            'processFusionAccounts',
+            'processIdentities',
+            'processFusionIdentityDecisions',
+            'identities.clear',
+            'processManagedAccounts',
+            'awaitPendingDisableOperations',
+            'reconcilePendingFormState',
+            'refreshUniqueAttributes',
+        ])
+    })
+})
 
 describe('corePipeline outputPhase', () => {
     it('drains queued form deletions before persistent pipeline exit', async () => {
