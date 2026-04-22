@@ -115,6 +115,12 @@ export type FusionReportDecision = {
  * Snapshot values only available from the aggregation orchestrator.
  * Passed to generateReport so it can build the full FusionReportStats.
  */
+/** Per-phase elapsed durations from pipeline orchestration (optional for backward compatibility). */
+export type PhaseTimingBreakdownEntry = {
+    phase: string
+    elapsed: string
+}
+
 export type AggregationStats = {
     identitiesFound: number
     managedAccountsFound: number
@@ -122,6 +128,7 @@ export type AggregationStats = {
     managedAccountsFoundRecord?: number
     managedAccountsFoundOrphan?: number
     totalProcessingTime: string
+    phaseTiming?: PhaseTimingBreakdownEntry[]
 }
 
 export type FusionReportStats = {
@@ -175,6 +182,8 @@ export type FusionReportStats = {
     fusionReviewNoMatchesOrphan?: number
     /** Formatted total processing time */
     totalProcessingTime?: string
+    /** Ordered pipeline phase durations (Setup → … → Report) when provided by the orchestrator */
+    phaseTiming?: PhaseTimingBreakdownEntry[]
     /** Formatted memory usage at report generation time */
     usedMemory?: string
     /** Total warnings logged during aggregation */

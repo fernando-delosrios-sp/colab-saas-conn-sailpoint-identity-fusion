@@ -186,13 +186,21 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
     }
 }
 
-/** Phase 3: Work queue depletion -- process and remove accounts from the queue. */
-export async function processPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<void> {
-    const { log, fusion, identities, sources } = serviceRegistry
-    const isPersistent = options.mode.kind === 'aggregation'
+/** Phase 3: Fusion account processing (existing fusion accounts). */
+export async function refreshPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<void> {
+    void options
+    const { log, fusion, sources } = serviceRegistry
 
     log.info('Processing existing fusion accounts')
     await fusion.processFusionAccounts()
+
+    log.info(`Refresh phase complete - ${sources.managedAccountsById.size} unprocessed account(s) remaining`)
+}
+
+/** Phase 4: Identity, decision, and managed account processing (including form reconciliation). */
+export async function processPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<void> {
+    const { log, fusion, identities, sources } = serviceRegistry
+    const isPersistent = options.mode.kind === 'aggregation'
 
     log.info('Processing identities')
     await fusion.processIdentities()
@@ -214,12 +222,20 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
     log.info('Reconciling pending form state (candidates + reviewer links)')
     fusion.reconcilePendingFormState()
 
+    log.info(`Process phase complete - ${sources.managedAccountsById.size} unprocessed account(s) remaining`)
+}
+
+/** Phase 5: Unique attribute refresh. */
+export async function uniqueAttributesPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<void> {
+    void options
+    const { log, fusion, sources } = serviceRegistry
+
     await fusion.refreshUniqueAttributes()
 
     log.info(`Work queue processing complete - ${sources.managedAccountsById.size} unprocessed account(s) remaining`)
 }
 
-/** Phase 4: Generate fusion report (conditional). */
+/** Phase 7: Generate fusion report (conditional). */
 export async function reportPhase(
     serviceRegistry: ServiceRegistry,
     fetchResult: FetchResult,
@@ -245,13 +261,14 @@ export async function reportPhase(
                     managedAccountsFoundRecord: fetchResult.managedAccountsFoundRecord,
                     managedAccountsFoundOrphan: fetchResult.managedAccountsFoundOrphan,
                     totalProcessingTime: timer.totalElapsed(),
+                    phaseTiming: timer.getPhaseBreakdown(),
                 })
             }
         }
     }
 }
 
-/** Phase 5: Cleanup, send accounts to platform, save state. Only mostly used by accountList. */
+/** Phase 6: Cleanup, send accounts to platform, save state. Only mostly used by accountList. */
 export async function outputPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<number> {
     const { log, fusion, forms, sources, attributes, messaging, res } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
