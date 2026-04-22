@@ -292,11 +292,9 @@ export interface AttributeMatchingSettingsMenu extends MatchingSettingsSection, 
 export interface DeveloperSettingsSection {
     reset: boolean
     /**
-     * Batch size for processing uncorrelated managed accounts during Match.
-     * Lower values reduce peak memory usage; higher values may improve throughput.
-     * Default: 50.
+     * Max concurrent in-process object work (Bottleneck `objects` limiter), e.g. fusion phases.
      */
-    managedAccountsBatchSize?: number
+    objectMaxConcurrent?: number
     /**
      * Force recalculation of all computed Normal-type attributes on every aggregation run,
      * even when no changes were detected.
@@ -330,32 +328,9 @@ export interface AdvancedConnectionSettingsSection {
     provisioningTimeout?: number
 
     /**
-     * Enable queue management for API requests.
+     * Max concurrent in-flight API requests (Bottleneck `api` limiter).
      */
-    enableQueue: boolean
-
-    /**
-     * Enable retry logic for failed API requests.
-     */
-    enableRetry: boolean
-
-    /**
-     * The number of times to retry a failed API request.
-     * Only used when retry is enabled. Configured in Advanced Connection Settings.
-     */
-    maxRetries?: number
-
-    /**
-     * Maximum number of requests to send per second (throttling).
-     * Only used when queue is enabled. Configured in Advanced Connection Settings.
-     */
-    requestsPerSecond?: number
-
-    /**
-     * Maximum number of API requests to run concurrently.
-     * Used for queueConfig.maxConcurrentRequests.
-     */
-    maxConcurrentRequests?: number
+    apiMaxConcurrent?: number
 
     /**
      * Interval (in milliseconds) between keep-alive signals sent to the platform
@@ -364,30 +339,6 @@ export interface AdvancedConnectionSettingsSection {
      * reduce timeout risk; higher values reduce keep-alive traffic.
      */
     processingWait?: number
-
-    /**
-     * Base delay (in milliseconds) between retry attempts for failed requests.
-     * For HTTP 429 responses, the retry delay is automatically calculated from the retry-after header.
-     */
-    retryDelay?: number
-
-    /**
-     * Number of requests to include in a single processing batch.
-     */
-    batchSize?: number
-
-    /**
-     * Enable priority processing in the queue, allowing more important requests to be handled first.
-     * Enabled by default when queue is enabled.
-     */
-    enablePriority?: boolean
-
-    /**
-     * Number of pages to fetch concurrently inside paginateParallel.
-     * Defaults to 8 when unset. When the queue is enabled the effective value is
-     * capped at maxConcurrentRequests so it never exceeds the queue's concurrency budget.
-     */
-    parallelBatchSize?: number
 }
 
 // Proxy Settings Section
@@ -426,10 +377,12 @@ export interface AdvancedSettingsMenu
 /** Internal constants and computed values not exposed through the UI configuration. */
 export interface InternalConfig {
     readonly fusionScoreMap?: Map<string, number>
-    readonly requestsPerSecondConstant: number
+    readonly maxLimiterRetries: number
+    readonly baseRetryDelayMs: number
+    readonly reservoirWindowMs: number
+    readonly reservoirAmount: number
     readonly tokenUrlPath: string
     readonly processingWaitConstant: number
-    readonly retriesConstant: number
     readonly workflowName: string
     readonly delayedAggregationWorkflowName: string
     readonly padding: string
@@ -448,7 +401,6 @@ export interface InternalConfig {
     readonly rateLimitJitterFactor: number
     readonly statsLoggingIntervalMs: number
     readonly maxStatsSamples: number
-    readonly queueProcessingIntervalMs: number
     readonly sailPointListMax: number
     readonly concurrency: {
         readonly uncorrelatedAccounts: number

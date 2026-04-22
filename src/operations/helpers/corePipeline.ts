@@ -1,7 +1,6 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
-import { promiseAllBatched } from '../../services/fusionService/collections'
 
 export type PipelineMode =
     | { kind: 'aggregation' } // full persistent run — accountList (includes optional aggregation report)
@@ -18,8 +17,6 @@ export interface FetchResult {
     managedAccountsFoundRecord: number
     managedAccountsFoundOrphan: number
 }
-
-const GLOBAL_OWNER_FETCH_BATCH_SIZE = 25
 
 async function applyPersistentFusionReset(serviceRegistry: ServiceRegistry): Promise<void> {
     const { forms, fusion, sources } = serviceRegistry
@@ -143,17 +140,17 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
         const globalOwnerFetchStartedAt = Date.now()
         const globalOwnerIds = await sources.fetchGlobalOwnerIdentityIds()
         const missingGlobalOwnerIds = globalOwnerIds.filter((id) => !identities.getIdentityById(id))
-        await promiseAllBatched(
+        const limiters = serviceRegistry.client.getLimiters()
+        await limiters.runAll(
             missingGlobalOwnerIds,
             async (id) => {
                 await identities.fetchIdentityById(id)
-            },
-            GLOBAL_OWNER_FETCH_BATCH_SIZE
+            }
         )
         log.info(
             `Performance metric: fetchPhase.globalOwnerHydration durationMs=${
                 Date.now() - globalOwnerFetchStartedAt
-            } totalIds=${globalOwnerIds.length} fetchedIds=${missingGlobalOwnerIds.length} batchSize=${GLOBAL_OWNER_FETCH_BATCH_SIZE}`
+            } totalIds=${globalOwnerIds.length} fetchedIds=${missingGlobalOwnerIds.length}`
         )
     }
 

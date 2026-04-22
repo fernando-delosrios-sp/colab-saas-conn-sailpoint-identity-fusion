@@ -31,7 +31,7 @@ export function getCallerInfo(skipFrames: number = 2): { origin: string; isOpera
         const startIdx = skipFrames + 1
         const maxIdx = Math.min(lines.length - 1, startIdx + 8)
 
-        const INFRASTRUCTURE_CLASSES = new Set(['Object', 'Module', 'Promise', 'InMemoryLockService', 'ApiQueue'])
+        const INFRASTRUCTURE_CLASSES = new Set(['Object', 'Module', 'Promise', 'InMemoryLockService', 'LimiterService'])
 
         const RUNTIME_INTERNALS = new Set(['process', 'internal', 'node', 'AsyncLocalStorage', 'AsyncResource'])
 

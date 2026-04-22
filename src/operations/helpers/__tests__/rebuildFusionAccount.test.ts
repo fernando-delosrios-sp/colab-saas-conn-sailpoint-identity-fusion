@@ -1,4 +1,5 @@
 import { rebuildFusionAccount } from '../rebuildFusionAccount'
+import { mockLimiters } from '../../__tests__/harness/mockRegistry'
 
 describe('rebuildFusionAccount', () => {
     it('fetches managed accounts from fusion attributes and identity links for configured managed sources only', async () => {
@@ -22,6 +23,7 @@ describe('rebuildFusionAccount', () => {
         })
 
         const registry = {
+            client: { getLimiters: () => mockLimiters },
             sources: {
                 fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
                 fusionAccountsByNativeIdentity: new Map([
@@ -66,6 +68,7 @@ describe('rebuildFusionAccount', () => {
         })
 
         const registry = {
+            client: { getLimiters: () => mockLimiters },
             sources: {
                 fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
                 fusionAccountsByNativeIdentity: new Map([

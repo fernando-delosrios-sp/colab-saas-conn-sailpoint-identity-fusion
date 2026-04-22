@@ -18,6 +18,24 @@ export function createOperationTimer() {
     }
 }
 
+/**
+ * Approximates the real objects limiter: bounded concurrency (default 25) and ordered results.
+ */
+export const mockLimiters = {
+    runAll: async <T, R>(items: T[], fn: (item: T, index: number) => Promise<R>, opts?: { maxConcurrent?: number }) => {
+        const maxConcurrent = opts?.maxConcurrent ?? 25
+        const out: R[] = new Array(items.length)
+        for (let s = 0; s < items.length; s += maxConcurrent) {
+            const end = Math.min(s + maxConcurrent, items.length)
+            const batch = await Promise.all(items.slice(s, end).map((it, j) => fn(it, s + j)))
+            for (let k = 0; k < batch.length; k++) out[s + k] = batch[k]
+        }
+        return out
+    },
+    objects: { schedule: (_o: any, f: () => any) => f() },
+    api: { schedule: (_o: any, f: () => any) => f() },
+}
+
 export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
     const timer = createOperationTimer()
 
@@ -107,6 +125,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
             timer: jest.fn(() => timer),
         },
         res: { send: jest.fn() },
+        client: { getLimiters: () => mockLimiters },
         schemas,
         sources,
         identities,

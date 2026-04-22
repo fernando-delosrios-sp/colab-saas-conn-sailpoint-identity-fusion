@@ -19,20 +19,14 @@
         "fusionFormExpirationDays": 7,
         "fusionAverageScore": 80,
         "provisioningTimeout": 300,
-        "managedAccountsBatchSize": 100,
+        "objectMaxConcurrent": 25,
+        "apiMaxConcurrent": 10,
         "fusionMaxCandidatesForForm": 3,
         "includeIdentities": true,
         "identityScopeQuery": "*",
         "maxHistoryMessages": 10,
         "attributeMerge": "first",
-        "enableQueue": true,
-        "enableRetry": true,
-        "maxRetries": 20,
-        "requestsPerSecond": 10,
-        "maxConcurrentRequests": 10,
         "processingWait": 60,
-        "retryDelay": 1000,
-        "batchSize": 250,
         "externalLoggingLevel": "info",
         "proxyEnabled": false,
         "proxyUrl": "",
@@ -47,7 +41,6 @@
         "trim": false,
         "force": false,
         "algorithm": "name-matcher",
-        "enablePriority": true,
         "aggregationMode": "none",
         "correlationMode": "none"
     },
@@ -905,7 +898,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance.</strong><br><br><ul><li><strong>Reset & refresh:</strong> Rebuild all Fusion accounts from scratch or force recalculate all Normal-type attributes on every run.</li><li><strong>Batch limits:</strong> Optimize memory usage vs throughput during match detection.</li><li><strong>Misc:</strong> Prevent multiple runs overlapping or stream logs to monitoring services.</li></ul>",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance.</strong><br><br><ul><li><strong>Reset & refresh:</strong> Rebuild all Fusion accounts from scratch or force recalculate all Normal-type attributes on every run.</li><li><strong>Concurrency:</strong> Cap in-process parallel object work (fusion phases, attribute refresh) separate from API rate limits.</li><li><strong>Misc:</strong> Prevent multiple runs overlapping or stream logs to monitoring services.</li></ul>",
                     "items": [
                         {
                             "key": "reset",
@@ -915,11 +908,13 @@
                             "helpKey": "Rebuild all Fusion accounts from scratch on the next run. Use with caution in production and remember to turn this off after it completes"
                         },
                         {
-                            "key": "managedAccountsBatchSize",
-                            "label": "Managed accounts batch size",
+                            "key": "objectMaxConcurrent",
+                            "label": "Max concurrent object processing",
                             "type": "number",
                             "required": false,
-                            "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100. Default: 50"
+                            "min": "1",
+                            "max": "100",
+                            "helpKey": "Maximum number of in-process fusion and attribute tasks to run in parallel. Lower values reduce memory; higher values can improve throughput. Default: 25"
                         },
                         {
                             "key": "forceAttributeRefresh",
@@ -983,7 +978,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Advanced Connection Settings",
-                    "sectionHelpMessage": "<strong>Fine-tune API and queue behavior.</strong><br><br><ul><li><strong>Provisioning timeout:</strong> Max wait for operations (default: 300s).</li><li><strong>Queue:</strong> Enable rate limiting and concurrency control.</li><li><strong>Retry:</strong> Auto-retry failed requests (recommended).</li><li><strong>Processing wait time:</strong> Keep-alive interval for long operations.</li><li><strong>Batching:</strong> Group requests for efficiency.</li></ul>",
+                    "sectionHelpMessage": "<strong>API keep-alive, timeouts, and in-flight request caps.</strong><br><br><ul><li><strong>Provisioning timeout:</strong> hard cap on each HTTP request to ISC.</li><li><strong>Max concurrent API requests:</strong> parallel in-flight API calls; rate limiting follows ISC&rsquo;s 100 requests per 10 seconds (built in).</li><li><strong>Max concurrent object processing (Developer):</strong> separate cap for in-process fusion work, also shown under Developer Settings.</li><li><strong>Processing wait time:</strong> how often the connector sends a keep-alive signal during long operations.</li></ul>",
                     "items": [
                         {
                             "key": "provisioningTimeout",
@@ -993,51 +988,22 @@
                             "helpKey": "Maximum time (in seconds) to wait for a provisioning operation to complete. Increase this if you experience timeouts with large batches. Default: 300"
                         },
                         {
-                            "key": "enableQueue",
-                            "label": "Enable queue?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Manage the flow of API requests to avoid overloading the server. Controls how many requests run at once and how fast they are sent"
-                        },
-                        {
-                            "key": "maxConcurrentRequests",
-                            "label": "Maximum concurrent requests",
+                            "key": "apiMaxConcurrent",
+                            "label": "Max concurrent API requests",
                             "type": "number",
                             "required": false,
                             "min": "1",
-                            "max": "10",
-                            "parentKey": "enableQueue",
-                            "parentValue": "true",
-                            "helpKey": "How many requests can run at the same time. Lower values are safer for rate-limited APIs. Default: 8"
+                            "max": "50",
+                            "helpKey": "Maximum in-flight API requests. ISC enforces 100 API calls per 10 seconds; the connector paces to that limit automatically. Default: 10"
                         },
                         {
-                            "key": "requestsPerSecond",
-                            "label": "Requests per second",
+                            "key": "objectMaxConcurrent",
+                            "label": "Max concurrent object processing",
                             "type": "number",
                             "required": false,
                             "min": "1",
-                            "max": "12",
-                            "parentKey": "enableQueue",
-                            "parentValue": "true",
-                            "helpKey": "Maximum number of requests sent per second. Reduce this if you are getting rate-limit errors. Default: 8"
-                        },
-                        {
-                            "key": "enableRetry",
-                            "label": "Enable retry?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Automatically retry requests that fail due to temporary errors (e.g. timeouts or rate limits). Recommended for production use"
-                        },
-                        {
-                            "key": "maxRetries",
-                            "label": "API request retries",
-                            "type": "number",
-                            "required": false,
-                            "min": "0",
-                            "max": "20",
-                            "parentKey": "enableRetry",
-                            "parentValue": "true",
-                            "helpKey": "How many times to retry a failed request before giving up. Default: 20"
+                            "max": "100",
+                            "helpKey": "Maximum in-process tasks (fusion phases, large loops) to run in parallel, separate from API throttling. Default: 25. Same setting as in Developer Settings."
                         },
                         {
                             "key": "processingWait",
@@ -1046,30 +1012,6 @@
                             "required": true,
                             "min": "0",
                             "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts. Default: 60"
-                        },
-                        {
-                            "key": "retryDelay",
-                            "label": "Retry delay (milliseconds)",
-                            "type": "number",
-                            "required": true,
-                            "min": "0",
-                            "helpKey": "Time to wait (in milliseconds) before retrying a failed request. The server may override this with its own recommended wait time. Default: 1000"
-                        },
-                        {
-                            "key": "batchSize",
-                            "label": "Batch size",
-                            "type": "number",
-                            "required": true,
-                            "min": "1",
-                            "max": "250",
-                            "helpKey": "Number of requests to group in each batch. Default: 250"
-                        },
-                        {
-                            "key": "enablePriority",
-                            "label": "Enable priority processing?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Process critical operations (like saving data) before less urgent ones (like logging). Recommended for best performance"
                         }
                     ]
                 },

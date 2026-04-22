@@ -10,7 +10,8 @@ import { FusionAccount } from '../../model/account'
 import { attrConcat, AttributeService } from '../attributeService'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
-import { mapValuesToArray, forEachBatched, promiseAllBatched, compact, yieldToEventLoop } from './collections'
+import { LimiterService } from '../limiterService'
+import { mapValuesToArray, compact, yieldToEventLoop } from './collections'
 import { FusionDecision } from '../../model/form'
 import { FusionMatch, MatchCandidateType, ScoringService } from '../scoringService'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
@@ -33,8 +34,8 @@ import { readString } from '../../utils/safeRead'
 
 /**
  * Service for identity fusion logic.
- * Pure in-memory operations - no ClientService dependency.
- * All data structures are passed in as parameters.
+ * Object backpressure is applied via the shared LimiterService from SourceService
+ * (objects limiter for heavy parallel work; API calls use the client’s api limiter).
  */
 export class FusionService {
     private fusionIdentityMap: Map<string, FusionAccount> = new Map()
@@ -63,7 +64,7 @@ export class FusionService {
     public readonly fusionReportOnAggregation: boolean
     public newManagedAccountsCount: number = 0
     public identitiesProcessedCount: number = 0
-    private readonly managedAccountsBatchSize: number
+    private readonly objectMaxConcurrent: number
     public readonly commandType?: StandardCommand
     /** Connector operation name (e.g. `custom:dryrun`) — used when SDK commandType alone is ambiguous. */
     private readonly operationContext?: string
@@ -123,15 +124,19 @@ export class FusionService {
         this.commandType = commandType
         this.operationContext = operationContext
         this.deleteEmpty = config.deleteEmpty
-        this.managedAccountsBatchSize = config.managedAccountsBatchSize ?? defaults.managedAccountsBatchSize
+        this.objectMaxConcurrent = config.objectMaxConcurrent ?? defaults.objectMaxConcurrent
+    }
+
+    private get limiters(): LimiterService {
+        return this.sources.limiters
     }
 
     /**
-     * Fusion/identity phases use Promise.all batches; each task runs a large synchronous preamble
-     * before its first await. Capping concurrency avoids stacking tens of accounts on one turn.
+     * Each task runs a large synchronous preamble before its first await. Capping concurrency
+     * avoids stacking tens of accounts on one turn.
      */
     private fusionParallelBatchSize(): number {
-        return Math.max(1, Math.min(this.managedAccountsBatchSize, 12))
+        return Math.max(1, Math.min(this.objectMaxConcurrent, 12))
     }
 
     /**
@@ -141,7 +146,7 @@ export class FusionService {
      * event-loop responsiveness for the SDK keep-alive and logger flush paths.
      */
     private managedAccountEventLoopYieldEvery(): number {
-        return Math.max(1, Math.min(this.managedAccountsBatchSize, 25))
+        return Math.max(1, Math.min(this.objectMaxConcurrent, 25))
     }
 
     /**
@@ -222,11 +227,10 @@ export class FusionService {
         this.log.info(
             `Pre-processing fusion accounts: loading ${fusionAccounts.length} fusion account record(s) from sources and registering them for fusion`
         )
-        const results: FusionAccount[] = []
-        await forEachBatched(fusionAccounts, async (x: Account) => {
+        const results = await this.limiters.runAll(fusionAccounts, async (x: Account) => {
             const fusionAccount = FusionAccount.fromFusionAccount(x)
             this.setFusionAccount(fusionAccount)
-            results.push(fusionAccount)
+            return fusionAccount
         })
         this.log.info(
             `Fusion account pre-process finished: ${results.length} account(s) loaded and registered | SECTION DURATION ${PhaseTimer.formatElapsed(
@@ -267,21 +271,20 @@ export class FusionService {
         this.log.info(
             `Processing fusion accounts: for each of ${total} fusion account(s), match managed accounts from the work queue and build fusion layers`
         )
-        const results = await promiseAllBatched(
-            fusionAccounts,
-            async (x: Account) => {
-                return await this.processFusionAccount(x)
-            },
-            batchSize,
-            (processed, ttl) => {
-                batchIndex++
-                if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
-                    this.log.info(
-                        `Fusion accounts progress: ${processed}/${ttl} processed | RUN ELAPSED ${PhaseTimer.formatElapsed(Date.now() - startedAt)}`
-                    )
-                }
+        const results: FusionAccount[] = []
+        for (let i = 0; i < fusionAccounts.length; i += batchSize) {
+            const batch = fusionAccounts.slice(i, i + batchSize)
+            const batchResults = await this.limiters.runAll(batch, (x) => this.processFusionAccount(x))
+            results.push(...batchResults)
+            const processed = results.length
+            const ttl = total
+            batchIndex++
+            if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
+                this.log.info(
+                    `Fusion accounts progress: ${processed}/${ttl} processed | RUN ELAPSED ${PhaseTimer.formatElapsed(Date.now() - startedAt)}`
+                )
             }
-        )
+        }
         this.log.info(
             `Fusion accounts phase finished: ${results.length} fusion account(s) processed (managed accounts matched and layered) | SECTION DURATION ${PhaseTimer.formatElapsed(
                 Date.now() - startedAt
@@ -352,7 +355,7 @@ export class FusionService {
      * Refresh unique attributes for all fusion accounts and identities in batches.
      */
     public async refreshUniqueAttributes(): Promise<void> {
-        const batchSize = this.managedAccountsBatchSize
+        const batchSize = this.objectMaxConcurrent
         const allAccounts = [...this.fusionAccounts, ...this.fusionIdentities]
         const total = allAccounts.length
         const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
@@ -366,7 +369,7 @@ export class FusionService {
             batchIndex += 1
             const batch = allAccounts.splice(0, batchSize)
             const batchStarted = Date.now()
-            await Promise.all(batch.map((account) => this.attributes.refreshUniqueAttributes(account)))
+            await this.limiters.runAll(batch, (account) => this.attributes.refreshUniqueAttributes(account))
             const done = total - allAccounts.length
             if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || allAccounts.length === 0) {
                 this.log.info(
@@ -681,19 +684,20 @@ export class FusionService {
         this.log.info(
             `Processing identity documents: creating or merging fusion accounts for ${total} ISC identity document(s)`
         )
-        const results = await promiseAllBatched(
-            identities,
-            (x) => this.processIdentity(x),
-            batchSize,
-            (processed, ttl) => {
-                batchIndex++
-                if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
-                    this.log.info(
-                        `Identity documents progress: ${processed}/${ttl} processed | RUN ELAPSED ${PhaseTimer.formatElapsed(Date.now() - startedAt)}`
-                    )
-                }
+        const results: (FusionAccount | undefined)[] = []
+        for (let i = 0; i < identities.length; i += batchSize) {
+            const batch = identities.slice(i, i + batchSize)
+            const batchResults = await this.limiters.runAll(batch, (x) => this.processIdentity(x))
+            results.push(...batchResults)
+            const processed = results.length
+            const ttl = total
+            batchIndex++
+            if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
+                this.log.info(
+                    `Identity documents progress: ${processed}/${ttl} processed | RUN ELAPSED ${PhaseTimer.formatElapsed(Date.now() - startedAt)}`
+                )
             }
-        )
+        }
         const { managedSources } = this.sources
         managedSources.forEach((source) => {
             this.sourcesByName.set(source.name, source)
@@ -894,7 +898,7 @@ export class FusionService {
             `Processing fusion identity decisions: applying ${fusionIdentityDecisions.length} reviewer form decision(s) (new identity or merge into existing)`
         )
 
-        const results = await promiseAllBatched(fusionIdentityDecisions, (x) => this.processFusionIdentityDecision(x))
+        const results = await this.limiters.runAll(fusionIdentityDecisions, (x) => this.processFusionIdentityDecision(x))
         this.log.info(
             `Fusion identity decisions phase finished: ${fusionIdentityDecisions.length} decision(s) applied | SECTION DURATION ${PhaseTimer.formatElapsed(
                 Date.now() - startedAt
@@ -1075,7 +1079,7 @@ export class FusionService {
      *
      * Memory Efficiency:
      * - Uses per-phase snapshots to avoid iterator invalidation while work-queue entries are removed
-     * - Configurable batch size (managedAccountsBatchSize, default 50) limits concurrent in-flight objects
+     * - objectMaxConcurrent limits concurrent in-flight object work
      * - Non-matches store minimal report data; full FusionAccount only for matches
      * - Arrays cleared by generateReport() or clearAnalyzedAccounts() after use
      * - Processes bounded batches to improve throughput while preserving shared-state updates.
@@ -1127,7 +1131,7 @@ export class FusionService {
         // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion row)
         // are registered as non-matches in fusionIdentityMap here, so they are immediately visible
         // as deferred-match candidates when uncorrelated accounts are scored in the main pass.
-        const batchSize = Math.max(1, this.managedAccountsBatchSize)
+        const batchSize = Math.max(1, this.objectMaxConcurrent)
         const correlatedAccounts = [...map.values()].filter((a) => a.uncorrelated === false)
         if (correlatedAccounts.length > 0) {
             this.log.info(
@@ -1135,7 +1139,7 @@ export class FusionService {
             )
             for (let i = 0; i < correlatedAccounts.length; i += batchSize) {
                 const batch = correlatedAccounts.slice(i, i + batchSize)
-                await Promise.all(batch.map((account) => this.processManagedAccount(account)))
+                await this.limiters.runAll(batch, (account) => this.processManagedAccount(account))
                 await yieldToEventLoop()
             }
             this.log.info(`Pre-pass complete: ${map.size} uncorrelated account(s) queued for scoring`)
@@ -1148,7 +1152,7 @@ export class FusionService {
             `Processing ${initialQueueSize} managed account(s): analyzing uncorrelated work-queue entries (matching and scoring vs identities)`
         )
         let processed = 0
-        const logProgressEvery = Math.max(1, Math.min(this.managedAccountsBatchSize, initialQueueSize))
+        const logProgressEvery = Math.max(1, Math.min(this.objectMaxConcurrent, initialQueueSize))
         for (let i = 0; i < queuedAccounts.length; i += batchSize) {
             const elapsedBeforeNextBatch = Date.now() - processManagedAccountsStartedAt
             if (processed > 0 && elapsedBeforeNextBatch >= phaseBudgetMs) {
@@ -1161,7 +1165,7 @@ export class FusionService {
                 break
             }
             const batch = queuedAccounts.slice(i, i + batchSize)
-            await Promise.all(batch.map((account) => this.processManagedAccount(account)))
+            await this.limiters.runAll(batch, (account) => this.processManagedAccount(account))
             processed += batch.length
             if (processed === 1 || processed % logProgressEvery === 0 || processed === initialQueueSize) {
                 this.log.info(
@@ -1713,7 +1717,7 @@ export class FusionService {
      *
      * Performance Optimization:
      * - Iterates Maps directly instead of creating intermediate arrays
-     * - Uses promiseAllBatched to bound concurrent getISCAccount calls
+     * - The objects limiter bounds concurrent getISCAccount calls
      * - Avoids spread operator to combine arrays
      *
      * @returns Array of formatted account outputs ready for the platform
@@ -1733,7 +1737,7 @@ export class FusionService {
             }
         }
 
-        const results = await promiseAllBatched(eligible, (x) => this.getISCAccount(x))
+        const results = await this.limiters.runAll(eligible, (x) => this.getISCAccount(x))
         return compact(results)
     }
 
@@ -1766,7 +1770,7 @@ export class FusionService {
         const logProgressEveryBatch = Math.max(1, Math.min(50, Math.ceil(totalBatches / 20) || 1))
         for (let i = 0; i < eligibleAccounts.length; i += batchSize) {
             const batch = eligibleAccounts.slice(i, i + batchSize)
-            const outputBatch = await Promise.all(batch.map((account) => this.getISCAccount(account, false)))
+            const outputBatch = await this.limiters.runAll(batch, (account) => this.getISCAccount(account, false))
             for (const output of outputBatch) {
                 if (output) {
                     send(output)

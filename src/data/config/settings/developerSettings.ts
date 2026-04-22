@@ -21,8 +21,7 @@ export const runtimeDefaults = {
 
 export function applySettings(config: FusionConfigBuild): void {
     config.reset = config.reset ?? runtimeDefaults.reset
-    config.managedAccountsBatchSize =
-        config.managedAccountsBatchSize ?? advancedInitialValues.managedAccountsBatchSize
+    config.objectMaxConcurrent = config.objectMaxConcurrent ?? advancedInitialValues.objectMaxConcurrent
     const rawMaxCandidates =
         config.fusionMaxCandidatesForForm !== undefined
             ? Number(config.fusionMaxCandidatesForForm)

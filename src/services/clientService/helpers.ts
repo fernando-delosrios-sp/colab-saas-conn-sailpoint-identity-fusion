@@ -1,14 +1,7 @@
 import { IAxiosRetryConfig } from 'axios-retry'
 import { logger } from '@sailpoint/connector-sdk'
 import axiosRetry from 'axios-retry'
-import {
-    BASE_RETRY_DELAY_MS,
-    DEFAULT_RETRIES,
-    DEFAULT_REQUESTS_PER_SECOND,
-    MAX_RETRY_DELAY_MS,
-    RATE_LIMIT_JITTER_FACTOR,
-    RETRY_JITTER_FACTOR,
-} from './constants'
+import { BASE_RETRY_DELAY_MS, MAX_RETRY_DELAY_MS, RATE_LIMIT_JITTER_FACTOR, RETRY_JITTER_FACTOR } from './constants'
 
 /**
  * Creates an axios retry configuration from the provided parameters
@@ -17,7 +10,7 @@ import {
  */
 export function createRetriesConfig(retries?: number): IAxiosRetryConfig {
     return {
-        retries: retries ?? DEFAULT_RETRIES,
+        retries: retries ?? 0,
         retryDelay: (retryCount, error) => {
             // Handle 429 rate limiting with retry-after header
             if (error?.response?.status === 429) {
@@ -65,7 +58,7 @@ export function createRetriesConfig(retries?: number): IAxiosRetryConfig {
             const url = requestConfig.url || 'unknown'
             const status = error?.response?.status || error?.code || 'unknown'
             logger.debug(
-                `Retrying API [${url}] due to error [${status}]. Retry number [${retryCount}/${retries ?? DEFAULT_RETRIES}]`
+                `Retrying API [${url}] due to error [${status}]. Retry number [${retryCount}/${retries ?? 0}]`
             )
 
             // Only log error details at debug level to avoid spam
@@ -73,21 +66,6 @@ export function createRetriesConfig(retries?: number): IAxiosRetryConfig {
                 logger.debug(`Error details: ${error.message || error}`)
             }
         },
-    }
-}
-
-/**
- * Creates an axios throttle configuration from the provided parameters
- * @param requestsPerSecond - Maximum number of requests per second (defaults to connector default requestsPerSecond)
- * @returns Throttle configuration object
- */
-export function createThrottleConfig(requestsPerSecond?: number) {
-    const rps = requestsPerSecond ?? DEFAULT_REQUESTS_PER_SECOND
-    return {
-        requestsPerSecond: rps,
-        // Additional throttle options for better control
-        maxConcurrentRequests: Math.max(10, rps * 2), // Allow some concurrency
-        burstSize: Math.max(5, Math.floor(rps / 2)), // Allow small bursts
     }
 }
 

@@ -118,13 +118,11 @@ export const hydrateIdentitiesForReportDecisions = async (serviceRegistry: Servi
         if (d?.submitter?.id) idsToHydrate.add(d.submitter.id)
         if (d?.identityId) idsToHydrate.add(d.identityId)
     }
-    await Promise.all(
-        [...idsToHydrate]
-            .filter((id) => !identities.getIdentityById(id))
-            .map((id) =>
-                // Best-effort: hydrate display names for reporting
-                identities.fetchIdentityById(id).catch(() => {})
-            )
+    const missing = [...idsToHydrate].filter((id) => !identities.getIdentityById(id))
+    const limiters = serviceRegistry.client.getLimiters()
+    await limiters.runAll(missing, (id) =>
+        // Best-effort: hydrate display names for reporting
+        identities.fetchIdentityById(id).catch(() => {})
     )
 }
 

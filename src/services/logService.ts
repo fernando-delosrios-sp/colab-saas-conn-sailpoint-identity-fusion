@@ -1,6 +1,6 @@
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
-import { ApiQueue } from './clientService/queue'
-import { QueuePriority } from './clientService/types'
+import { LimiterService } from './limiterService'
+import { Priority } from './limiterService/types'
 import { getCallerInfo } from './logCallerInfo'
 
 export { getCallerInfo, getCallerFunctionName } from './logCallerInfo'
@@ -121,7 +121,7 @@ export class LogService {
     /** Per-request timeout for external log fetches to prevent unbounded memory growth
      *  when the endpoint is unreachable (TCP timeouts can be 30-120s+ at the OS level). */
     private static readonly EXTERNAL_LOG_TIMEOUT_MS = 5_000
-    private apiQueue: ApiQueue | null = null
+    private limiter: LimiterService | null = null
     private issueSummary: AggregationIssueSummary = {
         warningCount: 0,
         errorCount: 0,
@@ -156,11 +156,11 @@ export class LogService {
     }
 
     /**
-     * Injects the API queue for routing external log calls with LOW priority.
+     * Injects the API limiter for routing external log calls with LOW priority.
      * Called by ServiceRegistry after ClientService is created.
      */
-    setQueue(queue: ApiQueue | null): void {
-        this.apiQueue = queue
+    setLimiter(limiter: LimiterService | null): void {
+        this.limiter = limiter
     }
 
     /**
@@ -235,7 +235,7 @@ export class LogService {
             }).then(() => {})
 
         const pending: Promise<void> = (
-            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW }).then(() => {}) : doFetch()
+            this.limiter ? this.limiter.api.schedule({ priority: Priority.LOW }, doFetch) : doFetch()
         )
             .catch(() => {})
             .finally(() => {

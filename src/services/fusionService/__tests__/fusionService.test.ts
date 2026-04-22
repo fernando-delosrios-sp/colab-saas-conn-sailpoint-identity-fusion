@@ -41,15 +41,29 @@ describe('FusionService', () => {
             fusionFormAttributes: ['email', 'firstName', 'lastName'],
             baseurl: 'https://example.identitynow.com',
             k8sCluster: false,
-            managedAccountsBatchSize: 50,
+            objectMaxConcurrent: 50,
             deleteEmpty: false,
             sources: [],
         } as unknown as FusionConfig
 
         // Reset mocks
         mockLog = new LogService({ spConnDebugLoggingEnabled: false }) as jest.Mocked<LogService>
-        const mockClient = {} as any
+        const mockLimiters = {
+            runAll: async <T, R>(items: T[], fn: (item: T, index: number) => Promise<R>) => {
+                const out: R[] = []
+                for (let s = 0; s < items.length; s += 25) {
+                    const end = Math.min(s + 25, items.length)
+                    out.push(...(await Promise.all(items.slice(s, end).map((it, j) => fn(it, s + j)))))
+                }
+                return out
+            },
+            objects: { schedule: (_o: any, f: () => any) => f() },
+        }
+        const mockClient = {
+            getLimiters: () => mockLimiters,
+        } as any
         mockSources = new SourceService(mockConfig, mockLog, mockClient) as jest.Mocked<SourceService>
+        Object.defineProperty(mockSources, 'limiters', { get: () => mockLimiters, configurable: true })
         mockIdentities = new IdentityService(mockConfig, mockLog, mockClient, mockSources) as jest.Mocked<IdentityService>
         mockForms = new FormService(
             mockConfig,
@@ -419,7 +433,7 @@ describe('FusionService', () => {
 
     describe('processManagedAccounts', () => {
         it('uses newly unmatched current-run accounts as deferred candidates for subsequent managed accounts', async () => {
-            ;(fusionService as any).managedAccountsBatchSize = 1
+            ;(fusionService as any).objectMaxConcurrent = 1
             const firstAccount = {
                 id: 'acct-seq-1',
                 nativeIdentity: 'native-seq-1',
@@ -471,7 +485,7 @@ describe('FusionService', () => {
         })
 
         it('resolves all correlated accounts in pre-pass before uncorrelated batch processing', async () => {
-            ;(fusionService as any).managedAccountsBatchSize = 2
+            ;(fusionService as any).objectMaxConcurrent = 2
             const correlatedA = {
                 id: 'acct-corr-a',
                 nativeIdentity: 'native-corr-a',

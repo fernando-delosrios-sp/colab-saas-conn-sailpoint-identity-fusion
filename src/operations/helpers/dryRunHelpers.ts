@@ -562,15 +562,16 @@ export const refreshUniqueAttributesForDryRun = async (
     //
     // Note: some unit-test mocks provide fusion.refreshUniqueAttributes() but not fusionAccounts/fusionIdentities getters.
     // Fall back to the legacy call in that case to keep tests and mocks stable.
-    const batchSize = serviceRegistry.config?.managedAccountsBatchSize ?? defaults.managedAccountsBatchSize
+    const objectMax = serviceRegistry.config?.objectMaxConcurrent ?? defaults.objectMaxConcurrent
+    const limiters = serviceRegistry.client.getLimiters()
     const fusionAccounts = readUnknown(fusion, 'fusionAccounts') as FusionAccount[] | undefined
     const fusionIdentities = readUnknown(fusion, 'fusionIdentities') as Iterable<FusionAccount> | undefined
     if (Array.isArray(fusionAccounts) && fusionIdentities && Symbol.iterator in Object(fusionIdentities)) {
         const shouldIncludeIdentities = runtimeOptions.includeExisting
         const refreshTargets = shouldIncludeIdentities ? [...fusionAccounts, ...fusionIdentities] : [...fusionAccounts]
-        for (let i = 0; i < refreshTargets.length; i += batchSize) {
-            const batch = refreshTargets.slice(i, i + batchSize)
-            await Promise.all(batch.map((account) => attributes.refreshUniqueAttributes(account)))
+        for (let i = 0; i < refreshTargets.length; i += objectMax) {
+            const batch = refreshTargets.slice(i, i + objectMax)
+            await limiters.runAll(batch, (account) => attributes.refreshUniqueAttributes(account))
         }
     } else {
         await fusion.refreshUniqueAttributes()
@@ -597,9 +598,9 @@ export const refreshUniqueAttributesForDryRun = async (
         )
         return aKey.localeCompare(bKey)
     })
-    for (let i = 0; i < stableAnalyzed.length; i += batchSize) {
-        const batch = stableAnalyzed.slice(i, i + batchSize)
-        await Promise.all(batch.map((account) => attributes.refreshUniqueAttributes(account)))
+    for (let i = 0; i < stableAnalyzed.length; i += objectMax) {
+        const batch = stableAnalyzed.slice(i, i + objectMax)
+        await limiters.runAll(batch, (account) => attributes.refreshUniqueAttributes(account))
     }
 
     log.info(`Unique attributes refreshed for ${analyzedUncorrelatedAccounts.length} analyzed uncorrelated account(s)`)

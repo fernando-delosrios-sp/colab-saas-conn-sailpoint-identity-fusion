@@ -1,7 +1,8 @@
 import { AccountsApiUpdateAccountRequest, IdentityDocument, Search } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
-import { ClientService, QueuePriority } from './clientService'
+import { ClientService } from './clientService'
+import { Priority } from './limiterService'
 import { LogService } from './logService'
 import { assert } from '../utils/assert'
 import { wrapConnectorError } from '../utils/error'
@@ -113,7 +114,7 @@ export class IdentityService {
             await wrapConnectorError(async () => {
                 const identities = await this.client.paginateSearchApi<IdentityDocument>(
                     query,
-                    QueuePriority.HIGH,
+                    Priority.HIGH,
                     'IdentityService>fetchIdentities searchPost'
                 )
                 this.identitiesById = new Map(
@@ -144,7 +145,7 @@ export class IdentityService {
             try {
                 yield* this.client.paginateSearchApiGenerator<IdentityDocument>(
                     query,
-                    QueuePriority.HIGH,
+                    Priority.HIGH,
                     'IdentityService>fetchIdentitiesGenerator searchPost',
                     abortSignal
                 )
@@ -175,7 +176,7 @@ export class IdentityService {
         return wrapConnectorError(async () => {
             const identities = await this.client.paginateSearchApi<IdentityDocument>(
                 query,
-                QueuePriority.HIGH,
+                Priority.HIGH,
                 'IdentityService>fetchIdentityById searchPost'
             )
             identities.forEach((identity) => this.identitiesById.set(identity.id, identity))
@@ -197,7 +198,7 @@ export class IdentityService {
         return wrapConnectorError(async () => {
             const identities = await this.client.paginateSearchApi<IdentityDocument>(
                 query,
-                QueuePriority.HIGH,
+                Priority.HIGH,
                 'IdentityService>fetchIdentityByName searchPost'
             )
             identities.forEach((identity) => this.identitiesById.set(identity.id, identity))
@@ -283,11 +284,8 @@ export class IdentityService {
             }
 
             const correlationPromise = this.client
-                .execute(
-                    () => accountsApi.updateAccount(requestParameters),
-                    QueuePriority.LOW,
-                    `IdentityService>correlateAccounts ${accountId}`
-                )
+                .getLimiters()
+                .api.schedule({ id: `correlate:${accountId}`, priority: Priority.LOW }, () => accountsApi.updateAccount(requestParameters))
                 .then(() => {
                     this.log.debug(
                         `Successfully correlated managed key ${accountId} (ISC id ${iscAccountId}) to identity ${identityId}`

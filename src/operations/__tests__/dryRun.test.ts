@@ -1,5 +1,6 @@
 import { dryRun } from '../dryRun'
 import { ServiceRegistry } from '../../services/serviceRegistry'
+import { mockLimiters } from './harness/mockRegistry'
 
 function createRegistry() {
     const timer = {
@@ -156,6 +157,7 @@ function createRegistry() {
             send: jest.fn(),
             keepAlive: jest.fn(),
         },
+        client: { getLimiters: () => mockLimiters },
     } as any
 }
 

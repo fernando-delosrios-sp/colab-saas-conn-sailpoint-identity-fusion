@@ -58,7 +58,7 @@ export class ServiceRegistry {
         this.log = context.logService ?? new LogService(logConfig)
         this.locks = context.lockService ?? new InMemoryLockService(this.log)
         this.client = context.connectionService ?? new ClientService(this.config, this.log)
-        this.log.setQueue(this.client.getQueue())
+        this.log.setLimiter(this.client.getLimiters())
 
         // Initialize services that don't depend on others
         this.sources = context.sourceService ?? new SourceService(this.config, this.log, this.client)

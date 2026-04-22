@@ -21,7 +21,8 @@ export const rebuildFusionAccount = async (
     if (!serviceRegistry) {
         serviceRegistry = ServiceRegistry.getCurrent()
     }
-    const { fusion, identities, sources } = serviceRegistry
+    const { fusion, identities, sources, client } = serviceRegistry
+    const limiters = client.getLimiters()
 
     await sources.fetchFusionAccount(nativeIdentity)
     const fusionAccountsMap = sources.fusionAccountsByNativeIdentity
@@ -41,21 +42,20 @@ export const rebuildFusionAccount = async (
             accountIds.add(identityAccount.id)
         }
     }
-    await Promise.all(
-        Array.from(accountIds).map(async (id: string) => {
-            const parsedManagedKey = parseManagedAccountKey(id)
-            if (parsedManagedKey) {
-                const managedAccount = await sources.fetchSourceAccountByNativeIdentity(
-                    parsedManagedKey.sourceId,
-                    parsedManagedKey.nativeIdentity
-                )
-                if (managedAccount?.id) {
-                    await sources.fetchManagedAccount(managedAccount.id)
-                }
-                return
+    const ids = Array.from(accountIds)
+    await limiters.runAll(ids, async (id: string) => {
+        const parsedManagedKey = parseManagedAccountKey(id)
+        if (parsedManagedKey) {
+            const managedAccount = await sources.fetchSourceAccountByNativeIdentity(
+                parsedManagedKey.sourceId,
+                parsedManagedKey.nativeIdentity
+            )
+            if (managedAccount?.id) {
+                await sources.fetchManagedAccount(managedAccount.id)
             }
-            await sources.fetchManagedAccount(id)
-        })
-    )
+            return
+        }
+        await sources.fetchManagedAccount(id)
+    })
     return await fusion.processFusionAccount(account, attributeOperations)
 }

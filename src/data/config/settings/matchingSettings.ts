@@ -8,7 +8,6 @@ import type { FusionConfigBuild } from '../types'
 export const connectorSpecInitialValues = {
     fusionAverageScore: 80,
     algorithm: 'name-matcher' as const,
-    enablePriority: true,
 } as const
 
 export const runtimeDefaults = {

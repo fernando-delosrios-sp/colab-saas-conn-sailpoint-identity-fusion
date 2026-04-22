@@ -18,17 +18,18 @@ export type InternalConfigByService = typeof internalConfig
 
 /** Flattened for `readConfig` merge — matches `InternalConfig` on `FusionConfig`. */
 export function getInternalConfigFlat(): {
-    requestsPerSecondConstant: number
     pageSize: number
+    maxLimiterRetries: number
+    baseRetryDelayMs: number
+    reservoirWindowMs: number
+    reservoirAmount: number
     tokenUrlPath: string
     processingWaitConstant: number
-    retriesConstant: number
     maxRetryDelayMs: number
     retryJitterFactor: number
     rateLimitJitterFactor: number
     statsLoggingIntervalMs: number
     maxStatsSamples: number
-    queueProcessingIntervalMs: number
     sailPointListMax: number
     workflowName: string
     delayedAggregationWorkflowName: string
