@@ -541,16 +541,13 @@ describe('dryRun', () => {
         expect(registry.fusion.processManagedAccounts).toHaveBeenCalled()
     })
 
-    it('completes supplemental analysis before output streaming', async () => {
+    it('skips supplemental analysis during output streaming', async () => {
         const registry = createRegistry()
 
         await dryRun(registry, { schema: { attributes: [] }, includeMatched: true } as any)
 
-        expect(registry.fusion.analyzeUncorrelatedAccounts).toHaveBeenCalled()
+        expect(registry.fusion.analyzeUncorrelatedAccounts).not.toHaveBeenCalled()
         expect(registry.fusion.forEachISCAccount).toHaveBeenCalled()
-        expect(registry.fusion.analyzeUncorrelatedAccounts.mock.invocationCallOrder[0]).toBeLessThan(
-            registry.fusion.forEachISCAccount.mock.invocationCallOrder[0]
-        )
     })
 
     it('fails when fusion source is unavailable', async () => {

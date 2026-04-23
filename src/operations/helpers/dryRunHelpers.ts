@@ -24,6 +24,7 @@ import { PhaseTimer } from '../../services/logService'
 import type { PhaseTimingBreakdownEntry } from '../../services/fusionService/types'
 import { sanitizeRecipients } from '../../services/messagingService/email'
 import { buildEmailReportFromFusionReport, hydrateIdentitiesForReportDecisions } from './generateReport'
+import { sanitizeRecipients } from '../../services/messagingService/email'
 
 /** Record managed source account ids present on a streamed fusion ISC row (drives report join coverage). */
 export const addCoveredManagedAccountIds = (account: StdAccountListOutput, into: Set<string>): void => {
@@ -353,8 +354,9 @@ export const prepareDryRunOutputData = async (
     serviceRegistry: ServiceRegistry,
     runtimeOptions: DryRunRuntimeOptions
 ): Promise<PreparedDryRunOutputData> => {
-    const { fusion } = serviceRegistry
-    const analyzedUncorrelatedAccounts = await fusion.analyzeUncorrelatedAccounts()
+    // Do not run a second managed-account analysis pass during dry-run output prep.
+    // This phase should only refresh unique attributes for accounts already processed upstream.
+    const analyzedUncorrelatedAccounts: FusionAccount[] = []
     const uniqueRefreshStartedAt = Date.now()
     await refreshUniqueAttributesForDryRun(serviceRegistry, analyzedUncorrelatedAccounts, runtimeOptions)
     const uniqueAttributesElapsedMs = Date.now() - uniqueRefreshStartedAt
