@@ -13,7 +13,7 @@ export const isDefined = (value: unknown): boolean => !isNullish(value)
 export function hasValue(value: string | null | undefined): value is string
 export function hasValue(value: unknown): boolean
 export function hasValue(value: unknown): boolean {
-    if (value === undefined || value === null) return false
+    if (isNullish(value)) return false
     if (typeof value === 'string') return value.trim().length > 0
     return true
 }
