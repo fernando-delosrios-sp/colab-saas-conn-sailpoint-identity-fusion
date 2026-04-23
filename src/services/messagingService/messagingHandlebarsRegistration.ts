@@ -1,6 +1,6 @@
 import Handlebars from 'handlebars'
 
-import { hasPresentAttributeValue, isDefined } from '../../utils/safeRead'
+import { hasValue, isDefined } from '../../utils/safeRead'
 
 import {
     mailtoHrefForHtmlAttribute,
@@ -105,12 +105,12 @@ export const registerHandlebarsHelpers = (): void => {
     })
 
     Handlebars.registerHelper('exists', (value: unknown) => {
-        return hasPresentAttributeValue(value)
+        return hasValue(value)
     })
 
     Handlebars.registerHelper('anyExists', (...args: unknown[]) => {
         const values = args.slice(0, -1)
-        return values.some((value) => hasPresentAttributeValue(value))
+        return values.some((value) => hasValue(value))
     })
 
     Handlebars.registerHelper('decisionAssigned', (decisions: unknown, outcome: unknown) => {
@@ -178,7 +178,7 @@ export const registerHandlebarsHelpers = (): void => {
         if (!stats || typeof stats !== 'object') return []
         const cards: Array<{ label: string; value: string }> = []
         const pushCard = (label: string, value: any): void => {
-            if (!hasPresentAttributeValue(value)) return
+            if (!hasValue(value)) return
             cards.push({ label, value: String(value) })
         }
         const formattedDate = reportDate ? formatDateYmd(reportDate) : undefined

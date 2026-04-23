@@ -25,7 +25,7 @@ import {
 } from './fusionReportHelpers'
 import { AttributeOperations } from '../attributeService/types'
 import { buildManagedAccountKey, getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
-import { hasPresentAttributeValue, readString } from '../../utils/safeRead'
+import { hasValue, readString } from '../../utils/safeRead'
 
 // ============================================================================
 // FusionService Class
@@ -2002,7 +2002,7 @@ export class FusionService {
             }
         }
         const identityId = account.identityId
-        if (hasPresentAttributeValue(identityId) && this.fusionIdentityMap.has(identityId)) {
+        if (hasValue(identityId) && this.fusionIdentityMap.has(identityId)) {
             return true
         }
         return false
@@ -2234,7 +2234,7 @@ export class FusionService {
      */
     public setFusionAccount(fusionAccount: FusionAccount): void {
         const identityId = fusionAccount.identityId
-        const hasIdentityId = hasPresentAttributeValue(identityId)
+        const hasIdentityId = hasValue(identityId)
 
         if (hasIdentityId) {
             const existingFusionAccount = this.fusionIdentityMap.get(identityId!)
