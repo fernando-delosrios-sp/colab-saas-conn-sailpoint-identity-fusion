@@ -24,7 +24,6 @@ import { PhaseTimer } from '../../services/logService'
 import type { PhaseTimingBreakdownEntry } from '../../services/fusionService/types'
 import { sanitizeRecipients } from '../../services/messagingService/email'
 import { buildEmailReportFromFusionReport, hydrateIdentitiesForReportDecisions } from './generateReport'
-import { sanitizeRecipients } from '../../services/messagingService/email'
 
 /** Record managed source account ids present on a streamed fusion ISC row (drives report join coverage). */
 export const addCoveredManagedAccountIds = (account: StdAccountListOutput, into: Set<string>): void => {
@@ -187,7 +186,7 @@ export const createDryRunRowEmitter = async (
             emitRow: async (payload: Record<string, unknown>) => {
                 res.send(payload)
             },
-            close: async () => {},
+            close: async () => { },
         }
     }
 
@@ -265,9 +264,9 @@ export const buildStatsForDryRun = (
         usedMemory: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
         ...(fusionCounts
             ? {
-                  fusionAccountsFound: fusionCounts.fusionAccountsFound,
-                  totalFusionAccounts: fusionCounts.totalFusionAccounts,
-              }
+                fusionAccountsFound: fusionCounts.fusionAccountsFound,
+                totalFusionAccounts: fusionCounts.totalFusionAccounts,
+            }
             : {}),
     }
 }
@@ -372,9 +371,9 @@ export const writeAndSendDryRunReport = async (
 ): Promise<
     | undefined
     | {
-          reportHtmlOutputPath?: string
-          statsWithPhaseTiming: ReturnType<typeof buildStatsForDryRun>
-      }
+        reportHtmlOutputPath?: string
+        statsWithPhaseTiming: ReturnType<typeof buildStatsForDryRun>
+    }
 > => {
     const { log } = serviceRegistry
     const shouldWriteHtmlReport = runtimeOptions.writeToDisk
@@ -847,19 +846,19 @@ export const refreshUniqueAttributesForDryRun = async (
     const stableAnalyzed = [...analyzedUncorrelatedAccounts].sort((a: any, b: any) => {
         const aKey = String(
             readUnknown(a, 'originAccountId') ??
-                readPathString(a, ['attributes', 'originAccount']) ??
-                readUnknown(a, 'nativeIdentity') ??
-                readUnknown(a, 'key') ??
-                readUnknown(a, 'name') ??
-                ''
+            readPathString(a, ['attributes', 'originAccount']) ??
+            readUnknown(a, 'nativeIdentity') ??
+            readUnknown(a, 'key') ??
+            readUnknown(a, 'name') ??
+            ''
         )
         const bKey = String(
             readUnknown(b, 'originAccountId') ??
-                readPathString(b, ['attributes', 'originAccount']) ??
-                readUnknown(b, 'nativeIdentity') ??
-                readUnknown(b, 'key') ??
-                readUnknown(b, 'name') ??
-                ''
+            readPathString(b, ['attributes', 'originAccount']) ??
+            readUnknown(b, 'nativeIdentity') ??
+            readUnknown(b, 'key') ??
+            readUnknown(b, 'name') ??
+            ''
         )
         return aKey.localeCompare(bKey)
     })
