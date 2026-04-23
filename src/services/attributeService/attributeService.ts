@@ -23,7 +23,7 @@ import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
 import { buildManagedAccountKey } from '../../model/managedAccountKey'
 import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
-import { readString } from '../../utils/safeRead'
+import { hasPresentAttributeValue, readString, trimStringIfNonEmpty } from '../../utils/safeRead'
 import { defaults } from '../../data/config'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
@@ -443,8 +443,7 @@ export class AttributeService {
 
         for (const definition of this.uniqueDefinitions) {
             const value = fusionAccount.attributes[definition.name]
-            const isEmpty = value === undefined || value === null || value === ''
-            if (isEmpty) continue
+            if (!hasPresentAttributeValue(value)) continue
 
             const valueStr = String(value)
             const lockKey = `unique:${definition.name}`
@@ -472,8 +471,7 @@ export class AttributeService {
             if (definition.name === fusionIdentityAttribute) continue
 
             const value = fusionAccount.attributes[definition.name]
-            const isEmpty = value === undefined || value === null || value === ''
-            if (isEmpty) continue
+            if (!hasPresentAttributeValue(value)) continue
 
             const valueStr = String(value)
             const lockKey = `unique:${definition.name}`
@@ -597,7 +595,7 @@ export class AttributeService {
         if (values.length === 0) return
         const set = this.getUniqueValues(attributeName)
         for (const v of values) {
-            if (v != null && v !== '') {
+            if (hasPresentAttributeValue(v)) {
                 set.add(String(v))
             }
         }
@@ -622,7 +620,7 @@ export class AttributeService {
             const values: string[] = []
             for (const account of accounts) {
                 const value = account.attributes?.[def.name]
-                if (value != null && value !== '') {
+                if (hasPresentAttributeValue(value)) {
                     values.push(String(value))
                 }
             }
@@ -678,8 +676,7 @@ export class AttributeService {
     ): Record<string, any> | undefined {
         const originIdRaw =
             fusionAccount.originAccountId ?? fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE]
-        const originId =
-            originIdRaw != null && String(originIdRaw).trim() !== '' ? String(originIdRaw).trim() : undefined
+        const originId = trimStringIfNonEmpty(originIdRaw)
         if (!originId) return undefined
 
         const { originSource } = fusionAccount
@@ -695,8 +692,8 @@ export class AttributeService {
         const schemaName = configuredSchemaName ?? identityName ?? originId
         const schemaId = configuredSchemaId ?? identityId ?? originId
 
-        const identityMatchesOrigin =
-            identityId !== undefined && identityId.trim() !== '' && identityId.trim() === originId
+        const identityIdTrimmed = trimStringIfNonEmpty(identityId)
+        const identityMatchesOrigin = identityIdTrimmed !== undefined && identityIdTrimmed === originId
         if (originSource === 'Identities' && identityHasData && identityMatchesOrigin) {
             return {
                 ...identityBag,
@@ -725,29 +722,24 @@ export class AttributeService {
     private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
         const identity = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
         const identityName = identity?.name
-        if (typeof identityName === 'string' && identityName.trim() !== '') {
-            return identityName.trim()
+        if (typeof identityName === 'string') {
+            const trimmed = trimStringIfNonEmpty(identityName)
+            if (trimmed !== undefined) return trimmed
         }
 
-        if (fusionAccount.identityDisplayName && fusionAccount.identityDisplayName.trim() !== '') {
-            return fusionAccount.identityDisplayName.trim()
-        }
+        const fromDisplay = trimStringIfNonEmpty(fusionAccount.identityDisplayName)
+        if (fromDisplay !== undefined) return fromDisplay
 
-        if (fusionAccount.name && fusionAccount.name.trim() !== '') {
-            return fusionAccount.name.trim()
-        }
-
-        return undefined
+        return trimStringIfNonEmpty(fusionAccount.name)
     }
 
     private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
-        if (fusionAccount.identityId && fusionAccount.identityId.trim() !== '') {
-            return fusionAccount.identityId.trim()
-        }
+        const fromFusion = trimStringIfNonEmpty(fusionAccount.identityId)
+        if (fromFusion !== undefined) return fromFusion
 
         const bagId = identity.id
-        if (typeof bagId === 'string' && bagId.trim() !== '') {
-            return bagId.trim()
+        if (typeof bagId === 'string') {
+            return trimStringIfNonEmpty(bagId)
         }
 
         return undefined
@@ -1041,22 +1033,12 @@ export class AttributeService {
         fusionDisplayAttribute: string
     ): string | undefined {
         if (attributeName === fusionIdentityAttribute) {
-            const fromTop = fusionAccount.originAccountId
-            if (fromTop != null && String(fromTop).trim() !== '') {
-                return String(fromTop).trim()
-            }
-            const fromAttrs = fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE]
-            if (fromAttrs != null && String(fromAttrs).trim() !== '') {
-                return String(fromAttrs).trim()
-            }
-            return undefined
+            const fromTop = trimStringIfNonEmpty(fusionAccount.originAccountId)
+            if (fromTop !== undefined) return fromTop
+            return trimStringIfNonEmpty(fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE])
         }
         if (attributeName === fusionDisplayAttribute) {
-            const accountName = fusionAccount.name
-            if (accountName != null && String(accountName).trim() !== '') {
-                return String(accountName).trim()
-            }
-            return undefined
+            return trimStringIfNonEmpty(fusionAccount.name)
         }
         return undefined
     }
@@ -1242,9 +1224,8 @@ export class AttributeService {
      * before evaluation, so the registry reflects other accounts only during generation.
      */
     private isUniqueTemplateValue(definition: UniqueAttributeDefinition, value: unknown): boolean {
-        if (value === undefined || value === null) return false
+        if (!hasPresentAttributeValue(value)) return false
         const raw = String(value)
-        if (raw === '') return false
 
         const transformed = this.applyUniqueValueOutputTransforms(definition, raw)
         if (transformed === '') return false

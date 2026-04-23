@@ -1,5 +1,28 @@
 export type SafeRecord = Record<string, unknown>
 
+/** True for `null` or `undefined` only. */
+export const isNullish = (value: unknown): value is null | undefined => value === null || value === undefined
+
+/** Inverse of {@link isNullish}. */
+export const isDefined = (value: unknown): boolean => !isNullish(value)
+
+/** True when `value` is `null`, `undefined`, or `''` (common “missing token” guard before `String(value)`). */
+export const isNullishOrEmptyString = (value: unknown): boolean => value == null || value === ''
+
+/**
+ * Attribute-bag style presence: not `undefined`, not `null`, and not `''`.
+ * Numbers (including `0`) and booleans (including `false`) count as present.
+ */
+export const hasPresentAttributeValue = (value: unknown): boolean =>
+    value !== undefined && value !== null && value !== ''
+
+/** Trims with `String()`; returns `undefined` for nullish inputs or whitespace-only results. */
+export const trimStringIfNonEmpty = (value: unknown): string | undefined => {
+    if (value == null) return undefined
+    const trimmed = String(value).trim()
+    return trimmed.length > 0 ? trimmed : undefined
+}
+
 export const isRecord = (value: unknown): value is SafeRecord =>
     typeof value === 'object' && value !== null && !Array.isArray(value)
 
