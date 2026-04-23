@@ -713,36 +713,20 @@ export class AttributeService {
     }
 
     private readAccountAttributeString(fusionAccount: FusionAccount, attributeName: string): string | undefined {
-        const value = fusionAccount.attributes[attributeName]
-        if (!isValidAttributeValue(value)) return undefined
-        const asString = String(value).trim()
-        return asString === '' ? undefined : asString
+        return trimStringIfNonEmpty(fusionAccount.attributes[attributeName])
     }
 
     private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
-        const identity = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
-        const identityName = identity?.name
-        if (typeof identityName === 'string') {
-            const trimmed = trimStringIfNonEmpty(identityName)
-            if (trimmed !== undefined) return trimmed
-        }
-
-        const fromDisplay = trimStringIfNonEmpty(fusionAccount.identityDisplayName)
-        if (fromDisplay !== undefined) return fromDisplay
-
-        return trimStringIfNonEmpty(fusionAccount.name)
+        const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
+        return (
+            trimStringIfNonEmpty(identityBag?.name) ??
+            trimStringIfNonEmpty(fusionAccount.identityDisplayName) ??
+            trimStringIfNonEmpty(fusionAccount.name)
+        )
     }
 
     private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
-        const fromFusion = trimStringIfNonEmpty(fusionAccount.identityId)
-        if (fromFusion !== undefined) return fromFusion
-
-        const bagId = identity.id
-        if (typeof bagId === 'string') {
-            return trimStringIfNonEmpty(bagId)
-        }
-
-        return undefined
+        return trimStringIfNonEmpty(fusionAccount.identityId) ?? trimStringIfNonEmpty(identity.id)
     }
 
     /**
@@ -787,10 +771,7 @@ export class AttributeService {
     }
 
     private getMainAccountOverrideId(fusionAccount: FusionAccount): string | undefined {
-        const rawValue = fusionAccount.attributeBag.current[MAIN_ACCOUNT_ATTRIBUTE]
-        if (!isValidAttributeValue(rawValue)) return undefined
-        const accountId = String(rawValue).trim()
-        return accountId.length > 0 ? accountId : undefined
+        return trimStringIfNonEmpty(fusionAccount.attributeBag.current[MAIN_ACCOUNT_ATTRIBUTE])
     }
 
     private getMainAccountContextAccount(

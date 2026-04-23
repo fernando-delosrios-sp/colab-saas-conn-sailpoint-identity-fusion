@@ -3,7 +3,6 @@ import {
     hasPresentAttributeValue,
     isDefined,
     isNullish,
-    isNullishOrEmptyString,
     isRecord,
     readArray,
     readBoolean,
@@ -22,13 +21,14 @@ describe('safeRead', () => {
         expect(isNullish(undefined)).toBe(true)
         expect(isNullish(0)).toBe(false)
         expect(isDefined(0)).toBe(true)
-        expect(isNullishOrEmptyString(null)).toBe(true)
-        expect(isNullishOrEmptyString('')).toBe(true)
-        expect(isNullishOrEmptyString(0)).toBe(false)
         expect(hasPresentAttributeValue('x')).toBe(true)
+        expect(hasPresentAttributeValue('  x  ')).toBe(true)
         expect(hasPresentAttributeValue(0)).toBe(true)
         expect(hasPresentAttributeValue(false)).toBe(true)
         expect(hasPresentAttributeValue('')).toBe(false)
+        expect(hasPresentAttributeValue('   ')).toBe(false)
+        expect(hasPresentAttributeValue(undefined)).toBe(false)
+        expect(hasPresentAttributeValue({})).toBe(true)
         expect(trimStringIfNonEmpty('  a  ')).toBe('a')
         expect(trimStringIfNonEmpty('   ')).toBeUndefined()
         expect(trimStringIfNonEmpty(null)).toBeUndefined()

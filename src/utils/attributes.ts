@@ -1,4 +1,4 @@
-import { hasPresentAttributeValue, isDefined, isNullishOrEmptyString, readUnknown, trimStringIfNonEmpty } from './safeRead'
+import { hasPresentAttributeValue, isDefined, readUnknown, trimStringIfNonEmpty } from './safeRead'
 
 /**
  * Attribute utility functions for picking, filtering, and transforming attributes.
@@ -98,7 +98,7 @@ export function setAttributeValue(
 }
 
 /**
- * Checks if an attribute value is valid (not null, undefined, or empty string)
+ * Checks if an attribute value is valid (not null/undefined, not empty or whitespace-only string)
  */
 export function isValidAttributeValue(value: unknown): boolean {
     return hasPresentAttributeValue(value)
@@ -250,7 +250,7 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
     // - { value: string }[] / { name: string }[] (other SDK shapes)
     const normalized: string[] = []
     for (const item of arr) {
-        if (item == null) continue
+        if (!hasPresentAttributeValue(item)) continue
         if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
             normalized.push(String(item))
             continue
@@ -275,11 +275,11 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
  * into an array would yield per-character tokens and break action dispatch.
  */
 export function normalizeActionTokens(raw: unknown): string[] {
-    if (isNullishOrEmptyString(raw)) return []
+    if (!hasPresentAttributeValue(raw)) return []
     if (Array.isArray(raw)) {
         const out: string[] = []
         for (const item of raw) {
-            if (isNullishOrEmptyString(item)) continue
+            if (!hasPresentAttributeValue(item)) continue
             if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
                 out.push(String(item))
                 continue

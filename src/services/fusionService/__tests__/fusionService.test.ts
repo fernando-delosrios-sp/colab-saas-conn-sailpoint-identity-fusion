@@ -11,6 +11,7 @@ import { FusionConfig } from '../../../model/config'
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount } from '../../../model/account'
+import { hasPresentAttributeValue } from '../../../utils/safeRead'
 
 // Mock dependencies
 jest.mock('../../logService')
@@ -106,7 +107,7 @@ describe('FusionService', () => {
                 (work instanceof Map ? work.get(managedKey) : undefined) ??
                 (all instanceof Map ? all.get(managedKey) : undefined)
             const raw = acc?.id
-            if (raw != null && String(raw).trim() !== '') return String(raw).trim()
+            if (hasPresentAttributeValue(raw)) return String(raw).trim()
             // Tests without composite map entries: treat non-composite keys as ISC account ids
             if (!managedKey.includes('::')) return managedKey
             return undefined

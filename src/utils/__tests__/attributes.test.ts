@@ -94,10 +94,11 @@ describe('attributes', () => {
             expect(isValidAttributeValue(false)).toBe(true)
         })
 
-        it('should return false for null, undefined, empty string', () => {
+        it('should return false for null, undefined, empty or whitespace-only string', () => {
             expect(isValidAttributeValue(null)).toBe(false)
             expect(isValidAttributeValue(undefined)).toBe(false)
             expect(isValidAttributeValue('')).toBe(false)
+            expect(isValidAttributeValue('   ')).toBe(false)
         })
     })
 
