@@ -1,5 +1,6 @@
 import { Attributes } from '@sailpoint/connector-sdk'
 import { AttributeMap } from '../../model/config'
+import { hasPresentAttributeValue } from '../../utils/safeRead'
 import { AttributeMappingConfig } from './types'
 
 // ============================================================================
@@ -126,7 +127,7 @@ const findFirstAttributeValue = (accounts: Attributes[], attributeNames: string[
     for (const account of accounts) {
         for (const attribute of attributeNames) {
             const value = account[attribute]
-            if (value !== undefined && value !== null && value !== '') {
+            if (hasPresentAttributeValue(value)) {
                 const splitValues = typeof value === 'string' ? attrSplit(value) : [value]
                 return splitValues[0]
             }
@@ -194,7 +195,7 @@ const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: strin
     for (const account of accounts) {
         for (const attribute of attributeNames) {
             const value = account[attribute]
-            if (value !== undefined && value !== null && value !== '') {
+            if (hasPresentAttributeValue(value)) {
                 let splitValues: string[]
                 if (typeof value === 'string') {
                     splitValues = attrSplit(value)
