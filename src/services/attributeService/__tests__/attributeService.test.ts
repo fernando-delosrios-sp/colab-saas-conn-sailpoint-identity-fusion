@@ -1859,3 +1859,323 @@ describe('AttributeService unique value registration', () => {
         expect(uniqueValues.has('persisted-id-1')).toBe(true)
     })
 })
+
+describe('AttributeService fusion identity/display safe defaults when undefined', () => {
+    const fusionSchemas = {
+        listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname']),
+        getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
+        fusionIdentityAttribute: 'id',
+        fusionDisplayAttribute: 'name',
+    } as any
+
+    const attachAttributesAccessor = (fusionAccount: any, attributeBag: any) => {
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value: any) => {
+                attributeBag.current = value
+            },
+        })
+    }
+
+    const baseDeps = () => ({
+        sourceService: {} as any,
+        log: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any,
+        locks: {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any,
+    })
+
+    it('normal definition on fusion identity falls back to originAccountId', async () => {
+        const { sourceService, log, locks } = baseDeps()
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [
+                {
+                    name: 'id',
+                    expression: '$noSuchVar',
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    refresh: true,
+                },
+            ],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+        const service = new AttributeService(config, fusionSchemas, sourceService, log, locks)
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'acct-slug',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            originAccountId: 'src-hr::native-1',
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.id).toBe('src-hr::native-1')
+    })
+
+    it('normal definition on fusion identity falls back to attributes.originAccount when originAccountId missing', async () => {
+        const { sourceService, log, locks } = baseDeps()
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [
+                {
+                    name: 'id',
+                    expression: '$noSuchVar',
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    refresh: true,
+                },
+            ],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+        const service = new AttributeService(config, fusionSchemas, sourceService, log, locks)
+        const attributeBag = {
+            current: { originAccount: 'from-attrs-only' },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'acct-slug',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.id).toBe('from-attrs-only')
+    })
+
+    it('normal definition on fusion display falls back to fusion account name', async () => {
+        const { sourceService, log, locks } = baseDeps()
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [
+                {
+                    name: 'name',
+                    expression: '$noSuchVar',
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    refresh: true,
+                },
+            ],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+        const service = new AttributeService(config, fusionSchemas, sourceService, log, locks)
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'managed-display-name',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            originAccountId: 'src-hr::x',
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.name).toBe('managed-display-name')
+    })
+
+    it('unique definitions on fusion identity/display use the same fallbacks', async () => {
+        const { sourceService, log, locks } = baseDeps()
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [
+                {
+                    name: 'id',
+                    expression: '$noSuchVar',
+                    useIncrementalCounter: false,
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                },
+                {
+                    name: 'name',
+                    expression: '$noSuchVar',
+                    useIncrementalCounter: false,
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                },
+            ],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+        const service = new AttributeService(config, fusionSchemas, sourceService, log, locks)
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: true,
+            name: 'unique-fallback-display',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            originAccountId: 'src-hr::uniq-origin',
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshUniqueAttributes(fusionAccount)
+        expect(fusionAccount.attributes.id).toBe('src-hr::uniq-origin')
+        expect(fusionAccount.attributes.name).toBe('unique-fallback-display')
+    })
+
+    it('still clears non-fusion attributes when the template is undefined', async () => {
+        const { sourceService, log, locks } = baseDeps()
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [
+                {
+                    name: 'nickname',
+                    expression: '$noSuchVar',
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    refresh: true,
+                },
+            ],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+        const service = new AttributeService(config, fusionSchemas, sourceService, log, locks)
+        const attributeBag = {
+            current: { nickname: 'stale' },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'x',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.nickname).toBeUndefined()
+    })
+
+    it('fromIdentity display attribute still prefers hosting identity name over fallbacks', async () => {
+        const { sourceService, log, locks } = baseDeps()
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [
+                {
+                    name: 'name',
+                    expression: '$noSuchVar',
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    refresh: true,
+                },
+            ],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+        const service = new AttributeService(config, fusionSchemas, sourceService, log, locks)
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: { name: 'Hosting Identity Name' },
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'fusion-account-slug',
+            sourceName: 'Fusion',
+            fromIdentity: true,
+            isIdentity: true,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.name).toBe('Hosting Identity Name')
+    })
+})

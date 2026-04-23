@@ -1030,6 +1030,37 @@ export class AttributeService {
         return Object.keys(fusionAccount.previousAttributes ?? {}).length > 0
     }
 
+    /**
+     * When a fusion identity/display definition evaluates to no value, use stable
+     * schema-driven defaults so the account is not left with a cleared id/name.
+     */
+    private fusionAttributeSafeDefault(
+        attributeName: string,
+        fusionAccount: FusionAccount,
+        fusionIdentityAttribute: string,
+        fusionDisplayAttribute: string
+    ): string | undefined {
+        if (attributeName === fusionIdentityAttribute) {
+            const fromTop = fusionAccount.originAccountId
+            if (fromTop != null && String(fromTop).trim() !== '') {
+                return String(fromTop).trim()
+            }
+            const fromAttrs = fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE]
+            if (fromAttrs != null && String(fromAttrs).trim() !== '') {
+                return String(fromAttrs).trim()
+            }
+            return undefined
+        }
+        if (attributeName === fusionDisplayAttribute) {
+            const accountName = fusionAccount.name
+            if (accountName != null && String(accountName).trim() !== '') {
+                return String(accountName).trim()
+            }
+            return undefined
+        }
+        return undefined
+    }
+
     // ------------------------------------------------------------------------
     // Private Attribute Processing Flow
     // ------------------------------------------------------------------------
@@ -1085,6 +1116,17 @@ export class AttributeService {
 
         const value = this.evaluateTemplate(definition, context, fusionAccount.name)
         if (value === undefined) {
+            const fallback = this.fusionAttributeSafeDefault(
+                name,
+                fusionAccount,
+                fusionIdentityAttribute,
+                fusionDisplayAttribute
+            )
+            if (fallback !== undefined) {
+                fusionAccount.attributes[name] = fallback
+                context[name] = fallback
+                return
+            }
             // Clear attribute when expression fails (e.g. unresolved variables), so we do not
             // retain a literal template string that may have come from attribute mapping.
             delete fusionAccount.attributes[name]
@@ -1163,6 +1205,18 @@ export class AttributeService {
 
             const value = await this.generateUniqueAttributeValue(definition, fusionAccount, context)
             if (value === undefined) {
+                const fallback = this.fusionAttributeSafeDefault(
+                    name,
+                    fusionAccount,
+                    fusionIdentityAttribute,
+                    fusionDisplayAttribute
+                )
+                if (fallback !== undefined) {
+                    this.getUniqueValues(name).add(fallback)
+                    fusionAccount.attributes[name] = fallback
+                    context[name] = fallback
+                    return
+                }
                 // Clear attribute when expression fails (e.g. unresolved variables)
                 delete fusionAccount.attributes[name]
                 delete context[name]
