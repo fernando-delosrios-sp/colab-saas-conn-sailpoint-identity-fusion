@@ -1,7 +1,7 @@
 import { FusionAccount } from '../../model/account'
 import { SourceType } from '../../model/config'
 import { pickAttributes } from '../../utils/attributes'
-import { hasPresentAttributeValue } from '../../utils/safeRead'
+import { hasValue } from '../../utils/safeRead'
 import { roundMetric2 } from '../../utils/numbers'
 import { UrlContext } from '../../utils/url'
 import type { FusionMatch, ScoreReport } from '../scoringService/types'
@@ -35,7 +35,7 @@ export function mapScoreReportsForFusionReport(scoreReports: ScoreReport[]): Fus
  */
 export function getFusionIdentityConflictTrackingKey(fusionAccount: FusionAccount): string {
     const nativeIdentity = fusionAccount.nativeIdentityOrUndefined
-    if (hasPresentAttributeValue(nativeIdentity)) {
+    if (hasValue(nativeIdentity)) {
         return nativeIdentity
     }
     const name = fusionAccount.name || fusionAccount.displayName || 'unknown'

@@ -7,21 +7,20 @@ export const isNullish = (value: unknown): value is null | undefined => value ==
 export const isDefined = (value: unknown): boolean => !isNullish(value)
 
 /**
- * Attribute / template “has a usable value”: not `null` or `undefined`, not `''`, and not
- * whitespace-only strings (after `trim`). Other scalars stay present (`0`, `false`, etc.);
- * objects and arrays count as present without string-trimming.
+ * Usable attribute / template value: not `null`/`undefined`, not `''` or whitespace-only strings.
+ * Non-string scalars (`0`, `false`) and objects/arrays count as present (no trim).
  */
-export function hasPresentAttributeValue(value: string | null | undefined): value is string
-export function hasPresentAttributeValue(value: unknown): boolean
-export function hasPresentAttributeValue(value: unknown): boolean {
+export function hasValue(value: string | null | undefined): value is string
+export function hasValue(value: unknown): boolean
+export function hasValue(value: unknown): boolean {
     if (value === undefined || value === null) return false
     if (typeof value === 'string') return value.trim().length > 0
     return true
 }
 
-/** Trims with `String()`; returns `undefined` when {@link hasPresentAttributeValue} is false or trim is empty. */
-export const trimStringIfNonEmpty = (value: unknown): string | undefined => {
-    if (!hasPresentAttributeValue(value)) return undefined
+/** `String(value).trim()` or `undefined` when {@link hasValue} is false / trim is empty. */
+export const trimStr = (value: unknown): string | undefined => {
+    if (!hasValue(value)) return undefined
     const trimmed = typeof value === 'string' ? value.trim() : String(value).trim()
     return trimmed.length > 0 ? trimmed : undefined
 }

@@ -19,7 +19,7 @@ import { normalizeName as normalizeNameForMatcher } from './nameMatching'
 import { TrigramIndex, buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
 import { isExactAttributeMatchScores } from './exactMatch'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
-import { hasPresentAttributeValue } from '../../utils/safeRead'
+import { hasValue } from '../../utils/safeRead'
 
 /** Build a skipped ScoreReport without spreading the full MatchingConfig. */
 function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreReport {
@@ -219,7 +219,7 @@ export class ScoringService {
 
         for (const attrName of this.indexedMandatoryAttributes) {
             const raw = account.attributes[attrName]
-            if (!hasPresentAttributeValue(raw)) {
+            if (!hasValue(raw)) {
                 // Account has no value for this mandatory attribute — cannot filter by it.
                 continue
             }
@@ -551,6 +551,6 @@ export class ScoringService {
      * representation is empty after trimming whitespace.
      */
     private isMissingMatchValue(value: unknown): boolean {
-        return !hasPresentAttributeValue(value)
+        return !hasValue(value)
     }
 }

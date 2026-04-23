@@ -1,6 +1,6 @@
 import {
     asRecord,
-    hasPresentAttributeValue,
+    hasValue,
     isDefined,
     isNullish,
     isRecord,
@@ -12,7 +12,7 @@ import {
     readPathUnknown,
     readString,
     readUnknown,
-    trimStringIfNonEmpty,
+    trimStr,
 } from '../safeRead'
 
 describe('safeRead', () => {
@@ -21,17 +21,17 @@ describe('safeRead', () => {
         expect(isNullish(undefined)).toBe(true)
         expect(isNullish(0)).toBe(false)
         expect(isDefined(0)).toBe(true)
-        expect(hasPresentAttributeValue('x')).toBe(true)
-        expect(hasPresentAttributeValue('  x  ')).toBe(true)
-        expect(hasPresentAttributeValue(0)).toBe(true)
-        expect(hasPresentAttributeValue(false)).toBe(true)
-        expect(hasPresentAttributeValue('')).toBe(false)
-        expect(hasPresentAttributeValue('   ')).toBe(false)
-        expect(hasPresentAttributeValue(undefined)).toBe(false)
-        expect(hasPresentAttributeValue({})).toBe(true)
-        expect(trimStringIfNonEmpty('  a  ')).toBe('a')
-        expect(trimStringIfNonEmpty('   ')).toBeUndefined()
-        expect(trimStringIfNonEmpty(null)).toBeUndefined()
+        expect(hasValue('x')).toBe(true)
+        expect(hasValue('  x  ')).toBe(true)
+        expect(hasValue(0)).toBe(true)
+        expect(hasValue(false)).toBe(true)
+        expect(hasValue('')).toBe(false)
+        expect(hasValue('   ')).toBe(false)
+        expect(hasValue(undefined)).toBe(false)
+        expect(hasValue({})).toBe(true)
+        expect(trimStr('  a  ')).toBe('a')
+        expect(trimStr('   ')).toBeUndefined()
+        expect(trimStr(null)).toBeUndefined()
     })
 
     it('narrows record-like values', () => {
