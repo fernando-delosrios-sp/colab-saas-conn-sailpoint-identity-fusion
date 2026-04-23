@@ -1,4 +1,4 @@
-import { hasValue, isDefined, readUnknown, trimStr } from './safeRead'
+import { hasValue, isDefined, missing, readUnknown, trimStr } from './safeRead'
 
 /**
  * Attribute utility functions for picking, filtering, and transforming attributes.
@@ -250,7 +250,7 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
     // - { value: string }[] / { name: string }[] (other SDK shapes)
     const normalized: string[] = []
     for (const item of arr) {
-        if (!hasValue(item)) continue
+        if (missing(item)) continue
         if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
             normalized.push(String(item))
             continue
@@ -275,11 +275,11 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
  * into an array would yield per-character tokens and break action dispatch.
  */
 export function normalizeActionTokens(raw: unknown): string[] {
-    if (!hasValue(raw)) return []
+    if (missing(raw)) return []
     if (Array.isArray(raw)) {
         const out: string[] = []
         for (const item of raw) {
-            if (!hasValue(item)) continue
+            if (missing(item)) continue
             if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
                 out.push(String(item))
                 continue

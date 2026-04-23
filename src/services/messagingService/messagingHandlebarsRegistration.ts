@@ -1,6 +1,6 @@
 import Handlebars from 'handlebars'
 
-import { hasValue, isDefined } from '../../utils/safeRead'
+import { hasValue, isDefined, missing, trimStr } from '../../utils/safeRead'
 
 import {
     mailtoHrefForHtmlAttribute,
@@ -58,7 +58,7 @@ export const registerHandlebarsHelpers = (): void => {
                 `<span style="word-break:break-word; overflow-wrap:anywhere;"${titleAttr}>${escDisplay}</span>`,
             )
         }
-        const str = String(value).trim()
+        const str = trimStr(value) ?? ''
         const { display, title } = truncateWithEllipsis(str, accountAttrMaxChars)
         const escDisplay = Handlebars.escapeExpression(display)
         const titleAttr = title ? ` title="${Handlebars.escapeExpression(title)}"` : ''
@@ -178,7 +178,7 @@ export const registerHandlebarsHelpers = (): void => {
         if (!stats || typeof stats !== 'object') return []
         const cards: Array<{ label: string; value: string }> = []
         const pushCard = (label: string, value: any): void => {
-            if (!hasValue(value)) return
+            if (missing(value)) return
             cards.push({ label, value: String(value) })
         }
         const formattedDate = reportDate ? formatDateYmd(reportDate) : undefined

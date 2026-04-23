@@ -15,7 +15,7 @@ import {
     normalizeCompositeManagedAccountKey,
     parseManagedAccountKey,
 } from './managedAccountKey'
-import { readString } from '../utils/safeRead'
+import { missing, readString, trimStr } from '../utils/safeRead'
 
 /**
  * Core domain model representing a fusion account in the Identity Fusion connector.
@@ -1015,8 +1015,8 @@ export class FusionAccount {
      * Add a dated history entry
      */
     private addHistory(message: string): void {
-        const normalizedMessage = String(message ?? '').trim()
-        if (!normalizedMessage) return
+        const normalizedMessage = trimStr(message) ?? ''
+        if (missing(normalizedMessage)) return
 
         const now = new Date().toISOString().split('T')[0]
         const datedMessage = `[${now}] ${normalizedMessage}`
@@ -1198,7 +1198,7 @@ export class FusionAccount {
                 const account = allAccountsById.get(accountId)
                 if (!account?.sourceName) continue
                 const parsed = parseManagedAccountKey(accountId)
-                const nativeId = String(account.nativeIdentity ?? parsed?.nativeIdentity ?? '').trim() || accountId
+                const nativeId = trimStr(account.nativeIdentity ?? parsed?.nativeIdentity) || accountId
                 this.setManagedAccountInfo(accountId, account.sourceName, nativeId)
             }
         }
@@ -1255,7 +1255,7 @@ export class FusionAccount {
      * @param decision - The fusion decision from the review form
      */
     public addFusionDecisionLayer(decision: FusionDecision): void {
-        const managedKey = String(decision.account.id ?? '').trim()
+        const managedKey = trimStr(decision.account.id) ?? ''
         if (!isCompositeManagedAccountKey(managedKey)) {
             throw new ConnectorError(
                 `Fusion decision account id must be a managed account key (sourceId::nativeIdentity), received: "${managedKey || 'empty'}".`,
@@ -1302,7 +1302,7 @@ export class FusionAccount {
         if (isNewAccount) {
             this.setNeedsRefresh(true)
             if (addAssociationHistory) {
-                const accountLabel = String(account.name ?? account.nativeIdentity ?? accountId).trim() || accountId
+                const accountLabel = trimStr(account.name ?? account.nativeIdentity ?? accountId) || accountId
                 const sourceLabel = account.sourceName ?? this._sourceName
                 this.addHistory(
                     `Associated managed account ${this.formatHistoryAccountInfo(accountLabel, sourceLabel)}`
@@ -1319,18 +1319,18 @@ export class FusionAccount {
 
         if (account.sourceName) {
             const parsedKey = parseManagedAccountKey(accountId)
-            const schemaNative = String(account.nativeIdentity ?? parsedKey?.nativeIdentity ?? '').trim() || accountId
+            const schemaNative = trimStr(account.nativeIdentity ?? parsedKey?.nativeIdentity) || accountId
             this.setManagedAccountInfo(accountId, account.sourceName, schemaNative)
 
             const contextAttributes = {
                 ...(account.attributes ?? {}),
                 _id: accountId,
                 source: {
-                    id: String(readString(account, 'sourceId', '')).trim(),
+                    id: trimStr(readString(account, 'sourceId', '')) ?? '',
                     name: account.sourceName ?? '',
                 },
                 schema: {
-                    name: String(account.name ?? account.nativeIdentity ?? '').trim() || accountId,
+                    name: trimStr(account.name ?? account.nativeIdentity) || accountId,
                     id: schemaNative,
                 },
                 // IdentityIQ-style compatibility: true means account is disabled.
@@ -1530,8 +1530,7 @@ export class FusionAccount {
     }
 
     private normalizeHistoryLabel(value: unknown, fallback: string): string {
-        const normalized = String(value ?? '').trim()
-        return normalized.length > 0 ? normalized : fallback
+        return trimStr(value) ?? fallback
     }
 
     private formatHistoryAccountInfo(name: unknown, source: unknown): string {

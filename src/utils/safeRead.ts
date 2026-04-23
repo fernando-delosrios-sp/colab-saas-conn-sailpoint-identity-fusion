@@ -18,9 +18,12 @@ export function hasValue(value: unknown): boolean {
     return true
 }
 
+/** Inverse of {@link hasValue} — prefer `if (missing(x))` over `if (!hasValue(x))`. */
+export const missing = (value: unknown): boolean => !hasValue(value)
+
 /** `String(value).trim()` or `undefined` when {@link hasValue} is false / trim is empty. */
 export const trimStr = (value: unknown): string | undefined => {
-    if (!hasValue(value)) return undefined
+    if (missing(value)) return undefined
     const trimmed = typeof value === 'string' ? value.trim() : String(value).trim()
     return trimmed.length > 0 ? trimmed : undefined
 }

@@ -3,6 +3,7 @@ import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector
 import { FusionAccount } from '../../model/account'
 import { SourceType } from '../../model/config'
 import { capitalizeFirst } from '../../utils/attributes'
+import { trimStr } from '../../utils/safeRead'
 import { ALGORITHM_LABELS } from './constants'
 import { Candidate, Score } from './types'
 
@@ -47,7 +48,7 @@ const getAttrValue = (attrs: Record<string, any> | undefined, name: string): str
     String(attrs?.[name] ?? attrs?.[lowerFirst(name)] ?? '')
 
 function getManagedAccountIdentifier(fusionAccount: FusionAccount): string {
-    const managedKey = String(fusionAccount.managedAccountId ?? '').trim()
+    const managedKey = trimStr(fusionAccount.managedAccountId) ?? ''
     if (managedKey) {
         return managedKey
     }
