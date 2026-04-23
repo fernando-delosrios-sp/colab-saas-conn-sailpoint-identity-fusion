@@ -25,7 +25,7 @@ import {
 } from './fusionReportHelpers'
 import { AttributeOperations } from '../attributeService/types'
 import { buildManagedAccountKey, getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
-import { hasValue, readString } from '../../utils/safeRead'
+import { hasValue, readString, trimStr } from '../../utils/safeRead'
 
 // ============================================================================
 // FusionService Class
@@ -1040,7 +1040,7 @@ export class FusionService {
                 this.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
                 const sourceInfo = this.sourcesByName.get(fusionDecision.account.sourceName)
                 if (sourceInfo?.config?.disableNonMatchingAccounts) {
-                    const decisionManagedKey = String(fusionDecision.account.id ?? '').trim()
+                    const decisionManagedKey = trimStr(fusionDecision.account.id) ?? ''
                     const managedAccount = decisionManagedKey
                         ? this.sources.managedAccountsById.get(decisionManagedKey)
                         : undefined

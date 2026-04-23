@@ -1,5 +1,5 @@
 import { Account } from 'sailpoint-api-client'
-import { readString } from '../utils/safeRead'
+import { readString, trimStr } from '../utils/safeRead'
 
 const MANAGED_ACCOUNT_KEY_SEPARATOR = '::'
 
@@ -13,8 +13,7 @@ type ManagedKeyAccountLike = {
 }
 
 function normalizePart(value: unknown): string | undefined {
-    const normalized = String(value ?? '').trim()
-    return normalized.length > 0 ? normalized : undefined
+    return trimStr(value ?? '')
 }
 
 function resolveSourceId(account: ManagedKeyAccountLike): string | undefined {

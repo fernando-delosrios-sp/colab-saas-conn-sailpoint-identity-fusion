@@ -28,7 +28,7 @@ import { LogService } from '../logService'
 import { assert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
 import { getDateFromISOString } from '../../utils/date'
-import { readPathString } from '../../utils/safeRead'
+import { readPathString, trimStr } from '../../utils/safeRead'
 import { buildSourceConfigPatch } from './helpers'
 import { buildSourceFilter } from './sourceAccountFilterHelpers'
 import {
@@ -769,12 +769,10 @@ export class SourceService {
      * composite key (sourceId::nativeIdentity); resolve the loaded Account to obtain `id`.
      */
     public resolveIscAccountIdForManagedKey(managedKey: string): string | undefined {
-        const trimmed = String(managedKey ?? '').trim()
-        if (!trimmed) return undefined
-        const account = this.managedAccountsAllById.get(trimmed) ?? this.managedAccountsById.get(trimmed)
-        const raw = account?.id
-        const id = raw != null ? String(raw).trim() : ''
-        return id.length > 0 ? id : undefined
+        const key = trimStr(managedKey)
+        if (key === undefined) return undefined
+        const account = this.managedAccountsAllById.get(key) ?? this.managedAccountsById.get(key)
+        return trimStr(account?.id)
     }
 
     /**

@@ -23,7 +23,7 @@ import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
 import { buildManagedAccountKey } from '../../model/managedAccountKey'
 import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
-import { hasValue, readString, trimStr } from '../../utils/safeRead'
+import { hasValue, missing, readString, trimStr } from '../../utils/safeRead'
 import { defaults } from '../../data/config'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
@@ -47,7 +47,7 @@ function getManagedAccountSnapshotKey(account: Record<string, any> | undefined):
         sourceId: velocitySnapshotSourceId(account),
         nativeIdentity: velocitySnapshotSchemaId(account),
     })
-    return String(key ?? '').trim()
+    return trimStr(key ?? '') ?? ''
 }
 
 // ============================================================================
@@ -259,11 +259,10 @@ export class AttributeService {
 
                 attributes[attribute] = processedValue
                 if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {
-                    const mainAccountId = String(processedValue).trim()
-                    prioritizedAccount =
-                        mainAccountId.length > 0
-                            ? this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId)
-                            : undefined
+                    const mainAccountId = trimStr(processedValue)
+                    prioritizedAccount = mainAccountId
+                        ? this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId)
+                        : undefined
                 }
                 if (attribute === 'history') {
                     this.applyHistoryMapping(processedValue, fusionAccount)
@@ -443,7 +442,7 @@ export class AttributeService {
 
         for (const definition of this.uniqueDefinitions) {
             const value = fusionAccount.attributes[definition.name]
-            if (!hasValue(value)) continue
+            if (missing(value)) continue
 
             const valueStr = String(value)
             const lockKey = `unique:${definition.name}`
@@ -471,7 +470,7 @@ export class AttributeService {
             if (definition.name === fusionIdentityAttribute) continue
 
             const value = fusionAccount.attributes[definition.name]
-            if (!hasValue(value)) continue
+            if (missing(value)) continue
 
             const valueStr = String(value)
             const lockKey = `unique:${definition.name}`
@@ -762,7 +761,7 @@ export class AttributeService {
         const prioritizedIndex = ordered.findIndex(
             (account) =>
                 getManagedAccountSnapshotKey(account) === mainAccountId ||
-                String(account?._id ?? '').trim() === mainAccountId
+                trimStr(account?._id) === mainAccountId
         )
         if (prioritizedIndex <= 0) return ordered
 
@@ -792,7 +791,7 @@ export class AttributeService {
             const match = accounts.find(
                 (account) =>
                     getManagedAccountSnapshotKey(account) === accountId ||
-                    String(account?._id ?? '').trim() === accountId
+                    trimStr(account?._id) === accountId
             )
             if (match) return match
         }
@@ -1205,7 +1204,7 @@ export class AttributeService {
      * before evaluation, so the registry reflects other accounts only during generation.
      */
     private isUniqueTemplateValue(definition: UniqueAttributeDefinition, value: unknown): boolean {
-        if (!hasValue(value)) return false
+        if (missing(value)) return false
         const raw = String(value)
 
         const transformed = this.applyUniqueValueOutputTransforms(definition, raw)

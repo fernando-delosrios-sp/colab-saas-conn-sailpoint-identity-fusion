@@ -3,6 +3,7 @@ import {
     hasValue,
     isDefined,
     isNullish,
+    missing,
     isRecord,
     readArray,
     readBoolean,
@@ -29,6 +30,8 @@ describe('safeRead', () => {
         expect(hasValue('   ')).toBe(false)
         expect(hasValue(undefined)).toBe(false)
         expect(hasValue({})).toBe(true)
+        expect(missing('')).toBe(true)
+        expect(missing('a')).toBe(false)
         expect(trimStr('  a  ')).toBe('a')
         expect(trimStr('   ')).toBeUndefined()
         expect(trimStr(null)).toBeUndefined()

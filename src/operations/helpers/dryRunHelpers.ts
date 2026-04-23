@@ -7,7 +7,7 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 import { FusionReportAccount } from '../../services/fusionService/types'
 import { isExactAttributeMatchScores } from '../../services/scoringService/exactMatch'
 import { FusionAccount } from '../../model/account'
-import { readArray, readBoolean, readPathString, readUnknown } from '../../utils/safeRead'
+import { readArray, readBoolean, readPathString, readUnknown, trimStr } from '../../utils/safeRead'
 import {
     buildReportAccountIndex,
     buildDryRunSummary,
@@ -647,8 +647,8 @@ const fusionIdentityAttributeValue = (attributes: any, attributeName: string): s
     if (!attributes || typeof attributes !== 'object') return ''
     const v = readUnknown(attributes, attributeName)
     if (v === undefined || v === null) return ''
-    if (Array.isArray(v)) return String(v[0] ?? '').trim()
-    return String(v).trim()
+    if (Array.isArray(v)) return trimStr(v[0]) ?? ''
+    return trimStr(v) ?? ''
 }
 
 const categorizeRow = (

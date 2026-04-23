@@ -19,7 +19,7 @@ import { normalizeName as normalizeNameForMatcher } from './nameMatching'
 import { TrigramIndex, buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
 import { isExactAttributeMatchScores } from './exactMatch'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
-import { hasValue } from '../../utils/safeRead'
+import { hasValue, missing, trimStr } from '../../utils/safeRead'
 
 /** Build a skipped ScoreReport without spreading the full MatchingConfig. */
 function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreReport {
@@ -219,7 +219,7 @@ export class ScoringService {
 
         for (const attrName of this.indexedMandatoryAttributes) {
             const raw = account.attributes[attrName]
-            if (!hasValue(raw)) {
+            if (missing(raw)) {
                 // Account has no value for this mandatory attribute — cannot filter by it.
                 continue
             }
@@ -504,13 +504,13 @@ export class ScoringService {
      * Prefer displayName/name, then fall back to uid-like identifiers.
      */
     private getIdentityDisplayLabel(fusionIdentity: FusionAccount): string {
-        const identityDisplayName = String(fusionIdentity.identityDisplayName ?? '').trim()
+        const identityDisplayName = trimStr(fusionIdentity.identityDisplayName) ?? ''
         if (identityDisplayName) return identityDisplayName
 
-        const identityId = String(fusionIdentity.identityId ?? '').trim()
+        const identityId = trimStr(fusionIdentity.identityId) ?? ''
         if (identityId) return identityId
 
-        const fallback = String(fusionIdentity.nativeIdentityOrUndefined ?? '').trim()
+        const fallback = trimStr(fusionIdentity.nativeIdentityOrUndefined) ?? ''
         return fallback || 'Unknown'
     }
 
@@ -551,6 +551,6 @@ export class ScoringService {
      * representation is empty after trimming whitespace.
      */
     private isMissingMatchValue(value: unknown): boolean {
-        return !hasValue(value)
+        return missing(value)
     }
 }
