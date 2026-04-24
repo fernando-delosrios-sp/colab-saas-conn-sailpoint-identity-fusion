@@ -38,17 +38,85 @@ function stripTrailingCommas(tsObjectLiteral) {
     return tsObjectLiteral.replace(/,(\s*[}\]])/g, '$1')
 }
 
-function tsValueToJson(valueSlice) {
+function parseNamedImports(source) {
+    const imports = new Map()
+    const importRegex = /import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/g
+    let m
+    while ((m = importRegex.exec(source))) {
+        const rawSpecifiers = m[1]
+        const modulePath = m[2]
+        for (const raw of rawSpecifiers.split(',')) {
+            const spec = raw.trim()
+            if (!spec) continue
+            const aliasMatch = spec.match(/^([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)$/)
+            if (aliasMatch) {
+                imports.set(aliasMatch[2], modulePath)
+            } else {
+                imports.set(spec, modulePath)
+            }
+        }
+    }
+    return imports
+}
+
+const enumMemberValueCache = new Map()
+function resolveEnumMemberValue(enumName, memberName, context) {
+    const cacheKey = `${context.tsPath}::${enumName}.${memberName}`
+    if (enumMemberValueCache.has(cacheKey)) {
+        return enumMemberValueCache.get(cacheKey)
+    }
+
+    const modulePath = context.imports.get(enumName)
+    if (!modulePath) return undefined
+
+    const resolvedModulePath = path.resolve(path.dirname(context.tsPath), modulePath)
+    const candidatePaths = [
+        `${resolvedModulePath}.ts`,
+        path.join(resolvedModulePath, 'index.ts'),
+    ]
+    const enumFilePath = candidatePaths.find((p) => fs.existsSync(p))
+    if (!enumFilePath) return undefined
+
+    const enumSource = fs.readFileSync(enumFilePath, 'utf8')
+    const enumBlockRegex = new RegExp(`export\\s+enum\\s+${enumName}\\s*\\{([\\s\\S]*?)\\}`, 'm')
+    const enumBlockMatch = enumSource.match(enumBlockRegex)
+    if (!enumBlockMatch) return undefined
+
+    const body = enumBlockMatch[1]
+    const stringMemberRegex = new RegExp(`\\b${memberName}\\b\\s*=\\s*(['"])(.*?)\\1`)
+    const stringMatch = body.match(stringMemberRegex)
+    if (stringMatch) {
+        enumMemberValueCache.set(cacheKey, stringMatch[2])
+        return stringMatch[2]
+    }
+
+    const numberMemberRegex = new RegExp(`\\b${memberName}\\b\\s*=\\s*(-?\\d+(?:\\.\\d+)?)`)
+    const numberMatch = body.match(numberMemberRegex)
+    if (numberMatch) {
+        const numericValue = Number(numberMatch[1])
+        enumMemberValueCache.set(cacheKey, numericValue)
+        return numericValue
+    }
+
+    return undefined
+}
+
+function tsValueToJson(valueSlice, context) {
     const v = valueSlice.trim()
     if (v === 'true' || v === 'false' || v === 'null') return v
     if (/^-?\d+(\.\d+)?$/.test(v)) return v
     if ((v.startsWith("'") && v.endsWith("'")) || (v.startsWith('"') && v.endsWith('"'))) {
         return JSON.stringify(v.slice(1, -1))
     }
+    const enumMemberMatch = v.match(/^([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)$/)
+    if (enumMemberMatch) {
+        const resolved = resolveEnumMemberValue(enumMemberMatch[1], enumMemberMatch[2], context)
+        if (resolved !== undefined) return JSON.stringify(resolved)
+    }
     throw new Error(`Unsupported literal in connector spec fragment: ${v.slice(0, 80)}`)
 }
 
-function objectLiteralToJson(tsObjectLiteral) {
+function objectLiteralToJson(tsObjectLiteral, context) {
     const inner = tsObjectLiteral.trim().slice(1, -1)
     const out = {}
     let pos = 0
@@ -101,7 +169,7 @@ function objectLiteralToJson(tsObjectLiteral) {
         while (tail < inner.length && /\s/.test(inner[tail])) tail++
         if (inner[tail] === ',') tail++
 
-        out[key] = JSON.parse(tsValueToJson(rawVal))
+        out[key] = JSON.parse(tsValueToJson(rawVal, context))
         pos = tail
     }
     return out
@@ -112,8 +180,12 @@ function loadInitialValues(fileName) {
     if (parsedCache.has(fileName)) return parsedCache.get(fileName)
     const tsPath = path.join(settingsDir, fileName)
     const source = fs.readFileSync(tsPath, 'utf8')
+    const context = {
+        tsPath,
+        imports: parseNamedImports(source),
+    }
     const literal = stripTrailingCommas(extractExportConstObjectLiteral(source, 'connectorSpecInitialValues'))
-    const parsed = objectLiteralToJson(literal)
+    const parsed = objectLiteralToJson(literal, context)
     parsedCache.set(fileName, parsed)
     return parsed
 }
