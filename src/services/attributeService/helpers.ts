@@ -1,5 +1,6 @@
 import { Attributes } from '@sailpoint/connector-sdk'
-import { AttributeMap } from '../../model/config'
+import { AttributeMap, AttributeMergeMode, DefaultAttributeMergeMode } from '../../model/config'
+import { hasValue } from '../../utils/safeRead'
 import { AttributeMappingConfig } from './types'
 
 // ============================================================================
@@ -63,7 +64,7 @@ export const processAttributeMapping = (
     const { attributeMerge } = config
 
     // Handle single-value merge strategies with early return
-    if (attributeMerge === 'first' || attributeMerge === 'source') {
+    if (attributeMerge === AttributeMergeMode.First || attributeMerge === AttributeMergeMode.Source) {
         return processSingleValueMerge(config, sourceAttributeMap, sourceOrder, prioritizedAccount)
     }
 
@@ -90,7 +91,7 @@ const processSingleValueMerge = (
                 ? String((src as { name?: unknown }).name ?? '')
                 : String(prioritizedAccount._source ?? '')
         const canEvaluatePrioritized =
-            attributeMerge !== 'source' || !specifiedSource || prioritizedSource === specifiedSource
+            attributeMerge !== AttributeMergeMode.Source || !specifiedSource || prioritizedSource === specifiedSource
         if (canEvaluatePrioritized) {
             const prioritizedValue = findFirstAttributeValue([prioritizedAccount], attributeNames)
             if (prioritizedValue !== undefined) {
@@ -101,7 +102,7 @@ const processSingleValueMerge = (
 
     for (const sourceName of sourceOrder) {
         // For 'source' merge strategy, only process the specified source
-        if (attributeMerge === 'source' && specifiedSource && sourceName !== specifiedSource) {
+        if (attributeMerge === AttributeMergeMode.Source && specifiedSource && sourceName !== specifiedSource) {
             continue
         }
 
@@ -126,7 +127,7 @@ const findFirstAttributeValue = (accounts: Attributes[], attributeNames: string[
     for (const account of accounts) {
         for (const attribute of attributeNames) {
             const value = account[attribute]
-            if (value !== undefined && value !== null && value !== '') {
+            if (hasValue(value)) {
                 const splitValues = typeof value === 'string' ? attrSplit(value) : [value]
                 return splitValues[0]
             }
@@ -155,7 +156,7 @@ const processMultiValueMerge = (
     // Extract unique values and sort once for both 'list' and 'concatenate' strategies
     const uniqueSorted = [...new Set(allValues)].sort()
 
-    if (attributeMerge === 'list') {
+    if (attributeMerge === AttributeMergeMode.List) {
         return uniqueSorted
     }
     // Pass true to skip redundant uniqueness filtering/sorting since we already did it above
@@ -194,7 +195,7 @@ const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: strin
     for (const account of accounts) {
         for (const attribute of attributeNames) {
             const value = account[attribute]
-            if (value !== undefined && value !== null && value !== '') {
+            if (hasValue(value)) {
                 let splitValues: string[]
                 if (typeof value === 'string') {
                     splitValues = attrSplit(value)
@@ -216,7 +217,7 @@ const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: strin
 export const buildAttributeMappingConfig = (
     attributeName: string,
     attributeMaps: AttributeMap[] | undefined,
-    defaultAttributeMerge: 'first' | 'list' | 'concatenate'
+    defaultAttributeMerge: DefaultAttributeMergeMode
 ): AttributeMappingConfig => {
     // Check if attribute has specific configuration in attributeMaps
     const attributeMap = attributeMaps?.find((am) => am.newAttribute === attributeName)

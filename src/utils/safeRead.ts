@@ -1,5 +1,33 @@
 export type SafeRecord = Record<string, unknown>
 
+/** True for `null` or `undefined` only. */
+export const isNullish = (value: unknown): value is null | undefined => value === null || value === undefined
+
+/** Inverse of {@link isNullish}. */
+export const isDefined = (value: unknown): boolean => !isNullish(value)
+
+/**
+ * Usable attribute / template value: not `null`/`undefined`, not `''` or whitespace-only strings.
+ * Non-string scalars (`0`, `false`) and objects/arrays count as present (no trim).
+ */
+export function hasValue(value: string | null | undefined): value is string
+export function hasValue(value: unknown): boolean
+export function hasValue(value: unknown): boolean {
+    if (isNullish(value)) return false
+    if (typeof value === 'string') return value.trim().length > 0
+    return true
+}
+
+/** Inverse of {@link hasValue} — prefer `if (missing(x))` over `if (!hasValue(x))`. */
+export const missing = (value: unknown): boolean => !hasValue(value)
+
+/** `String(value).trim()` or `undefined` when {@link hasValue} is false / trim is empty. */
+export const trimStr = (value: unknown): string | undefined => {
+    if (missing(value)) return undefined
+    const trimmed = typeof value === 'string' ? value.trim() : String(value).trim()
+    return trimmed.length > 0 ? trimmed : undefined
+}
+
 export const isRecord = (value: unknown): value is SafeRecord =>
     typeof value === 'object' && value !== null && !Array.isArray(value)
 

@@ -5,7 +5,7 @@ import { LogService, PhaseTimer } from '../logService'
 import { FormService } from '../formService'
 import { defaultFusionMaxCandidatesForForm, defaults } from '../../data/config'
 import { IdentityService } from '../identityService'
-import { SourceInfo, SourceService, buildSourceConfigPatch } from '../sourceService'
+import { SourceInfo, SourceService } from '../sourceService'
 import { FusionAccount } from '../../model/account'
 import { attrConcat, AttributeService } from '../attributeService'
 import { assert } from '../../utils/assert'
@@ -26,7 +26,7 @@ import {
 } from './fusionReportHelpers'
 import { AttributeOperations } from '../attributeService/types'
 import { buildManagedAccountKey, getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
-import { readString } from '../../utils/safeRead'
+import { hasValue, readString, trimStr } from '../../utils/safeRead'
 
 // ============================================================================
 // FusionService Class
@@ -207,15 +207,23 @@ export class FusionService {
      */
     public async disableReset(): Promise<void> {
         const { fusionSourceId } = this.sources
-        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/reset', false)
-        await this.sources.patchSourceConfig(fusionSourceId, requestParameters, 'FusionService>disableReset')
+        await this.sources.patchSourceConfig(
+            fusionSourceId,
+            '/connectorAttributes/reset',
+            false,
+            'FusionService>disableReset'
+        )
     }
 
     /** Clears the persisted fusion state in the source configuration. */
     public async resetState(): Promise<void> {
         const { fusionSourceId } = this.sources
-        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/fusionState', false)
-        await this.sources.patchSourceConfig(fusionSourceId, requestParameters, 'FusionService>resetState')
+        await this.sources.patchSourceConfig(
+            fusionSourceId,
+            '/connectorAttributes/fusionState',
+            false,
+            'FusionService>resetState'
+        )
     }
 
     // ------------------------------------------------------------------------
@@ -1044,7 +1052,7 @@ export class FusionService {
                 this.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
                 const sourceInfo = this.sourcesByName.get(fusionDecision.account.sourceName)
                 if (sourceInfo?.config?.disableNonMatchingAccounts) {
-                    const decisionManagedKey = String(fusionDecision.account.id ?? '').trim()
+                    const decisionManagedKey = trimStr(fusionDecision.account.id) ?? ''
                     const managedAccount = decisionManagedKey
                         ? this.sources.managedAccountsById.get(decisionManagedKey)
                         : undefined
@@ -2006,7 +2014,7 @@ export class FusionService {
             }
         }
         const identityId = account.identityId
-        if (identityId && identityId.trim() !== '' && this.fusionIdentityMap.has(identityId)) {
+        if (hasValue(identityId) && this.fusionIdentityMap.has(identityId)) {
             return true
         }
         return false
@@ -2238,7 +2246,7 @@ export class FusionService {
      */
     public setFusionAccount(fusionAccount: FusionAccount): void {
         const identityId = fusionAccount.identityId
-        const hasIdentityId = identityId && identityId.trim() !== ''
+        const hasIdentityId = hasValue(identityId)
 
         if (hasIdentityId) {
             const existingFusionAccount = this.fusionIdentityMap.get(identityId!)

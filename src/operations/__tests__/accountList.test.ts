@@ -210,7 +210,7 @@ describe('accountList setup phase', () => {
     })
 
     it('clears analyzed accounts after output rows are sent', async () => {
-        const { registry, fusion } = createMockRegistry([])
+        const { registry } = createMockRegistry([])
         const input = { schema: { attributes: [] } } as any
 
         await accountList(registry, input)

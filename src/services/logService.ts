@@ -43,10 +43,16 @@ type LogConfig = {
  * Created via {@link LogService.timer}. Calls delegate to the parent LogService
  * so caller-origin detection and external logging continue to work.
  */
+export type PhaseTimingEntry = {
+    phase: string
+    elapsed: string
+}
+
 export class PhaseTimer {
     private log: LogService
     private operationStart: number
     private phaseStart: number
+    private phaseEntries: PhaseTimingEntry[] = []
 
     constructor(log: LogService) {
         this.log = log
@@ -55,11 +61,32 @@ export class PhaseTimer {
     }
 
     /** Logs message with elapsed time since last checkpoint, then resets the phase clock. */
-    phase(message: string, level: LogLevel = 'info'): void {
+    phase(message: string, level: LogLevel = 'info', breakdownPhase?: string): void {
         const now = Date.now()
         const elapsed = now - this.phaseStart
+        this.phaseEntries.push({
+            phase: breakdownPhase ?? message,
+            elapsed: PhaseTimer.formatElapsed(elapsed),
+        })
         this.log[level](`${message} (${PhaseTimer.formatElapsed(elapsed)})`)
         this.phaseStart = now
+    }
+
+    /** Ordered { phase, elapsed } records for each completed {@link phase} call. */
+    getPhaseBreakdown(): PhaseTimingEntry[] {
+        return [...this.phaseEntries]
+    }
+
+    /**
+     * Records a completed interval without logging (for blocks timed manually).
+     * Resets the phase clock to now so a subsequent {@link phase} call measures from here.
+     */
+    recordElapsed(phase: string, elapsedMs: number): void {
+        this.phaseEntries.push({
+            phase,
+            elapsed: PhaseTimer.formatElapsed(elapsedMs),
+        })
+        this.phaseStart = Date.now()
     }
 
     /** Logs message with total elapsed time since timer creation. */

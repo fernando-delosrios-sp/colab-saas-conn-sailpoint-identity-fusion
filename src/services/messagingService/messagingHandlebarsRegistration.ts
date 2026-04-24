@@ -1,5 +1,7 @@
 import Handlebars from 'handlebars'
 
+import { hasValue, isDefined, missing, trimStr } from '../../utils/safeRead'
+
 import {
     mailtoHrefForHtmlAttribute,
     maxDisplayCharsForAccountAttributeValue,
@@ -30,7 +32,7 @@ export const registerHandlebarsHelpers = (): void => {
     }
 
     Handlebars.registerHelper('formatAttribute', (value: unknown) => {
-        if (value === null || value === undefined) {
+        if (!isDefined(value)) {
             return 'N/A'
         }
         if (typeof value === 'object') {
@@ -44,7 +46,7 @@ export const registerHandlebarsHelpers = (): void => {
 
     /** Renders attribute values; long text is shortened with a character budget; emails become mailto links (triple braces in templates). */
     Handlebars.registerHelper('formatAccountAttributeValue', (_attributeKey: unknown, value: unknown) => {
-        if (value === null || value === undefined) {
+        if (!isDefined(value)) {
             return 'N/A'
         }
         if (typeof value === 'object') {
@@ -56,7 +58,7 @@ export const registerHandlebarsHelpers = (): void => {
                 `<span style="word-break:break-word; overflow-wrap:anywhere;"${titleAttr}>${escDisplay}</span>`,
             )
         }
-        const str = String(value).trim()
+        const str = trimStr(value) ?? ''
         const { display, title } = truncateWithEllipsis(str, accountAttrMaxChars)
         const escDisplay = Handlebars.escapeExpression(display)
         const titleAttr = title ? ` title="${Handlebars.escapeExpression(title)}"` : ''
@@ -103,12 +105,12 @@ export const registerHandlebarsHelpers = (): void => {
     })
 
     Handlebars.registerHelper('exists', (value: unknown) => {
-        return value !== null && value !== undefined && value !== ''
+        return hasValue(value)
     })
 
     Handlebars.registerHelper('anyExists', (...args: unknown[]) => {
         const values = args.slice(0, -1)
-        return values.some((value) => value !== null && value !== undefined && value !== '')
+        return values.some((value) => hasValue(value))
     })
 
     Handlebars.registerHelper('decisionAssigned', (decisions: unknown, outcome: unknown) => {
@@ -176,7 +178,7 @@ export const registerHandlebarsHelpers = (): void => {
         if (!stats || typeof stats !== 'object') return []
         const cards: Array<{ label: string; value: string }> = []
         const pushCard = (label: string, value: any): void => {
-            if (value === null || value === undefined || value === '') return
+            if (missing(value)) return
             cards.push({ label, value: String(value) })
         }
         const formattedDate = reportDate ? formatDateYmd(reportDate) : undefined
@@ -195,5 +197,33 @@ export const registerHandlebarsHelpers = (): void => {
         pushCard('Fusion Automatic Matches', stats.fusionAutomaticMatches)
 
         return cards
+    })
+
+    const PIPELINE_PHASE_ORDER = [
+        'Setup',
+        'Fetch',
+        'Refresh',
+        'Process',
+        'Unique attributes',
+        'Output',
+    ] as const
+
+    /** Ordered phase tiles for HTML; missing phases show an em dash. */
+    Handlebars.registerHelper('orderedPhaseTimingEntries', (stats: Record<string, unknown> | null | undefined) => {
+        const raw = stats?.phaseTiming
+        const byPhase = new Map<string, string>()
+        if (Array.isArray(raw)) {
+            for (const e of raw) {
+                if (e && typeof e === 'object' && typeof (e as { phase?: string }).phase === 'string') {
+                    const phase = (e as { phase: string }).phase
+                    const elapsed = (e as { elapsed?: unknown }).elapsed
+                    byPhase.set(phase, isDefined(elapsed) ? String(elapsed) : '—')
+                }
+            }
+        }
+        return PIPELINE_PHASE_ORDER.map((phase) => ({
+            phase,
+            elapsed: byPhase.get(phase) ?? '—',
+        }))
     })
 }

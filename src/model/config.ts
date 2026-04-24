@@ -24,6 +24,16 @@ export interface BaseConfig {
     spConnDebugLoggingEnabled: boolean
 }
 
+export enum AttributeMergeMode {
+    First = 'first',
+    List = 'list',
+    Concatenate = 'concatenate',
+    Source = 'source',
+}
+
+export type DefaultAttributeMergeMode =
+    AttributeMergeMode.First | AttributeMergeMode.List | AttributeMergeMode.Concatenate
+
 /**
  * Configuration for mapping one or more source attributes into a single fusion attribute.
  * Controls how values are merged when multiple source accounts contribute the same attribute.
@@ -34,7 +44,7 @@ export interface AttributeMap {
     /** Source attribute names to read values from */
     existingAttributes: string[]
     /** Strategy for merging values: keep first, collect as list, concatenate strings, or pick from specific source */
-    attributeMerge?: 'first' | 'list' | 'concatenate' | 'source'
+    attributeMerge?: AttributeMergeMode
     /** Specific source name to use (only applicable when attributeMerge is "source") */
     source?: string
 }
@@ -172,15 +182,11 @@ export interface SourceConfig {
     disableNonMatchingAccounts?: boolean
     aggregationMode?: 'none' | 'before' | 'delayed'
     /**
-     * Number of times to poll the aggregation task result for this source
-     * when `aggregationMode` is `before`.
+     * Maximum time (minutes) to poll aggregation task status for this source when
+     * `aggregationMode` is `before`. Status is checked every 30 seconds until the task
+     * completes or this deadline is reached.
      */
-    taskResultRetries?: number
-    /**
-     * Wait time (in milliseconds) between aggregation task status polls for
-     * this source when `aggregationMode` is `before`.
-     */
-    taskResultWait?: number
+    aggregationTimeout?: number
     aggregationDelay?: number
     optimizedAggregation?: boolean
     accountFilter?: string
@@ -227,7 +233,7 @@ export interface SourceSettingsMenu extends ScopeSection, SourcesSection, Proces
 
 /** Configuration for attribute mapping definitions and the default merge strategy. */
 export interface AttributeMappingDefinitionsSection {
-    attributeMerge: 'first' | 'list' | 'concatenate'
+    attributeMerge: DefaultAttributeMergeMode
     attributeMaps?: AttributeMap[]
 }
 

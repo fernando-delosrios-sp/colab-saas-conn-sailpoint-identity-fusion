@@ -2,7 +2,6 @@ import { FusionAccount } from '../../model/account'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing } from '../../model/config'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { countIdentityBackedFusionMatches } from '../formService/helpers'
-import { LogService } from '../logService'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
 import {
     normalizeLIG3,
@@ -19,6 +18,8 @@ import { normalizeName as normalizeNameForMatcher } from './nameMatching'
 import { TrigramIndex, buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
 import { isExactAttributeMatchScores } from './exactMatch'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
+import { LogService } from '../logService'
+import { missing, trimStr } from '../../utils/safeRead'
 
 /** Build a skipped ScoreReport without spreading the full MatchingConfig. */
 function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreReport {
@@ -84,7 +85,7 @@ export class ScoringService {
      */
     constructor(
         config: FusionConfig,
-        private log: LogService
+        _log: LogService
     ) {
         this.matchingConfigs = config.matchingConfigs ?? []
         this.fusionAverageScore = config.fusionAverageScore ?? 0
@@ -218,7 +219,7 @@ export class ScoringService {
 
         for (const attrName of this.indexedMandatoryAttributes) {
             const raw = account.attributes[attrName]
-            if (raw === null || raw === undefined || String(raw).trim().length === 0) {
+            if (missing(raw)) {
                 // Account has no value for this mandatory attribute — cannot filter by it.
                 continue
             }
@@ -503,13 +504,13 @@ export class ScoringService {
      * Prefer displayName/name, then fall back to uid-like identifiers.
      */
     private getIdentityDisplayLabel(fusionIdentity: FusionAccount): string {
-        const identityDisplayName = String(fusionIdentity.identityDisplayName ?? '').trim()
+        const identityDisplayName = trimStr(fusionIdentity.identityDisplayName) ?? ''
         if (identityDisplayName) return identityDisplayName
 
-        const identityId = String(fusionIdentity.identityId ?? '').trim()
+        const identityId = trimStr(fusionIdentity.identityId) ?? ''
         if (identityId) return identityId
 
-        const fallback = String(fusionIdentity.nativeIdentityOrUndefined ?? '').trim()
+        const fallback = trimStr(fusionIdentity.nativeIdentityOrUndefined) ?? ''
         return fallback || 'Unknown'
     }
 
@@ -550,6 +551,6 @@ export class ScoringService {
      * representation is empty after trimming whitespace.
      */
     private isMissingMatchValue(value: unknown): boolean {
-        return value === null || value === undefined || String(value).trim().length === 0
+        return missing(value)
     }
 }

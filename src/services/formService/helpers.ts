@@ -6,6 +6,7 @@ import { assert } from '../../utils/assert'
 import { FusionMatch, MatchCandidateType } from '../scoringService/types'
 import { Candidate } from './types'
 import { internalConfig } from '../../data/config'
+import { trimStr } from '../../utils/safeRead'
 
 // ============================================================================
 // Helper Functions
@@ -21,14 +22,14 @@ export const resolveIdentitiesSelectLabel = (
     identityDocument?: IdentityDocument
 ): string => {
     const fromIndex = identityDocument?.attributes
-        ? String((identityDocument.attributes as Record<string, unknown>).displayName ?? '').trim()
+        ? trimStr((identityDocument.attributes as Record<string, unknown>).displayName) ?? ''
         : ''
     if (fromIndex) return fromIndex
 
-    const fromFusion = String(fusionAttributes?.displayName ?? '').trim()
+    const fromFusion = trimStr(fusionAttributes?.displayName) ?? ''
     if (fromFusion) return fromFusion
 
-    const fromIdentityName = String(identityDocument?.name ?? '').trim()
+    const fromIdentityName = trimStr(identityDocument?.name) ?? ''
     if (fromIdentityName) return fromIdentityName
 
     // During initial candidate build we may not have hydrated identity documents yet.

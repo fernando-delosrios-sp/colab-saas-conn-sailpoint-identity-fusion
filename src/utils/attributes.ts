@@ -1,4 +1,4 @@
-import { readUnknown } from './safeRead'
+import { hasValue, isDefined, missing, readUnknown, trimStr } from './safeRead'
 
 /**
  * Attribute utility functions for picking, filtering, and transforming attributes.
@@ -98,10 +98,10 @@ export function setAttributeValue(
 }
 
 /**
- * Checks if an attribute value is valid (not null, undefined, or empty string)
+ * Checks if an attribute value is valid (not null/undefined, not empty or whitespace-only string)
  */
 export function isValidAttributeValue(value: unknown): boolean {
-    return value !== undefined && value !== null && value !== ''
+    return hasValue(value)
 }
 
 // ============================================================================
@@ -145,7 +145,7 @@ export function mergeAttributes(...sources: (Record<string, any> | undefined)[])
     for (const source of sources) {
         if (!source) continue
         for (const [key, value] of Object.entries(source)) {
-            if (value !== undefined && value !== null) {
+            if (isDefined(value)) {
                 result[key] = value
             }
         }
@@ -250,7 +250,7 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
     // - { value: string }[] / { name: string }[] (other SDK shapes)
     const normalized: string[] = []
     for (const item of arr) {
-        if (item == null) continue
+        if (missing(item)) continue
         if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
             normalized.push(String(item))
             continue
@@ -260,7 +260,7 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
             const value = readUnknown(item, 'value')
             const name = readUnknown(item, 'name')
             const pick = id ?? value ?? name
-            if (pick != null && pick !== '') {
+            if (hasValue(pick)) {
                 normalized.push(String(pick))
             }
         }
@@ -275,11 +275,11 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
  * into an array would yield per-character tokens and break action dispatch.
  */
 export function normalizeActionTokens(raw: unknown): string[] {
-    if (raw == null || raw === '') return []
+    if (missing(raw)) return []
     if (Array.isArray(raw)) {
         const out: string[] = []
         for (const item of raw) {
-            if (item == null || item === '') continue
+            if (missing(item)) continue
             if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
                 out.push(String(item))
                 continue
@@ -289,7 +289,7 @@ export function normalizeActionTokens(raw: unknown): string[] {
                 const value = readUnknown(item, 'value')
                 const name = readUnknown(item, 'name')
                 const pick = id ?? value ?? name
-                if (pick != null && pick !== '') out.push(String(pick))
+                if (hasValue(pick)) out.push(String(pick))
             }
         }
         return out
@@ -302,7 +302,7 @@ export function normalizeActionTokens(raw: unknown): string[] {
         const value = readUnknown(raw, 'value')
         const name = readUnknown(raw, 'name')
         const pick = id ?? value ?? name
-        return pick != null && pick !== '' ? [String(pick)] : []
+        return hasValue(pick) ? [String(pick)] : []
     }
     return []
 }
@@ -359,7 +359,5 @@ export function buildAccountIdentifier(
  * Trims a string and returns undefined if empty.
  */
 function trimOrUndefined(value: string | null | undefined): string | undefined {
-    if (!value) return undefined
-    const trimmed = String(value).trim()
-    return trimmed.length > 0 ? trimmed : undefined
+    return trimStr(value)
 }

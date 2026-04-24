@@ -11,6 +11,7 @@ import { FusionConfig } from '../../../model/config'
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount } from '../../../model/account'
+import { hasValue, trimStr } from '../../../utils/safeRead'
 
 // Mock dependencies
 jest.mock('../../logService')
@@ -50,9 +51,10 @@ describe('FusionService', () => {
         mockLog = new LogService({ spConnDebugLoggingEnabled: false }) as jest.Mocked<LogService>
         const mockLimiters = {
             runAll: async <T, R>(items: T[], fn: (item: T, index: number) => Promise<R>) => {
+                const chunk = Math.max(1, mockConfig.objectMaxConcurrent ?? 25)
                 const out: R[] = []
-                for (let s = 0; s < items.length; s += 25) {
-                    const end = Math.min(s + 25, items.length)
+                for (let s = 0; s < items.length; s += chunk) {
+                    const end = Math.min(s + chunk, items.length)
                     out.push(...(await Promise.all(items.slice(s, end).map((it, j) => fn(it, s + j)))))
                 }
                 return out
@@ -120,7 +122,7 @@ describe('FusionService', () => {
                 (work instanceof Map ? work.get(managedKey) : undefined) ??
                 (all instanceof Map ? all.get(managedKey) : undefined)
             const raw = acc?.id
-            if (raw != null && String(raw).trim() !== '') return String(raw).trim()
+            if (hasValue(raw)) return trimStr(raw) ?? ''
             // Tests without composite map entries: treat non-composite keys as ISC account ids
             if (!managedKey.includes('::')) return managedKey
             return undefined
@@ -501,7 +503,7 @@ describe('FusionService', () => {
         })
 
         it('processes only remaining managed accounts on the next run after budget pause', async () => {
-            ;(fusionService as any).managedAccountsBatchSize = 1
+            ;(fusionService as any).objectMaxConcurrent = 1
             const accountA = {
                 id: 'acct-next-run-a',
                 nativeIdentity: 'native-next-run-a',

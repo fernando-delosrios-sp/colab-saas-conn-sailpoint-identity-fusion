@@ -18,7 +18,7 @@ import { IdentityService } from '../identityService'
 import { MessagingService } from '../messagingService'
 import { SourceService } from '../sourceService'
 import { assert, softAssert } from '../../utils/assert'
-import { readString, readUnknown } from '../../utils/safeRead'
+import { readString, readUnknown, trimStr } from '../../utils/safeRead'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
 import { Candidate, PendingReviewFormContext, PendingReviewReviewerContext, PendingReviewAccountContext } from './types'
@@ -373,8 +373,7 @@ export class FormService {
                 }
                 return undefined
             }
-            const str = String(value).trim()
-            return str.length > 0 ? str : undefined
+            return trimStr(value)
         }
 
         // Collect IDs that are not already in cache so we can fetch them in parallel.

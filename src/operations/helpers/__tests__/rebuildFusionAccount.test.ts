@@ -10,15 +10,23 @@ describe('rebuildFusionAccount', () => {
             if (sourceName === 'Source B') return { isManaged: false }
             return undefined
         })
+        const fetchSourceAccountByNativeIdentity = jest.fn().mockImplementation(async (_sid: string, native: string) => {
+            if (native === 'native-new') return { id: 'acct-new', sourceName: 'Source A' }
+            return undefined
+        })
         const getIdentityById = jest.fn().mockReturnValue({
             id: 'identity-1',
             accounts: [
-                { id: 'acct-existing', source: { name: 'Source A' } },
-                { id: 'acct-new', source: { name: 'Source A' } },
-                { id: 'acct-other', source: { name: 'Source B' } },
+                { id: 'acct-existing', source: { id: 'src-a', name: 'Source A' }, accountId: 'native-existing' },
+                {
+                    id: 'acct-new',
+                    source: { id: 'src-a', name: 'Source A' },
+                    accountId: 'native-new',
+                },
+                { id: 'acct-other', source: { id: 'src-b', name: 'Source B' }, accountId: 'native-b' },
                 { id: 'acct-unknown', source: { name: 'Unknown Source' } },
                 { id: 'acct-nosource' },
-                { id: 'acct-existing', source: { name: 'Source A' } },
+                { id: 'acct-existing', source: { id: 'src-a', name: 'Source A' }, accountId: 'native-existing' },
             ],
         })
 
@@ -39,6 +47,7 @@ describe('rebuildFusionAccount', () => {
                     ],
                 ]),
                 fetchManagedAccount,
+                fetchSourceAccountByNativeIdentity,
                 getSourceByName,
             },
             identities: {
@@ -52,6 +61,7 @@ describe('rebuildFusionAccount', () => {
 
         await rebuildFusionAccount('fusion-1', {} as any, registry)
 
+        expect(fetchSourceAccountByNativeIdentity).toHaveBeenCalledWith('src-a', 'native-new')
         expect(fetchManagedAccount).toHaveBeenCalledTimes(2)
         expect(fetchManagedAccount).toHaveBeenCalledWith('acct-existing')
         expect(fetchManagedAccount).toHaveBeenCalledWith('acct-new')

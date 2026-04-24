@@ -47,6 +47,27 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
             {{/each}}
           </table>
         </div>
+        {{#if stats.phaseTiming}}
+        <div style="margin-top: 18px;">
+          <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">Phase timing</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+            {{#each (chunk (orderedPhaseTimingEntries stats) 3)}}
+            <tr>
+              {{#each this}}
+              <td width="33.33%" style="vertical-align:top; padding:6px 6px;">
+                {{#if this}}
+                <div style="border: 1px solid #e6ebf5; border-radius: 10px; padding: 10px; background:#fbfcff;">
+                  <div style="font-size: 11px; color: #5f6b7a; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">{{phase}}</div>
+                  <div style="font-size: 16px; color: #0f172a; font-weight: 700;">{{elapsed}}</div>
+                </div>
+                {{/if}}
+              </td>
+              {{/each}}
+            </tr>
+            {{/each}}
+          </table>
+        </div>
+        {{/if}}
         {{/if}}
 
         {{#if (gt stats.aggregationWarnings 0)}}
@@ -591,6 +612,7 @@ export type FusionReportEmailData = {
     managedAccountsProcessedOrphan?: number
     totalProcessingTime?: string
     usedMemory?: string
+    phaseTiming?: Array<{ phase: string; elapsed: string }>
   }
 }
 

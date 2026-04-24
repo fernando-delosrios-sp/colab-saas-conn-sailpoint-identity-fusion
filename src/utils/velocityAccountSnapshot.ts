@@ -1,3 +1,5 @@
+import { trimStr } from './safeRead'
+
 /**
  * Velocity account snapshots (`$accounts[]`, `$sources`, `$account`) expose nested
  * `source` and `schema` objects. These helpers read the current shape and fall
@@ -7,34 +9,34 @@ export function velocitySnapshotSourceName(account: Record<string, any> | undefi
     if (!account) return ''
     const nested = account.source
     if (nested && typeof nested === 'object' && nested !== null && 'name' in nested) {
-        return String((nested as { name?: unknown }).name ?? '').trim()
+        return trimStr((nested as { name?: unknown }).name) ?? ''
     }
-    return String(account._source ?? '').trim()
+    return trimStr(account._source) ?? ''
 }
 
 export function velocitySnapshotSourceId(account: Record<string, any> | undefined | null): string {
     if (!account) return ''
     const nested = account.source
     if (nested && typeof nested === 'object' && nested !== null && 'id' in nested) {
-        return String((nested as { id?: unknown }).id ?? '').trim()
+        return trimStr((nested as { id?: unknown }).id) ?? ''
     }
-    return String(account._sourceId ?? '').trim()
+    return trimStr(account._sourceId) ?? ''
 }
 
 export function velocitySnapshotSchemaName(account: Record<string, any> | undefined | null): string {
     if (!account) return ''
     const nested = account.schema
     if (nested && typeof nested === 'object' && nested !== null && 'name' in nested) {
-        return String((nested as { name?: unknown }).name ?? '').trim()
+        return trimStr((nested as { name?: unknown }).name) ?? ''
     }
-    return String(account._name ?? '').trim()
+    return trimStr(account._name) ?? ''
 }
 
 export function velocitySnapshotSchemaId(account: Record<string, any> | undefined | null): string {
     if (!account) return ''
     const nested = account.schema
     if (nested && typeof nested === 'object' && nested !== null && 'id' in nested) {
-        return String((nested as { id?: unknown }).id ?? '').trim()
+        return trimStr((nested as { id?: unknown }).id) ?? ''
     }
-    return String(account._managedKey ?? '').trim()
+    return trimStr(account._managedKey) ?? ''
 }

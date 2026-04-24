@@ -42,7 +42,8 @@
         "force": false,
         "algorithm": "name-matcher",
         "aggregationMode": "none",
-        "correlationMode": "none"
+        "correlationMode": "none",
+        "aggregationTimeout": 10
     },
     "sourceConfig": [
         {
@@ -244,26 +245,15 @@
                                             ]
                                         },
                                         {
-                                            "key": "taskResultRetries",
-                                            "label": "Aggregation task result retries",
+                                            "key": "aggregationTimeout",
+                                            "label": "Aggregation wait timeout (minutes)",
                                             "type": "number",
                                             "required": false,
                                             "min": "0",
-                                            "value": "5",
+                                            "value": "10",
                                             "parentKey": "aggregationMode",
                                             "parentValue": "before",
-                                            "helpKey": "How many times to check whether an aggregation has finished for this source. Increase if this source takes longer to aggregate. Default: 5"
-                                        },
-                                        {
-                                            "key": "taskResultWait",
-                                            "label": "Aggregation task result wait time (seconds)",
-                                            "type": "number",
-                                            "required": false,
-                                            "min": "0",
-                                            "value": "60",
-                                            "parentKey": "aggregationMode",
-                                            "parentValue": "before",
-                                            "helpKey": "Seconds to wait between aggregation status checks for this source. Default: 60"
+                                            "helpKey": "Maximum time to wait for this source's aggregation to finish when using Aggregate before processing. The connector checks task status every 30 seconds until completion or this timeout. Increase for very large sources. Default: 10 minutes"
                                         },
                                         {
                                             "key": "aggregationDelay",

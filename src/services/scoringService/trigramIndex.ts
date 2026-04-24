@@ -1,4 +1,5 @@
 import { FusionAccount } from '../../model/account'
+import { missing } from '../../utils/safeRead'
 import { normalizeLIG3 } from './helpers'
 
 /**
@@ -31,7 +32,7 @@ export function buildAttributeIndex(identities: FusionAccount[], attribute: stri
     const index: TrigramIndex = new Map()
     for (const identity of identities) {
         const raw = identity.attributes[attribute]
-        if (raw === null || raw === undefined || String(raw).trim().length === 0) continue
+        if (missing(raw)) continue
         const normalized = normalizeLIG3(String(raw))
         for (const trigram of extractTrigrams(normalized)) {
             let bucket = index.get(trigram)

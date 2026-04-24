@@ -5,6 +5,7 @@ import { jaroWinkler, diceCoefficient } from './stringComparison'
 import { match as nameMatch, matchNormalized as nameMatchNormalized } from './nameMatching'
 import { evaluateVelocityTemplate } from '../attributeService/formatting'
 import type { RenderContext } from 'velocityjs/dist/src/type'
+import { missing, trimStr } from '../../utils/safeRead'
 
 // Module-level regex constants — compiled once, reused on every call (hot scoring loop)
 const DIACRITICS_RE = /[\u0300-\u036f]/g
@@ -317,14 +318,14 @@ export const scoreCustomVelocity = (
     }) as RenderContext
 
     const rendered = evaluateVelocityTemplate(expression, context)
-    if (rendered === undefined || rendered === null || String(rendered).trim() === '') {
+    if (missing(rendered)) {
         if (effectiveSkipMatchIfMissing(matching)) {
             return makeScoreReport(matching, 0, false, 'Rule skipped (custom Velocity returned no value)', true)
         }
         return makeScoreReport(matching, 0, false, 'Custom Velocity returned no value')
     }
 
-    const n = Number(String(rendered).trim())
+    const n = Number(trimStr(rendered))
     if (!Number.isFinite(n)) {
         return makeScoreReport(matching, 0, false, 'Velocity output is not a valid number')
     }

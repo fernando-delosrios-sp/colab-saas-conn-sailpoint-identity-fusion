@@ -1,5 +1,9 @@
 import {
     asRecord,
+    hasValue,
+    isDefined,
+    isNullish,
+    missing,
     isRecord,
     readArray,
     readBoolean,
@@ -9,9 +13,30 @@ import {
     readPathUnknown,
     readString,
     readUnknown,
+    trimStr,
 } from '../safeRead'
 
 describe('safeRead', () => {
+    it('classifies nullish and attribute presence', () => {
+        expect(isNullish(null)).toBe(true)
+        expect(isNullish(undefined)).toBe(true)
+        expect(isNullish(0)).toBe(false)
+        expect(isDefined(0)).toBe(true)
+        expect(hasValue('x')).toBe(true)
+        expect(hasValue('  x  ')).toBe(true)
+        expect(hasValue(0)).toBe(true)
+        expect(hasValue(false)).toBe(true)
+        expect(hasValue('')).toBe(false)
+        expect(hasValue('   ')).toBe(false)
+        expect(hasValue(undefined)).toBe(false)
+        expect(hasValue({})).toBe(true)
+        expect(missing('')).toBe(true)
+        expect(missing('a')).toBe(false)
+        expect(trimStr('  a  ')).toBe('a')
+        expect(trimStr('   ')).toBeUndefined()
+        expect(trimStr(null)).toBeUndefined()
+    })
+
     it('narrows record-like values', () => {
         expect(isRecord({ a: 1 })).toBe(true)
         expect(isRecord(null)).toBe(false)

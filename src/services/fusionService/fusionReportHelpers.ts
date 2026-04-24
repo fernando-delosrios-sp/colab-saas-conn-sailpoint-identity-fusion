@@ -1,6 +1,7 @@
 import { FusionAccount } from '../../model/account'
 import { SourceType } from '../../model/config'
 import { pickAttributes } from '../../utils/attributes'
+import { trimStr } from '../../utils/safeRead'
 import { roundMetric2 } from '../../utils/numbers'
 import { UrlContext } from '../../utils/url'
 import type { FusionMatch, ScoreReport } from '../scoringService/types'
@@ -34,8 +35,9 @@ export function mapScoreReportsForFusionReport(scoreReports: ScoreReport[]): Fus
  */
 export function getFusionIdentityConflictTrackingKey(fusionAccount: FusionAccount): string {
     const nativeIdentity = fusionAccount.nativeIdentityOrUndefined
-    if (nativeIdentity && nativeIdentity.trim() !== '') {
-        return nativeIdentity
+    const trimmedNative = trimStr(nativeIdentity)
+    if (trimmedNative) {
+        return trimmedNative
     }
     const name = fusionAccount.name || fusionAccount.displayName || 'unknown'
     return `name:${name}`
@@ -45,11 +47,10 @@ export function getFusionIdentityConflictTrackingKey(fusionAccount: FusionAccoun
 export function fusionReportMatchCandidateAccountFields(match: FusionMatch): Pick<FusionReportMatch, 'accountId' | 'accountName'> {
     const fi = match.fusionIdentity
     if (fi) {
-        const accountId =
-            String(fi.identityId ?? fi.nativeIdentityOrUndefined ?? '').trim() || undefined
+        const accountId = trimStr(fi.identityId ?? fi.nativeIdentityOrUndefined)
         return { accountId, accountName: getFusionReportAccountLabel(fi) }
     }
-    const id = String(match.identityId ?? '').trim()
+    const id = trimStr(match.identityId) ?? ''
     return {
         accountId: id || undefined,
         accountName: match.identityName,
@@ -57,20 +58,16 @@ export function fusionReportMatchCandidateAccountFields(match: FusionMatch): Pic
 }
 
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {
-    const rowTitle = String(fusionAccount.name ?? '').trim()
+    const rowTitle = trimStr(fusionAccount.name) ?? ''
     if (rowTitle) return rowTitle
 
-    const idn = String(fusionAccount.identityDisplayName ?? '').trim()
+    const idn = trimStr(fusionAccount.identityDisplayName) ?? ''
     if (idn) return idn
 
-    const legacyDisplayName = String(fusionAccount.displayName ?? '').trim()
+    const legacyDisplayName = trimStr(fusionAccount.displayName) ?? ''
     if (legacyDisplayName) return legacyDisplayName
 
-    const uid = String(
-        fusionAccount.managedAccountId ??
-            fusionAccount.identityId ??
-            ''
-    ).trim()
+    const uid = trimStr(fusionAccount.managedAccountId ?? fusionAccount.identityId) ?? ''
     return uid || 'Unknown'
 }
 

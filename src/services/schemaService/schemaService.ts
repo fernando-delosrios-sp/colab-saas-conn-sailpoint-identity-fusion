@@ -1,6 +1,8 @@
 import { AccountSchema, Attributes, SchemaAttribute } from '@sailpoint/connector-sdk'
 import {
     AttributeMap,
+    AttributeMergeMode,
+    DefaultAttributeMergeMode,
     FusionConfig,
     NormalAttributeDefinition,
     SourceConfig,
@@ -20,7 +22,7 @@ export class SchemaService {
     private attributeMap: Map<string, AttributeMap> = new Map()
     private _fusionSchemaAttributeNames: string[] = []
     private _fusionSchemaAttributeMap: Map<string, SchemaAttribute> = new Map()
-    private readonly attributeMerge: 'first' | 'list' | 'concatenate'
+    private readonly attributeMerge: DefaultAttributeMergeMode
     private readonly normalAttributeDefinitions: NormalAttributeDefinition[]
     private readonly uniqueAttributeDefinitions: UniqueAttributeDefinition[]
     private readonly sourceConfigs: SourceConfig[]
@@ -203,13 +205,13 @@ export class SchemaService {
         for (const attribute of schema.attributes) {
             const attributeMap = this.attributeMap.get(attribute.name!)
             if (attributeMap) {
-                if (attributeMap.attributeMerge === 'list') {
+                if (attributeMap.attributeMerge === AttributeMergeMode.List) {
                     attribute.multi = true
                 } else {
                     attribute.multi = false
                 }
             } else {
-                if (this.attributeMerge === 'list') {
+                if (this.attributeMerge === AttributeMergeMode.List) {
                     attribute.multi = true
                 } else {
                     attribute.multi = false
@@ -226,7 +228,7 @@ export class SchemaService {
     private getAttributeMappingAttributes(): SchemaAttribute[] {
         const attributes: SchemaAttribute[] = []
         for (const attributeMap of this.attributeMap.values()) {
-            if (attributeMap.attributeMerge === 'list') {
+            if (attributeMap.attributeMerge === AttributeMergeMode.List) {
                 attributes.push({
                     name: attributeMap.newAttribute,
                     description: `Created from ${attributeMap.existingAttributes.join(', ')}`,

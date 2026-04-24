@@ -7,7 +7,6 @@ import {
     TaskManagementV2025ApiGetTaskStatusRequest,
     AccountsApiGetAccountRequest,
     Source,
-    SourcesV2025ApiUpdateSourceRequest,
     SchemaV2025,
     SourcesV2025ApiGetSourceSchemasRequest,
     SourcesV2025ApiPutSourceSchemaRequest,
@@ -30,7 +29,7 @@ import { LogService } from '../logService'
 import { assert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
 import { getDateFromISOString } from '../../utils/date'
-import { readPathString } from '../../utils/safeRead'
+import { readPathString, trimStr } from '../../utils/safeRead'
 import { buildSourceConfigPatch } from './helpers'
 import { buildSourceFilter } from './sourceAccountFilterHelpers'
 import {
@@ -775,12 +774,10 @@ export class SourceService {
      * composite key (sourceId::nativeIdentity); resolve the loaded Account to obtain `id`.
      */
     public resolveIscAccountIdForManagedKey(managedKey: string): string | undefined {
-        const trimmed = String(managedKey ?? '').trim()
-        if (!trimmed) return undefined
-        const account = this.managedAccountsAllById.get(trimmed) ?? this.managedAccountsById.get(trimmed)
-        const raw = account?.id
-        const id = raw != null ? String(raw).trim() : ''
-        return id.length > 0 ? id : undefined
+        const key = trimStr(managedKey)
+        if (key === undefined) return undefined
+        const account = this.managedAccountsAllById.get(key) ?? this.managedAccountsById.get(key)
+        return trimStr(account?.id)
     }
 
     /**
@@ -982,9 +979,11 @@ export class SourceService {
      */
     public async patchSourceConfig(
         sourceId: string,
-        requestParameters: SourcesV2025ApiUpdateSourceRequest,
+        path: string,
+        value: any,
         context?: string
     ): Promise<Source | undefined> {
+        const requestParameters = buildSourceConfigPatch(sourceId, path, value)
         const { sourcesApi } = this.client
         const updateSource = async () => {
             const response = await sourcesApi.updateSource(requestParameters)
@@ -1043,8 +1042,12 @@ export class SourceService {
         }
 
         this.log.info('Setting processing lock to true.')
-        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/processing', true)
-        await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>setProcessLock')
+        await this.patchSourceConfig(
+            fusionSourceId,
+            '/connectorAttributes/processing',
+            true,
+            'SourceService>setProcessLock'
+        )
     }
 
     /**
@@ -1065,8 +1068,12 @@ export class SourceService {
         try {
             const fusionSourceId = this.fusionSourceId
             this.log.info('Releasing processing lock.')
-            const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/processing', false)
-            await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>releaseProcessLock')
+            await this.patchSourceConfig(
+                fusionSourceId,
+                '/connectorAttributes/processing',
+                false,
+                'SourceService>releaseProcessLock'
+            )
         } catch (error) {
             this.log.error(
                 `Failed to release processing lock: ${error instanceof Error ? error.message : String(error)}`
@@ -1093,12 +1100,12 @@ export class SourceService {
 
         const fusionSourceId = this.fusionSourceId
         this.log.info(`Saving batch cumulative count: ${JSON.stringify(this.batchCumulativeCount)}`)
-        const requestParameters = buildSourceConfigPatch(
+        await this.patchSourceConfig(
             fusionSourceId,
             '/connectorAttributes/batchCumulativeCount',
-            this.batchCumulativeCount
+            this.batchCumulativeCount,
+            'SourceService>saveBatchCumulativeCount'
         )
-        await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>saveBatchCumulativeCount')
     }
 
     /**
@@ -1117,12 +1124,12 @@ export class SourceService {
         this.batchCumulativeCount = {}
         const fusionSourceId = this.fusionSourceId
         this.log.info('Resetting batch cumulative count')
-        const requestParameters = buildSourceConfigPatch(
+        await this.patchSourceConfig(
             fusionSourceId,
             '/connectorAttributes/batchCumulativeCount',
-            {}
+            {},
+            'SourceService>resetBatchCumulativeCount'
         )
-        await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>resetBatchCumulativeCount')
     }
 
     // ------------------------------------------------------------------------
@@ -2027,18 +2034,20 @@ export class SourceService {
             return
         }
 
-        const taskResultRetries = sourceInfo?.config?.taskResultRetries ?? 5
-        const taskResultWait = sourceInfo?.config?.taskResultWait ?? 60000
+        const timeoutMinutes = sourceInfo?.config?.aggregationTimeout ?? 10
+        const pollIntervalMs = 30_000
+        const deadlineMs = Date.now() + timeoutMinutes * 60_000
         const taskId = loadAccountsTask?.task?.id
         let pollsExecuted = 0
         let lastTaskStatus: any = undefined
 
-        let count = taskResultRetries
-        while (--count > 0) {
-            if (!taskId) {
-                this.log.warn(`Aggregation task ID not found for source ${sourceName} (${id})`)
-                break
-            }
+        if (!taskId) {
+            this.log.warn(`Aggregation task ID not found for source ${sourceName} (${id})`)
+        }
+
+        let firstPoll = true
+        while (!completed && taskId && (firstPoll || Date.now() < deadlineMs)) {
+            firstPoll = false
             const requestParameters: TaskManagementV2025ApiGetTaskStatusRequest = {
                 id: taskId,
             }
@@ -2057,9 +2066,12 @@ export class SourceService {
             if (taskStatus?.completed) {
                 completed = true
                 break
-            } else {
-                await new Promise((resolve) => setTimeout(resolve, taskResultWait))
             }
+            const remainingMs = deadlineMs - Date.now()
+            if (remainingMs <= 0) {
+                break
+            }
+            await new Promise((resolve) => setTimeout(resolve, Math.min(pollIntervalMs, remainingMs)))
         }
         if (!completed) {
             const lastStatusSummary = lastTaskStatus
@@ -2072,7 +2084,7 @@ export class SourceService {
                 })
                 : 'none'
             this.log.warn(
-                `Failed to aggregate managed accounts for source ${sourceName} (${id}). taskId=${taskId ?? 'unknown'}, pollsExecuted=${pollsExecuted}, maxPolls=${Math.max(taskResultRetries - 1, 0)}, pollWaitMs=${taskResultWait}, lastTaskStatus=${lastStatusSummary}`
+                `Failed to aggregate managed accounts for source ${sourceName} (${id}). taskId=${taskId ?? 'unknown'}, timeoutMinutes=${timeoutMinutes}, pollIntervalMs=${pollIntervalMs}, pollsExecuted=${pollsExecuted}, lastTaskStatus=${lastStatusSummary}`
             )
         }
     }

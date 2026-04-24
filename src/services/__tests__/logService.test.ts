@@ -98,3 +98,23 @@ describe('PhaseTimer.formatElapsed', () => {
         expect(PhaseTimer.formatElapsed(3_661_000)).toBe('1H 1M 1S')
     })
 })
+
+describe('PhaseTimer breakdown', () => {
+    it('records ordered phase entries from phase() and recordElapsed()', () => {
+        jest.useFakeTimers()
+        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const timer = log.timer()
+        jest.advanceTimersByTime(1000)
+        timer.phase('Step A', 'info', 'Setup')
+        jest.advanceTimersByTime(2500)
+        timer.phase('Step B', 'info', 'Fetch')
+        timer.recordElapsed('Output', 100)
+        expect(timer.getPhaseBreakdown()).toEqual([
+            { phase: 'Setup', elapsed: '1.0S' },
+            { phase: 'Fetch', elapsed: '2.5S' },
+            { phase: 'Output', elapsed: '100MS' },
+        ])
+        jest.useRealTimers()
+    })
+})

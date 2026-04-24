@@ -10,7 +10,7 @@ import { FusionDecision } from '../../model/form'
 import { SourceType } from '../../model/config'
 import { createUrlContext } from '../../utils/url'
 import { readString } from '../../utils/safeRead'
-import { setupPhase, fetchPhase, processPhase } from './corePipeline'
+import { setupPhase, fetchPhase, refreshPhase, processPhase, uniqueAttributesPhase } from './corePipeline'
 
 const toReportDecision = (
     decision: FusionDecision,
@@ -90,13 +90,22 @@ export async function fetchAndProcessForReport(serviceRegistry: ServiceRegistry)
         // Reset flag was set — return empty stats; caller should check or ignore report
         return { identitiesFound: 0, managedAccountsFound: 0, totalProcessingTime: timer.totalElapsed() }
     }
+    timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
 
     const fetchResult = await fetchPhase(serviceRegistry, options)
 
     // Fetch sender separately — fetchPhase omits it for dry-run, but the report email needs it
     await messaging.fetchSender()
+    timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
+
+    await refreshPhase(serviceRegistry, options)
+    timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
 
     await processPhase(serviceRegistry, options)
+    timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
+
+    await uniqueAttributesPhase(serviceRegistry, options)
+    timer.phase('PHASE 5: Unique attributes', 'info', 'Unique attributes')
 
     return {
         identitiesFound: fetchResult.identitiesFound,
@@ -105,6 +114,7 @@ export async function fetchAndProcessForReport(serviceRegistry: ServiceRegistry)
         managedAccountsFoundRecord: fetchResult.managedAccountsFoundRecord,
         managedAccountsFoundOrphan: fetchResult.managedAccountsFoundOrphan,
         totalProcessingTime: timer.totalElapsed(),
+        phaseTiming: timer.getPhaseBreakdown(),
     }
 }
 
@@ -274,12 +284,17 @@ export const generateReport = async (
     if (!serviceRegistry) {
         serviceRegistry = ServiceRegistry.getCurrent()
     }
-    const { fusion, identities, messaging } = serviceRegistry
+    const { fusion, identities, messaging, log } = serviceRegistry
     await hydrateIdentitiesForReportDecisions(serviceRegistry)
     if (aggregationStats) {
+        const reportPhaseTimer = log.timer()
         const stats = buildFusionReportStats(serviceRegistry, aggregationStats)
         const report = fusion.generateReport(includeNonMatches, stats)
         report.fusionReviewDecisions = buildFusionReviewDecisions(serviceRegistry)
+        reportPhaseTimer.phase('PHASE 7: Report (fusion report)', 'info', 'Report')
+        const priorPhases = aggregationStats.phaseTiming ?? []
+        stats.phaseTiming = [...priorPhases, ...reportPhaseTimer.getPhaseBreakdown()]
+        report.stats = stats
         // aggregationStats is present for both the aggregation report path and reportAction path.
         // Use 'aggregation' label when it came from the real accountList pipeline; 'fusion' for standalone.
         await messaging.sendReport(report, fusionAccount, 'aggregation')
