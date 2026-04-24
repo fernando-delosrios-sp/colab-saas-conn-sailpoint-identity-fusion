@@ -1,3 +1,5 @@
+import { AttributeMergeMode } from '../../model/config'
+
 // ============================================================================
 // Type Definitions — Attribute Service
 // ============================================================================
@@ -12,7 +14,7 @@ export type AttributeMappingConfig = {
     /** Source attribute names to look for in managed accounts */
     sourceAttributes: string[]
     /** Strategy for merging values from multiple sources */
-    attributeMerge: 'first' | 'list' | 'concatenate' | 'source'
+    attributeMerge: AttributeMergeMode
     /** Specific source name (only used with "source" merge strategy) */
     source?: string
 }

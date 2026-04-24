@@ -2,7 +2,6 @@ import { FusionAccount } from '../../model/account'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing } from '../../model/config'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { countIdentityBackedFusionMatches } from '../formService/helpers'
-import { LogService } from '../logService'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
 import {
     normalizeLIG3,
@@ -19,7 +18,8 @@ import { normalizeName as normalizeNameForMatcher } from './nameMatching'
 import { TrigramIndex, buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
 import { isExactAttributeMatchScores } from './exactMatch'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
-import { hasValue, missing, trimStr } from '../../utils/safeRead'
+import { LogService } from '../logService'
+import { missing, trimStr } from '../../utils/safeRead'
 
 /** Build a skipped ScoreReport without spreading the full MatchingConfig. */
 function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreReport {
@@ -85,7 +85,7 @@ export class ScoringService {
      */
     constructor(
         config: FusionConfig,
-        private log: LogService
+        _log: LogService
     ) {
         this.matchingConfigs = config.matchingConfigs ?? []
         this.fusionAverageScore = config.fusionAverageScore ?? 0

@@ -2,9 +2,10 @@
  * connector-spec.json -> Attribute Mapping Settings -> Attribute Mapping Definitions
  */
 import type { FusionConfigBuild } from '../types'
+import { AttributeMergeMode } from '../../../model/config'
 
 export const connectorSpecInitialValues = {
-    attributeMerge: 'first' as const,
+    attributeMerge: AttributeMergeMode.First,
 } as const
 
 export const runtimeDefaults = {} as const

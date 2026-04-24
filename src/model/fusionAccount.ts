@@ -2,7 +2,7 @@ import { Account, IdentityDocument } from 'sailpoint-api-client'
 import { isNewerThan } from '../utils/date'
 import { toSetFromAttribute as attributeToSet } from '../utils/attributes'
 import { FusionDecision } from './form'
-import { FusionConfig, SourceConfig, SourceType } from './config'
+import { FusionConfig, SourceType } from './config'
 import { Attributes, ConnectorError, ConnectorErrorType, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { FusionMatch } from '../services/scoringService'
 import { attrConcat, attrSplit } from '../services/attributeService/helpers'
@@ -103,7 +103,6 @@ export class FusionAccount {
     private _modified: string = ''
 
     // Read-only configuration (set in constructor)
-    private readonly sourceConfigs: SourceConfig[]
     /** Cached Set of configured source names for O(1) `.has()` lookups. */
     private readonly sourceConfigNamesSet: Set<string>
     private readonly fusionAccountRefreshThresholdInSeconds: number
@@ -121,7 +120,6 @@ export class FusionAccount {
                 ConnectorErrorType.Generic
             )
         }
-        this.sourceConfigs = config.sources
         this.sourceConfigNamesSet = new Set(config.sources.map((sc) => sc.name))
         this.fusionAccountRefreshThresholdInSeconds = config.fusionAccountRefreshThresholdInSeconds
         this.maxHistoryMessages = config.maxHistoryMessages

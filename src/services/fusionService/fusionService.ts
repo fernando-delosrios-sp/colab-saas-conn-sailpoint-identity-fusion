@@ -5,7 +5,7 @@ import { LogService, PhaseTimer } from '../logService'
 import { FormService } from '../formService'
 import { defaultFusionMaxCandidatesForForm, defaults } from '../../data/config'
 import { IdentityService } from '../identityService'
-import { SourceInfo, SourceService, buildSourceConfigPatch } from '../sourceService'
+import { SourceInfo, SourceService } from '../sourceService'
 import { FusionAccount } from '../../model/account'
 import { attrConcat, AttributeService } from '../attributeService'
 import { assert } from '../../utils/assert'
@@ -202,15 +202,23 @@ export class FusionService {
      */
     public async disableReset(): Promise<void> {
         const { fusionSourceId } = this.sources
-        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/reset', false)
-        await this.sources.patchSourceConfig(fusionSourceId, requestParameters, 'FusionService>disableReset')
+        await this.sources.patchSourceConfig(
+            fusionSourceId,
+            '/connectorAttributes/reset',
+            false,
+            'FusionService>disableReset'
+        )
     }
 
     /** Clears the persisted fusion state in the source configuration. */
     public async resetState(): Promise<void> {
         const { fusionSourceId } = this.sources
-        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/fusionState', false)
-        await this.sources.patchSourceConfig(fusionSourceId, requestParameters, 'FusionService>resetState')
+        await this.sources.patchSourceConfig(
+            fusionSourceId,
+            '/connectorAttributes/fusionState',
+            false,
+            'FusionService>resetState'
+        )
     }
 
     // ------------------------------------------------------------------------

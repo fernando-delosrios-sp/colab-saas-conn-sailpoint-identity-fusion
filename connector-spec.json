@@ -33,7 +33,6 @@
         "processingWait": 60,
         "retryDelay": 1000,
         "batchSize": 250,
-        "parallelBatchSize": 8,
         "externalLoggingLevel": "info",
         "proxyEnabled": false,
         "proxyUrl": "",

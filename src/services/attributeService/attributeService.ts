@@ -1,6 +1,7 @@
 import {
     FusionConfig,
     AttributeMap,
+    DefaultAttributeMergeMode,
     NormalAttributeDefinition,
     UniqueAttributeDefinition,
     SourceConfig,
@@ -15,7 +16,7 @@ import { LockService } from '../lockService'
 import { RenderContext } from 'velocityjs/dist/src/type'
 import { v4 as uuidv4 } from 'uuid'
 import { assert } from '../../utils/assert'
-import { SourceService, buildSourceConfigPatch } from '../sourceService'
+import { SourceService } from '../sourceService'
 import { COMPOUND_KEY_UNIQUE_ID_ATTRIBUTE, FUSION_STATE_CONFIG_PATH } from './constants'
 import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
@@ -64,12 +65,11 @@ export class AttributeService {
     private uniqueDefinitions: UniqueAttributeDefinition[] = []
     private uniqueAttributeNames: Set<string> = new Set()
     private uniqueValuesByAttribute: Map<string, Set<string>> = new Map()
-    private normalDefinitionByName: Map<string, NormalAttributeDefinition> = new Map()
     private uniqueDefinitionByName: Map<string, UniqueAttributeDefinition> = new Map()
     private stateWrapper?: StateWrapper
     private readonly skipAccountsWithMissingId: boolean
     private readonly attributeMaps?: AttributeMap[]
-    private readonly attributeMerge: 'first' | 'list' | 'concatenate'
+    private readonly attributeMerge: DefaultAttributeMergeMode
     private readonly sourceConfigs: SourceConfig[]
     private readonly maxAttempts?: number
     private readonly forceAttributeRefresh: boolean
@@ -92,7 +92,7 @@ export class AttributeService {
         private sourceService: SourceService,
         private log: LogService,
         private locks: LockService,
-        private commandType?: StandardCommand
+        _commandType?: StandardCommand
     ) {
         this.attributeMaps = config.attributeMaps
         this.attributeMerge = config.attributeMerge
@@ -104,7 +104,6 @@ export class AttributeService {
         this.normalDefinitions = config.normalAttributeDefinitions ? [...config.normalAttributeDefinitions] : []
         this.uniqueDefinitions = config.uniqueAttributeDefinitions ? [...config.uniqueAttributeDefinitions] : []
 
-        this.normalDefinitionByName = new Map(this.normalDefinitions.map((d) => [d.name, d]))
         this.uniqueDefinitionByName = new Map(this.uniqueDefinitions.map((d) => [d.name, d]))
         this.uniqueAttributeNames = new Set(this.uniqueDefinitions.map((d) => d.name))
 
@@ -123,8 +122,12 @@ export class AttributeService {
         const stateObject = await this.getStateObject()
 
         this.log.info(`Saving state object: ${JSON.stringify(stateObject)}`)
-        const requestParameters = buildSourceConfigPatch(fusionSourceId, FUSION_STATE_CONFIG_PATH, stateObject)
-        await this.sourceService.patchSourceConfig(fusionSourceId, requestParameters, 'AttributeService>saveState')
+        await this.sourceService.patchSourceConfig(
+            fusionSourceId,
+            FUSION_STATE_CONFIG_PATH,
+            stateObject,
+            'AttributeService>saveState'
+        )
     }
 
     /**

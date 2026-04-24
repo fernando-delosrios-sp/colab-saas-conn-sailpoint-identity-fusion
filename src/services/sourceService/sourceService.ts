@@ -7,7 +7,6 @@ import {
     TaskManagementV2025ApiGetTaskStatusRequest,
     AccountsApiGetAccountRequest,
     Source,
-    SourcesV2025ApiUpdateSourceRequest,
     SchemaV2025,
     SourcesV2025ApiGetSourceSchemasRequest,
     SourcesV2025ApiPutSourceSchemaRequest,
@@ -974,9 +973,11 @@ export class SourceService {
      */
     public async patchSourceConfig(
         sourceId: string,
-        requestParameters: SourcesV2025ApiUpdateSourceRequest,
+        path: string,
+        value: any,
         context?: string
     ): Promise<Source | undefined> {
+        const requestParameters = buildSourceConfigPatch(sourceId, path, value)
         const { sourcesApi } = this.client
         const updateSource = async () => {
             const response = await sourcesApi.updateSource(requestParameters)
@@ -1035,8 +1036,12 @@ export class SourceService {
         }
 
         this.log.info('Setting processing lock to true.')
-        const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/processing', true)
-        await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>setProcessLock')
+        await this.patchSourceConfig(
+            fusionSourceId,
+            '/connectorAttributes/processing',
+            true,
+            'SourceService>setProcessLock'
+        )
     }
 
     /**
@@ -1057,8 +1062,12 @@ export class SourceService {
         try {
             const fusionSourceId = this.fusionSourceId
             this.log.info('Releasing processing lock.')
-            const requestParameters = buildSourceConfigPatch(fusionSourceId, '/connectorAttributes/processing', false)
-            await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>releaseProcessLock')
+            await this.patchSourceConfig(
+                fusionSourceId,
+                '/connectorAttributes/processing',
+                false,
+                'SourceService>releaseProcessLock'
+            )
         } catch (error) {
             this.log.error(
                 `Failed to release processing lock: ${error instanceof Error ? error.message : String(error)}`
@@ -1085,12 +1094,12 @@ export class SourceService {
 
         const fusionSourceId = this.fusionSourceId
         this.log.info(`Saving batch cumulative count: ${JSON.stringify(this.batchCumulativeCount)}`)
-        const requestParameters = buildSourceConfigPatch(
+        await this.patchSourceConfig(
             fusionSourceId,
             '/connectorAttributes/batchCumulativeCount',
-            this.batchCumulativeCount
+            this.batchCumulativeCount,
+            'SourceService>saveBatchCumulativeCount'
         )
-        await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>saveBatchCumulativeCount')
     }
 
     /**
@@ -1109,12 +1118,12 @@ export class SourceService {
         this.batchCumulativeCount = {}
         const fusionSourceId = this.fusionSourceId
         this.log.info('Resetting batch cumulative count')
-        const requestParameters = buildSourceConfigPatch(
+        await this.patchSourceConfig(
             fusionSourceId,
             '/connectorAttributes/batchCumulativeCount',
-            {}
+            {},
+            'SourceService>resetBatchCumulativeCount'
         )
-        await this.patchSourceConfig(fusionSourceId, requestParameters, 'SourceService>resetBatchCumulativeCount')
     }
 
     // ------------------------------------------------------------------------

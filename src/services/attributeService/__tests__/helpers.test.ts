@@ -1,5 +1,6 @@
 import { attrSplit, attrConcat, processAttributeMapping, buildAttributeMappingConfig } from '../helpers'
 import { Attributes } from '@sailpoint/connector-sdk'
+import { AttributeMergeMode } from '../../../model/config'
 
 describe('attributeService helpers', () => {
     describe('attrSplit', () => {
@@ -54,7 +55,7 @@ describe('attributeService helpers', () => {
             const config = {
                 attributeName: 'displayName',
                 sourceAttributes: ['displayName'],
-                attributeMerge: 'first' as const,
+                attributeMerge: AttributeMergeMode.First,
             }
             expect(processAttributeMapping(config, map, ['Source1'])).toBe('Alice')
         })
@@ -66,7 +67,7 @@ describe('attributeService helpers', () => {
             const config = {
                 attributeName: 'email',
                 sourceAttributes: ['email'],
-                attributeMerge: 'source' as const,
+                attributeMerge: AttributeMergeMode.Source,
                 source: 'IT',
             }
             expect(processAttributeMapping(config, map, ['HR', 'IT'])).toBe('it@acme.com')
@@ -79,7 +80,7 @@ describe('attributeService helpers', () => {
             const config = {
                 attributeName: 'dept',
                 sourceAttributes: ['dept'],
-                attributeMerge: 'list' as const,
+                attributeMerge: AttributeMergeMode.List,
             }
             const result = processAttributeMapping(config, map, ['S1', 'S2'])
             expect(result).toEqual(expect.arrayContaining(['HR', 'IT']))
@@ -93,7 +94,7 @@ describe('attributeService helpers', () => {
             const config = {
                 attributeName: 'role',
                 sourceAttributes: ['role'],
-                attributeMerge: 'concatenate' as const,
+                attributeMerge: AttributeMergeMode.Concatenate,
             }
             const result = processAttributeMapping(config, map, ['S1', 'S2'])
             expect(result).toMatch(/\[Admin\].*\[User\]|\[User\].*\[Admin\]/)
@@ -104,7 +105,7 @@ describe('attributeService helpers', () => {
             const config = {
                 attributeName: 'displayName',
                 sourceAttributes: ['displayName'],
-                attributeMerge: 'first' as const,
+                attributeMerge: AttributeMergeMode.First,
             }
             expect(processAttributeMapping(config, map, ['Empty'])).toBeUndefined()
         })
@@ -116,10 +117,10 @@ describe('attributeService helpers', () => {
                 {
                     newAttribute: 'email',
                     existingAttributes: ['mail', 'emailAddress'],
-                    attributeMerge: 'first' as const,
+                    attributeMerge: AttributeMergeMode.First,
                 },
             ]
-            const result = buildAttributeMappingConfig('email', maps, 'list')
+            const result = buildAttributeMappingConfig('email', maps, AttributeMergeMode.List)
             expect(result).toEqual({
                 attributeName: 'email',
                 sourceAttributes: ['mail', 'emailAddress'],
@@ -128,7 +129,7 @@ describe('attributeService helpers', () => {
         })
 
         it('should use default when no attributeMap', () => {
-            const result = buildAttributeMappingConfig('displayName', [], 'first')
+            const result = buildAttributeMappingConfig('displayName', [], AttributeMergeMode.First)
             expect(result).toEqual({
                 attributeName: 'displayName',
                 sourceAttributes: ['displayName'],
@@ -141,11 +142,11 @@ describe('attributeService helpers', () => {
                 {
                     newAttribute: 'manager',
                     existingAttributes: ['manager'],
-                    attributeMerge: 'source' as const,
+                    attributeMerge: AttributeMergeMode.Source,
                     source: 'HR',
                 },
             ]
-            const result = buildAttributeMappingConfig('manager', maps, 'first')
+            const result = buildAttributeMappingConfig('manager', maps, AttributeMergeMode.First)
             expect(result.source).toBe('HR')
         })
     })
