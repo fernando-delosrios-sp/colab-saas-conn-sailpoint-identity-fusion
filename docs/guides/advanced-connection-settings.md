@@ -194,14 +194,14 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 | ------------------------------- | ------- | ------- | -------------------------- |
 | **Enable queue?**               | Yes     | Boolean | Activates queue system     |
 | **Maximum concurrent requests** | 10      | 1–10    | Max simultaneous API calls |
-| **Requests per second**         | 8       | 1–12    | Rate limit (throttle)      |
+| **Requests per second**         | 10      | 1–12    | Rate limit (throttle)      |
 
 **When to enable queue:**
 
 | Scenario                        | Enable?  | Configuration                 |
 | ------------------------------- | -------- | ----------------------------- |
-| Production (>500 accounts)      | Yes      | Max concurrent: 10; RPS: 8    |
-| Large dataset (>5,000 accounts) | Yes      | Start at max concurrent: 10; RPS: 8-10 |
+| Production (>500 accounts)      | Yes      | Max concurrent: 10; RPS: 10    |
+| Large dataset (>5,000 accounts) | Yes      | Start at max concurrent: 10; RPS: 10 |
 | ISC API rate limits             | Yes      | RPS ≤ ISC limit; enable retry |
 | HTTP 429 errors                 | Yes      | Lower RPS; enable retry       |
 | Testing/development             | Optional | Default settings usually fine |
@@ -211,7 +211,7 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 | Metric                      | Initial value | Adjust if...                                                                          |
 | --------------------------- | ------------- | ------------------------------------------------------------------------------------- |
 | **Max concurrent requests** | 10            | HTTP 429 errors → decrease to 5–8; slow aggregation and no errors → increase to 15–20 |
-| **Requests per second**     | 8             | HTTP 429 errors → decrease to 4–6; increase carefully toward tenant limits              |
+| **Requests per second**     | 10            | HTTP 429 errors → decrease to 4–6; increase carefully toward tenant limits              |
 
 **Interaction with Connection Settings:**
 

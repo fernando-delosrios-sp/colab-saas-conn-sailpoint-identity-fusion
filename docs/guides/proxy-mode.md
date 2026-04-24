@@ -54,11 +54,11 @@ Proxy mode allows the Identity Fusion NG connector to **delegate all processing*
    ↓
 2. Proxy client (ISC) receives command
    ↓
-3. Client POSTs to Proxy URL (the connector **automatically sets** `proxyEnabled: false` in the config when forwarding to prevent the server from re-forwarding):
+3. Client POSTs to Proxy URL (the connector **automatically sets** `isProxy: true` in the config when forwarding to prevent the server from re-forwarding):
    {
      "type": "std:account:list",
      "input": { ... },
-     "config": { ...connector config, proxyEnabled: false... }
+     "config": { ...connector config, isProxy: true... }
    }
    ↓
 4. Proxy server receives request

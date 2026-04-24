@@ -46,6 +46,8 @@ For each attribute you want to generate, add an **Attribute Definition**:
 | **Maximum length**                | Integer (optional)  | Truncate to this length                  | 20; counter preserved at end for Unique/Counter                       |
 | **Normalize special characters?** | Boolean             | Remove special chars/quotes              | Yes for usernames/IDs                                                 |
 | **Remove spaces?**                | Boolean             | Remove all whitespace                    | Yes for usernames/IDs                                                 |
+| **Trim leading and trailing spaces?** | Boolean         | Strip leading/trailing whitespace        | Yes for most attributes                                               |
+| **Use incremental counter?**      | Boolean (optional)  | Unique type only: when `true`, `$counter` always increments instead of resetting on collision | Yes for counters that must never reuse a value; No (default) for collision-based disambiguation |
 | **Refresh on each aggregation?**  | Boolean             | Recalculate every run (Normal type only) | Yes if dynamic; No if stable                                          |
 
 

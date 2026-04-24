@@ -11,11 +11,11 @@ The Account Update operation applies changes to a fusion account. Currently, it 
     - Loads sources and schema.
 
 2.  **Fusion Account Rebuild**:
-    - Rebuilds the fusion account to ensure we are operating on the latest persisted account state.
-    - **Configuration**:
-        - `refreshMapping`: False (does not recompute mapped values).
-        - `refreshDefinition`: False (does not recompute definition values).
-        - `resetDefinition`: False.
+    - Fetches the current fusion account, identity, and linked source accounts without recomputing any attribute values.
+    - **Attribute operations** (`ATTR_OPS_NONE`):
+        - `refreshMapping`: False — preserves existing mapped attribute values.
+        - `refreshDefinition`: False — preserves existing Velocity-defined attribute values.
+        - `resetDefinition`: False — unique values are not touched.
 
 3.  **Change Processing**:
     - Iterates through the list of requested changes.
@@ -31,4 +31,4 @@ The Account Update operation applies changes to a fusion account. Currently, it 
 
 ## Behavior Notes
 
-- **No attribute refresh on update**: The account is rebuilt with `refreshMapping: false` and `refreshDefinition: false`, preserving all existing attribute values including `nativeIdentity` and account `name`. The update operation only processes entitlement changes (actions), it does not regenerate attributes.
+- **No attribute refresh on update**: The account is rebuilt with `ATTR_OPS_NONE` (`refreshMapping: false`, `refreshDefinition: false`), preserving all existing attribute values including `nativeIdentity` and account `name`. The update operation only processes entitlement changes (actions) and does not regenerate attributes.

@@ -18,13 +18,14 @@ The Account Create operation creates a new fusion account for a specific identit
     - Ensures the identity exists and has a valid ID.
 
 3.  **Fusion Account Pre-processing**:
-    - Fetches all existing fusion accounts from sources.
-    - Initializes attribute counters for unique value generation.
-    - Pre-processes all existing fusion accounts to register their unique attribute values, ensuring new accounts don't collide with existing ones.
+    - Fetches all existing fusion accounts from sources and initializes attribute counters.
+    - Bulk-registers unique attribute values directly from raw account data (lightweight path — avoids full account hydration).
+    - Pre-processes fusion accounts to populate the identity map used for duplicate account detection.
 
 4.  **Identity Processing**:
     - Processes the fetched identity to create an in-memory fusion identity.
-    - Refreshes unique attributes for this new fusion identity, generating new unique values if necessary (e.g., email aliases).
+    - Sets the `requested` status on the new fusion account.
+    - Explicitly refreshes unique attributes (`refreshUniqueAttributes`) to generate collision-free values against the registered pool.
 
 5.  **Action Execution**:
     - Checks for any actions specified in `input.attributes.actions`.

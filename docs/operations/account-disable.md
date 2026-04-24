@@ -11,10 +11,10 @@ The Account Disable operation disables a fusion account. This typically prevents
 
 2.  **Fusion Account Rebuild**:
     - Rebuilds the fusion account to ensure we have the latest state before disabling.
-    - **Configuration**:
-        - `refreshMapping`: True.
-        - `refreshDefinition`: True.
-        - `resetDefinition`: False.
+    - **Attribute operations** (`ATTR_OPS_REFRESH`):
+        - `refreshMapping`: True — re-evaluates attribute mappings from source accounts.
+        - `refreshDefinition`: True — re-evaluates Velocity template definitions.
+        - `resetDefinition`: False — unique attribute values are preserved.
 
 3.  **Disable**:
     - Sets the account's status to disabled.

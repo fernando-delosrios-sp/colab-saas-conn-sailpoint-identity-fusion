@@ -11,16 +11,18 @@ The Account Enable operation re-enables a previously disabled fusion account. Th
     - Initializes attribute counters.
 
 2.  **Global Pre-processing**:
-    - **Crucial Step**: Fetches and pre-processes **ALL** fusion accounts.
-    - Registers all currently used unique attribute values.
+    - **Crucial Step**: Fetches **ALL** fusion accounts.
+    - Bulk-registers unique attribute values directly from raw account data to build the collision registry.
+    - Pre-processes fusion accounts to populate the identity map.
     - _Why?_ To ensure that when we re-enable this account, we don't assign it a unique value (e.g., `john.doe@example.com`) that has been taken by another account while this one was disabled.
 
-3.  **Fusion Account Rebuild**:
-    - Rebuilds the target fusion account.
-    - **Configuration**:
-        - `refreshMapping`: True.
-        - `refreshDefinition`: True.
-        - `resetDefinition`: **True** (forces a complete re-calculation of attributes to ensure uniqueness).
+3.  **Fusion Account Rebuild and Unique Attribute Refresh**:
+    - Rebuilds the target fusion account with `resetDefinition: True`, which unregisters existing unique attribute values and recalculates them.
+    - After rebuild, explicitly refreshes unique attributes (`refreshUniqueAttributes`) to generate collision-free values against the pool registered in Step 2.
+    - **Attribute operations** (`ATTR_OPS_RESET`):
+        - `refreshMapping`: True — re-evaluates attribute mappings from source accounts.
+        - `refreshDefinition`: True — re-evaluates Velocity template definitions.
+        - `resetDefinition`: True — unregisters and regenerates unique attribute values.
 
 4.  **Enable**:
     - Sets the account's status to enabled.
@@ -30,6 +32,6 @@ The Account Enable operation re-enables a previously disabled fusion account. Th
 
 ## Behavior Notes
 
-- **Unique attribute reset**: Enabling a Fusion account sets `resetDefinition: true`, which unregisters the account's existing unique attribute values and regenerates them. This guarantees that the re-enabled account receives collision-free values even if its previous values were reassigned to other accounts while it was disabled.
+- **Unique attribute reset**: Enabling a Fusion account uses `ATTR_OPS_RESET` (`resetDefinition: true`), which unregisters the account's existing unique attribute values and recalculates them. An explicit `refreshUniqueAttributes` pass follows the rebuild to resolve any collisions against the global registry collected in the pre-processing step. This guarantees the re-enabled account receives collision-free values even if its previous values were reassigned while it was disabled.
 - **Changeable unique attributes**: Use regular unique attribute schemas (e.g. usernames, email aliases) to define attributes you want refreshed on enable/disable cycles. Disabling and then re-enabling a Fusion account is the mechanism that triggers this regeneration.
 - **nativeIdentity and name are preserved**: Even though unique attributes are reset, the `nativeIdentity` and account `name` are never changed. The attribute definition engine skips them for identity-linked accounts to prevent disconnection and identity destruction.
