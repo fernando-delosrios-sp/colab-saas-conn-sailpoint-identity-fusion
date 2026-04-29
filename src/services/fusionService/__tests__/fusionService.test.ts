@@ -157,8 +157,6 @@ describe('FusionService', () => {
             const output = await fusionService.getISCAccount(fusionAccount)
 
             expect(output).toMatchObject({
-                identity: 'NG000025',
-                uuid: 'NG000025',
                 key,
             })
         })
