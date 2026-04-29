@@ -1,0 +1,336 @@
+import { doubleMetaphone } from 'double-metaphone'
+import { MatchingConfig, effectiveSkipMatchIfMissing } from '../../model/config'
+import { ScoreReport } from './types'
+import { jaroWinkler, diceCoefficient } from './stringComparison'
+import { match as nameMatch, matchNormalized as nameMatchNormalized } from './nameMatching'
+import { evaluateVelocityTemplate } from '../attributeService/formatting'
+import type { RenderContext } from 'velocityjs/dist/src/type'
+import { missing, trimStr } from '../../utils/safeRead'
+
+// Module-level regex constants — compiled once, reused on every call (hot scoring loop)
+const DIACRITICS_RE = /[\u0300-\u036f]/g
+const WHITESPACE_RE = /\s+/g
+
+/**
+ * Normalize a string for LIG3 scoring: lowercase, remove diacritics, trim, collapse whitespace.
+ * Exported so callers can pre-normalize and cache the result before entering the O(n×m) scoring loop.
+ */
+export function normalizeLIG3(str: string): string {
+    return str.toLowerCase().normalize('NFD').replace(DIACRITICS_RE, '').trim().replace(WHITESPACE_RE, ' ')
+}
+
+/**
+ * Build a ScoreReport without spreading the entire MatchingConfig.
+ * Explicit field construction avoids allocating a full object copy per comparison in the hot loop.
+ */
+function makeScoreReport(
+    matching: MatchingConfig,
+    score: number,
+    isMatch: boolean,
+    comment?: string,
+    skipped?: boolean
+): ScoreReport {
+    const r: ScoreReport = {
+        attribute: matching.attribute,
+        algorithm: matching.algorithm,
+        fusionScore: matching.fusionScore,
+        mandatory: matching.mandatory,
+        skipMatchIfMissing: matching.skipMatchIfMissing,
+        score,
+        isMatch,
+    }
+    if (comment !== undefined) r.comment = comment
+    if (skipped !== undefined) r.skipped = skipped
+    return r
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+export const scoreDice = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => {
+    const similarity = diceCoefficient.similarity(accountAttribute, identityAttribute)
+    const score = Math.round(similarity * 100)
+
+    const threshold = matching.fusionScore ?? 0
+    const isMatch = score >= threshold
+
+    return makeScoreReport(matching, score, isMatch)
+}
+
+export const scoreDoubleMetaphone = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => {
+    const accountCodes = doubleMetaphone(accountAttribute)
+    const identityCodes = doubleMetaphone(identityAttribute)
+
+    let score = 0
+    let comment = ''
+
+    if (accountCodes[0] === identityCodes[0] && accountCodes[0]) {
+        score = 100
+        comment = 'Primary codes match'
+    } else if (accountCodes[1] === identityCodes[1] && accountCodes[1]) {
+        score = 80
+        comment = 'Secondary codes match'
+    } else if (accountCodes[0] === identityCodes[1] || accountCodes[1] === identityCodes[0]) {
+        score = 70
+        comment = 'Cross-match between primary and secondary codes'
+    } else {
+        const candidatesA = [accountCodes[0], accountCodes[1]].filter((c): c is string => Boolean(c))
+        const candidatesB = [identityCodes[0], identityCodes[1]].filter((c): c is string => Boolean(c))
+
+        let bestSimilarity = 0
+        for (const a of candidatesA) {
+            for (const b of candidatesB) {
+                const jw = jaroWinkler.similarity(a, b)
+                const dice = diceCoefficient.similarity(a, b)
+                bestSimilarity = Math.max(bestSimilarity, jw, dice)
+            }
+        }
+
+        if (bestSimilarity >= 0.85) {
+            score = 60
+            comment = 'Strong phonetic similarity'
+        } else if (bestSimilarity >= 0.7) {
+            score = 45
+            comment = 'Moderate phonetic similarity'
+        } else if (bestSimilarity >= 0.55) {
+            score = 30
+            comment = 'Partial phonetic similarity'
+        } else if (bestSimilarity >= 0.4) {
+            score = 15
+            comment = 'Weak phonetic similarity'
+        } else {
+            score = 0
+            comment = 'No phonetic match'
+        }
+    }
+
+    const threshold = matching.fusionScore ?? 0
+    const isMatch = score >= threshold
+
+    return makeScoreReport(matching, score, isMatch, comment)
+}
+
+export const scoreJaroWinkler = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => {
+    const similarity = jaroWinkler.similarity(accountAttribute, identityAttribute)
+    const score = Math.round(similarity * 100)
+
+    const threshold = matching.fusionScore ?? 0
+    const isMatch = score >= threshold
+
+    return makeScoreReport(matching, score, isMatch)
+}
+
+export const scoreNameMatcher = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => {
+    const similarity = nameMatch(accountAttribute, identityAttribute)
+    // nameMatch returns a normalized score (0-1), convert to 0-100
+    const score = Math.round(similarity * 100)
+
+    const threshold = matching.fusionScore ?? 0
+    const isMatch = score >= threshold
+
+    return makeScoreReport(matching, score, isMatch)
+}
+
+/**
+ * Name matching on already-normalized strings (output of {@link normalizeName}).
+ * Called by the ScoringService cache layer after pre-normalizing both sides;
+ * avoids repeated normalization in the O(n×m) loop — mirrors the scoreLIG3Normalized pattern.
+ */
+export function scoreNameMatcherNormalized(normA: string, normB: string, matching: MatchingConfig): ScoreReport {
+    const similarity = nameMatchNormalized(normA, normB)
+    const score = Math.round(similarity * 100)
+    const threshold = matching.fusionScore ?? 0
+    return makeScoreReport(matching, score, score >= threshold)
+}
+
+/**
+ * LIG3 scoring on already-normalized strings. Called by the ScoringService cache layer
+ * after it has pre-normalized both sides; avoids repeated normalization in the O(n×m) loop.
+ */
+export function scoreLIG3Normalized(normA: string, normB: string, matching: MatchingConfig): ScoreReport {
+    const s1 = normA
+    const s2 = normB
+
+    if (s1.length === 0 && s2.length === 0) {
+        const threshold = matching.fusionScore ?? 0
+        return makeScoreReport(matching, 0, 0 >= threshold, 'Both values empty')
+    }
+
+    if (s1 === s2) {
+        return makeScoreReport(matching, 100, true, 'Exact match')
+    }
+
+    if (s1.length === 0 || s2.length === 0) {
+        return makeScoreReport(matching, 0, false, 'Empty string comparison')
+    }
+
+    const baseScore = calculateLIG3Similarity(s1, s2)
+    const tokenBonus = calculateTokenBonus(s1, s2)
+    const prefixBonus = calculatePrefixBonus(s1, s2)
+    const rawScore = baseScore * 0.7 + tokenBonus * 0.2 + prefixBonus * 0.1
+    const score = Math.round(Math.min(100, rawScore))
+
+    const threshold = matching.fusionScore ?? 0
+    const isMatch = score >= threshold
+
+    let comment = ''
+    if (score >= 95) {
+        comment = 'Very high similarity'
+    } else if (score >= 80) {
+        comment = 'High similarity with minor differences'
+    } else if (score >= 60) {
+        comment = 'Moderate similarity detected'
+    } else if (score >= 40) {
+        comment = 'Low similarity, possible match'
+    } else {
+        comment = 'Low similarity'
+    }
+
+    return makeScoreReport(matching, score, isMatch, comment)
+}
+
+/** Public entry point: normalizes both sides then delegates to {@link scoreLIG3Normalized}. */
+export const scoreLIG3 = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => scoreLIG3Normalized(normalizeLIG3(accountAttribute), normalizeLIG3(identityAttribute), matching)
+
+function calculateLIG3Similarity(s1: string, s2: string): number {
+    const len1 = s1.length
+    const len2 = s2.length
+    const maxLen = Math.max(len1, len2)
+
+    // Rolling 3-row approach: only rows i-2, i-1, and i are needed at any time.
+    // Reduces allocation from O(len1 * len2) to O(3 * len2) per comparison.
+    const cols = len2 + 1
+    let prevPrev = new Float64Array(cols) // row i-2
+    let prev = new Float64Array(cols) // row i-1
+    let curr = new Float64Array(cols) // row i
+
+    // Initialize row 0
+    for (let j = 0; j <= len2; j++) prev[j] = j * 0.8
+
+    for (let i = 1; i <= len1; i++) {
+        curr[0] = i * 0.8
+        for (let j = 1; j <= len2; j++) {
+            const cost = s1[i - 1] === s2[j - 1] ? 0 : 1
+            const substitution = prev[j - 1] + cost
+            const insertion = curr[j - 1] + 0.9
+            const deletion = prev[j] + 0.9
+            curr[j] = Math.min(substitution, insertion, deletion)
+
+            if (i > 1 && j > 1 && s1[i - 1] === s2[j - 2] && s1[i - 2] === s2[j - 1]) {
+                curr[j] = Math.min(curr[j], prevPrev[j - 2] + 0.5)
+            }
+        }
+        // Rotate rows: prevPrev ← prev ← curr ← prevPrev (reuse allocation)
+        const tmp = prevPrev
+        prevPrev = prev
+        prev = curr
+        curr = tmp
+    }
+
+    const distance = prev[len2]
+    const similarity = ((maxLen - distance) / maxLen) * 100
+    return Math.max(0, similarity)
+}
+
+function calculateTokenBonus(s1: string, s2: string): number {
+    // Whitespace is already normalized to single spaces by scoreLIG3.normalize() —
+    // no empty tokens can result from splitting on ' '.
+    const tokens1 = s1.split(' ')
+    const tokens2 = s2.split(' ')
+
+    if (tokens1.length <= 1 && tokens2.length <= 1) {
+        return 0
+    }
+
+    let matchedTokens = 0
+    const used = new Set<number>()
+    for (const token1 of tokens1) {
+        for (let j = 0; j < tokens2.length; j++) {
+            if (!used.has(j)) {
+                const token2 = tokens2[j]
+                if (token1 === token2 || (token1.length > 2 && token2.startsWith(token1.substring(0, 2)))) {
+                    matchedTokens++
+                    used.add(j)
+                    break
+                }
+            }
+        }
+    }
+    const maxTokens = Math.max(tokens1.length, tokens2.length)
+    return (matchedTokens / maxTokens) * 100
+}
+
+function calculatePrefixBonus(s1: string, s2: string): number {
+    let commonPrefix = 0
+    const minLen = Math.min(s1.length, s2.length)
+    for (let i = 0; i < minLen; i++) {
+        if (s1[i] === s2[i]) {
+            commonPrefix++
+        } else {
+            break
+        }
+    }
+    const prefixWeight = Math.min(commonPrefix, 5)
+    return (prefixWeight / 5) * 100
+}
+
+/**
+ * Similarity from a user-defined Velocity template. Template is compiled once per process (shared cache).
+ * Context: $accountValue, $candidateValue, $attribute.
+ */
+export const scoreCustomVelocity = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => {
+    const expression = (matching.customVelocityExpression ?? '').trim()
+    const threshold = matching.fusionScore ?? 0
+
+    if (!expression) {
+        return makeScoreReport(matching, 0, false, 'Custom Velocity expression is empty')
+    }
+
+    const context = Object.assign(Object.create(null), {
+        accountValue: accountAttribute,
+        candidateValue: identityAttribute,
+        attribute: matching.attribute,
+    }) as RenderContext
+
+    const rendered = evaluateVelocityTemplate(expression, context)
+    if (missing(rendered)) {
+        if (effectiveSkipMatchIfMissing(matching)) {
+            return makeScoreReport(matching, 0, false, 'Rule skipped (custom Velocity returned no value)', true)
+        }
+        return makeScoreReport(matching, 0, false, 'Custom Velocity returned no value')
+    }
+
+    const n = Number(trimStr(rendered))
+    if (!Number.isFinite(n)) {
+        return makeScoreReport(matching, 0, false, 'Velocity output is not a valid number')
+    }
+
+    const score = Math.round(Math.max(0, Math.min(100, n)))
+    const isMatch = score >= threshold
+    return makeScoreReport(matching, score, isMatch)
+}

@@ -1,0 +1,338 @@
+import { AccountsApiUpdateAccountRequest, IdentityDocument, Search } from 'sailpoint-api-client'
+import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
+import { FusionConfig } from '../model/config'
+import { ClientService, QueuePriority } from './clientService'
+import { LogService } from './logService'
+import { assert } from '../utils/assert'
+import { wrapConnectorError } from '../utils/error'
+import { FusionAccount } from '../model/account'
+import { SourceService } from './sourceService'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const IDENTITY_SEARCH_INCLUDES = [
+    'id',
+    'name',
+    'displayName',
+    'email',
+    'attributes',
+    'accounts',
+    'disabled',
+    'protected',
+]
+
+function buildIdentityQuery(queryString: string): Search {
+    return {
+        indices: ['identities'],
+        query: { query: queryString },
+        queryResultFilter: { includes: IDENTITY_SEARCH_INCLUDES },
+        includeNested: true,
+    }
+}
+
+// ============================================================================
+// IdentityService Class
+// ============================================================================
+
+/**
+ * Service for managing identity documents, identity lookups, and reviewer management.
+ */
+export class IdentityService {
+    private identitiesById: Map<string, IdentityDocument> = new Map()
+    private readonly identityScopeQuery?: string
+    private readonly includeIdentities: boolean
+
+    // ------------------------------------------------------------------------
+    // Constructor
+    // ------------------------------------------------------------------------
+
+    /**
+     * @param config - Fusion configuration containing identity scope settings
+     * @param log - Logger instance
+     * @param client - API client for ISC search and account operations
+     */
+    constructor(
+        config: FusionConfig,
+        private log: LogService,
+        private client: ClientService,
+        private sources: SourceService
+    ) {
+        this.identityScopeQuery = config.identityScopeQuery
+        this.includeIdentities = config.includeIdentities ?? true
+    }
+
+    // ------------------------------------------------------------------------
+    // Public Properties/Getters
+    // ------------------------------------------------------------------------
+
+    /**
+     * Get all identities as an array.
+     * Note: Creates a new array on each access. Use identityCount for size checks
+     * and identityValues() for iteration when no array is needed.
+     */
+    public get identities(): IdentityDocument[] {
+        assert(this.identitiesById, 'Identities not fetched')
+        return Array.from(this.identitiesById.values())
+    }
+
+    /**
+     * Get the number of cached identities without creating an intermediate array.
+     */
+    public get identityCount(): number {
+        return this.identitiesById.size
+    }
+
+    /**
+     * Returns an iterator over cached identity documents.
+     * Avoids creating a temporary array when only iteration is needed.
+     */
+    public identityValues(): IterableIterator<IdentityDocument> {
+        return this.identitiesById.values()
+    }
+
+    // ------------------------------------------------------------------------
+    // Public Fetch Methods
+    // ------------------------------------------------------------------------
+
+    /**
+     * Fetch identities and cache them
+     */
+    public async fetchIdentities(): Promise<void> {
+        if (!this.includeIdentities) {
+            this.log.info('Identity fetching disabled by configuration, skipping identity fetch.')
+            return
+        }
+
+        if (this.identityScopeQuery) {
+            this.log.info('Fetching identities.')
+
+            const query = buildIdentityQuery(this.identityScopeQuery)
+
+            await wrapConnectorError(async () => {
+                const identities = await this.client.paginateSearchApi<IdentityDocument>(
+                    query,
+                    QueuePriority.HIGH,
+                    'IdentityService>fetchIdentities searchPost'
+                )
+                this.identitiesById = new Map(
+                    identities.map((identity) => [identity.protected ? '-' : identity.id, identity])
+                )
+                this.identitiesById.delete('-')
+            }, `Failed to fetch identities using scope query "${this.identityScopeQuery}"`)
+        } else {
+            this.log.info('No identity scope query defined, skipping identity fetch.')
+            this.identitiesById = new Map()
+        }
+    }
+
+    /**
+     * Fetch identities as an async generator using search pagination.
+     */
+    public async *fetchIdentitiesGenerator(abortSignal?: AbortSignal): AsyncGenerator<IdentityDocument[]> {
+        if (!this.includeIdentities) {
+            this.log.info('Identity fetching disabled by configuration, skipping identity fetch.')
+            return
+        }
+
+        if (this.identityScopeQuery) {
+            this.log.info('Fetching identities (streaming).')
+
+            const query = buildIdentityQuery(this.identityScopeQuery)
+
+            try {
+                yield* this.client.paginateSearchApiGenerator<IdentityDocument>(
+                    query,
+                    QueuePriority.HIGH,
+                    'IdentityService>fetchIdentitiesGenerator searchPost',
+                    abortSignal
+                )
+            } catch (error) {
+                if (error instanceof ConnectorError) throw error
+                const detail = error instanceof Error ? error.message : String(error)
+                throw new ConnectorError(
+                    `Failed to fetch identities using scope query "${this.identityScopeQuery}": ${detail}`,
+                    ConnectorErrorType.Generic
+                )
+            }
+        } else {
+            this.log.info('No identity scope query defined, skipping identity fetch.')
+        }
+    }
+
+    /**
+     * Fetches a single identity by ID and adds it to the cache.
+     *
+     * @param id - The ISC identity ID to fetch
+     * @returns The fetched identity document
+     */
+    public async fetchIdentityById(id: string): Promise<IdentityDocument> {
+        this.log.debug(`Fetching identity ${id}.`)
+
+        const query = buildIdentityQuery(`id:"${id}"`)
+
+        return wrapConnectorError(async () => {
+            const identities = await this.client.paginateSearchApi<IdentityDocument>(
+                query,
+                QueuePriority.HIGH,
+                'IdentityService>fetchIdentityById searchPost'
+            )
+            identities.forEach((identity) => this.identitiesById.set(identity.id, identity))
+            return identities[0]
+        }, `Failed to fetch identity by ID "${id}"`)
+    }
+
+    /**
+     * Fetches a single identity by exact name match and adds it to the cache.
+     *
+     * @param name - The identity name to search for
+     * @returns The fetched identity document
+     */
+    public async fetchIdentityByName(name: string): Promise<IdentityDocument> {
+        this.log.debug(`Fetching identity ${name}.`)
+
+        const query = buildIdentityQuery(`name.exact:"${name}"`)
+
+        return wrapConnectorError(async () => {
+            const identities = await this.client.paginateSearchApi<IdentityDocument>(
+                query,
+                QueuePriority.HIGH,
+                'IdentityService>fetchIdentityByName searchPost'
+            )
+            identities.forEach((identity) => this.identitiesById.set(identity.id, identity))
+            return identities[0]
+        }, `Failed to fetch identity by name "${name}"`)
+    }
+
+    // ------------------------------------------------------------------------
+    // Public Lookup Methods
+    // ------------------------------------------------------------------------
+
+    /**
+     * Retrieves an identity from the local cache by ID.
+     *
+     * @param id - The identity ID to look up
+     * @returns The cached identity document, or undefined if not found
+     */
+    public getIdentityById(id?: string): IdentityDocument | undefined {
+        if (id) {
+            return this.identitiesById.get(id)
+        }
+    }
+
+    /**
+     * Best-effort cache hydration for identity IDs not already present.
+     * Failed fetches are ignored so reporting can proceed with partial display data.
+     */
+    public async hydrateMissingIdentitiesById(ids: string[]): Promise<void> {
+        const missing = [...new Set(ids.filter((id) => id && !this.getIdentityById(id)))]
+        await Promise.all(missing.map((id) => this.fetchIdentityById(id).catch(() => {})))
+    }
+
+    // ------------------------------------------------------------------------
+    // Public Correlation Methods
+    // ------------------------------------------------------------------------
+
+    /**
+     * Triggers asynchronous correlation of missing accounts to the fusion account's identity.
+     * Correlation promises are tracked on the fusion account and resolved later during
+     * {@link FusionAccount.resolvePendingOperations}.
+     *
+     * @param fusionAccount - The fusion account with missing accounts to correlate
+     * @param accountIdFilter - If provided, only correlate these specific account IDs
+     *   (used for per-source correlation where only a subset should be directly correlated)
+     * @returns true if correlation was initiated, false if no identity ID is available
+     */
+    public async correlateAccounts(fusionAccount: FusionAccount, accountIdFilter?: string[]): Promise<boolean> {
+        const { identityId } = fusionAccount
+        const { accountsApi } = this.client
+
+        if (!identityId) {
+            this.log.warn(`Cannot correlate fusion account ${fusionAccount.name}: no identity ID`)
+            return false
+        }
+
+        const targetIds = accountIdFilter ?? fusionAccount.missingAccountIds
+
+        if (targetIds.length === 0) {
+            this.log.info(`No accounts to correlate for fusion account ${fusionAccount.name}`)
+            return true
+        }
+
+        this.log.info(
+            `Triggering correlation for ${targetIds.length} account(s) for fusion account ${fusionAccount.name}`
+        )
+
+        const accountIdsToCorrelate = [...targetIds]
+
+        for (const accountId of accountIdsToCorrelate) {
+            const iscAccountId = this.sources.resolveIscAccountIdForManagedKey(accountId)
+            if (!iscAccountId) {
+                this.log.warn(
+                    `Skipping correlation for managed key "${accountId}": ISC account id not found in loaded source data`
+                )
+                continue
+            }
+
+            // Optimistic: mark as correlated before the API call so the account
+            // output reflects a successful correlation without waiting for the queue.
+            // If the API call fails, the next aggregation will re-detect it as uncorrelated.
+            fusionAccount.setCorrelatedAccount(accountId)
+
+            const requestParameters: AccountsApiUpdateAccountRequest = {
+                id: iscAccountId,
+                requestBody: [
+                    {
+                        op: 'replace',
+                        path: '/identityId',
+                        value: identityId,
+                    },
+                ],
+            }
+
+            const correlationPromise = this.client
+                .execute(
+                    () => accountsApi.updateAccount(requestParameters),
+                    QueuePriority.LOW,
+                    `IdentityService>correlateAccounts ${accountId}`
+                )
+                .then(() => {
+                    this.log.debug(
+                        `Successfully correlated managed key ${accountId} (ISC id ${iscAccountId}) to identity ${identityId}`
+                    )
+                })
+                .catch((error) => {
+                    this.log.error(`Failed to correlate managed key ${accountId}: ${error}`)
+                })
+
+            fusionAccount.addCorrelationPromise(accountId, correlationPromise)
+        }
+
+        // Return immediately - correlation happens asynchronously
+        return true
+    }
+
+    // ------------------------------------------------------------------------
+    // Public Utility Methods
+    // ------------------------------------------------------------------------
+
+    /**
+     * Removes a single identity from the cache by ID.
+     * Called by FusionService.processFusionAccount after claiming a fusion account
+     * for a given identity, so that processIdentities skips it rather than
+     * relying solely on the fusionIdentityMap.has() lazy guard.
+     *
+     * @param id - The identity ID to remove from the cache
+     */
+    public deleteIdentity(id: string): void {
+        this.identitiesById.delete(id)
+    }
+
+    /**
+     * Clear the identity cache
+     */
+    public clear(): void {
+        this.identitiesById.clear()
+    }
+}

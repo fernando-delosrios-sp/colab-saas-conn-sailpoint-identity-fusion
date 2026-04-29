@@ -1,0 +1,48 @@
+{
+    "correlatedAccounts": [
+        {
+            "accountId": "9906d96b05374e869f806d22d3d47800",
+            "accountName": "Ada Wong",
+            "identityId": "id-ada-wong-001",
+            "decision": "approved-by-form"
+        },
+        {
+            "accountId": "a768462973c341fab45d19e1ea591d94",
+            "accountName": "Annette Birkin",
+            "identityId": "id-annette-birkin-001",
+            "decision": "approved-by-form"
+        },
+        {
+            "accountId": "a88bc571a2174476aa8c7b53f4a478d8",
+            "accountName": "Carlos Oliveira",
+            "identityId": "id-carlos-oliveira-001",
+            "decision": "approved-by-form"
+        }
+    ],
+    "decisions": [
+        {
+            "formId": "form-instance-ada-wong-pass2",
+            "accountId": "9906d96b05374e869f806d22d3d47800",
+            "finished": true,
+            "newIdentity": false,
+            "identityId": "id-ada-wong-001",
+            "comments": "Confirmed best match for Ada Wong"
+        },
+        {
+            "formId": "form-instance-annette-birkin-pass2",
+            "accountId": "a768462973c341fab45d19e1ea591d94",
+            "finished": true,
+            "newIdentity": false,
+            "identityId": "id-annette-birkin-001",
+            "comments": "Confirmed best match for Annette Birkin"
+        },
+        {
+            "formId": "form-instance-carlos-oliveira-pass2",
+            "accountId": "a88bc571a2174476aa8c7b53f4a478d8",
+            "finished": true,
+            "newIdentity": false,
+            "identityId": "id-carlos-oliveira-001",
+            "comments": "Confirmed best match for Carlos Oliveira"
+        }
+    ]
+}

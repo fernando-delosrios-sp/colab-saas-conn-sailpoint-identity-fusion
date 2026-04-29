@@ -1,0 +1,46 @@
+site_name: Identity Fusion NG Documentation
+site_description: Identity Fusion NG usage guides and operations reference
+site_dir: site
+docs_dir: docs
+
+theme:
+  name: material
+
+nav:
+  - Home: home.md
+  - Get started: get-started.md
+  - Concepts:
+      - Map, define, and match: concepts/map-define-match.md
+  - Configuration guides:
+      - Guides overview: guides/index.md
+      - Core pipeline:
+          - Map: guides/map.md
+          - Define: guides/define.md
+          - Match: guides/match.md
+          - Matching algorithms: guides/matching-algorithms.md
+      - Sources and scope:
+          - Source configuration: guides/source-configuration.md
+      - Deployment and integration:
+          - Advanced connection settings: guides/advanced-connection-settings.md
+          - Proxy mode: guides/proxy-mode.md
+      - Change management:
+          - Migration from previous Identity Fusion: guides/migration-from-previous-fusion.md
+          - Testing process: guides/testing-process.md
+  - Run and troubleshoot:
+      - Troubleshooting: guides/troubleshooting.md
+  - Operations reference:
+      - Connector operations (APIs ISC calls): operations/index.md
+      - Connectivity:
+          - Test connection: operations/test-connection.md
+          - Dry run (custom): operations/custom-dryrun.md
+      - Schema and reads:
+          - Account discover schema: operations/account-discover-schema.md
+          - Account list: operations/account-list.md
+          - Account read: operations/account-read.md
+      - Account lifecycle:
+          - Account create: operations/account-create.md
+          - Account update: operations/account-update.md
+          - Account enable: operations/account-enable.md
+          - Account disable: operations/account-disable.md
+      - Entitlements:
+          - Entitlement list: operations/entitlement-list.md

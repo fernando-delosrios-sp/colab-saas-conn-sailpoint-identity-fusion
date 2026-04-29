@@ -1,0 +1,248 @@
+import { Attributes } from '@sailpoint/connector-sdk'
+import { AttributeMap, AttributeMergeMode, DefaultAttributeMergeMode } from '../../model/config'
+import { hasValue } from '../../utils/safeRead'
+import { AttributeMappingConfig } from './types'
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+// Pre-compiled regex for better performance
+const BRACKET_REGEX = /\[([^ ].+?)\]/g
+const ORIGIN_SOURCE_TOKEN = '$originSource'
+
+/**
+ * Split attribute value that may contain bracketed values like [value1] [value2]
+ * Optimized to use pre-compiled regex and matchAll for better performance
+ */
+export const attrSplit = (text: string): string[] => {
+    if (!text) return []
+
+    const set = new Set<string>()
+
+    // Use matchAll for cleaner and potentially faster iteration
+    const matches = text.matchAll(BRACKET_REGEX)
+    for (const match of matches) {
+        if (match[1]) {
+            set.add(match[1])
+        }
+    }
+
+    return set.size === 0 ? [text] : [...set]
+}
+
+/**
+ * Concatenate array of strings into bracketed format: [value1] [value2]
+ * Optimized to avoid unnecessary array operations and early return for empty lists
+ *
+ * @param list - Array of strings to concatenate
+ * @param alreadyProcessed - If true, assumes list is already sorted with unique values (for performance)
+ */
+export const attrConcat = (list: string[], alreadyProcessed: boolean = false): string => {
+    if (list.length === 0) {
+        return ''
+    }
+
+    // If already sorted with unique values (e.g., from processAttributeMapping), skip redundant work
+    const unique = alreadyProcessed ? list : Array.from(new Set(list)).sort()
+
+    // Filter out empty strings to prevent empty brackets like "[] [Source]"
+    return unique
+        .filter(Boolean)
+        .map((x) => `[${x}]`)
+        .join(' ')
+}
+
+/**
+ * Process a single attribute from source accounts based on processing configuration
+ */
+export const processAttributeMapping = (
+    config: AttributeMappingConfig,
+    sourceAttributeMap: Map<string, Attributes[]>,
+    sourceOrder: string[],
+    prioritizedAccount?: Attributes
+): any => {
+    const { attributeMerge } = config
+
+    // Handle single-value merge strategies with early return
+    if (attributeMerge === AttributeMergeMode.First || attributeMerge === AttributeMergeMode.Source) {
+        return processSingleValueMerge(config, sourceAttributeMap, sourceOrder, prioritizedAccount)
+    }
+
+    // Handle multi-value merge strategies
+    return processMultiValueMerge(config, sourceAttributeMap, sourceOrder)
+}
+
+/**
+ * Process attribute mapping for single-value merge strategies ('first' or 'source')
+ * Returns the first matching value found or undefined
+ */
+const processSingleValueMerge = (
+    config: AttributeMappingConfig,
+    sourceAttributeMap: Map<string, Attributes[]>,
+    sourceOrder: string[],
+    prioritizedAccount?: Attributes
+): any => {
+    const { sourceAttributes, attributeName, attributeMerge, source: specifiedSource } = config
+    const attributeNames = Array.from(new Set([...sourceAttributes, attributeName]))
+    let prioritizedSource = ''
+
+    if (prioritizedAccount) {
+        const src = prioritizedAccount.source
+        prioritizedSource =
+            src && typeof src === 'object' && src !== null && 'name' in src
+                ? String((src as { name?: unknown }).name ?? '')
+                : String(prioritizedAccount._source ?? '')
+    }
+    const resolvedSource = specifiedSource === ORIGIN_SOURCE_TOKEN ? prioritizedSource : specifiedSource
+
+    if (prioritizedAccount) {
+        const canEvaluatePrioritized =
+            attributeMerge !== AttributeMergeMode.Source || !resolvedSource || prioritizedSource === resolvedSource
+        if (canEvaluatePrioritized) {
+            const prioritizedValue = findFirstAttributeValue([prioritizedAccount], attributeNames)
+            if (prioritizedValue !== undefined) {
+                return prioritizedValue
+            }
+        }
+    }
+
+    for (const sourceName of sourceOrder) {
+        // For 'source' merge strategy, only process the specified source
+        if (attributeMerge === AttributeMergeMode.Source && resolvedSource && sourceName !== resolvedSource) {
+            continue
+        }
+
+        const accounts = sourceAttributeMap.get(sourceName)
+        if (!accounts || accounts.length === 0) {
+            continue
+        }
+
+        const firstValue = findFirstAttributeValue(accounts, attributeNames)
+        if (firstValue !== undefined) {
+            return firstValue
+        }
+    }
+
+    return undefined
+}
+
+/**
+ * Find the first attribute value from a list of accounts
+ */
+const findFirstAttributeValue = (accounts: Attributes[], attributeNames: string[]): any => {
+    for (const account of accounts) {
+        for (const attribute of attributeNames) {
+            const value = account[attribute]
+            if (hasValue(value)) {
+                const splitValues = typeof value === 'string' ? attrSplit(value) : [value]
+                return splitValues[0]
+            }
+        }
+    }
+    return undefined
+}
+
+/**
+ * Process attribute mapping for multi-value merge strategies ('list' or 'concatenate')
+ * Returns a list of unique sorted values or a concatenated string
+ */
+const processMultiValueMerge = (
+    config: AttributeMappingConfig,
+    sourceAttributeMap: Map<string, Attributes[]>,
+    sourceOrder: string[]
+): any => {
+    const { sourceAttributes, attributeName, attributeMerge } = config
+    const attributeNames = Array.from(new Set([...sourceAttributes, attributeName]))
+    const allValues = collectAllAttributeValues(sourceAttributeMap, sourceOrder, attributeNames)
+
+    if (allValues.length === 0) {
+        return undefined
+    }
+
+    // Extract unique values and sort once for both 'list' and 'concatenate' strategies
+    const uniqueSorted = [...new Set(allValues)].sort()
+
+    if (attributeMerge === AttributeMergeMode.List) {
+        return uniqueSorted
+    }
+    // Pass true to skip redundant uniqueness filtering/sorting since we already did it above
+    return attrConcat(uniqueSorted, true)
+}
+
+/**
+ * Collect all attribute values from sources in order
+ */
+const collectAllAttributeValues = (
+    sourceAttributeMap: Map<string, Attributes[]>,
+    sourceOrder: string[],
+    attributeNames: string[]
+): string[] => {
+    const allValues: string[] = []
+
+    for (const sourceName of sourceOrder) {
+        const accounts = sourceAttributeMap.get(sourceName)
+        if (!accounts || accounts.length === 0) {
+            continue
+        }
+
+        const sourceValues = extractValuesFromAccounts(accounts, attributeNames)
+        allValues.push(...sourceValues)
+    }
+
+    return allValues
+}
+
+/**
+ * Extract and split all attribute values from a list of accounts
+ */
+const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: string[]): string[] => {
+    const values: string[] = []
+
+    for (const account of accounts) {
+        for (const attribute of attributeNames) {
+            const value = account[attribute]
+            if (hasValue(value)) {
+                let splitValues: string[]
+                if (typeof value === 'string') {
+                    splitValues = attrSplit(value)
+                } else {
+                    // Convert non-string values to strings
+                    splitValues = [String(value)]
+                }
+                values.push(...splitValues)
+            }
+        }
+    }
+
+    return values
+}
+
+/**
+ * Build processing configuration for an attribute by merging schema with attributeMaps
+ */
+export const buildAttributeMappingConfig = (
+    attributeName: string,
+    attributeMaps: AttributeMap[] | undefined,
+    defaultAttributeMerge: DefaultAttributeMergeMode
+): AttributeMappingConfig => {
+    // Check if attribute has specific configuration in attributeMaps
+    const attributeMap = attributeMaps?.find((am) => am.newAttribute === attributeName)
+
+    if (attributeMap) {
+        // Use attributeMap configuration
+        return {
+            attributeName,
+            sourceAttributes: attributeMap.existingAttributes || [attributeName],
+            attributeMerge: attributeMap.attributeMerge || defaultAttributeMerge,
+            source: attributeMap.source,
+        }
+    } else {
+        // Use global attributeMerge policy with direct attribute name
+        return {
+            attributeName,
+            sourceAttributes: [attributeName],
+            attributeMerge: defaultAttributeMerge,
+        }
+    }
+}

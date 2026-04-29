@@ -1,0 +1,66 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Two-pass scenario manifest",
+    "type": "object",
+    "required": ["name", "description", "operation", "configFile", "dataFiles"],
+    "properties": {
+        "name": {
+            "type": "string",
+            "minLength": 1
+        },
+        "description": {
+            "type": "string",
+            "minLength": 1
+        },
+        "operation": {
+            "type": "string",
+            "enum": ["std:account:list"]
+        },
+        "configFile": {
+            "type": "string",
+            "pattern": ".*\\.json$"
+        },
+        "dataFiles": {
+            "type": "object",
+            "required": ["identities", "pass1", "pass2"],
+            "properties": {
+                "identities": {
+                    "type": "string",
+                    "pattern": ".*\\.json$"
+                },
+                "pass1": {
+                    "type": "object",
+                    "required": ["managedAccounts", "forms"],
+                    "properties": {
+                        "managedAccounts": { "type": "string", "pattern": ".*\\.json$" },
+                        "forms": { "type": "string", "pattern": ".*\\.json$" }
+                    },
+                    "additionalProperties": false
+                },
+                "pass2": {
+                    "type": "object",
+                    "required": ["managedAccounts", "forms"],
+                    "properties": {
+                        "managedAccounts": { "type": "string", "pattern": ".*\\.json$" },
+                        "forms": { "type": "string", "pattern": ".*\\.json$" }
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        },
+        "outputFiles": {
+            "type": "object",
+            "properties": {
+                "pass1Expected": { "type": "string", "pattern": ".*\\.json$" },
+                "pass1Generated": { "type": "string", "pattern": ".*\\.json$" },
+                "pass2Expected": { "type": "string", "pattern": ".*\\.json$" },
+                "pass2Generated": { "type": "string", "pattern": ".*\\.json$" },
+                "pass1SideEffectsGenerated": { "type": "string", "pattern": ".*\\.json$" },
+                "pass2SideEffectsGenerated": { "type": "string", "pattern": ".*\\.json$" }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}

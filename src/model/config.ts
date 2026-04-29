@@ -1,0 +1,493 @@
+/** Base connector configuration provided by the ISC platform. */
+export interface BaseConfig {
+    beforeProvisioningRule: string | null
+    cloudCacheUpdate: number
+    cloudDisplayName: string
+    cloudExternalId: string
+    commandType: string
+    connectionType: string
+    connectorName: string
+    deleteThresholdPercentage: number
+    deleteEmpty: boolean
+    formPath: string | null
+    healthy: boolean
+    idnProxyType: string
+    invocationId: string
+    since: string
+    sourceDescription: string
+    spConnectorInstanceId: string
+    spConnectorSpecId: string
+    spConnectorSupportsCustomSchemas: boolean
+    status: string
+    templateApplication: string
+    version: number
+    spConnDebugLoggingEnabled: boolean
+}
+
+export enum AttributeMergeMode {
+    First = 'first',
+    List = 'list',
+    Concatenate = 'concatenate',
+    Source = 'source',
+}
+
+export type DefaultAttributeMergeMode =
+    AttributeMergeMode.First | AttributeMergeMode.List | AttributeMergeMode.Concatenate
+
+/**
+ * Configuration for mapping one or more source attributes into a single fusion attribute.
+ * Controls how values are merged when multiple source accounts contribute the same attribute.
+ */
+export interface AttributeMap {
+    /** The target fusion attribute name to create */
+    newAttribute: string
+    /** Source attribute names to read values from */
+    existingAttributes: string[]
+    /** Strategy for merging values: keep first, collect as list, concatenate strings, or pick from specific source */
+    attributeMerge?: AttributeMergeMode
+    /** Specific source name to use (only applicable when attributeMerge is "source"); supports "$originSource" */
+    source?: string
+}
+
+/**
+ * Configuration for a normal (non-unique) generated attribute.
+ * Value is computed via a Velocity template expression on every aggregation when refresh is enabled.
+ */
+export interface NormalAttributeDefinition {
+    /** The target attribute name */
+    name: string
+    /** Apache Velocity template expression for value generation */
+    expression: string
+    /** Case transformation to apply after generation */
+    case?: 'same' | 'lower' | 'upper' | 'capitalize'
+    /** Maximum character length for generated values */
+    maxLength?: number
+    /** Whether to normalize (transliterate) the generated value */
+    normalize: boolean
+    /** Whether to remove spaces from the generated value */
+    spaces: boolean
+    /** Whether to trim whitespace from the generated value */
+    trim: boolean
+    /** Whether to regenerate this attribute on every aggregation */
+    refresh: boolean
+}
+
+/**
+ * Configuration for a unique generated attribute.
+ * Value must be unique across all accounts. Supports `$UUID` in the expression
+ * (auto-generates a v4 UUID injected into the Velocity context) and an optional
+ * incremental counter for sequential numbering or collision disambiguation.
+ *
+ * Unique expressions also receive `$isUnique(value)`, which returns whether `value`
+ * (after the same trim/case/spaces/normalize/maxLength rules as the generated value)
+ * is not already present in the in-use registry for this attribute. On reset, existing
+ * values for the account are unregistered before the template runs, so candidates can
+ * be tested without relying on `$counter` disambiguation.
+ * When using Velocity directives (`#if`, `#set`, …), put each directive on its own line;
+ * velocity.js does not treat single-line `#if…#else…#end` as separate blocks.
+ */
+export interface UniqueAttributeDefinition {
+    /** The target attribute name */
+    name: string
+    /** Apache Velocity template expression. Use $UUID for auto-generated UUIDs, $counter for counter values, $isUnique(...) to test candidates against registered values. */
+    expression: string
+    /** Case transformation to apply after generation */
+    case?: 'same' | 'lower' | 'upper' | 'capitalize'
+    /** Use a persistent incremental counter ($counter) that always increments instead of collision-based disambiguation */
+    useIncrementalCounter?: boolean
+    /** Starting value for the incremental counter */
+    counterStart?: number
+    /** Minimum digits for the counter value (zero-padded) */
+    digits?: number
+    /** Maximum character length for generated values */
+    maxLength?: number
+    /** Whether to normalize (transliterate) the generated value */
+    normalize: boolean
+    /** Whether to remove spaces from the generated value */
+    spaces: boolean
+    /** Whether to trim whitespace from the generated value */
+    trim: boolean
+}
+
+/**
+ * Configuration for a single attribute matching rule used in Match scoring.
+ */
+export interface MatchingConfig {
+    /** The attribute name to compare between accounts */
+    attribute: string
+    /** The similarity algorithm to use for comparison */
+    algorithm?: 'name-matcher' | 'jaro-winkler' | 'lig3' | 'dice' | 'double-metaphone' | 'average' | 'weighted-mean' | 'custom'
+    /**
+     * When `algorithm` is `custom`, Apache Velocity template evaluated per pair.
+     * Context includes `$accountValue`, `$candidateValue`, and `$attribute` (rule attribute name).
+     * Rendered output must parse as a number in 0–100 (used as similarity score).
+     */
+    customVelocityExpression?: string
+    /** Minimum similarity score (0-100) required to consider this attribute a match */
+    fusionScore?: number
+    /** If true, this rule must pass its minimum similarity for the pair to be a potential match */
+    mandatory?: boolean
+    /** If true (default), skip this rule when either side is missing (null/undefined/empty after trim). */
+    skipMatchIfMissing?: boolean
+}
+
+/**
+ * Whether a rule should be skipped when either side has a missing match value.
+ * Default is to skip when the key is omitted or true; explicit `false` always evaluates.
+ * Mandatory rules are always evaluated so missing data can fail the threshold.
+ */
+export function effectiveSkipMatchIfMissing(matching: Pick<MatchingConfig, 'skipMatchIfMissing' | 'mandatory'>): boolean {
+    if (matching.mandatory === true) {
+        return false
+    }
+    return matching.skipMatchIfMissing !== false
+}
+
+// ============================================================================
+// Connection Settings Menu
+// ============================================================================
+
+/** ISC API connection credentials. */
+export interface ConnectionSettingsSection {
+    baseurl: string
+    clientId: string
+    clientSecret: string
+}
+
+export type ConnectionSettingsMenu = ConnectionSettingsSection
+
+// ============================================================================
+// Source Settings Menu
+// ============================================================================
+
+/** Controls which identities are included in fusion processing. */
+export interface ScopeSection {
+    includeIdentities?: boolean
+    identityScopeQuery?: string
+}
+
+export enum SourceType {
+    Authoritative = 'authoritative',
+    Record = 'record',
+    Orphan = 'orphan',
+}
+
+export type CorrelationMode = 'correlate' | 'reverse' | 'none'
+
+/** Configuration for a single managed source that feeds into fusion. */
+export interface SourceConfig {
+    name: string
+    enabled?: boolean
+    sourceType?: SourceType
+    disableNonMatchingAccounts?: boolean
+    aggregationMode?: 'none' | 'before' | 'delayed'
+    /**
+     * Maximum time (minutes) to poll aggregation task status for this source when
+     * `aggregationMode` is `before`. Status is checked every 30 seconds until the task
+     * completes or this deadline is reached.
+     */
+    aggregationTimeout?: number
+    aggregationDelay?: number
+    optimizedAggregation?: boolean
+    accountFilter?: string
+    accountJmespathFilter?: string
+    accountLimit?: number
+    correlationMode?: CorrelationMode
+    correlationAttribute?: string
+    correlationDisplayName?: string
+    /**
+     * Same-aggregation matching: after identity matching, also compare to other new
+     * unmatched accounts from this run. If the only strong match is such a peer, defer
+     * instead of creating another Fusion identity until a later run. When false, skip
+     * that check (normal unmatched handling). Default true; disable when one person may
+     * appear as multiple accounts in a single aggregation.
+     */
+    deferredMatching?: boolean
+    /**
+     * Record sources only: when true (default), record accounts are scored in the Match
+     * phase against identities (and deferred peers when enabled). When false, Match
+     * scoring is skipped; the account still maps attributes and contributes to unique
+     * attribute registration (for example reserving third-party identifiers).
+     */
+    includeRecordAccountsForMatching?: boolean
+}
+
+/** Configuration for all managed sources and aggregation behavior. */
+export interface SourcesSection {
+    sources: SourceConfig[]
+}
+
+/** Controls various processing behaviors during aggregation. */
+export interface ProcessingControlSection {
+    deleteEmpty: boolean
+    skipAccountsWithMissingId: boolean
+    maxHistoryMessages: number
+}
+
+/** Combined source settings: scope, sources, and processing controls. */
+export interface SourceSettingsMenu extends ScopeSection, SourcesSection, ProcessingControlSection { }
+
+// ============================================================================
+// Attribute Mapping Settings Menu
+// ============================================================================
+
+/** Configuration for attribute mapping definitions and the default merge strategy. */
+export interface AttributeMappingDefinitionsSection {
+    attributeMerge: DefaultAttributeMergeMode
+    attributeMaps?: AttributeMap[]
+}
+
+export type AttributeMappingSettingsMenu = AttributeMappingDefinitionsSection
+
+// ============================================================================
+// Normal Attribute Definition Settings Menu
+// ============================================================================
+
+/** Configuration for normal (non-unique) attribute definitions (Velocity templates). */
+export interface NormalAttributeDefinitionSettingsSection {
+    normalAttributeDefinitions: NormalAttributeDefinition[]
+}
+
+export type NormalAttributeDefinitionSettingsMenu = NormalAttributeDefinitionSettingsSection
+
+// ============================================================================
+// Unique Attribute Definition Settings Menu
+// ============================================================================
+
+/** Configuration for unique attribute definitions (unique IDs, UUIDs, counters). */
+export interface UniqueAttributeDefinitionSettingsSection {
+    uniqueAttributeDefinitions: UniqueAttributeDefinition[]
+    /**
+     * Maximum number of attempts to generate a unique attribute value before giving up.
+     * Prevents infinite loops when generating unique attributes.
+     */
+    maxAttempts?: number
+}
+
+export type UniqueAttributeDefinitionSettingsMenu = UniqueAttributeDefinitionSettingsSection
+
+// ============================================================================
+// Attribute Matching Settings Menu
+// ============================================================================
+
+/** Configuration for Match rules and scoring strategy. */
+export interface MatchingSettingsSection {
+    matchingConfigs?: MatchingConfig[]
+    /** Minimum weighted combined match score (0-100). Required for matching. */
+    fusionAverageScore?: number
+    /** When true, exact attribute matches skip manual review (automatic assignment to the matched identity). */
+    fusionMergingExactMatch: boolean
+}
+
+/** Configuration for the manual review workflow and fusion reports. */
+export interface ReviewSettingsSection {
+    fusionFormAttributes?: string[]
+    fusionFormExpirationDays: number
+    fusionOwnerIsGlobalReviewer?: boolean
+    fusionReportOnAggregation?: boolean
+}
+
+/** Combined Attribute Matching Settings: matching rules and review workflow. */
+export interface AttributeMatchingSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection { }
+
+// ============================================================================
+// Advanced Settings Menu
+// ============================================================================
+
+/** Developer/debug settings including reset flag, attribute refresh behavior, concurrency check, and external logging. */
+export interface DeveloperSettingsSection {
+    reset: boolean
+    /**
+     * Batch size for processing uncorrelated managed accounts during Match.
+     * Lower values reduce peak memory usage; higher values may improve throughput.
+     * Default: 50.
+     */
+    managedAccountsBatchSize?: number
+    /**
+     * Force recalculation of all computed Normal-type attributes on every aggregation run,
+     * even when no changes were detected.
+     */
+    forceAttributeRefresh: boolean
+    /**
+     * Enable the concurrency check that prevents concurrent account aggregations.
+     * When enabled, a processing lock is set on the source at the start of each
+     * aggregation. If the lock is already active (from a prior incomplete run or
+     * a concurrent aggregation), it is automatically reset and an error is returned
+     * asking the user to verify no other aggregation is running before retrying.
+     * Enabled by default.
+     */
+    concurrencyCheckEnabled: boolean
+    /**
+     * Maximum number of potential identity matches included on each fusion review form.
+     * When there are more candidates than this cap, the highest-scoring matches are kept (see form builder).
+     * Valid range: 1–15. Default for new sources: `sourceConfigInitialValues.fusionMaxCandidatesForForm` in connector-spec.json.
+     */
+    fusionMaxCandidatesForForm?: number
+    externalLoggingEnabled: boolean
+    externalLoggingUrl?: string
+    externalLoggingLevel?: 'error' | 'warn' | 'info' | 'debug'
+}
+
+// Advanced Connection Settings Section
+export interface AdvancedConnectionSettingsSection {
+    /**
+     * Maximum time in seconds to wait for provisioning operations to complete.
+     */
+    provisioningTimeout?: number
+
+    /**
+     * Enable queue management for API requests.
+     */
+    enableQueue: boolean
+
+    /**
+     * Enable retry logic for failed API requests.
+     */
+    enableRetry: boolean
+
+    /**
+     * The number of times to retry a failed API request.
+     * Only used when retry is enabled. Configured in Advanced Connection Settings.
+     */
+    maxRetries?: number
+
+    /**
+     * Maximum number of requests to send per second (throttling).
+     * Only used when queue is enabled. Configured in Advanced Connection Settings.
+     */
+    requestsPerSecond?: number
+
+    /**
+     * Maximum number of API requests to run concurrently.
+     * Used for queueConfig.maxConcurrentRequests.
+     */
+    maxConcurrentRequests?: number
+
+    /**
+     * Interval (in milliseconds) between keep-alive signals sent to the platform
+     * during long-running account list and account update operations. Configured in
+     * seconds in the connector UI; converted to milliseconds internally. Lower values
+     * reduce timeout risk; higher values reduce keep-alive traffic.
+     */
+    processingWait?: number
+
+    /**
+     * Base delay (in milliseconds) between retry attempts for failed requests.
+     * For HTTP 429 responses, the retry delay is automatically calculated from the retry-after header.
+     */
+    retryDelay?: number
+
+    /**
+     * Number of requests to include in a single processing batch.
+     */
+    batchSize?: number
+
+    /**
+     * Enable priority processing in the queue, allowing more important requests to be handled first.
+     * Enabled by default when queue is enabled.
+     */
+    enablePriority?: boolean
+
+    /**
+     * Number of pages to fetch concurrently inside paginateParallel.
+     * Defaults to 8 when unset. When the queue is enabled the effective value is
+     * capped at maxConcurrentRequests so it never exceeds the queue's concurrency budget.
+     */
+    parallelBatchSize?: number
+}
+
+// Proxy Settings Section
+export interface ProxySettingsSection {
+    /**
+     * Enable proxy mode to delegate all processing to an external endpoint.
+     */
+    proxyEnabled?: boolean
+
+    /**
+     * URL of the external endpoint that will handle processing when proxy mode is enabled.
+     */
+    proxyUrl?: string
+
+    /**
+     * Password or secret used by the external endpoint when proxy mode is enabled.
+     */
+    proxyPassword?: string
+
+    /**
+     * Timeout in milliseconds for requests sent to the external proxy endpoint.
+     */
+    proxyRequestTimeoutMs?: number
+}
+
+/** Combined advanced settings: developer, connection tuning, and proxy. */
+export interface AdvancedSettingsMenu
+    extends DeveloperSettingsSection,
+    AdvancedConnectionSettingsSection,
+    ProxySettingsSection { }
+
+// ============================================================================
+// Internal/Computed fields
+// ============================================================================
+
+/** Internal constants and computed values not exposed through the UI configuration. */
+export interface InternalConfig {
+    readonly fusionScoreMap?: Map<string, number>
+    readonly requestsPerSecondConstant: number
+    readonly tokenUrlPath: string
+    readonly processingWaitConstant: number
+    readonly retriesConstant: number
+    readonly workflowName: string
+    readonly delayedAggregationWorkflowName: string
+    readonly padding: string
+    readonly msDay: number
+    readonly identityNotFoundWait: number
+    readonly identityNotFoundRetries: number
+    readonly separator: string
+    readonly fusionFormNamePattern: string
+    readonly nonAggregableTypes: readonly string[]
+    readonly pageSize: number
+    readonly fusionAccountRefreshThresholdInSeconds: number
+    readonly fusionMaxCandidatesForFormMin: number
+    readonly fusionMaxCandidatesForFormMax: number
+    readonly maxRetryDelayMs: number
+    readonly retryJitterFactor: number
+    readonly rateLimitJitterFactor: number
+    readonly statsLoggingIntervalMs: number
+    readonly maxStatsSamples: number
+    readonly queueProcessingIntervalMs: number
+    readonly sailPointListMax: number
+    readonly concurrency: {
+        readonly uncorrelatedAccounts: number
+        readonly processAccounts: number
+        readonly correlateAccounts: number
+    }
+    readonly fusionState?: Record<string, any>
+    /**
+     * Persisted cumulative count of accounts fetched per source in batch mode.
+     * Used when a source has an `accountLimit`: the effective limit for each run
+     * is `batchCumulativeCount[sourceName] + accountLimit`, ensuring previously
+     * fetched accounts are always included. Updated after each successful run
+     * and cleared on reset.
+     */
+    readonly batchCumulativeCount?: Record<string, number>
+    readonly isProxy?: boolean
+}
+
+// ============================================================================
+// Source Config - Combination of all menus
+// ============================================================================
+
+/**
+ * Complete fusion connector configuration. Combines all menu sections, the base
+ * ISC platform config, and internal computed constants into a single interface.
+ */
+export interface FusionConfig
+    extends BaseConfig,
+    ConnectionSettingsMenu,
+    SourceSettingsMenu,
+    AttributeMappingSettingsMenu,
+    NormalAttributeDefinitionSettingsMenu,
+    UniqueAttributeDefinitionSettingsMenu,
+    AttributeMatchingSettingsMenu,
+    AdvancedSettingsMenu,
+    InternalConfig { }
