@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -37,6 +39,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -97,7 +101,7 @@ jobs:
           - flag risky changes with hidden side effects or brittle coupling
           - suggest maintainability improvements and test gaps
           Keep feedback concrete and actionable.
-          Return concise review findings and recommended fixes." --model composer-2
+          Return concise review findings and recommended fixes." --model composer-2 --trust
 
   ai-docs-review:
     name: AI docs review (informational)
@@ -123,4 +127,4 @@ jobs:
           - detect stale or missing technical documentation in changed code
           - check whether README changelog updates are clear and accurate
           Keep feedback concise and specific.
-          Return concise review findings and recommended fixes." --model composer-2
+          Return concise review findings and recommended fixes." --model composer-2 --trust
