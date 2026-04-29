@@ -390,6 +390,15 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ---
 
+## Changelog
+
+### 2.1.6 - 2026-04-29
+
+- Added PR CI review orchestration with refactor, documentation, and README changelog gates.
+- Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
+---
+
 ## License
 
 Distributed under the MIT License. See [LICENSE.txt](LICENSE.txt) for more information.
