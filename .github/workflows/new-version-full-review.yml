@@ -11,7 +11,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: new-version-full-review-${{ github.event.pull_request.number }}
+  group: new-version-full-review-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -87,12 +87,12 @@ jobs:
       - name: Install Cursor CLI
         run: |
           curl https://cursor.com/install -fsS | bash
-          echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Cursor refactor reviewer
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: |
-          agent -p "Review this pull request with focus on refactor quality:
+          cursor-agent -p "Review this pull request with focus on refactor quality:
           - detect overcomplicated logic and suggest simplifications
           - flag risky changes with hidden side effects or brittle coupling
           - suggest maintainability improvements and test gaps
@@ -113,12 +113,12 @@ jobs:
       - name: Install Cursor CLI
         run: |
           curl https://cursor.com/install -fsS | bash
-          echo "$HOME/.cursor/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Cursor docs reviewer
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: |
-          agent -p "Review this pull request with focus on documentation quality:
+          cursor-agent -p "Review this pull request with focus on documentation quality:
           - ensure JSDoc and inline comments match implementation behavior
           - detect stale or missing technical documentation in changed code
           - check whether README changelog updates are clear and accurate
