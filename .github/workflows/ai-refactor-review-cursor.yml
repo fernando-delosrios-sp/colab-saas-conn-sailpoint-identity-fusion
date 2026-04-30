@@ -1,0 +1,58 @@
+# AI refactor review using Cursor agent.
+# Skips AI follow-up branches (prefix ai/) to avoid loops.
+name: AI Refactor Review (Cursor)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ai-refactor-review-cursor-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  refactor-review:
+    name: Refactor review (Cursor)
+    if: >
+      github.event.pull_request && !github.event.pull_request.draft
+      && !startsWith(github.event.pull_request.head.ref, 'ai/')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Cursor CLI
+        run: |
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Cursor refactor reviewer
+        if: env.CURSOR_API_KEY != ''
+        run: |
+          cursor-agent -p "Review this pull request with focus on refactor quality:
+          - detect overcomplicated logic and suggest simplifications
+          - flag risky changes with hidden side effects or brittle coupling
+          - suggest maintainability improvements and test gaps
+          Keep feedback concrete and actionable.
+          Apply concrete, minimal, safe fixes directly in the codebase.
+          Return concise review findings and recommended fixes." --model composer-2 --trust
+      - name: Create refactor follow-up PR
+        if: env.CURSOR_API_KEY != ''
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: ai/refactor-review-cursor-${{ github.event.pull_request.number }}-${{ github.run_id }}
+          base: ${{ github.event.pull_request.base.ref }}
+          title: "AI refactor follow-up (Cursor) for #${{ github.event.pull_request.number }}"
+          body: |
+            Automated AI follow-up fixes for refactor quality based on PR #${{ github.event.pull_request.number }}.
+          commit-message: "chore(ai): apply refactor follow-up fixes (cursor)"
+          labels: ai, automated
