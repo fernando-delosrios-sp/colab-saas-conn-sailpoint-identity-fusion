@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   manual-dispatch:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && contains(github.workflow_ref, '/.github/workflows/ai-cursor-review.yml@')
     name: On-demand (no PR context)
     runs-on: ubuntu-latest
     steps:

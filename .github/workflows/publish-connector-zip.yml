@@ -3,9 +3,6 @@ name: Build and release connector
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
-    types: [closed]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +10,6 @@ permissions:
 
 jobs:
   release:
-    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
