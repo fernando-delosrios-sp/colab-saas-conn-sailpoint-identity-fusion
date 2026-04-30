@@ -70,9 +70,8 @@ export const scoreDoubleMetaphone = (
     const accountCodes = doubleMetaphone(accountAttribute)
     const identityCodes = doubleMetaphone(identityAttribute)
 
-    let score = 0
-    let comment = ''
-
+    let score: number;
+    let comment: string;
     if (accountCodes[0] === identityCodes[0] && accountCodes[0]) {
         score = 100
         comment = 'Primary codes match'
@@ -190,7 +189,7 @@ export function scoreLIG3Normalized(normA: string, normB: string, matching: Matc
     const threshold = matching.fusionScore ?? 0
     const isMatch = score >= threshold
 
-    let comment = ''
+    let comment: string
     if (score >= 95) {
         comment = 'Very high similarity'
     } else if (score >= 80) {
