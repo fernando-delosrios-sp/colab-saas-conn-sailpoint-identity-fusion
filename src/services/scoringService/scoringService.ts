@@ -229,10 +229,12 @@ export class ScoringService {
             if (resultSet === undefined) {
                 resultSet = attrCandidates
             } else {
-                // Intersection: keep only identities present in BOTH sets.
+                // Intersection: build new set to avoid delete-during-iteration bugs.
+                const intersected = new Set<FusionAccount>()
                 for (const identity of resultSet) {
-                    if (!attrCandidates.has(identity)) resultSet.delete(identity)
+                    if (attrCandidates.has(identity)) intersected.add(identity)
                 }
+                resultSet = intersected
             }
         }
 
@@ -243,11 +245,13 @@ export class ScoringService {
 
         // Apply auto-assigned exclusions within the candidate set.
         if (excludeIds && excludeIds.size > 0) {
+            const filtered = new Set<FusionAccount>()
             for (const identity of resultSet) {
-                if (identity.identityId && excludeIds.has(identity.identityId)) {
-                    resultSet.delete(identity)
+                if (!(identity.identityId && excludeIds.has(identity.identityId))) {
+                    filtered.add(identity)
                 }
             }
+            resultSet = filtered
         }
 
         return resultSet
