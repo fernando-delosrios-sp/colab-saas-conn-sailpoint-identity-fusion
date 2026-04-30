@@ -73,12 +73,18 @@ export class ApiQueue {
     }
 
     /**
+     * Sub-queue key for an item — must match {@link enqueueItem} so abort/remove paths stay consistent.
+     */
+    private queueKeyForItem(item: { priority: QueuePriority }): QueuePriority {
+        return this.config.enablePriority ? item.priority : QueuePriority.MEDIUM
+    }
+
+    /**
      * Push an item onto the appropriate sub-queue.
      * When priority is disabled all items go to MEDIUM (FIFO behaviour is preserved).
      */
     private enqueueItem(item: QueueItem): void {
-        const key = this.config.enablePriority ? item.priority : QueuePriority.MEDIUM
-        this.queues.get(key)!.push(item)
+        this.queues.get(this.queueKeyForItem(item))!.push(item)
     }
 
     /**
@@ -113,7 +119,7 @@ export class ApiQueue {
 
             // Handle pre-flight abort
             if (options.abortSignal?.aborted) {
-                const subQueue = this.queues.get(item.priority)!
+                const subQueue = this.queues.get(this.queueKeyForItem(item))!
                 const idx = subQueue.indexOf(item)
                 if (idx !== -1) subQueue.splice(idx, 1)
                 this.stats.queueLength = this.totalQueueLength()
@@ -122,15 +128,19 @@ export class ApiQueue {
             }
 
             // Handle abort while queued
-            options.abortSignal?.addEventListener('abort', () => {
-                const subQueue = this.queues.get(item.priority)!
-                const index = subQueue.indexOf(item)
-                if (index !== -1) {
-                    subQueue.splice(index, 1)
-                    this.stats.queueLength = this.totalQueueLength()
-                    item.reject(new Error('Aborted'))
-                }
-            })
+            options.abortSignal?.addEventListener(
+                'abort',
+                () => {
+                    const subQueue = this.queues.get(this.queueKeyForItem(item))!
+                    const index = subQueue.indexOf(item)
+                    if (index !== -1) {
+                        subQueue.splice(index, 1)
+                        this.stats.queueLength = this.totalQueueLength()
+                        item.reject(new Error('Aborted'))
+                    }
+                },
+                { once: true }
+            )
 
             this.stats.queueLength = this.totalQueueLength()
 
