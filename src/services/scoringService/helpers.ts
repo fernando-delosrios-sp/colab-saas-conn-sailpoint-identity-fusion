@@ -207,11 +207,8 @@ export function scoreLIG3Normalized(normA: string, normB: string, matching: Matc
 }
 
 /** Public entry point: normalizes both sides then delegates to {@link scoreLIG3Normalized}. */
-export const scoreLIG3 = (
-    accountAttribute: string,
-    identityAttribute: string,
-    matching: MatchingConfig
-): ScoreReport => scoreLIG3Normalized(normalizeLIG3(accountAttribute), normalizeLIG3(identityAttribute), matching)
+export const scoreLIG3 = (accountAttribute: string, identityAttribute: string, matching: MatchingConfig): ScoreReport =>
+    scoreLIG3Normalized(normalizeLIG3(accountAttribute), normalizeLIG3(identityAttribute), matching)
 
 function calculateLIG3Similarity(s1: string, s2: string): number {
     const len1 = s1.length

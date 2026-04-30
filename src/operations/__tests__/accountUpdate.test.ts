@@ -106,7 +106,9 @@ describe('accountUpdate', () => {
 
     it('preserves reverse correlation attributes as-is during account update', async () => {
         const registry = createRegistry()
-        registry.config.sources = [{ name: 'HR', correlationMode: 'reverse', correlationAttribute: 'reverseNativeIdentity' }]
+        registry.config.sources = [
+            { name: 'HR', correlationMode: 'reverse', correlationAttribute: 'reverseNativeIdentity' },
+        ]
         registry.sources.fusionAccountsByNativeIdentity.set('fusion-1', {
             attributes: {
                 reverseNativeIdentity: 'native-before-update',

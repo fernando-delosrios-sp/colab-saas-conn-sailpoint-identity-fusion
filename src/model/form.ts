@@ -1,7 +1,6 @@
 import { Attributes } from '@sailpoint/connector-sdk'
 import { SourceType } from './config'
 
-
 /** Account representation used in fusion review forms, including optional match score. */
 type Account = {
     id: string

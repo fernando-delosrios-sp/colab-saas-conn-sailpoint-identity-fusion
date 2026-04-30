@@ -65,9 +65,9 @@ export type DryRunHelpersContext = {
         }) => Promise<
             | undefined
             | {
-                reportHtmlOutputPath?: string
-                statsWithPhaseTiming: AggregationStats
-            }
+                  reportHtmlOutputPath?: string
+                  statsWithPhaseTiming: AggregationStats
+              }
         >
     }
     forms: { pendingReviewContextByAccountId: PendingReviewContextByAccountId }
@@ -79,7 +79,10 @@ export type DryRunHelpersContext = {
     fusion: {
         generateReport: (includeNonMatches: boolean, stats?: AggregationStats) => FusionReport
         forEachISCAccount: (callback: (account: StdAccountListOutput) => void) => Promise<number>
-        getISCAccount: (account: FusionAccount, includeUncorrelated: boolean) => Promise<StdAccountListOutput | undefined>
+        getISCAccount: (
+            account: FusionAccount,
+            includeUncorrelated: boolean
+        ) => Promise<StdAccountListOutput | undefined>
         clearAnalyzedAccounts: () => void
         refreshUniqueAttributes: () => Promise<void>
     }
@@ -213,7 +216,7 @@ export const createDryRunRowEmitter = async (
             emitRow: async (payload: Record<string, unknown>) => {
                 res.send(payload)
             },
-            close: async () => { },
+            close: async () => {},
         }
     }
 
@@ -377,9 +380,9 @@ export const writeAndSendDryRunReport = async (
 ): Promise<
     | undefined
     | {
-        reportHtmlOutputPath?: string
-        statsWithPhaseTiming: AggregationStats
-    }
+          reportHtmlOutputPath?: string
+          statsWithPhaseTiming: AggregationStats
+      }
 > => {
     const { reports } = context
     return reports.writeAndSendDryRunReport({
@@ -465,9 +468,7 @@ export const streamEnrichedOutputRows = async (
             pendingReviewByAccountId,
             context.config?.baseurl,
             (accountId?: string) =>
-                accountId
-                    ? context.sources.resolveIscAccountIdForManagedKey(accountId) ?? accountId
-                    : undefined
+                accountId ? (context.sources.resolveIscAccountIdForManagedKey(accountId) ?? accountId) : undefined
         )
         addEnrichedRowToGroups(
             enriched,
@@ -480,12 +481,7 @@ export const streamEnrichedOutputRows = async (
         )
     })
 
-    return await emitGroupedRows(
-        groupedRows,
-        optionEmitCounter,
-        rowEmitter.emitRow,
-        decisionAccountIds
-    )
+    return await emitGroupedRows(groupedRows, optionEmitCounter, rowEmitter.emitRow, decisionAccountIds)
 }
 
 export const streamUncorrelatedAnalyzedRows = async (
@@ -519,9 +515,7 @@ export const streamUncorrelatedAnalyzedRows = async (
             pendingReviewByAccountId,
             context.config?.baseurl,
             (accountId?: string) =>
-                accountId
-                    ? context.sources.resolveIscAccountIdForManagedKey(accountId) ?? accountId
-                    : undefined
+                accountId ? (context.sources.resolveIscAccountIdForManagedKey(accountId) ?? accountId) : undefined
         )
         addEnrichedRowToGroups(
             enriched,
@@ -534,12 +528,7 @@ export const streamUncorrelatedAnalyzedRows = async (
         )
     }
 
-    const emittedRows = await emitGroupedRows(
-        groupedRows,
-        optionEmitCounter,
-        rowEmitter.emitRow,
-        decisionAccountIds
-    )
+    const emittedRows = await emitGroupedRows(groupedRows, optionEmitCounter, rowEmitter.emitRow, decisionAccountIds)
     const totalSentRows = sentRows + emittedRows
     log.info(`Uncorrelated managed account streaming emitted ${totalSentRows} row(s)`)
     return totalSentRows
@@ -585,9 +574,7 @@ export const streamOrphanDeferredReportRows = async (
             pendingReviewByAccountId,
             context.config?.baseurl,
             (accountId?: string) =>
-                accountId
-                    ? context.sources.resolveIscAccountIdForManagedKey(accountId) ?? accountId
-                    : undefined
+                accountId ? (context.sources.resolveIscAccountIdForManagedKey(accountId) ?? accountId) : undefined
         )
         addEnrichedRowToGroups(
             enriched,
@@ -600,12 +587,7 @@ export const streamOrphanDeferredReportRows = async (
         )
     }
 
-    return await emitGroupedRows(
-        groupedRows,
-        optionEmitCounter,
-        rowEmitter.emitRow,
-        decisionAccountIds
-    )
+    return await emitGroupedRows(groupedRows, optionEmitCounter, rowEmitter.emitRow, decisionAccountIds)
 }
 
 const CATEGORY_ORDER = [
@@ -713,7 +695,11 @@ const emitGroupedRows = async (
             const { matching, review, ...cleanAttributes } = attributes
 
             const includeReview = row.categories.includes('review') || row.categories.includes('decisions')
-            const { sourceContext: sourceStatus, correlationContext: correlationStatus, ...matchingStatus } = matching ?? {}
+            const {
+                sourceContext: sourceStatus,
+                correlationContext: correlationStatus,
+                ...matchingStatus
+            } = matching ?? {}
             const relatedRaw = readUnknown(readUnknown(row.account, 'attributes'), 'accounts')
             const relatedIds = Array.isArray(relatedRaw) ? relatedRaw.map((x) => String(x)) : []
             const reviewStatus = {
@@ -828,19 +814,19 @@ export const refreshUniqueAttributesForDryRun = async (
     const stableAnalyzed = [...analyzedUncorrelatedAccounts].sort((a: any, b: any) => {
         const aKey = String(
             readUnknown(a, 'originAccountId') ??
-            readPathString(a, ['attributes', 'originAccount']) ??
-            readUnknown(a, 'nativeIdentity') ??
-            readUnknown(a, 'key') ??
-            readUnknown(a, 'name') ??
-            ''
+                readPathString(a, ['attributes', 'originAccount']) ??
+                readUnknown(a, 'nativeIdentity') ??
+                readUnknown(a, 'key') ??
+                readUnknown(a, 'name') ??
+                ''
         )
         const bKey = String(
             readUnknown(b, 'originAccountId') ??
-            readPathString(b, ['attributes', 'originAccount']) ??
-            readUnknown(b, 'nativeIdentity') ??
-            readUnknown(b, 'key') ??
-            readUnknown(b, 'name') ??
-            ''
+                readPathString(b, ['attributes', 'originAccount']) ??
+                readUnknown(b, 'nativeIdentity') ??
+                readUnknown(b, 'key') ??
+                readUnknown(b, 'name') ??
+                ''
         )
         return aKey.localeCompare(bKey)
     })

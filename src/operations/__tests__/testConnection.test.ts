@@ -57,9 +57,7 @@ describe('testConnection', () => {
     })
 
     it('skips delayed aggregation workflow validation when no delayed sources are configured', async () => {
-        const { registry } = createMockRegistry([
-            { name: 'AD', correlationMode: 'none', aggregationMode: 'before' },
-        ])
+        const { registry } = createMockRegistry([{ name: 'AD', correlationMode: 'none', aggregationMode: 'before' }])
 
         await testConnection(registry, {})
 

@@ -858,7 +858,11 @@ export class SourceService {
      * Each source is scheduled via the provided callback and runs out-of-band.
      */
     public async aggregateDelayedSources(
-        scheduleAggregation: (args: { sourceId: string; delayMinutes: number; disableOptimization: boolean }) => Promise<void>
+        scheduleAggregation: (args: {
+            sourceId: string
+            delayMinutes: number
+            disableOptimization: boolean
+        }) => Promise<void>
     ): Promise<void> {
         assert(scheduleAggregation, 'Delayed aggregation scheduler is required')
         const delayedSources = this.managedSources.filter((s) => s.config?.aggregationMode === 'delayed')
@@ -886,7 +890,8 @@ export class SourceService {
                     })
                 } catch (err) {
                     this.log.error(
-                        `Failed to schedule delayed aggregation for source ${source.name}: ${err instanceof Error ? err.message : String(err)
+                        `Failed to schedule delayed aggregation for source ${source.name}: ${
+                            err instanceof Error ? err.message : String(err)
                         }`
                     )
                 }
@@ -1024,7 +1029,7 @@ export class SourceService {
             // await this.releaseProcessLock()
             throw new ConnectorError(
                 'An account aggregation is already in progress or the previous one did not finish cleanly. ' +
-                'Please verify no other aggregation is running and try again.',
+                    'Please verify no other aggregation is running and try again.',
                 ConnectorErrorType.Generic
             )
         }
@@ -1278,7 +1283,7 @@ export class SourceService {
 
         this.log.info(
             `Reverse correlation for source "${sourceConfig.name}" (sourceType=${sourceConfig.sourceType}): ` +
-            'minimal setup — identity attribute and managed source correlation only (no fusion schema or identity profile changes).'
+                'minimal setup — identity attribute and managed source correlation only (no fusion schema or identity profile changes).'
         )
         await this.ensureIdentityAttribute(correlationAttribute, correlationDisplayName)
         await this.ensureManagedSourceCorrelation(correlationAttribute, managedSourceId)
@@ -1459,10 +1464,7 @@ export class SourceService {
         let created: any
         try {
             created = await this.client.execute(
-                () =>
-                    identityAttributesApi
-                        .createIdentityAttribute(createPayload)
-                        .then((r) => r.data),
+                () => identityAttributesApi.createIdentityAttribute(createPayload).then((r) => r.data),
                 QueuePriority.HIGH,
                 `SourceService>ensureIdentityAttribute create ${attributeName}`,
                 undefined,
@@ -1548,13 +1550,13 @@ export class SourceService {
             if (!requiresFullReverseCorrelationArtifacts(sourceConfig)) {
                 this.log.warn(
                     `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}" while configuring reverse correlation attribute "${attributeName}". ` +
-                    'Skipping identity profile mapping (non-authoritative source).'
+                        'Skipping identity profile mapping (non-authoritative source).'
                 )
                 return
             }
             throw new ConnectorError(
                 `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}" while configuring reverse correlation attribute "${attributeName}". ` +
-                IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                    IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
                 ConnectorErrorType.Generic
             )
         }
@@ -1581,14 +1583,16 @@ export class SourceService {
 
             if (existingIndex >= 0) {
                 const existing = transforms[existingIndex]
-                if (this.isDesiredIdentityProfileTransform(existing, attributeName, fusionSource.name, fusionSourceId)) {
+                if (
+                    this.isDesiredIdentityProfileTransform(existing, attributeName, fusionSource.name, fusionSourceId)
+                ) {
                     this.log.info(
                         `Identity profile ${profile.id} already maps "${attributeName}" from source "${fusionSource.name}"`
                     )
                 } else {
                     this.log.info(
                         `Identity profile ${profile.id} already defines a mapping for identity attribute "${attributeName}"; ` +
-                        'leaving it unchanged so a custom transform is not overwritten.'
+                            'leaving it unchanged so a custom transform is not overwritten.'
                     )
                 }
                 continue
@@ -1599,21 +1603,21 @@ export class SourceService {
             const hasIdentityAttributeConfig = !!profile.identityAttributeConfig
             const jsonPatchOperationV2025 = hasIdentityAttributeConfig
                 ? [
-                    {
-                        op: 'replace' as JsonPatchOperationV2025OpV2025,
-                        path: '/identityAttributeConfig/attributeTransforms',
-                        value: nextTransforms,
-                    },
-                ]
+                      {
+                          op: 'replace' as JsonPatchOperationV2025OpV2025,
+                          path: '/identityAttributeConfig/attributeTransforms',
+                          value: nextTransforms,
+                      },
+                  ]
                 : [
-                    {
-                        op: 'add' as JsonPatchOperationV2025OpV2025,
-                        path: '/identityAttributeConfig',
-                        value: {
-                            attributeTransforms: nextTransforms,
-                        },
-                    },
-                ]
+                      {
+                          op: 'add' as JsonPatchOperationV2025OpV2025,
+                          path: '/identityAttributeConfig',
+                          value: {
+                              attributeTransforms: nextTransforms,
+                          },
+                      },
+                  ]
 
             let updatedProfile: any
             try {
@@ -1639,7 +1643,7 @@ export class SourceService {
             if (!updatedProfile) {
                 throw new ConnectorError(
                     `Failed to update identity profile ${profile.id} for reverse correlation attribute "${attributeName}". ` +
-                    IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                        IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
                     ConnectorErrorType.Generic
                 )
             }
@@ -1654,11 +1658,13 @@ export class SourceService {
             if (!verified) {
                 throw new ConnectorError(
                     `Identity profile mapping verification failed for profile ${profile.id} and attribute "${attributeName}". ` +
-                    IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                        IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
                     ConnectorErrorType.Generic
                 )
             }
-            this.log.info(`Verified identity profile mapping for profile ${profile.id} and attribute "${attributeName}"`)
+            this.log.info(
+                `Verified identity profile mapping for profile ${profile.id} and attribute "${attributeName}"`
+            )
         }
     }
 
@@ -1775,7 +1781,9 @@ export class SourceService {
         if (matchingProfiles.length === 0) {
             return false
         }
-        return matchingProfiles.every((profile: any) => this.profileHasIdentityAttributeTransform(profile, attributeName))
+        return matchingProfiles.every((profile: any) =>
+            this.profileHasIdentityAttributeTransform(profile, attributeName)
+        )
     }
 
     private async waitForIdentityProfileMapping(
@@ -2048,12 +2056,12 @@ export class SourceService {
         if (!completed) {
             const lastStatusSummary = lastTaskStatus
                 ? JSON.stringify({
-                    completed: lastTaskStatus.completed,
-                    completionStatus: lastTaskStatus.completionStatus,
-                    type: lastTaskStatus.type,
-                    description: lastTaskStatus.description,
-                    messages: lastTaskStatus.messages,
-                })
+                      completed: lastTaskStatus.completed,
+                      completionStatus: lastTaskStatus.completionStatus,
+                      type: lastTaskStatus.type,
+                      description: lastTaskStatus.description,
+                      messages: lastTaskStatus.messages,
+                  })
                 : 'none'
             this.log.warn(
                 `Failed to aggregate managed accounts for source ${sourceName} (${id}). taskId=${taskId ?? 'unknown'}, timeoutMinutes=${timeoutMinutes}, pollIntervalMs=${pollIntervalMs}, pollsExecuted=${pollsExecuted}, lastTaskStatus=${lastStatusSummary}`

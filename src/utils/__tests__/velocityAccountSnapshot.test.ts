@@ -21,6 +21,5 @@ describe('velocityAccountSnapshot', () => {
         expect(velocitySnapshotSourceId(legacy)).toBe('sid')
         expect(velocitySnapshotSchemaName(legacy)).toBe('N')
         expect(velocitySnapshotSchemaId(legacy)).toBe('nid')
-
     })
 })

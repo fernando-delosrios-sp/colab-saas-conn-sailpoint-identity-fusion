@@ -20,7 +20,11 @@ export interface OperationHandlerOptions {
     keepAliveIntervalMs?: number
 }
 
-function resolveRunMode(context: any, proxy: ProxyService, operationName: string): { runMode: RunMode; isProxyServer: boolean } {
+function resolveRunMode(
+    context: any,
+    proxy: ProxyService,
+    operationName: string
+): { runMode: RunMode; isProxyServer: boolean } {
     const isProxyServer = proxy.isProxyService()
     const isCustom = context[operationName] !== undefined
     const isProxyClient = !isProxyServer && proxy.isProxyMode()

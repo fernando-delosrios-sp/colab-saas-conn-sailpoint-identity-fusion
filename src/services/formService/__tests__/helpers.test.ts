@@ -1,4 +1,9 @@
-import { buildFormName, calculateExpirationDate, countIdentityBackedFusionMatches, resolveIdentitiesSelectLabel } from '../helpers'
+import {
+    buildFormName,
+    calculateExpirationDate,
+    countIdentityBackedFusionMatches,
+    resolveIdentitiesSelectLabel,
+} from '../helpers'
 import { MatchCandidateType } from '../../scoringService/types'
 
 describe('formService helpers', () => {
@@ -7,7 +12,12 @@ describe('formService helpers', () => {
             expect(
                 countIdentityBackedFusionMatches([
                     { identityId: 'a', identityName: 'A', scores: [] } as any,
-                    { identityId: 'b', identityName: 'B', candidateType: MatchCandidateType.NewUnmatched, scores: [] } as any,
+                    {
+                        identityId: 'b',
+                        identityName: 'B',
+                        candidateType: MatchCandidateType.NewUnmatched,
+                        scores: [],
+                    } as any,
                     { identityId: 'c', identityName: 'C', scores: [] } as any,
                 ])
             ).toBe(2)

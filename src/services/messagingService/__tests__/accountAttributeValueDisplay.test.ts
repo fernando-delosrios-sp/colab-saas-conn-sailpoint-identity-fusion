@@ -32,7 +32,7 @@ describe('accountAttributeValueDisplay', () => {
 
     it('mailto href keeps @ visible for simple addresses', () => {
         expect(mailtoHrefForHtmlAttribute('annette.birkin@umbrellacorp.com')).toBe(
-            'mailto:annette.birkin@umbrellacorp.com',
+            'mailto:annette.birkin@umbrellacorp.com'
         )
     })
 
