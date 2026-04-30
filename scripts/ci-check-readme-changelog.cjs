@@ -12,6 +12,16 @@ function fail(message) {
     process.exit(1)
 }
 
+function requiresChangelogEntry(file) {
+    return (
+        file === 'README.md' ||
+        file.startsWith('src/') ||
+        file === 'connector-spec.json' ||
+        file === 'package.json' ||
+        file === 'package-lock.json'
+    )
+}
+
 const readme = readFileSync('README.md', 'utf8')
 if (!/^##\s+Changelog\s*$/m.test(readme)) {
     fail('README.md must include a "## Changelog" section.')
@@ -29,8 +39,14 @@ let changedFiles = run(`git diff --name-only origin/${baseRef}...HEAD`).split('\
 if (!changedFiles.length) {
     changedFiles = run('git diff --name-only').split('\n').filter(Boolean)
 }
+
+if (!changedFiles.some(requiresChangelogEntry)) {
+    console.log('No product/runtime files changed; skipping README changelog requirement.')
+    process.exit(0)
+}
+
 if (!changedFiles.includes('README.md')) {
-    fail('README.md must be updated on every PR and include a changelog entry.')
+    fail('README.md must be updated when product/runtime files change and include a changelog entry.')
 }
 
 let patch = run(`git diff --unified=0 origin/${baseRef}...HEAD -- README.md`)

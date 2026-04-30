@@ -4,7 +4,7 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
 
 #### Scope Section
 
-![Source Settings - Scope](../assets/images/config-source-scope.png)
+![Source Settings](../assets/images/match-source-settings.png)
 
 | Field                                | Description                                                                | Required                              | Notes                                                                                                                                                                                     |
 | ------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -15,7 +15,7 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
 
 #### Sources Section
 
-![Source Settings - Sources](../assets/images/config-source-sources.png)
+![Source Settings](../assets/images/match-source-settings.png)
 
 | Field                             | Description                                                 | Required | Notes                                         |
 | --------------------------------- | ----------------------------------------------------------- | -------- | --------------------------------------------- |
@@ -23,7 +23,7 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
 
 **Per-source configuration:**
 
-![Source Settings - Per-source configuration](../assets/images/config-source-single.png)
+![Source Settings](../assets/images/match-source-settings.png)
 
 | Field                                           | Description                                                           | Required               | Notes                                                                                                                                                                                                                                                                                                    |
 | ----------------------------------------------- | --------------------------------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -103,7 +103,7 @@ flowchart TD
 
 #### Processing Control Section
 
-![Source Settings - Processing Control](../assets/images/config-source-processing.png)
+![Source Settings](../assets/images/match-source-settings.png)
 
 | Field                                              | Description                                                              | Required | Notes                                                                                                  |
 | -------------------------------------------------- | ------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------ |
