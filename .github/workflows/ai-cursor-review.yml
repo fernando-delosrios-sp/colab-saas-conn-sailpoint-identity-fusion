@@ -33,6 +33,8 @@ jobs:
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,8 +45,7 @@ jobs:
           curl https://cursor.com/install -fsS | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Cursor refactor reviewer
-        env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        if: env.CURSOR_API_KEY != ''
         run: |
           cursor-agent -p "Review this pull request with focus on refactor quality:
           - detect overcomplicated logic and suggest simplifications
@@ -54,6 +55,7 @@ jobs:
           Apply concrete, minimal, safe fixes directly in the codebase.
           Return concise review findings and recommended fixes." --model composer-2 --trust
       - name: Create refactor follow-up PR
+        if: env.CURSOR_API_KEY != ''
         uses: peter-evans/create-pull-request@v6
         with:
           branch: ai/refactor-review-${{ github.event.pull_request.number }}-${{ github.run_id }}
@@ -72,6 +74,8 @@ jobs:
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,8 +86,7 @@ jobs:
           curl https://cursor.com/install -fsS | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Cursor docs reviewer
-        env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        if: env.CURSOR_API_KEY != ''
         run: |
           cursor-agent -p "Review this pull request with focus on documentation quality:
           - ensure JSDoc and inline comments match implementation behavior
@@ -93,6 +96,7 @@ jobs:
           Apply concrete, minimal, safe fixes directly in the codebase.
           Return concise review findings and recommended fixes." --model composer-2 --trust
       - name: Create docs follow-up PR
+        if: env.CURSOR_API_KEY != ''
         uses: peter-evans/create-pull-request@v6
         with:
           branch: ai/docs-review-${{ github.event.pull_request.number }}-${{ github.run_id }}

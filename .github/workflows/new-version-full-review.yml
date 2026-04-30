@@ -81,7 +81,9 @@ jobs:
     name: AI refactor review (informational)
     runs-on: ubuntu-latest
     continue-on-error: true
-    if: "!github.event.pull_request.draft"
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    env:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
     permissions:
       contents: read
       pull-requests: write
@@ -93,8 +95,7 @@ jobs:
           curl https://cursor.com/install -fsS | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Cursor refactor reviewer
-        env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        if: env.CURSOR_API_KEY != ''
         run: |
           cursor-agent -p "Review this pull request with focus on refactor quality:
           - detect overcomplicated logic and suggest simplifications
@@ -102,12 +103,17 @@ jobs:
           - suggest maintainability improvements and test gaps
           Keep feedback concrete and actionable.
           Return concise review findings and recommended fixes." --model composer-2 --trust
+      - name: Skip when Cursor API key is missing
+        if: env.CURSOR_API_KEY == ''
+        run: echo "CURSOR_API_KEY is not set; skipping AI refactor review."
 
   ai-docs-review:
     name: AI docs review (informational)
     runs-on: ubuntu-latest
     continue-on-error: true
-    if: "!github.event.pull_request.draft"
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    env:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
     permissions:
       contents: read
       pull-requests: write
@@ -119,8 +125,7 @@ jobs:
           curl https://cursor.com/install -fsS | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Cursor docs reviewer
-        env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        if: env.CURSOR_API_KEY != ''
         run: |
           cursor-agent -p "Review this pull request with focus on documentation quality:
           - ensure JSDoc and inline comments match implementation behavior
@@ -128,3 +133,6 @@ jobs:
           - check whether README changelog updates are clear and accurate
           Keep feedback concise and specific.
           Return concise review findings and recommended fixes." --model composer-2 --trust
+      - name: Skip when Cursor API key is missing
+        if: env.CURSOR_API_KEY == ''
+        run: echo "CURSOR_API_KEY is not set; skipping AI docs review."

@@ -18,6 +18,7 @@ function requiresChangelogEntry(file) {
         file.startsWith('src/') ||
         file.startsWith('docs/') ||
         file === 'mkdocs.yml' ||
+        file === 'tsconfig.json' ||
         file === 'package.json' ||
         file === 'package-lock.json'
     )
