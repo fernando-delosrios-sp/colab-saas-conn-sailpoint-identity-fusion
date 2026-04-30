@@ -16,9 +16,7 @@ function requiresChangelogEntry(file) {
     return (
         file === 'README.md' ||
         file.startsWith('src/') ||
-        file.startsWith('docs/') ||
-        file === 'mkdocs.yml' ||
-        file === 'tsconfig.json' ||
+        file === 'connector-spec.json' ||
         file === 'package.json' ||
         file === 'package-lock.json'
     )
@@ -43,12 +41,12 @@ if (!changedFiles.length) {
 }
 
 if (!changedFiles.some(requiresChangelogEntry)) {
-    console.log('No product/docs files changed; skipping README changelog requirement.')
+    console.log('No product/runtime files changed; skipping README changelog requirement.')
     process.exit(0)
 }
 
 if (!changedFiles.includes('README.md')) {
-    fail('README.md must be updated when product/docs files change and include a changelog entry.')
+    fail('README.md must be updated when product/runtime files change and include a changelog entry.')
 }
 
 let patch = run(`git diff --unified=0 origin/${baseRef}...HEAD -- README.md`)

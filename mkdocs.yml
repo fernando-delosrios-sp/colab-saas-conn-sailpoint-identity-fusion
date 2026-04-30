@@ -2,6 +2,7 @@ site_name: Identity Fusion NG Documentation
 site_description: Identity Fusion NG usage guides and operations reference
 site_dir: site
 docs_dir: docs
+exclude_docs: README.md
 
 theme:
   name: material
