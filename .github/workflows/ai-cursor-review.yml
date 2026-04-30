@@ -1,0 +1,104 @@
+# Cursor AI review jobs: callable from "New version full review" and usable on demand.
+# Skips when the head branch looks like an AI follow-up (prefix ai/) to avoid loops.
+name: AI Cursor review
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ai-cursor-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manual-dispatch:
+    if: github.event_name == 'workflow_dispatch'
+    name: On-demand (no PR context)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hint
+        run: |
+          echo "This workflow is meant for pull_request runs (from New version full review) or a manual re-run in a PR’s Actions tab."
+          echo "With workflow_dispatch from the default branch, there is no pull_request; AI review jobs are skipped."
+
+  ai-refactor-review:
+    name: AI refactor review (opens follow-up PR)
+    if: >
+      github.event_name == 'pull_request' && !github.event.pull_request.draft
+      && !startsWith(github.event.pull_request.head.ref, 'ai/')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Cursor CLI
+        run: |
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Cursor refactor reviewer
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          cursor-agent -p "Review this pull request with focus on refactor quality:
+          - detect overcomplicated logic and suggest simplifications
+          - flag risky changes with hidden side effects or brittle coupling
+          - suggest maintainability improvements and test gaps
+          Keep feedback concrete and actionable.
+          Apply concrete, minimal, safe fixes directly in the codebase.
+          Return concise review findings and recommended fixes." --model composer-2 --trust
+      - name: Create refactor follow-up PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: ai/refactor-review-${{ github.event.pull_request.number }}-${{ github.run_id }}
+          base: ${{ github.event.pull_request.base.ref }}
+          title: "AI refactor follow-up for #${{ github.event.pull_request.number }}"
+          body: |
+            Automated AI follow-up fixes for refactor quality based on PR #${{ github.event.pull_request.number }}.
+          commit-message: "chore(ai): apply refactor follow-up fixes"
+          labels: ai, automated
+
+  ai-docs-review:
+    name: AI docs review (opens follow-up PR)
+    if: >
+      github.event_name == 'pull_request' && !github.event.pull_request.draft
+      && !startsWith(github.event.pull_request.head.ref, 'ai/')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Cursor CLI
+        run: |
+          curl https://cursor.com/install -fsS | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Cursor docs reviewer
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          cursor-agent -p "Review this pull request with focus on documentation quality:
+          - ensure JSDoc and inline comments match implementation behavior
+          - detect stale or missing technical documentation in changed code
+          - check whether README changelog updates are clear and accurate
+          Keep feedback concise and specific.
+          Apply concrete, minimal, safe fixes directly in the codebase.
+          Return concise review findings and recommended fixes." --model composer-2 --trust
+      - name: Create docs follow-up PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: ai/docs-review-${{ github.event.pull_request.number }}-${{ github.run_id }}
+          base: ${{ github.event.pull_request.base.ref }}
+          title: "AI docs follow-up for #${{ github.event.pull_request.number }}"
+          body: |
+            Automated AI follow-up fixes for documentation quality based on PR #${{ github.event.pull_request.number }}.
+          commit-message: "chore(ai): apply docs follow-up fixes"
+          labels: ai, automated
