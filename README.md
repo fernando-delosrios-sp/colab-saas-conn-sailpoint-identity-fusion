@@ -392,7 +392,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
-- (2026-04-30) Updated `ci:docs-review` script to handle missing pip packages gracefully.
+- (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
 
 ### 2.1.6 - 2026-04-29
 

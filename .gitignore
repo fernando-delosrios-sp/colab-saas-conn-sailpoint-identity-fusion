@@ -33,7 +33,7 @@ config.json
 .httpyac.json
 .env*
 .venv/
-docs/home.md
+docs/index.md
 docs/LICENSE.txt
 
 # Logs

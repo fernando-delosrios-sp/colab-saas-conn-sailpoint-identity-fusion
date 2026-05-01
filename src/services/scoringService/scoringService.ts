@@ -331,6 +331,10 @@ export class ScoringService {
         return this.identityMatchesManagedAccountKey(fusionIdentity, managedAccountId)
     }
 
+    /**
+     * Check whether a fusion identity matches a managed account key by comparing against
+     * all known identity key variants (managedAccountId, nativeIdentity, originAccountId, accountIdsSet, missingAccountIdsSet).
+     */
     private identityMatchesManagedAccountKey(fusionIdentity: FusionAccount, managedAccountId: string): boolean {
         const candidates = [
             fusionIdentity.managedAccountId,
