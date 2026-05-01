@@ -72,6 +72,8 @@ export class MessagingService {
 
     /** UTF-8 byte length of JSON-serialized workflow from getWorkflow; undefined if not measured yet or call failed. */
     private emailSenderWorkflowDefinitionBytes: number | undefined
+
+    /** Cached result of buildEmailHeaderSubtitle; undefined until first call, then the computed value. */
     private _cachedEmailHeaderSubtitle: string | undefined
 
     // ------------------------------------------------------------------------
