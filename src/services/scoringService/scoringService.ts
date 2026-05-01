@@ -229,10 +229,12 @@ export class ScoringService {
             if (resultSet === undefined) {
                 resultSet = attrCandidates
             } else {
-                // Intersection: keep only identities present in BOTH sets.
+                // Intersection: build a new Set instead of deleting during iteration (O(n) vs O(n²))
+                const intersection = new Set<FusionAccount>()
                 for (const identity of resultSet) {
-                    if (!attrCandidates.has(identity)) resultSet.delete(identity)
+                    if (attrCandidates.has(identity)) intersection.add(identity)
                 }
+                resultSet = intersection
             }
         }
 

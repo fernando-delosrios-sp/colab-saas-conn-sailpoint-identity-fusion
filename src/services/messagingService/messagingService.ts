@@ -103,10 +103,12 @@ export class MessagingService {
 
         let host: string | undefined
         try {
-            const origin = getUIOriginFromBaseUrl(this.apiBaseUrl) ?? this.apiBaseUrl
-            host = new URL(origin).hostname
+            const origin = getUIOriginFromBaseUrl(this.apiBaseUrl)
+            if (origin) {
+                host = new URL(origin).hostname
+            }
         } catch {
-            host = undefined
+            // fall through to try apiBaseUrl directly
         }
         if (!host) {
             try {
@@ -669,30 +671,50 @@ export class MessagingService {
             return Array.from(emails)
         }
 
-        const results = await Promise.all(
-            validIds.map(async (identityId) => {
-                let identity = this.identities?.getIdentityById(identityId)
-                if (!identity) {
+        // Partition: cached emails can be collected immediately, uncached IDs need fetching
+        const cachedEmails: string[][] = []
+        const uncachedIds: string[] = []
+
+        for (const identityId of validIds) {
+            const identity = this.identities?.getIdentityById(identityId)
+            if (identity) {
+                const attrs: any = identity.attributes ?? {}
+                const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
+                const normalized = normalizeEmailValue(emailValue)
+                if (normalized.length > 0) {
+                    cachedEmails.push(normalized)
+                }
+            } else {
+                uncachedIds.push(identityId)
+            }
+        }
+
+        // Batch-fetch uncached identities to avoid N+1 query pattern
+        const BATCH_SIZE = 10
+        for (let i = 0; i < uncachedIds.length; i += BATCH_SIZE) {
+            const batch = uncachedIds.slice(i, i + BATCH_SIZE)
+            await Promise.all(
+                batch.map(async (identityId) => {
                     try {
-                        identity = await this.identities?.fetchIdentityById(identityId)
+                        const identity = await this.identities?.fetchIdentityById(identityId)
+                        if (identity) {
+                            const attrs: any = identity.attributes ?? {}
+                            const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
+                            const normalized = normalizeEmailValue(emailValue)
+                            if (normalized.length > 0) {
+                                cachedEmails.push(normalized)
+                            } else {
+                                this.log.warn(`No email found for identity ${identityId}`)
+                            }
+                        }
                     } catch (e) {
                         this.log.warn(`Failed to fetch identity ${identityId}: ${e}`)
                     }
-                }
+                })
+            )
+        }
 
-                const attrs: any = identity?.attributes ?? {}
-                const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
-                const normalized = normalizeEmailValue(emailValue)
-
-                if (normalized.length === 0) {
-                    this.log.warn(`No email found for identity ${identityId}`)
-                }
-
-                return normalized
-            })
-        )
-
-        for (const normalized of results) {
+        for (const normalized of cachedEmails) {
             for (const e of normalized) {
                 emails.add(e)
             }

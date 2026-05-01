@@ -167,8 +167,14 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
     let managedAccountsFoundRecord = 0
     let managedAccountsFoundOrphan = 0
 
+    // Build sourceType cache once to avoid repeated getSourceByNameSafe lookups (which do trim checks)
+    const sourceTypeCache = new Map<string, SourceType>()
+    for (const source of sources.managedSources) {
+        sourceTypeCache.set(source.name, source.sourceType)
+    }
+
     for (const account of sources.managedAccountsById.values()) {
-        const sourceType = sources.getSourceByNameSafe(account.sourceName)?.sourceType ?? SourceType.Authoritative
+        const sourceType = account.sourceName ? sourceTypeCache.get(account.sourceName) ?? SourceType.Authoritative : SourceType.Authoritative
         if (sourceType === SourceType.Record) {
             managedAccountsFoundRecord++
         } else if (sourceType === SourceType.Orphan) {
