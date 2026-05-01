@@ -70,8 +70,7 @@ export class SourceService {
     // Unified source storage - both managed and fusion sources
     private sourcesById: Map<string, SourceInfo> = new Map()
     private sourcesByName: Map<string, SourceInfo> = new Map()
-    private fusionLatestAggregationDate: Date | undefined
-    private sourceAggregationDates: Map<string, Date> = new Map()
+    private aggregationDateCache: Map<string, Promise<Date>> = new Map()
     private _allSources?: SourceInfo[]
     private _fusionSourceId?: string
     private _fusionSourceOwner?: OwnerDto
@@ -904,33 +903,45 @@ export class SourceService {
      * Get latest aggregation date for a source (only for managed sources)
      */
     public async getLatestAggregationDate(sourceId: string): Promise<Date> {
-        const source = this.sourcesById.get(sourceId)
-        assert(source, 'Source not found')
-        const sourceName = source.name
-
-        const { searchApi } = this.client
-        const search: Search = {
-            indices: ['events'],
-            query: {
-                query: `operation:AGGREGATE AND status:PASSED AND objects:ACCOUNT AND target.name.exact:"${sourceName} [source]"`,
-            },
-            sort: ['-created'],
+        const cached = this.aggregationDateCache.get(sourceId)
+        if (cached) {
+            return cached
         }
 
-        const requestParameters: SearchApiSearchPostRequest = { search, limit: 1 }
-        const searchPost = async () => {
-            const response = await searchApi.searchPost(requestParameters)
-            return response.data ?? []
-        }
-        const aggregations = await this.client.execute(
-            searchPost,
-            QueuePriority.HIGH,
-            'SourceService>getLatestAggregationDate'
-        )
+        const fetchPromise = (async () => {
+            const source = this.sourcesById.get(sourceId)
+            assert(source, 'Source not found')
+            const sourceName = source.name
 
-        const latestAggregation = getDateFromISOString(aggregations?.[0]?.created)
+            const { searchApi } = this.client
+            const search: Search = {
+                indices: ['events'],
+                query: {
+                    query: `operation:AGGREGATE AND status:PASSED AND objects:ACCOUNT AND target.name.exact:"${sourceName} [source]"`,
+                },
+                sort: ['-created'],
+            }
 
-        return latestAggregation
+            const requestParameters: SearchApiSearchPostRequest = { search, limit: 1 }
+            const searchPost = async () => {
+                const response = await searchApi.searchPost(requestParameters)
+                return response.data ?? []
+            }
+            const aggregations = await this.client.execute(
+                searchPost,
+                QueuePriority.HIGH,
+                'SourceService>getLatestAggregationDate'
+            )
+
+            return getDateFromISOString(aggregations?.[0]?.created)
+        })()
+
+        this.aggregationDateCache.set(sourceId, fetchPromise)
+
+        // Clear cache entry on failure to allow retry
+        fetchPromise.catch(() => this.aggregationDateCache.delete(sourceId))
+
+        return fetchPromise
     }
 
     // ------------------------------------------------------------------------
@@ -1969,18 +1980,10 @@ export class SourceService {
      */
     private async shouldAggregateSource(source: SourceInfo): Promise<boolean> {
         assert(source.isManaged, 'Only managed sources can be aggregated')
-        if (!this.fusionLatestAggregationDate) {
-            this.fusionLatestAggregationDate = await this.getLatestAggregationDate(this.fusionSourceId)
-        }
+        const fusionLatestAggregationDate = await this.getLatestAggregationDate(this.fusionSourceId)
+        const latestSourceDate = await this.getLatestAggregationDate(source.id)
 
-        // Cache aggregation dates to avoid redundant API calls
-        let latestSourceDate = this.sourceAggregationDates.get(source.id)
-        if (!latestSourceDate) {
-            latestSourceDate = await this.getLatestAggregationDate(source.id)
-            this.sourceAggregationDates.set(source.id, latestSourceDate)
-        }
-
-        return this.fusionLatestAggregationDate! > latestSourceDate
+        return fusionLatestAggregationDate > latestSourceDate
     }
 
     /**
