@@ -62,8 +62,9 @@ export function queryAttributeIndex(index: TrigramIndex, accountValue: string): 
     // have few repeated 3-char windows, so the savings from skipping the Set allocation outweigh
     // the rare duplicate bucket lookup.
     const padded = `  ${normalized} `
-    for (let i = 0; i <= padded.length - 3; i++) {
-        const bucket = index.get(padded.slice(i, i + 3))
+    const len = padded.length
+    for (let i = 0; i < len - 2; i++) {
+        const bucket = index.get(padded.substring(i, i + 3))
         if (bucket) {
             for (const identity of bucket) {
                 candidates.add(identity)
