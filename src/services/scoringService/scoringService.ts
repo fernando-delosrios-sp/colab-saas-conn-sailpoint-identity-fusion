@@ -49,6 +49,9 @@ const SCORING_IDENTITY_YIELD_INTERVAL = 100
 /** Attribute label on the synthetic combined score row in reports and forms. */
 export const COMBINED_SCORE_ROW_ATTRIBUTE = 'Combined score'
 
+/** Module-level cache for normalized composite managed account keys. Avoids repeated normalization in hot scoring loop. */
+const normalizedManagedAccountKeyCache = new Map<string, string | undefined>()
+
 /**
  * Service for calculating and managing similarity scores for identity matching.
  * Handles score calculation, threshold checking, and score formatting.
@@ -107,32 +110,30 @@ export class ScoringService {
      * regardless of how many managed accounts are scored against it.
      */
     private getNormalized(account: FusionAccount, attrName: string, rawValue: string): string {
-        let byAttr = this.normalizedCache.get(account)
-        if (!byAttr) {
-            byAttr = new Map()
-            this.normalizedCache.set(account, byAttr)
-        }
-        let cached = byAttr.get(attrName)
-        if (cached === undefined) {
-            cached = normalizeLIG3(rawValue)
-            byAttr.set(attrName, cached)
-        }
-        return cached
+        const byAttr = this.normalizedCache.get(account) ?? (() => {
+            const m = new Map()
+            this.normalizedCache.set(account, m)
+            return m
+        })()
+        const cached = byAttr.get(attrName)
+        if (cached !== undefined) return cached
+        const normalized = normalizeLIG3(rawValue)
+        byAttr.set(attrName, normalized)
+        return normalized
     }
 
     /** Return the name-normalized form of `rawValue` for `account`, computing and caching on first access. */
     private getNameNormalized(account: FusionAccount, attrName: string, rawValue: string): string {
-        let byAttr = this.nameNormalizedCache.get(account)
-        if (!byAttr) {
-            byAttr = new Map()
-            this.nameNormalizedCache.set(account, byAttr)
-        }
-        let cached = byAttr.get(attrName)
-        if (cached === undefined) {
-            cached = normalizeNameForMatcher(rawValue)
-            byAttr.set(attrName, cached)
-        }
-        return cached
+        const byAttr = this.nameNormalizedCache.get(account) ?? (() => {
+            const m = new Map()
+            this.nameNormalizedCache.set(account, m)
+            return m
+        })()
+        const cached = byAttr.get(attrName)
+        if (cached !== undefined) return cached
+        const normalized = normalizeNameForMatcher(rawValue)
+        byAttr.set(attrName, normalized)
+        return normalized
     }
 
     /**
@@ -345,18 +346,35 @@ export class ScoringService {
     private static sameManagedAccountKey(a: string | undefined, b: string | undefined): boolean {
         if (!a || !b) return false
         if (a === b) return true
-        const normalizedA = normalizeCompositeManagedAccountKey(a)
-        const normalizedB = normalizeCompositeManagedAccountKey(b)
+        const normalizedA = normalizedManagedAccountKeyCache.get(a) ?? (() => {
+            const n = normalizeCompositeManagedAccountKey(a)
+            normalizedManagedAccountKeyCache.set(a, n)
+            return n
+        })()
+        const normalizedB = normalizedManagedAccountKeyCache.get(b) ?? (() => {
+            const n = normalizeCompositeManagedAccountKey(b)
+            normalizedManagedAccountKeyCache.set(b, n)
+            return n
+        })()
         return normalizedA !== undefined && normalizedA === normalizedB
     }
 
     private static hasEquivalentManagedAccountId(values: ReadonlySet<string> | undefined, key: string): boolean {
         if (!values) return false
         if (values.has(key)) return true
-        const normalizedKey = normalizeCompositeManagedAccountKey(key)
+        const normalizedKey = normalizedManagedAccountKeyCache.get(key) ?? (() => {
+            const n = normalizeCompositeManagedAccountKey(key)
+            normalizedManagedAccountKeyCache.set(key, n)
+            return n
+        })()
         if (!normalizedKey) return false
         for (const value of values) {
-            if (normalizeCompositeManagedAccountKey(value) === normalizedKey) return true
+            const normalizedValue = normalizedManagedAccountKeyCache.get(value) ?? (() => {
+                const n = normalizeCompositeManagedAccountKey(value)
+                normalizedManagedAccountKeyCache.set(value, n)
+                return n
+            })()
+            if (normalizedValue === normalizedKey) return true
         }
         return false
     }

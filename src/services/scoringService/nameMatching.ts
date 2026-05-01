@@ -13,6 +13,17 @@ import { doubleMetaphone } from 'double-metaphone'
 
 // Module-level regex constants — compiled once, reused on every normalizeName call (hot scoring loop)
 const NAME_DIACRITICS_RE = /[\u0300-\u036f]/g
+
+// Cache for doubleMetaphone results — avoids repeated expensive phonetic encoding in hot loop
+const phoneticCodeCache = new Map<string, [string, string | undefined]>()
+
+const cachedDoubleMetaphone = (token: string): [string, string | undefined] => {
+    const cached = phoneticCodeCache.get(token)
+    if (cached) return cached
+    const result = doubleMetaphone(token)
+    phoneticCodeCache.set(token, result)
+    return result
+}
 const NAME_SPECIAL_CHARS_RE = /[^a-z0-9\s]/g
 const NAME_WHITESPACE_RE = /\s+/g
 
@@ -190,7 +201,7 @@ function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): numb
 
     // Pre-compute phonetic codes for validTokens2 so doubleMetaphone is called O(n1+n2)
     // times instead of O(n1*n2) — each code pair is computed once and reused across all token1s.
-    const codes2List = validTokens2.map((t) => doubleMetaphone(t))
+    const codes2List = validTokens2.map((t) => cachedDoubleMetaphone(t))
 
     // Compare phonetic codes for each token pair.
     // Keep exact matches as full credit, but allow partial credit for near matches.
@@ -198,7 +209,7 @@ function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): numb
     let phoneticScore = 0
 
     for (const token1 of validTokens1) {
-        const codes1 = doubleMetaphone(token1)
+        const codes1 = cachedDoubleMetaphone(token1)
         let bestForToken = 0
 
         for (const codes2 of codes2List) {
