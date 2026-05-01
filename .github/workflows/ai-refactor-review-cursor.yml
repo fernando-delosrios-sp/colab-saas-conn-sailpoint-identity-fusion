@@ -46,6 +46,8 @@ jobs:
           Keep feedback concrete and actionable.
           Apply concrete, minimal, safe fixes directly in the codebase.
           Return concise review findings and recommended fixes." --model composer-2 --trust
+      - name: Restore workflow files
+        run: git restore .github/workflows/ || true
       - name: Create refactor follow-up PR
         if: env.CURSOR_API_KEY != ''
         uses: peter-evans/create-pull-request@v6
