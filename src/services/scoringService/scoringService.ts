@@ -287,6 +287,7 @@ export class ScoringService {
                 : undefined
 
         let compared = 0
+        let yieldCounter = 0
         for (const fusionIdentity of fusionIdentities) {
             if (
                 candidateType === MatchCandidateType.NewUnmatched &&
@@ -305,7 +306,9 @@ export class ScoringService {
             if (maxIdentity !== undefined && countIdentityBackedFusionMatches(fusionAccount.fusionMatchesRaw) >= maxIdentity) {
                 break
             }
-            if (compared % SCORING_IDENTITY_YIELD_INTERVAL === 0) {
+            yieldCounter += 1
+            if (yieldCounter >= SCORING_IDENTITY_YIELD_INTERVAL) {
+                yieldCounter = 0
                 await new Promise<void>((resolve) => setImmediate(resolve))
             }
         }

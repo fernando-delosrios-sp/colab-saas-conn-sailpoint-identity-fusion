@@ -15,8 +15,9 @@ export type TrigramIndex = Map<string, Set<FusionAccount>>
 export function extractTrigrams(normalized: string): Set<string> {
     const result = new Set<string>()
     const padded = `  ${normalized} `
-    for (let i = 0; i <= padded.length - 3; i++) {
-        result.add(padded.slice(i, i + 3))
+    const len = padded.length
+    for (let i = 0; i < len - 2; i++) {
+        result.add(padded.substring(i, i + 3))
     }
     return result
 }
