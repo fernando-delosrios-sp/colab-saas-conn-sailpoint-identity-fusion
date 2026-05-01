@@ -381,16 +381,11 @@ export class SourceService {
     public async fetchGlobalOwnerIdentityIds(): Promise<string[]> {
         const ownerIdSet = new Set<string>()
 
-        let ownerId: string | undefined
-        try {
-            ownerId = this.fusionSourceOwner.id
-        } catch (error) {
-            if (error instanceof Error && error.message.includes('Fusion source owner not found')) {
-                return []
-            }
-            throw error
+        if (!this._fusionSourceOwner) {
+            return []
         }
-        if (ownerId) ownerIdSet.add(ownerId)
+        const ownerId = this._fusionSourceOwner.id
+        ownerIdSet.add(ownerId)
 
         const workgroupId = this._fusionSourceManagementWorkgroupId
         if (workgroupId) {
