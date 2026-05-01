@@ -14,6 +14,9 @@ concurrency:
     group: new-version-full-review-${{ github.event.pull_request.number || github.ref }}
     cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
     refactor-quality:
         name: Refactor quality
@@ -77,11 +80,12 @@ jobs:
             - name: Run docs review checks
               run: npm run ci:docs-review
 
-    ai-cursor-review:
-        name: AI Cursor review
-        if: github.event_name == 'pull_request' && !github.event.pull_request.draft
-        uses: ./.github/workflows/ai-cursor-review.yml
-        secrets: inherit
-        permissions:
-            contents: write
-            pull-requests: write
+  ai-opencode-review:
+    name: AI OpenCode review
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    uses: ./.github/workflows/ai-opencode-review.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
