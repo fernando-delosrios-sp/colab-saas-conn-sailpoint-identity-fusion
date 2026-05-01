@@ -45,7 +45,9 @@ describe('MessagingService report size limits', () => {
     it('delivers explicit-recipient reports through messaging-owned sender readiness', async () => {
         const { service, workflowsApi } = createMessagingService()
         const report = {
-            accounts: [{ accountName: 'Alice', accountSource: 'HR', matches: [{ identityName: 'Alice', isMatch: true }] }],
+            accounts: [
+                { accountName: 'Alice', accountSource: 'HR', matches: [{ identityName: 'Alice', isMatch: true }] },
+            ],
             totalAccounts: 1,
             matches: 1,
         } as any
@@ -75,7 +77,9 @@ describe('MessagingService report size limits', () => {
         expect(workflowsApi.testWorkflow).toHaveBeenCalledTimes(1)
         const sentInput = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input
         const payloadBytes = Buffer.byteLength(
-            JSON.stringify({ input: { subject: sentInput.subject, body: sentInput.body, recipients: sentInput.recipients } }),
+            JSON.stringify({
+                input: { subject: sentInput.subject, body: sentInput.body, recipients: sentInput.recipients },
+            }),
             'utf8'
         )
         const definitionBytes = Buffer.byteLength(
@@ -89,7 +93,9 @@ describe('MessagingService report size limits', () => {
     it('keeps regular report body unchanged when under limit', async () => {
         const { service, workflowsApi } = createMessagingService()
         const report = {
-            accounts: [{ accountName: 'Alice', accountSource: 'HR', matches: [{ identityName: 'Alice', isMatch: true }] }],
+            accounts: [
+                { accountName: 'Alice', accountSource: 'HR', matches: [{ identityName: 'Alice', isMatch: true }] },
+            ],
             totalAccounts: 1,
             matches: 1,
         } as any
@@ -121,7 +127,9 @@ describe('MessagingService report size limits', () => {
         const definitionBytes = Buffer.byteLength(JSON.stringify(fullWorkflow), 'utf8')
         const sentInput = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input
         const payloadBytes = Buffer.byteLength(
-            JSON.stringify({ input: { subject: sentInput.subject, body: sentInput.body, recipients: sentInput.recipients } }),
+            JSON.stringify({
+                input: { subject: sentInput.subject, body: sentInput.body, recipients: sentInput.recipients },
+            }),
             'utf8'
         )
         expect(definitionBytes + payloadBytes).toBeLessThanOrEqual(1_500_000)
@@ -133,7 +141,9 @@ describe('MessagingService report size limits', () => {
         const { service, workflowsApi } = createMessagingService({ padding: largeDefinition })
         const escapeHeavyText = '\\"\\n'.repeat(350_000)
         const report = {
-            accounts: [{ accountName: escapeHeavyText, accountSource: 'HR', matches: [{ identityName: 'x', isMatch: true }] }],
+            accounts: [
+                { accountName: escapeHeavyText, accountSource: 'HR', matches: [{ identityName: 'x', isMatch: true }] },
+            ],
             totalAccounts: 1,
             matches: 1,
         } as any
@@ -149,7 +159,9 @@ describe('MessagingService report size limits', () => {
         const definitionBytes = Buffer.byteLength(JSON.stringify(fullWorkflow), 'utf8')
         const sentInput = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input
         const payloadBytes = Buffer.byteLength(
-            JSON.stringify({ input: { subject: sentInput.subject, body: sentInput.body, recipients: sentInput.recipients } }),
+            JSON.stringify({
+                input: { subject: sentInput.subject, body: sentInput.body, recipients: sentInput.recipients },
+            }),
             'utf8'
         )
         expect(definitionBytes + payloadBytes).toBeLessThanOrEqual(1_500_000)

@@ -34,8 +34,7 @@ export function applySettings(config: FusionConfigBuild): void {
             if (readBoolean(sourceConfig, 'forceAggregation', false) && !sourceConfig.aggregationMode) {
                 sourceConfig.aggregationMode = 'before'
             }
-            const rawTimeout =
-                sourceConfig.aggregationTimeout ?? runtimeDefaults.source.aggregationTimeoutMinutes
+            const rawTimeout = sourceConfig.aggregationTimeout ?? runtimeDefaults.source.aggregationTimeoutMinutes
             const aggregationTimeout =
                 typeof rawTimeout === 'number' && Number.isFinite(rawTimeout) && rawTimeout >= 0
                     ? rawTimeout
@@ -46,8 +45,7 @@ export function applySettings(config: FusionConfigBuild): void {
                 aggregationMode: sourceConfig.aggregationMode ?? runtimeDefaults.source.aggregationMode,
                 aggregationTimeout,
                 aggregationDelay: sourceConfig.aggregationDelay ?? runtimeDefaults.source.aggregationDelay,
-                optimizedAggregation:
-                    sourceConfig.optimizedAggregation ?? runtimeDefaults.source.optimizedAggregation,
+                optimizedAggregation: sourceConfig.optimizedAggregation ?? runtimeDefaults.source.optimizedAggregation,
                 accountFilter: sourceConfig.accountFilter ?? undefined,
                 accountJmespathFilter: sourceConfig.accountJmespathFilter ?? undefined,
                 correlationMode: sourceConfig.correlationMode ?? runtimeDefaults.source.correlationMode,

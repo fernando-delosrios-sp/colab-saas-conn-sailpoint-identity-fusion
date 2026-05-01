@@ -2,16 +2,16 @@
 name: AI Cursor Review
 
 on:
-  workflow_call:
-  workflow_dispatch:
+    workflow_call:
+    workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+    contents: write
+    pull-requests: write
 
 concurrency:
-  group: ai-cursor-review-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+    group: ai-cursor-review-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

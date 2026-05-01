@@ -6,55 +6,11 @@ jest.mock('../actions', () => ({
     executeActions: jest.fn(),
 }))
 
+import { createRegistry as createMockRegistry } from './harness/registryMocking'
+
 function createRegistry() {
-    const fusionIdentity = {
-        nativeIdentity: 'fusion-id-1',
-        addStatus: jest.fn(),
-    }
-
-    const timer = {
-        phase: jest.fn(),
-        end: jest.fn(),
-    }
-
-    return {
-        log: {
-            info: jest.fn(),
-            debug: jest.fn(),
-            crash: jest.fn(),
-            timer: jest.fn(() => timer),
-        },
-        identities: {
-            fetchIdentityByName: jest.fn().mockResolvedValue({ id: 'id-1', name: 'Alice Doe' }),
-        },
-        sources: {
-            fetchAllSources: jest.fn().mockResolvedValue(undefined),
-            fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
-            fusionAccounts: [{ id: 'fusion-existing-1' }],
-        },
-        schemas: {
-            setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
-            fusionDisplayAttribute: 'name',
-        },
-        forms: {
-            fetchFormData: jest.fn().mockResolvedValue(undefined),
-        },
-        fusion: {
-            preProcessFusionAccounts: jest.fn().mockResolvedValue(undefined),
-            processIdentity: jest.fn().mockResolvedValue(undefined),
-            getFusionIdentity: jest.fn().mockReturnValue(fusionIdentity),
-            normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
-            getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-created' }),
-        },
-        attributes: {
-            initializeCounters: jest.fn().mockResolvedValue(undefined),
-            registerUniqueValuesFromRawAccounts: jest.fn(),
-            refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
-        },
-        res: {
-            send: jest.fn(),
-        },
-    } as any
+    const registry = createMockRegistry()
+    return registry
 }
 
 describe('accountCreate', () => {
@@ -82,7 +38,9 @@ describe('accountCreate', () => {
 
         expect(registry.identities.fetchIdentityByName).toHaveBeenCalledWith('Alice Doe')
         expect(registry.sources.fetchFusionAccounts).toHaveBeenCalledTimes(1)
-        expect(registry.attributes.registerUniqueValuesFromRawAccounts).toHaveBeenCalledWith(registry.sources.fusionAccounts)
+        expect(registry.attributes.registerUniqueValuesFromRawAccounts).toHaveBeenCalledWith(
+            registry.sources.fusionAccounts
+        )
         expect(registry.fusion.preProcessFusionAccounts).toHaveBeenCalledTimes(1)
         expect(registry.fusion.processIdentity).toHaveBeenCalledWith({ id: 'id-1', name: 'Alice Doe' })
         expect(registry.fusion.getFusionIdentity().addStatus).toHaveBeenCalledWith(

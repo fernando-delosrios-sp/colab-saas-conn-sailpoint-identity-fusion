@@ -543,14 +543,14 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
 </html>`
 
 export const compileEmailTemplates = (): Map<string, HandlebarsTemplateDelegate> => {
-  const templates = new Map<string, HandlebarsTemplateDelegate>()
+    const templates = new Map<string, HandlebarsTemplateDelegate>()
 
-  // Runtime source of truth: always use in-code templates to avoid
-  // runtime path issues in ISC packaging. Keep src/services/messagingService/templates/*.hbs
-  // behaviorally in sync as human-readable references.
-  templates.set('fusion-report', Handlebars.compile(DEFAULT_FUSION_REPORT_TEMPLATE))
-  templates.set('fusion-review', Handlebars.compile(DEFAULT_FUSION_REVIEW_TEMPLATE))
-  return templates
+    // Runtime source of truth: always use in-code templates to avoid
+    // runtime path issues in ISC packaging. Keep src/services/messagingService/templates/*.hbs
+    // behaviorally in sync as human-readable references.
+    templates.set('fusion-report', Handlebars.compile(DEFAULT_FUSION_REPORT_TEMPLATE))
+    templates.set('fusion-review', Handlebars.compile(DEFAULT_FUSION_REVIEW_TEMPLATE))
+    return templates
 }
 
 // ============================================================================
@@ -562,106 +562,106 @@ export const compileEmailTemplates = (): Map<string, HandlebarsTemplateDelegate>
  * plus the standalone form URL for actioning the review.
  */
 export type FusionReviewEmailData = {
-  accounts: FusionReportEmailData['accounts']
-  totalAccounts: number
-  matches: number
-  reportDate: Date | string
-  formInstanceId?: string
-  formUrl?: string
-  /** Tenant host and fusion source, e.g. "acme.identitynow.com - My Fusion Source" */
-  headerSubtitle?: string
+    accounts: FusionReportEmailData['accounts']
+    totalAccounts: number
+    matches: number
+    reportDate: Date | string
+    formInstanceId?: string
+    formUrl?: string
+    /** Tenant host and fusion source, e.g. "acme.identitynow.com - My Fusion Source" */
+    headerSubtitle?: string
 }
 
 export type EditRequestEmailData = {
-  accountName: string
-  accountSource: string
-  accountAttributes: Record<string, any>
-  formInstanceId?: string
+    accountName: string
+    accountSource: string
+    accountAttributes: Record<string, any>
+    formInstanceId?: string
 }
 
 export type FusionReportEmailData = {
-  reportTitle: string
-  /** Tenant host and fusion source, e.g. "acme.identitynow.com - My Fusion Source" */
-  headerSubtitle?: string
-  accounts: Array<{
-    accountName: string
-    accountUrl?: string
-    accountSource: string
-    sourceType?: SourceType
-    deferred?: boolean
-    accountId?: string
-    accountEmail?: string
-    accountAttributes?: Record<string, any>
-    error?: string
-    matches: Array<{
-      identityName: string
-      identityId?: string
-      identityUrl?: string
-      isMatch: boolean
-      exact?: boolean
-      scores?: Array<{
-        attribute: string
-        algorithm?: string
-        score: number
-        fusionScore?: number
-        isMatch: boolean
-        comment?: string
-      }>
+    reportTitle: string
+    /** Tenant host and fusion source, e.g. "acme.identitynow.com - My Fusion Source" */
+    headerSubtitle?: string
+    accounts: Array<{
+        accountName: string
+        accountUrl?: string
+        accountSource: string
+        sourceType?: SourceType
+        deferred?: boolean
+        accountId?: string
+        accountEmail?: string
+        accountAttributes?: Record<string, any>
+        error?: string
+        matches: Array<{
+            identityName: string
+            identityId?: string
+            identityUrl?: string
+            isMatch: boolean
+            exact?: boolean
+            scores?: Array<{
+                attribute: string
+                algorithm?: string
+                score: number
+                fusionScore?: number
+                isMatch: boolean
+                comment?: string
+            }>
+        }>
     }>
-  }>
-  totalAccounts: number
-  matches: number
-  reportDate: Date | string
-  fusionReviewDecisions?: Array<{
-    reviewerId: string
-    reviewerName: string
-    reviewerUrl?: string
-    reviewerEmail?: string
-    accountId: string
-    accountName: string
-    accountUrl?: string
-    accountSource: string
-    sourceType?: SourceType
-    decision: 'assign-existing-identity' | 'create-new-identity' | 'confirm-no-match'
-    decisionLabel: string
-    selectedIdentityId?: string
-    selectedIdentityName?: string
-    selectedIdentityUrl?: string
-    comments?: string
-    formUrl?: string
-    automaticAssignment?: boolean
-  }>
-  stats?: {
-    totalFusionAccounts?: number
-    fusionAccountsFound?: number
-    fusionReviewsCreated?: number
-    fusionReviewAssignments?: number
-    fusionReviewsFound?: number
-    fusionReviewInstancesFound?: number
-    fusionAutomaticMatches?: number
-    fusionReviewsProcessed?: number
-    fusionReviewNewIdentities?: number
-    fusionReviewNonMatches?: number
-    fusionReviewDecisionsAuthoritative?: number
-    fusionReviewDecisionsRecord?: number
-    fusionReviewDecisionsOrphan?: number
-    fusionReviewNewIdentitiesAuthoritative?: number
-    fusionReviewNoMatchesRecord?: number
-    fusionReviewNoMatchesOrphan?: number
-    identitiesFound?: number
-    identitiesProcessed?: number
-    managedAccountsFound?: number
-    managedAccountsFoundAuthoritative?: number
-    managedAccountsFoundRecord?: number
-    managedAccountsFoundOrphan?: number
-    managedAccountsProcessed?: number
-    managedAccountsProcessedAuthoritative?: number
-    managedAccountsProcessedRecord?: number
-    managedAccountsProcessedOrphan?: number
-    totalProcessingTime?: string
-    usedMemory?: string
-    phaseTiming?: Array<{ phase: string; elapsed: string }>
-  }
+    totalAccounts: number
+    matches: number
+    reportDate: Date | string
+    fusionReviewDecisions?: Array<{
+        reviewerId: string
+        reviewerName: string
+        reviewerUrl?: string
+        reviewerEmail?: string
+        accountId: string
+        accountName: string
+        accountUrl?: string
+        accountSource: string
+        sourceType?: SourceType
+        decision: 'assign-existing-identity' | 'create-new-identity' | 'confirm-no-match'
+        decisionLabel: string
+        selectedIdentityId?: string
+        selectedIdentityName?: string
+        selectedIdentityUrl?: string
+        comments?: string
+        formUrl?: string
+        automaticAssignment?: boolean
+    }>
+    stats?: {
+        totalFusionAccounts?: number
+        fusionAccountsFound?: number
+        fusionReviewsCreated?: number
+        fusionReviewAssignments?: number
+        fusionReviewsFound?: number
+        fusionReviewInstancesFound?: number
+        fusionAutomaticMatches?: number
+        fusionReviewsProcessed?: number
+        fusionReviewNewIdentities?: number
+        fusionReviewNonMatches?: number
+        fusionReviewDecisionsAuthoritative?: number
+        fusionReviewDecisionsRecord?: number
+        fusionReviewDecisionsOrphan?: number
+        fusionReviewNewIdentitiesAuthoritative?: number
+        fusionReviewNoMatchesRecord?: number
+        fusionReviewNoMatchesOrphan?: number
+        identitiesFound?: number
+        identitiesProcessed?: number
+        managedAccountsFound?: number
+        managedAccountsFoundAuthoritative?: number
+        managedAccountsFoundRecord?: number
+        managedAccountsFoundOrphan?: number
+        managedAccountsProcessed?: number
+        managedAccountsProcessedAuthoritative?: number
+        managedAccountsProcessedRecord?: number
+        managedAccountsProcessedOrphan?: number
+        totalProcessingTime?: string
+        usedMemory?: string
+        phaseTiming?: Array<{ phase: string; elapsed: string }>
+    }
 }
 
 // ============================================================================
@@ -672,49 +672,49 @@ export type FusionReportEmailData = {
  * Render fusion review email template
  */
 export const renderFusionReviewEmail = (
-  templates: Map<string, HandlebarsTemplateDelegate>,
-  data: FusionReviewEmailData
+    templates: Map<string, HandlebarsTemplateDelegate>,
+    data: FusionReviewEmailData
 ): string => {
-  const template = templates.get('fusion-review')
-  if (!template) {
-    throw new ConnectorError(
-      'Fusion review email template not found. Email templates may not have been compiled correctly.',
-      ConnectorErrorType.Generic
-    )
-  }
-  return template(data)
+    const template = templates.get('fusion-review')
+    if (!template) {
+        throw new ConnectorError(
+            'Fusion review email template not found. Email templates may not have been compiled correctly.',
+            ConnectorErrorType.Generic
+        )
+    }
+    return template(data)
 }
 
 /**
  * Render edit request email template
  */
 export const renderEditRequestEmail = (
-  templates: Map<string, HandlebarsTemplateDelegate>,
-  data: EditRequestEmailData
+    templates: Map<string, HandlebarsTemplateDelegate>,
+    data: EditRequestEmailData
 ): string => {
-  const template = templates.get('edit-request')
-  if (!template) {
-    throw new ConnectorError(
-      'Edit request email template not found. Email templates may not have been compiled correctly.',
-      ConnectorErrorType.Generic
-    )
-  }
-  return template(data)
+    const template = templates.get('edit-request')
+    if (!template) {
+        throw new ConnectorError(
+            'Edit request email template not found. Email templates may not have been compiled correctly.',
+            ConnectorErrorType.Generic
+        )
+    }
+    return template(data)
 }
 
 /**
  * Render fusion report email template
  */
 export const renderFusionReport = (
-  templates: Map<string, HandlebarsTemplateDelegate>,
-  data: FusionReportEmailData
+    templates: Map<string, HandlebarsTemplateDelegate>,
+    data: FusionReportEmailData
 ): string => {
-  const template = templates.get('fusion-report')
-  if (!template) {
-    throw new ConnectorError(
-      'Fusion report email template not found. Email templates may not have been compiled correctly.',
-      ConnectorErrorType.Generic
-    )
-  }
-  return template(data)
+    const template = templates.get('fusion-report')
+    if (!template) {
+        throw new ConnectorError(
+            'Fusion report email template not found. Email templates may not have been compiled correctly.',
+            ConnectorErrorType.Generic
+        )
+    }
+    return template(data)
 }

@@ -32,7 +32,9 @@ export enum AttributeMergeMode {
 }
 
 export type DefaultAttributeMergeMode =
-    AttributeMergeMode.First | AttributeMergeMode.List | AttributeMergeMode.Concatenate
+    | AttributeMergeMode.First
+    | AttributeMergeMode.List
+    | AttributeMergeMode.Concatenate
 
 /**
  * Configuration for mapping one or more source attributes into a single fusion attribute.
@@ -116,7 +118,15 @@ export interface MatchingConfig {
     /** The attribute name to compare between accounts */
     attribute: string
     /** The similarity algorithm to use for comparison */
-    algorithm?: 'name-matcher' | 'jaro-winkler' | 'lig3' | 'dice' | 'double-metaphone' | 'average' | 'weighted-mean' | 'custom'
+    algorithm?:
+        | 'name-matcher'
+        | 'jaro-winkler'
+        | 'lig3'
+        | 'dice'
+        | 'double-metaphone'
+        | 'average'
+        | 'weighted-mean'
+        | 'custom'
     /**
      * When `algorithm` is `custom`, Apache Velocity template evaluated per pair.
      * Context includes `$accountValue`, `$candidateValue`, and `$attribute` (rule attribute name).
@@ -136,7 +146,9 @@ export interface MatchingConfig {
  * Default is to skip when the key is omitted or true; explicit `false` always evaluates.
  * Mandatory rules are always evaluated so missing data can fail the threshold.
  */
-export function effectiveSkipMatchIfMissing(matching: Pick<MatchingConfig, 'skipMatchIfMissing' | 'mandatory'>): boolean {
+export function effectiveSkipMatchIfMissing(
+    matching: Pick<MatchingConfig, 'skipMatchIfMissing' | 'mandatory'>
+): boolean {
     if (matching.mandatory === true) {
         return false
     }
@@ -225,7 +237,7 @@ export interface ProcessingControlSection {
 }
 
 /** Combined source settings: scope, sources, and processing controls. */
-export interface SourceSettingsMenu extends ScopeSection, SourcesSection, ProcessingControlSection { }
+export interface SourceSettingsMenu extends ScopeSection, SourcesSection, ProcessingControlSection {}
 
 // ============================================================================
 // Attribute Mapping Settings Menu
@@ -288,7 +300,7 @@ export interface ReviewSettingsSection {
 }
 
 /** Combined Attribute Matching Settings: matching rules and review workflow. */
-export interface AttributeMatchingSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection { }
+export interface AttributeMatchingSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection {}
 
 // ============================================================================
 // Advanced Settings Menu
@@ -421,9 +433,7 @@ export interface ProxySettingsSection {
 
 /** Combined advanced settings: developer, connection tuning, and proxy. */
 export interface AdvancedSettingsMenu
-    extends DeveloperSettingsSection,
-    AdvancedConnectionSettingsSection,
-    ProxySettingsSection { }
+    extends DeveloperSettingsSection, AdvancedConnectionSettingsSection, ProxySettingsSection {}
 
 // ============================================================================
 // Internal/Computed fields
@@ -482,12 +492,13 @@ export interface InternalConfig {
  * ISC platform config, and internal computed constants into a single interface.
  */
 export interface FusionConfig
-    extends BaseConfig,
-    ConnectionSettingsMenu,
-    SourceSettingsMenu,
-    AttributeMappingSettingsMenu,
-    NormalAttributeDefinitionSettingsMenu,
-    UniqueAttributeDefinitionSettingsMenu,
-    AttributeMatchingSettingsMenu,
-    AdvancedSettingsMenu,
-    InternalConfig { }
+    extends
+        BaseConfig,
+        ConnectionSettingsMenu,
+        SourceSettingsMenu,
+        AttributeMappingSettingsMenu,
+        NormalAttributeDefinitionSettingsMenu,
+        UniqueAttributeDefinitionSettingsMenu,
+        AttributeMatchingSettingsMenu,
+        AdvancedSettingsMenu,
+        InternalConfig {}

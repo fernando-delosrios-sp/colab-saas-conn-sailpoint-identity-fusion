@@ -152,9 +152,7 @@ describe('ScoringService mandatory matching behavior', () => {
 
         expect(fusionAccount.addFusionMatch).toHaveBeenCalled()
         const fusionMatch = fusionAccount.addFusionMatch.mock.calls[0][0]
-        const rules = fusionMatch.scores.filter(
-            (s: any) => !s.skipped && s.algorithm !== WEIGHTED_MEAN_ALGORITHM
-        )
+        const rules = fusionMatch.scores.filter((s: any) => !s.skipped && s.algorithm !== WEIGHTED_MEAN_ALGORITHM)
         const combined = fusionMatch.scores.find((s: any) => s.algorithm === WEIGHTED_MEAN_ALGORITHM)
         expect(combined).toBeDefined()
         const sumWeighted = rules.reduce((acc: number, s: any) => acc + (s.weightedScore ?? 0), 0)
@@ -205,7 +203,9 @@ describe('ScoringService max identity match candidates', () => {
             2
         )
 
-        expect(fusionAccount.fusionMatches.filter((m) => (m.candidateType ?? 'identity') === 'identity')).toHaveLength(2)
+        expect(fusionAccount.fusionMatches.filter((m) => (m.candidateType ?? 'identity') === 'identity')).toHaveLength(
+            2
+        )
         expect(compared).toBe(2)
     })
 })

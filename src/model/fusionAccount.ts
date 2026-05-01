@@ -999,7 +999,7 @@ export class FusionAccount {
      */
     public clearFusionIdentityReferences(): void {
         for (const match of this._fusionMatches) {
-            ; (match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
+            ;(match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
         }
     }
 

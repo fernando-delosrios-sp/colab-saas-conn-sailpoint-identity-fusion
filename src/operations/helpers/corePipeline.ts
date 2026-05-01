@@ -135,7 +135,9 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
 
     const fetchAllStartedAt = Date.now()
     await Promise.all(fetchTasks)
-    log.info(`Performance metric: fetchPhase.parallelFetch durationMs=${Date.now() - fetchAllStartedAt} taskCount=${fetchTasks.length}`)
+    log.info(
+        `Performance metric: fetchPhase.parallelFetch durationMs=${Date.now() - fetchAllStartedAt} taskCount=${fetchTasks.length}`
+    )
 
     // Form instance processing must run after managed accounts are loaded
     log.info('Processing fetched form data')
@@ -230,7 +232,10 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
 }
 
 /** Phase 5: Unique attribute refresh. */
-export async function uniqueAttributesPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<void> {
+export async function uniqueAttributesPhase(
+    serviceRegistry: ServiceRegistry,
+    options: CorePipelineOptions
+): Promise<void> {
     void options
     const { log, fusion, sources } = serviceRegistry
 
@@ -244,7 +249,10 @@ export async function uniqueAttributesPhase(serviceRegistry: ServiceRegistry, op
  * - Aggregation mode: default unique-attribute refresh.
  * - Dry-run mode: allows command-specific preparation while keeping a shared phase boundary.
  */
-export async function outputPreparationPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<void> {
+export async function outputPreparationPhase(
+    serviceRegistry: ServiceRegistry,
+    options: CorePipelineOptions
+): Promise<void> {
     await uniqueAttributesPhase(serviceRegistry, options)
 }
 
@@ -299,12 +307,16 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
         const sendAccountsStartedAt = Date.now()
         count = await fusion.forEachISCAccount((account) => res.send(account))
         log.info(`Sent ${count} account(s) to platform`)
-        log.info(`Performance metric: outputPhase.sendAccounts durationMs=${Date.now() - sendAccountsStartedAt} count=${count}`)
+        log.info(
+            `Performance metric: outputPhase.sendAccounts durationMs=${Date.now() - sendAccountsStartedAt} count=${count}`
+        )
 
         const saveAttributesStartedAt = Date.now()
         await attributes.saveState()
         log.info('Attribute state saved')
-        log.info(`Performance metric: outputPhase.saveAttributeState durationMs=${Date.now() - saveAttributesStartedAt}`)
+        log.info(
+            `Performance metric: outputPhase.saveAttributeState durationMs=${Date.now() - saveAttributesStartedAt}`
+        )
         const saveCumulativeCountStartedAt = Date.now()
         await sources.saveBatchCumulativeCount()
         log.info('Batch cumulative count saved')

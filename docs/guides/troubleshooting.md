@@ -86,13 +86,13 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
 
 **Required API scopes:**
 
-| Scope                                   | Purpose                                        |
-| --------------------------------------- | ---------------------------------------------- |
-| `sp:scopes:all`                         | All operations (or use specific scopes below)  |
-| `sp:scim:read`, `sp:scim:write`         | Identity/account operations                    |
-| `sp:accounts:read`, `sp:accounts:write` | Account management                             |
-| `sp:forms:manage`                       | Create/manage review forms (for matching) |
-| `sp:workflow:execute`                   | Execute workflows (for notifications)          |
+| Scope                                   | Purpose                                       |
+| --------------------------------------- | --------------------------------------------- |
+| `sp:scopes:all`                         | All operations (or use specific scopes below) |
+| `sp:scim:read`, `sp:scim:write`         | Identity/account operations                   |
+| `sp:accounts:read`, `sp:accounts:write` | Account management                            |
+| `sp:forms:manage`                       | Create/manage review forms (for matching)     |
+| `sp:workflow:execute`                   | Execute workflows (for notifications)         |
 
 **Solution:**
 
@@ -145,16 +145,16 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
 
 **Possible causes:**
 
-| Cause                                | Diagnostic                                    | Solution                                                                                   |
-| ------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Source name mismatch**             | Check exact source names in ISC vs config     | Update source names in **Authoritative account sources** (case-sensitive)                  |
-| **Managed sources disabled**         | Verify each source shows **Enabled = On**     | In the GUI, go to **Source Setup → Source Configuration** and enable all managed sources   |
-| **Identity Scope Query too strict**  | Test query in ISC search                      | Relax query; or use `*` for all identities                                                 |
-| **Account filter excludes accounts** | Review filter logic                           | Adjust or remove **Account filter**                                                        |
-| **Machine accounts excluded**        | Check logs for `isMachine=true` discard warnings | Expected behavior. Identity Fusion NG does not support machine accounts and skips them. |
-| **Sources not aggregated**           | Check source aggregation history              | Run aggregation on source systems first                                                    |
-| **Stuck processing state**           | Check account history for "processing" status | Simply retry the aggregation; the connector auto-resets the flag and asks you to run again |
-| **Configuration error**              | Review all configuration fields               | Validate configuration                                                                     |
+| Cause                                | Diagnostic                                       | Solution                                                                                   |
+| ------------------------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| **Source name mismatch**             | Check exact source names in ISC vs config        | Update source names in **Authoritative account sources** (case-sensitive)                  |
+| **Managed sources disabled**         | Verify each source shows **Enabled = On**        | In the GUI, go to **Source Setup → Source Configuration** and enable all managed sources   |
+| **Identity Scope Query too strict**  | Test query in ISC search                         | Relax query; or use `*` for all identities                                                 |
+| **Account filter excludes accounts** | Review filter logic                              | Adjust or remove **Account filter**                                                        |
+| **Machine accounts excluded**        | Check logs for `isMachine=true` discard warnings | Expected behavior. Identity Fusion NG does not support machine accounts and skips them.    |
+| **Sources not aggregated**           | Check source aggregation history                 | Run aggregation on source systems first                                                    |
+| **Stuck processing state**           | Check account history for "processing" status    | Simply retry the aggregation; the connector auto-resets the flag and asks you to run again |
+| **Configuration error**              | Review all configuration fields                  | Validate configuration                                                                     |
 
 **Screenshot placeholder:** Source configuration.
 
@@ -219,11 +219,11 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
 
 **Possible causes:**
 
-| Cause                            | Diagnostic                                                 | Solution                                                                   |
-| -------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
-| **Expression always same value** | Check Velocity expression                                  | Add variable parts (firstname, lastname) instead of fixed strings          |
+| Cause                            | Diagnostic                                              | Solution                                                                   |
+| -------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Expression always same value** | Check Velocity expression                               | Add variable parts (firstname, lastname) instead of fixed strings          |
 | **Max attempts too low**         | Check **Maximum attempts for unique Define generation** | Increase to 200–500 for large datasets                                     |
-| **High collision rate**          | Many accounts with same firstname+lastname                 | Use more distinguishing expression (add middle initial, employee ID, etc.) |
+| **High collision rate**          | Many accounts with same firstname+lastname              | Use more distinguishing expression (add middle initial, employee ID, etc.) |
 
 **Example fix:**
 
@@ -692,10 +692,10 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 | Aggregation hangs        | Timeout too low              | Increase timeout                      | [2.1](#issue-21-aggregation-hangs-or-times-out)                     |
 | No accounts              | Source name mismatch         | Fix source names                      | [2.2](#issue-22-no-accounts-or-fewer-accounts-than-expected)        |
 | Accounts disabled        | By design                    | Configure provisioning plan           | [2.3](#issue-23-aggregation-succeeds-but-accounts-are-disabled)     |
-| Unique generation fails  | Expression always same       | Add variable parts                    | [3.1](#issue-31-unique-defines-fail-or-loop)         |
+| Unique generation fails  | Expression always same       | Add variable parts                    | [3.1](#issue-31-unique-defines-fail-or-loop)                        |
 | Wrong schema             | Config not saved             | Save, re-discover                     | [3.2](#issue-32-schema-discovery-shows-wrong-or-missing-attributes) |
 | Velocity error           | Null value                   | Add null checks                       | [3.3](#issue-33-velocity-expression-errors)                         |
-| No duplicates found      | Threshold too high           | Lower thresholds                      | [4.1](#issue-41-no-potential-matches-found-expected-some)        |
+| No duplicates found      | Threshold too high           | Lower thresholds                      | [4.1](#issue-41-no-potential-matches-found-expected-some)           |
 | Too many false positives | Threshold too low            | Raise thresholds; add mandatory       | [4.2](#issue-42-too-many-false-positives-wrong-matches)             |
 | No review emails         | Access profile not assigned  | Assign reviewer access                | [4.3](#issue-43-reviewers-not-receiving-forms)                      |
 | Proxy connection fails   | Server not reachable         | Check URL, firewall                   | [5.1](#issue-51-connection-to-proxy-fails)                          |

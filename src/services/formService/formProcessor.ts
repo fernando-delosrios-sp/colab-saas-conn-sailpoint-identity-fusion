@@ -39,7 +39,9 @@ function readCorrelatedIdentityId(formInput: any): string | undefined {
     // Fall back to dictionary structure
     try {
         const dict = formInput as Record<string, any>
-        const inputObj = Object.values(dict ?? {}).find((x: any) => x?.id === 'identityId' && (x.value || x.description))
+        const inputObj = Object.values(dict ?? {}).find(
+            (x: any) => x?.id === 'identityId' && (x.value || x.description)
+        )
         const value = inputObj?.value || inputObj?.description
         return typeof value === 'string' && value.length > 0 ? value : undefined
     } catch {
@@ -87,7 +89,9 @@ export const getReviewerInfo = (
  * Handles both flat structure { account: "...", name: "...", source: "..." }
  * and dictionary structure where formInput is an object with input objects keyed by id.
  */
-export const extractAccountInfoFromFormInput = (formInput: any): { id: string; name: string; sourceName: string } | null => {
+export const extractAccountInfoFromFormInput = (
+    formInput: any
+): { id: string; name: string; sourceName: string } | null => {
     let accountId: string | undefined
     let accountName: string | undefined
     let accountSource: string | undefined
@@ -170,9 +174,7 @@ export const createFusionDecision = async (
     assert(formInstance.id, 'Form instance ID is required')
 
     const finished =
-        formInstance.state === 'COMPLETED' ||
-        formInstance.state === 'IN_PROGRESS' ||
-        formInstance.state === 'SUBMITTED'
+        formInstance.state === 'COMPLETED' || formInstance.state === 'IN_PROGRESS' || formInstance.state === 'SUBMITTED'
 
     const { formData, formInput, recipients } = formInstance
 
@@ -194,13 +196,13 @@ export const createFusionDecision = async (
     const existingIdentity = isNewIdentity
         ? undefined
         : Array.isArray(identitiesValue)
-            ? identitiesValue[0]
-            : identitiesValue
+          ? identitiesValue[0]
+          : identitiesValue
 
     if (!isNewIdentity && !existingIdentity) {
         logger.error(
             `[formProcessor] Form ${formInstance.id}: toggle is false but no identity selected ` +
-            `for account ${accountInfo.name} [${accountInfo.sourceName}]. Skipping decision.`
+                `for account ${accountInfo.name} [${accountInfo.sourceName}]. Skipping decision.`
         )
         return null
     }
@@ -263,9 +265,9 @@ export const createFusionDecision = async (
     }
     const selectedIdentityName = existingIdentity
         ? selectedIdentity?.displayName ||
-        (selectedIdentity as any)?.attributes?.displayName ||
-        selectedIdentity?.name ||
-        existingIdentity
+          (selectedIdentity as any)?.attributes?.displayName ||
+          selectedIdentity?.name ||
+          existingIdentity
         : undefined
 
     // Defensive: ensure decision.account fields are strings so templates never render "[object Object]".

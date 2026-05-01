@@ -1,9 +1,6 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { FusionAccount } from '../../model/account'
-import {
-    AggregationStats,
-    FusionReport,
-} from '../../services/fusionService/types'
+import { AggregationStats, FusionReport } from '../../services/fusionService/types'
 import { setupPhase, fetchPhase, refreshPhase, processPhase, uniqueAttributesPhase } from './corePipeline'
 
 /**
