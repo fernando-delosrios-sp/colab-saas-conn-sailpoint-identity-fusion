@@ -287,6 +287,7 @@ export class ScoringService {
                 : undefined
 
         let compared = 0
+        // Counter-based yielding avoids modulo on every iteration; reset after each yield.
         let yieldCounter = 0
         for (const fusionIdentity of fusionIdentities) {
             if (
