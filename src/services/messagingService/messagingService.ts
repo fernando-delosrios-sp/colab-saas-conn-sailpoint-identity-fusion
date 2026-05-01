@@ -671,10 +671,10 @@ export class MessagingService {
 
         const results = await Promise.all(
             validIds.map(async (identityId) => {
-                let identity = this.identities!.getIdentityById(identityId)
+                let identity = this.identities?.getIdentityById(identityId)
                 if (!identity) {
                     try {
-                        identity = await this.identities!.fetchIdentityById(identityId)
+                        identity = await this.identities?.fetchIdentityById(identityId)
                     } catch (e) {
                         this.log.warn(`Failed to fetch identity ${identityId}: ${e}`)
                     }
