@@ -382,6 +382,9 @@ export class SourceService {
         const ownerIdSet = new Set<string>()
 
         let ownerId: string | undefined
+        // Only swallow the specific "owner not found" error; rethrow unexpected errors
+        // so callers can distinguish between a missing owner (expected empty result) and
+        // other failures (propagate upward).
         try {
             ownerId = this.fusionSourceOwner.id
         } catch (error) {
