@@ -49,9 +49,9 @@ if (!changedFiles.includes('README.md')) {
     fail('README.md must be updated when product/runtime files change and include a changelog entry.')
 }
 
-let patch = run(`git diff --unified=0 origin/${baseRef}...HEAD -- README.md`)
+let patch = run(`git diff --unified=1000 origin/${baseRef}...HEAD -- README.md`)
 if (!patch) {
-    patch = run('git diff --unified=0 -- README.md')
+    patch = run('git diff --unified=1000 -- README.md')
 }
 const lines = patch.split('\n')
 

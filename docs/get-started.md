@@ -20,14 +20,14 @@ This page is the shortest path from “new Fusion source” to a working aggrega
 
 ## Where to go next
 
-| Goal | Guide |
-| ---- | ----- |
-| Source types, filters, correlation modes | [Source configuration](guides/source-configuration.md) |
-| Similarity algorithms and tuning | [Matching algorithms](guides/matching-algorithms.md) |
-| Queues, retries, batching, logging | [Advanced connection settings](guides/advanced-connection-settings.md) |
-| Run logic outside ISC | [Proxy mode](guides/proxy-mode.md) |
-| Upgrade from Identity Fusion 1.x | [Migration](guides/migration-from-previous-fusion.md) |
-| Validation workflow | [Testing process](guides/testing-process.md) |
-| Errors and recovery | [Troubleshooting](guides/troubleshooting.md) |
+| Goal                                     | Guide                                                                  |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| Source types, filters, correlation modes | [Source configuration](guides/source-configuration.md)                 |
+| Similarity algorithms and tuning         | [Matching algorithms](guides/matching-algorithms.md)                   |
+| Queues, retries, batching, logging       | [Advanced connection settings](guides/advanced-connection-settings.md) |
+| Run logic outside ISC                    | [Proxy mode](guides/proxy-mode.md)                                     |
+| Upgrade from Identity Fusion 1.x         | [Migration](guides/migration-from-previous-fusion.md)                  |
+| Validation workflow                      | [Testing process](guides/testing-process.md)                           |
+| Errors and recovery                      | [Troubleshooting](guides/troubleshooting.md)                           |
 
 For connector operations (test connection, account list, and so on), use **Operations** in the site navigation.

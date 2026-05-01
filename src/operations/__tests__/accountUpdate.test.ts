@@ -11,39 +11,12 @@ jest.mock('../actions', () => ({
     executeActions: jest.fn(),
 }))
 
-function createRegistry() {
-    const timer = {
-        phase: jest.fn(),
-        end: jest.fn(),
-    }
+import { createRegistry as createMockRegistry } from './harness/registryMocking'
 
-    return {
-        config: {
-            sources: [],
-        },
-        log: {
-            info: jest.fn(),
-            debug: jest.fn(),
-            crash: jest.fn(),
-            timer: jest.fn(() => timer),
-        },
-        sources: {
-            fetchAllSources: jest.fn().mockResolvedValue(undefined),
-            fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
-            fusionAccountsByNativeIdentity: new Map(),
-        },
-        schemas: {
-            setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
-        },
-        forms: {},
-        fusion: {
-            normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
-            getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-updated' }),
-        },
-        res: {
-            send: jest.fn(),
-        },
-    } as any
+function createRegistry() {
+    const registry = createMockRegistry()
+    Object.assign(registry.fusion, { getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-updated' }) })
+    return registry
 }
 
 describe('accountUpdate', () => {
@@ -106,7 +79,9 @@ describe('accountUpdate', () => {
 
     it('preserves reverse correlation attributes as-is during account update', async () => {
         const registry = createRegistry()
-        registry.config.sources = [{ name: 'HR', correlationMode: 'reverse', correlationAttribute: 'reverseNativeIdentity' }]
+        registry.config.sources = [
+            { name: 'HR', correlationMode: 'reverse', correlationAttribute: 'reverseNativeIdentity' },
+        ]
         registry.sources.fusionAccountsByNativeIdentity.set('fusion-1', {
             attributes: {
                 reverseNativeIdentity: 'native-before-update',

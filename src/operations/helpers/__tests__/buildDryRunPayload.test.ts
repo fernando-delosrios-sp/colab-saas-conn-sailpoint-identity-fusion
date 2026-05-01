@@ -97,7 +97,9 @@ describe('buildDryRunPayload', () => {
                 sourceType: SourceType.Authoritative,
                 deferred: true,
                 fusionIdentityComparisons: 2,
-                matches: [{ identityName: 'Unmatched Candidate', isMatch: true, candidateType: 'new-unmatched', scores: [] }],
+                matches: [
+                    { identityName: 'Unmatched Candidate', isMatch: true, candidateType: 'new-unmatched', scores: [] },
+                ],
             },
         ])
         const row = {
@@ -182,7 +184,12 @@ describe('buildDryRunPayload', () => {
             reportOptions: defaultReportOptions,
             reportAccounts: [
                 { accountId: 'acc-1', accountName: 'A', accountSource: 'HR', matches: [] },
-                { accountId: 'acc-2', accountName: 'B', accountSource: 'IT', matches: [{ identityName: 'X', isMatch: true }] },
+                {
+                    accountId: 'acc-2',
+                    accountName: 'B',
+                    accountSource: 'IT',
+                    matches: [{ identityName: 'X', isMatch: true }],
+                },
             ],
             issueSummary: {
                 warningCount: 1,

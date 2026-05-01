@@ -26,8 +26,6 @@ describe('compileAccountPageJmespathFilter', () => {
 
     it('throws when expression does not return an array', () => {
         const compiled = compileAccountPageJmespathFilter('HR', 'accounts[0].id')
-        expect(() => compiled!.filterAccountPage([{ id: 'a1' } as any])).toThrow(
-            'must return an array'
-        )
+        expect(() => compiled!.filterAccountPage([{ id: 'a1' } as any])).toThrow('must return an array')
     })
 })

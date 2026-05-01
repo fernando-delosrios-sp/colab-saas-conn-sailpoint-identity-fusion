@@ -511,7 +511,7 @@ export class AttributeService {
         if (this.skipAccountsWithMissingId && !uniqueId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -631,7 +631,7 @@ export class AttributeService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} raw account(s) ` +
-            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -676,8 +676,7 @@ export class AttributeService {
         fusionAccount: FusionAccount,
         orderedAccounts: Record<string, any>[]
     ): Record<string, any> | undefined {
-        const originIdRaw =
-            fusionAccount.originAccountId ?? fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE]
+        const originIdRaw = fusionAccount.originAccountId ?? fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE]
         const originId = trimStr(originIdRaw)
         if (!originId) return undefined
 
@@ -720,11 +719,7 @@ export class AttributeService {
 
     private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
         const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
-        return (
-            trimStr(identityBag?.name) ??
-            trimStr(fusionAccount.identityDisplayName) ??
-            trimStr(fusionAccount.name)
-        )
+        return trimStr(identityBag?.name) ?? trimStr(fusionAccount.identityDisplayName) ?? trimStr(fusionAccount.name)
     }
 
     private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
@@ -763,8 +758,7 @@ export class AttributeService {
 
         const prioritizedIndex = ordered.findIndex(
             (account) =>
-                getManagedAccountSnapshotKey(account) === mainAccountId ||
-                trimStr(account?._id) === mainAccountId
+                getManagedAccountSnapshotKey(account) === mainAccountId || trimStr(account?._id) === mainAccountId
         )
         if (prioritizedIndex <= 0) return ordered
 
@@ -792,9 +786,7 @@ export class AttributeService {
     ): Record<string, any> | undefined {
         for (const accounts of sourceAttributeMap.values()) {
             const match = accounts.find(
-                (account) =>
-                    getManagedAccountSnapshotKey(account) === accountId ||
-                    trimStr(account?._id) === accountId
+                (account) => getManagedAccountSnapshotKey(account) === accountId || trimStr(account?._id) === accountId
             )
             if (match) return match
         }
