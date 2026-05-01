@@ -492,7 +492,8 @@ export class SourceService {
 
                 if (!response.ok) {
                     const responseBody = await response.text()
-                    throw new Error(`HTTP ${response.status} ${response.statusText} - ${responseBody}`)
+                    const safeBodyPreview = responseBody.length > 100 ? responseBody.substring(0, 100) + '...' : responseBody
+                    throw new Error(`HTTP ${response.status} ${response.statusText} - ${safeBodyPreview}`)
                 }
             },
             QueuePriority.LOW,

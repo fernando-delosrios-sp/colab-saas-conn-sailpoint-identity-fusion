@@ -28,6 +28,9 @@ const colors = {
     white: '\x1b[37m',
 }
 
+// Sanitize: strip newlines/carriage returns to prevent log injection attacks
+const sanitizeLog = (message) => message.replace(/[\r\n]+/g, ' ')
+
 // Colorize log messages
 const colorizeLog = (message) => {
     // Match pattern: HH:MM:SS [LEVEL] origin: message
@@ -107,12 +110,13 @@ app.post('/', (req, res) => {
             message = `${req.method} ${req.path} (empty body)`
         }
 
-        // Write to file (message already includes timestamp from connector)
-        const logLine = `${message}\n`
+        // Sanitize to prevent log injection
+        const sanitized = sanitizeLog(message)
+        const logLine = `${sanitized}\n`
         fs.appendFileSync(LOG_FILE, logLine)
 
         // Print to console with colors - one line per message
-        console.log(colorizeLog(message))
+        console.log(colorizeLog(sanitized))
 
         res.status(200).json({ success: true })
     } catch (error) {
@@ -143,12 +147,13 @@ app.all('/logs', (req, res) => {
             message = `${req.method} ${req.path} (empty body)`
         }
 
-        // Write to file (message already includes timestamp from connector)
-        const logLine = `${message}\n`
+        // Sanitize to prevent log injection
+        const sanitized = sanitizeLog(message)
+        const logLine = `${sanitized}\n`
         fs.appendFileSync(LOG_FILE, logLine)
 
         // Print to console with colors - one line per message
-        console.log(colorizeLog(message))
+        console.log(colorizeLog(sanitized))
 
         res.status(200).json({ success: true })
     } catch (error) {
@@ -174,12 +179,14 @@ app.use((req, res) => {
             message = `${req.method} ${req.path}`
         }
 
-        const logLine = `${message}\n`
+        // Sanitize to prevent log injection
+        const sanitized = sanitizeLog(message)
+        const logLine = `${sanitized}\n`
 
         fs.appendFileSync(LOG_FILE, logLine)
 
         // Print full message to console with colors for real-time monitoring
-        console.log(colorizeLog(message))
+        console.log(colorizeLog(sanitized))
 
         res.status(200).json({ success: true })
     } catch (error) {
