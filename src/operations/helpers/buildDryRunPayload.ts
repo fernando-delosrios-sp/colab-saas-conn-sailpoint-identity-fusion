@@ -199,9 +199,7 @@ const wireCandidateType = (ct: FusionReportMatch['candidateType']): MatchingCand
     return 'identity'
 }
 
-const mapScoresToThresholdWire = (
-    scores: FusionReportMatch['scores'] | undefined
-): MatchingCandidate['scores'] =>
+const mapScoresToThresholdWire = (scores: FusionReportMatch['scores'] | undefined): MatchingCandidate['scores'] =>
     scores?.map((s) => {
         const { fusionScore, ...rest } = s
         return fusionScore !== undefined ? { ...rest, threshold: fusionScore } : rest
@@ -427,9 +425,7 @@ export const buildDryRunSummary = (params: {
     reportOutputPath?: string
     reportHtmlOutputPath?: string
 }): DryRunSummary => {
-    const deferredMatchesCount = params.reportAccounts.filter(
-        (x) => Boolean(x.deferred) && x.matches.length > 0
-    ).length
+    const deferredMatchesCount = params.reportAccounts.filter((x) => Boolean(x.deferred) && x.matches.length > 0).length
 
     // Run-wide totals (dry-run account slice + fusion stats)
     const stats = params.stats ?? {}

@@ -55,7 +55,7 @@ export type { PendingReviewFormContext, PendingReviewReviewerContext, PendingRev
  * Handles creation, processing, and cleanup of fusion forms for Match review.
  */
 export class FormService {
-    private formsToDelete: string[] = []
+    private formsToDelete: Set<string> = new Set()
     private readonly formDeleteQueueConcurrency = 1
     private readonly pendingFormDeleteTasks: Set<Promise<void>> = new Set()
     private readonly queuedFormDeleteIds: Set<string> = new Set()
@@ -139,7 +139,7 @@ export class FormService {
             }
             this.log.debug(
                 `Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern} ` +
-                `(active=${activeForms.length}, stale=${staleForms.length})`
+                    `(active=${activeForms.length}, stale=${staleForms.length})`
             )
             for (const staleForm of staleForms) {
                 const staleFormId = staleForm.id
@@ -152,7 +152,7 @@ export class FormService {
         } else {
             this.log.debug(
                 `Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern} ` +
-                '(stale cleanup disabled for this run)'
+                    '(stale cleanup disabled for this run)'
             )
         }
         this._formsFound = activeForms.length
@@ -213,15 +213,15 @@ export class FormService {
      * Clean up completed and cancelled forms
      */
     public async cleanUpForms(): Promise<void> {
-        if (this.formsToDelete.length === 0) {
+        if (this.formsToDelete.size === 0) {
             this.log.debug('No forms to clean up')
             return
         }
 
         // Snapshot and clear the transient list up front so producers can keep enqueueing
         // while this cleanup pass deduplicates and schedules the current batch.
-        const formIdsToQueue = [...new Set(this.formsToDelete)]
-        this.formsToDelete = []
+        const formIdsToQueue = Array.from(this.formsToDelete)
+        this.formsToDelete = new Set()
 
         let queuedCount = 0
         for (const formId of formIdsToQueue) {
@@ -405,7 +405,7 @@ export class FormService {
 
             const existing = normalizeEmail(readUnknown(c.attributes, 'email'))
             if (existing) {
-                ; (c.attributes as Record<string, unknown>).email = existing
+                ;(c.attributes as Record<string, unknown>).email = existing
                 continue
             }
 
@@ -415,7 +415,7 @@ export class FormService {
                     readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail') ?? readUnknown(attrs, 'emailAddress')
                 )
                 if (hydrated) {
-                    ; (c.attributes as Record<string, unknown>).email = hydrated
+                    ;(c.attributes as Record<string, unknown>).email = hydrated
                 }
             }
         }
@@ -609,7 +609,7 @@ export class FormService {
         try {
             const managedAccountKey = fusionAccount.managedAccountId
             const reportAccountId = managedAccountKey
-                ? this.sources.resolveIscAccountIdForManagedKey(managedAccountKey) ?? managedAccountKey
+                ? (this.sources.resolveIscAccountIdForManagedKey(managedAccountKey) ?? managedAccountKey)
                 : undefined
             await this.messaging.sendFusionEmail(formInstance, {
                 accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
@@ -1022,8 +1022,8 @@ export class FormService {
 
         this.log.debug(
             `Form analysis result: shouldDeleteForm=${shouldDeleteForm}, ` +
-            `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
-            `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
+                `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
+                `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
         )
 
         return {
@@ -1153,7 +1153,7 @@ export class FormService {
         const decisionType = decision.newIdentity ? 'new identity' : `link to ${decision.identityId}`
         this.log.debug(
             `Processed fusion decision for account ${decision.account.id}, reviewer ${decision.submitter.id}, ` +
-            `decision: ${decisionType}`
+                `decision: ${decisionType}`
         )
     }
 
@@ -1214,9 +1214,8 @@ export class FormService {
      */
     private addFormToDelete(formDefinitionId: string): void {
         // Avoid double-queueing the same definition id (processFusionFormInstances can hit multiple paths)
-        if (!this.formsToDelete.includes(formDefinitionId)) {
-            this.formsToDelete.push(formDefinitionId)
-        }
+
+        this.formsToDelete.add(formDefinitionId)
     }
 
     private kickoffFormDeleteWorkers(): void {

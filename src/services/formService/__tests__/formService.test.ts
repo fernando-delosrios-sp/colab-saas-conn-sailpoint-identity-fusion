@@ -52,9 +52,7 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
 
         await service.fetchFormInstancesByDefinitionId('fd-1')
 
-        expect(warn).toHaveBeenCalledWith(
-            expect.stringContaining('returned 250 instance(s) for formDefinitionId=fd-1')
-        )
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('returned 250 instance(s) for formDefinitionId=fd-1'))
     })
 })
 
@@ -123,7 +121,7 @@ describe('FormService stale-form cleanup queue', () => {
             {} as any
         )
 
-            ; (service as any).addFormToDelete('form-stale')
+        ;(service as any).addFormToDelete('form-stale')
 
         await service.cleanUpForms()
         expect(deleteFormDefinition).toHaveBeenCalledTimes(1)

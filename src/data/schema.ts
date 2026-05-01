@@ -81,7 +81,8 @@ export const fusionAccountSchemaAttributes: SchemaAttribute[] = [
     },
     {
         name: 'originAccount',
-        description: 'Origin identity ID or managed account key (set on creation, immutable, persisted even if missing)',
+        description:
+            'Origin identity ID or managed account key (set on creation, immutable, persisted even if missing)',
         type: 'string',
         multi: false,
         entitlement: false,

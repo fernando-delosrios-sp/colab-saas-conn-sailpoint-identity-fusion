@@ -38,7 +38,9 @@ describe('accountCreate', () => {
 
         expect(registry.identities.fetchIdentityByName).toHaveBeenCalledWith('Alice Doe')
         expect(registry.sources.fetchFusionAccounts).toHaveBeenCalledTimes(1)
-        expect(registry.attributes.registerUniqueValuesFromRawAccounts).toHaveBeenCalledWith(registry.sources.fusionAccounts)
+        expect(registry.attributes.registerUniqueValuesFromRawAccounts).toHaveBeenCalledWith(
+            registry.sources.fusionAccounts
+        )
         expect(registry.fusion.preProcessFusionAccounts).toHaveBeenCalledTimes(1)
         expect(registry.fusion.processIdentity).toHaveBeenCalledWith({ id: 'id-1', name: 'Alice Doe' })
         expect(registry.fusion.getFusionIdentity().addStatus).toHaveBeenCalledWith(

@@ -33,7 +33,9 @@ describe('accountEnable', () => {
 
         expect(registry.attributes.initializeCounters).toHaveBeenCalledTimes(1)
         expect(registry.sources.fetchFusionAccounts).toHaveBeenCalledTimes(1)
-        expect(registry.attributes.registerUniqueValuesFromRawAccounts).toHaveBeenCalledWith(registry.sources.fusionAccounts)
+        expect(registry.attributes.registerUniqueValuesFromRawAccounts).toHaveBeenCalledWith(
+            registry.sources.fusionAccounts
+        )
         expect(registry.fusion.preProcessFusionAccounts).toHaveBeenCalledTimes(1)
         expect(rebuildFusionAccount).toHaveBeenCalledWith('fusion-1', expect.any(Object), registry)
         expect(registry.attributes.refreshUniqueAttributes).toHaveBeenCalledWith(fusionAccount)

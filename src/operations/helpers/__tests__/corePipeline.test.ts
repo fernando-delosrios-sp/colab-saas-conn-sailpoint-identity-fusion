@@ -1,4 +1,11 @@
-import { fetchPhase, outputPhase, outputPreparationPhase, refreshPhase, processPhase, uniqueAttributesPhase } from '../corePipeline'
+import {
+    fetchPhase,
+    outputPhase,
+    outputPreparationPhase,
+    refreshPhase,
+    processPhase,
+    uniqueAttributesPhase,
+} from '../corePipeline'
 
 import { createRegistry as createMockRegistry } from '../../__tests__/harness/registryMocking'
 
@@ -98,7 +105,11 @@ describe('corePipeline outputPhase', () => {
 
     it('passes stale cleanup flag only for persistent fetch runs', async () => {
         const { registry, forms } = createRegistry()
-        const identities = { fetchIdentities: jest.fn().mockResolvedValue(undefined), identityCount: 0, getIdentityById: jest.fn() }
+        const identities = {
+            fetchIdentities: jest.fn().mockResolvedValue(undefined),
+            identityCount: 0,
+            getIdentityById: jest.fn(),
+        }
         const sources = {
             fetchManagedAccounts: jest.fn().mockResolvedValue(undefined),
             fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
@@ -109,7 +120,10 @@ describe('corePipeline outputPhase', () => {
             fetchGlobalOwnerIdentityIds: jest.fn().mockResolvedValue([]),
         }
         const fusion = { fusionReportOnAggregation: false, fusionOwnerIsGlobalReviewer: false }
-        const messaging = { fetchSender: jest.fn().mockResolvedValue(undefined), fetchDelayedAggregationSender: jest.fn().mockResolvedValue(undefined) }
+        const messaging = {
+            fetchSender: jest.fn().mockResolvedValue(undefined),
+            fetchDelayedAggregationSender: jest.fn().mockResolvedValue(undefined),
+        }
         const log = { info: jest.fn() }
         const serviceRegistry = { ...registry, forms, identities, sources, fusion, messaging, log }
 

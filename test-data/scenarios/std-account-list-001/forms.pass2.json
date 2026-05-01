@@ -17,9 +17,7 @@
         },
         "formData": {
             "newIdentity": false,
-            "identities": [
-                "id-carlos-oliveira-001"
-            ],
+            "identities": ["id-carlos-oliveira-001"],
             "comments": "Confirmed best match for Carlos Oliveira"
         }
     },
@@ -41,9 +39,7 @@
         },
         "formData": {
             "newIdentity": false,
-            "identities": [
-                "id-ada-wong-001"
-            ],
+            "identities": ["id-ada-wong-001"],
             "comments": "Confirmed best match for Ada Wong"
         }
     },
@@ -65,9 +61,7 @@
         },
         "formData": {
             "newIdentity": false,
-            "identities": [
-                "id-annette-birkin-001"
-            ],
+            "identities": ["id-annette-birkin-001"],
             "comments": "Confirmed best match for Annette Birkin"
         }
     }

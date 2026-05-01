@@ -30,8 +30,7 @@ describe('evaluateVelocityTemplate', () => {
 
         it('does not expose Function via Date.constructor prototype chain (SSTI / RCE)', () => {
             const context = { d: new Date('2020-01-01T00:00:00.000Z') }
-            const malicious =
-                '#set($f=$d.constructor.constructor("return \\"pwned\\""))$f()'
+            const malicious = '#set($f=$d.constructor.constructor("return \\"pwned\\""))$f()'
             const result = evaluateVelocityTemplate(malicious, context)
             expect(result).not.toBe('pwned')
             expect(result == null || String(result).includes('pwned')).toBe(false)
@@ -477,10 +476,7 @@ describe('evaluateVelocityTemplate', () => {
 
         it('should parse JSON and allow downstream use via #set', () => {
             const context = { raw: '{"role":"admin","id":7}' }
-            const result = evaluateVelocityTemplate(
-                '#set($p=$JSON.parse($raw))$p.role:$p.id',
-                context
-            )
+            const result = evaluateVelocityTemplate('#set($p=$JSON.parse($raw))$p.role:$p.id', context)
             expect(result).toBe('admin:7')
         })
 

@@ -70,10 +70,7 @@ function resolveEnumMemberValue(enumName, memberName, context) {
     if (!modulePath) return undefined
 
     const resolvedModulePath = path.resolve(path.dirname(context.tsPath), modulePath)
-    const candidatePaths = [
-        `${resolvedModulePath}.ts`,
-        path.join(resolvedModulePath, 'index.ts'),
-    ]
+    const candidatePaths = [`${resolvedModulePath}.ts`, path.join(resolvedModulePath, 'index.ts')]
     const enumFilePath = candidatePaths.find((p) => fs.existsSync(p))
     if (!enumFilePath) return undefined
 
