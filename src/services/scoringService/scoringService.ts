@@ -327,26 +327,18 @@ export class ScoringService {
             return fusionAccount.nativeIdentityOrUndefined === fusionIdentity.nativeIdentityOrUndefined
         }
 
-        if (ScoringService.sameManagedAccountKey(managedAccountId, fusionIdentity.managedAccountId)) {
-            return true
-        }
+        return this.identityMatchesManagedAccountKey(fusionIdentity, managedAccountId)
+    }
 
-        if (ScoringService.sameManagedAccountKey(managedAccountId, fusionIdentity.nativeIdentityOrUndefined)) {
-            return true
-        }
-
-        if (ScoringService.sameManagedAccountKey(managedAccountId, fusionIdentity.originAccountId)) {
-            return true
-        }
-
-        if (
-            ScoringService.hasEquivalentManagedAccountId(fusionIdentity.accountIdsSet, managedAccountId) ||
-            ScoringService.hasEquivalentManagedAccountId(fusionIdentity.missingAccountIdsSet, managedAccountId)
-        ) {
-            return true
-        }
-
-        return false
+    private identityMatchesManagedAccountKey(fusionIdentity: FusionAccount, managedAccountId: string): boolean {
+        const candidates = [
+            fusionIdentity.managedAccountId,
+            fusionIdentity.nativeIdentityOrUndefined,
+            fusionIdentity.originAccountId,
+            ...(fusionIdentity.accountIdsSet ?? []),
+            ...(fusionIdentity.missingAccountIdsSet ?? []),
+        ]
+        return candidates.some((candidate) => candidate && ScoringService.sameManagedAccountKey(managedAccountId, candidate))
     }
 
     private static sameManagedAccountKey(a: string | undefined, b: string | undefined): boolean {
