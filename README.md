@@ -391,6 +391,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 ---
 
 ## Changelog
+n- (2026-05-01) Added missing unit tests for wrapConnectorError utility.
 
 - (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
 
