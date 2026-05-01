@@ -52,7 +52,7 @@ jobs:
         if: env.CURSOR_API_KEY != ''
         uses: peter-evans/create-pull-request@v6
         with:
-          branch: ai/performance-review-cursor-${{ github.event.pull_request.number }}-${{ github.run_id }}
+          branch: ai/performance-review-cursor-${{ github.event.pull_request.number }}
           base: ${{ github.event.pull_request.head.ref }}
           title: "AI performance follow-up (Cursor) for #${{ github.event.pull_request.number }}"
           body: |

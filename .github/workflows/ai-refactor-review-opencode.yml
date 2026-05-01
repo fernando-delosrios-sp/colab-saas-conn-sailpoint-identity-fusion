@@ -53,7 +53,7 @@ jobs:
         if: env.OPENCODE_API_KEY != ''
         uses: peter-evans/create-pull-request@v6
         with:
-          branch: ai/refactor-review-opencode-${{ github.event.pull_request.number }}-${{ github.run_id }}
+          branch: ai/refactor-review-opencode-${{ github.event.pull_request.number }}
           base: ${{ github.event.pull_request.head.ref }}
           title: "AI refactor follow-up (OpenCode) for #${{ github.event.pull_request.number }}"
           body: |
