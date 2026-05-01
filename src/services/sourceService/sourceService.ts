@@ -383,9 +383,12 @@ export class SourceService {
 
         let ownerId: string | undefined
         try {
-            ownerId = this.fusionSourceOwner?.id
-        } catch {
-            // fusionSourceOwner asserts when undefined; return empty list
+            ownerId = this.fusionSourceOwner.id
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('Fusion source owner not found')) {
+                return []
+            }
+            throw error
         }
         if (ownerId) ownerIdSet.add(ownerId)
 
