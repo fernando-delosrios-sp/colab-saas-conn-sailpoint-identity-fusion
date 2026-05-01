@@ -23,7 +23,7 @@ import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { BaseConfig, FusionConfig, SourceConfig, SourceType } from '../../model/config'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
-import { assert } from '../../utils/assert'
+import { assert, softAssert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
 import { getDateFromISOString } from '../../utils/date'
 import { readPathString, trimStr } from '../../utils/safeRead'
@@ -382,15 +382,11 @@ export class SourceService {
         const ownerIdSet = new Set<string>()
 
         let ownerId: string | undefined
-        try {
-            ownerId = this.fusionSourceOwner.id
-        } catch (error) {
-            if (error instanceof Error && error.message.includes('Fusion source owner not found')) {
-                return []
-            }
-            throw error
+        if (!softAssert(this._fusionSourceOwner, 'Fusion source owner not found')) {
+            return []
         }
-        if (ownerId) ownerIdSet.add(ownerId)
+        ownerId = this.fusionSourceOwner.id
+        ownerIdSet.add(ownerId)
 
         const workgroupId = this._fusionSourceManagementWorkgroupId
         if (workgroupId) {
