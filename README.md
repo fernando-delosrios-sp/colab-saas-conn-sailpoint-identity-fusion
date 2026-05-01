@@ -391,7 +391,8 @@ The documentation site is built with MkDocs and published from the `main` branch
 ---
 
 ## Changelog
-- (2026-05-01) Added tests for isNewerThan utility function in src/utils/__tests__/date.test.ts
+
+- (2026-05-01) Added tests for isNewerThan utility function in `src/utils/__tests__/date.test.ts`
 
 - (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
 
