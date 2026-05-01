@@ -206,7 +206,7 @@ function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): numb
             const s01 = codeSimilarity(codes1[0], codes2[1])
             const s10 = codeSimilarity(codes1[1], codes2[0])
             const s11 = codeSimilarity(codes1[1], codes2[1])
-            const bestPair = s00 > s01 ? (s00 > s10 ? (s00 > s11 ? s00 : s11) : (s10 > s11 ? s10 : s11)) : (s01 > s10 ? (s01 > s11 ? s01 : s11) : (s10 > s11 ? s10 : s11))
+            const bestPair = Math.max(s00, s01, s10, s11)
             if (bestPair >= MIN_CODE_SIMILARITY) {
                 bestForToken = bestForToken > bestPair ? bestForToken : bestPair
             }
