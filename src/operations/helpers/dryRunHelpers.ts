@@ -144,7 +144,7 @@ type DryRunFinalizationInput = {
     reportHtmlOutputPath?: string
 }
 
-const REPORT_DISK_SUBDIR = 'reports'
+
 
 /** Short host segment for filenames: first DNS label of the baseurl host, or full IP literal (sanitized). */
 export const hostnameSegmentFromBaseurl = (baseurl: string | undefined): string => {
@@ -288,7 +288,7 @@ export const streamDryRunRows = async (
     rowEmitter: DryRunRowEmitter
 ) => {
     const streamContext = initializeDryRunStreamingContext(context, report)
-    let sentRows = 0
+    let sentRows: number
 
     try {
         sentRows = await streamEnrichedOutputRows(

@@ -6,41 +6,12 @@ jest.mock('../helpers/rebuildFusionAccount', () => ({
     rebuildFusionAccount: jest.fn(),
 }))
 
-function createRegistry() {
-    const timer = {
-        phase: jest.fn(),
-        end: jest.fn(),
-    }
+import { createRegistry as createMockRegistry } from './harness/registryMocking'
 
-    return {
-        log: {
-            info: jest.fn(),
-            debug: jest.fn(),
-            crash: jest.fn(),
-            timer: jest.fn(() => timer),
-        },
-        sources: {
-            fetchAllSources: jest.fn().mockResolvedValue(undefined),
-            fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
-            fusionAccounts: [{ id: 'fusion-existing-1' }],
-        },
-        schemas: {
-            setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
-        },
-        fusion: {
-            preProcessFusionAccounts: jest.fn().mockResolvedValue(undefined),
-            normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
-            getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-enabled' }),
-        },
-        attributes: {
-            initializeCounters: jest.fn().mockResolvedValue(undefined),
-            registerUniqueValuesFromRawAccounts: jest.fn(),
-            refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
-        },
-        res: {
-            send: jest.fn(),
-        },
-    } as any
+function createRegistry() {
+    const registry = createMockRegistry()
+    Object.assign(registry.fusion, { getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-enabled' }) })
+    return registry
 }
 
 describe('accountEnable', () => {

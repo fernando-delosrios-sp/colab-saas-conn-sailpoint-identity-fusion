@@ -1219,11 +1219,15 @@ export class FormService {
     }
 
     private kickoffFormDeleteWorkers(): void {
-        while (this.activeFormDeleteWorkers < this.formDeleteQueueConcurrency && this.formDeleteQueue.length > 0) {
-            let trackedPromise!: Promise<void>
+        while (
+            this.activeFormDeleteWorkers < this.formDeleteQueueConcurrency &&
+            this.formDeleteQueue.length > 0
+        ) {
             this.activeFormDeleteWorkers++
             const workerPromise = this.runFormDeleteWorker()
-            trackedPromise = workerPromise.finally(() => {
+
+            // eslint-disable-next-line prefer-const
+            let trackedPromise: Promise<void> = workerPromise.finally(() => {
                 // Keep worker accounting + task tracking in one finally block so awaitPendingDeleteOperations
                 // always observes a consistent view, even when deletion throws.
                 this.activeFormDeleteWorkers--
