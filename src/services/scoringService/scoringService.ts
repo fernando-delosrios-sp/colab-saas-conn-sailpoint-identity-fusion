@@ -350,17 +350,6 @@ export class ScoringService {
         return normalizedA !== undefined && normalizedA === normalizedB
     }
 
-    private static hasEquivalentManagedAccountId(values: ReadonlySet<string> | undefined, key: string): boolean {
-        if (!values) return false
-        if (values.has(key)) return true
-        const normalizedKey = normalizeCompositeManagedAccountKey(key)
-        if (!normalizedKey) return false
-        for (const value of values) {
-            if (normalizeCompositeManagedAccountKey(value) === normalizedKey) return true
-        }
-        return false
-    }
-
     /**
      * Compares two fusion accounts across all configured matching rules and records
      * a match if the weighted combined score and mandatory rules pass.
