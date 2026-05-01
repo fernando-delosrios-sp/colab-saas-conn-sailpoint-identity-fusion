@@ -23,12 +23,12 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install yamale
-        run: pip install yamale
+      - name: Install yamllint
+        run: pip install yamllint
 
       - name: Lint YAML files
         run: |
           for f in .github/workflows/*.yml; do
             echo "Linting $f"
-            yamale -s "$f" 2>&1 || { echo "FAILED: $f"; exit 1; }
+            yamllint -d "{extends: relaxed, rules: {new-line-at-end-of-file: disable}}" "$f" 2>&1 || { echo "FAILED: $f"; exit 1; }
           done

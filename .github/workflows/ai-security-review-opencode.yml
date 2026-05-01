@@ -30,6 +30,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
           persist-credentials: false
       - name: Install OpenCode CLI
@@ -52,7 +53,7 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           branch: ai/security-review-opencode-${{ github.event.pull_request.number }}-${{ github.run_id }}
-          base: ${{ github.event.pull_request.base.ref }}
+          base: ${{ github.event.pull_request.head.ref }}
           title: "AI security follow-up (OpenCode) for #${{ github.event.pull_request.number }}"
           body: |
             Automated AI follow-up fixes for security based on PR #${{ github.event.pull_request.number }}.
