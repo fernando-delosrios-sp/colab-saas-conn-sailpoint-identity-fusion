@@ -394,6 +394,8 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ### 2.1.6 - 2026-04-29
 
+- Improved performance by caching listSourceSchemas API results.
+
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
 

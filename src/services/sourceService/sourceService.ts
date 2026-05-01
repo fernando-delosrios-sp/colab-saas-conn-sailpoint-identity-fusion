@@ -77,6 +77,7 @@ export class SourceService {
     private _fusionSourceOwner?: OwnerDto
     private _fusionSourceManagementWorkgroupId?: string
     private _fusionSourceWorkgroupMemberIds?: string[]
+    private sourceSchemasCache: Map<string, SchemaV2025[]> = new Map()
 
     /** Per-run cache: managed source names that passed reverse-correlation setup/assert this session. */
     private reverseCorrelationReadinessBySourceName = new Set<string>()
@@ -935,6 +936,10 @@ export class SourceService {
      * List schemas for a source
      */
     public async listSourceSchemas(sourceId: string): Promise<SchemaV2025[]> {
+        if (this.sourceSchemasCache.has(sourceId)) {
+            return this.sourceSchemasCache.get(sourceId)!
+        }
+
         const { sourcesApi } = this.client
         const requestParameters: SourcesV2025ApiGetSourceSchemasRequest = {
             sourceId,
@@ -954,6 +959,8 @@ export class SourceService {
                 ConnectorErrorType.Generic
             )
         }
+
+        this.sourceSchemasCache.set(sourceId, schemas)
         return schemas
     }
 
@@ -1395,6 +1402,8 @@ export class SourceService {
                 ConnectorErrorType.Generic
             )
         }
+
+        this.sourceSchemasCache.delete(fusionSourceId)
 
         this.log.info(`Added reverse correlation attribute "${attributeName}" to Fusion source schema`)
     }
