@@ -32,6 +32,8 @@ export function applySettings(config: FusionConfigBuild): void {
     config.pageSize = config.batchSize ?? internalConfig.clientService.pageSize
     config.enablePriority = config.enablePriority ?? matchingInitialValues.enablePriority
     const processingWaitSeconds =
-        config.processingWait !== undefined ? config.processingWait : internalConfig.clientService.processingWaitConstant / 1000
+        config.processingWait !== undefined
+            ? config.processingWait
+            : internalConfig.clientService.processingWaitConstant / 1000
     config.processingWait = processingWaitSeconds * 1000
 }

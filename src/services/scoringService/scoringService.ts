@@ -83,10 +83,7 @@ export class ScoringService {
      * @param config - Fusion configuration containing matching rules and score thresholds
      * @param log - Logger instance
      */
-    constructor(
-        config: FusionConfig,
-        _log: LogService
-    ) {
+    constructor(config: FusionConfig, _log: LogService) {
         this.matchingConfigs = config.matchingConfigs ?? []
         this.fusionAverageScore = config.fusionAverageScore ?? 0
         this.fusionMergingExactMatch = config.fusionMergingExactMatch ?? false
@@ -304,7 +301,10 @@ export class ScoringService {
                     break
                 }
             }
-            if (maxIdentity !== undefined && countIdentityBackedFusionMatches(fusionAccount.fusionMatchesRaw) >= maxIdentity) {
+            if (
+                maxIdentity !== undefined &&
+                countIdentityBackedFusionMatches(fusionAccount.fusionMatchesRaw) >= maxIdentity
+            ) {
                 break
             }
             yieldCounter += 1
@@ -399,8 +399,16 @@ export class ScoringService {
             // normalization in the hot loop. LIG3 also applies a length-ratio upper-bound check.
             let scoreReport: ScoreReport
             if (matching.algorithm === 'lig3') {
-                const normAccount = this.getNormalized(fusionAccount, matching.attribute, (accountAttribute ?? '').toString())
-                const normIdentity = this.getNormalized(fusionIdentity, matching.attribute, (identityAttribute ?? '').toString())
+                const normAccount = this.getNormalized(
+                    fusionAccount,
+                    matching.attribute,
+                    (accountAttribute ?? '').toString()
+                )
+                const normIdentity = this.getNormalized(
+                    fusionIdentity,
+                    matching.attribute,
+                    (identityAttribute ?? '').toString()
+                )
                 if (ScoringService.lig3UpperBound(normAccount, normIdentity) < (matching.fusionScore ?? 0)) {
                     // Score is mathematically unreachable — skip as if the rule failed.
                     scoreReport = makeSkippedReport(matching, 'Length ratio upper bound below threshold')
@@ -408,7 +416,9 @@ export class ScoringService {
                     if (matching.mandatory) {
                         hasFailedMandatory = true
                         for (let r = i + 1; r < this.matchingConfigs.length; r++) {
-                            scores.push(makeSkippedReport(this.matchingConfigs[r], 'Rule skipped (mandatory attribute failed)'))
+                            scores.push(
+                                makeSkippedReport(this.matchingConfigs[r], 'Rule skipped (mandatory attribute failed)')
+                            )
                         }
                         break
                     }
@@ -416,8 +426,16 @@ export class ScoringService {
                 }
                 scoreReport = scoreLIG3Normalized(normAccount, normIdentity, matching)
             } else if (matching.algorithm === 'name-matcher') {
-                const normAccount = this.getNameNormalized(fusionAccount, matching.attribute, (accountAttribute ?? '').toString())
-                const normIdentity = this.getNameNormalized(fusionIdentity, matching.attribute, (identityAttribute ?? '').toString())
+                const normAccount = this.getNameNormalized(
+                    fusionAccount,
+                    matching.attribute,
+                    (accountAttribute ?? '').toString()
+                )
+                const normIdentity = this.getNameNormalized(
+                    fusionIdentity,
+                    matching.attribute,
+                    (identityAttribute ?? '').toString()
+                )
                 scoreReport = scoreNameMatcherNormalized(normAccount, normIdentity, matching)
             } else {
                 scoreReport = this.scoreAttribute(
@@ -449,7 +467,10 @@ export class ScoringService {
             ) {
                 for (let r = i + 1; r < this.matchingConfigs.length; r++) {
                     scores.push(
-                        makeSkippedReport(this.matchingConfigs[r], 'Rule skipped (combined score cannot reach threshold)')
+                        makeSkippedReport(
+                            this.matchingConfigs[r],
+                            'Rule skipped (combined score cannot reach threshold)'
+                        )
                     )
                 }
                 break

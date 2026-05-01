@@ -48,10 +48,7 @@ export function applySettings(config: FusionConfigBuild): void {
         assert(attribute, 'Attribute is required to get fusion score')
         const score = config.fusionScoreMap!.get(attribute)
         if (score === undefined) {
-            throw new ConnectorError(
-                `Fusion score not found for attribute: ${attribute}`,
-                ConnectorErrorType.NotFound
-            )
+            throw new ConnectorError(`Fusion score not found for attribute: ${attribute}`, ConnectorErrorType.NotFound)
         }
         return score
     }

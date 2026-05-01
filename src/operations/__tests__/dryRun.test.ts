@@ -266,10 +266,12 @@ describe('dryRun', () => {
     it('streams enriched rows and sends a final summary object', async () => {
         const registry = createRegistry()
 
-        await dryRun(
-            registry,
-            { schema: { attributes: [] }, includeMatched: true, includeDeferred: true, includeDecisions: true } as any
-        )
+        await dryRun(registry, {
+            schema: { attributes: [] },
+            includeMatched: true,
+            includeDeferred: true,
+            includeDecisions: true,
+        } as any)
 
         expect(registry.fusion.generateReport).toHaveBeenCalledWith(true, expect.any(Object))
         expect(registry.res.send).toHaveBeenCalledTimes(3)
@@ -322,28 +324,30 @@ describe('dryRun', () => {
     it('emits synthetic deferred row when deferred managed account id is not on any fusion ISC row', async () => {
         const registry = createRegistry()
 
-        registry.fusion.generateReport.mockImplementation((_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
-            accounts: [
-                {
-                    accountId: 'acc-orphan-deferred',
-                    accountName: 'Orphan Deferred',
-                    accountSource: 'HR',
-                    sourceType: 'authoritative',
-                    deferred: true,
-                    fusionIdentityComparisons: 1,
-                    matches: [
-                        {
-                            identityName: 'Peer unmatched',
-                            isMatch: true,
-                            candidateType: 'new-unmatched',
-                            scores: [],
-                        },
-                    ],
-                },
-            ],
-            fusionReviewDecisions: [],
-            stats: { managedAccountsFound: 1, ...stats },
-        }))
+        registry.fusion.generateReport.mockImplementation(
+            (_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
+                accounts: [
+                    {
+                        accountId: 'acc-orphan-deferred',
+                        accountName: 'Orphan Deferred',
+                        accountSource: 'HR',
+                        sourceType: 'authoritative',
+                        deferred: true,
+                        fusionIdentityComparisons: 1,
+                        matches: [
+                            {
+                                identityName: 'Peer unmatched',
+                                isMatch: true,
+                                candidateType: 'new-unmatched',
+                                scores: [],
+                            },
+                        ],
+                    },
+                ],
+                fusionReviewDecisions: [],
+                stats: { managedAccountsFound: 1, ...stats },
+            })
+        )
 
         registry.fusion.forEachISCAccount.mockImplementation(async (send: (account: any) => void) => {
             send({
@@ -403,10 +407,13 @@ describe('dryRun', () => {
     it('ignores legacy runtime options and emits no rows without include* flags', async () => {
         const registry = createRegistry()
 
-        await dryRun(
-            registry,
-            { schema: { attributes: [] }, onlyMatching: true, onlyReview: true, limit: 1, summary: true } as any
-        )
+        await dryRun(registry, {
+            schema: { attributes: [] },
+            onlyMatching: true,
+            onlyReview: true,
+            limit: 1,
+            summary: true,
+        } as any)
 
         expect(registry.res.send).toHaveBeenCalledTimes(1)
         const summary = registry.res.send.mock.calls[0][0]
@@ -433,61 +440,63 @@ describe('dryRun', () => {
         const registry = createRegistry()
         registry.sources.managedAccountsById.set('acc-3', { id: 'acc-3', sourceName: 'HR' })
 
-        registry.fusion.generateReport.mockImplementation((_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
-            accounts: [
-                {
-                    accountId: 'acc-1',
-                    accountName: 'Alice HR',
-                    accountSource: 'HR',
-                    fusionIdentityComparisons: 1,
-                    matches: [
-                        {
-                            identityName: 'Alice',
-                            identityId: 'id-1',
-                            isMatch: true,
-                            scores: [
-                                { algorithm: 'jaro-winkler', score: 100, skipped: false },
-                                { algorithm: 'name-matcher', score: 100, skipped: false },
-                            ],
-                        },
-                    ],
-                },
-                {
-                    accountId: 'acc-2',
-                    accountName: 'Bob IT',
-                    accountSource: 'IT',
-                    fusionIdentityComparisons: 0,
-                    matches: [],
-                    deferred: true,
-                },
-                {
-                    accountId: 'acc-3',
-                    accountName: 'Charlie HR',
-                    accountSource: 'HR',
-                    fusionIdentityComparisons: 1,
-                    matches: [
-                        {
-                            identityName: 'Charlie',
-                            identityId: 'id-3',
-                            isMatch: true,
-                            scores: [{ algorithm: 'jaro-winkler', score: 90, skipped: false }],
-                        },
-                    ],
-                },
-            ],
-            fusionReviewDecisions: [
-                {
-                    accountId: 'acc-2',
-                    accountName: 'Bob IT',
-                    accountSource: 'IT',
-                    reviewerId: 'rev-1',
-                    reviewerName: 'Reviewer One',
-                    decision: 'assign-existing-identity',
-                    decisionLabel: 'Assign Existing Identity',
-                },
-            ],
-            stats: { managedAccountsFound: 3, ...stats },
-        }))
+        registry.fusion.generateReport.mockImplementation(
+            (_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
+                accounts: [
+                    {
+                        accountId: 'acc-1',
+                        accountName: 'Alice HR',
+                        accountSource: 'HR',
+                        fusionIdentityComparisons: 1,
+                        matches: [
+                            {
+                                identityName: 'Alice',
+                                identityId: 'id-1',
+                                isMatch: true,
+                                scores: [
+                                    { algorithm: 'jaro-winkler', score: 100, skipped: false },
+                                    { algorithm: 'name-matcher', score: 100, skipped: false },
+                                ],
+                            },
+                        ],
+                    },
+                    {
+                        accountId: 'acc-2',
+                        accountName: 'Bob IT',
+                        accountSource: 'IT',
+                        fusionIdentityComparisons: 0,
+                        matches: [],
+                        deferred: true,
+                    },
+                    {
+                        accountId: 'acc-3',
+                        accountName: 'Charlie HR',
+                        accountSource: 'HR',
+                        fusionIdentityComparisons: 1,
+                        matches: [
+                            {
+                                identityName: 'Charlie',
+                                identityId: 'id-3',
+                                isMatch: true,
+                                scores: [{ algorithm: 'jaro-winkler', score: 90, skipped: false }],
+                            },
+                        ],
+                    },
+                ],
+                fusionReviewDecisions: [
+                    {
+                        accountId: 'acc-2',
+                        accountName: 'Bob IT',
+                        accountSource: 'IT',
+                        reviewerId: 'rev-1',
+                        reviewerName: 'Reviewer One',
+                        decision: 'assign-existing-identity',
+                        decisionLabel: 'Assign Existing Identity',
+                    },
+                ],
+                stats: { managedAccountsFound: 3, ...stats },
+            })
+        )
 
         registry.fusion.forEachISCAccount.mockImplementation(async (send: (account: any) => void) => {
             send({
@@ -586,17 +595,14 @@ describe('dryRun', () => {
             ],
         ])
 
-        await dryRun(
-            registry,
-            {
-                schema: { attributes: [] },
-                includeExisting: true,
-                includeNonMatched: true,
-                includeDeferred: true,
-                includeReview: true,
-                includeDecisions: true,
-            } as any
-        )
+        await dryRun(registry, {
+            schema: { attributes: [] },
+            includeExisting: true,
+            includeNonMatched: true,
+            includeDeferred: true,
+            includeReview: true,
+            includeDecisions: true,
+        } as any)
 
         expect(registry.res.send).toHaveBeenCalledTimes(3)
         // CATEGORY_ORDER emits nonMatched before existing-fusion; second fusion row is in the nonMatched group first.
@@ -604,13 +610,7 @@ describe('dryRun', () => {
         const secondRow = registry.res.send.mock.calls[1][0]
         const summary = registry.res.send.mock.calls[2][0]
 
-        expect(firstRow.reportCategories).toEqual([
-            'nonMatched',
-            'deferred',
-            'review',
-            'decisions',
-            'existing-fusion',
-        ])
+        expect(firstRow.reportCategories).toEqual(['nonMatched', 'deferred', 'review', 'decisions', 'existing-fusion'])
         expect(secondRow.reportCategories).toEqual(['existing-fusion'])
         expect(firstRow.review).toBeDefined()
         expect(secondRow.review).toBeUndefined()
@@ -670,28 +670,27 @@ describe('dryRun', () => {
             getPhaseBreakdown: timer.getPhaseBreakdown.bind(timer),
             recordElapsed: timer.recordElapsed.bind(timer),
         })
-        registry.fusion.generateReport.mockImplementation((_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
-            accounts: [
-                {
-                    accountId: 'acc-no-identity-match',
-                    accountName: 'No Identity Match',
-                    accountSource: 'HR',
-                    fusionIdentityComparisons: 1,
-                    matches: [{ identityName: 'Unknown Candidate', isMatch: true, scores: [] }],
-                },
-            ],
-            fusionReviewDecisions: [],
-            stats: { managedAccountsFound: 1, ...stats },
-        }))
-
-        await dryRun(
-            registry,
-            {
-                schema: { attributes: [] },
-                includeMatched: true,
-                sendReportTo: [' reviewer.one@example.com ', 'reviewer.two@example.com'],
-            } as any
+        registry.fusion.generateReport.mockImplementation(
+            (_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
+                accounts: [
+                    {
+                        accountId: 'acc-no-identity-match',
+                        accountName: 'No Identity Match',
+                        accountSource: 'HR',
+                        fusionIdentityComparisons: 1,
+                        matches: [{ identityName: 'Unknown Candidate', isMatch: true, scores: [] }],
+                    },
+                ],
+                fusionReviewDecisions: [],
+                stats: { managedAccountsFound: 1, ...stats },
+            })
         )
+
+        await dryRun(registry, {
+            schema: { attributes: [] },
+            includeMatched: true,
+            sendReportTo: [' reviewer.one@example.com ', 'reviewer.two@example.com'],
+        } as any)
 
         expect(registry.messaging.fetchSender).toHaveBeenCalledTimes(1)
         expect(registry.messaging.sendReportTo).toHaveBeenCalledWith(expect.any(Object), {
@@ -723,7 +722,6 @@ describe('dryRun', () => {
             'Report',
         ])
     })
-
 
     it('writes a pretty JSON array detail file and returns only the summary when writeToDisk is true', async () => {
         const fs = await import('fs')

@@ -55,7 +55,7 @@ export const registerHandlebarsHelpers = (): void => {
             const escDisplay = Handlebars.escapeExpression(display)
             const titleAttr = title ? ` title="${Handlebars.escapeExpression(title)}"` : ''
             return new Handlebars.SafeString(
-                `<span style="word-break:break-word; overflow-wrap:anywhere;"${titleAttr}>${escDisplay}</span>`,
+                `<span style="word-break:break-word; overflow-wrap:anywhere;"${titleAttr}>${escDisplay}</span>`
             )
         }
         const str = trimStr(value) ?? ''
@@ -66,14 +66,12 @@ export const registerHandlebarsHelpers = (): void => {
 
         if (!emailAddressPattern.test(str)) {
             return new Handlebars.SafeString(
-                `<span style="word-break:break-word; overflow-wrap:anywhere;"${titleAttr}>${escDisplay}</span>`,
+                `<span style="word-break:break-word; overflow-wrap:anywhere;"${titleAttr}>${escDisplay}</span>`
             )
         }
         const href = mailtoHrefForHtmlAttribute(str)
         const escFull = Handlebars.escapeExpression(str)
-        return new Handlebars.SafeString(
-            `<a href="${href}" title="${escFull}" style="${linkStyle}">${escDisplay}</a>`,
-        )
+        return new Handlebars.SafeString(`<a href="${href}" title="${escFull}" style="${linkStyle}">${escDisplay}</a>`)
     })
 
     Handlebars.registerHelper('formatScores', (scores: any[]) => {
@@ -199,14 +197,7 @@ export const registerHandlebarsHelpers = (): void => {
         return cards
     })
 
-    const PIPELINE_PHASE_ORDER = [
-        'Setup',
-        'Fetch',
-        'Refresh',
-        'Process',
-        'Unique attributes',
-        'Output',
-    ] as const
+    const PIPELINE_PHASE_ORDER = ['Setup', 'Fetch', 'Refresh', 'Process', 'Unique attributes', 'Output'] as const
 
     /** Ordered phase tiles for HTML; missing phases show an em dash. */
     Handlebars.registerHelper('orderedPhaseTimingEntries', (stats: Record<string, unknown> | null | undefined) => {
