@@ -1,36 +1,36 @@
 name: CodeQL
 
 on:
-  pull_request:
-    branches: ["main"]
-  schedule:
-    - cron: "27 7 * * 4"
-  workflow_dispatch:
+    pull_request:
+        branches: ['main']
+    schedule:
+        - cron: '27 7 * * 4'
+    workflow_dispatch:
 
 permissions:
-  contents: read
-  security-events: write
+    contents: read
+    security-events: write
 
 concurrency:
-  group: codeql-${{ github.ref }}
-  cancel-in-progress: true
+    group: codeql-${{ github.ref }}
+    cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  analyze-js-ts:
-    name: Analyze JavaScript/TypeScript
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    analyze-js-ts:
+        name: Analyze JavaScript/TypeScript
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: javascript-typescript
-          # queries: security-extended
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v4
+              with:
+                  languages: javascript-typescript
+                  # queries: security-extended
 
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+            - name: Perform CodeQL Analysis
+              uses: github/codeql-action/analyze@v4

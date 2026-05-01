@@ -12,17 +12,17 @@ The Entitlement List operation returns available entitlements for the fusion con
 2.  **Status Entitlements**:
     - If `type` is "status":
     - Returns a static list of status values, including:
-      - `authorized`
-      - `auto`
-      - `baseline`
-      - `manual`
-      - `orphan`
-      - `nonMatched`
-      - `reviewer`
-      - `requested`
-      - `uncorrelated`
-      - `activeReviews`
-      - `candidate`
+        - `authorized`
+        - `auto`
+        - `baseline`
+        - `manual`
+        - `orphan`
+        - `nonMatched`
+        - `reviewer`
+        - `requested`
+        - `uncorrelated`
+        - `activeReviews`
+        - `candidate`
     - _Note_: Status entitlements are static and **not** requestable.
 
 3.  **Action Entitlements**:

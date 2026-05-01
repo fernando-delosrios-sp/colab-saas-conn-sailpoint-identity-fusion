@@ -70,10 +70,7 @@ function resolveEnumMemberValue(enumName, memberName, context) {
     if (!modulePath) return undefined
 
     const resolvedModulePath = path.resolve(path.dirname(context.tsPath), modulePath)
-    const candidatePaths = [
-        `${resolvedModulePath}.ts`,
-        path.join(resolvedModulePath, 'index.ts'),
-    ]
+    const candidatePaths = [`${resolvedModulePath}.ts`, path.join(resolvedModulePath, 'index.ts')]
     const enumFilePath = candidatePaths.find((p) => fs.existsSync(p))
     if (!enumFilePath) return undefined
 
@@ -125,6 +122,7 @@ function objectLiteralToJson(tsObjectLiteral, context) {
         if (pos >= inner.length) break
 
         let keyEnd = pos
+        let key;
         if (inner[pos] === "'" || inner[pos] === '"') {
             const q = inner[pos]
             keyEnd = pos + 1
@@ -132,11 +130,11 @@ function objectLiteralToJson(tsObjectLiteral, context) {
                 if (inner[keyEnd] === '\\') keyEnd++
                 keyEnd++
             }
-            var key = inner.slice(pos + 1, keyEnd)
+            key = inner.slice(pos + 1, keyEnd)
             keyEnd++
         } else {
             while (keyEnd < inner.length && /[\w$]/.test(inner[keyEnd])) keyEnd++
-            var key = inner.slice(pos, keyEnd)
+            key = inner.slice(pos, keyEnd)
         }
 
         while (keyEnd < inner.length && /\s/.test(inner[keyEnd])) keyEnd++

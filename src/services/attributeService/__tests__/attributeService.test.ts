@@ -951,7 +951,9 @@ describe('AttributeService mainAccount override', () => {
 
     const createFusionAccount = (mainAccount?: string, needsReset = false) => {
         const attributeBag = {
-            current: mainAccount ? { mainAccount, id: 'fusion-id-1', name: 'immutable-name' } : { id: 'fusion-id-1', name: 'immutable-name' },
+            current: mainAccount
+                ? { mainAccount, id: 'fusion-id-1', name: 'immutable-name' }
+                : { id: 'fusion-id-1', name: 'immutable-name' },
             previous: {},
             identity: {},
             accounts: [],

@@ -14,8 +14,6 @@ export const runtimeDefaults = {
 
 export function applySettings(config: FusionConfigBuild): void {
     config.deleteEmpty = config.deleteEmpty ?? runtimeDefaults.deleteEmpty
-    config.skipAccountsWithMissingId =
-        config.skipAccountsWithMissingId ?? runtimeDefaults.skipAccountsWithMissingId
-    config.maxHistoryMessages =
-        config.maxHistoryMessages ?? connectorSpecInitialValues.maxHistoryMessages
+    config.skipAccountsWithMissingId = config.skipAccountsWithMissingId ?? runtimeDefaults.skipAccountsWithMissingId
+    config.maxHistoryMessages = config.maxHistoryMessages ?? connectorSpecInitialValues.maxHistoryMessages
 }
