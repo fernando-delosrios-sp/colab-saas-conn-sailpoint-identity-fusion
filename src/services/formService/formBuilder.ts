@@ -251,7 +251,7 @@ export const buildFormFields = (
         })
     }
 
-    // Build search query for identities: id:xxx OR id:yyy OR id:zzz
+    // Build search query to match any of the candidate identities
     const identitySearchQuery = candidates.map((c) => `id:${c.id}`).join(' OR ')
 
     // Fusion decision section: New identity toggle and identities select in a COLUMN_SET
