@@ -63,8 +63,10 @@ export function parseManagedAccountKey(
 }
 
 export function getManagedAccountKeyFromAccount(account: Account): string | undefined {
-    return buildManagedAccountKey({
+    const composite = buildManagedAccountKey({
         sourceId: readString(account, 'sourceId'),
         nativeIdentity: account.nativeIdentity,
     })
+    if (composite) return composite
+    return undefined
 }
