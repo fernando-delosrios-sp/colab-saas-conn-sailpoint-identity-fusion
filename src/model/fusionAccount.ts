@@ -1148,58 +1148,26 @@ export class FusionAccount {
         this._missingAccountIds = normalizeManagedAccountKeySet(this._missingAccountIds)
         this._accountIds = normalizeManagedAccountKeySet(this._accountIds)
 
-        // Phase 1: Identity-based matching via index (O(1) lookup)
-        if (this._identityId !== undefined) {
-            const matchedIds = accountsByIdentityId.get(this._identityId)
-            if (matchedIds) {
-                for (const id of matchedIds) {
-                    const account = accountsById.get(id)
-                    if (account) {
-                        this.setCorrelatedAccount(id)
-                        this.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
-                        accountsById.delete(id)
-                    }
-                }
-                // Clean up the index entry since all accounts for this identity have been claimed
-                accountsByIdentityId.delete(this._identityId)
-            }
-        }
-
-        // Phase 2: Previous-run matching (scan remaining accounts)
-        if (this._previousAccountIds.size > 0 || this._missingAccountIds.size > 0) {
-            for (const [id, account] of accountsById) {
-                if (this._previousAccountIds.has(id) || this._missingAccountIds.has(id)) {
-                    this.setUncorrelatedAccount(id)
-                    this.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
-                    accountsById.delete(id)
-                    // Also clean up the identity index
-                    if (account.identityId) {
-                        const idSet = accountsByIdentityId.get(account.identityId)
-                        if (idSet) {
-                            idSet.delete(id)
-                            if (idSet.size === 0) accountsByIdentityId.delete(account.identityId)
-                        }
-                    }
-                }
-            }
-        }
+        this.processIdentityMatchedAccounts(
+            accountsById,
+            accountsByIdentityId,
+            addAssociationHistory,
+            skipAssociationHistoryForManagedKeys
+        )
+        this.processPreviousRunMatchedAccounts(
+            accountsById,
+            accountsByIdentityId,
+            addAssociationHistory,
+            skipAssociationHistoryForManagedKeys
+        )
 
         // Prune account references that no longer exist in the managed-account inventory.
         if (pruneDeletedManagedAccounts && allAccountsById) {
             this.pruneDeletedManagedAccounts(allAccountsById)
         }
 
-        // Preserve source/nativeIdentity context for missing accounts even if they were
-        // not claimed from the current work queue (e.g. still missing from previous runs).
         if (allAccountsById) {
-            for (const accountId of this._missingAccountIds) {
-                if (this._managedAccountInfo.has(accountId)) continue
-                const account = allAccountsById.get(accountId)
-                if (!account?.sourceName) continue
-                const parsed = parseManagedAccountKey(accountId)
-                const nativeId = trimStr(account.nativeIdentity ?? parsed?.nativeIdentity) || accountId
-                this.setManagedAccountInfo(accountId, account.sourceName, nativeId)
-            }
+            this.preserveMissingAccountContext(allAccountsById)
         }
 
         // Update orphan status based on final account state
@@ -1209,6 +1177,75 @@ export class FusionAccount {
             this._needsRefresh = false
         } else {
             this._statuses.delete('orphan')
+        }
+    }
+
+    /**
+     * Phase 1: Identity-based matching via index (O(1) lookup)
+     */
+    private processIdentityMatchedAccounts(
+        accountsById: Map<string, Account>,
+        accountsByIdentityId: Map<string, Set<string>>,
+        addAssociationHistory: boolean,
+        skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
+    ): void {
+        if (this._identityId === undefined) return
+
+        const matchedIds = accountsByIdentityId.get(this._identityId)
+        if (!matchedIds) return
+
+        for (const id of matchedIds) {
+            const account = accountsById.get(id)
+            if (account) {
+                this.setCorrelatedAccount(id)
+                this.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
+                accountsById.delete(id)
+            }
+        }
+        // Clean up the index entry since all accounts for this identity have been claimed
+        accountsByIdentityId.delete(this._identityId)
+    }
+
+    /**
+     * Phase 2: Previous-run matching (scan remaining accounts)
+     */
+    private processPreviousRunMatchedAccounts(
+        accountsById: Map<string, Account>,
+        accountsByIdentityId: Map<string, Set<string>>,
+        addAssociationHistory: boolean,
+        skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
+    ): void {
+        if (this._previousAccountIds.size === 0 && this._missingAccountIds.size === 0) return
+
+        for (const [id, account] of accountsById) {
+            if (this._previousAccountIds.has(id) || this._missingAccountIds.has(id)) {
+                this.setUncorrelatedAccount(id)
+                this.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
+                accountsById.delete(id)
+                // Also clean up the identity index
+                if (account.identityId) {
+                    const idSet = accountsByIdentityId.get(account.identityId)
+                    if (idSet) {
+                        idSet.delete(id)
+                        if (idSet.size === 0) accountsByIdentityId.delete(account.identityId)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Preserve source/nativeIdentity context for missing accounts even if they were
+     * not claimed from the current work queue (e.g. still missing from previous runs).
+     */
+    private preserveMissingAccountContext(allAccountsById: Map<string, Account>): void {
+        for (const accountId of this._missingAccountIds) {
+            if (this._managedAccountInfo.has(accountId)) continue
+            const account = allAccountsById.get(accountId)
+            if (!account?.sourceName) continue
+            const parsed = parseManagedAccountKey(accountId)
+            const nativeId = trimStr(account.nativeIdentity ?? parsed?.nativeIdentity) || accountId
+            this.setManagedAccountInfo(accountId, account.sourceName, nativeId)
         }
     }
 
