@@ -16,11 +16,6 @@ export function isExactAttributeMatchScores(scores: ReadonlyArray<ExactMatchScor
         return false
     }
     const ruleScores = scores.filter((s) => !SYNTHETIC_MATCH_SCORE_ALGORITHMS.has(String(s.algorithm ?? '')))
-    if (ruleScores.length === 0) {
-        return false
-    }
-    if (ruleScores.some((s) => s.skipped)) {
-        return false
-    }
-    return ruleScores.every((s) => s.score === 100)
+
+    return ruleScores.length > 0 && ruleScores.every((s) => !s.skipped && s.score === 100)
 }
