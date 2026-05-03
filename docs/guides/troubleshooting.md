@@ -588,7 +588,9 @@ Advanced Settings → Developer Settings:
 | **Info**  | Errors + warnings + info messages      | Production; standard monitoring |
 | **Debug** | All logs including detailed debug info | **Troubleshooting**             |
 
-**⚠️ Note:** Debug level generates high log volume; use temporarily for troubleshooting.
+!!! note
+
+    Debug level generates high log volume; use temporarily for troubleshooting.
 
 ---
 
@@ -617,7 +619,9 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 
 **Symptom:** Major configuration changes; accounts have wrong data; need fresh start.
 
-**⚠️ WARNING:** This deletes all Fusion account data. Use with caution.
+!!! warning
+
+    This deletes all Fusion account data. Use with caution.
 
 **Solution:**
 
