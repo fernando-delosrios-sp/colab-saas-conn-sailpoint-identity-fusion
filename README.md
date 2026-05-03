@@ -392,6 +392,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- (2026-05-01) Added test coverage for connector factory.
 - (2026-05-01) Added missing unit tests for wrapConnectorError utility.
 - (2026-05-01) Added missing test suite for `accountDiscoverSchema` operation, improving test coverage and catching potential bugs.
 - (2026-05-01) 🧹 [Code Health] Simplified logical complexity in `effectiveSkipMatchIfMissing` function.
