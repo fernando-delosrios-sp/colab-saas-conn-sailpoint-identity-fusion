@@ -392,6 +392,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- (2026-05-01) Added tests for `generateReport.ts` helpers.
 - (2026-05-01) Added tests for isNewerThan utility function in `src/utils/__tests__/date.test.ts`
 - (2026-05-01) Added test coverage for connector factory.
 - (2026-05-01) Added missing unit tests for wrapConnectorError utility.
