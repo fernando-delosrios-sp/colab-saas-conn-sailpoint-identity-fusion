@@ -392,6 +392,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- (2026-05-01) Added tests for createOperationHandler infrastructure wrapper.
 - Removed dead code `getCallerFunctionName` function from `logCallerInfo.ts` and its re-export from `logService.ts`.
 
 - (2026-05-01) Refactored `getManagedAccountKeyFromAccount` in `src/model/managedAccountKey.ts` to directly return `buildManagedAccountKey` result.
