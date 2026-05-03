@@ -1,3 +1,7 @@
+## 2024-05-03 - Stack Trace Exposure in FormService
+**Vulnerability:** Explicit logging of error stack traces (`error.stack`) during form definition creation in `FormService`, which could leak internal implementation details if logs are inadvertently exposed.
+**Learning:** While stack traces should not be globally suppressed in core logging services as this ruins observability, explicit statements that write `.stack` to the logs in specific services handling external/API failures can needlessly risk exposing internals.
+**Prevention:** Avoid manually appending `.stack` to log messages in service-level catch blocks. Let the global logger decide how to serialize Error objects securely.
 ## 2024-05-02 - [Authentication Bypass via console.assert]
 **Vulnerability:** The proxy authentication check (`assert(serverPassword === clientPassword, ...)`) in `ProxyService` was using `console.assert` instead of a custom error-throwing assertion utility. `console.assert` in Node.js only prints to stderr and does NOT throw an error or halt execution, allowing requests to proceed even with incorrect passwords.
 **Learning:** Node.js `console.assert` behavior differs from browser `console.assert` or assertion libraries, leading to silent authentication bypass if used for critical security logic. Always verify that assertion functions actually throw errors in the runtime environment.
