@@ -392,6 +392,8 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- Removed dead code `getCallerFunctionName` function from `logCallerInfo.ts` and its re-export from `logService.ts`.
+
 - (2026-05-01) Refactored `getManagedAccountKeyFromAccount` in `src/model/managedAccountKey.ts` to directly return `buildManagedAccountKey` result.
 - (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
 - (2026-05-01) Fixed a security vulnerability related to predictable request ID generation by replacing `Math.random()` with `uuidv4()` in `src/services/clientService/queue.ts`.

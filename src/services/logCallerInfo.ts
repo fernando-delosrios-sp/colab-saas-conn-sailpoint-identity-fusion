@@ -100,9 +100,3 @@ export function getCallerInfo(skipFrames: number = 2): { origin: string; isOpera
     }
 }
 
-/**
- * Legacy function for backwards compatibility
- */
-export function getCallerFunctionName(skipFrames: number = 2): string | undefined {
-    return getCallerInfo(skipFrames).origin
-}
