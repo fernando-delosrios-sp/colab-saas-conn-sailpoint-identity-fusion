@@ -392,6 +392,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- Add tests for setupPhase in corePipeline
 - (2026-05-01) Added missing tests for streamUncorrelatedAnalyzedRows in dryRunHelpers to improve test coverage.
 - (2026-05-01) Added tests for `generateReport.ts` helpers.
 - (2026-05-01) Added tests for isNewerThan utility function in `src/utils/__tests__/date.test.ts`
