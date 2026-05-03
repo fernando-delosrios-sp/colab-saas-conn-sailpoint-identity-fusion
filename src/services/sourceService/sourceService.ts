@@ -955,8 +955,9 @@ export class SourceService {
      * List schemas for a source
      */
     public async listSourceSchemas(sourceId: string): Promise<SchemaV2025[]> {
-        if (this.sourceSchemasCache.has(sourceId)) {
-            return this.sourceSchemasCache.get(sourceId)!
+        const cachedSchemas = this.sourceSchemasCache.get(sourceId)
+        if (cachedSchemas) {
+            return cachedSchemas
         }
 
         const { sourcesApi } = this.client
