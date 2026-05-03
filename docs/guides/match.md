@@ -115,7 +115,8 @@ Configure **Source Settings → Processing Control** for account lifecycle:
 | **Correlate missing source accounts on aggregation?** | Yes                   | Automatically correlate new or previously missing source accounts. When this is **disabled**, a new managed account will **not** be correlated to an existing identity during aggregation unless you also configure an enforced correlation role (see below).                                 |
 | **Force attribute refresh on next aggregation?**      | No                    | Located at **Advanced Settings → Developer Settings**. Applies only to Normal-type attributes; Unique attributes are only computed on account creation or activation. One-time refresh: the option is automatically turned off after the next run. Expensive if attributes change frequently. |
 
-> **Important:** When merging a new managed account with an existing identity, managed account correlation will only occur if **Correlate missing source accounts on aggregation?** is enabled **or** you have configured an **enforced correlation role** that drives that correlation. Otherwise, the connector will not correlate the new managed account automatically.
+!!! warning "Important"
+    When merging a new managed account with an existing identity, managed account correlation will only occur if **Correlate missing source accounts on aggregation?** is enabled **or** you have configured an **enforced correlation role** that drives that correlation. Otherwise, the connector will not correlate the new managed account automatically.
 
 ---
 
