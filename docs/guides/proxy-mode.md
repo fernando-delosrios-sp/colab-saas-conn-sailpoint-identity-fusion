@@ -190,7 +190,9 @@ Local testing: http://localhost:3000/fusion (not reachable from ISC)
 | **ISC (client)** | Proxy password field                  | `<your-secret>` |
 | **Proxy server** | `PROXY_PASSWORD` environment variable | `<same-secret>` |
 
-⚠️ **Security:** Passwords must match exactly between client and server.
+!!! warning "Security"
+
+    Passwords must match exactly between client and server.
 
 ---
 

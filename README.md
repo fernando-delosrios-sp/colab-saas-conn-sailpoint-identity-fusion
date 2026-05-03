@@ -392,6 +392,20 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- Add tests for setupPhase in corePipeline
+- (2026-05-01) Added missing tests for streamUncorrelatedAnalyzedRows in dryRunHelpers to improve test coverage.
+- (2026-05-01) Added tests for `generateReport.ts` helpers.
+- (2026-05-01) Added tests for isNewerThan utility function in `src/utils/__tests__/date.test.ts`
+- (2026-05-01) Added test coverage for connector factory.
+- (2026-05-01) Added missing unit tests for wrapConnectorError utility.
+- (2026-05-01) Added missing test suite for `accountDiscoverSchema` operation, improving test coverage and catching potential bugs.
+- (2026-05-01) 🧹 [Code Health] Simplified logical complexity in `effectiveSkipMatchIfMissing` function.
+- (2026-05-01) Added tests for createOperationHandler infrastructure wrapper.
+- Removed dead code `getCallerFunctionName` function from `logCallerInfo.ts` and its re-export from `logService.ts`.
+
+- (2026-05-01) Fixed a security vulnerability related to predictable request ID generation by replacing `Math.random()` with `uuidv4()` in `src/services/clientService/queue.ts`.
+- (2026-05-01) Fix: Update explicit TODO referencing hardcoded identity structures in formBuilder.ts.
+
 - (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
 
 ### 2.1.6 - 2026-04-29
