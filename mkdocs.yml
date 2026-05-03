@@ -45,3 +45,8 @@ nav:
                 - Account disable: operations/account-disable.md
           - Entitlements:
                 - Entitlement list: operations/entitlement-list.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
