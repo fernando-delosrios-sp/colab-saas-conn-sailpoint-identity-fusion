@@ -76,12 +76,12 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 → Prevents accidental reset on next run
 ```
 
-**⚠️ Warnings:**
+!!! warning
 
-- **Data loss:** All Fusion account history, processing state, and custom attributes are deleted
-- **Performance:** Full rebuild can take hours for large datasets (10k+ accounts)
-- **Identity impact:** If Fusion is authoritative, identities may be temporarily impacted
-- **Coordination:** Notify stakeholders before resetting in production
+    - **Data loss:** All Fusion account history, processing state, and custom attributes are deleted
+    - **Performance:** Full rebuild can take hours for large datasets (10k+ accounts)
+    - **Identity impact:** If Fusion is authoritative, identities may be temporarily impacted
+    - **Coordination:** Notify stakeholders before resetting in production
 
 ### External logging
 
@@ -281,7 +281,9 @@ HTTP 429 retry (rate limit):
 | Long-duration failures      | Increase retry delay (2000–5000ms)   |
 | Quick failures (auth, etc.) | Lower retry count (5–10)             |
 
-**⚠️ Note:** Retry delay is the **base** delay. For HTTP 429, the connector uses the `Retry-After` header from the API response, which may be longer.
+!!! note
+
+    Retry delay is the **base** delay. For HTTP 429, the connector uses the `Retry-After` header from the API response, which may be longer.
 
 ### Batch size
 
