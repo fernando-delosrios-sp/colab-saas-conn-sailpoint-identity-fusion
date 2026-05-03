@@ -392,6 +392,8 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- Removed dead code `getCallerFunctionName` function from `logCallerInfo.ts` and its re-export from `logService.ts`.
+
 - (2026-05-01) Fixed a security vulnerability related to predictable request ID generation by replacing `Math.random()` with `uuidv4()` in `src/services/clientService/queue.ts`.
 - (2026-05-01) Fix: Update explicit TODO referencing hardcoded identity structures in formBuilder.ts.
 
