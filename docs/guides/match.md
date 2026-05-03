@@ -152,7 +152,8 @@ For each attribute you want to use in match detection, add a **Fusion attribute 
 | **Mandatory match?**           | Must meet this rule’s minimum for a potential match            | Yes for critical identifiers; passing mandatories still contribute weighted score like other rules.                                             |
 | **Skip match if missing**      | Skip when either value is missing                              | Default: Yes. Skipped rules do not affect the combined score. Automatic assignment on exact match requires no skipped rules and all scores 100. |
 
-> **Example edge cases:** When two feeds disagree in subtle ways (for example transposed dates of birth, married-name changes, nicknames vs legal names, phone formatting only, or missing contact on one side), tuning is easier if you compare **fictional** side-by-side rows and recommended algorithms first. See **Real-world matching examples (anonymized)** in [Effective use of matching algorithms](matching-algorithms.md#real-world-matching-examples-anonymized).
+!!! tip "Example edge cases"
+    When two feeds disagree in subtle ways (for example transposed dates of birth, married-name changes, nicknames vs legal names, phone formatting only, or missing contact on one side), tuning is easier if you compare **fictional** side-by-side rows and recommended algorithms first. See **Real-world matching examples (anonymized)** in [Effective use of matching algorithms](matching-algorithms.md#real-world-matching-examples-anonymized).
 
 **Algorithm selection guide:**
 
@@ -241,7 +242,8 @@ Configure **Attribute Matching Settings → Review Settings** for the manual rev
 | **Owner is global reviewer?**                      | Add Fusion source owner to all review forms | Yes (ensures at least one reviewer)                           |
 | **Send report to owner on aggregation?**           | Email report after each aggregation         | Yes (useful for monitoring)                                   |
 
-> **Note:** The maximum number of candidate identities shown on a single review form is controlled by **Max match candidates per review form** in **Advanced Settings → Developer Settings** (default for new sources comes from `fusionMaxCandidatesForForm` in `connector-spec.json` → `sourceConfigInitialValues`; max 15). Only the highest-scoring potential matches are included if the limit is exceeded.
+!!! note
+    The maximum number of candidate identities shown on a single review form is controlled by **Max match candidates per review form** in **Advanced Settings → Developer Settings** (default for new sources comes from `fusionMaxCandidatesForForm` in `connector-spec.json` → `sourceConfigInitialValues`; max 15). Only the highest-scoring potential matches are included if the limit is exceeded.
 
 ### What the aggregation report includes
 
@@ -327,7 +329,8 @@ Create an access profile for viewing match reports:
 | ----------------- | ------------- | ---------------------------------- | --------------------------------------------------------- |
 | **Fusion Report** | Fusion report | Identity governance team, auditors | View list of potential matches without review permissions |
 
-**Note:** The Fusion source automatically creates entitlements for each source reviewer and the Fusion report. Run **Entitlement Aggregation** to populate these entitlements.
+!!! note
+    The Fusion source automatically creates entitlements for each source reviewer and the Fusion report. Run **Entitlement Aggregation** to populate these entitlements.
 
 ---
 
@@ -475,7 +478,8 @@ Track these metrics to assess Match effectiveness:
 | **Forms expiring**           | Forms timing out before review              | Increase **Manual review expiration days**; notify reviewers                             |
 | **Incorrect algorithm**      | Matches don't make sense                    | Switch algorithm (see [Matching algorithms](matching-algorithms.md))                     |
 
-**Interpreting ambiguous reviews:** If reviewers repeatedly see “obvious same person” rows that still look risky (for example identical name and email but **different normalized date of birth**, or **policy-sensitive** fields that disagree between sources), compare your thresholds to the walkthroughs in [Real-world matching examples (anonymized)](matching-algorithms.md#real-world-matching-examples-anonymized)—especially **Transposed date of birth** and **Legal sex or gender marker difference**—then adjust Map/Define normalization, mandatory rules, or review attributes accordingly.
+!!! tip "Interpreting ambiguous reviews"
+    If reviewers repeatedly see “obvious same person” rows that still look risky (for example identical name and email but **different normalized date of birth**, or **policy-sensitive** fields that disagree between sources), compare your thresholds to the walkthroughs in [Real-world matching examples (anonymized)](matching-algorithms.md#real-world-matching-examples-anonymized)—especially **Transposed date of birth** and **Legal sex or gender marker difference**—then adjust Map/Define normalization, mandatory rules, or review attributes accordingly.
 
 ---
 
