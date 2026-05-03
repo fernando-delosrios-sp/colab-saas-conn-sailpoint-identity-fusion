@@ -149,10 +149,7 @@ export interface MatchingConfig {
 export function effectiveSkipMatchIfMissing(
     matching: Pick<MatchingConfig, 'skipMatchIfMissing' | 'mandatory'>
 ): boolean {
-    if (matching.mandatory === true) {
-        return false
-    }
-    return matching.skipMatchIfMissing !== false
+    return !matching.mandatory && matching.skipMatchIfMissing !== false
 }
 
 // ============================================================================
