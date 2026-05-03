@@ -382,6 +382,9 @@ export class SourceService {
         const ownerIdSet = new Set<string>()
 
         let ownerId: string | undefined
+        // Only swallow the specific "owner not found" error; rethrow unexpected errors
+        // so callers can distinguish between a missing owner (expected empty result) and
+        // other failures (propagate upward).
         try {
             ownerId = this.fusionSourceOwner.id
         } catch (error) {
@@ -489,7 +492,8 @@ export class SourceService {
 
                 if (!response.ok) {
                     const responseBody = await response.text()
-                    throw new Error(`HTTP ${response.status} ${response.statusText} - ${responseBody}`)
+                    const safeBodyPreview = responseBody.length > 100 ? responseBody.substring(0, 100) + '...' : responseBody
+                    throw new Error(`HTTP ${response.status} ${response.statusText} - ${safeBodyPreview}`)
                 }
             },
             QueuePriority.LOW,
@@ -1341,26 +1345,26 @@ export class SourceService {
         const missingArtifacts: ReverseCorrelationArtifact[] = []
         const full = requiresFullReverseCorrelationArtifacts(sourceConfig)
 
-        if (full) {
-            const fusionSchemaReady = await this.hasFusionSchemaAttribute(correlationAttribute)
-            if (!fusionSchemaReady) {
-                missingArtifacts.push('fusion_schema_attribute')
-            }
+        const [fusionSchemaReady, identityAttributeReady, identityProfileReady, managedCorrelationReady] =
+            await Promise.all([
+                full ? this.hasFusionSchemaAttribute(correlationAttribute) : Promise.resolve(true),
+                this.hasSearchableIdentityAttribute(correlationAttribute),
+                full ? this.hasIdentityProfileMapping(correlationAttribute, sourceConfig) : Promise.resolve(true),
+                this.hasManagedSourceCorrelation(correlationAttribute, managedSourceId),
+            ])
+
+        if (full && !fusionSchemaReady) {
+            missingArtifacts.push('fusion_schema_attribute')
         }
 
-        const identityAttributeReady = await this.hasSearchableIdentityAttribute(correlationAttribute)
         if (!identityAttributeReady) {
             missingArtifacts.push('identity_attribute')
         }
 
-        if (full) {
-            const identityProfileReady = await this.hasIdentityProfileMapping(correlationAttribute, sourceConfig)
-            if (!identityProfileReady) {
-                missingArtifacts.push('identity_profile_mapping')
-            }
+        if (full && !identityProfileReady) {
+            missingArtifacts.push('identity_profile_mapping')
         }
 
-        const managedCorrelationReady = await this.hasManagedSourceCorrelation(correlationAttribute, managedSourceId)
         if (!managedCorrelationReady) {
             missingArtifacts.push('managed_source_correlation')
         }
