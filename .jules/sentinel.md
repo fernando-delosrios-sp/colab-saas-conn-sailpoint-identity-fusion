@@ -1,0 +1,4 @@
+## 2024-05-02 - [Authentication Bypass via console.assert]
+**Vulnerability:** The proxy authentication check (`assert(serverPassword === clientPassword, ...)`) in `ProxyService` was using `console.assert` instead of a custom error-throwing assertion utility. `console.assert` in Node.js only prints to stderr and does NOT throw an error or halt execution, allowing requests to proceed even with incorrect passwords.
+**Learning:** Node.js `console.assert` behavior differs from browser `console.assert` or assertion libraries, leading to silent authentication bypass if used for critical security logic. Always verify that assertion functions actually throw errors in the runtime environment.
+**Prevention:** Use a dedicated assertion library or a custom utility (`src/utils/assert.ts` in this project) that explicitly throws errors. Search for and eliminate any direct imports of `assert` from `console` for control flow or security checks.

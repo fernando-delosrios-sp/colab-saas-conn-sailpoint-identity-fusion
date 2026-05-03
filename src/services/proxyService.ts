@@ -1,7 +1,7 @@
 import { ConnectorError, Response } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
-import { assert } from 'console'
+import { assert } from '../utils/assert'
 
 const KEEPALIVE = 2.5 * 60 * 1000
 const DEFAULT_PROXY_REQUEST_TIMEOUT_MS = 5 * 60 * 1000
