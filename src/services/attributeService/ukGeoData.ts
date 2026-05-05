@@ -174,10 +174,13 @@ for (const region of UK_REGIONS) {
 
 for (const city of UK_CITIES) {
     const cityName = city.name.toLowerCase()
-    if (!ukCitiesByName.has(cityName)) {
-        ukCitiesByName.set(cityName, [])
+    // Optimization: Single lookup using get() avoids double lookup from has() + get()
+    let cities = ukCitiesByName.get(cityName)
+    if (!cities) {
+        cities = []
+        ukCitiesByName.set(cityName, cities)
     }
-    ukCitiesByName.get(cityName)!.push(city)
+    cities.push(city)
 }
 
 /**
