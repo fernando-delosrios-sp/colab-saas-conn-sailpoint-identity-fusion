@@ -395,10 +395,13 @@ for (const state of US_STATES) {
 
 for (const city of US_CITIES) {
     const cityName = city.name.toLowerCase()
-    if (!citiesByName.has(cityName)) {
-        citiesByName.set(cityName, [])
+    // Optimization: Single lookup using get() avoids double lookup from has() + get()
+    let cities = citiesByName.get(cityName)
+    if (!cities) {
+        cities = []
+        citiesByName.set(cityName, cities)
     }
-    citiesByName.get(cityName)!.push(city)
+    cities.push(city)
 }
 
 /**
