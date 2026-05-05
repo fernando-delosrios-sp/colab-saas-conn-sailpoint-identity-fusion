@@ -999,7 +999,7 @@ export class FusionAccount {
      */
     public clearFusionIdentityReferences(): void {
         for (const match of this._fusionMatches) {
-            ;(match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
+            ; (match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
         }
     }
 
@@ -1269,7 +1269,7 @@ export class FusionAccount {
             if (removedFromAccounts || removedFromMissing) {
                 removedAnyReference = true
                 this.addHistory(
-                    `Removed managed account reference (not present in source inventory or excluded by source filters): ${accountId}`
+                    `Removed managed account missing reference: ${accountId}`
                 )
             }
             this._previousAccountIds.delete(accountId)
