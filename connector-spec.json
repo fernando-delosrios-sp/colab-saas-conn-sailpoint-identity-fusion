@@ -571,9 +571,9 @@
                                         },
                                         {
                                             "key": "trim",
-                                            "label": "Trim leading and trailing spaces?",
+                                            "label": "Trim leading and trailing white space?",
                                             "type": "toggle",
-                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value"
+                                            "helpKey": "Remove extra white space at the beginning and end of the defined value"
                                         },
                                         {
                                             "key": "maxLength",
