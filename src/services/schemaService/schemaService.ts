@@ -13,6 +13,7 @@ import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
 import { fusionAccountSchemaAttributes } from '../../data/schema'
 import { isAccountSchema, apiSchemaToAccountSchema } from './helpers'
+import { promiseAllBatched } from '../fusionService/collections'
 
 /**
  * Service for managing account schema, dynamic schema building.
@@ -296,15 +297,13 @@ export class SchemaService {
     public async getManagedSourceSchemaAttributeNames(): Promise<Set<string>> {
         const names = new Set<string>()
         const { managedSources } = this.sources
-        const schemas = await Promise.all(
-            managedSources.map(async (source) => {
-                try {
-                    return await this.fetchAccountSchema(source.id)
-                } catch {
-                    return undefined
-                }
-            })
-        )
+        const schemas = await promiseAllBatched(managedSources, async (source) => {
+            try {
+                return await this.fetchAccountSchema(source.id)
+            } catch {
+                return undefined
+            }
+        })
         for (const schema of schemas) {
             if (schema) {
                 for (const attr of schema.attributes) {
@@ -345,12 +344,10 @@ export class SchemaService {
 
         const accountSchemaAttributes: SchemaAttribute[] = []
         // Fetch schemas from all managed sources in parallel
-        const schemaResults = await Promise.all(
-            managedSources.reverse().map(async (source) => {
-                const accountSchema = await this.fetchAccountSchema(source.id)
-                return this.getAccountSchemaAttributes(accountSchema, source.name)
-            })
-        )
+        const schemaResults = await promiseAllBatched([...managedSources].reverse(), async (source) => {
+            const accountSchema = await this.fetchAccountSchema(source.id)
+            return this.getAccountSchemaAttributes(accountSchema, source.name)
+        })
         for (const attributes of schemaResults) {
             accountSchemaAttributes.push(...attributes)
         }
