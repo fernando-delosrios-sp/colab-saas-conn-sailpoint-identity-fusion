@@ -2157,7 +2157,7 @@ describe('FusionService', () => {
             const analyzed = await fusionService.analyzeUncorrelatedAccounts()
 
             expect(analyzed).toHaveLength(2)
-            expect(analyzed[1].fusionMatches.some((match) => match.candidateType === 'new-unmatched')).toBe(true)
+            expect(analyzed[1].fusionMatchesRaw.some((match) => match.candidateType === 'new-unmatched')).toBe(true)
             expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
         })
     })

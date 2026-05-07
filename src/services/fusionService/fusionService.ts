@@ -1461,7 +1461,9 @@ export class FusionService {
                 fusionAccount.clearFusionIdentityReferences()
                 return undefined
             }
-            const perfectMatch = fusionAccount.fusionMatches.find((m) => FusionService.hasAllAttributeScoresPerfect(m))
+            const perfectMatch = fusionAccount.fusionMatchesRaw.find((m) =>
+                FusionService.hasAllAttributeScoresPerfect(m)
+            )
             if (this.config.fusionMergingExactMatch && perfectMatch?.identityId) {
                 return this.handleExactMatch(fusionAccount, account, perfectMatch.identityId)
             }
@@ -1561,7 +1563,7 @@ export class FusionService {
         try {
             const outcome = await this.forms.createFusionForm(fusionAccount, reviewers)
             if (!outcome.formDefinitionReady) {
-                const matchCount = fusionAccount.fusionMatches.length
+                const matchCount = fusionAccount.fusionMatchesRaw.length
                 const maxForm = this.config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
                 const message =
                     !reviewers || reviewers.size === 0
@@ -1585,7 +1587,7 @@ export class FusionService {
     }
 
     private handleDeferredMatch(fusionAccount: FusionAccount, account: Account): undefined {
-        const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'new-unmatched')
+        const deferredMatches = fusionAccount.fusionMatchesRaw.filter((m) => m.candidateType === 'new-unmatched')
         const { headline, summary } = FusionService.formatFusionMatchDiscoveryLog(deferredMatches, true)
         this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}; skipping account for now`)
         this.removeManagedAccountFromWorkQueue(account)
@@ -1668,7 +1670,9 @@ export class FusionService {
                 !this.hasIdentityBackedMatches(fusionAccount) &&
                 this.hasNewUnmatchedPeerMatches(fusionAccount)
             ) {
-                const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'new-unmatched')
+                const deferredMatches = fusionAccount.fusionMatchesRaw.filter(
+                    (m) => m.candidateType === 'new-unmatched'
+                )
                 const { headline, summary } = FusionService.formatFusionMatchDiscoveryLog(deferredMatches, true)
                 this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}`)
             }
@@ -1776,7 +1780,9 @@ export class FusionService {
                 fusionAccount.clearFusionIdentityReferences()
                 return undefined
             }
-            const perfectMatch = fusionAccount.fusionMatches.find((m) => FusionService.hasAllAttributeScoresPerfect(m))
+            const perfectMatch = fusionAccount.fusionMatchesRaw.find((m) =>
+                FusionService.hasAllAttributeScoresPerfect(m)
+            )
             if (this.config.fusionMergingExactMatch && perfectMatch?.identityId) {
                 return this.handleExactMatch(fusionAccount, account, perfectMatch.identityId)
             }
@@ -1798,7 +1804,7 @@ export class FusionService {
         this.fusionIdentityComparisonsByAccount.set(fusionAccount, fusionIdentityComparisons)
         if (fusionAccount.isMatch) {
             if (hasIdentityBackedMatches) {
-                const identityMatches = fusionAccount.fusionMatches.filter(
+                const identityMatches = fusionAccount.fusionMatchesRaw.filter(
                     (m) => (m.candidateType ?? 'identity') === 'identity'
                 )
                 const { headline, summary } = FusionService.formatFusionMatchDiscoveryLog(identityMatches, false)
@@ -1810,7 +1816,7 @@ export class FusionService {
                 this.matchAccounts.push(fusionAccount)
                 return
             }
-            const deferredMatches = fusionAccount.fusionMatches
+            const deferredMatches = fusionAccount.fusionMatchesRaw
                 .filter((match) => match.candidateType === 'new-unmatched')
                 .map((match) => {
                     const fields = fusionReportMatchCandidateAccountFields(match)
@@ -2522,7 +2528,7 @@ export class FusionService {
 
         // Report on managed accounts with matches (forms created)
         for (const fusionAccount of this.matchAccounts) {
-            const fusionMatches = fusionAccount.fusionMatches
+            const fusionMatches = fusionAccount.fusionMatchesRaw
             if (fusionMatches && fusionMatches.length > 0) {
                 const matches = fusionMatches.map((match) => ({
                     ...fusionReportMatchCandidateAccountFields(match),
@@ -2608,10 +2614,10 @@ export class FusionService {
     }
 
     private hasIdentityBackedMatches(fusionAccount: FusionAccount): boolean {
-        return fusionAccount.fusionMatches.some((match) => (match.candidateType ?? 'identity') === 'identity')
+        return fusionAccount.fusionMatchesRaw.some((match) => (match.candidateType ?? 'identity') === 'identity')
     }
 
     private hasNewUnmatchedPeerMatches(fusionAccount: FusionAccount): boolean {
-        return fusionAccount.fusionMatches.some((match) => match.candidateType === 'new-unmatched')
+        return fusionAccount.fusionMatchesRaw.some((match) => match.candidateType === 'new-unmatched')
     }
 }

@@ -203,9 +203,9 @@ describe('ScoringService max identity match candidates', () => {
             2
         )
 
-        expect(fusionAccount.fusionMatches.filter((m) => (m.candidateType ?? 'identity') === 'identity')).toHaveLength(
-            2
-        )
+        expect(
+            fusionAccount.fusionMatchesRaw.filter((m) => (m.candidateType ?? 'identity') === 'identity')
+        ).toHaveLength(2)
         expect(compared).toBe(2)
     })
 })

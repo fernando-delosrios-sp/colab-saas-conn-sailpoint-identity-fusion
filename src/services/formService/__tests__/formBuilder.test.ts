@@ -43,7 +43,7 @@ describe('formBuilder conditions', () => {
 describe('candidate list building', () => {
     it('falls back to identity id when displayName is missing', () => {
         const fusionAccount = {
-            fusionMatches: [
+            fusionMatchesRaw: [
                 {
                     fusionIdentity: {
                         identityId: 'fallback-id-1',
@@ -68,7 +68,7 @@ describe('candidate list building', () => {
             }) as any
 
         const fusionAccount = {
-            fusionMatches: [mkMatch('low', 80), mkMatch('high', 95), mkMatch('mid', 88)],
+            fusionMatchesRaw: [mkMatch('low', 80), mkMatch('high', 95), mkMatch('mid', 88)],
         } as any
 
         const candidates = buildCandidateList(fusionAccount, 2)

@@ -86,13 +86,13 @@ export const countIdentityBackedFusionMatches = (matches: readonly FusionMatch[]
  */
 export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: number): Candidate[] => {
     assert(fusionAccount, 'Fusion account is required')
-    assert(fusionAccount.fusionMatches, 'Fusion matches are required')
+    assert(fusionAccount.fusionMatchesRaw, 'Fusion matches are required')
     assert(
         maxCandidates >= 1 && maxCandidates <= internalConfig.formService.fusionMaxCandidatesForFormMax,
         `maxCandidates must be between 1 and ${internalConfig.formService.fusionMaxCandidatesForFormMax}`
     )
 
-    const ordered = [...fusionAccount.fusionMatches].sort(compareMatchesForForm).slice(0, maxCandidates)
+    const ordered = [...fusionAccount.fusionMatchesRaw].sort(compareMatchesForForm).slice(0, maxCandidates)
 
     return ordered.map((match) => {
         assert(match.fusionIdentity, 'Fusion identity is required in match')
