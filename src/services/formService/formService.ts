@@ -28,12 +28,8 @@ import {
     PendingReviewReviewerContext,
     PendingReviewAccountContext,
 } from './types'
-import { defaultFusionMaxCandidatesForForm } from '../../data/config'
+import { defaultFusionMaxCandidatesForForm, internalConfig } from '../../data/config'
 import {
-    buildCandidateList,
-    buildFormName,
-    calculateExpirationDate,
-    getFormOwner,
     resolveIdentitiesSelectLabel,
 } from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
@@ -43,6 +39,7 @@ import {
     extractCandidateIdsFromFormInput,
     getReviewerInfo,
 } from './formProcessor'
+import { FusionMatch } from '../scoringService/types'
 
 export type { PendingReviewFormContext, PendingReviewReviewerContext, PendingReviewAccountContext } from './types'
 
@@ -337,7 +334,7 @@ export class FormService {
     }> {
         this.log.debug(`Building fusion form for account ${fusionAccount.name} with ${reviewerCount} reviewer(s)`)
 
-        const candidates = buildCandidateList(fusionAccount, this.fusionMaxCandidatesForForm)
+        const candidates = this._buildCandidateList(fusionAccount)
         assert(candidates, 'Failed to build candidate list')
 
         await this.enrichCandidateIdentities(candidates)
@@ -345,14 +342,14 @@ export class FormService {
         const sourceType =
             this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
 
-        const formName = buildFormName(fusionAccount, this.fusionFormNamePattern)
+        const formName = this._buildFormName(fusionAccount)
         assert(formName, 'Form name is required')
 
         const formDefinition = await this.getOrCreateFormDefinition(formName, fusionAccount, candidates)
         const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
         assert(formInput, 'Form input is required')
 
-        const expire = calculateExpirationDate(this.fusionFormExpirationDays)
+        const expire = this._calculateExpirationDate()
         assert(expire, 'Form expiration date is required')
 
         const { fusionSourceId } = this.sources
@@ -815,6 +812,65 @@ export class FormService {
     // Private Helper Methods
     // ------------------------------------------------------------------------
 
+    private _rankScoreForMatch(match: FusionMatch): number {
+        const combined = match.scores?.find(
+            (s) =>
+                s.algorithm === 'weighted-mean' ||
+                s.attribute === 'Combined score' ||
+                s.attribute === 'Combined match score'
+        )
+        if (combined) return combined.score
+        const scored = match.scores?.filter((s) => !s.skipped) ?? []
+        if (scored.length === 0) return 0
+        return Math.max(...scored.map((s) => s.score))
+    }
+
+    private _compareMatchesForForm(a: FusionMatch, b: FusionMatch): number {
+        const delta = this._rankScoreForMatch(b) - this._rankScoreForMatch(a)
+        if (delta !== 0) return delta
+        const ida = String(a.fusionIdentity?.identityId ?? a.identityId ?? '')
+        const idb = String(b.fusionIdentity?.identityId ?? b.identityId ?? '')
+        return ida.localeCompare(idb)
+    }
+
+    private _buildCandidateList(fusionAccount: FusionAccount): Candidate[] {
+        assert(fusionAccount, 'Fusion account is required')
+        assert(fusionAccount.fusionMatches, 'Fusion matches are required')
+        assert(
+            this.fusionMaxCandidatesForForm >= 1 &&
+                this.fusionMaxCandidatesForForm <= internalConfig.formService.fusionMaxCandidatesForFormMax,
+            `maxCandidates must be between 1 and ${internalConfig.formService.fusionMaxCandidatesForFormMax}`
+        )
+
+        const ordered = [...fusionAccount.fusionMatches].sort(this._compareMatchesForForm).slice(0, this.fusionMaxCandidatesForForm)
+
+        return ordered.map((match) => {
+            assert(match.fusionIdentity, 'Fusion identity is required in match')
+            assert(match.fusionIdentity.identityId, 'Fusion identity ID is required')
+            const attrs: Record<string, any> = match.fusionIdentity.attributes || {}
+            const id = match.fusionIdentity.identityId
+            return {
+                id,
+                name: resolveIdentitiesSelectLabel(attrs, id),
+                attributes: attrs,
+                scores: match.scores || [],
+            }
+        })
+    }
+
+    private _buildFormName(fusionAccount: FusionAccount): string {
+        const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
+        const source = `[${fusionAccount.sourceName}]`
+        const accountIdentifier = trimStr(fusionAccount.nativeIdentity) || trimStr(fusionAccount.managedAccountId) || 'unknown'
+        return `${this.fusionFormNamePattern} - ${accountName} ${source} (${accountIdentifier})`
+    }
+
+    private _calculateExpirationDate(): string {
+        const expirationDate = new Date()
+        expirationDate.setDate(expirationDate.getDate() + this.fusionFormExpirationDays)
+        return expirationDate.toISOString()
+    }
+
     /**
      * Collect pending (unanswered) form instance URLs by recipient identityId,
      * and candidate identity IDs from pending form instances.
@@ -1176,7 +1232,7 @@ export class FormService {
         const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
         const formInputs = buildFormInputs(fusionAccount, candidates, this.fusionFormAttributes)
         const formConditions = buildFormConditions(candidates, this.fusionFormAttributes)
-        const owner = getFormOwner(this.sources)
+        const owner = this.sources.fusionSourceOwner
 
         // Validate form definition components before creating
         this.log.debug(

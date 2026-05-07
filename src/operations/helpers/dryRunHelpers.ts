@@ -372,26 +372,6 @@ export const initializeDryRunExecution = async (
     return { runtimeOptions, rowEmitter }
 }
 
-export const writeAndSendDryRunReport = async (
-    context: Pick<DryRunHelpersContext, 'reports'>,
-    report: FusionReport,
-    finalDryRunStats: AggregationStats,
-    reportPhaseStartedAt?: number
-): Promise<
-    | undefined
-    | {
-          reportHtmlOutputPath?: string
-          statsWithPhaseTiming: AggregationStats
-      }
-> => {
-    const { reports } = context
-    return reports.writeAndSendDryRunReport({
-        report,
-        finalDryRunStats,
-        reportPhaseStartedAt,
-    })
-}
-
 export const finalizeDryRun = async (
     context: Pick<DryRunHelpersContext, 'fusion' | 'res' | 'sources'>,
     finalizationInput: DryRunFinalizationInput
