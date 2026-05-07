@@ -392,6 +392,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- (2026-05-07) ⚡ Bolt: Replaced array-generating getters with zero-copy accessors in hot loops to improve performance.
 - (2026-05-01) Refactored `getManagedAccountKeyFromAccount` in `src/model/managedAccountKey.ts` to directly return `buildManagedAccountKey` result.
 - (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
 
