@@ -12,7 +12,7 @@ import { createRegistry as createMockRegistry } from '../../__tests__/harness/re
 
 function createRegistry() {
     const registry = createMockRegistry()
-    registry.sources.managedAccountsById = new Map()
+    registry.sources.managedAccountsById = new Map(); registry.sources.managedSources = []
     registry.sources.clearManagedAccounts = jest.fn()
     registry.sources.saveBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
     registry.sources.clearFusionAccounts = jest.fn()
@@ -142,6 +142,7 @@ describe('corePipeline setupPhase', () => {
     it('throws error if fusion source is not found', async () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = false
+        registry.sources.managedSources = []
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
 
@@ -152,6 +153,7 @@ describe('corePipeline setupPhase', () => {
     it('returns false and disables reset if fusion reset flag is detected during aggregation', async () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
+        registry.sources.managedSources = []
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
         registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
@@ -174,6 +176,7 @@ describe('corePipeline setupPhase', () => {
     it('returns false without modifying persistent state if fusion reset flag is detected during dry-run', async () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
+        registry.sources.managedSources = []
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
         registry.fusion.isReset = jest.fn().mockReturnValue(true)
@@ -190,6 +193,7 @@ describe('corePipeline setupPhase', () => {
     it('disables force attribute refresh flag if enabled in aggregation mode', async () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
+        registry.sources.managedSources = []
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
         registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
@@ -210,6 +214,7 @@ describe('corePipeline setupPhase', () => {
     it('sets provided schema instead of loading from source if schema is passed', async () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
+        registry.sources.managedSources = []
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
         registry.fusion.isReset = jest.fn().mockReturnValue(false)
@@ -229,6 +234,7 @@ describe('corePipeline setupPhase', () => {
     it('handles reverse correlation sources in aggregation mode', async () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
+        registry.sources.managedSources = []
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
         registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
