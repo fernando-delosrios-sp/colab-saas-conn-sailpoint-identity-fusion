@@ -1,9 +1,12 @@
-import { ServiceRegistry } from '../../services/serviceRegistry'
 import { assert } from '../../utils/assert'
 import { FusionAccount } from '../../model/account'
 import { AttributeOperations } from '../../services/attributeService/types'
 import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
 import { readString } from '../../utils/safeRead'
+import type { FusionService } from '../../services/fusionService'
+import type { IdentityService } from '../../services/identityService'
+import type { SourceService } from '../../services/sourceService'
+import type { LogService } from '../../services/logService'
 
 /**
  * Rebuilds a fusion account by fetching fresh data and reprocessing attributes.
@@ -11,18 +14,15 @@ import { readString } from '../../utils/safeRead'
  *
  * @param nativeIdentity - The native identity (unique ID) of the fusion account
  * @param attributeOperations - Flags controlling which attribute operations to perform
- * @param serviceRegistry - Optional; defaults to ServiceRegistry.getCurrent() if omitted
+ * @param services - Object containing the services needed for rebuilding
  * @returns The rebuilt FusionAccount, or undefined if not found
  */
 export const rebuildFusionAccount = async (
     nativeIdentity: string,
     attributeOperations: AttributeOperations,
-    serviceRegistry?: ServiceRegistry
+    services: { fusion: FusionService; identities: IdentityService; sources: SourceService; log: LogService }
 ): Promise<FusionAccount | undefined> => {
-    if (!serviceRegistry) {
-        serviceRegistry = ServiceRegistry.getCurrent()
-    }
-    const { fusion, identities, sources, log } = serviceRegistry
+    const { fusion, identities, sources, log } = services
 
     await sources.fetchFusionAccount(nativeIdentity)
     const fusionAccountsMap = sources.fusionAccountsByNativeIdentity
