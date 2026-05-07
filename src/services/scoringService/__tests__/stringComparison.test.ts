@@ -9,11 +9,17 @@ describe('stringComparison', () => {
         it('should return 0 for empty strings', () => {
             expect(jaroWinklerSimilarity('', 'hello')).toBe(0)
             expect(jaroWinklerSimilarity('hello', '')).toBe(0)
+            expect(jaroWinklerSimilarity('', '')).toBe(0)
         })
 
         it('should return high similarity for similar strings', () => {
             const sim = jaroWinklerSimilarity('martha', 'marhta')
             expect(sim).toBeGreaterThan(0.9)
+        })
+
+        it('should return 0 when strings have no matches or match window is negative', () => {
+            expect(jaroWinklerSimilarity('a', 'b')).toBe(0)
+            expect(jaroWinklerSimilarity('abc', 'xyz')).toBe(0)
         })
 
         it('should return lower similarity for different strings', () => {
@@ -42,6 +48,7 @@ describe('stringComparison', () => {
         it('should return 0 for strings shorter than 2 chars', () => {
             expect(diceCoefficientSimilarity('a', 'ab')).toBe(0)
             expect(diceCoefficientSimilarity('', 'ab')).toBe(0)
+            expect(diceCoefficientSimilarity('', '')).toBe(0)
         })
 
         it('should return high similarity for similar strings', () => {
