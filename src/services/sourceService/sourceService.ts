@@ -257,6 +257,13 @@ export class SourceService {
         return !!this._fusionSourceId
     }
 
+    /**
+     * Whether cascade aggregation is enabled globally.
+     */
+    public get isCascadeAggregationEnabled(): boolean {
+        return this.config.cascadeAggregationEnabled ?? false
+    }
+
     // ------------------------------------------------------------------------
     // Public Source Fetch Methods
     // ------------------------------------------------------------------------
@@ -2024,7 +2031,7 @@ export class SourceService {
     /**
      * Aggregate managed source
      */
-    private async aggregateManagedSource(
+    public async aggregateManagedSource(
         id: string,
         disableOptimization?: boolean,
         awaitTaskStatus: boolean = true

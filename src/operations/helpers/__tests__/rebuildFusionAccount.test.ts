@@ -45,6 +45,9 @@ describe('rebuildFusionAccount', () => {
                 ]),
                 fetchManagedAccount,
                 getSourceByName,
+                getSourceById: jest.fn().mockReturnValue(undefined),
+                aggregateManagedSource: jest.fn().mockResolvedValue(undefined),
+                config: { cascadeAggregationEnabled: false },
             },
             identities: {
                 fetchIdentityById: jest.fn().mockResolvedValue(undefined),
@@ -56,7 +59,7 @@ describe('rebuildFusionAccount', () => {
             log: { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() },
         } as any
 
-        await rebuildFusionAccount('fusion-1', {} as any, registry)
+        await rebuildFusionAccount('fusion-1', {} as any, { fusion: registry.fusion, identities: registry.identities, sources: registry.sources, log: registry.log })
 
         expect(fetchManagedAccount).toHaveBeenCalledTimes(2)
         expect(fetchManagedAccount).toHaveBeenCalledWith('source-a-id', 'user-stored')
@@ -84,6 +87,9 @@ describe('rebuildFusionAccount', () => {
                 ]),
                 fetchManagedAccount,
                 getSourceByName: jest.fn(() => ({ isManaged: true })),
+                getSourceById: jest.fn().mockReturnValue(undefined),
+                aggregateManagedSource: jest.fn().mockResolvedValue(undefined),
+                config: { cascadeAggregationEnabled: false },
             },
             identities: {
                 fetchIdentityById: jest.fn().mockResolvedValue(undefined),
@@ -95,7 +101,7 @@ describe('rebuildFusionAccount', () => {
             log: { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() },
         } as any
 
-        await rebuildFusionAccount('fusion-2', {} as any, registry)
+        await rebuildFusionAccount('fusion-2', {} as any, { fusion: registry.fusion, identities: registry.identities, sources: registry.sources, log: registry.log })
 
         expect(fetchManagedAccount).toHaveBeenCalledTimes(1)
         expect(fetchManagedAccount).toHaveBeenCalledWith('source-a', 'native-99')
@@ -122,6 +128,9 @@ describe('rebuildFusionAccount', () => {
                 ]),
                 fetchManagedAccount,
                 getSourceByName: jest.fn(),
+                getSourceById: jest.fn().mockReturnValue(undefined),
+                aggregateManagedSource: jest.fn().mockResolvedValue(undefined),
+                config: { cascadeAggregationEnabled: false },
             },
             identities: {
                 fetchIdentityById: jest.fn().mockResolvedValue(undefined),
@@ -133,7 +142,7 @@ describe('rebuildFusionAccount', () => {
             log,
         } as any
 
-        await rebuildFusionAccount('fusion-3', {} as any, registry)
+        await rebuildFusionAccount('fusion-3', {} as any, { fusion: registry.fusion, identities: registry.identities, sources: registry.sources, log: registry.log })
 
         expect(log.warn).toHaveBeenCalledWith(
             expect.stringContaining('Skipping legacy non-composite managed account reference')

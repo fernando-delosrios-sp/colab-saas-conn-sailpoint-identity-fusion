@@ -8,6 +8,11 @@ import type { IdentityService } from '../../services/identityService'
 import type { SourceService } from '../../services/sourceService'
 import type { LogService } from '../../services/logService'
 
+interface ParsedAccountKey {
+    sourceId: string
+    nativeIdentity: string
+}
+
 /**
  * Rebuilds a fusion account by fetching fresh data and reprocessing attributes.
  * Loads the fusion account, its identity, and all linked managed accounts.
@@ -47,13 +52,39 @@ export const rebuildFusionAccount = async (
             accountIds.add(managedAccountKey)
         }
     }
+
+    const parsedKeys: ParsedAccountKey[] = []
+    for (const id of accountIds) {
+        const parsed = parseManagedAccountKey(id)
+        if (!parsed) {
+            log.warn(`Skipping legacy non-composite managed account reference during fusion account rebuild: ${id}`)
+            continue
+        }
+        parsedKeys.push(parsed)
+    }
+
+    const cascadeEnabled = sources.isCascadeAggregationEnabled
+    const uniqueSourceIds = new Set(parsedKeys.map((k) => k.sourceId))
+
+    if (cascadeEnabled && uniqueSourceIds.size > 0) {
+        log.info(`Cascade aggregation enabled: triggering aggregation for ${uniqueSourceIds.size} source(s) before fetching managed accounts`)
+        await Promise.all(
+            Array.from(uniqueSourceIds).map(async (sourceId) => {
+                const sourceInfo = sources.getSourceById(sourceId)
+                if (!sourceInfo?.isManaged) return
+                const disableOptimization = sourceInfo?.config?.optimizedAggregation === false
+                log.info(`Cascade: aggregating managed source ${sourceInfo.name ?? sourceId}`)
+                try {
+                    await sources.aggregateManagedSource(sourceId, disableOptimization)
+                } catch (error) {
+                    log.error(`Cascade aggregation failed for source ${sourceInfo.name ?? sourceId}: ${error instanceof Error ? error.message : String(error)}. Continuing with main process.`)
+                }
+            })
+        )
+    }
+
     await Promise.all(
-        Array.from(accountIds).map(async (id: string) => {
-            const parsed = parseManagedAccountKey(id)
-            if (!parsed) {
-                log.warn(`Skipping legacy non-composite managed account reference during fusion account rebuild: ${id}`)
-                return
-            }
+        parsedKeys.map(async (parsed) => {
             await sources.fetchManagedAccount(parsed.sourceId, parsed.nativeIdentity)
         })
     )
