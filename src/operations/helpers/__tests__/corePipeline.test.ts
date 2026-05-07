@@ -12,7 +12,7 @@ import { createRegistry as createMockRegistry } from '../../__tests__/harness/re
 
 function createRegistry() {
     const registry = createMockRegistry()
-    registry.sources.managedAccountsById = new Map()
+    registry.sources.managedAccountsById = new Map(); registry.sources.managedSources = []
     registry.sources.clearManagedAccounts = jest.fn()
     registry.sources.saveBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
     registry.sources.clearFusionAccounts = jest.fn()
