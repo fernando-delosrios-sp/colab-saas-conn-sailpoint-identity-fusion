@@ -8,3 +8,6 @@
 ## 2026-05-04 - [Single Lookup Optimization]
 **Learning:** The pattern of using Map.has() followed by Map.set() and Map.get() introduces unnecessary double lookups. Using Map.get() first and conditionally initializing missing values avoids redundant operations and is significantly more efficient for operations over large datasets.
 **Action:** Replaced Map.has() checks with a single Map.get() call to initialize missing items more efficiently in static initialization blocks.
+## 2026-05-07 - [Prevent Heap Allocations in Hot Loops]
+**Learning:** Dense domain logic loops that iterate over properties generating arrays on every read (like `Array.from(set)` getters) cause unnecessary heap allocations and garbage collection overhead, particularly inside nested loops (`findFusionAccountByIdentityManagedAccounts`).
+**Action:** Extract the intersection logic into a dedicated helper method and iterate over zero-copy native `ReadonlySet` accessors (e.g., `accountIdsSet` and `missingAccountIdsSet`) instead of array-generating getters to eliminate the allocation overhead.
