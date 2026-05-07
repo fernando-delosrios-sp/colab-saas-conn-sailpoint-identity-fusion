@@ -99,4 +99,3 @@ export function getCallerInfo(skipFrames: number = 2): { origin: string; isOpera
         return { origin: 'unknown', isOperation: false }
     }
 }
-

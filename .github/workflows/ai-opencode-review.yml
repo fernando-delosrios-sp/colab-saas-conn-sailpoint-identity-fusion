@@ -2,47 +2,47 @@
 name: AI OpenCode Review
 
 on:
-  workflow_call:
-  workflow_dispatch:
+    workflow_call:
+    workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+    contents: write
+    pull-requests: write
+    issues: write
 
 jobs:
-  docs:
-    name: Docs review (OpenCode)
-    uses: ./.github/workflows/ai-docs-review-opencode.yml
-    secrets: inherit
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+    docs:
+        name: Docs review (OpenCode)
+        uses: ./.github/workflows/ai-docs-review-opencode.yml
+        secrets: inherit
+        permissions:
+            contents: write
+            pull-requests: write
+            issues: write
 
-  performance:
-    name: Performance review (OpenCode)
-    uses: ./.github/workflows/ai-performance-review-opencode.yml
-    secrets: inherit
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+    performance:
+        name: Performance review (OpenCode)
+        uses: ./.github/workflows/ai-performance-review-opencode.yml
+        secrets: inherit
+        permissions:
+            contents: write
+            pull-requests: write
+            issues: write
 
-  security:
-    name: Security review (OpenCode)
-    uses: ./.github/workflows/ai-security-review-opencode.yml
-    secrets: inherit
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+    security:
+        name: Security review (OpenCode)
+        uses: ./.github/workflows/ai-security-review-opencode.yml
+        secrets: inherit
+        permissions:
+            contents: write
+            pull-requests: write
+            issues: write
 
-  refactor:
-    name: Refactor review (OpenCode)
-    uses: ./.github/workflows/ai-refactor-review-opencode.yml
-    secrets: inherit
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+    refactor:
+        name: Refactor review (OpenCode)
+        uses: ./.github/workflows/ai-refactor-review-opencode.yml
+        secrets: inherit
+        permissions:
+            contents: write
+            pull-requests: write
+            issues: write
