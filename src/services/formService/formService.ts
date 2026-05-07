@@ -1219,10 +1219,7 @@ export class FormService {
     }
 
     private kickoffFormDeleteWorkers(): void {
-        while (
-            this.activeFormDeleteWorkers < this.formDeleteQueueConcurrency &&
-            this.formDeleteQueue.length > 0
-        ) {
+        while (this.activeFormDeleteWorkers < this.formDeleteQueueConcurrency && this.formDeleteQueue.length > 0) {
             this.activeFormDeleteWorkers++
             const workerPromise = this.runFormDeleteWorker()
 

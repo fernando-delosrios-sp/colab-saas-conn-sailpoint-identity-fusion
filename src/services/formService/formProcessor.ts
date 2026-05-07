@@ -96,6 +96,8 @@ export const extractAccountInfoFromFormInput = (
     let accountName: string | undefined
     let accountSource: string | undefined
 
+    if (!formInput) return null
+
     // Try flat structure first (as sent in createFormInstance)
     if (typeof formInput.account === 'string') {
         accountId = formInput.account

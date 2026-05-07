@@ -3,60 +3,60 @@
 name: AI Refactor Review (OpenCode)
 
 on:
-  workflow_call:
-  workflow_dispatch:
+    workflow_call:
+    workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+    contents: write
+    pull-requests: write
+    issues: write
 
 concurrency:
-  group: ai-refactor-review-opencode-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+    group: ai-refactor-review-opencode-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
 
 jobs:
-  refactor-review:
-    name: Refactor review (OpenCode)
-    if: >
-      github.event.pull_request && !github.event.pull_request.draft
-      && !startsWith(github.event.pull_request.head.ref, 'ai/')
-      && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    env:
-      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Install OpenCode CLI
-        run: |
-          curl -fsSL https://opencode.ai/install | bash
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: OpenCode refactor reviewer
-        if: env.OPENCODE_API_KEY != ''
-        run: |
-          opencode run "Review this pull request with focus on refactor quality:
-          - detect overcomplicated logic and suggest simplifications
-          - flag risky changes with hidden side effects or brittle coupling
-          - suggest maintainability improvements and test gaps
-          Keep feedback concrete and actionable.
-          Apply concrete, minimal, safe fixes directly in the codebase.
-          Return concise review findings and recommended fixes." --model opencode/minimax-m2.7
-      - name: Restore workflow files
-        run: git restore .github/workflows/ || true
-      - name: Create refactor follow-up PR
-        if: env.OPENCODE_API_KEY != ''
-        uses: peter-evans/create-pull-request@v6
-        with:
-          branch: ai/refactor-review-opencode-${{ github.event.pull_request.number }}
-          base: ${{ github.event.pull_request.head.ref }}
-          title: "AI refactor follow-up (OpenCode) for #${{ github.event.pull_request.number }}"
-          body: |
-            Automated AI follow-up fixes for refactor quality based on PR #${{ github.event.pull_request.number }}.
-          commit-message: "chore(ai): apply refactor follow-up fixes (opencode)"
-          labels: ai, automated
+    refactor-review:
+        name: Refactor review (OpenCode)
+        if: >
+            github.event.pull_request && !github.event.pull_request.draft
+            && !startsWith(github.event.pull_request.head.ref, 'ai/')
+            && github.event.pull_request.head.repo.full_name == github.repository
+        runs-on: ubuntu-latest
+        continue-on-error: true
+        env:
+            OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.pull_request.head.ref }}
+                  fetch-depth: 0
+                  persist-credentials: false
+            - name: Install OpenCode CLI
+              run: |
+                  curl -fsSL https://opencode.ai/install | bash
+                  echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+            - name: OpenCode refactor reviewer
+              if: env.OPENCODE_API_KEY != ''
+              run: |
+                  opencode run "Review this pull request with focus on refactor quality:
+                  - detect overcomplicated logic and suggest simplifications
+                  - flag risky changes with hidden side effects or brittle coupling
+                  - suggest maintainability improvements and test gaps
+                  Keep feedback concrete and actionable.
+                  Apply concrete, minimal, safe fixes directly in the codebase.
+                  Return concise review findings and recommended fixes." --model opencode/minimax-m2.7
+            - name: Restore workflow files
+              run: git restore .github/workflows/ || true
+            - name: Create refactor follow-up PR
+              if: env.OPENCODE_API_KEY != ''
+              uses: peter-evans/create-pull-request@v6
+              with:
+                  branch: ai/refactor-review-opencode-${{ github.event.pull_request.number }}
+                  base: ${{ github.event.pull_request.head.ref }}
+                  title: 'AI refactor follow-up (OpenCode) for #${{ github.event.pull_request.number }}'
+                  body: |
+                      Automated AI follow-up fixes for refactor quality based on PR #${{ github.event.pull_request.number }}.
+                  commit-message: 'chore(ai): apply refactor follow-up fixes (opencode)'
+                  labels: ai, automated
