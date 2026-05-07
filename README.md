@@ -392,6 +392,8 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- Added test coverage for formService helpers `buildCandidateList` and `getFormOwner`.
+
 - (2026-05-01) Refactored `getManagedAccountKeyFromAccount` in `src/model/managedAccountKey.ts` to directly return `buildManagedAccountKey` result.
 - (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
 
