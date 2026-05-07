@@ -1,5 +1,0 @@
-💡 **What:** Replaced unbound parallel schema fetch calls in `Promise.all` with a bounded batch execution using `promiseAllBatched`.
-
-🎯 **Why:** To solve the N+1 API call fetching issue. Doing an async API call via `managedSources.map()` inside `Promise.all` executes the requests simultaneously and creates an unbounded number of concurrent API calls. This leads to API rate-limit drops and high memory/IO spikes as the number of managed sources grows. `promiseAllBatched` ensures calls execute in bounded chunks (batch size limit). Also replaced `managedSources.reverse()` with `[...managedSources].reverse()` to prevent array mutation side effects.
-
-📊 **Measured Improvement:** We were able to demonstrate the bounding behavior conceptually and through codebase understanding. We avoided a direct live-test overload as generating thousands of managed sources to invoke rate-limiting on the network is impractical in the sandbox environment, but the bounded strategy prevents the documented N+1 parallel bottleneck.
