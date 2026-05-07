@@ -922,45 +922,25 @@ export class FusionService {
         )
         if (identityAccountIds.size === 0) return undefined
 
+        const hasIntersection = (account: FusionAccount) => {
+            for (const id of account.accountIdsSet) {
+                if (identityAccountIds.has(id)) return true
+            }
+            for (const id of account.missingAccountIdsSet) {
+                if (identityAccountIds.has(id)) return true
+            }
+            return false
+        }
+
         // Check uncorrelated accounts first
         for (const account of this.fusionAccountMap.values()) {
-            let found = false
-            for (const id of account.accountIds) {
-                if (identityAccountIds.has(id)) {
-                    found = true
-                    break
-                }
-            }
-            if (!found) {
-                for (const id of account.missingAccountIds) {
-                    if (identityAccountIds.has(id)) {
-                        found = true
-                        break
-                    }
-                }
-            }
-            if (found) return account
+            if (hasIntersection(account)) return account
         }
 
         // Check for accounts from stale identity IDs (identity was destroyed and recreated)
         for (const [existingIdentityId, account] of this.fusionIdentityMap.entries()) {
             if (existingIdentityId === identity.id) continue
-            let found = false
-            for (const id of account.accountIds) {
-                if (identityAccountIds.has(id)) {
-                    found = true
-                    break
-                }
-            }
-            if (!found) {
-                for (const id of account.missingAccountIds) {
-                    if (identityAccountIds.has(id)) {
-                        found = true
-                        break
-                    }
-                }
-            }
-            if (found) return account
+            if (hasIntersection(account)) return account
         }
 
         return undefined
