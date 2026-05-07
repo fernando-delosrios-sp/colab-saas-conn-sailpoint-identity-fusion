@@ -34,7 +34,11 @@ describe('accountRead', () => {
 
         expect(registry.sources.fetchAllSources).toHaveBeenCalledTimes(1)
         expect(registry.schemas.setFusionAccountSchema).toHaveBeenCalledTimes(1)
-        expect(rebuildFusionAccount).toHaveBeenCalledWith('fusion-1', expect.any(Object), registry)
+        expect(rebuildFusionAccount).toHaveBeenCalledWith(
+            'fusion-1',
+            expect.any(Object),
+            expect.objectContaining({ fusion: expect.any(Object), identities: expect.any(Object), sources: expect.any(Object), log: expect.any(Object) })
+        )
         expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(fusionAccount)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-1' })
