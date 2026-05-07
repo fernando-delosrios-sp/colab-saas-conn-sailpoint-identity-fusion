@@ -392,6 +392,8 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- **Refactor:** Extracted the core aggregation and dry-run execution pipeline phases into a shared helper function `executeSharedPipelinePhases` to prevent duplicate logging/sequence code.
+
 - (2026-05-01) Refactored `getManagedAccountKeyFromAccount` in `src/model/managedAccountKey.ts` to directly return `buildManagedAccountKey` result.
 - (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
 
