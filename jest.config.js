@@ -8,6 +8,10 @@ module.exports = {
         '<rootDir>/src/__tests__/test-config.ts',
         '<rootDir>/src/operations/__tests__/fixtures/',
         '<rootDir>/src/operations/__tests__/harness/',
+        '<rootDir>/src/operations/__tests__/chain/framework/',
+        '<rootDir>/src/operations/__tests__/chain/harness/',
+        '<rootDir>/src/operations/__tests__/chain/steps/',
+        '<rootDir>/src/operations/__tests__/chain/data/',
     ],
     // Allow Jest to transform ESM-only packages (e.g. double-metaphone) via Babel
     transformIgnorePatterns: ['node_modules/(?!(double-metaphone|uuid)/)'],

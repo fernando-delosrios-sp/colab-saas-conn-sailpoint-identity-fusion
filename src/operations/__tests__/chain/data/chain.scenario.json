@@ -1,0 +1,446 @@
+{
+  "$schema": "./chain.schema.json",
+  "version": "1.0.0",
+  "config": {
+    "sources": [
+      {
+        "name": "HR Source",
+        "sourceType": "authoritative",
+        "correlationMode": "none",
+        "deferredMatching": true,
+        "accountJmespathFilter": "department == 'Engineering'"
+      },
+      {
+        "name": "Payroll Source",
+        "sourceType": "authoritative",
+        "correlationMode": "none"
+      }
+    ],
+    "uniqueAttributeDefinitions": [
+      {
+        "name": "employeeId",
+        "expression": "$counter",
+        "useIncrementalCounter": true,
+        "counterStart": 1000,
+        "digits": 5,
+        "normalize": false,
+        "spaces": false,
+        "trim": true
+      },
+      {
+        "name": "alias",
+        "expression": "#if($account.displayName.contains(\"Admin\"))ALPHA-$UUID#{else}BETA-$counter#{end}",
+        "normalize": true,
+        "spaces": true,
+        "trim": true
+      }
+    ],
+    "normalAttributeDefinitions": [
+      {
+        "name": "department",
+        "expression": "$account.department",
+        "refresh": true,
+        "normalize": false,
+        "spaces": false,
+        "trim": true
+      },
+      {
+        "name": "title",
+        "expression": "$account.title",
+        "refresh": true,
+        "normalize": false,
+        "spaces": false,
+        "trim": true
+      }
+    ],
+    "attributeMaps": [
+      {
+        "newAttribute": "fullName",
+        "existingAttributes": ["displayName"],
+        "attributeMerge": "concatenate"
+      },
+      {
+        "newAttribute": "contactEmail",
+        "existingAttributes": ["email", "mail"],
+        "attributeMerge": "first"
+      }
+    ],
+    "matchingConfigs": [
+      {
+        "attribute": "displayName",
+        "algorithm": "name-matcher",
+        "fusionScore": 70
+      },
+      {
+        "attribute": "email",
+        "algorithm": "dice",
+        "fusionScore": 90,
+        "mandatory": false
+      }
+    ],
+    "fusionAverageScore": 80,
+    "fusionMergingExactMatch": true,
+    "fusionOwnerIsGlobalReviewer": true,
+    "fusionFormExpirationDays": 7,
+    "includeIdentities": true,
+    "deleteEmpty": true,
+    "maxHistoryMessages": 20
+  },
+  "initialState": {
+    "identities": [
+      {
+        "id": "identity-alice",
+        "name": "Alice Developer",
+        "attributes": {
+          "displayName": "Alice Developer",
+          "email": "alice.dev@example.com",
+          "department": "Engineering"
+        },
+        "accounts": [
+          {
+            "source": { "id": "source-hr", "name": "HR Source" },
+            "accountId": "alice-hr"
+          }
+        ]
+      },
+      {
+        "id": "identity-bob",
+        "name": "Bob Tester",
+        "attributes": {
+          "displayName": "Bob Tester",
+          "email": "bob.test@example.com",
+          "department": "QA"
+        },
+        "accounts": [
+          {
+            "source": { "id": "source-hr", "name": "HR Source" },
+            "accountId": "bob-hr"
+          }
+        ]
+      },
+      {
+        "id": "identity-carol",
+        "name": "Carol Admin",
+        "attributes": {
+          "displayName": "Carol Admin",
+          "email": "carol@example.com",
+          "department": "IT"
+        },
+        "accounts": []
+      },
+      {
+        "id": "identity-dave",
+        "name": "Dave Manager",
+        "attributes": {
+          "displayName": "Dave Manager",
+          "email": "dave.mgr@example.com",
+          "department": "Engineering"
+        },
+        "accounts": [
+          {
+            "source": { "id": "source-hr", "name": "HR Source" },
+            "accountId": "dave-hr"
+          }
+        ]
+      }
+    ],
+    "managedAccounts": {
+      "pass1": [
+        {
+          "id": "hr-acct-1",
+          "nativeIdentity": "hr-acct-1",
+          "sourceName": "HR Source",
+          "name": "Alice Developer",
+          "attributes": {
+            "displayName": "Alice Developer",
+            "email": "alice.dev@example.com",
+            "department": "Engineering",
+            "title": "Senior Developer"
+          }
+        },
+        {
+          "id": "hr-acct-2",
+          "nativeIdentity": "hr-acct-2",
+          "sourceName": "HR Source",
+          "name": "Bob Tester",
+          "attributes": {
+            "displayName": "Bob Tester",
+            "email": "bob.test@example.com",
+            "department": "Engineering",
+            "title": "Tester"
+          }
+        },
+        {
+          "id": "hr-acct-3",
+          "nativeIdentity": "hr-acct-3",
+          "sourceName": "HR Source",
+          "name": "Eve Newhire",
+          "attributes": {
+            "displayName": "Eve Newhire",
+            "email": "eve.new@example.com",
+            "department": "Engineering",
+            "title": "Junior Developer"
+          }
+        },
+        {
+          "id": "hr-acct-4",
+          "nativeIdentity": "hr-acct-4",
+          "sourceName": "HR Source",
+          "name": "Frank Partial",
+          "attributes": {
+            "displayName": "Frank Partial",
+            "email": "frank.p@example.com",
+            "department": "Finance",
+            "title": "Analyst"
+          }
+        },
+        {
+          "id": "hr-acct-5",
+          "nativeIdentity": "hr-acct-5",
+          "sourceName": "HR Source",
+          "name": "Dave Manager",
+          "attributes": {
+            "displayName": "Dave Manager",
+            "email": "dave.mgr@example.com",
+            "department": "Engineering",
+            "title": "Engineering Manager"
+          }
+        }
+      ],
+      "pass2": [
+        {
+          "id": "hr-acct-1",
+          "nativeIdentity": "hr-acct-1",
+          "sourceName": "HR Source",
+          "name": "Alice Developer",
+          "attributes": {
+            "displayName": "Alice Developer",
+            "email": "alice.dev@example.com",
+            "department": "Engineering",
+            "title": "Staff Engineer"
+          }
+        },
+        {
+          "id": "hr-acct-2",
+          "nativeIdentity": "hr-acct-2",
+          "sourceName": "HR Source",
+          "name": "Bob Tester",
+          "attributes": {
+            "displayName": "Bob Tester",
+            "email": "bob.test@example.com",
+            "department": "Engineering",
+            "title": "QA Lead"
+          }
+        },
+        {
+          "id": "hr-acct-3",
+          "nativeIdentity": "hr-acct-3",
+          "sourceName": "HR Source",
+          "name": "Eve Newhire",
+          "attributes": {
+            "displayName": "Eve Newhire",
+            "email": "eve.new@example.com",
+            "department": "Engineering",
+            "title": "Junior Developer"
+          }
+        },
+        {
+          "id": "payroll-acct-1",
+          "nativeIdentity": "payroll-acct-1",
+          "sourceName": "Payroll Source",
+          "name": "Alice Developer",
+          "attributes": {
+            "displayName": "Alice Developer",
+            "email": "alice.dev@example.com",
+            "department": "Engineering",
+            "title": "Senior Developer"
+          }
+        },
+        {
+          "id": "payroll-acct-2",
+          "nativeIdentity": "payroll-acct-2",
+          "sourceName": "Payroll Source",
+          "name": "Grace Outsider",
+          "attributes": {
+            "displayName": "Grace Outsider",
+            "email": "grace.out@example.com",
+            "department": "Engineering",
+            "title": "Contractor"
+          }
+        },
+        {
+          "id": "payroll-acct-3",
+          "nativeIdentity": "payroll-acct-3",
+          "sourceName": "Payroll Source",
+          "name": "Eve Newhire",
+          "attributes": {
+            "displayName": "Eve Newhire",
+            "email": "eve.new@example.com",
+            "department": "Engineering",
+            "title": "Junior Developer"
+          }
+        }
+      ]
+    },
+    "fusionAccounts": [],
+    "forms": []
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "operation": "accountDiscoverSchema",
+      "description": "Schema discovery returns current source schema",
+      "expectedOutput": {
+        "attributes": [
+          { "name": "displayName" },
+          { "name": "email" },
+          { "name": "employeeId" },
+          { "name": "department" }
+        ]
+      }
+    },
+    {
+      "id": "step-2",
+      "operation": "entitlementList",
+      "description": "Entitlement list returns status + action entitlements",
+      "input": { "type": "status" },
+      "expectedOutput": {
+        "entitlements": [
+          { "attribute": "statuses", "value": "enabled" },
+          { "attribute": "statuses", "value": "disabled" }
+        ]
+      }
+    },
+    {
+      "id": "step-3",
+      "operation": "entitlementList",
+      "description": "Action entitlements include managed source reviewers",
+      "input": { "type": "action" },
+      "expectedOutput": {
+        "entitlements": [
+          { "attribute": "actions", "value": "correlate" }
+        ]
+      }
+    },
+    {
+      "id": "step-4",
+      "operation": "accountList",
+      "pass": 1,
+      "description": "First aggregation: one authoritative source, matches and deferred matches",
+      "expectedOutput": {
+        "outputCount": 5,
+        "identitiesFound": 4,
+        "correlatedCount": 3,
+        "unmatchedCount": 2
+      }
+    },
+    {
+      "id": "step-5",
+      "operation": "accountCreate",
+      "description": "Create a new Fusion account from Carol Admin identity",
+      "input": {
+        "identity": "Carol Admin",
+        "attributes": {
+          "name": "Carol Admin",
+          "actions": ["correlate:identity-carol"]
+        }
+      },
+      "expectedOutput": {
+        "identityLinked": true,
+        "actionsExecuted": 1
+      }
+    },
+    {
+      "id": "step-6",
+      "operation": "accountList",
+      "pass": 2,
+      "description": "Second aggregation: additional source, deferred matches become matches",
+      "expectedOutput": {
+        "outputCount": 4,
+        "identitiesFound": 5,
+        "correlatedCount": 3,
+        "unmatchedCount": 2
+      }
+    },
+    {
+      "id": "step-7",
+      "operation": "accountDisable",
+      "description": "Disable an existing Fusion account",
+      "input": {
+        "identity": "fusion-identity-carol"
+      },
+      "expectedOutput": {
+        "disabled": true,
+        "attributesPreserved": true
+      }
+    },
+    {
+      "id": "step-8",
+      "operation": "accountEnable",
+      "description": "Enable account: unique attributes should be refreshed (changed)",
+      "input": {
+        "identity": "fusion-identity-alice",
+        "schema": { "attributes": [] }
+      },
+      "expectedOutput": {
+        "enabled": true,
+        "uniqueAttributesRefreshed": true
+      }
+    },
+    {
+      "id": "step-9",
+      "operation": "accountRead",
+      "description": "Read account: unique attributes should NOT be refreshed (unchanged)",
+      "input": {
+        "identity": "fusion-identity-alice",
+        "schema": { "attributes": [] }
+      },
+      "expectedOutput": {
+        "identityFound": true,
+        "uniqueAttributesUnchanged": true
+      }
+    },
+    {
+      "id": "step-10",
+      "operation": "accountUpdate",
+      "description": "Update entitlements: add correlate action",
+      "input": {
+        "identity": "fusion-identity-bob",
+        "schema": { "attributes": [] },
+        "changes": [
+          { "attribute": "actions", "op": "Add", "value": "correlate:identity-bob" }
+        ]
+      },
+      "expectedOutput": {
+        "entitlementChanged": true,
+        "correlationRecomputed": true
+      }
+    }
+  ],
+  "referenceValues": {
+    "step-4": {
+      "expectedCorrelatedCount": 3,
+      "expectedNewFusionCount": 5,
+      "expectedDeferredCount": 0,
+      "expectedUnmatchedCount": 2
+    },
+    "step-6": {
+      "expectedCorrelatedCount": 3,
+      "expectedDeferredConverted": 1,
+      "expectedNewFusionCount": 1,
+      "expectedUnmatchedCount": 2
+    },
+    "step-8": {
+      "uniqueAttributeChanged": true,
+      "employeeIdRegenerated": true,
+      "aliasRegenerated": true,
+      "normalAttributesUpdated": true
+    },
+    "step-9": {
+      "uniqueAttributeUnchanged": true,
+      "employeeIdPreserved": true,
+      "aliasPreserved": true,
+      "normalAttributesUpdated": true
+    }
+  }
+}
