@@ -66,9 +66,9 @@ export class ProxyService {
             if (this.config.proxyPassword) {
                 const serverPassword = process.env.PROXY_PASSWORD
                 const clientPassword = this.config.proxyPassword
-                const serverBuffer = Buffer.from(serverPassword || '');
-                const clientBuffer = Buffer.from(clientPassword || '');
-                const isMatch = serverBuffer.length === clientBuffer.length && crypto.timingSafeEqual(serverBuffer, clientBuffer);
+                const expectedHash = crypto.createHash('sha256').update(serverPassword || '').digest()
+                const actualHash = crypto.createHash('sha256').update(clientPassword || '').digest()
+                const isMatch = crypto.timingSafeEqual(expectedHash, actualHash)
                 assert(isMatch, 'Proxy password mismatch')
             }
             return true
