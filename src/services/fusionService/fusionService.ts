@@ -907,6 +907,20 @@ export class FusionService {
      * Called from processIdentity to avoid creating a duplicate baseline account when
      * an ISC identity is recreated with a new ID.
      */
+    private hasIntersectingManagedAccounts(account: FusionAccount, identityAccountIds: Set<string>): boolean {
+        for (const id of account.accountIdsSet) {
+            if (identityAccountIds.has(id)) {
+                return true
+            }
+        }
+        for (const id of account.missingAccountIdsSet) {
+            if (identityAccountIds.has(id)) {
+                return true
+            }
+        }
+        return false
+    }
+
     private findFusionAccountByIdentityManagedAccounts(identity: IdentityDocument): FusionAccount | undefined {
         const sourceNames = this.configSourceNames
         const identityAccountIds = new Set<string>(
@@ -922,25 +936,19 @@ export class FusionService {
         )
         if (identityAccountIds.size === 0) return undefined
 
-        const hasIntersection = (account: FusionAccount) => {
-            for (const id of account.accountIdsSet) {
-                if (identityAccountIds.has(id)) return true
-            }
-            for (const id of account.missingAccountIdsSet) {
-                if (identityAccountIds.has(id)) return true
-            }
-            return false
-        }
-
         // Check uncorrelated accounts first
         for (const account of this.fusionAccountMap.values()) {
-            if (hasIntersection(account)) return account
+            if (this.hasIntersectingManagedAccounts(account, identityAccountIds)) {
+                return account
+            }
         }
 
         // Check for accounts from stale identity IDs (identity was destroyed and recreated)
         for (const [existingIdentityId, account] of this.fusionIdentityMap.entries()) {
             if (existingIdentityId === identity.id) continue
-            if (hasIntersection(account)) return account
+            if (this.hasIntersectingManagedAccounts(account, identityAccountIds)) {
+                return account
+            }
         }
 
         return undefined
