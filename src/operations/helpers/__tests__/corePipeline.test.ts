@@ -143,6 +143,7 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = false
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
 
         await expect(setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } }))
             .rejects.toThrow('Fusion source not found')
@@ -152,6 +153,7 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
         registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
         registry.fusion.isReset = jest.fn().mockReturnValue(true)
         registry.forms.deleteExistingForms = jest.fn().mockResolvedValue(undefined)
@@ -173,6 +175,7 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
         registry.fusion.isReset = jest.fn().mockReturnValue(true)
         registry.forms.deleteExistingForms = jest.fn().mockResolvedValue(undefined)
         registry.fusion.disableReset = jest.fn().mockResolvedValue(undefined)
@@ -188,6 +191,7 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
         registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
         registry.fusion.isReset = jest.fn().mockReturnValue(false)
         registry.config = { forceAttributeRefresh: true, sources: [] }
@@ -207,6 +211,7 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
         registry.fusion.isReset = jest.fn().mockReturnValue(false)
         registry.config = { forceAttributeRefresh: false, sources: [] }
         registry.schemas.setFusionAccountSchema = jest.fn().mockResolvedValue(undefined)
@@ -225,6 +230,7 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
         registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
         registry.fusion.isReset = jest.fn().mockReturnValue(false)
 
