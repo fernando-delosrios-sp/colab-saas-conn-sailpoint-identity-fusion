@@ -1,8 +1,6 @@
 import { ConnectorError, StdAccountDisableInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
-import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
-import { assert } from '../utils/assert'
-import { ATTR_OPS_REFRESH } from '../services/attributeService/types'
+import { processReadOrDisable } from './helpers/readDisableShared'
 
 /**
  * Account disable operation - Disables a fusion account.
@@ -23,34 +21,10 @@ import { ATTR_OPS_REFRESH } from '../services/attributeService/types'
  */
 export const accountDisable = async (serviceRegistry: ServiceRegistry, input: StdAccountDisableInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, fusion, sources, schemas, res } = serviceRegistry
-
     try {
-        log.info(`Disabling account: ${input.identity}`)
-        assert(input.identity, 'Account identity is required')
-        const timer = log.timer()
-
-        await sources.fetchAllSources()
-        await schemas.setFusionAccountSchema(input.schema)
-        timer.phase('Step 1: Loading sources and schema')
-
-        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_REFRESH, serviceRegistry)
-        assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
-        log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
-        timer.phase('Step 2: Rebuilding fusion account with fresh attributes')
-
-        fusionAccount.disable()
-        timer.phase('Step 3: Disabling fusion account')
-
-        await fusion.normalizePendingFormStateForOutput()
-        const iscAccount = await fusion.getISCAccount(fusionAccount)
-        assert(iscAccount, 'Failed to generate ISC account from fusion account')
-        timer.phase('Step 4: Generating ISC account')
-
-        res.send(iscAccount)
-        timer.end(`✓ Account disable completed for ${input.identity}`)
+        await processReadOrDisable(serviceRegistry, input, 'disable')
     } catch (error) {
         if (error instanceof ConnectorError) throw error
-        log.crash(`Failed to disable account ${input.identity}`, error)
+        serviceRegistry.log.crash(`Failed to disable account ${input.identity}`, error)
     }
 }

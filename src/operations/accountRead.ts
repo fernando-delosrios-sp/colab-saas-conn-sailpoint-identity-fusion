@@ -1,8 +1,6 @@
 import { ConnectorError, StdAccountReadInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
-import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
-import { assert } from '../utils/assert'
-import { ATTR_OPS_REFRESH } from '../services/attributeService/types'
+import { processReadOrDisable } from './helpers/readDisableShared'
 
 /**
  * Account read operation - Reads a single fusion account by identity.
@@ -20,31 +18,10 @@ import { ATTR_OPS_REFRESH } from '../services/attributeService/types'
  */
 export const accountRead = async (serviceRegistry: ServiceRegistry, input: StdAccountReadInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, fusion, schemas, sources, res } = serviceRegistry
-
     try {
-        log.info(`Reading account: ${input.identity}`)
-        assert(input.identity, 'Account identity is required')
-        const timer = log.timer()
-
-        await sources.fetchAllSources()
-        await schemas.setFusionAccountSchema(input.schema)
-        timer.phase('Step 1: Loading sources and schema')
-
-        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_REFRESH, serviceRegistry)
-        assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
-        log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
-        timer.phase('Step 2: Rebuilding fusion account with fresh attributes')
-
-        await fusion.normalizePendingFormStateForOutput()
-        const iscAccount = await fusion.getISCAccount(fusionAccount)
-        assert(iscAccount, 'Failed to generate ISC account from fusion account')
-        timer.phase('Step 3: Generating ISC account')
-
-        res.send(iscAccount)
-        timer.end(`✓ Account read completed for ${input.identity}`)
+        await processReadOrDisable(serviceRegistry, input, 'read')
     } catch (error) {
         if (error instanceof ConnectorError) throw error
-        log.crash(`Failed to read account ${input.identity}`, error)
+        serviceRegistry.log.crash(`Failed to read account ${input.identity}`, error)
     }
 }
