@@ -4,6 +4,7 @@ import {
     outputPreparationPhase,
     refreshPhase,
     processPhase,
+    setupPhase,
     uniqueAttributesPhase,
 } from '../corePipeline'
 
@@ -11,7 +12,7 @@ import { createRegistry as createMockRegistry } from '../../__tests__/harness/re
 
 function createRegistry() {
     const registry = createMockRegistry()
-    registry.sources.managedAccountsById = new Map()
+    registry.sources.managedAccountsById = new Map(); registry.sources.managedSources = []
     registry.sources.clearManagedAccounts = jest.fn()
     registry.sources.saveBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
     registry.sources.clearFusionAccounts = jest.fn()
@@ -20,7 +21,7 @@ function createRegistry() {
         registry,
         forms: registry.forms,
         fusion: registry.fusion,
-        sources: registry.sources
+        sources: registry.sources,
     }
 }
 
@@ -133,5 +134,130 @@ describe('corePipeline outputPhase', () => {
         forms.fetchFormInstancesData.mockClear()
         await fetchPhase(serviceRegistry, { mode: { kind: 'dry-run' } })
         expect(forms.fetchFormInstancesData).toHaveBeenCalledWith(false)
+    })
+})
+
+
+describe('corePipeline setupPhase', () => {
+    it('throws error if fusion source is not found', async () => {
+        const { registry } = createRegistry()
+        registry.sources.hasFusionSource = false
+        registry.sources.managedSources = []
+        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
+
+        await expect(setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } }))
+            .rejects.toThrow('Fusion source not found')
+    })
+
+    it('returns false and disables reset if fusion reset flag is detected during aggregation', async () => {
+        const { registry } = createRegistry()
+        registry.sources.hasFusionSource = true
+        registry.sources.managedSources = []
+        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
+        registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
+        registry.fusion.isReset = jest.fn().mockReturnValue(true)
+        registry.forms.deleteExistingForms = jest.fn().mockResolvedValue(undefined)
+        registry.fusion.disableReset = jest.fn().mockResolvedValue(undefined)
+        registry.fusion.resetState = jest.fn().mockResolvedValue(undefined)
+        registry.sources.resetBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
+
+        const result = await setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })
+
+        expect(result).toBe(false)
+        expect(registry.sources.setProcessLock).toHaveBeenCalled()
+        expect(registry.forms.deleteExistingForms).toHaveBeenCalled()
+        expect(registry.fusion.disableReset).toHaveBeenCalled()
+        expect(registry.fusion.resetState).toHaveBeenCalled()
+        expect(registry.sources.resetBatchCumulativeCount).toHaveBeenCalled()
+    })
+
+    it('returns false without modifying persistent state if fusion reset flag is detected during dry-run', async () => {
+        const { registry } = createRegistry()
+        registry.sources.hasFusionSource = true
+        registry.sources.managedSources = []
+        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
+        registry.fusion.isReset = jest.fn().mockReturnValue(true)
+        registry.forms.deleteExistingForms = jest.fn().mockResolvedValue(undefined)
+        registry.fusion.disableReset = jest.fn().mockResolvedValue(undefined)
+
+        const result = await setupPhase(registry as any, undefined, { mode: { kind: 'dry-run' } })
+
+        expect(result).toBe(false)
+        expect(registry.forms.deleteExistingForms).not.toHaveBeenCalled()
+        expect(registry.fusion.disableReset).not.toHaveBeenCalled()
+    })
+
+    it('disables force attribute refresh flag if enabled in aggregation mode', async () => {
+        const { registry } = createRegistry()
+        registry.sources.hasFusionSource = true
+        registry.sources.managedSources = []
+        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
+        registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
+        registry.fusion.isReset = jest.fn().mockReturnValue(false)
+        registry.config = { forceAttributeRefresh: true, sources: [] }
+        registry.fusion.disableForceAttributeRefresh = jest.fn().mockResolvedValue(undefined)
+        registry.schemas.loadFusionAccountSchemaFromSource = jest.fn().mockResolvedValue(undefined)
+        registry.sources.aggregateManagedSources = jest.fn().mockResolvedValue(undefined)
+        registry.sources.clearReverseCorrelationReadinessCache = jest.fn()
+        registry.attributes.initializeCounters = jest.fn().mockResolvedValue(undefined)
+
+        const result = await setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })
+
+        expect(result).toBe(true)
+        expect(registry.fusion.disableForceAttributeRefresh).toHaveBeenCalled()
+    })
+
+    it('sets provided schema instead of loading from source if schema is passed', async () => {
+        const { registry } = createRegistry()
+        registry.sources.hasFusionSource = true
+        registry.sources.managedSources = []
+        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
+        registry.fusion.isReset = jest.fn().mockReturnValue(false)
+        registry.config = { forceAttributeRefresh: false, sources: [] }
+        registry.schemas.setFusionAccountSchema = jest.fn().mockResolvedValue(undefined)
+        registry.schemas.loadFusionAccountSchemaFromSource = jest.fn().mockResolvedValue(undefined)
+        registry.attributes.initializeCounters = jest.fn().mockResolvedValue(undefined)
+
+        const dummySchema = { attributes: [] }
+        const result = await setupPhase(registry as any, dummySchema, { mode: { kind: 'dry-run' } })
+
+        expect(result).toBe(true)
+        expect(registry.schemas.setFusionAccountSchema).toHaveBeenCalledWith(dummySchema)
+        expect(registry.schemas.loadFusionAccountSchemaFromSource).not.toHaveBeenCalled()
+    })
+
+    it('handles reverse correlation sources in aggregation mode', async () => {
+        const { registry } = createRegistry()
+        registry.sources.hasFusionSource = true
+        registry.sources.managedSources = []
+        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
+        registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
+        registry.fusion.isReset = jest.fn().mockReturnValue(false)
+
+        const reverseSource = { name: 'reverseSrc', correlationMode: 'reverse', correlationAttribute: 'uid' }
+        registry.config = { forceAttributeRefresh: false, sources: [reverseSource] }
+        registry.schemas.loadFusionAccountSchemaFromSource = jest.fn().mockResolvedValue(undefined)
+        registry.sources.clearReverseCorrelationReadinessCache = jest.fn()
+        registry.schemas.getManagedSourceSchemaAttributeNames = jest.fn().mockResolvedValue(['uid'])
+        registry.sources.ensureReverseCorrelationSetup = jest.fn().mockResolvedValue(undefined)
+        registry.schemas.setFusionAccountSchema = jest.fn().mockResolvedValue(undefined)
+        registry.sources.aggregateManagedSources = jest.fn().mockResolvedValue(undefined)
+        registry.attributes.initializeCounters = jest.fn().mockResolvedValue(undefined)
+
+        const result = await setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })
+
+        expect(result).toBe(true)
+        expect(registry.sources.clearReverseCorrelationReadinessCache).toHaveBeenCalled()
+        expect(registry.schemas.getManagedSourceSchemaAttributeNames).toHaveBeenCalled()
+        expect(registry.sources.ensureReverseCorrelationSetup).toHaveBeenCalledWith(reverseSource, ['uid'])
+        // the mock is called twice: once with the normal schema logic, and once after reverse correlation setup
+        expect(registry.schemas.setFusionAccountSchema).toHaveBeenCalledWith(undefined)
+        expect(registry.sources.aggregateManagedSources).toHaveBeenCalled()
     })
 })
