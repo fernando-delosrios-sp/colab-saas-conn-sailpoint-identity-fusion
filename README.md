@@ -7,7 +7,7 @@
 **Documentation**
 
 - Full documentation site: [GitHub Pages](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/)
-- Source docs in this repository: [documentation folder](docs/README.md)
+- Source docs in this repository: [documentation folder](https://github.com/fernando-delosrios-sp/colab-saas-conn-sailpoint-identity-fusion/tree/main/docs)
 - Start here for the core concepts and architecture: [Identity Fusion NG Framework](docs/collateral/Identity_Fusion_NG_Framework.pdf)
 
 Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consolidates account data from one or more managed sources, lets you **map** attributes into a single Fusion account schema, **define** derived and unique values (including Velocity-based computation), and optionally **match** new or changed accounts to existing identities so you can avoid duplicate identities without brittle exact-match correlation alone.
@@ -391,6 +391,8 @@ The documentation site is built with MkDocs and published from the `main` branch
 ---
 
 ## Changelog
+
+- (2026-05-07) Added tests for `extractAccountInfoFromFormInput` in `formProcessor.ts` and handled null input.
 
 - (2026-05-01) Refactored `getManagedAccountKeyFromAccount` in `src/model/managedAccountKey.ts` to directly return `buildManagedAccountKey` result.
 - (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
