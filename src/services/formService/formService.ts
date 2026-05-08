@@ -1395,7 +1395,6 @@ export class FormService {
                 }
                 if (error instanceof Error) {
                     this.log.error(`Error message: ${error.message}`)
-                    this.log.error(`Error stack: ${error.stack}`)
                 }
                 throw error
             }

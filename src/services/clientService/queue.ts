@@ -1,4 +1,5 @@
 import { logger } from '@sailpoint/connector-sdk'
+import { v4 as uuidv4 } from 'uuid'
 import { QueueItem, QueueStats, QueueConfig, QueuePriority } from './types'
 import { shouldRetry, calculateRetryDelay } from './helpers'
 import { internalConfig } from '../../data/config'
@@ -94,7 +95,7 @@ export class ApiQueue {
         } = {}
     ): Promise<T> {
         const item: QueueItem<T> = {
-            id: options.id || `req-${Date.now()}-${Math.random()}`,
+            id: options.id || `req-${Date.now()}-${uuidv4()}`,
             priority: options.priority ?? QueuePriority.MEDIUM,
             execute,
             resolve: () => {},

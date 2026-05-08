@@ -392,16 +392,27 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+### 2.1.6 - 2026-05-01
+
 - (2026-05-07) Bound identity enrichment batch sizes using `promiseAllBatched` to resolve unbounded API concurrency issues.
+- (2026-05-07) Optimize N+1 fetch in `getRecipientEmails` by batch fetching missing identities.
+- (2026-05-01) Added missing test suite for `accountDiscoverSchema` operation, improving test coverage and catching potential bugs.
+- (2026-05-01) Added missing tests for `streamUncorrelatedAnalyzedRows` in `dryRunHelpers` to improve test coverage.
+- (2026-05-01) Added missing unit tests for `wrapConnectorError` utility.
+- (2026-05-01) Added test coverage for connector factory.
+- (2026-05-01) Added tests for `createOperationHandler` infrastructure wrapper.
+- (2026-05-01) Added tests for `generateReport.ts` helpers.
+- (2026-05-01) Added tests for `isNewerThan` utility function in `src/utils/__tests__/date.test.ts`.
+- (2026-05-01) Added tests for `setupPhase` in `corePipeline`.
+- (2026-05-01) Fixed a security vulnerability related to predictable request ID generation by replacing `Math.random()` with `uuidv4()` in `src/services/clientService/queue.ts`.
+- (2026-05-01) Fixed explicit TODO referencing hardcoded identity structures in `formBuilder.ts`.
 - (2026-05-01) Refactored `getManagedAccountKeyFromAccount` in `src/model/managedAccountKey.ts` to directly return `buildManagedAccountKey` result.
+- (2026-05-01) Removed dead code `getCallerFunctionName` function from `logCallerInfo.ts` and its re-export from `logService.ts`.
+- (2026-05-01) Simplified logical complexity in `effectiveSkipMatchIfMissing` function.
 - (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
-
-### 2.1.6 - 2026-04-29
-
-- Improved performance by caching listSourceSchemas API results.
-
-- Added PR CI review orchestration with refactor, documentation, and README changelog gates.
-- Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+- (2026-04-29) Added PR CI review orchestration with refactor, documentation, and README changelog gates.
+- (2026-04-29) Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+- (2026-04-29) Improved performance by caching `listSourceSchemas` API results.
 
 ---
 
