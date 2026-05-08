@@ -1,3 +1,4 @@
+import { promiseAllBatched } from '../fusionService/collections'
 import {
     FormDefinitionResponseV2025,
     FormInstanceResponseV2025,
@@ -388,13 +389,14 @@ export class FormService {
         const uncachedIds = candidates.filter((c) => !this.identities!.getIdentityById(c.id)).map((c) => c.id)
 
         if (uncachedIds.length > 0) {
-            await Promise.all(
-                uncachedIds.map((id) =>
+            await promiseAllBatched(
+                uncachedIds,
+                (id) =>
                     this.identities!.fetchIdentityById(id).catch((error) => {
                         const detail = error instanceof Error ? error.message : String(error)
                         this.log.debug(`Could not load identity ${id} for candidate enrichment: ${detail}`)
-                    })
-                )
+                    }),
+                50
             )
         }
 
