@@ -1,7 +1,9 @@
 import {
+    buildCandidateList,
     buildFormName,
     calculateExpirationDate,
     countIdentityBackedFusionMatches,
+    getFormOwner,
     resolveIdentitiesSelectLabel,
 } from '../helpers'
 import { MatchCandidateType } from '../../scoringService/types'
@@ -113,6 +115,124 @@ describe('formService helpers', () => {
             expect(new Date(result).toDateString()).toBe(expected.toDateString())
 
             jest.useRealTimers()
+        })
+    })
+    describe('buildCandidateList', () => {
+        it('should sort candidates by combined score and limit to maxCandidates', () => {
+            const fusionAccount = {
+                fusionMatches: [
+                    {
+                        identityId: 'id-1',
+                        fusionIdentity: { identityId: 'id-1', attributes: { displayName: 'John Doe' } },
+                        scores: [{ attribute: 'Combined score', score: 50 }],
+                    },
+                    {
+                        identityId: 'id-2',
+                        fusionIdentity: { identityId: 'id-2', attributes: { displayName: 'Jane Doe' } },
+                        scores: [{ attribute: 'Combined score', score: 90 }],
+                    },
+                    {
+                        identityId: 'id-3',
+                        fusionIdentity: { identityId: 'id-3', attributes: { displayName: 'Jim Doe' } },
+                        scores: [{ attribute: 'Combined score', score: 70 }],
+                    },
+                ],
+            } as any
+
+            const candidates = buildCandidateList(fusionAccount, 2)
+            expect(candidates).toHaveLength(2)
+            expect(candidates[0].id).toBe('id-2')
+            expect(candidates[1].id).toBe('id-3')
+        })
+
+        it('should fall back to best non-skipped rule score if combined score is missing', () => {
+            const fusionAccount = {
+                fusionMatches: [
+                    {
+                        identityId: 'id-1',
+                        fusionIdentity: { identityId: 'id-1', attributes: { displayName: 'John Doe' } },
+                        scores: [
+                            { attribute: 'rule1', score: 60, skipped: false },
+                            { attribute: 'rule2', score: 80, skipped: false },
+                        ],
+                    },
+                    {
+                        identityId: 'id-2',
+                        fusionIdentity: { identityId: 'id-2', attributes: { displayName: 'Jane Doe' } },
+                        scores: [{ attribute: 'rule3', score: 100, skipped: true }],
+                    },
+                ],
+            } as any
+
+            const candidates = buildCandidateList(fusionAccount, 2)
+            expect(candidates[0].id).toBe('id-1') // id-1 has 80, id-2 has 0 (since rule3 is skipped)
+        })
+
+        it('should fall back to identity ID locale compare for ties', () => {
+            const fusionAccount = {
+                fusionMatches: [
+                    {
+                        identityId: 'id-B',
+                        fusionIdentity: { identityId: 'id-B', attributes: { displayName: 'B Doe' } },
+                        scores: [{ attribute: 'Combined score', score: 50 }],
+                    },
+                    {
+                        identityId: 'id-A',
+                        fusionIdentity: { identityId: 'id-A', attributes: { displayName: 'A Doe' } },
+                        scores: [{ attribute: 'Combined score', score: 50 }],
+                    },
+                ],
+            } as any
+
+            const candidates = buildCandidateList(fusionAccount, 2)
+            expect(candidates[0].id).toBe('id-A')
+            expect(candidates[1].id).toBe('id-B')
+        })
+
+        it('should throw an error if fusionAccount is not provided', () => {
+            expect(() => buildCandidateList(null as any, 5)).toThrow()
+        })
+
+        it('should throw an error if maxCandidates is out of range', () => {
+            const fusionAccount = { fusionMatches: [] } as any
+            expect(() => buildCandidateList(fusionAccount, 0)).toThrow()
+            expect(() => buildCandidateList(fusionAccount, 20)).toThrow()
+        })
+
+        it('should map matches to Candidate objects correctly', () => {
+            const fusionAccount = {
+                fusionMatches: [
+                    {
+                        identityId: 'id-1',
+                        fusionIdentity: {
+                            identityId: 'id-1',
+                            attributes: { displayName: 'John Doe', department: 'IT' },
+                        },
+                        scores: [{ attribute: 'Combined score', score: 50 }],
+                    },
+                ],
+            } as any
+
+            const candidates = buildCandidateList(fusionAccount, 1)
+            expect(candidates[0]).toEqual({
+                id: 'id-1',
+                name: 'John Doe',
+                attributes: { displayName: 'John Doe', department: 'IT' },
+                scores: [{ attribute: 'Combined score', score: 50 }],
+            })
+        })
+    })
+
+    describe('getFormOwner', () => {
+        it('should return fusionSourceOwner from source service', () => {
+            const sourceService = { fusionSourceOwner: { type: 'IDENTITY', id: 'owner-id', name: 'Owner' } } as any
+            const owner = getFormOwner(sourceService)
+            expect(owner).toEqual({ type: 'IDENTITY', id: 'owner-id', name: 'Owner' })
+        })
+
+        it('should throw an error if fusionSourceOwner is undefined', () => {
+            const sourceService = { fusionSourceOwner: undefined } as any
+            expect(() => getFormOwner(sourceService)).toThrow()
         })
     })
 })
