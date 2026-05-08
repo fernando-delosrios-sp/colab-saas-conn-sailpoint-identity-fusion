@@ -91,7 +91,8 @@ $Math.floor($Datefns.differenceInDays($Datefns.now(), $hireDate) / 365)
 
 **`$isUnique(value)` helper:** Unique definitions can call `$isUnique(...)` inside the Velocity expression to test whether a candidate value is currently free after the same trim/case/spaces/normalize/maxLength rules are applied. Use this to choose between candidate formats before the connector falls back to automatic `$counter` disambiguation.
 
-> **Template safety note:** Keep Velocity directives on separate lines (`#if`, `#else`, `#end`, `#set`) to avoid parser ambiguities.
+!!! warning "Template safety note"
+    Keep Velocity directives on separate lines (`#if`, `#else`, `#end`, `#set`) to avoid parser ambiguities.
 
 **Examples:**
 
