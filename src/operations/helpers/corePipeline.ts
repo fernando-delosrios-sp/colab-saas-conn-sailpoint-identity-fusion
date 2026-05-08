@@ -76,29 +76,14 @@ export async function setupPhase(
 
     if (isPersistent) {
         sources.clearReverseCorrelationReadinessCache()
-        const reverseCorrelationSources = config.sources.filter((sc) => sc.correlationMode === 'reverse')
-        if (reverseCorrelationSources.length > 0) {
-            const reverseCorrelationStartedAt = Date.now()
-            const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
-            // Reverse-correlation setup mutates shared connector/source state and is kept serial
-            // to preserve deterministic ordering and avoid cross-source readiness races.
-            for (const sc of reverseCorrelationSources) {
-                try {
-                    await sources.ensureReverseCorrelationSetup(sc, schemaAttrNames)
-                } catch (error) {
-                    log.error(
-                        `Reverse correlation setup failed for source "${sc.name}" (attribute="${sc.correlationAttribute ?? 'unset'}"): ${
-                            error instanceof Error ? error.message : String(error)
-                        }`
-                    )
-                    throw error
-                }
-            }
+        const reverseCorrelationStartedAt = Date.now()
+        const reverseCorrelationCount = await sources.setupReverseCorrelationSources()
+        if (reverseCorrelationCount > 0) {
             await schemas.setFusionAccountSchema(undefined)
             log.debug('Fusion account schema refreshed after reverse correlation setup')
-            log.info(`Reverse correlation setup completed for ${reverseCorrelationSources.length} source(s)`)
+            log.info(`Reverse correlation setup completed for ${reverseCorrelationCount} source(s)`)
             log.info(
-                `Performance metric: reverseCorrelationSetup durationMs=${Date.now() - reverseCorrelationStartedAt} sources=${reverseCorrelationSources.length}`
+                `Performance metric: reverseCorrelationSetup durationMs=${Date.now() - reverseCorrelationStartedAt} sources=${reverseCorrelationCount}`
             )
         }
         const aggregateManagedSourcesStartedAt = Date.now()

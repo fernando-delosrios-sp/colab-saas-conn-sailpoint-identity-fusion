@@ -1,12 +1,9 @@
 import { FusionAccount } from '../../model/account'
-import { IdentityDocument, OwnerDto } from 'sailpoint-api-client'
+import { IdentityDocument } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
-import { SourceService } from '../sourceService'
-import { assert } from '../../utils/assert'
 import { FusionMatch, MatchCandidateType } from '../scoringService/types'
-import { Candidate } from './types'
-import { internalConfig } from '../../data/config'
 import { trimStr } from '../../utils/safeRead'
+import { Candidate } from './types'
 
 // ============================================================================
 // Helper Functions
@@ -43,31 +40,6 @@ export const resolveIdentitiesSelectLabel = (
     return identityId
 }
 
-/**
- * Sort key for ranking match candidates on review forms: combined match score when present,
- * otherwise the best non-skipped rule score.
- */
-const rankScoreForMatch = (match: FusionMatch): number => {
-    const combined = match.scores?.find(
-        (s) =>
-            s.algorithm === 'weighted-mean' ||
-            s.attribute === 'Combined score' ||
-            s.attribute === 'Combined match score'
-    )
-    if (combined) return combined.score
-    const scored = match.scores?.filter((s) => !s.skipped) ?? []
-    if (scored.length === 0) return 0
-    return Math.max(...scored.map((s) => s.score))
-}
-
-const compareMatchesForForm = (a: FusionMatch, b: FusionMatch): number => {
-    const delta = rankScoreForMatch(b) - rankScoreForMatch(a)
-    if (delta !== 0) return delta
-    const ida = String(a.fusionIdentity?.identityId ?? a.identityId ?? '')
-    const idb = String(b.fusionIdentity?.identityId ?? b.identityId ?? '')
-    return ida.localeCompare(idb)
-}
-
 /** Matches counted toward the review-form cap (excludes deferred same-run peer candidates). */
 export const countIdentityBackedFusionMatches = (matches: readonly FusionMatch[] | undefined): number => {
     if (!matches) return 0
@@ -81,42 +53,13 @@ export const countIdentityBackedFusionMatches = (matches: readonly FusionMatch[]
 }
 
 /**
- * Build the ordered candidate list for a fusion review form (highest combined score first),
- * capped at `maxCandidates` (configured via `fusionMaxCandidatesForForm`).
- */
-export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: number): Candidate[] => {
-    assert(fusionAccount, 'Fusion account is required')
-    assert(fusionAccount.fusionMatches, 'Fusion matches are required')
-    assert(
-        maxCandidates >= 1 && maxCandidates <= internalConfig.formService.fusionMaxCandidatesForFormMax,
-        `maxCandidates must be between 1 and ${internalConfig.formService.fusionMaxCandidatesForFormMax}`
-    )
-
-    const ordered = [...fusionAccount.fusionMatches].sort(compareMatchesForForm).slice(0, maxCandidates)
-
-    return ordered.map((match) => {
-        assert(match.fusionIdentity, 'Fusion identity is required in match')
-        assert(match.fusionIdentity.identityId, 'Fusion identity ID is required')
-        const attrs: Record<string, any> = match.fusionIdentity.attributes || {}
-        const id = match.fusionIdentity.identityId
-        return {
-            id,
-            name: resolveIdentitiesSelectLabel(attrs, id),
-            attributes: attrs,
-            scores: match.scores || [],
-        }
-    })
-}
-
-/**
  * Build form name from fusion account with a stable account identifier suffix
  * to avoid collisions when multiple accounts share the same display name/source.
  */
 export const buildFormName = (fusionAccount: FusionAccount, fusionFormNamePattern: string): string => {
     const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
     const source = `[${fusionAccount.sourceName}]`
-    const accountIdentifier =
-        trimStr(fusionAccount.nativeIdentity) || trimStr(fusionAccount.managedAccountId) || 'unknown'
+    const accountIdentifier = trimStr(fusionAccount.nativeIdentity) || trimStr(fusionAccount.managedAccountId) || 'unknown'
     return `${fusionFormNamePattern} - ${accountName} ${source} (${accountIdentifier})`
 }
 
@@ -130,10 +73,29 @@ export const calculateExpirationDate = (fusionFormExpirationDays: number): strin
 }
 
 /**
- * Get form owner from fusion source
+ * Build candidate list from fusion account matches, sorted by combined match score descending,
+ * capped at maxCandidates.
  */
-export const getFormOwner = (sources: SourceService): OwnerDto => {
-    const owner = sources.fusionSourceOwner
-    assert(owner, 'Fusion source owner not found')
-    return owner
+export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: number): Candidate[] => {
+    const matches = fusionAccount.fusionMatches ?? []
+    const scored = matches
+        .filter((m) => m.fusionIdentity?.identityId)
+        .map((m) => {
+            const identityId = m.fusionIdentity!.identityId
+            const displayName = m.fusionIdentity!.attributes?.displayName as string | undefined
+            return {
+                id: identityId,
+                name: displayName || identityId,
+                attributes: (m.fusionIdentity?.attributes ?? {}) as Record<string, any>,
+                scores: m.scores ?? [],
+            } as Candidate
+        })
+
+    scored.sort((a, b) => {
+        const aMax = Math.max(0, ...(a.scores.filter((s) => s.score != null).map((s) => s.score as number)))
+        const bMax = Math.max(0, ...(b.scores.filter((s) => s.score != null).map((s) => s.score as number)))
+        return bMax - aMax
+    })
+
+    return scored.slice(0, maxCandidates)
 }

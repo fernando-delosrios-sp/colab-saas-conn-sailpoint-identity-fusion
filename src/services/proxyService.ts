@@ -1,7 +1,8 @@
 import { ConnectorError, Response } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
-import { assert } from 'console'
+import { assert } from '../utils/assert'
+import crypto from 'crypto'
 
 const KEEPALIVE = 2.5 * 60 * 1000
 const DEFAULT_PROXY_REQUEST_TIMEOUT_MS = 5 * 60 * 1000
@@ -65,7 +66,10 @@ export class ProxyService {
             if (this.config.proxyPassword) {
                 const serverPassword = process.env.PROXY_PASSWORD
                 const clientPassword = this.config.proxyPassword
-                assert(serverPassword === clientPassword, 'Proxy password mismatch')
+                const serverBuffer = Buffer.from(serverPassword || '');
+                const clientBuffer = Buffer.from(clientPassword || '');
+                const isMatch = serverBuffer.length === clientBuffer.length && crypto.timingSafeEqual(serverBuffer, clientBuffer);
+                assert(isMatch, 'Proxy password mismatch')
             }
             return true
         } else {

@@ -40,6 +40,7 @@ import {
     buildIscAccountsQueryFilter,
 } from './accountFilters'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { ServiceRegistry } from '../serviceRegistry'
 
 type ReverseCorrelationArtifact =
     | 'fusion_schema_attribute'
@@ -254,6 +255,13 @@ export class SourceService {
      */
     public get hasFusionSource(): boolean {
         return !!this._fusionSourceId
+    }
+
+    /**
+     * Whether cascade aggregation is enabled globally.
+     */
+    public get isCascadeAggregationEnabled(): boolean {
+        return this.config.cascadeAggregationEnabled ?? false
     }
 
     // ------------------------------------------------------------------------
@@ -959,8 +967,9 @@ export class SourceService {
      * List schemas for a source
      */
     public async listSourceSchemas(sourceId: string): Promise<SchemaV2025[]> {
-        if (this.sourceSchemasCache.has(sourceId)) {
-            return this.sourceSchemasCache.get(sourceId)!
+        const cachedSchemas = this.sourceSchemasCache.get(sourceId)
+        if (cachedSchemas) {
+            return cachedSchemas
         }
 
         const { sourcesApi } = this.client
@@ -1270,6 +1279,32 @@ export class SourceService {
     }
 
     /**
+     * Set up reverse correlation for multiple sources sequentially.
+     * Kept serial to preserve deterministic ordering and avoid cross-source readiness races.
+     */
+    public async setupReverseCorrelationSources(): Promise<number> {
+        const reverseCorrelationSources = this.sources.filter((sc) => sc.correlationMode === 'reverse')
+        if (reverseCorrelationSources.length === 0) {
+            return 0
+        }
+        const schemas = ServiceRegistry.getCurrent().schemas
+        const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
+        for (const sc of reverseCorrelationSources) {
+            try {
+                await this.ensureReverseCorrelationSetup(sc, schemaAttrNames)
+            } catch (error) {
+                this.log.error(
+                    `Reverse correlation setup failed for source "${sc.name}" (attribute="${sc.correlationAttribute ?? 'unset'}"): ${
+                        error instanceof Error ? error.message : String(error)
+                    }`
+                )
+                throw error
+            }
+        }
+        return reverseCorrelationSources.length
+    }
+
+    /**
      * Validate reverse-correlation prerequisites for runtime operations.
      * Throws when setup is incomplete.
      */
@@ -1344,26 +1379,26 @@ export class SourceService {
         const missingArtifacts: ReverseCorrelationArtifact[] = []
         const full = requiresFullReverseCorrelationArtifacts(sourceConfig)
 
-        if (full) {
-            const fusionSchemaReady = await this.hasFusionSchemaAttribute(correlationAttribute)
-            if (!fusionSchemaReady) {
-                missingArtifacts.push('fusion_schema_attribute')
-            }
+        const [fusionSchemaReady, identityAttributeReady, identityProfileReady, managedCorrelationReady] =
+            await Promise.all([
+                full ? this.hasFusionSchemaAttribute(correlationAttribute) : Promise.resolve(true),
+                this.hasSearchableIdentityAttribute(correlationAttribute),
+                full ? this.hasIdentityProfileMapping(correlationAttribute, sourceConfig) : Promise.resolve(true),
+                this.hasManagedSourceCorrelation(correlationAttribute, managedSourceId),
+            ])
+
+        if (full && !fusionSchemaReady) {
+            missingArtifacts.push('fusion_schema_attribute')
         }
 
-        const identityAttributeReady = await this.hasSearchableIdentityAttribute(correlationAttribute)
         if (!identityAttributeReady) {
             missingArtifacts.push('identity_attribute')
         }
 
-        if (full) {
-            const identityProfileReady = await this.hasIdentityProfileMapping(correlationAttribute, sourceConfig)
-            if (!identityProfileReady) {
-                missingArtifacts.push('identity_profile_mapping')
-            }
+        if (full && !identityProfileReady) {
+            missingArtifacts.push('identity_profile_mapping')
         }
 
-        const managedCorrelationReady = await this.hasManagedSourceCorrelation(correlationAttribute, managedSourceId)
         if (!managedCorrelationReady) {
             missingArtifacts.push('managed_source_correlation')
         }
@@ -1996,7 +2031,7 @@ export class SourceService {
     /**
      * Aggregate managed source
      */
-    private async aggregateManagedSource(
+    public async aggregateManagedSource(
         id: string,
         disableOptimization?: boolean,
         awaitTaskStatus: boolean = true
