@@ -133,11 +133,11 @@ What type of attribute are you comparing?
 
 **Prefix weighting example:**
 
-| String 1               | String 2               | Score | Note                                        |
-| ---------------------- | ---------------------- | ----- | ------------------------------------------- |
-| john.smith@company.com | john.smyth@company.com | 95    | High due to strong prefix match             |
-| john.smith@company.com | jane.smith@company.com | 82    | Lower due to prefix mismatch (john vs jane) |
-| smithj@company.com     | smithjo@company.com    | 97    | Very close; prefix nearly identical         |
+| String 1                 | String 2                 | Score | Note                                        |
+| ------------------------ | ------------------------ | ----- | ------------------------------------------- |
+| <john.smith@company.com> | <john.smyth@company.com> | 95    | High due to strong prefix match             |
+| <john.smith@company.com> | <jane.smith@company.com> | 82    | Lower due to prefix mismatch (john vs jane) |
+| <smithj@company.com>     | <smithjo@company.com>    | 97    | Very close; prefix nearly identical         |
 
 **When to use:**
 

@@ -275,7 +275,7 @@ Include attributes that help reviewers decide if identities are matches:
 | Attribute      | Why include              | Example                                                   |
 | -------------- | ------------------------ | --------------------------------------------------------- |
 | **name**       | Primary identifier       | John Smith vs J. Smith                                    |
-| **email**      | Usually unique           | john.smith@company.com vs jsmith@company.com              |
+| **email**      | Usually unique           | <john.smith@company.com> vs <jsmith@company.com>          |
 | **department** | Context for verification | Engineering vs IT                                         |
 | **manager**    | Organizational context   | Same manager → likely same person                         |
 | **hireDate**   | Temporal context         | Hired same day → suspicious; years apart → unlikely match |
