@@ -1,3 +1,6 @@
+## 2026-05-07 - Add SchemaService promise cache to avoid duplicate API calls
+**Learning:** Promise.all iterating over independent map functions can trigger multiple consecutive calls of the same asynchronous method across multiple sources sequentially or concurrently, causing N+1 fetching issues.
+**Action:** Added `accountSchemasCache` to deduplicate and cache concurrent requests in `fetchAccountSchema` so that any sequential fetches immediately return the cached Promise.
 ## 2025-05-03 - [Parallel Verification API Calls]
 **Learning:** Sequential validation and verification API calls when initializing reverse correlation setups introduces unnecessary bottlenecks and latency. By replacing sequential API calls in `getReverseCorrelationSetupStatus` with `Promise.all`, the execution time is reduced.
 **Action:** Group independent read-only validation API calls using a single `Promise.all` array and passing `Promise.resolve(true)` for conditionally skipped async checks within the array to maintain parallel execution mapping.
