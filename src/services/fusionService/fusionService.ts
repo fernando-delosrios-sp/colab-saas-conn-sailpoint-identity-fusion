@@ -907,6 +907,20 @@ export class FusionService {
      * Called from processIdentity to avoid creating a duplicate baseline account when
      * an ISC identity is recreated with a new ID.
      */
+    private hasIntersectingManagedAccounts(account: FusionAccount, identityAccountIds: Set<string>): boolean {
+        for (const id of account.accountIdsSet) {
+            if (identityAccountIds.has(id)) {
+                return true
+            }
+        }
+        for (const id of account.missingAccountIdsSet) {
+            if (identityAccountIds.has(id)) {
+                return true
+            }
+        }
+        return false
+    }
+
     private findFusionAccountByIdentityManagedAccounts(identity: IdentityDocument): FusionAccount | undefined {
         const sourceNames = this.configSourceNames
         const identityAccountIds = new Set<string>(
@@ -924,43 +938,17 @@ export class FusionService {
 
         // Check uncorrelated accounts first
         for (const account of this.fusionAccountMap.values()) {
-            let found = false
-            for (const id of account.accountIds) {
-                if (identityAccountIds.has(id)) {
-                    found = true
-                    break
-                }
+            if (this.hasIntersectingManagedAccounts(account, identityAccountIds)) {
+                return account
             }
-            if (!found) {
-                for (const id of account.missingAccountIds) {
-                    if (identityAccountIds.has(id)) {
-                        found = true
-                        break
-                    }
-                }
-            }
-            if (found) return account
         }
 
         // Check for accounts from stale identity IDs (identity was destroyed and recreated)
         for (const [existingIdentityId, account] of this.fusionIdentityMap.entries()) {
             if (existingIdentityId === identity.id) continue
-            let found = false
-            for (const id of account.accountIds) {
-                if (identityAccountIds.has(id)) {
-                    found = true
-                    break
-                }
+            if (this.hasIntersectingManagedAccounts(account, identityAccountIds)) {
+                return account
             }
-            if (!found) {
-                for (const id of account.missingAccountIds) {
-                    if (identityAccountIds.has(id)) {
-                        found = true
-                        break
-                    }
-                }
-            }
-            if (found) return account
         }
 
         return undefined
