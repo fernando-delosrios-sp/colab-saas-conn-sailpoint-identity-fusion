@@ -1,9 +1,17 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { ChainState, StepResult, ChainFusionAccount } from './ChainState'
+import { ChainState } from './ChainState'
 import { ChainContext } from './ChainContext'
-import { createChainMockRegistry } from '../harness/chainMockDelegate'
-import { executeStep as executeOperationStep } from '../steps/stepDefinitions'
+
+export interface StepDefinition {
+    id: string
+    operation: string
+    pass?: number
+    description?: string
+    input?: Record<string, unknown>
+    expectedOutput?: unknown
+    expectedStateDelta?: Record<string, unknown>
+}
 
 export interface ScenararioConfig {
     sources?: Array<Record<string, unknown>>
@@ -24,23 +32,24 @@ export interface ScenararioConfig {
     [key: string]: unknown
 }
 
-export interface StepDefinition {
-    id: string
-    operation: string
-    pass?: number
-    description?: string
-    input?: Record<string, unknown>
-    mockDelegate?: string
-    expectedOutput?: Record<string, unknown>
-    expectedStateDelta?: Record<string, unknown>
-}
-
 export interface ChainScenario {
     version: string
+    chainName?: string
+    recordedAt?: string
     config: ScenararioConfig
     initialState: Record<string, unknown>
     steps: StepDefinition[]
     referenceValues?: Record<string, Record<string, unknown>>
+}
+
+export interface StepResult {
+    stepId: string
+    operation: string
+    success: boolean
+    output: unknown
+    stateDelta: Record<string, unknown>
+    duration: number
+    error?: string
 }
 
 export interface ChainResult {
@@ -65,7 +74,7 @@ export class ChainRunner {
             identities: (this.scenario.initialState.identities as any[]) ?? [],
             managedAccounts: (this.scenario.initialState.managedAccounts as Record<string, any[]>) ?? {},
             fusionAccounts: (this.scenario.initialState.fusionAccounts as any[]) ?? [],
-            forms: (this.scenario.initialState.forms as any[]) ?? [],
+            forms: (this.scenario.initialState.formDecisions as any[]) ?? [],
         })
     }
 
@@ -105,22 +114,16 @@ export class ChainRunner {
 
         const startTime = Date.now()
 
-        const registry = createChainMockRegistry(this.scenario.config, step, this.state)
-
-        const context: ChainContext = {
-            registry,
-            state: this.state,
-            options: {
-                pass: step.pass ?? 1,
-                stepId: step.id,
-            },
-        }
-
         try {
-            const output = await executeOperationStep(step, context)
+            const stepFn = getStepFn(step.operation)
+            if (!stepFn) {
+                throw new Error(`No step function registered for operation: ${step.operation}`)
+            }
+
+            const context = this.buildContext(step)
+            const output = await stepFn(step, context)
 
             const stateDelta = this.buildStateDelta(step, output)
-
             this.state.applyDelta(stateDelta)
 
             const result: StepResult = {
@@ -195,6 +198,17 @@ export class ChainRunner {
         }
     }
 
+    private buildContext(step: StepDefinition): ChainContext {
+        return {
+            registry: {},
+            state: this.state,
+            options: {
+                pass: step.pass ?? 1,
+                stepId: step.id,
+            },
+        } as unknown as ChainContext
+    }
+
     private buildStateDelta(step: StepDefinition, output: unknown): Record<string, unknown> {
         const delta: Record<string, unknown> = {}
 
@@ -202,23 +216,19 @@ export class ChainRunner {
             Object.assign(delta, step.expectedStateDelta)
         }
 
-        if (step.operation === 'accountList' && output) {
-            const out = output as Record<string, unknown>
-            if (out.fusionAccounts) {
-                delta.fusionAccountsAdd = out.fusionAccounts
-            }
-            if (out.identities) {
-                delta.identitiesAdd = out.identities
-            }
-        }
-
-        if (step.operation === 'accountCreate' && output) {
-            const out = output as Record<string, unknown>
-            if (out.fusionAccount) {
-                delta.fusionAccountsAdd = [out.fusionAccount]
-            }
-        }
-
         return delta
     }
+}
+
+const stepFns = new Map<string, (step: StepDefinition, context: ChainContext) => Promise<unknown>>()
+
+export function registerStepFn(
+    operation: string,
+    fn: (step: StepDefinition, context: ChainContext) => Promise<unknown>
+): void {
+    stepFns.set(operation, fn)
+}
+
+function getStepFn(operation: string): ((step: StepDefinition, context: ChainContext) => Promise<unknown>) | undefined {
+    return stepFns.get(operation)
 }
