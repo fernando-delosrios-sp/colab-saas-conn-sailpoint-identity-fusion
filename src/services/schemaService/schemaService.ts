@@ -23,6 +23,7 @@ export class SchemaService {
     private attributeMap: Map<string, AttributeMap> = new Map()
     private _fusionSchemaAttributeNames: string[] = []
     private _fusionSchemaAttributeMap: Map<string, SchemaAttribute> = new Map()
+    private accountSchemasCache = new Map<string, Promise<AccountSchema>>()
     private readonly attributeMerge: DefaultAttributeMergeMode
     private readonly normalAttributeDefinitions: NormalAttributeDefinition[]
     private readonly uniqueAttributeDefinitions: UniqueAttributeDefinition[]
@@ -185,12 +186,18 @@ export class SchemaService {
      * @returns The converted AccountSchema
      */
     private async fetchAccountSchema(id: string): Promise<AccountSchema> {
-        const sourceSchemas = await this.sources.listSourceSchemas(id)
-        const apiAccountSchema = sourceSchemas.find(isAccountSchema)
-        assert(apiAccountSchema, `Account schema not found for source ${id}`)
-        const accountSchema = apiSchemaToAccountSchema(apiAccountSchema)
-
-        return accountSchema
+        let promise = this.accountSchemasCache.get(id)
+        if (!promise) {
+            promise = (async () => {
+                const sourceSchemas = await this.sources.listSourceSchemas(id)
+                const apiAccountSchema = sourceSchemas.find(isAccountSchema)
+                assert(apiAccountSchema, `Account schema not found for source ${id}`)
+                const accountSchema = apiSchemaToAccountSchema(apiAccountSchema)
+                return accountSchema
+            })()
+            this.accountSchemasCache.set(id, promise)
+        }
+        return promise
     }
 
     /**
