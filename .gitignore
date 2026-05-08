@@ -39,3 +39,6 @@ docs/LICENSE.txt
 # Logs
 logs/
 
+# Recordings (generated test baselines from record mode)
+test-data/recordings/
+
