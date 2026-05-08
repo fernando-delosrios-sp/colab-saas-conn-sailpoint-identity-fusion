@@ -52,15 +52,15 @@ export class StateWrapper {
             const lockKey = `counter:${key}`
 
             return await this.locks!.withLock(lockKey, async () => {
+                const currentValue = this.state.get(key)
+
                 // Ensure counter exists (should have been initialized, but check for safety)
-                if (!this.state.has(key)) {
+                if (currentValue === undefined) {
                     throw new ConnectorError(
                         `Counter "${key}" was not initialized. Ensure the attribute definition for "${key}" is configured and initializeCounters() has been called.`,
                         ConnectorErrorType.Generic
                     )
                 }
-
-                const currentValue = this.state.get(key)!
                 const nextValue = currentValue + 1
                 this.state.set(key, nextValue)
                 // Verify the state was actually updated
