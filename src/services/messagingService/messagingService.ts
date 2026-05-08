@@ -669,6 +669,8 @@ export class MessagingService {
             return Array.from(emails)
         }
 
+        await this.identities?.hydrateMissingIdentitiesById(validIds)
+
         const results = await Promise.all(
             validIds.map(async (identityId) => {
                 let identity = this.identities?.getIdentityById(identityId)

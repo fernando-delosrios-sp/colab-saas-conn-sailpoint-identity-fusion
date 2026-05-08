@@ -1,3 +1,6 @@
+## 2026-05-07 - Batch Fetching to Resolve N+1 API Pattern
+**Learning:** Resolving N+1 fetch issues inside `Promise.all` loops can be efficiently solved by performing a single batch hydrate operation prior to the loop.
+**Action:** Added `await this.identities?.hydrateMissingIdentitiesById(validIds)` before mapping over the IDs to ensure subsequent `getIdentityById` calls hit the cache, averting numerous individual fallback `fetchIdentityById` API requests.
 ## 2026-05-07 - Add SchemaService promise cache to avoid duplicate API calls
 **Learning:** Promise.all iterating over independent map functions can trigger multiple consecutive calls of the same asynchronous method across multiple sources sequentially or concurrently, causing N+1 fetching issues.
 **Action:** Added `accountSchemasCache` to deduplicate and cache concurrent requests in `fetchAccountSchema` so that any sequential fetches immediately return the cached Promise.
