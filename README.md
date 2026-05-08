@@ -392,6 +392,8 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- (2026-05-07) Improved performance by batching concurrent API calls in `fetchAccountSchema`.
+
 ### 2.1.6 - 2026-05-01
 
 - (2026-05-01) Added missing test suite for `accountDiscoverSchema` operation, improving test coverage and catching potential bugs.
