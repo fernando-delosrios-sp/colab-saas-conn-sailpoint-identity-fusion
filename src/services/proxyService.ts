@@ -84,44 +84,7 @@ export class ProxyService {
             this.res.keepAlive()
         }, KEEPALIVE)
         try {
-            if (!this.config.proxyEnabled || !this.config.proxyUrl) {
-                throw new ConnectorError('Proxy mode is not enabled or proxy URL is missing')
-            }
-            const { proxyUrl } = this.config
-            const externalConfig = { ...this.config, isProxy: true }
-            const body = {
-                type: this.commandType,
-                input,
-                config: externalConfig,
-            }
-            const proxyRequestTimeoutMs = this.config.proxyRequestTimeoutMs ?? DEFAULT_PROXY_REQUEST_TIMEOUT_MS
-            const controller = new AbortController()
-            const timeout = setTimeout(() => {
-                controller.abort()
-            }, proxyRequestTimeoutMs)
-            let response: globalThis.Response
-            try {
-                response = await fetch(proxyUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(body),
-                    signal: controller.signal,
-                })
-            } catch (fetchError) {
-                if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-                    throw new ConnectorError(`Proxy request to ${proxyUrl} timed out after ${proxyRequestTimeoutMs} ms`)
-                }
-                this.log.error(
-                    `Proxy fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown fetch error'}`
-                )
-                throw new ConnectorError(
-                    `Failed to connect to proxy server at ${proxyUrl}: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`
-                )
-            } finally {
-                clearTimeout(timeout)
-            }
+            const response = await this.performFetch(input)
 
             if (!response.ok) {
                 const errorText = await response.text()
@@ -131,101 +94,7 @@ export class ProxyService {
             }
 
             const data = await response.text()
-
-            if (!data || data.trim().length === 0) {
-                this.log.debug('Proxy received empty response')
-                return
-            }
-
-            this.log.debug(
-                `Proxy received response (${data.length} chars): ${data.substring(0, 500)}${data.length > 500 ? '...' : ''}`
-            )
-
-            const lines = data.split('\n').filter((line) => line.trim().length > 0)
-            this.log.debug(`Processing ${lines.length} non-empty lines from proxy response`)
-
-            if (lines.length === 0) {
-                this.log.debug('Proxy received response with no valid content')
-                return
-            }
-
-            if (lines.length === 1) {
-                try {
-                    let parsed = JSON.parse(lines[0])
-
-                    if (parsed === null || parsed === undefined) {
-                        this.log.debug('Proxy received null/undefined response')
-                        return
-                    }
-
-                    if (typeof parsed === 'object' && !Array.isArray(parsed)) {
-                        this.log.debug(`Before unwrap - parsed keys: ${Object.keys(parsed).join(', ')}`)
-                    }
-                    parsed = unwrapData(parsed, this.log)
-                    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-                        this.log.debug(`After unwrap - parsed keys: ${Object.keys(parsed).join(', ')}`)
-                    }
-
-                    if (Array.isArray(parsed)) {
-                        if (parsed.length === 0) {
-                            this.log.debug('Proxy received empty array')
-                            return
-                        }
-                        this.log.info(`Proxy received JSON array with ${parsed.length} items`)
-                        let sentCount = 0
-                        for (const item of parsed) {
-                            const unwrappedItem = unwrapData(item, this.log)
-
-                            if (!isValidObject(unwrappedItem)) {
-                                this.log.debug(`Skipping empty object in array`)
-                                continue
-                            }
-
-                            this.log.debug(`Sending item: ${JSON.stringify(unwrappedItem).substring(0, 200)}`)
-                            this.res.send(unwrappedItem)
-                            sentCount++
-                        }
-                        this.log.info(`Proxy sent ${sentCount} valid objects from array`)
-                        return
-                    } else {
-                        if (parsed === null || parsed === undefined) {
-                            this.log.debug(`Skipping null/undefined single object`)
-                            return
-                        }
-
-                        this.log.debug(`Sending single object: ${JSON.stringify(parsed).substring(0, 200)}`)
-                        this.res.send(parsed)
-                        return
-                    }
-                } catch {
-                    this.log.warn('Failed to parse response as JSON array, trying NDJSON')
-                }
-            }
-
-            let validObjectCount = 0
-            for (const line of lines) {
-                try {
-                    let parsed = JSON.parse(line)
-
-                    parsed = unwrapData(parsed, this.log)
-
-                    if (!isValidObject(parsed)) {
-                        this.log.debug(`Skipping empty NDJSON object`)
-                        continue
-                    }
-
-                    this.log.debug(`Sending object: ${JSON.stringify(parsed).substring(0, 200)}`)
-                    this.res.send(parsed)
-                    validObjectCount++
-                } catch (parseError) {
-                    this.log.error(`Failed to parse line: ${line.substring(0, 200)}`)
-                    throw new ConnectorError(
-                        `Failed to parse JSON line from proxy response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. Line: ${line.substring(0, 100)}`
-                    )
-                }
-            }
-
-            this.log.info(`Proxy sent ${validObjectCount} valid objects to ISC`)
+            this.processProxyResponse(data)
         } catch (error) {
             if (error instanceof ConnectorError) throw error
             const detail = error instanceof Error ? error.message : String(error)
@@ -233,5 +102,155 @@ export class ProxyService {
         } finally {
             clearInterval(interval)
         }
+    }
+
+    private async performFetch(input: any): Promise<globalThis.Response> {
+        if (!this.config.proxyEnabled || !this.config.proxyUrl) {
+            throw new ConnectorError('Proxy mode is not enabled or proxy URL is missing')
+        }
+        const { proxyUrl } = this.config
+        const externalConfig = { ...this.config, isProxy: true }
+        const body = {
+            type: this.commandType,
+            input,
+            config: externalConfig,
+        }
+        const proxyRequestTimeoutMs = this.config.proxyRequestTimeoutMs ?? DEFAULT_PROXY_REQUEST_TIMEOUT_MS
+        const controller = new AbortController()
+        const timeout = setTimeout(() => {
+            controller.abort()
+        }, proxyRequestTimeoutMs)
+
+        try {
+            return await fetch(proxyUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal,
+            })
+        } catch (fetchError) {
+            if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+                throw new ConnectorError(`Proxy request to ${proxyUrl} timed out after ${proxyRequestTimeoutMs} ms`)
+            }
+            this.log.error(
+                `Proxy fetch failed: ${fetchError instanceof Error ? fetchError.message : 'Unknown fetch error'}`
+            )
+            throw new ConnectorError(
+                `Failed to connect to proxy server at ${proxyUrl}: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`
+            )
+        } finally {
+            clearTimeout(timeout)
+        }
+    }
+
+    private processProxyResponse(data: string): void {
+        if (!data || data.trim().length === 0) {
+            this.log.debug('Proxy received empty response')
+            return
+        }
+
+        this.log.debug(
+            `Proxy received response (${data.length} chars): ${data.substring(0, 500)}${data.length > 500 ? '...' : ''}`
+        )
+
+        const lines = data.split('\n').filter((line) => line.trim().length > 0)
+        this.log.debug(`Processing ${lines.length} non-empty lines from proxy response`)
+
+        if (lines.length === 0) {
+            this.log.debug('Proxy received response with no valid content')
+            return
+        }
+
+        if (lines.length === 1) {
+            const success = this.tryProcessSingleLineJsonResponse(lines[0])
+            if (success) {
+                return
+            }
+            this.log.warn('Failed to parse response as JSON array, trying NDJSON')
+        }
+
+        this.processNdjsonResponse(lines)
+    }
+
+    private tryProcessSingleLineJsonResponse(line: string): boolean {
+        try {
+            let parsed = JSON.parse(line)
+
+            if (parsed === null || parsed === undefined) {
+                this.log.debug('Proxy received null/undefined response')
+                return true
+            }
+
+            if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                this.log.debug(`Before unwrap - parsed keys: ${Object.keys(parsed).join(', ')}`)
+            }
+            parsed = unwrapData(parsed, this.log)
+            if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                this.log.debug(`After unwrap - parsed keys: ${Object.keys(parsed).join(', ')}`)
+            }
+
+            if (Array.isArray(parsed)) {
+                if (parsed.length === 0) {
+                    this.log.debug('Proxy received empty array')
+                    return true
+                }
+                this.log.info(`Proxy received JSON array with ${parsed.length} items`)
+                let sentCount = 0
+                for (const item of parsed) {
+                    const unwrappedItem = unwrapData(item, this.log)
+
+                    if (!isValidObject(unwrappedItem)) {
+                        this.log.debug(`Skipping empty object in array`)
+                        continue
+                    }
+
+                    this.log.debug(`Sending item: ${JSON.stringify(unwrappedItem).substring(0, 200)}`)
+                    this.res.send(unwrappedItem)
+                    sentCount++
+                }
+                this.log.info(`Proxy sent ${sentCount} valid objects from array`)
+                return true
+            } else {
+                if (parsed === null || parsed === undefined) {
+                    this.log.debug(`Skipping null/undefined single object`)
+                    return true
+                }
+
+                this.log.debug(`Sending single object: ${JSON.stringify(parsed).substring(0, 200)}`)
+                this.res.send(parsed)
+                return true
+            }
+        } catch {
+            return false
+        }
+    }
+
+    private processNdjsonResponse(lines: string[]): void {
+        let validObjectCount = 0
+        for (const line of lines) {
+            try {
+                let parsed = JSON.parse(line)
+
+                parsed = unwrapData(parsed, this.log)
+
+                if (!isValidObject(parsed)) {
+                    this.log.debug(`Skipping empty NDJSON object`)
+                    continue
+                }
+
+                this.log.debug(`Sending object: ${JSON.stringify(parsed).substring(0, 200)}`)
+                this.res.send(parsed)
+                validObjectCount++
+            } catch (parseError) {
+                this.log.error(`Failed to parse line: ${line.substring(0, 200)}`)
+                throw new ConnectorError(
+                    `Failed to parse JSON line from proxy response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. Line: ${line.substring(0, 100)}`
+                )
+            }
+        }
+
+        this.log.info(`Proxy sent ${validObjectCount} valid objects to ISC`)
     }
 }
