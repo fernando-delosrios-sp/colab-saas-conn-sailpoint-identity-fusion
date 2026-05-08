@@ -396,6 +396,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ### 2.1.6 - 2026-05-01
 
+- Added test coverage for formService helpers `buildCandidateList` and `getFormOwner`.
 - **Refactor:** Extracted the core aggregation and dry-run execution pipeline phases into a shared helper function `executeSharedPipelinePhases` to prevent duplicate logging/sequence code.
 - (2026-05-07) Bound identity enrichment batch sizes using `promiseAllBatched` to resolve unbounded API concurrency issues.
 - (2026-05-07) Optimize N+1 fetch in `getRecipientEmails` by batch fetching missing identities.
