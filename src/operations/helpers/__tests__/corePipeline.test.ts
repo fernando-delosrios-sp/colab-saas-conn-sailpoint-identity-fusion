@@ -21,7 +21,7 @@ function createRegistry() {
         registry,
         forms: registry.forms,
         fusion: registry.fusion,
-        sources: registry.sources
+        sources: registry.sources,
     }
 }
 
