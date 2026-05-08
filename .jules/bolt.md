@@ -4,6 +4,7 @@
 **Action:** Replaced `Promise.all(ids.map(fn))` with `promiseAllBatched(ids, fn, 50)`, bounding concurrency and saving significant resource cycles. Measured a theoretical execution drop from unmanageable latency at scale to predictable latency (baseline benchmark script Unbounded time: ~27ms vs Batched ~213ms for small arrays, but with safety guarantees over 1000 items).
 
 ## 2026-05-07 - Batch Fetching to Resolve N+1 API Pattern
+
 **Learning:** Resolving N+1 fetch issues inside `Promise.all` loops can be efficiently solved by performing a single batch hydrate operation prior to the loop.
 **Action:** Added `await this.identities?.hydrateMissingIdentitiesById(validIds)` before mapping over the IDs to ensure subsequent `getIdentityById` calls hit the cache, averting numerous individual fallback `fetchIdentityById` API requests.
 ## 2026-05-07 - Add SchemaService promise cache to avoid duplicate API calls
