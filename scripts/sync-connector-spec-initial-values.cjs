@@ -122,7 +122,7 @@ function objectLiteralToJson(tsObjectLiteral, context) {
         if (pos >= inner.length) break
 
         let keyEnd = pos
-        let key;
+        let key
         if (inner[pos] === "'" || inner[pos] === '"') {
             const q = inner[pos]
             keyEnd = pos + 1

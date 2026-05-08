@@ -343,3 +343,25 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
 
     return count
 }
+
+export async function executeSharedPipelinePhases(
+    serviceRegistry: ServiceRegistry,
+    schema: any,
+    options: CorePipelineOptions,
+    timer: import('../../services/logService').PhaseTimer
+): Promise<{ shouldContinue: boolean; fetchResult?: FetchResult }> {
+    const shouldContinue = await setupPhase(serviceRegistry, schema, options)
+    if (!shouldContinue) return { shouldContinue: false }
+    timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
+
+    const fetchResult = await fetchPhase(serviceRegistry, options)
+    timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
+
+    await refreshPhase(serviceRegistry, options)
+    timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
+
+    await processPhase(serviceRegistry, options)
+    timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
+
+    return { shouldContinue: true, fetchResult }
+}

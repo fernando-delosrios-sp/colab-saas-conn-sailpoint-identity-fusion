@@ -70,8 +70,8 @@ export const scoreDoubleMetaphone = (
     const accountCodes = doubleMetaphone(accountAttribute)
     const identityCodes = doubleMetaphone(identityAttribute)
 
-    let score: number;
-    let comment: string;
+    let score: number
+    let comment: string
     if (accountCodes[0] === identityCodes[0] && accountCodes[0]) {
         score = 100
         comment = 'Primary codes match'
