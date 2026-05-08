@@ -144,8 +144,6 @@ type DryRunFinalizationInput = {
     reportHtmlOutputPath?: string
 }
 
-
-
 /** Short host segment for filenames: first DNS label of the baseurl host, or full IP literal (sanitized). */
 export const hostnameSegmentFromBaseurl = (baseurl: string | undefined): string => {
     if (!baseurl || typeof baseurl !== 'string' || !baseurl.trim()) {

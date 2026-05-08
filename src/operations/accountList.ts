@@ -2,10 +2,7 @@ import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import {
     type CorePipelineOptions,
-    setupPhase,
-    fetchPhase,
-    refreshPhase,
-    processPhase,
+    executeSharedPipelinePhases,
     uniqueAttributesPhase,
     reportPhase,
     outputPhase,
@@ -34,19 +31,14 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         const timer = log.timer()
         log.info('Starting aggregation')
 
-        const shouldContinue = await setupPhase(serviceRegistry, input.schema, options)
+        const { shouldContinue, fetchResult } = await executeSharedPipelinePhases(
+            serviceRegistry,
+            input.schema,
+            options,
+            timer
+        )
         processLockAcquired = true
-        if (!shouldContinue) return
-        timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
-
-        const fetchResult = await fetchPhase(serviceRegistry, options)
-        timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
-
-        await refreshPhase(serviceRegistry, options)
-        timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
-
-        await processPhase(serviceRegistry, options)
-        timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
+        if (!shouldContinue || !fetchResult) return
 
         await uniqueAttributesPhase(serviceRegistry, options)
         timer.phase('PHASE 5: Unique attributes', 'info', 'Unique attributes')
