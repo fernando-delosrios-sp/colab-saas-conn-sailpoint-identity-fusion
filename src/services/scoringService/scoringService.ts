@@ -343,7 +343,9 @@ export class ScoringService {
             ...(fusionIdentity.accountIdsSet ?? []),
             ...(fusionIdentity.missingAccountIdsSet ?? []),
         ]
-        return candidates.some((candidate) => candidate && ScoringService.sameManagedAccountKey(managedAccountId, candidate))
+        return candidates.some(
+            (candidate) => candidate && ScoringService.sameManagedAccountKey(managedAccountId, candidate)
+        )
     }
 
     private static sameManagedAccountKey(a: string | undefined, b: string | undefined): boolean {

@@ -12,7 +12,8 @@ import { createRegistry as createMockRegistry } from '../../__tests__/harness/re
 
 function createRegistry() {
     const registry = createMockRegistry()
-    registry.sources.managedAccountsById = new Map(); registry.sources.managedSources = []
+    registry.sources.managedAccountsById = new Map()
+    registry.sources.managedSources = []
     registry.sources.clearManagedAccounts = jest.fn()
     registry.sources.saveBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
     registry.sources.clearFusionAccounts = jest.fn()
@@ -21,7 +22,7 @@ function createRegistry() {
         registry,
         forms: registry.forms,
         fusion: registry.fusion,
-        sources: registry.sources
+        sources: registry.sources,
     }
 }
 
@@ -137,7 +138,6 @@ describe('corePipeline outputPhase', () => {
     })
 })
 
-
 describe('corePipeline setupPhase', () => {
     it('throws error if fusion source is not found', async () => {
         const { registry } = createRegistry()
@@ -146,8 +146,9 @@ describe('corePipeline setupPhase', () => {
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
 
-        await expect(setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } }))
-            .rejects.toThrow('Fusion source not found')
+        await expect(setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })).rejects.toThrow(
+            'Fusion source not found'
+        )
     })
 
     it('returns false and disables reset if fusion reset flag is detected during aggregation', async () => {

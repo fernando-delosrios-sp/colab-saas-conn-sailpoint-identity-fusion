@@ -1,5 +1,9 @@
-import { hostnameSegmentFromBaseurl, streamUncorrelatedAnalyzedRows, DryRunRuntimeOptions, DryRunRowEmitter } from '../dryRunHelpers'
-
+import {
+    hostnameSegmentFromBaseurl,
+    streamUncorrelatedAnalyzedRows,
+    DryRunRuntimeOptions,
+    DryRunRowEmitter,
+} from '../dryRunHelpers'
 
 describe('hostnameSegmentFromBaseurl', () => {
     it('uses the first DNS label, not the full FQDN', () => {
@@ -70,7 +74,7 @@ describe('streamUncorrelatedAnalyzedRows', () => {
         mockRowEmitter = {
             emitRow: jest.fn().mockResolvedValue(undefined),
             close: jest.fn().mockResolvedValue(undefined),
-            diskOutputPath: 'test-path'
+            diskOutputPath: 'test-path',
         }
         runtimeOptions = {
             includeExisting: false,
@@ -86,7 +90,15 @@ describe('streamUncorrelatedAnalyzedRows', () => {
     })
 
     it('returns sentRows immediately if selectedCategories is empty', async () => {
-        const noCategoryOptions = { ...runtimeOptions, includeNonMatched: false, includeMatched: false, includeExact: false, includeDeferred: false, includeReview: false, includeDecisions: false }
+        const noCategoryOptions = {
+            ...runtimeOptions,
+            includeNonMatched: false,
+            includeMatched: false,
+            includeExact: false,
+            includeDeferred: false,
+            includeReview: false,
+            includeDecisions: false,
+        }
         const result = await streamUncorrelatedAnalyzedRows(
             mockContext,
             mockAnalyzedAccounts,
@@ -122,21 +134,22 @@ describe('streamUncorrelatedAnalyzedRows', () => {
     })
 
     it('processes accounts and emits them', async () => {
-        mockAnalyzedAccounts = [
-            { nativeIdentity: 'user1' } as any,
-            { nativeIdentity: 'user2' } as any,
-        ]
+        mockAnalyzedAccounts = [{ nativeIdentity: 'user1' } as any, { nativeIdentity: 'user2' } as any]
 
         const iscOutput1 = { attributes: { id: 'user1' } }
         const iscOutput2 = { attributes: { id: 'user2' } }
 
-        mockContext.fusion.getISCAccount
-            .mockResolvedValueOnce(iscOutput1)
-            .mockResolvedValueOnce(iscOutput2)
+        mockContext.fusion.getISCAccount.mockResolvedValueOnce(iscOutput1).mockResolvedValueOnce(iscOutput2)
 
         const enrichMock = buildDryRunPayload.enrichISCAccountWithMatching as jest.Mock
-        enrichMock.mockReturnValueOnce({ account: { attributes: { id: 'user1', statuses: ['nonMatched'] } }, status: 'non-matched' })
-        enrichMock.mockReturnValueOnce({ account: { attributes: { id: 'user2', statuses: ['nonMatched'] } }, status: 'non-matched' })
+        enrichMock.mockReturnValueOnce({
+            account: { attributes: { id: 'user1', statuses: ['nonMatched'] } },
+            status: 'non-matched',
+        })
+        enrichMock.mockReturnValueOnce({
+            account: { attributes: { id: 'user2', statuses: ['nonMatched'] } },
+            status: 'non-matched',
+        })
 
         const result = await streamUncorrelatedAnalyzedRows(
             mockContext,
