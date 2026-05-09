@@ -296,15 +296,14 @@ export class SchemaService {
     public async getManagedSourceSchemaAttributeNames(): Promise<Set<string>> {
         const names = new Set<string>()
         const { managedSources } = this.sources
-        const schemas = await Promise.all(
-            managedSources.map(async (source) => {
-                try {
-                    return await this.fetchAccountSchema(source.id)
-                } catch {
-                    return undefined
-                }
-            })
-        )
+        const schemas: (AccountSchema | undefined)[] = []
+        for (const source of managedSources) {
+            try {
+                schemas.push(await this.fetchAccountSchema(source.id))
+            } catch {
+                schemas.push(undefined)
+            }
+        }
         for (const schema of schemas) {
             if (schema) {
                 for (const attr of schema.attributes) {
@@ -344,13 +343,12 @@ export class SchemaService {
         const { managedSources } = this.sources
 
         const accountSchemaAttributes: SchemaAttribute[] = []
-        // Fetch schemas from all managed sources in parallel
-        const schemaResults = await Promise.all(
-            managedSources.reverse().map(async (source) => {
-                const accountSchema = await this.fetchAccountSchema(source.id)
-                return this.getAccountSchemaAttributes(accountSchema, source.name)
-            })
-        )
+        // Fetch schemas from all managed sources sequentially to avoid concurrent API throttling
+        const schemaResults: SchemaAttribute[][] = []
+        for (const source of managedSources.reverse()) {
+            const accountSchema = await this.fetchAccountSchema(source.id)
+            schemaResults.push(this.getAccountSchemaAttributes(accountSchema, source.name))
+        }
         for (const attributes of schemaResults) {
             accountSchemaAttributes.push(...attributes)
         }

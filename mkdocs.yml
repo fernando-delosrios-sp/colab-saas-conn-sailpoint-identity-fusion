@@ -47,6 +47,6 @@ nav:
                 - Entitlement list: operations/entitlement-list.md
 
 markdown_extensions:
-  - admonition
-  - pymdownx.details
-  - pymdownx.superfences
+    - admonition
+    - pymdownx.details
+    - pymdownx.superfences

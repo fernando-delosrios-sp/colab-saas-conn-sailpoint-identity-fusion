@@ -28,7 +28,6 @@ jest.mock('../operations/accountDiscoverSchema', () => ({ accountDiscoverSchema:
 jest.mock('../operations/dryRun', () => ({ dryRun: jest.fn() }))
 
 describe('connector factory', () => {
-
     let mockConnector: any
 
     beforeEach(() => {
@@ -139,7 +138,6 @@ describe('connector factory', () => {
 
         // Find calls and extract errorMessage functions
         const calls = (createOperationHandler as jest.Mock).mock.calls
-
 
         const accountReadCall = calls.find((c: any) => c[0] === 'accountRead')
 
