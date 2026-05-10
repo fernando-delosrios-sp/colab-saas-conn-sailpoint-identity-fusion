@@ -21,3 +21,8 @@
 **Vulnerability:** The proxy password verification logic first performed a short-circuiting length equality check (`serverBuffer.length === clientBuffer.length`) before calling `crypto.timingSafeEqual()`. This allowed an attacker to determine the exact length of the expected password through timing differences, as incorrect lengths would return faster.
 **Learning:** Checking string lengths before using `crypto.timingSafeEqual` completely nullifies the security benefits of constant-time comparison. While `crypto.timingSafeEqual` throws an error on unequal length inputs, falling back to a short-circuit comparison is unsafe.
 **Prevention:** Always convert both sensitive strings (passwords, tokens) to fixed-length representations (e.g., SHA-256 hashes) using `crypto.createHash` before comparing them with `crypto.timingSafeEqual`. This ensures the inputs always have identical lengths and the comparison occurs in constant time regardless of the original inputs.
+
+## 2026-05-09 - Fix SSRF Vulnerability in ProxyService
+**Vulnerability:** The ProxyService (`src/services/proxyService.ts`) fetched data directly from a user-configured `proxyUrl` without validating the scheme, making it vulnerable to Server-Side Request Forgery (SSRF) if a user supplied a malicious URL scheme like `file://` or an internal metadata endpoint.
+**Learning:** External or user-provided URLs must always be validated prior to making network requests, especially in Node.js where `fetch` or HTTP clients might attempt to resolve arbitrary schemes or hostnames.
+**Prevention:** Enforce strict URL scheme validation (e.g., checking for `http://` or `https://`) whenever initializing requests with configured URLs.

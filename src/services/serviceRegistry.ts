@@ -14,6 +14,7 @@ import { ScoringService } from './scoringService'
 import { MessagingService } from './messagingService'
 import { ProxyService } from './proxyService'
 import { ReportService } from './reportService'
+import { RecordingService } from './recording/RecordingService'
 
 /**
  * Central dependency injection container for all connector services.
@@ -39,6 +40,7 @@ export class ServiceRegistry {
     public messaging: MessagingService
     public reports: ReportService
     public proxy: ProxyService
+    public recording?: RecordingService
 
     /**
      * Creates a new ServiceRegistry, initializing all services in dependency order.
@@ -109,6 +111,13 @@ export class ServiceRegistry {
         )
 
         this.proxy = context.proxyService ?? new ProxyService(this.config, this.log, this.res, commandType)
+
+        if (process.env.RECORD_MODE === 'true') {
+            const recordingService = (context as any).recordingService as RecordingService | undefined
+            this.recording =
+                recordingService ?? RecordingService.init(this.log, this.config)
+            this.log.info(`RecordingService enabled — chain: ${this.recording.getName()}`)
+        }
     }
 
     /**

@@ -1,0 +1,236 @@
+import * as fs from 'fs'
+import * as path from 'path'
+import { LogService } from '../logService'
+import { SourceService } from '../sourceService'
+import { IdentityService } from '../identityService'
+import { FormService } from '../formService'
+import { FusionConfig } from '../../model/config'
+
+function sanitizeForJson(value: unknown): unknown {
+    if (value === undefined || value === null) return value
+    return JSON.parse(JSON.stringify(value))
+}
+
+interface StateSnapshot {
+    identities: unknown[]
+    managedAccounts: unknown[]
+    fusionAccounts: unknown[]
+    formDecisions: unknown[]
+}
+
+interface RecordedStep {
+    stepId: string
+    operation: string
+    pass?: number
+    input: unknown
+    output: unknown[]
+    stateAfter: StateSnapshot
+    timestamp: string
+    duration: number
+}
+
+export class RecordingService {
+    private static instance?: RecordingService
+
+    private readonly chainName: string
+    private readonly steps: RecordedStep[] = []
+    private currentStep: RecordedStep | null = null
+    private stepIndex = 0
+    private finalized = false
+
+    private constructor(
+        private readonly log: LogService,
+        private readonly config: FusionConfig
+    ) {
+        this.chainName = process.env.RECORD_CHAIN_NAME ?? `recording-${Date.now()}`
+        this.log.info(`RecordingService initialized — chain "${this.chainName}"`)
+
+        process.on('SIGINT', () => {
+            void this.finalize().then(() => process.exit(0))
+        })
+        process.on('SIGTERM', () => {
+            void this.finalize().then(() => process.exit(0))
+        })
+    }
+
+    static init(log: LogService, config: FusionConfig): RecordingService {
+        if (!RecordingService.instance) {
+            RecordingService.instance = new RecordingService(log, config)
+        }
+        return RecordingService.instance
+    }
+
+    static getInstance(): RecordingService | undefined {
+        return RecordingService.instance
+    }
+
+    getName(): string {
+        return this.chainName
+    }
+
+    getStepCount(): number {
+        return this.steps.length
+    }
+
+    getSteps(): RecordedStep[] {
+        return [...this.steps]
+    }
+
+    startOperation(
+        operation: string,
+        input: unknown,
+        res: { send: (value: unknown) => void },
+        sources: SourceService,
+        identities: IdentityService,
+        forms: FormService
+    ): void {
+        this.stepIndex++
+        this.currentStep = {
+            stepId: `step-${this.stepIndex}`,
+            operation,
+            pass: operation === 'accountList' ? this.stepIndex : undefined,
+            input: sanitizeForJson(input),
+            output: [],
+            stateAfter: this.snapshotState(sources, identities, forms),
+            timestamp: new Date().toISOString(),
+            duration: 0,
+        }
+
+        const originalSend = res.send.bind(res)
+        res.send = (value: unknown) => {
+            this.currentStep?.output.push(sanitizeForJson(value))
+            originalSend(value)
+        }
+
+        this.log.debug(`Recording step ${this.stepIndex}: ${operation}`)
+    }
+
+    endOperation(sources: SourceService, identities: IdentityService, forms: FormService): void {
+        if (!this.currentStep) return
+
+        this.currentStep.stateAfter = this.snapshotState(sources, identities, forms)
+        this.currentStep.duration =
+            Date.now() - new Date(this.currentStep.timestamp).getTime()
+        this.steps.push({ ...this.currentStep })
+
+        this.log.debug(
+            `Recorded step ${this.currentStep.stepId} — ${this.currentStep.output.length} output(s), ${this.currentStep.duration}ms`
+        )
+        this.currentStep = null
+    }
+
+    private snapshotState(
+        sources: SourceService,
+        identities: IdentityService,
+        forms: FormService
+    ): StateSnapshot {
+        let managedAccounts: unknown[] = []
+        if (sources?.managedAccountsAllById) {
+            managedAccounts = Array.from(sources.managedAccountsAllById.values()).map((a) =>
+                sanitizeForJson(a)
+            )
+        }
+
+        let fusionAccounts: unknown[] = []
+        if (sources?.fusionAccountsByNativeIdentity) {
+            fusionAccounts = Array.from(
+                sources.fusionAccountsByNativeIdentity.values()
+            ).map((a) => sanitizeForJson(a))
+        }
+
+        let identityList: unknown[] = []
+        try {
+            identityList = Array.from(identities.identityValues()).map((i) =>
+                sanitizeForJson(i)
+            )
+        } catch {
+            /* identityValues may not be accessible in all contexts */
+        }
+
+        let formDecisions: unknown[] = []
+        try {
+            formDecisions = forms.fusionIdentityDecisions
+        } catch {
+            /* may not be accessible */
+        }
+
+        return {
+            identities: identityList,
+            managedAccounts,
+            fusionAccounts,
+            formDecisions,
+        }
+    }
+
+    async finalize(): Promise<string> {
+        if (this.finalized) return ''
+        this.finalized = true
+
+        const dir = path.resolve('test-data', 'recordings', this.chainName)
+        fs.mkdirSync(dir, { recursive: true })
+
+        const scenario = this.buildScenario()
+        const filePath = path.join(dir, 'scenario.json')
+        fs.writeFileSync(filePath, JSON.stringify(scenario, null, 2) + '\n')
+
+        this.log.info(
+            `Recording "${this.chainName}" finalized — ${this.steps.length} steps → ${filePath}`
+        )
+        return filePath
+    }
+
+    private buildScenario(): Record<string, unknown> {
+        const firstStep = this.steps[0]
+        const firstState = firstStep?.stateAfter
+        const initialState = firstState
+            ? {
+                  identities: firstState.identities,
+                  managedAccounts: firstState.managedAccounts,
+                  fusionAccounts: firstState.fusionAccounts,
+                  formDecisions: firstState.formDecisions,
+              }
+            : {
+                  identities: [],
+                  managedAccounts: [],
+                  fusionAccounts: [],
+                  formDecisions: [],
+              }
+
+        const scenarioSteps = this.steps.map((step) => ({
+            id: step.stepId,
+            operation: step.operation,
+            pass: step.pass,
+            description: `Recorded ${step.operation} — ${step.duration}ms, ${step.output.length} outputs`,
+            input: step.input as Record<string, unknown>,
+            expectedOutput:
+                step.output.length > 0
+                    ? step.output.length === 1
+                        ? step.output[0]
+                        : step.output
+                    : undefined,
+            expectedStateDelta: step.stateAfter,
+        }))
+
+        const referenceValues: Record<string, Record<string, unknown>> = {}
+        for (const step of this.steps) {
+            referenceValues[step.stepId] = {
+                outputCount: step.output.length,
+                durationMs: step.duration,
+                managedAccountsCount: step.stateAfter.managedAccounts.length,
+                fusionAccountsCount: step.stateAfter.fusionAccounts.length,
+                identitiesCount: step.stateAfter.identities.length,
+                formDecisionsCount: step.stateAfter.formDecisions.length,
+            }
+        }
+
+        return {
+            version: '1.0.0',
+            recordedAt: new Date().toISOString(),
+            chainName: this.chainName,
+            config: sanitizeForJson(this.config),
+            initialState,
+            steps: scenarioSteps,
+            referenceValues,
+        }
+    }
+}

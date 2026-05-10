@@ -101,7 +101,20 @@ export function createOperationHandler(
             interval = scheduleKeepAlive(options, config, runMode, isProxyServer, res)
 
             logger.info(`Running ${operationName} in ${runMode} mode`)
+            serviceRegistry.recording?.startOperation(
+                operationName,
+                input,
+                res,
+                serviceRegistry.sources,
+                serviceRegistry.identities,
+                serviceRegistry.forms
+            )
             await runOperation(runMode, operationName, context, serviceRegistry, input, defaultFn)
+            serviceRegistry.recording?.endOperation(
+                serviceRegistry.sources,
+                serviceRegistry.identities,
+                serviceRegistry.forms
+            )
         } catch (error) {
             if (error instanceof ConnectorError) throw error
             logger.error(error)

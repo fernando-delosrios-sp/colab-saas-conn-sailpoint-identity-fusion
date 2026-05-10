@@ -30,7 +30,7 @@ import { ATTR_OPS_RESET } from '../services/attributeService/types'
  */
 export const accountEnable = async (serviceRegistry: ServiceRegistry, input: StdAccountEnableInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, fusion, sources, schemas, attributes, res } = serviceRegistry
+    const { log, fusion, sources, schemas, attributes, res, identities } = serviceRegistry
 
     try {
         log.info(`Enabling account: ${input.identity}`)
@@ -49,7 +49,7 @@ export const accountEnable = async (serviceRegistry: ServiceRegistry, input: Std
         await fusion.preProcessFusionAccounts()
         timer.phase('Step 2: Pre-processing all fusion accounts to collect unique values')
 
-        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_RESET, serviceRegistry)
+        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_RESET, { fusion, identities, sources, log })
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
 

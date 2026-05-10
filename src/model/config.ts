@@ -231,6 +231,7 @@ export interface ProcessingControlSection {
     deleteEmpty: boolean
     skipAccountsWithMissingId: boolean
     maxHistoryMessages: number
+    cascadeAggregationEnabled?: boolean
 }
 
 /** Combined source settings: scope, sources, and processing controls. */

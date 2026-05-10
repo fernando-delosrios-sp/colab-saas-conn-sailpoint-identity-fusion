@@ -40,6 +40,7 @@ import {
     buildIscAccountsQueryFilter,
 } from './accountFilters'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { ServiceRegistry } from '../serviceRegistry'
 
 type ReverseCorrelationArtifact =
     | 'fusion_schema_attribute'
@@ -254,6 +255,13 @@ export class SourceService {
      */
     public get hasFusionSource(): boolean {
         return !!this._fusionSourceId
+    }
+
+    /**
+     * Whether cascade aggregation is enabled globally.
+     */
+    public get isCascadeAggregationEnabled(): boolean {
+        return this.config.cascadeAggregationEnabled ?? false
     }
 
     // ------------------------------------------------------------------------
@@ -1272,6 +1280,32 @@ export class SourceService {
     }
 
     /**
+     * Set up reverse correlation for multiple sources sequentially.
+     * Kept serial to preserve deterministic ordering and avoid cross-source readiness races.
+     */
+    public async setupReverseCorrelationSources(): Promise<number> {
+        const reverseCorrelationSources = this.sources.filter((sc) => sc.correlationMode === 'reverse')
+        if (reverseCorrelationSources.length === 0) {
+            return 0
+        }
+        const schemas = ServiceRegistry.getCurrent().schemas
+        const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
+        for (const sc of reverseCorrelationSources) {
+            try {
+                await this.ensureReverseCorrelationSetup(sc, schemaAttrNames)
+            } catch (error) {
+                this.log.error(
+                    `Reverse correlation setup failed for source "${sc.name}" (attribute="${sc.correlationAttribute ?? 'unset'}"): ${
+                        error instanceof Error ? error.message : String(error)
+                    }`
+                )
+                throw error
+            }
+        }
+        return reverseCorrelationSources.length
+    }
+
+    /**
      * Validate reverse-correlation prerequisites for runtime operations.
      * Throws when setup is incomplete.
      */
@@ -1998,7 +2032,7 @@ export class SourceService {
     /**
      * Aggregate managed source
      */
-    private async aggregateManagedSource(
+    public async aggregateManagedSource(
         id: string,
         disableOptimization?: boolean,
         awaitTaskStatus: boolean = true

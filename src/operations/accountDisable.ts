@@ -23,7 +23,7 @@ import { ATTR_OPS_REFRESH } from '../services/attributeService/types'
  */
 export const accountDisable = async (serviceRegistry: ServiceRegistry, input: StdAccountDisableInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, fusion, sources, schemas, res } = serviceRegistry
+    const { log, fusion, sources, schemas, res, identities } = serviceRegistry
 
     try {
         log.info(`Disabling account: ${input.identity}`)
@@ -34,7 +34,7 @@ export const accountDisable = async (serviceRegistry: ServiceRegistry, input: St
         await schemas.setFusionAccountSchema(input.schema)
         timer.phase('Step 1: Loading sources and schema')
 
-        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_REFRESH, serviceRegistry)
+        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_REFRESH, { fusion, identities, sources, log })
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
         timer.phase('Step 2: Rebuilding fusion account with fresh attributes')

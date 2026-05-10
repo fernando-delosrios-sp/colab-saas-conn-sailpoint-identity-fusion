@@ -9,11 +9,14 @@
 **Action:** Convert these blockquotes to Material admonitions (e.g., `!!! tip`, `!!! warning "Important"`, `!!! note`) with 4-space indentation for the body text to improve visual hierarchy and reader clarity.
 
 ## 2026-05-03 - Admonition Extensions for MkDocs Material
-
-**Learning:** MkDocs requires explicit enablement of `markdown_extensions` (`admonition`, `pymdownx.details`, and `pymdownx.superfences`) in `mkdocs.yml` to support Material-style admonitions (`!!! note`, `!!! tip`).
-**Action:** Always verify that admonition extensions are present in `mkdocs.yml` before trying to use `!!!` style formatting in documentation, and verify with a local `mkdocs build`.
-
-## 2025-05-05 - Use Material Admonitions instead of Markdown Blockquotes
-
-**Learning:** When updating MkDocs documentation, standard Markdown blockquotes with bold headers (e.g., `> **Tip:**`) do not leverage the visual hierarchy available in the Material theme.
-**Action:** Convert them to Material for MkDocs admonitions (e.g., `!!! tip`) with 4-space indentation to improve visual clarity and reader experience.
+ 
+ **Learning:** MkDocs requires explicit enablement of `markdown_extensions` (`admonition`, `pymdownx.details`, and `pymdownx.superfences`) in `mkdocs.yml` to support Material-style admonitions (`!!! note`, `!!! tip`).
+ **Action:** Always verify that admonition extensions are present in `mkdocs.yml` before trying to use `!!!` style formatting in documentation, and verify with a local `mkdocs build`.
+ 
+ ## 2025-05-05 - Use Material Admonitions instead of Markdown Blockquotes
+ 
+ **Learning:** When updating MkDocs documentation, standard Markdown blockquotes with bold headers (e.g., `> **Tip:**`) do not leverage the visual hierarchy available in the Material theme.
+ **Action:** Convert them to Material for MkDocs admonitions (e.g., `!!! tip`) with 4-space indentation to improve visual clarity and reader experience.
+ ## 2026-05-08 - MkDocs Admonition Syncing for GitHub Compatibility
+ **Learning:** `README.md` is primarily rendered by Git forges (like GitHub), which do not support MkDocs Material admonition syntax (`!!! note`). Directly applying MkDocs syntax to the repository's root `README.md` breaks the homepage rendering.
+ **Action:** Keep `README.md` in standard Markdown blockquote formatting (`> **Note:**`) so it renders correctly on GitHub, and dynamically transform these blockquotes into MkDocs admonitions programmatically during the `docs:sync-home` build step.
