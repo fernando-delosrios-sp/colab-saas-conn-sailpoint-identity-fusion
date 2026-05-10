@@ -1,9 +1,9 @@
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
-import { ApiQueue } from './clientService/queue'
-import { QueuePriority } from './clientService/types'
-import { getCallerInfo } from './logCallerInfo'
+import { ApiQueue } from '../clientService/queue'
+import { QueuePriority } from '../clientService/types'
+import { getCallerInfo } from './helpers'
 
-export { getCallerInfo } from './logCallerInfo'
+export { getCallerInfo } from './helpers'
 
 type Logger = typeof logger
 
@@ -259,12 +259,12 @@ export class LogService {
                 headers: { 'Content-Type': 'text/plain' },
                 body: logMessage,
                 signal: AbortSignal.timeout(LogService.EXTERNAL_LOG_TIMEOUT_MS),
-            }).then(() => {})
+            }).then(() => { })
 
         const pending: Promise<void> = (
-            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW }).then(() => {}) : doFetch()
+            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW }).then(() => { }) : doFetch()
         )
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => {
                 this.pendingExternalLogs.delete(pending)
             })

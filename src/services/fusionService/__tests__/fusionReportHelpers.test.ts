@@ -5,7 +5,7 @@ import {
     getFusionReportAccountLabel,
     buildMinimalFusionReportAccount,
     buildIdentityConflictWarningsFromMap,
-} from '../fusionReportHelpers'
+} from '../helpers'
 import { UrlContext } from '../../../utils/url'
 import { SourceType } from '../../../model/config'
 
