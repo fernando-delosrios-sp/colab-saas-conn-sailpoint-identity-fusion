@@ -14,3 +14,7 @@
 ## 2026-05-08 - MkDocs Admonition Syncing for GitHub Compatibility
 **Learning:** `README.md` is primarily rendered by Git forges (like GitHub), which do not support MkDocs Material admonition syntax (`!!! note`). Directly applying MkDocs syntax to the repository's root `README.md` breaks the homepage rendering.
 **Action:** Keep `README.md` in standard Markdown blockquote formatting (`> **Note:**`) so it renders correctly on GitHub, and dynamically transform these blockquotes into MkDocs admonitions programmatically during the `docs:sync-home` build step.
+
+## 2026-05-10 - MkDocs Local Build Requirements
+**Learning:** To verify MkDocs documentation locally, the environment must first install the required Python dependencies (`python3 -m pip install -r requirements-docs.txt`) before running `python3 -m mkdocs build`, as these are not automatically handled by the `npm run docs:build` wrapper script.
+**Action:** Always run `python3 -m pip install -r requirements-docs.txt` before attempting to run `mkdocs build` to ensure the required plugins and themes are available.

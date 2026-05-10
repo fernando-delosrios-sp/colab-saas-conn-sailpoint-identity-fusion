@@ -49,7 +49,9 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
     Machine accounts (`isMachine=true`) are not supported for managed-source processing. Because `isMachine` is not an ISC account-list API filter, the connector applies this exclusion client-side and skips those accounts after fetching.
 
 !!! note "Execution order"
-    1) `Accounts API filter` (server-side, ISC), 2) `Accounts JMESPath filter` (client-side, page-wise on `{ "accounts": [...] }`), 3) built-in machine account exclusion (`isMachine=true`).
+    1.  **`Accounts API filter`**: Server-side filter applied directly to the ISC Accounts list API request.
+    2.  **`Accounts JMESPath filter`**: Client-side filtering applied page-wise to the `{ "accounts": [...] }` API response.
+    3.  **Built-in machine account exclusion**: The connector automatically drops accounts with `isMachine=true` on the client side.
 
 !!! tip
     You can use the **Aggregate before processing** option to ensure a managed source has newer data than the last time Identity Fusion ran and/or synchronize aggregation schedules. If you don't need the absolute latest data blocking the aggregation response, consider **Delayed aggregation** to speed up the account list operation.
