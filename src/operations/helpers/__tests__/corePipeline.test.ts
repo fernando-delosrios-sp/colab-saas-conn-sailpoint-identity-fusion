@@ -248,6 +248,7 @@ describe('corePipeline setupPhase', () => {
         registry.schemas.getManagedSourceSchemaAttributeNames = jest.fn().mockResolvedValue(['uid'])
         registry.sources.ensureReverseCorrelationSetup = jest.fn().mockResolvedValue(undefined)
         registry.schemas.setFusionAccountSchema = jest.fn().mockResolvedValue(undefined)
+        registry.sources.setupReverseCorrelationSources = jest.fn().mockResolvedValue(1)
         registry.sources.aggregateManagedSources = jest.fn().mockResolvedValue(undefined)
         registry.attributes.initializeCounters = jest.fn().mockResolvedValue(undefined)
 
@@ -255,8 +256,7 @@ describe('corePipeline setupPhase', () => {
 
         expect(result).toBe(true)
         expect(registry.sources.clearReverseCorrelationReadinessCache).toHaveBeenCalled()
-        expect(registry.schemas.getManagedSourceSchemaAttributeNames).toHaveBeenCalled()
-        expect(registry.sources.ensureReverseCorrelationSetup).toHaveBeenCalledWith(reverseSource, ['uid'])
+        expect(registry.sources.setupReverseCorrelationSources).toHaveBeenCalled()
         // the mock is called twice: once with the normal schema logic, and once after reverse correlation setup
         expect(registry.schemas.setFusionAccountSchema).toHaveBeenCalledWith(undefined)
         expect(registry.sources.aggregateManagedSources).toHaveBeenCalled()
