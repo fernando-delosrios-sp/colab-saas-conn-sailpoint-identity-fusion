@@ -392,6 +392,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- (2026-05-07) Added missing test cases for `trigramIndex.ts` to improve test coverage.
 - (2026-05-07) Improved performance by batching concurrent API calls in `fetchAccountSchema`.
 
 ### 2.1.6 - 2026-05-01
