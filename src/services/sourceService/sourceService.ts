@@ -1596,19 +1596,8 @@ export class SourceService {
     private async ensureIdentityProfileMapping(attributeName: string, sourceConfig: SourceConfig): Promise<void> {
         const fusionSourceId = this.fusionSourceId
         const fusionSource = this.getFusionSource()
-        const { identityProfilesApi } = this.client
 
-        const profiles = await this.client.paginate(
-            (params: IdentityProfilesV2025ApiListIdentityProfilesRequest) =>
-                identityProfilesApi.listIdentityProfiles(params),
-            {},
-            QueuePriority.HIGH,
-            'SourceService>ensureIdentityProfileMapping listProfiles'
-        )
-
-        const matchingProfiles = profiles.filter(
-            (p: any) => p.authoritativeSource?.id === fusionSourceId || p.source?.id === fusionSourceId
-        )
+        const matchingProfiles = await this.getMatchingIdentityProfiles(fusionSourceId)
         if (matchingProfiles.length === 0) {
             if (!requiresFullReverseCorrelationArtifacts(sourceConfig)) {
                 this.log.warn(
@@ -1629,106 +1618,129 @@ export class SourceService {
 
         assert(fusionSource, 'Fusion source not found')
 
+        for (const profile of matchingProfiles) {
+            await this.upsertIdentityProfileTransform(profile, attributeName, fusionSourceId, fusionSource.name)
+        }
+    }
+
+    private async getMatchingIdentityProfiles(fusionSourceId: string): Promise<any[]> {
+        const { identityProfilesApi } = this.client
+        const profiles = await this.client.paginate(
+            (params: IdentityProfilesV2025ApiListIdentityProfilesRequest) =>
+                identityProfilesApi.listIdentityProfiles(params),
+            {},
+            QueuePriority.HIGH,
+            'SourceService>ensureIdentityProfileMapping listProfiles'
+        )
+
+        return profiles.filter(
+            (p: any) => p.authoritativeSource?.id === fusionSourceId || p.source?.id === fusionSourceId
+        )
+    }
+
+    private async upsertIdentityProfileTransform(
+        profile: any,
+        attributeName: string,
+        fusionSourceId: string,
+        fusionSourceName: string
+    ): Promise<void> {
+        const { identityProfilesApi } = this.client
         const newTransform = {
             identityAttributeName: attributeName,
             transformDefinition: {
                 type: 'accountAttribute',
                 attributes: {
                     sourceId: fusionSourceId,
-                    sourceName: fusionSource.name,
+                    sourceName: fusionSourceName,
                     attributeName,
                 },
             },
         }
-        for (const profile of matchingProfiles) {
-            const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
-            const existingIndex = transforms.findIndex((t) => t.identityAttributeName === attributeName)
 
-            if (existingIndex >= 0) {
-                const existing = transforms[existingIndex]
-                if (
-                    this.isDesiredIdentityProfileTransform(existing, attributeName, fusionSource.name, fusionSourceId)
-                ) {
-                    this.log.info(
-                        `Identity profile ${profile.id} already maps "${attributeName}" from source "${fusionSource.name}"`
-                    )
-                } else {
-                    this.log.info(
-                        `Identity profile ${profile.id} already defines a mapping for identity attribute "${attributeName}"; ` +
-                            'leaving it unchanged so a custom transform is not overwritten.'
-                    )
-                }
-                continue
+        const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
+        const existingIndex = transforms.findIndex((t: any) => t.identityAttributeName === attributeName)
+
+        if (existingIndex >= 0) {
+            const existing = transforms[existingIndex]
+            if (this.isDesiredIdentityProfileTransform(existing, attributeName, fusionSourceName, fusionSourceId)) {
+                this.log.info(
+                    `Identity profile ${profile.id} already maps "${attributeName}" from source "${fusionSourceName}"`
+                )
+            } else {
+                this.log.info(
+                    `Identity profile ${profile.id} already defines a mapping for identity attribute "${attributeName}"; ` +
+                        'leaving it unchanged so a custom transform is not overwritten.'
+                )
             }
+            return
+        }
 
-            const nextTransforms = [...transforms, newTransform]
-
-            const hasIdentityAttributeConfig = !!profile.identityAttributeConfig
-            const jsonPatchOperationV2025 = hasIdentityAttributeConfig
-                ? [
-                      {
-                          op: 'replace' as JsonPatchOperationV2025OpV2025,
-                          path: '/identityAttributeConfig/attributeTransforms',
-                          value: nextTransforms,
+        const nextTransforms = [...transforms, newTransform]
+        const hasIdentityAttributeConfig = !!profile.identityAttributeConfig
+        const jsonPatchOperationV2025 = hasIdentityAttributeConfig
+            ? [
+                  {
+                      op: 'replace' as JsonPatchOperationV2025OpV2025,
+                      path: '/identityAttributeConfig/attributeTransforms',
+                      value: nextTransforms,
+                  },
+              ]
+            : [
+                  {
+                      op: 'add' as JsonPatchOperationV2025OpV2025,
+                      path: '/identityAttributeConfig',
+                      value: {
+                          attributeTransforms: nextTransforms,
                       },
-                  ]
-                : [
-                      {
-                          op: 'add' as JsonPatchOperationV2025OpV2025,
-                          path: '/identityAttributeConfig',
-                          value: {
-                              attributeTransforms: nextTransforms,
-                          },
-                      },
-                  ]
+                  },
+              ]
 
-            let updatedProfile: any
-            try {
-                updatedProfile = await this.client.execute(
-                    () =>
-                        identityProfilesApi
-                            .updateIdentityProfile({
-                                identityProfileId: profile.id!,
-                                jsonPatchOperationV2025,
-                            })
-                            .then((r) => r.data),
-                    QueuePriority.HIGH,
-                    `SourceService>ensureIdentityProfileMapping upsert ${attributeName} profile=${profile.id}`,
-                    undefined,
-                    true
-                )
-            } catch (error: any) {
-                throw new ConnectorError(
-                    buildIdentityProfileUpsertErrorMessage(profile.id!, attributeName, error),
-                    ConnectorErrorType.Generic
-                )
-            }
-            if (!updatedProfile) {
-                throw new ConnectorError(
-                    `Failed to update identity profile ${profile.id} for reverse correlation attribute "${attributeName}". ` +
-                        IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
-                    ConnectorErrorType.Generic
-                )
-            }
-            this.log.info(`Added identity profile mapping for attribute "${attributeName}" on profile ${profile.id}`)
-
-            const verified = await this.waitForIdentityProfileMapping(
-                profile.id!,
-                attributeName,
-                fusionSource.name,
-                fusionSourceId
+        let updatedProfile: any
+        try {
+            updatedProfile = await this.client.execute(
+                () =>
+                    identityProfilesApi
+                        .updateIdentityProfile({
+                            identityProfileId: profile.id!,
+                            jsonPatchOperationV2025,
+                        })
+                        .then((r) => r.data),
+                QueuePriority.HIGH,
+                `SourceService>ensureIdentityProfileMapping upsert ${attributeName} profile=${profile.id}`,
+                undefined,
+                true
             )
-            if (!verified) {
-                throw new ConnectorError(
-                    `Identity profile mapping verification failed for profile ${profile.id} and attribute "${attributeName}". ` +
-                        IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
-                    ConnectorErrorType.Generic
-                )
-            }
-            this.log.info(
-                `Verified identity profile mapping for profile ${profile.id} and attribute "${attributeName}"`
+        } catch (error: any) {
+            throw new ConnectorError(
+                buildIdentityProfileUpsertErrorMessage(profile.id!, attributeName, error),
+                ConnectorErrorType.Generic
             )
         }
+        if (!updatedProfile) {
+            throw new ConnectorError(
+                `Failed to update identity profile ${profile.id} for reverse correlation attribute "${attributeName}". ` +
+                    IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                ConnectorErrorType.Generic
+            )
+        }
+        this.log.info(`Added identity profile mapping for attribute "${attributeName}" on profile ${profile.id}`)
+
+        const verified = await this.waitForIdentityProfileMapping(
+            profile.id!,
+            attributeName,
+            fusionSourceName,
+            fusionSourceId
+        )
+        if (!verified) {
+            throw new ConnectorError(
+                `Identity profile mapping verification failed for profile ${profile.id} and attribute "${attributeName}". ` +
+                    IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
+                ConnectorErrorType.Generic
+            )
+        }
+        this.log.info(
+            `Verified identity profile mapping for profile ${profile.id} and attribute "${attributeName}"`
+        )
     }
 
     /**
