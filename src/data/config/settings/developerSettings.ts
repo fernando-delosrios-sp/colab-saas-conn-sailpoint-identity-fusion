@@ -43,6 +43,11 @@ export function applySettings(config: FusionConfigBuild): void {
     if (config.externalLoggingEnabled) {
         assert(config.externalLoggingUrl, 'External logging URL is required when external logging is enabled')
         assert(
+            config.externalLoggingUrl.toLowerCase().startsWith('http://') ||
+                config.externalLoggingUrl.toLowerCase().startsWith('https://'),
+            'External logging URL must use http or https protocol'
+        )
+        assert(
             ['error', 'warn', 'info', 'debug'].includes(config.externalLoggingLevel || ''),
             'External logging level must be one of: error, warn, info, debug'
         )
