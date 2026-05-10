@@ -154,4 +154,4 @@ When using **Keep a list of values** or **Concatenate**, consider the ISC schema
 | **Concatenate**           | Single-valued (string) | Direct mapping              | Human-readable display; search            |
 
 !!! note
-    After **Discover Schema**, ISC may show multi-valued attributes as entitlement-type (multi-valued) fields. Your identity profile transforms must handle arrays appropriately.
+After **Discover Schema**, ISC may show multi-valued attributes as entitlement-type (multi-valued) fields. Your identity profile transforms must handle arrays appropriately.
