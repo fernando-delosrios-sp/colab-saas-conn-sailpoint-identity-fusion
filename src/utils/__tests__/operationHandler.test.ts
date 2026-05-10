@@ -109,7 +109,7 @@ describe('createOperationHandler', () => {
 
         it('should start simple keepAlive interval', async () => {
             let resolveFn: () => void
-            const longPromise = new Promise<void>(resolve => {
+            const longPromise = new Promise<void>((resolve) => {
                 resolveFn = resolve
             })
             defaultFn.mockReturnValue(longPromise)
@@ -139,7 +139,7 @@ describe('createOperationHandler', () => {
 
         it('should start memory keepAlive interval', async () => {
             let resolveFn: () => void
-            const longPromise = new Promise<void>(resolve => {
+            const longPromise = new Promise<void>((resolve) => {
                 resolveFn = resolve
             })
             defaultFn.mockReturnValue(longPromise)
@@ -222,7 +222,10 @@ describe('createOperationHandler', () => {
             const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
 
             await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
-            await expect(handler(context, input, res)).rejects.toHaveProperty('message', 'Default error message: String error')
+            await expect(handler(context, input, res)).rejects.toHaveProperty(
+                'message',
+                'Default error message: String error'
+            )
         })
 
         it('should wrap Error objects in ConnectorError', async () => {
@@ -231,7 +234,10 @@ describe('createOperationHandler', () => {
             const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
 
             await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
-            await expect(handler(context, input, res)).rejects.toHaveProperty('message', 'Default error message: Standard error')
+            await expect(handler(context, input, res)).rejects.toHaveProperty(
+                'message',
+                'Default error message: Standard error'
+            )
         })
 
         it('should use function for error message if provided', async () => {
@@ -244,7 +250,10 @@ describe('createOperationHandler', () => {
             const handler = createOperationHandler(operationName, defaultFn, mockConfig, options)
 
             await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
-            await expect(handler(context, input, res)).rejects.toHaveProperty('message', 'Dynamic error for testInput: Failed')
+            await expect(handler(context, input, res)).rejects.toHaveProperty(
+                'message',
+                'Dynamic error for testInput: Failed'
+            )
         })
     })
 

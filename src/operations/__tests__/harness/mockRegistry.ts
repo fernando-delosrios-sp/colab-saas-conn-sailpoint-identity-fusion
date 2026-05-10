@@ -35,6 +35,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         resetBatchCumulativeCount: jest.fn().mockResolvedValue(undefined),
         ensureReverseCorrelationSetup: jest.fn().mockResolvedValue(undefined),
         clearReverseCorrelationReadinessCache: jest.fn(),
+        setupReverseCorrelationSources: jest.fn().mockResolvedValue(0),
         aggregateManagedSources: jest.fn().mockResolvedValue(undefined),
         aggregateDelayedSources: jest.fn().mockResolvedValue(undefined),
         fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
