@@ -369,6 +369,14 @@
                             "type": "toggle",
                             "required": false,
                             "helpKey": "Skip accounts that are missing a unique identity value. These accounts will be logged so you can review them later"
+                        },
+                        {
+                            "key": "cascadeAggregationEnabled",
+                            "label": "Enable cascade aggregation for single account read",
+                            "type": "toggle",
+                            "value": "false",
+                            "required": false,
+                            "helpKey": "When enabled, triggers aggregation of managed sources before fetching managed accounts during single account operations (e.g., accountRead). This ensures the most up-to-date account data is fetched before processing the fusion account. Errors during cascade aggregation are logged but do not stop the main process."
                         }
                     ]
                 }
@@ -571,9 +579,9 @@
                                         },
                                         {
                                             "key": "trim",
-                                            "label": "Trim leading and trailing spaces?",
+                                            "label": "Trim leading and trailing white space?",
                                             "type": "toggle",
-                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value"
+                                            "helpKey": "Remove extra white space at the beginning and end of the defined value"
                                         },
                                         {
                                             "key": "maxLength",

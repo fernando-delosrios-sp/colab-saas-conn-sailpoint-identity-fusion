@@ -47,30 +47,6 @@ export async function fetchAndProcessForReport(serviceRegistry: ServiceRegistry)
     }
 }
 
-export const hydrateIdentitiesForReportDecisions = async (serviceRegistry: ServiceRegistry): Promise<void> => {
-    const { reports } = serviceRegistry
-    await reports.hydrateIdentitiesForReportDecisions()
-}
-
-export const buildFusionReviewDecisions = (serviceRegistry: ServiceRegistry) => {
-    const { reports } = serviceRegistry
-    return reports.buildFusionReviewDecisions()
-}
-
-export const buildFusionReportStats = (serviceRegistry: ServiceRegistry, aggregationStats: AggregationStats) => {
-    const { reports } = serviceRegistry
-    return reports.buildFusionReportStats(aggregationStats)
-}
-
-export const buildEmailReportFromFusionReport = (
-    serviceRegistry: ServiceRegistry,
-    baseReport: FusionReport,
-    aggregationStats: AggregationStats
-): FusionReport => {
-    const { reports } = serviceRegistry
-    return reports.buildEmailReportFromFusionReport(baseReport, aggregationStats)
-}
-
 /**
  * Builds and sends a fusion report email for the given fusion account.
  *

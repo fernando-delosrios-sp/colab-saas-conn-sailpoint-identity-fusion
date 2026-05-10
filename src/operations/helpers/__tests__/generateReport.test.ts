@@ -1,15 +1,8 @@
 import { ServiceRegistry } from '../../../services/serviceRegistry'
-import {
-    fetchAndProcessForReport,
-    hydrateIdentitiesForReportDecisions,
-    buildFusionReviewDecisions,
-    buildFusionReportStats,
-    buildEmailReportFromFusionReport,
-    generateReport,
-} from '../generateReport'
+import { fetchAndProcessForReport, generateReport } from '../generateReport'
 import * as corePipeline from '../corePipeline'
 import { FusionAccount } from '../../../model/account'
-import { AggregationStats, FusionReport } from '../../../services/fusionService/types'
+import { AggregationStats } from '../../../services/fusionService/types'
 
 jest.mock('../corePipeline', () => ({
     setupPhase: jest.fn(),
@@ -34,10 +27,6 @@ describe('generateReport helpers', () => {
         }
 
         mockReportsService = {
-            hydrateIdentitiesForReportDecisions: jest.fn().mockResolvedValue(undefined),
-            buildFusionReviewDecisions: jest.fn().mockReturnValue([]),
-            buildFusionReportStats: jest.fn().mockReturnValue({}),
-            buildEmailReportFromFusionReport: jest.fn().mockReturnValue({}),
             generateAndSendFusionReport: jest.fn().mockResolvedValue(undefined),
         }
 
@@ -99,38 +88,6 @@ describe('generateReport helpers', () => {
         })
     })
 
-    describe('delegation functions', () => {
-        it('should call hydrateIdentitiesForReportDecisions on the reports service', async () => {
-            await hydrateIdentitiesForReportDecisions(mockServiceRegistry as ServiceRegistry)
-            expect(mockReportsService.hydrateIdentitiesForReportDecisions).toHaveBeenCalled()
-        })
-
-        it('should call buildFusionReviewDecisions on the reports service', () => {
-            const result = buildFusionReviewDecisions(mockServiceRegistry as ServiceRegistry)
-            expect(mockReportsService.buildFusionReviewDecisions).toHaveBeenCalled()
-            expect(result).toEqual([])
-        })
-
-        it('should call buildFusionReportStats on the reports service', () => {
-            const mockStats = {} as AggregationStats
-            const result = buildFusionReportStats(mockServiceRegistry as ServiceRegistry, mockStats)
-            expect(mockReportsService.buildFusionReportStats).toHaveBeenCalledWith(mockStats)
-            expect(result).toEqual({})
-        })
-
-        it('should call buildEmailReportFromFusionReport on the reports service', () => {
-            const mockBaseReport = {} as FusionReport
-            const mockStats = {} as AggregationStats
-            const result = buildEmailReportFromFusionReport(
-                mockServiceRegistry as ServiceRegistry,
-                mockBaseReport,
-                mockStats
-            )
-            expect(mockReportsService.buildEmailReportFromFusionReport).toHaveBeenCalledWith(mockBaseReport, mockStats)
-            expect(result).toEqual({})
-        })
-    })
-
     describe('generateReport', () => {
         it('should fetch ServiceRegistry.getCurrent() if not provided, and call generateAndSendFusionReport', async () => {
             const mockFusionAccount = {} as FusionAccount
@@ -148,7 +105,6 @@ describe('generateReport helpers', () => {
             const mockFusionAccount = {} as FusionAccount
             const mockStats = {} as AggregationStats
 
-            // Do not spy on getCurrent here to ensure it uses the provided one.
             jest.spyOn(ServiceRegistry, 'getCurrent').mockClear()
 
             await generateReport(mockFusionAccount, true, mockServiceRegistry as ServiceRegistry, mockStats)

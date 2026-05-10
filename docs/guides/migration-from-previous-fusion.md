@@ -3,7 +3,7 @@
 This guide describes how to migrate from an earlier Identity Fusion connector to **Identity Fusion NG** with minimal disruption. The approach uses the existing (old) Fusion source as a **managed source** in the new setup, validates new accounts, then migrates identities to a new profile before decommissioning the old one.
 
 !!! info "Video walkthrough"
-A step-by-step migration demo is available on YouTube: [https://youtu.be/Gy4eiSgtq_0](https://youtu.be/Gy4eiSgtq_0).
+    A step-by-step migration demo is available on YouTube: [https://youtu.be/Gy4eiSgtq_0](https://youtu.be/Gy4eiSgtq_0).
 
 ---
 

@@ -25,7 +25,7 @@ The Entitlement List operation returns available entitlements for the fusion con
         - `candidate`
 
     !!! note
-    Status entitlements are static and **not** requestable.
+        Status entitlements are static and **not** requestable.
 
 3.  **Action Entitlements**:
     - If `type` is "action":
@@ -36,7 +36,7 @@ The Entitlement List operation returns available entitlements for the fusion con
         - This entitlement must be made available to users through an access profile. The connector deliberately omits this entitlement from the target account so it can be requested multiple times.
 
     !!! note
-    Actions are modeled as entitlements so they can be requested via access requests in ISC. All Action entitlements are requestable.
+        Actions are modeled as entitlements so they can be requested via access requests in ISC. All Action entitlements are requestable.
 
 4.  **Output**:
     - Returns the list of entitlements.

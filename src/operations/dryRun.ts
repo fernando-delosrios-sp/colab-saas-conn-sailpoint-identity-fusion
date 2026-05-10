@@ -2,7 +2,7 @@ import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { initializeDryRunExecution, prepareDryRunOutputData, streamDryRunRows } from './helpers/dryRunHelpers'
 import { buildDryRunSummary } from './helpers/buildDryRunPayload'
-import { CorePipelineOptions, setupPhase, fetchPhase, refreshPhase, processPhase } from './helpers/corePipeline'
+import { CorePipelineOptions, executeSharedPipelinePhases } from './helpers/corePipeline'
 import { PhaseTimer } from '../services/logService'
 
 /**
@@ -29,18 +29,13 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         const { runtimeOptions, rowEmitter } = execution
 
         // PHASES 1-4: Shared core pipeline
-        const shouldContinue = await setupPhase(serviceRegistry, input.schema, options)
-        if (!shouldContinue) return
-        timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
-
-        const fetchResult = await fetchPhase(serviceRegistry, options)
-        timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
-
-        await refreshPhase(serviceRegistry, options)
-        timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
-
-        await processPhase(serviceRegistry, options)
-        timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
+        const { shouldContinue, fetchResult } = await executeSharedPipelinePhases(
+            serviceRegistry,
+            input.schema,
+            options,
+            timer
+        )
+        if (!shouldContinue || !fetchResult) return
 
         const issueSummary = log.getAggregationIssueSummary()
         const { report } = reports.initializeDryRunReport({
