@@ -32,6 +32,9 @@ export function createRegistry() {
             fusionAccounts: [{ id: 'fusion-existing-1' }],
             fusionAccountsByNativeIdentity: new Map(),
             hasFusionSource: true,
+            clearReverseCorrelationReadinessCache: jest.fn(),
+            setupReverseCorrelationSources: jest.fn().mockResolvedValue(0),
+            aggregateManagedSources: jest.fn().mockResolvedValue(undefined),
         },
         schemas: {
             setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),

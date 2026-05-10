@@ -45,11 +45,9 @@ describe('generateReport helpers', () => {
 
             const result = await fetchAndProcessForReport(mockServiceRegistry as ServiceRegistry)
 
-            expect(corePipeline.setupPhase).toHaveBeenCalledWith(
-                mockServiceRegistry,
-                undefined,
-                { mode: { kind: 'dry-run' } }
-            )
+            expect(corePipeline.setupPhase).toHaveBeenCalledWith(mockServiceRegistry, undefined, {
+                mode: { kind: 'dry-run' },
+            })
             expect(result).toEqual({
                 identitiesFound: 0,
                 managedAccountsFound: 0,

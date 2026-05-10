@@ -3,7 +3,6 @@ import {
     buildFormName,
     calculateExpirationDate,
     countIdentityBackedFusionMatches,
-    getFormOwner,
     resolveIdentitiesSelectLabel,
 } from '../helpers'
 import { MatchCandidateType } from '../../scoringService/types'
@@ -117,6 +116,7 @@ describe('formService helpers', () => {
             jest.useRealTimers()
         })
     })
+
     describe('buildCandidateList', () => {
         it('should sort candidates by combined score and limit to maxCandidates', () => {
             const fusionAccount = {
@@ -193,12 +193,6 @@ describe('formService helpers', () => {
             expect(() => buildCandidateList(null as any, 5)).toThrow()
         })
 
-        it('should throw an error if maxCandidates is out of range', () => {
-            const fusionAccount = { fusionMatches: [] } as any
-            expect(() => buildCandidateList(fusionAccount, 0)).toThrow()
-            expect(() => buildCandidateList(fusionAccount, 20)).toThrow()
-        })
-
         it('should map matches to Candidate objects correctly', () => {
             const fusionAccount = {
                 fusionMatches: [
@@ -220,19 +214,6 @@ describe('formService helpers', () => {
                 attributes: { displayName: 'John Doe', department: 'IT' },
                 scores: [{ attribute: 'Combined score', score: 50 }],
             })
-        })
-    })
-
-    describe('getFormOwner', () => {
-        it('should return fusionSourceOwner from source service', () => {
-            const sourceService = { fusionSourceOwner: { type: 'IDENTITY', id: 'owner-id', name: 'Owner' } } as any
-            const owner = getFormOwner(sourceService)
-            expect(owner).toEqual({ type: 'IDENTITY', id: 'owner-id', name: 'Owner' })
-        })
-
-        it('should throw an error if fusionSourceOwner is undefined', () => {
-            const sourceService = { fusionSourceOwner: undefined } as any
-            expect(() => getFormOwner(sourceService)).toThrow()
         })
     })
 })

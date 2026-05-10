@@ -66,8 +66,14 @@ export class ProxyService {
             if (this.config.proxyPassword) {
                 const serverPassword = process.env.PROXY_PASSWORD
                 const clientPassword = this.config.proxyPassword
-                const expectedHash = crypto.createHash('sha256').update(serverPassword || '').digest()
-                const actualHash = crypto.createHash('sha256').update(clientPassword || '').digest()
+                const expectedHash = crypto
+                    .createHash('sha256')
+                    .update(serverPassword || '')
+                    .digest()
+                const actualHash = crypto
+                    .createHash('sha256')
+                    .update(clientPassword || '')
+                    .digest()
                 const isMatch = crypto.timingSafeEqual(expectedHash, actualHash)
                 assert(isMatch, 'Proxy password mismatch')
             }
@@ -113,6 +119,9 @@ export class ProxyService {
             throw new ConnectorError('Proxy mode is not enabled or proxy URL is missing')
         }
         const { proxyUrl } = this.config
+        if (!proxyUrl.toLowerCase().startsWith('http://') && !proxyUrl.toLowerCase().startsWith('https://')) {
+            throw new ConnectorError('Proxy URL must use http or https protocol')
+        }
         const externalConfig = { ...this.config, isProxy: true }
         const body = {
             type: this.commandType,

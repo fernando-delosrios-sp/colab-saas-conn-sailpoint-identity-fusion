@@ -116,7 +116,7 @@ Configure **Source Settings → Processing Control** for account lifecycle:
 | **Force attribute refresh on next aggregation?**      | No                    | Located at **Advanced Settings → Developer Settings**. Applies only to Normal-type attributes; Unique attributes are only computed on account creation or activation. One-time refresh: the option is automatically turned off after the next run. Expensive if attributes change frequently. |
 
 !!! warning "Important"
-    When merging a new managed account with an existing identity, managed account correlation will only occur if **Correlate missing source accounts on aggregation?** is enabled **or** you have configured an **enforced correlation role** that drives that correlation. Otherwise, the connector will not correlate the new managed account automatically.
+When merging a new managed account with an existing identity, managed account correlation will only occur if **Correlate missing source accounts on aggregation?** is enabled **or** you have configured an **enforced correlation role** that drives that correlation. Otherwise, the connector will not correlate the new managed account automatically.
 
 ---
 
@@ -153,7 +153,7 @@ For each attribute you want to use in match detection, add a **Fusion attribute 
 | **Skip match if missing**      | Skip when either value is missing                              | Default: Yes. Skipped rules do not affect the combined score. Automatic assignment on exact match requires no skipped rules and all scores 100. |
 
 !!! tip "Example edge cases"
-    When two feeds disagree in subtle ways (for example transposed dates of birth, married-name changes, nicknames vs legal names, phone formatting only, or missing contact on one side), tuning is easier if you compare **fictional** side-by-side rows and recommended algorithms first. See **Real-world matching examples (anonymized)** in [Effective use of matching algorithms](matching-algorithms.md#real-world-matching-examples-anonymized).
+When two feeds disagree in subtle ways (for example transposed dates of birth, married-name changes, nicknames vs legal names, phone formatting only, or missing contact on one side), tuning is easier if you compare **fictional** side-by-side rows and recommended algorithms first. See **Real-world matching examples (anonymized)** in [Effective use of matching algorithms](matching-algorithms.md#real-world-matching-examples-anonymized).
 
 **Algorithm selection guide:**
 
@@ -243,7 +243,7 @@ Configure **Attribute Matching Settings → Review Settings** for the manual rev
 | **Send report to owner on aggregation?**           | Email report after each aggregation         | Yes (useful for monitoring)                                   |
 
 !!! note
-    The maximum number of candidate identities shown on a single review form is controlled by **Max match candidates per review form** in **Advanced Settings → Developer Settings** (default for new sources comes from `fusionMaxCandidatesForForm` in `connector-spec.json` → `sourceConfigInitialValues`; max 15). Only the highest-scoring potential matches are included if the limit is exceeded.
+The maximum number of candidate identities shown on a single review form is controlled by **Max match candidates per review form** in **Advanced Settings → Developer Settings** (default for new sources comes from `fusionMaxCandidatesForForm` in `connector-spec.json` → `sourceConfigInitialValues`; max 15). Only the highest-scoring potential matches are included if the limit is exceeded.
 
 ### What the aggregation report includes
 
@@ -330,7 +330,7 @@ Create an access profile for viewing match reports:
 | **Fusion Report** | Fusion report | Identity governance team, auditors | View list of potential matches without review permissions |
 
 !!! note
-    The Fusion source automatically creates entitlements for each source reviewer and the Fusion report. Run **Entitlement Aggregation** to populate these entitlements.
+The Fusion source automatically creates entitlements for each source reviewer and the Fusion report. Run **Entitlement Aggregation** to populate these entitlements.
 
 ---
 
@@ -479,7 +479,7 @@ Track these metrics to assess Match effectiveness:
 | **Incorrect algorithm**      | Matches don't make sense                    | Switch algorithm (see [Matching algorithms](matching-algorithms.md))                     |
 
 !!! tip "Interpreting ambiguous reviews"
-    If reviewers repeatedly see “obvious same person” rows that still look risky (for example identical name and email but **different normalized date of birth**, or **policy-sensitive** fields that disagree between sources), compare your thresholds to the walkthroughs in [Real-world matching examples (anonymized)](matching-algorithms.md#real-world-matching-examples-anonymized)—especially **Transposed date of birth** and **Legal sex or gender marker difference**—then adjust Map/Define normalization, mandatory rules, or review attributes accordingly.
+If reviewers repeatedly see “obvious same person” rows that still look risky (for example identical name and email but **different normalized date of birth**, or **policy-sensitive** fields that disagree between sources), compare your thresholds to the walkthroughs in [Real-world matching examples (anonymized)](matching-algorithms.md#real-world-matching-examples-anonymized)—especially **Transposed date of birth** and **Legal sex or gender marker difference**—then adjust Map/Define normalization, mandatory rules, or review attributes accordingly.
 
 ---
 
