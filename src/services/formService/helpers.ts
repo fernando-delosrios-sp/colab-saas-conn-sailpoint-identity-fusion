@@ -92,9 +92,16 @@ export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: 
         })
 
     scored.sort((a, b) => {
-        const aMax = Math.max(0, ...(a.scores.filter((s) => s.score != null).map((s) => s.score as number)))
-        const bMax = Math.max(0, ...(b.scores.filter((s) => s.score != null).map((s) => s.score as number)))
-        return bMax - aMax
+        const aMax = Math.max(
+            0,
+            ...(a.scores.filter((s) => s.score != null && !s.skipped).map((s) => s.score as number))
+        )
+        const bMax = Math.max(
+            0,
+            ...(b.scores.filter((s) => s.score != null && !s.skipped).map((s) => s.score as number))
+        )
+        if (bMax !== aMax) return bMax - aMax
+        return a.id.localeCompare(b.id)
     })
 
     return scored.slice(0, maxCandidates)

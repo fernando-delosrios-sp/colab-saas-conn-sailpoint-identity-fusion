@@ -67,7 +67,9 @@ function createTwoPassRegistry(scenario: AggregationScenario) {
 
 describe('accountList setup phase', () => {
     beforeEach(() => {
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation(() => undefined)
+        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation((reg) => {
+            ;(ServiceRegistry as any).current = reg
+        })
     })
 
     afterEach(() => {
@@ -82,13 +84,13 @@ describe('accountList setup phase', () => {
             correlationDisplayName: 'HR Native Identity',
         }
         const { registry, schemas, sources } = createMockRegistry([reverseSource])
+        sources.setupReverseCorrelationSources = jest.fn().mockResolvedValue(1)
         const input = { schema: { attributes: [] } } as any
 
         await accountList(registry, input)
 
         expect(sources.clearReverseCorrelationReadinessCache).toHaveBeenCalledTimes(1)
-        expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledTimes(1)
-        expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledWith(reverseSource, expect.any(Set))
+        expect(sources.setupReverseCorrelationSources).toHaveBeenCalledTimes(1)
         expect(schemas.setFusionAccountSchema).toHaveBeenNthCalledWith(1, input.schema)
         expect(schemas.setFusionAccountSchema).toHaveBeenNthCalledWith(2, undefined)
     })
@@ -104,7 +106,7 @@ describe('accountList setup phase', () => {
         await accountList(registry, input)
 
         expect(sources.clearReverseCorrelationReadinessCache).toHaveBeenCalledTimes(1)
-        expect(sources.ensureReverseCorrelationSetup).not.toHaveBeenCalled()
+        expect(sources.setupReverseCorrelationSources).toHaveBeenCalledTimes(1)
         expect(schemas.setFusionAccountSchema).toHaveBeenCalledTimes(1)
         expect(schemas.setFusionAccountSchema).toHaveBeenCalledWith(input.schema)
     })
@@ -127,19 +129,9 @@ describe('accountList setup phase', () => {
         const { registry, sources } = createMockRegistry(reverseSources)
         const input = { schema: { attributes: [] } } as any
 
-        let inFlight = 0
-        let maxInFlight = 0
-        sources.ensureReverseCorrelationSetup.mockImplementation(async () => {
-            inFlight++
-            maxInFlight = Math.max(maxInFlight, inFlight)
-            await new Promise((resolve) => setTimeout(resolve, 5))
-            inFlight--
-        })
-
         await accountList(registry, input)
 
-        expect(sources.ensureReverseCorrelationSetup).toHaveBeenCalledTimes(2)
-        expect(maxInFlight).toBe(1)
+        expect(sources.setupReverseCorrelationSources).toHaveBeenCalledTimes(1)
     })
 
     it('hydrates missing global owners with bounded concurrency', async () => {
@@ -225,7 +217,9 @@ describe('accountList setup phase', () => {
 
 describe('accountList two-pass aggregation lifecycle', () => {
     beforeEach(() => {
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation(() => undefined)
+        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation((reg) => {
+            ;(ServiceRegistry as any).current = reg
+        })
     })
 
     afterEach(() => {
