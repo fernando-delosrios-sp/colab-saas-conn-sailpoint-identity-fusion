@@ -1,10 +1,10 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { LogService } from '../logService'
-import { SourceService } from '../sourceService'
-import { IdentityService } from '../identityService'
-import { FormService } from '../formService'
-import { FusionConfig } from '../../model/config'
+import { LogService } from './logService'
+import { SourceService } from './sourceService'
+import { IdentityService } from './identityService'
+import { FormService } from './formService'
+import { FusionConfig } from '../model/config'
 
 function sanitizeForJson(value: unknown): unknown {
     if (value === undefined || value === null) return value
@@ -184,17 +184,17 @@ export class RecordingService {
         const firstState = firstStep?.stateAfter
         const initialState = firstState
             ? {
-                  identities: firstState.identities,
-                  managedAccounts: firstState.managedAccounts,
-                  fusionAccounts: firstState.fusionAccounts,
-                  formDecisions: firstState.formDecisions,
-              }
+                identities: firstState.identities,
+                managedAccounts: firstState.managedAccounts,
+                fusionAccounts: firstState.fusionAccounts,
+                formDecisions: firstState.formDecisions,
+            }
             : {
-                  identities: [],
-                  managedAccounts: [],
-                  fusionAccounts: [],
-                  formDecisions: [],
-              }
+                identities: [],
+                managedAccounts: [],
+                fusionAccounts: [],
+                formDecisions: [],
+            }
 
         const scenarioSteps = this.steps.map((step) => ({
             id: step.stepId,

@@ -14,7 +14,7 @@ import { ScoringService } from './scoringService'
 import { MessagingService } from './messagingService'
 import { ProxyService } from './proxyService'
 import { ReportService } from './reportService'
-import { RecordingService } from './recordingService/RecordingService'
+import { RecordingService } from './recordingService'
 
 /**
  * Central dependency injection container for all connector services.
