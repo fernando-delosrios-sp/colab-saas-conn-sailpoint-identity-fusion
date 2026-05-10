@@ -92,6 +92,9 @@ export class ProxyService {
                 throw new ConnectorError('Proxy mode is not enabled or proxy URL is missing')
             }
             const { proxyUrl } = this.config
+            if (!proxyUrl.toLowerCase().startsWith('http://') && !proxyUrl.toLowerCase().startsWith('https://')) {
+                throw new ConnectorError('Proxy URL must use http or https protocol')
+            }
             const externalConfig = { ...this.config, isProxy: true }
             const body = {
                 type: this.commandType,
