@@ -30,9 +30,7 @@ import {
     PendingReviewAccountContext,
 } from './types'
 import { defaultFusionMaxCandidatesForForm, internalConfig } from '../../data/config'
-import {
-    resolveIdentitiesSelectLabel,
-} from './helpers'
+import { resolveIdentitiesSelectLabel } from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 import {
     createFusionDecision,
@@ -844,7 +842,9 @@ export class FormService {
             `maxCandidates must be between 1 and ${internalConfig.formService.fusionMaxCandidatesForFormMax}`
         )
 
-        const ordered = [...fusionAccount.fusionMatches].sort(this._compareMatchesForForm).slice(0, this.fusionMaxCandidatesForForm)
+        const ordered = [...fusionAccount.fusionMatches]
+            .sort(this._compareMatchesForForm)
+            .slice(0, this.fusionMaxCandidatesForForm)
 
         return ordered.map((match) => {
             assert(match.fusionIdentity, 'Fusion identity is required in match')
@@ -863,7 +863,8 @@ export class FormService {
     private _buildFormName(fusionAccount: FusionAccount): string {
         const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
         const source = `[${fusionAccount.sourceName}]`
-        const accountIdentifier = trimStr(fusionAccount.nativeIdentity) || trimStr(fusionAccount.managedAccountId) || 'unknown'
+        const accountIdentifier =
+            trimStr(fusionAccount.nativeIdentity) || trimStr(fusionAccount.managedAccountId) || 'unknown'
         return `${this.fusionFormNamePattern} - ${accountName} ${source} (${accountIdentifier})`
     }
 
