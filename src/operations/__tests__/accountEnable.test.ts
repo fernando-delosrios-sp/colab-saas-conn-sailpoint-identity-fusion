@@ -40,7 +40,12 @@ describe('accountEnable', () => {
         expect(rebuildFusionAccount).toHaveBeenCalledWith(
             'fusion-1',
             expect.any(Object),
-            expect.objectContaining({ fusion: expect.any(Object), identities: expect.any(Object), sources: expect.any(Object), log: expect.any(Object) })
+            expect.objectContaining({
+                fusion: expect.any(Object),
+                identities: expect.any(Object),
+                sources: expect.any(Object),
+                log: expect.any(Object),
+            })
         )
         expect(registry.attributes.refreshUniqueAttributes).toHaveBeenCalledWith(fusionAccount)
         expect(fusionAccount.enable).toHaveBeenCalledTimes(1)

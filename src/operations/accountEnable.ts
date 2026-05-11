@@ -49,7 +49,12 @@ export const accountEnable = async (serviceRegistry: ServiceRegistry, input: Std
         await fusion.preProcessFusionAccounts()
         timer.phase('Step 2: Pre-processing all fusion accounts to collect unique values')
 
-        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_RESET, { fusion, identities, sources, log })
+        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_RESET, {
+            fusion,
+            identities,
+            sources,
+            log,
+        })
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
 

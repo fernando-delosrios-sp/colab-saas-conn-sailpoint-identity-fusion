@@ -118,7 +118,6 @@ describe('formService helpers', () => {
         })
     })
 
-
     describe('buildCandidateList', () => {
         it('should sort candidates by combined score and limit to maxCandidates', () => {
             const fusionAccount = {
@@ -236,5 +235,4 @@ describe('formService helpers', () => {
             expect(() => getFormOwner(sourceService)).toThrow()
         })
     })
-
 })
