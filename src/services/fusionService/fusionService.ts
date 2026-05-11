@@ -357,50 +357,38 @@ export class FusionService {
             candidateIdsNeedingStatus.add(id)
         }
 
-        // Clear stale transient state for ALL accounts we may output.
-        // Some accounts can be keyed in fusionAccountMap (e.g. missing/blank identityId or uncorrelated),
-        // and would otherwise retain stale values forever.
-        for (const account of this.fusionAccountMap.values()) {
-            account.removeStatus('candidate')
-            account.clearFusionReviews()
-        }
-        for (const identity of this.fusionIdentityMap.values()) {
-            identity.removeStatus('candidate')
-            identity.clearFusionReviews()
-        }
-
-        // Re-apply candidate status for identities that are candidates on active pending forms
-        for (const identityId of candidateIdsNeedingStatus) {
-            const identity = this.fusionIdentityMap.get(identityId)
-            if (identity) {
-                identity.addStatus('candidate')
-            }
-        }
-
-        // Re-apply pending reviewer URLs for identities that are recipients of active pending forms
-        for (const [reviewerId, urls] of pendingReviewUrlsByReviewerId.entries()) {
-            const reviewer = this.fusionIdentityMap.get(reviewerId)
-            if (!reviewer || !urls?.length) continue
-            for (const url of urls) {
-                reviewer.addFusionReview(url)
-            }
-        }
-
-        // Fusion accounts keyed by nativeIdentity can still carry identityId; reconcile those too.
-        for (const account of this.fusionAccountMap.values()) {
-            const iid = account.identityId
-            if (!iid || !candidateIdsNeedingStatus.has(iid)) continue
-            account.addStatus('candidate')
-        }
-
+        // Clear stale transient state, re-apply candidate statuses, and sync attributes.
         // Sync the in-memory Sets back into each account's attribute bag so that
-        // _attributeBag.current['statuses'] / ['reviews'] reflect the mutations above.
+        // _attributeBag.current['statuses'] / ['reviews'] reflect the mutations.
         // Without this, anything reading fusionAccount.attributes between now and
         // getISCAccount (attribute mapping, report generation, etc.) would see stale values.
         for (const account of this.fusionAccountMap.values()) {
+            account.removeStatus('candidate')
+            account.clearFusionReviews()
+
+            const iid = account.identityId
+            if (iid && candidateIdsNeedingStatus.has(iid)) {
+                account.addStatus('candidate')
+            }
+
             account.syncCollectionAttributesToBag()
         }
-        for (const identity of this.fusionIdentityMap.values()) {
+
+        for (const [identityId, identity] of this.fusionIdentityMap.entries()) {
+            identity.removeStatus('candidate')
+            identity.clearFusionReviews()
+
+            if (candidateIdsNeedingStatus.has(identityId)) {
+                identity.addStatus('candidate')
+            }
+
+            const urls = pendingReviewUrlsByReviewerId.get(identityId)
+            if (urls?.length) {
+                for (const url of urls) {
+                    identity.addFusionReview(url)
+                }
+            }
+
             identity.syncCollectionAttributesToBag()
         }
     }
