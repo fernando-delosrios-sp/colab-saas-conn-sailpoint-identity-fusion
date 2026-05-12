@@ -37,3 +37,8 @@
 
 **Learning:** Resolving N+1 sequential fetching bottlenecks inside loop iterations is not limited to modifying the N+1 `Promise.all` logic, sequential execution can also be bottlenecked when waiting on individual async fetching calls like `await this.fetchAccountSchema(source.id)` in a `for...of` loop when the data itself has no required order context.
 **Action:** Grouped independent asynchronous calls into a single array utilizing `promiseAllBatched` helper for efficient batch execution instead of awaiting them inside a sequential `for...of` loop where strict ordering of returned schema attributes wasn't required.
+
+## 2026-05-12 - Prevent unbounded parallel execution in forms and identities
+
+**Learning:** `Promise.all(array.map(fn))` triggers unbounded parallel execution which can cause API rate limit or bottleneck issues. Replacing it with an explicit batched approach prevents spikes in API usage.
+**Action:** Replaced `Promise.all(forms.map(...))` and `Promise.all(missing.map(...))` with `promiseAllBatched` in `src/services/formService/formService.ts` and `src/services/identityService.ts` to bound concurrency.

@@ -202,7 +202,7 @@ export class FormService {
 
     public async deleteExistingForms(): Promise<void> {
         const forms = await this.fetchFormsByName(this.fusionFormNamePattern)
-        await Promise.all(forms.map((form) => this.deleteForm(form.id!)))
+        await promiseAllBatched(forms, (form) => this.deleteForm(form.id!))
     }
 
     /**
