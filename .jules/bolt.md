@@ -32,3 +32,8 @@
 
 **Learning:** Dense domain logic loops that iterate over properties generating arrays on every read (like `Array.from(set)` getters) cause unnecessary heap allocations and garbage collection overhead, particularly inside nested loops (`findFusionAccountByIdentityManagedAccounts`).
 **Action:** Extract the intersection logic into a dedicated helper method and iterate over zero-copy native `ReadonlySet` accessors (e.g., `accountIdsSet` and `missingAccountIdsSet`) instead of array-generating getters to eliminate the allocation overhead.
+
+## 2026-05-11 - Batch Fetching to Resolve Sequential Processing Bottlecks
+
+**Learning:** Resolving N+1 sequential fetching bottlenecks inside loop iterations is not limited to modifying the N+1 `Promise.all` logic, sequential execution can also be bottlenecked when waiting on individual async fetching calls like `await this.fetchAccountSchema(source.id)` in a `for...of` loop when the data itself has no required order context.
+**Action:** Grouped independent asynchronous calls into a single array utilizing `promiseAllBatched` helper for efficient batch execution instead of awaiting them inside a sequential `for...of` loop where strict ordering of returned schema attributes wasn't required.
