@@ -45,9 +45,7 @@ rl.question('Enter chain name: ', (chainName) => {
 
     child.on('exit', (code) => {
         console.log('')
-        console.log(
-            `Recording finalized — scenario saved to test-data/recordings/${safeName}/scenario.json`
-        )
+        console.log(`Recording finalized — scenario saved to test-data/recordings/${safeName}/scenario.json`)
         process.exit(code ?? 0)
     })
 

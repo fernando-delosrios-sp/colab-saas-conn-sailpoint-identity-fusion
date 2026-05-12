@@ -357,50 +357,38 @@ export class FusionService {
             candidateIdsNeedingStatus.add(id)
         }
 
-        // Clear stale transient state for ALL accounts we may output.
-        // Some accounts can be keyed in fusionAccountMap (e.g. missing/blank identityId or uncorrelated),
-        // and would otherwise retain stale values forever.
-        for (const account of this.fusionAccountMap.values()) {
-            account.removeStatus('candidate')
-            account.clearFusionReviews()
-        }
-        for (const identity of this.fusionIdentityMap.values()) {
-            identity.removeStatus('candidate')
-            identity.clearFusionReviews()
-        }
-
-        // Re-apply candidate status for identities that are candidates on active pending forms
-        for (const identityId of candidateIdsNeedingStatus) {
-            const identity = this.fusionIdentityMap.get(identityId)
-            if (identity) {
-                identity.addStatus('candidate')
-            }
-        }
-
-        // Re-apply pending reviewer URLs for identities that are recipients of active pending forms
-        for (const [reviewerId, urls] of pendingReviewUrlsByReviewerId.entries()) {
-            const reviewer = this.fusionIdentityMap.get(reviewerId)
-            if (!reviewer || !urls?.length) continue
-            for (const url of urls) {
-                reviewer.addFusionReview(url)
-            }
-        }
-
-        // Fusion accounts keyed by nativeIdentity can still carry identityId; reconcile those too.
-        for (const account of this.fusionAccountMap.values()) {
-            const iid = account.identityId
-            if (!iid || !candidateIdsNeedingStatus.has(iid)) continue
-            account.addStatus('candidate')
-        }
-
+        // Clear stale transient state, re-apply candidate statuses, and sync attributes.
         // Sync the in-memory Sets back into each account's attribute bag so that
-        // _attributeBag.current['statuses'] / ['reviews'] reflect the mutations above.
+        // _attributeBag.current['statuses'] / ['reviews'] reflect the mutations.
         // Without this, anything reading fusionAccount.attributes between now and
         // getISCAccount (attribute mapping, report generation, etc.) would see stale values.
         for (const account of this.fusionAccountMap.values()) {
+            account.removeStatus('candidate')
+            account.clearFusionReviews()
+
+            const iid = account.identityId
+            if (iid && candidateIdsNeedingStatus.has(iid)) {
+                account.addStatus('candidate')
+            }
+
             account.syncCollectionAttributesToBag()
         }
-        for (const identity of this.fusionIdentityMap.values()) {
+
+        for (const [identityId, identity] of this.fusionIdentityMap.entries()) {
+            identity.removeStatus('candidate')
+            identity.clearFusionReviews()
+
+            if (candidateIdsNeedingStatus.has(identityId)) {
+                identity.addStatus('candidate')
+            }
+
+            const urls = pendingReviewUrlsByReviewerId.get(identityId)
+            if (urls?.length) {
+                for (const url of urls) {
+                    identity.addFusionReview(url)
+                }
+            }
+
             identity.syncCollectionAttributesToBag()
         }
     }
@@ -439,9 +427,9 @@ export class FusionService {
             if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || allAccounts.length === 0) {
                 this.log.info(
                     `Unique-attribute generation progress: ${done}/${total} account(s) done — batch ${batchIndex}/${totalBatches} ` +
-                    `| LAST BATCH ${PhaseTimer.formatElapsed(Date.now() - batchStarted)} | RUN ELAPSED ${PhaseTimer.formatElapsed(
-                        Date.now() - startedAt
-                    )}`
+                        `| LAST BATCH ${PhaseTimer.formatElapsed(Date.now() - batchStarted)} | RUN ELAPSED ${PhaseTimer.formatElapsed(
+                            Date.now() - startedAt
+                        )}`
                 )
             }
         }
@@ -490,7 +478,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${account.nativeIdentity}), ` +
-            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
@@ -549,7 +537,7 @@ export class FusionService {
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
-            `${fusionAccount.accountIdsSet.size} account(s), ${fusionAccount.missingAccountIdsSet.size} missing`
+                `${fusionAccount.accountIdsSet.size} account(s), ${fusionAccount.missingAccountIdsSet.size} missing`
         )
 
         await yieldToEventLoop()
@@ -577,7 +565,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.setFusionAccount(fusionAccount)
@@ -692,7 +680,7 @@ export class FusionService {
                 fusionAccount.setReverseCorrelationAttribute(sourceConfig.correlationAttribute, info.schema.id)
                 this.log.debug(
                     `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.schema.id}" ` +
-                    `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
+                        `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
                 )
             }
         }
@@ -841,7 +829,7 @@ export class FusionService {
             if (existingAccount) {
                 this.log.debug(
                     `Reusing existing Fusion account ${existingAccount.nativeIdentity} for identity ` +
-                    `${identity.name} (${identityId}) - prevents duplicate baseline creation`
+                        `${identity.name} (${identityId}) - prevents duplicate baseline creation`
                 )
                 // Remove from whichever map currently holds it
                 if (this.fusionAccountMap.get(existingAccount.nativeIdentity) === existingAccount) {
@@ -1044,8 +1032,8 @@ export class FusionService {
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
             `${existingIdentityAccount ? 'Reusing' : 'Created'} fusion account from decision: ` +
-            `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
-            `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
+                `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
+                `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
         )
 
         // For authorized decisions (including synthetic perfect-match automatic assignment),
@@ -1117,7 +1105,7 @@ export class FusionService {
             this.setFusionAccount(fusionAccount)
             this.log.debug(
                 `Registered decision account as fusion account: ${fusionDecision.account.name} ` +
-                `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`
+                    `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`
             )
         }
         return fusionAccount
@@ -1209,7 +1197,7 @@ export class FusionService {
                 this._sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                    `Managed accounts from this source will be treated as NonMatched.`
+                        `Managed accounts from this source will be treated as NonMatched.`
                 )
             }
         }
@@ -1668,7 +1656,8 @@ export class FusionService {
         }
         const totalMs = Date.now() - analyzeUncorrelatedStartedAt
         this.log.info(
-            `Performance metric: FusionService.analyzeUncorrelatedAccounts durationMs=${totalMs} analyzed=${results.length
+            `Performance metric: FusionService.analyzeUncorrelatedAccounts durationMs=${totalMs} analyzed=${
+                results.length
             } matchScoringMs=${this.currentRunMatchScoringMs}`
         )
         return results
@@ -1721,7 +1710,7 @@ export class FusionService {
         } else {
             this.log.debug(
                 `Skipping Match scoring for record source account: ${name} [${sourceName}] ` +
-                `(includeRecordAccountsForMatching=false)`
+                    `(includeRecordAccountsForMatching=false)`
             )
         }
 
@@ -2056,7 +2045,8 @@ export class FusionService {
             await yieldToEventLoop()
         }
         this.log.info(
-            `Performance metric: FusionService.forEachISCAccount durationMs=${Date.now() - forEachStartedAt
+            `Performance metric: FusionService.forEachISCAccount durationMs=${
+                Date.now() - forEachStartedAt
             } eligible=${totalEligible} sent=${count} batchSize=${batchSize}`
         )
         return count
@@ -2433,7 +2423,7 @@ export class FusionService {
         )
         this.log.warn(
             `More than one Fusion account was found for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
-            'This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.'
+                'This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.'
         )
     }
 

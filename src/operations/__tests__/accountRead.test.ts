@@ -37,7 +37,12 @@ describe('accountRead', () => {
         expect(rebuildFusionAccount).toHaveBeenCalledWith(
             'fusion-1',
             expect.any(Object),
-            expect.objectContaining({ fusion: expect.any(Object), identities: expect.any(Object), sources: expect.any(Object), log: expect.any(Object) })
+            expect.objectContaining({
+                fusion: expect.any(Object),
+                identities: expect.any(Object),
+                sources: expect.any(Object),
+                log: expect.any(Object),
+            })
         )
         expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(fusionAccount)

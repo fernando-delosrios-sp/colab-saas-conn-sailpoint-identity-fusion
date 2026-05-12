@@ -114,8 +114,7 @@ export class ServiceRegistry {
 
         if (process.env.RECORD_MODE === 'true') {
             const recordingService = (context as any).recordingService as RecordingService | undefined
-            this.recording =
-                recordingService ?? RecordingService.init(this.log, this.config)
+            this.recording = recordingService ?? RecordingService.init(this.log, this.config)
             this.log.info(`RecordingService enabled — chain: ${this.recording.getName()}`)
         }
     }
