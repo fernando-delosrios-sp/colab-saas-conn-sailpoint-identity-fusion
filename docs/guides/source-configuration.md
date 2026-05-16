@@ -11,8 +11,11 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
 | **Include identities in the scope?** | Include identities in addition to managed accounts from configured sources | No                                    | Enable for identity-only Defines or to define the baseline for Match (sources scope = managed accounts from configured sources).                                                          |
 | **Identity Scope Query**             | Search/filter query to limit which identities are evaluated                | Yes (when include identities enabled) | Uses [ISC search syntax](https://documentation.sailpoint.com/saas/help/search/building-query.html); examples: `*` (all), `attributes.cloudLifecycleState:active`, `source.name:"Workday"` |
 
-!!! tip
-You may or may not include identities in your scope. When not included, only those managed accounts previously processed that turned into an identity will be considered as your baseline to compare new uncorrelated managed accounts. When included, all your existing identities in the scope will be part of that baseline from the beginning, as well as managed accounts that turn into identities over time. When including identities in the scope, the Fusion attribute definition context can also access the `$identity` object.
+!!! tip "Identity scope behavior"
+    Including identities in your scope affects your baseline for matching and what is available in expressions:
+
+    - **Not included:** Your baseline consists *only* of managed accounts previously processed by Fusion that became an identity.
+    - **Included:** Your baseline immediately includes all existing identities matching the query, plus any managed accounts that turn into identities over time. The `$identity` object also becomes available in the Fusion attribute definition context.
 
 #### Sources Section
 
@@ -49,7 +52,9 @@ You may or may not include identities in your scope. When not included, only tho
 Machine accounts (`isMachine=true`) are not supported for managed-source processing. Because `isMachine` is not an ISC account-list API filter, the connector applies this exclusion client-side and skips those accounts after fetching.
 
 !!! note "Execution order"
-    1) `Accounts API filter` (server-side, ISC), 2) `Accounts JMESPath filter` (client-side, page-wise on `{ "accounts": [...] }`), 3) built-in machine account exclusion (`isMachine=true`).
+    1. `Accounts API filter` (server-side, ISC)
+    2. `Accounts JMESPath filter` (client-side, page-wise on `{ "accounts": [...] }`)
+    3. Built-in machine account exclusion (`isMachine=true`)
 
 !!! tip
 You can use the **Aggregate before processing** option to ensure a managed source has newer data than the last time Identity Fusion ran and/or synchronize aggregation schedules. If you don't need the absolute latest data blocking the aggregation response, consider **Delayed aggregation** to speed up the account list operation.

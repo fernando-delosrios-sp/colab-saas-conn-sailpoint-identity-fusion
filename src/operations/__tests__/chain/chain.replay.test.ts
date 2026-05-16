@@ -74,7 +74,6 @@ function registerAllStepFns(): void {
         const registry = replayCtx.registry as unknown as MockRegistry
 
         context.state.setPassIndex(step.pass ?? 1)
-
         ;(ServiceRegistry.setCurrent as jest.Mock).mockImplementation(() => undefined)
 
         try {

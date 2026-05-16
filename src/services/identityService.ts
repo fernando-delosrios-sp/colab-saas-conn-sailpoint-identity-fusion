@@ -2,6 +2,7 @@ import { AccountsApiUpdateAccountRequest, IdentityDocument, Search } from 'sailp
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { ClientService, QueuePriority } from './clientService'
+import { promiseAllBatched } from './fusionService/collections'
 import { LogService } from './logService'
 import { assert } from '../utils/assert'
 import { wrapConnectorError } from '../utils/error'
@@ -227,7 +228,7 @@ export class IdentityService {
      */
     public async hydrateMissingIdentitiesById(ids: string[]): Promise<void> {
         const missing = [...new Set(ids.filter((id) => id && !this.getIdentityById(id)))]
-        await Promise.all(missing.map((id) => this.fetchIdentityById(id).catch(() => {})))
+        await promiseAllBatched(missing, (id) => this.fetchIdentityById(id).catch(() => {}))
     }
 
     // ------------------------------------------------------------------------

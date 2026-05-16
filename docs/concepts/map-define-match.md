@@ -24,8 +24,8 @@ See the [Match](../guides/match.md) and [Matching algorithms](../guides/matching
 
 Fusion supports distinct ways of relating accounts to identities (for example authoritative accounts, records, and orphan handling). How you configure sources and authority depends on which mode you use.
 
-For mode-specific behavior and source options, read [Source configuration](../guides/source-configuration.md) and the overview on the [home page](../home.md#operation-modes).
+For mode-specific behavior and source options, read [Source configuration](../guides/source-configuration.md) and the overview on the [home page](../index.md#operation-modes).
 
 ## Full configuration reference
 
-Field-level tables for every ISC configuration section live on the [home page](../home.md#reference-configuration-at-a-glance) (synced from the repository README).
+Field-level tables for every ISC configuration section live on the [home page](../index.md#reference-configuration-at-a-glance) (synced from the repository README).
