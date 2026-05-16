@@ -59,7 +59,12 @@ describe('rebuildFusionAccount', () => {
             log: { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() },
         } as any
 
-        await rebuildFusionAccount('fusion-1', {} as any, { fusion: registry.fusion, identities: registry.identities, sources: registry.sources, log: registry.log })
+        await rebuildFusionAccount('fusion-1', {} as any, {
+            fusion: registry.fusion,
+            identities: registry.identities,
+            sources: registry.sources,
+            log: registry.log,
+        })
 
         expect(fetchManagedAccount).toHaveBeenCalledTimes(2)
         expect(fetchManagedAccount).toHaveBeenCalledWith('source-a-id', 'user-stored')
@@ -101,7 +106,12 @@ describe('rebuildFusionAccount', () => {
             log: { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() },
         } as any
 
-        await rebuildFusionAccount('fusion-2', {} as any, { fusion: registry.fusion, identities: registry.identities, sources: registry.sources, log: registry.log })
+        await rebuildFusionAccount('fusion-2', {} as any, {
+            fusion: registry.fusion,
+            identities: registry.identities,
+            sources: registry.sources,
+            log: registry.log,
+        })
 
         expect(fetchManagedAccount).toHaveBeenCalledTimes(1)
         expect(fetchManagedAccount).toHaveBeenCalledWith('source-a', 'native-99')
@@ -142,7 +152,12 @@ describe('rebuildFusionAccount', () => {
             log,
         } as any
 
-        await rebuildFusionAccount('fusion-3', {} as any, { fusion: registry.fusion, identities: registry.identities, sources: registry.sources, log: registry.log })
+        await rebuildFusionAccount('fusion-3', {} as any, {
+            fusion: registry.fusion,
+            identities: registry.identities,
+            sources: registry.sources,
+            log: registry.log,
+        })
 
         expect(log.warn).toHaveBeenCalledWith(
             expect.stringContaining('Skipping legacy non-composite managed account reference')

@@ -16,12 +16,12 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     const state = context.state
     const pass = step.pass ?? 1
 
-    const sourceConfigs: SourceConfigLike[] = ((step.expectedStateDelta?.sources as Array<Record<string, unknown>>) ?? []).map(
-        (s) => ({
-            name: (s.name as string) ?? 'unknown',
-            correlationMode: (s.correlationMode as SourceConfigLike['correlationMode']) ?? 'none',
-        })
-    )
+    const sourceConfigs: SourceConfigLike[] = (
+        (step.expectedStateDelta?.sources as Array<Record<string, unknown>>) ?? []
+    ).map((s) => ({
+        name: (s.name as string) ?? 'unknown',
+        correlationMode: (s.correlationMode as SourceConfigLike['correlationMode']) ?? 'none',
+    }))
 
     const { registry } = createBaseOperationRegistry(sourceConfigs)
 
@@ -34,12 +34,10 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         registry.sources.managedAccountsById = map
         registry.sources.managedAccountsAllById = new Map(map)
 
-        registry.sources.fetchManagedAccounts = jest
-            .fn()
-            .mockImplementation(async () => {
-                registry.sources.managedAccountsById = map
-                registry.sources.managedAccountsAllById = new Map(map)
-            })
+        registry.sources.fetchManagedAccounts = jest.fn().mockImplementation(async () => {
+            registry.sources.managedAccountsById = map
+            registry.sources.managedAccountsAllById = new Map(map)
+        })
     }
 
     const identities = state.getIdentities()
@@ -51,40 +49,30 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         registry.identities.fetchIdentities = jest.fn().mockImplementation(async () => {
             registry.identities.identityCount = identities.length
         })
-        registry.identities.fetchIdentityByName = jest
-            .fn()
-            .mockImplementation(async (name: string) => {
-                return state.getIdentityByName(name) ?? null
-            })
-        registry.identities.getIdentityById = jest
-            .fn()
-            .mockImplementation((id: string) => {
-                return state.getIdentityById(id)
-            })
+        registry.identities.fetchIdentityByName = jest.fn().mockImplementation(async (name: string) => {
+            return state.getIdentityByName(name) ?? null
+        })
+        registry.identities.getIdentityById = jest.fn().mockImplementation((id: string) => {
+            return state.getIdentityById(id)
+        })
     }
 
     const fusionAccounts = state.getFusionAccounts()
     if (fusionAccounts.length > 0) {
-        const fusionMap = new Map(
-            fusionAccounts.map((a) => [a.nativeIdentity, a])
-        )
+        const fusionMap = new Map(fusionAccounts.map((a) => [a.nativeIdentity, a]))
         registry.sources.fusionAccountsByNativeIdentity = fusionMap
         registry.sources.fusionAccounts = fusionAccounts
         registry.sources.fusionAccountCount = fusionAccounts.length
 
-        registry.sources.fetchFusionAccounts = jest
-            .fn()
-            .mockImplementation(async () => {
-                registry.sources.fusionAccountsByNativeIdentity = fusionMap
-                registry.sources.fusionAccounts = fusionAccounts
-            })
+        registry.sources.fetchFusionAccounts = jest.fn().mockImplementation(async () => {
+            registry.sources.fusionAccountsByNativeIdentity = fusionMap
+            registry.sources.fusionAccounts = fusionAccounts
+        })
     }
 
-    registry.sources.getSourceByName = jest
-        .fn()
-        .mockImplementation((name: string) => {
-            return sourceConfigs.find((s: any) => s.name === name)
-        })
+    registry.sources.getSourceByName = jest.fn().mockImplementation((name: string) => {
+        return sourceConfigs.find((s: any) => s.name === name)
+    })
 
     registry.res.send = jest.fn()
 
@@ -106,7 +94,11 @@ export function collectOutputs(context: ChainContext): unknown[] {
     return sent
 }
 
-export function compareOutputs(actual: unknown[], expected: unknown, stepId: string): { match: boolean; drift: string[] } {
+export function compareOutputs(
+    actual: unknown[],
+    expected: unknown,
+    stepId: string
+): { match: boolean; drift: string[] } {
     const drift: string[] = []
 
     if (expected === undefined || expected === null) {
@@ -124,7 +116,9 @@ export function compareOutputs(actual: unknown[], expected: unknown, stepId: str
             const keys = new Set([...Object.keys(expectedObj), ...Object.keys(actualObj)])
             for (const key of keys) {
                 if (JSON.stringify(expectedObj[key]) !== JSON.stringify(actualObj[key])) {
-                    drift.push(`${stepId}.${key}: expected ${JSON.stringify(expectedObj[key])}, got ${JSON.stringify(actualObj[key])}`)
+                    drift.push(
+                        `${stepId}.${key}: expected ${JSON.stringify(expectedObj[key])}, got ${JSON.stringify(actualObj[key])}`
+                    )
                 }
             }
         } catch {

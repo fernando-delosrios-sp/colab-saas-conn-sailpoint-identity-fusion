@@ -67,7 +67,9 @@ export const rebuildFusionAccount = async (
     const uniqueSourceIds = new Set(parsedKeys.map((k) => k.sourceId))
 
     if (cascadeEnabled && uniqueSourceIds.size > 0) {
-        log.info(`Cascade aggregation enabled: triggering aggregation for ${uniqueSourceIds.size} source(s) before fetching managed accounts`)
+        log.info(
+            `Cascade aggregation enabled: triggering aggregation for ${uniqueSourceIds.size} source(s) before fetching managed accounts`
+        )
         await Promise.all(
             Array.from(uniqueSourceIds).map(async (sourceId) => {
                 const sourceInfo = sources.getSourceById(sourceId)
@@ -77,7 +79,9 @@ export const rebuildFusionAccount = async (
                 try {
                     await sources.aggregateManagedSource(sourceId, disableOptimization)
                 } catch (error) {
-                    log.error(`Cascade aggregation failed for source ${sourceInfo.name ?? sourceId}: ${error instanceof Error ? error.message : String(error)}. Continuing with main process.`)
+                    log.error(
+                        `Cascade aggregation failed for source ${sourceInfo.name ?? sourceId}: ${error instanceof Error ? error.message : String(error)}. Continuing with main process.`
+                    )
                 }
             })
         )

@@ -240,6 +240,11 @@ export function extractArray<T = any>(attributes: Record<string, any>, key: stri
  * toSetFromAttribute(null, 'tags')
  * // Returns: Set()
  */
+function extractObjectValue(item: object): string | undefined {
+    const pick = readUnknown(item, 'id') ?? readUnknown(item, 'value') ?? readUnknown(item, 'name')
+    return hasValue(pick) ? String(pick) : undefined
+}
+
 export function toSetFromAttribute(attributes: Record<string, any> | null | undefined, key: string): Set<string> {
     const raw = attributes?.[key]
     const arr = Array.isArray(raw) ? raw : []
@@ -256,13 +261,8 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
             continue
         }
         if (typeof item === 'object') {
-            const id = readUnknown(item, 'id')
-            const value = readUnknown(item, 'value')
-            const name = readUnknown(item, 'name')
-            const pick = id ?? value ?? name
-            if (hasValue(pick)) {
-                normalized.push(String(pick))
-            }
+            const val = extractObjectValue(item)
+            if (val !== undefined) normalized.push(val)
         }
     }
 
@@ -285,11 +285,8 @@ export function normalizeActionTokens(raw: unknown): string[] {
                 continue
             }
             if (typeof item === 'object') {
-                const id = readUnknown(item, 'id')
-                const value = readUnknown(item, 'value')
-                const name = readUnknown(item, 'name')
-                const pick = id ?? value ?? name
-                if (hasValue(pick)) out.push(String(pick))
+                const val = extractObjectValue(item)
+                if (val !== undefined) out.push(val)
             }
         }
         return out
@@ -298,11 +295,8 @@ export function normalizeActionTokens(raw: unknown): string[] {
         return [String(raw)]
     }
     if (typeof raw === 'object') {
-        const id = readUnknown(raw, 'id')
-        const value = readUnknown(raw, 'value')
-        const name = readUnknown(raw, 'name')
-        const pick = id ?? value ?? name
-        return hasValue(pick) ? [String(pick)] : []
+        const val = extractObjectValue(raw as object)
+        return val !== undefined ? [val] : []
     }
     return []
 }

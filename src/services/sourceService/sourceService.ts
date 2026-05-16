@@ -1738,9 +1738,7 @@ export class SourceService {
                 ConnectorErrorType.Generic
             )
         }
-        this.log.info(
-            `Verified identity profile mapping for profile ${profile.id} and attribute "${attributeName}"`
-        )
+        this.log.info(`Verified identity profile mapping for profile ${profile.id} and attribute "${attributeName}"`)
     }
 
     /**

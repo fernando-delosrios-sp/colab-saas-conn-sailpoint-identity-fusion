@@ -259,12 +259,12 @@ export class LogService {
                 headers: { 'Content-Type': 'text/plain' },
                 body: logMessage,
                 signal: AbortSignal.timeout(LogService.EXTERNAL_LOG_TIMEOUT_MS),
-            }).then(() => { })
+            }).then(() => {})
 
         const pending: Promise<void> = (
-            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW }).then(() => { }) : doFetch()
+            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW }).then(() => {}) : doFetch()
         )
-            .catch(() => { })
+            .catch(() => {})
             .finally(() => {
                 this.pendingExternalLogs.delete(pending)
             })

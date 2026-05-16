@@ -182,15 +182,10 @@ describe('fusionReportHelpers', () => {
                 attributes: {
                     attr1: 'val1',
                     attr2: 'val2',
-                    attr3: 'val3'
-                }
+                    attr3: 'val3',
+                },
             } as any
-            const result = buildMinimalFusionReportAccount(
-                acc,
-                mockUrlContext,
-                SourceType.Record,
-                ['attr1', 'attr2']
-            )
+            const result = buildMinimalFusionReportAccount(acc, mockUrlContext, SourceType.Record, ['attr1', 'attr2'])
 
             expect(result).toEqual({
                 accountName: 'Test Acc',
@@ -201,7 +196,7 @@ describe('fusionReportHelpers', () => {
                 accountEmail: 'test@example.com',
                 accountAttributes: {
                     attr1: 'val1',
-                    attr2: 'val2'
+                    attr2: 'val2',
                 },
                 matches: [],
             })
@@ -213,39 +208,21 @@ describe('fusionReportHelpers', () => {
                 name: 'Test Acc',
                 managedAccountId: 'acc1',
             } as any
-            const result = buildMinimalFusionReportAccount(
-                acc,
-                mockUrlContext,
-                undefined,
-                []
-            )
+            const result = buildMinimalFusionReportAccount(acc, mockUrlContext, undefined, [])
 
             expect(result.sourceType).toBe(SourceType.Authoritative)
         })
 
         it('should include error if provided', () => {
             const acc = { name: 'Test Acc' } as any
-            const result = buildMinimalFusionReportAccount(
-                acc,
-                mockUrlContext,
-                undefined,
-                [],
-                'Some error'
-            )
+            const result = buildMinimalFusionReportAccount(acc, mockUrlContext, undefined, [], 'Some error')
 
             expect(result.error).toBe('Some error')
         })
 
         it('should use accountIdOverride if provided', () => {
             const acc = { name: 'Test Acc', managedAccountId: 'orig1' } as any
-            const result = buildMinimalFusionReportAccount(
-                acc,
-                mockUrlContext,
-                undefined,
-                [],
-                undefined,
-                'overridden1'
-            )
+            const result = buildMinimalFusionReportAccount(acc, mockUrlContext, undefined, [], undefined, 'overridden1')
 
             expect(result.accountId).toBe('overridden1')
             expect(mockUrlContext.humanAccount).toHaveBeenCalledWith('overridden1')

@@ -304,14 +304,20 @@ export class SchemaService {
     public async getManagedSourceSchemaAttributeNames(): Promise<Set<string>> {
         const names = new Set<string>()
         const { managedSources } = this.sources
-        const schemas: (AccountSchema | undefined)[] = []
-        for (const source of managedSources) {
-            try {
-                schemas.push(await this.fetchAccountSchema(source.id))
-            } catch {
-                schemas.push(undefined)
-            }
-        }
+
+        // Fetch schemas from managed sources concurrently to resolve sequential N+1 bottleneck
+        const schemas = await promiseAllBatched(
+            managedSources,
+            async (source) => {
+                try {
+                    return await this.fetchAccountSchema(source.id)
+                } catch {
+                    return undefined
+                }
+            },
+            50
+        )
+
         for (const schema of schemas) {
             if (schema) {
                 for (const attr of schema.attributes) {

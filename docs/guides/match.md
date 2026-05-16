@@ -506,4 +506,4 @@ If reviewers repeatedly see “obvious same person” rows that still look risky
 
 - For algorithm selection and tuning, see [Effective use of matching algorithms](matching-algorithms.md).
 - For attribute merging strategies, see [Effective use of Map](map.md).
-- For ISC setup (connection, schema, identity profile), see the [repository README](../home.md#quick-start).
+- For ISC setup (connection, schema, identity profile), see the [repository README](../index.md#quick-start).

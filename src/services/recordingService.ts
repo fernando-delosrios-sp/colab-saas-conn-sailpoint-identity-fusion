@@ -109,8 +109,7 @@ export class RecordingService {
         if (!this.currentStep) return
 
         this.currentStep.stateAfter = this.snapshotState(sources, identities, forms)
-        this.currentStep.duration =
-            Date.now() - new Date(this.currentStep.timestamp).getTime()
+        this.currentStep.duration = Date.now() - new Date(this.currentStep.timestamp).getTime()
         this.steps.push({ ...this.currentStep })
 
         this.log.debug(
@@ -119,30 +118,20 @@ export class RecordingService {
         this.currentStep = null
     }
 
-    private snapshotState(
-        sources: SourceService,
-        identities: IdentityService,
-        forms: FormService
-    ): StateSnapshot {
+    private snapshotState(sources: SourceService, identities: IdentityService, forms: FormService): StateSnapshot {
         let managedAccounts: unknown[] = []
         if (sources?.managedAccountsAllById) {
-            managedAccounts = Array.from(sources.managedAccountsAllById.values()).map((a) =>
-                sanitizeForJson(a)
-            )
+            managedAccounts = Array.from(sources.managedAccountsAllById.values()).map((a) => sanitizeForJson(a))
         }
 
         let fusionAccounts: unknown[] = []
         if (sources?.fusionAccountsByNativeIdentity) {
-            fusionAccounts = Array.from(
-                sources.fusionAccountsByNativeIdentity.values()
-            ).map((a) => sanitizeForJson(a))
+            fusionAccounts = Array.from(sources.fusionAccountsByNativeIdentity.values()).map((a) => sanitizeForJson(a))
         }
 
         let identityList: unknown[] = []
         try {
-            identityList = Array.from(identities.identityValues()).map((i) =>
-                sanitizeForJson(i)
-            )
+            identityList = Array.from(identities.identityValues()).map((i) => sanitizeForJson(i))
         } catch {
             /* identityValues may not be accessible in all contexts */
         }
@@ -173,9 +162,7 @@ export class RecordingService {
         const filePath = path.join(dir, 'scenario.json')
         fs.writeFileSync(filePath, JSON.stringify(scenario, null, 2) + '\n')
 
-        this.log.info(
-            `Recording "${this.chainName}" finalized — ${this.steps.length} steps → ${filePath}`
-        )
+        this.log.info(`Recording "${this.chainName}" finalized — ${this.steps.length} steps → ${filePath}`)
         return filePath
     }
 
@@ -184,17 +171,17 @@ export class RecordingService {
         const firstState = firstStep?.stateAfter
         const initialState = firstState
             ? {
-                identities: firstState.identities,
-                managedAccounts: firstState.managedAccounts,
-                fusionAccounts: firstState.fusionAccounts,
-                formDecisions: firstState.formDecisions,
-            }
+                  identities: firstState.identities,
+                  managedAccounts: firstState.managedAccounts,
+                  fusionAccounts: firstState.fusionAccounts,
+                  formDecisions: firstState.formDecisions,
+              }
             : {
-                identities: [],
-                managedAccounts: [],
-                fusionAccounts: [],
-                formDecisions: [],
-            }
+                  identities: [],
+                  managedAccounts: [],
+                  fusionAccounts: [],
+                  formDecisions: [],
+              }
 
         const scenarioSteps = this.steps.map((step) => ({
             id: step.stepId,
@@ -203,11 +190,7 @@ export class RecordingService {
             description: `Recorded ${step.operation} — ${step.duration}ms, ${step.output.length} outputs`,
             input: step.input as Record<string, unknown>,
             expectedOutput:
-                step.output.length > 0
-                    ? step.output.length === 1
-                        ? step.output[0]
-                        : step.output
-                    : undefined,
+                step.output.length > 0 ? (step.output.length === 1 ? step.output[0] : step.output) : undefined,
             expectedStateDelta: step.stateAfter,
         }))
 

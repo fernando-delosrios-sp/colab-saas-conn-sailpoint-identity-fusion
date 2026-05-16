@@ -51,7 +51,12 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
         await schemas.setFusionAccountSchema(input.schema)
         timer.phase('Step 1: Loading sources and schema')
 
-        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_NONE, { fusion, identities, sources, log })
+        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_NONE, {
+            fusion,
+            identities,
+            sources,
+            log,
+        })
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
         timer.phase('Step 2: Rebuilding fusion account with fresh attributes')
