@@ -241,10 +241,7 @@ export function extractArray<T = any>(attributes: Record<string, any>, key: stri
  * // Returns: Set()
  */
 function extractObjectValue(item: object): string | undefined {
-    const id = readUnknown(item, 'id')
-    const value = readUnknown(item, 'value')
-    const name = readUnknown(item, 'name')
-    const pick = id ?? value ?? name
+    const pick = readUnknown(item, 'id') ?? readUnknown(item, 'value') ?? readUnknown(item, 'name')
     return hasValue(pick) ? String(pick) : undefined
 }
 
