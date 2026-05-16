@@ -42,3 +42,4 @@ logs/
 # Recordings (generated test baselines from record mode)
 test-data/recordings/
 
+tools.yaml
