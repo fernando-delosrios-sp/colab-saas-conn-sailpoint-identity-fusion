@@ -208,12 +208,9 @@ const mapScoresToThresholdWire = (scores: FusionReportMatch['scores'] | undefine
 const deriveMatchingStatus = (reportAccounts: FusionReportAccount[]): MatchingStatus => {
     // No report accounts linked to this ISC account in this run -> existing Fusion-only.
     if (reportAccounts.length === 0) return 'not-analyzed'
-    const hasDeferred = reportAccounts.some((x) => Boolean(x.deferred))
-    if (hasDeferred) return 'deferred'
-    const hasError = reportAccounts.some((x) => Boolean(x.error))
-    if (hasError) return 'review-error'
-    const hasMatch = reportAccounts.some((x) => x.matches.length > 0)
-    if (hasMatch) return 'matched'
+    if (reportAccounts.some((x) => x.deferred)) return 'deferred'
+    if (reportAccounts.some((x) => x.error)) return 'review-error'
+    if (reportAccounts.some((x) => x.matches.length > 0)) return 'matched'
     return 'non-matched'
 }
 
