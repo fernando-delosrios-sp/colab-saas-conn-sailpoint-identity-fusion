@@ -1,6 +1,6 @@
 import { logger } from '@sailpoint/connector-sdk'
 import { v4 as uuidv4 } from 'uuid'
-import { QueueItem, QueueStats, QueueConfig, QueuePriority } from './types'
+import { QueueItem, QueueStats, QueueConfig, QueuePriority, QueuedItemInfo } from './types'
 import { shouldRetry, calculateRetryDelay } from './helpers'
 import { internalConfig } from '../../data/config'
 
@@ -23,6 +23,7 @@ export class ApiQueue {
         [QueuePriority.LOW, []],
     ])
     private activeRequests: number = 0
+    private activeItems: Map<string, QueueItem> = new Map()
     private processing: boolean = false
     private stats: QueueStats = {
         totalProcessed: 0,
@@ -92,6 +93,8 @@ export class ApiQueue {
             maxRetries?: number
             id?: string
             abortSignal?: AbortSignal
+            label?: string
+            noRetry?: boolean
         } = {}
     ): Promise<T> {
         const item: QueueItem<T> = {
@@ -104,6 +107,8 @@ export class ApiQueue {
             maxRetries: options.maxRetries ?? this.config.maxRetries,
             createdAt: Date.now(),
             abortSignal: options.abortSignal,
+            label: options.label,
+            noRetry: options.noRetry,
         }
 
         return new Promise<T>((resolve, reject) => {
@@ -181,6 +186,7 @@ export class ApiQueue {
     private async executeRequest<T>(item: QueueItem<T>): Promise<void> {
         this.activeRequests++
         this.stats.activeRequests = this.activeRequests
+        this.activeItems.set(item.id, item)
 
         const waitTime = Date.now() - item.createdAt
         this.pushStat('wait', waitTime)
@@ -210,7 +216,7 @@ export class ApiQueue {
             this.pushStat('processing', processingTime)
 
             // Check if we should retry
-            if (shouldRetry(error) && item.retryCount < item.maxRetries) {
+            if (!item.noRetry && shouldRetry(error) && item.retryCount < item.maxRetries) {
                 item.retryCount++
                 this.stats.totalRetries++
                 this.updateStats()
@@ -232,6 +238,7 @@ export class ApiQueue {
         } finally {
             this.activeRequests--
             this.stats.activeRequests = this.activeRequests
+            this.activeItems.delete(item.id)
 
             // Continue processing
             setTimeout(() => this.processQueue(), 0)
@@ -243,6 +250,46 @@ export class ApiQueue {
      */
     getStats(): QueueStats {
         return { ...this.stats }
+    }
+
+    /**
+     * Map a QueueItem to a serialisable QueuedItemInfo.
+     */
+    private toItemInfo(item: QueueItem): QueuedItemInfo {
+        return {
+            id: item.id,
+            priority: item.priority,
+            label: item.label,
+            createdAt: item.createdAt,
+            retryCount: item.retryCount,
+            maxRetries: item.maxRetries,
+            waitTimeMs: Date.now() - item.createdAt,
+            noRetry: item.noRetry,
+        }
+    }
+
+    /**
+     * Returns sanitised info for all items waiting in the priority queues.
+     */
+    getPendingItems(): QueuedItemInfo[] {
+        const items: QueuedItemInfo[] = []
+        for (const q of this.queues.values()) {
+            for (const item of q) {
+                items.push(this.toItemInfo(item))
+            }
+        }
+        return items
+    }
+
+    /**
+     * Returns sanitised info for all items currently executing.
+     */
+    getActiveItems(): QueuedItemInfo[] {
+        const items: QueuedItemInfo[] = []
+        for (const item of this.activeItems.values()) {
+            items.push(this.toItemInfo(item))
+        }
+        return items
     }
 
     /**
@@ -295,7 +342,12 @@ export class ApiQueue {
             q.forEach((item) => item.reject(new Error('Queue cleared')))
             q.length = 0
         }
+        for (const item of this.activeItems.values()) {
+            item.reject(new Error('Queue cleared'))
+        }
+        this.activeItems.clear()
         this.stats.queueLength = 0
+        this.stats.activeRequests = 0
     }
 
     /**

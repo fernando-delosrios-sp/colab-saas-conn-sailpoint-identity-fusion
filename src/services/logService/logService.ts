@@ -262,7 +262,7 @@ export class LogService {
             }).then(() => {})
 
         const pending: Promise<void> = (
-            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW }).then(() => {}) : doFetch()
+            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW, label: 'LogService>sendExternalLog', noRetry: true }).then(() => {}) : doFetch()
         )
             .catch(() => {})
             .finally(() => {
