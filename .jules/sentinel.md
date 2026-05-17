@@ -27,3 +27,9 @@
 **Vulnerability:** The ProxyService (`src/services/proxyService.ts`) fetched data directly from a user-configured `proxyUrl` without validating the scheme, making it vulnerable to Server-Side Request Forgery (SSRF) if a user supplied a malicious URL scheme like `file://` or an internal metadata endpoint.
 **Learning:** External or user-provided URLs must always be validated prior to making network requests, especially in Node.js where `fetch` or HTTP clients might attempt to resolve arbitrary schemes or hostnames.
 **Prevention:** Enforce strict URL scheme validation (e.g., checking for `http://` or `https://`) whenever initializing requests with configured URLs.
+
+## 2026-05-17 - Log Injection via Control Characters
+
+**Vulnerability:** The `sanitizeLog` function in `log-server.js` only stripped `\r` and `\n` characters to prevent Log Injection attacks. An attacker could bypass this by using other Unicode line terminators (like \u2028 or \u2029) or ASCII control characters (like \u0085 Next Line) to inject new log entries. Additionally, passing non-string data (e.g., an array or object without a `replace` method) would crash the server, causing Denial of Service.
+**Learning:** Robust sanitization must handle type coercion explicitly before executing string methods. It must also account for a comprehensive range of ASCII control characters and Unicode line separators, not just `\r\n`.
+**Prevention:** Convert unknown input explicitly to strings (e.g., using `String()`) before executing string prototype methods. Utilize comprehensive regular expressions (e.g., `/[\x00-\x08\x0A-\x1F\x7F\u0085\u2028\u2029]+/g`) to sanitize log injection attack vectors thoroughly.
