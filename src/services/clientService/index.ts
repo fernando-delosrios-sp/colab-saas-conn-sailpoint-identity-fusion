@@ -5,7 +5,7 @@ export { ClientService } from './clientService'
 export { ApiQueue } from './queue'
 
 // Type exports
-export type { QueueItem, QueueStats, QueueConfig } from './types'
+export type { QueueItem, QueueStats, QueueConfig, QueuedItemInfo } from './types'
 export { QueuePriority } from './types'
 
 // Helper exports

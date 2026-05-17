@@ -726,7 +726,7 @@ export class FormService {
             return matchingInstances
         }
 
-        const formInstances = await this.client.execute(searchFormInstancesByTenant)
+        const formInstances = await this.client.execute(searchFormInstancesByTenant, undefined, `FormService>searchFormInstancesByTenant formDef=${formDefinitionId ?? 'all'}`)
         return formInstances ?? []
     }
 
@@ -757,7 +757,7 @@ export class FormService {
             return response.data
         }
 
-        const formInstance = await this.client.execute(patchFormInstanceState)
+        const formInstance = await this.client.execute(patchFormInstanceState, undefined, `FormService>setFormInstanceState id=${formInstanceID} state=${state}`)
         return formInstance
     }
 
@@ -1455,7 +1455,7 @@ export class FormService {
         }
 
         this.log.debug(`Executing form creation through client...`)
-        const formInstance = await this.client.execute(createFormDefinition)
+        const formInstance = await this.client.execute(createFormDefinition, undefined, `FormService>createFormDefinition name=${form.body.name}`)
         assert(formInstance, 'Failed to create form definition')
         assert(formInstance.id, 'Form definition ID is missing')
 
@@ -1512,7 +1512,7 @@ export class FormService {
             return response.data
         }
 
-        const response = await this.client.execute(createFormInstanceCall)
+        const response = await this.client.execute(createFormInstanceCall, undefined, `FormService>createFormInstance formDef=${formDefinitionId}`)
         assert(response, 'Failed to create form instance')
         this.log.debug(`Form instance created successfully: ${response.id || 'unknown'}`)
         this._formInstancesCreated++
@@ -1533,7 +1533,7 @@ export class FormService {
         const deleteFormDefinition = async () => {
             await customFormsApi.deleteFormDefinition({ formDefinitionID })
         }
-        await this.client.execute(deleteFormDefinition)
+        await this.client.execute(deleteFormDefinition, undefined, `FormService>deleteFormDefinition id=${formDefinitionID}`)
         this.log.debug(`Form definition deleted successfully: ${formDefinitionID}`)
     }
 }

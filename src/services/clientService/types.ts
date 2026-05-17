@@ -20,6 +20,24 @@ export interface QueueItem<T = any> {
     maxRetries: number
     createdAt: number
     abortSignal?: AbortSignal
+    label?: string
+    noRetry?: boolean
+}
+
+/**
+ * Serialisable, sanitized view of a queued or active item.
+ * Excludes function references (execute, resolve, reject, abortSignal)
+ * so it is safe for logging, transmission, and external inspection.
+ */
+export interface QueuedItemInfo {
+    id: string
+    priority: QueuePriority
+    label?: string
+    createdAt: number
+    retryCount: number
+    maxRetries: number
+    waitTimeMs: number
+    noRetry?: boolean
 }
 
 /**

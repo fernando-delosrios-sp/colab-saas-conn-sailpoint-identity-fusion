@@ -729,7 +729,7 @@ export class MessagingService {
                 return (resp as any)?.data ?? resp
             }
 
-            await this.client.execute(patchCall)
+            await this.client.execute(patchCall, undefined, `MessagingService>disableWorkflow id=${workflow.id}`)
             this.log.info(`Disabled workflow ${workflow.id} to allow test execution`)
         } catch (e) {
             // If we can't disable it, testWorkflow may fail with 400.
@@ -811,7 +811,7 @@ export class MessagingService {
             const response = await workflowsApi.createWorkflow({ createWorkflowRequestV2025 })
             return response.data
         }
-        const workflowData = await this.client.execute(createWorkflowFn)
+        const workflowData = await this.client.execute(createWorkflowFn, undefined, `MessagingService>createWorkflow name=${createWorkflowRequestV2025.name}`)
         assert(workflowData, 'Failed to create workflow')
         assert(workflowData.id, 'Workflow ID is required')
 
@@ -835,7 +835,7 @@ export class MessagingService {
             const response = await workflowsApi.testWorkflow(requestParameters)
             return response
         }
-        const response = await this.client.execute(testWorkflowFn)
+        const response = await this.client.execute(testWorkflowFn, undefined, `MessagingService>testWorkflow id=${requestParameters.id}`)
         assert(response, 'Workflow response is required')
         this.log.debug(`Workflow executed. Response code ${response.status}`)
         return response

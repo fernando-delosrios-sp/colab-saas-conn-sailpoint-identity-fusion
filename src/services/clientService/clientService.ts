@@ -1,7 +1,7 @@
 import FormData from 'form-data'
 import https from 'https'
 import { ApiQueue } from './queue'
-import { QueueConfig, QueuePriority, QueueStats } from './types'
+import { QueueConfig, QueuePriority, QueueStats, QueuedItemInfo } from './types'
 import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
 import {
@@ -208,13 +208,16 @@ export class ClientService {
      * @param priority - Queue priority when queue is enabled
      * @param context - Optional hint for error logs (e.g. "SourceService>saveBatchCumulativeCount")
      * @param abortSignal - Optional signal to abort the request
+     * @param throwOnError - Whether to rethrow on failure instead of returning undefined
+     * @param noRetry - When true, the request is never retried on failure
      */
     public async execute<TResponse>(
         apiFunction: () => Promise<TResponse>,
         priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string,
         abortSignal?: AbortSignal,
-        throwOnError: boolean = false
+        throwOnError: boolean = false,
+        noRetry?: boolean
     ): Promise<TResponse | undefined> {
         const fn = () => {
             if (abortSignal?.aborted) {
@@ -243,7 +246,7 @@ export class ClientService {
 
         try {
             if (this.queue) {
-                return await this.queue.enqueue(() => fn(), { priority, abortSignal })
+                return await this.queue.enqueue(() => fn(), { priority, abortSignal, label: context, noRetry })
             }
 
             return await fn()
@@ -516,6 +519,20 @@ export class ClientService {
             }
         }
         return this.queue.getStats()
+    }
+
+    /**
+     * Returns sanitised info for all items currently waiting in queue or actively executing.
+     * Returns empty arrays when the queue is disabled.
+     */
+    public getQueueItems(): { pending: QueuedItemInfo[]; active: QueuedItemInfo[] } {
+        if (!this.queue) {
+            return { pending: [], active: [] }
+        }
+        return {
+            pending: this.queue.getPendingItems(),
+            active: this.queue.getActiveItems(),
+        }
     }
 
     /**
