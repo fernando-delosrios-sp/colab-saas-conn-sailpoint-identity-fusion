@@ -1,3 +1,4 @@
+import { ConnectorError } from '@sailpoint/connector-sdk'
 import { accountEnable } from '../accountEnable'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
@@ -51,5 +52,25 @@ describe('accountEnable', () => {
         expect(fusionAccount.enable).toHaveBeenCalledTimes(1)
         expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-enabled' })
+    })
+
+    it('throws ConnectorError when caught', async () => {
+        const registry = createRegistry()
+        const error = new ConnectorError('Connector error')
+        ;(rebuildFusionAccount as jest.Mock).mockRejectedValue(error)
+
+        await expect(
+            accountEnable(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)
+        ).rejects.toThrow(ConnectorError)
+    })
+
+    it('logs crash when non-ConnectorError is caught', async () => {
+        const registry = createRegistry()
+        const error = new Error('Generic error')
+        ;(rebuildFusionAccount as jest.Mock).mockRejectedValue(error)
+
+        await accountEnable(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)
+
+        expect(registry.log.crash).toHaveBeenCalledWith('Failed to enable account fusion-1', error)
     })
 })
