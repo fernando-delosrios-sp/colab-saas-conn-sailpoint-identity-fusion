@@ -28,4 +28,11 @@ describe('compileAccountPageJmespathFilter', () => {
         const compiled = compileAccountPageJmespathFilter('HR', 'accounts[0].id')
         expect(() => compiled!.filterAccountPage([{ id: 'a1' } as any])).toThrow('must return an array')
     })
+
+    it('throws on runtime execution failure', () => {
+        const compiled = compileAccountPageJmespathFilter('HR', 'accounts[?abs(name) == `1`]')
+        expect(() => compiled!.filterAccountPage([{ name: 'foo' } as any])).toThrow(
+            'Invalid Accounts JMESPath filter for source "HR": TypeError: abs() expected argument 1 to be type number but received type string instead.. Expression: accounts[?abs(name) == `1`]'
+        )
+    })
 })
