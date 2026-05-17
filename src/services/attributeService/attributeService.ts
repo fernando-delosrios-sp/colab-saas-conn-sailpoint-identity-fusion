@@ -721,9 +721,9 @@ export class AttributeService {
     private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
         const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
         return (
+            trimStr(fusionAccount.name) ??
             trimStr(identityBag?.name) ??
-            trimStr(fusionAccount.identityDisplayName) ??
-            trimStr(fusionAccount.name)
+            trimStr(fusionAccount.identityDisplayName)
         )
     }
 
