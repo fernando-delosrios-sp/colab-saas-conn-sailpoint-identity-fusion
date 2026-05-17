@@ -24,5 +24,6 @@
 **Action:** Keep `README.md` in standard Markdown blockquote formatting (`> **Note:**`) so it renders correctly on GitHub, and dynamically transform these blockquotes into MkDocs admonitions programmatically during the `docs:sync-home` build step.
 
 ## 2025-02-27 - Clarify identity scope tip
+
 **Learning:** Dense paragraphs inside admonitions (like the identity scope tip) are hard to scan, especially when describing distinct configuration states (e.g., "Not included" vs "Included"). Using Markdown bullet points with bold prefixes improves clarity. Also, MkDocs material admonitions require 4-space indentation for all block content.
 **Action:** When converting verbose explanatory text into MkDocs admonitions, format distinct states or choices as bulleted lists, ensuring 4-space indentation to satisfy both Material theme parsing and readability standards.
