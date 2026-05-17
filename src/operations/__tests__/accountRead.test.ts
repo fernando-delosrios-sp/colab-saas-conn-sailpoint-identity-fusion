@@ -1,6 +1,7 @@
 import { accountRead } from '../accountRead'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
+import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 
 jest.mock('../helpers/rebuildFusionAccount', () => ({
     rebuildFusionAccount: jest.fn(),
@@ -52,5 +53,25 @@ describe('accountRead', () => {
     it('rejects when identity is missing', async () => {
         const registry = createRegistry()
         await expect(accountRead(registry, {} as any)).rejects.toBeTruthy()
+    })
+
+    it('re-throws a ConnectorError when encountered', async () => {
+        const registry = createRegistry()
+        const error = new ConnectorError('Custom error', ConnectorErrorType.NotFound)
+        registry.sources.fetchAllSources.mockRejectedValue(error)
+
+        await expect(
+            accountRead(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)
+        ).rejects.toThrow(error)
+        expect(registry.log.crash).not.toHaveBeenCalled()
+    })
+
+    it('crashes via log.crash when a non-ConnectorError is encountered', async () => {
+        const registry = createRegistry()
+        const error = new Error('Unexpected error')
+        registry.sources.fetchAllSources.mockRejectedValue(error)
+
+        await accountRead(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)
+        expect(registry.log.crash).toHaveBeenCalledWith('Failed to read account fusion-1', error)
     })
 })
