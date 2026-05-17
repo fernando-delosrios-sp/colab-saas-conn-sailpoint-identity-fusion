@@ -29,7 +29,18 @@ const colors = {
 }
 
 // Sanitize: strip newlines/carriage returns to prevent log injection attacks
-const sanitizeLog = (message) => message.replace(/[\r\n]+/g, ' ')
+const sanitizeLog = (message) => {
+    // Convert to string to prevent bypass via arrays/objects and crash due to missing replace method
+    if (typeof message !== 'string') {
+        try {
+            message = JSON.stringify(message)
+        } catch (e) {
+            message = String(message)
+        }
+    }
+    // Remove all ASCII control characters (except tab \x09), DEL, and Unicode line/paragraph separators
+    return message.replace(/[\x00-\x08\x0A-\x1F\x7F\u0085\u2028\u2029]+/g, ' ')
+}
 
 // Colorize log messages
 const colorizeLog = (message) => {
