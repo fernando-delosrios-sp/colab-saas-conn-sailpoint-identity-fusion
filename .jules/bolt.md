@@ -42,3 +42,8 @@
 
 **Learning:** `Promise.all(array.map(fn))` triggers unbounded parallel execution which can cause API rate limit or bottleneck issues. Replacing it with an explicit batched approach prevents spikes in API usage.
 **Action:** Replaced `Promise.all(forms.map(...))` and `Promise.all(missing.map(...))` with `promiseAllBatched` in `src/services/formService/formService.ts` and `src/services/identityService.ts` to bound concurrency.
+
+## 2026-05-17 - Prevent unbounded parallel execution in source service methods
+
+**Learning:** Unbounded `Promise.all(array.map(fn))` in methods like `fetchManagedAccounts`, `aggregateManagedSources`, and `aggregateDelayedSources` initiates thousands of concurrent asynchronous requests when iterating over potentially large arrays (e.g. `managedSources`). This results in memory exhaustion and external API rate limit triggers.
+**Action:** Replaced these unbounded `Promise.all` mapping blocks with `promiseAllBatched` to bound concurrency while maintaining parallel execution benefits.

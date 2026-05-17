@@ -82,7 +82,7 @@ export class ServiceRegistry {
         const commandType = context.commandType as StandardCommand | undefined
         this.attributes =
             context.attributesService ??
-            new AttributeService(this.config, this.schemas, this.sources, this.log, this.locks, commandType)
+            new AttributeService(this.config, this.schemas, this.sources, this.log, this.locks)
 
         // Initialize FusionService last (depends on multiple services)
         this.fusion =
