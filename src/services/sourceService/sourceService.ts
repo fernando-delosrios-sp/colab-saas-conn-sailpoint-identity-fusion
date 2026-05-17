@@ -648,62 +648,58 @@ export class SourceService {
         })
 
         await wrapConnectorError(async () => {
-            await Promise.all(
-                sourcesWithLimits.map(async ({ source, effectiveLimit }) => {
-                    this.log.info(`Fetching accounts from source: ${source.name}`)
-                    let collectedCount = 0
-                    let discardedMachineCount = 0
+            for (const { source, effectiveLimit } of sourcesWithLimits) {
+                this.log.info(`Fetching accounts from source: ${source.name}`)
+                let collectedCount = 0
+                let discardedMachineCount = 0
 
-                    for await (const batch of this.fetchAccountsBySourceIdGenerator(
-                        source.id,
-                        abortSignal,
-                        effectiveLimit
-                    )) {
-                        const filteredBatch = this.applyManagedJmespathFilter(source, batch)
-                        for (const account of filteredBatch) {
-                            if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
-                            if (this.isMachineManagedAccount(account)) {
-                                discardedMachineCount++
-                                continue
-                            }
-
-                            const accountKey = getManagedAccountKeyFromAccount(account)
-                            if (!accountKey) {
-                                continue
-                            }
-                            this.managedAccountsById.set(accountKey, account)
-                            this.managedAccountsAllById.set(accountKey, account)
-                            if (account.identityId) {
-                                let idSet = this.managedAccountsByIdentityId.get(account.identityId)
-                                if (!idSet) {
-                                    idSet = new Set()
-                                    this.managedAccountsByIdentityId.set(account.identityId, idSet)
-                                }
-                                idSet.add(accountKey)
-                            }
-                            collectedCount++
+                for await (const batch of this.fetchAccountsBySourceIdGenerator(
+                    source.id,
+                    abortSignal,
+                    effectiveLimit
+                )) {
+                    const filteredBatch = this.applyManagedJmespathFilter(source, batch)
+                    for (const account of filteredBatch) {
+                        if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
+                        if (this.isMachineManagedAccount(account)) {
+                            discardedMachineCount++
+                            continue
                         }
-                        if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) {
-                            this.log.info(
-                                `Source ${source.name}: reached effectiveLimit of ${effectiveLimit}, stopping`
-                            )
-                            break
+
+                        const accountKey = getManagedAccountKeyFromAccount(account)
+                        if (!accountKey) {
+                            continue
                         }
+                        this.managedAccountsById.set(accountKey, account)
+                        this.managedAccountsAllById.set(accountKey, account)
+                        if (account.identityId) {
+                            let idSet = this.managedAccountsByIdentityId.get(account.identityId)
+                            if (!idSet) {
+                                idSet = new Set()
+                                this.managedAccountsByIdentityId.set(account.identityId, idSet)
+                            }
+                            idSet.add(accountKey)
+                        }
+                        collectedCount++
                     }
+                    if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) {
+                        this.log.info(`Source ${source.name}: reached effectiveLimit of ${effectiveLimit}, stopping`)
+                        break
+                    }
+                }
 
-                    this.log.info(`Source ${source.name}: collected ${collectedCount} account(s)`)
-                    if (discardedMachineCount > 0) {
-                        this.log.warn(
-                            `Source ${source.name}: discarded ${discardedMachineCount} managed machine account(s) where isMachine=true`
-                        )
-                    }
+                this.log.info(`Source ${source.name}: collected ${collectedCount} account(s)`)
+                if (discardedMachineCount > 0) {
+                    this.log.warn(
+                        `Source ${source.name}: discarded ${discardedMachineCount} managed machine account(s) where isMachine=true`
+                    )
+                }
 
-                    if (this.batchLimitedSourceNames.has(source.name)) {
-                        this.batchCumulativeCount[source.name] = collectedCount
-                        this.log.debug(`Source ${source.name}: updated cumulative count to ${collectedCount}`)
-                    }
-                })
-            )
+                if (this.batchLimitedSourceNames.has(source.name)) {
+                    this.batchCumulativeCount[source.name] = collectedCount
+                    this.log.debug(`Source ${source.name}: updated cumulative count to ${collectedCount}`)
+                }
+            }
             this.log.debug(`Total managed accounts loaded: ${this.managedAccountsById.size}`)
         }, 'Failed to fetch managed accounts')
     }
@@ -840,32 +836,26 @@ export class SourceService {
         const managedSources = this.managedSources
         this.log.debug(`Checking aggregation control for ${managedSources.length} managed source(s)`)
 
-        const aggregationChecks = await Promise.all(
-            managedSources.map(async (source) => {
-                const mode = source.config?.aggregationMode ?? 'none'
+        const aggregationChecks: { source: SourceInfo; shouldAggregate: boolean }[] = []
+        for (const source of managedSources) {
+            const mode = source.config?.aggregationMode ?? 'none'
 
-                if (mode !== 'before') {
-                    this.log.debug(
-                        `Source ${source.name}: aggregationMode=${mode}, skipping pre-processing aggregation`
-                    )
-                    return { source, shouldAggregate: false }
-                }
+            if (mode !== 'before') {
+                this.log.debug(`Source ${source.name}: aggregationMode=${mode}, skipping pre-processing aggregation`)
+                aggregationChecks.push({ source, shouldAggregate: false })
+                continue
+            }
 
-                const shouldAggregate = await this.shouldAggregateSource(source)
-                return { source, shouldAggregate }
-            })
-        )
+            const shouldAggregate = await this.shouldAggregateSource(source)
+            aggregationChecks.push({ source, shouldAggregate })
+        }
 
         const disableOptimization = (source: SourceInfo) => source.config?.optimizedAggregation === false
 
-        await Promise.all(
-            aggregationChecks
-                .filter(({ shouldAggregate }) => shouldAggregate)
-                .map(async ({ source }) => {
-                    this.log.info(`Aggregating source before processing: ${source.name}`)
-                    await this.aggregateManagedSource(source.id, disableOptimization(source))
-                })
-        )
+        for (const { source } of aggregationChecks.filter(({ shouldAggregate }) => shouldAggregate)) {
+            this.log.info(`Aggregating source before processing: ${source.name}`)
+            await this.aggregateManagedSource(source.id, disableOptimization(source))
+        }
         this.log.debug('Pre-processing source aggregation completed')
     }
 
@@ -889,30 +879,28 @@ export class SourceService {
 
         this.log.info(`Scheduling delayed aggregation for ${delayedSources.length} source(s)`)
 
-        await Promise.all(
-            delayedSources.map(async (source) => {
-                const delayMinutes = source.config?.aggregationDelay ?? 5
-                const disableOpt = source.config?.optimizedAggregation === false
+        for (const source of delayedSources) {
+            const delayMinutes = source.config?.aggregationDelay ?? 5
+            const disableOpt = source.config?.optimizedAggregation === false
 
-                this.log.info(
-                    `Source ${source.name}: scheduling delayed aggregation in ${delayMinutes} minute(s), disableOptimization=${disableOpt}`
+            this.log.info(
+                `Source ${source.name}: scheduling delayed aggregation in ${delayMinutes} minute(s), disableOptimization=${disableOpt}`
+            )
+
+            try {
+                await scheduleAggregation({
+                    sourceId: source.id,
+                    delayMinutes,
+                    disableOptimization: disableOpt,
+                })
+            } catch (err) {
+                this.log.error(
+                    `Failed to schedule delayed aggregation for source ${source.name}: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`
                 )
-
-                try {
-                    await scheduleAggregation({
-                        sourceId: source.id,
-                        delayMinutes,
-                        disableOptimization: disableOpt,
-                    })
-                } catch (err) {
-                    this.log.error(
-                        `Failed to schedule delayed aggregation for source ${source.name}: ${
-                            err instanceof Error ? err.message : String(err)
-                        }`
-                    )
-                }
-            })
-        )
+            }
+        }
     }
 
     /**
