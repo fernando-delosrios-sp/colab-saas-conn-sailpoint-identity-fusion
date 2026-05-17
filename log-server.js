@@ -3,7 +3,7 @@ const express = require('express')
 const fs = require('fs')
 const path = require('path')
 
-const PORT = process.env.PORT || 2389
+const PORT = process.env.PORT || 3000
 const LOG_FILE = process.env.LOG_FILE || 'logs/remote-logs.txt'
 
 // ANSI color codes
