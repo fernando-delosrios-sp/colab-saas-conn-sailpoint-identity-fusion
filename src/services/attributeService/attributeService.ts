@@ -85,7 +85,6 @@ export class AttributeService {
      * @param sourceService - Source service for persisting state to the fusion source config
      * @param log - Logger instance
      * @param locks - Lock service for thread-safe unique Define generation
-     * @param commandType - The current SDK command type (affects key generation behavior)
      */
     constructor(
         config: FusionConfig,
