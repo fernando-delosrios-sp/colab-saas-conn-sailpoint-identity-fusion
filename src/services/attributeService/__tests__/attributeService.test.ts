@@ -2181,3 +2181,149 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
         expect(fusionAccount.attributes.name).toBe('Hosting Identity Name')
     })
 })
+
+describe('AttributeService error handling', () => {
+    const createService = () => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [
+                {
+                    name: 'normalAttr',
+                    expression: '$something',
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    refresh: true,
+                },
+            ],
+            uniqueAttributeDefinitions: [
+                {
+                    name: 'uniqueAttr',
+                    expression: '$something',
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    maxIterations: 10,
+                },
+            ],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = {
+            debug: jest.fn(),
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+        } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        return new AttributeService(config, schemas, sourceService, log, locks)
+    }
+
+    const attachAttributesAccessor = (fusionAccount: any, attributeBag: any) => {
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+    }
+
+    const createFusionAccount = (attrs: Record<string, any> = {}) => {
+        const attributeBag: any = {
+            current: { ...attrs },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map(),
+            primaryAccount: {
+                id: '123',
+                name: '123',
+                identityId: 'ident123',
+                sourceId: 'hr-source',
+                sourceName: 'HR',
+                attributes: {},
+                entitlements: [],
+                disabled: false,
+                locked: false,
+                privileged: false,
+                manuallyCorrelated: false,
+                hasEntitlements: false,
+                created: '2020-01-01T00:00:00Z',
+                modified: '2020-01-01T00:00:00Z',
+                uncorrelated: false,
+            },
+        }
+
+        const fusionAccount: any = {
+            id: 'fusion-1',
+            name: 'John Doe',
+            sourceName: 'IdentityFusion',
+            attributes: { ...attrs },
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        attachAttributesAccessor(fusionAccount, attributeBag)
+
+        return fusionAccount
+    }
+
+    it('catches and logs errors when generating normal attributes without re-throwing', async () => {
+        const service = createService()
+        const fusionAccount = createFusionAccount()
+
+        const logErrorSpy = jest.spyOn((service as any).log, 'error')
+
+        // Mock processNormalDefinition to throw
+        ;(service as any).processNormalDefinition = jest.fn().mockRejectedValue(new Error('Test normal error'))
+
+        // Mock processUniqueDefinition to succeed
+        ;(service as any).processUniqueDefinition = jest.fn().mockResolvedValue(undefined)
+
+        // Should not throw
+        await expect(service.refreshAllAttributes(fusionAccount)).resolves.not.toThrow()
+
+        expect(logErrorSpy).toHaveBeenCalledWith(
+            'Error generating normal attribute normalAttr for account: John Doe (IdentityFusion)',
+            'Test normal error'
+        )
+    })
+
+    it('catches, logs, and re-throws errors when generating unique attributes', async () => {
+        const service = createService()
+        const fusionAccount = createFusionAccount()
+
+        const logErrorSpy = jest.spyOn((service as any).log, 'error')
+
+        // Mock processNormalDefinition to succeed
+        ;(service as any).processNormalDefinition = jest.fn().mockResolvedValue(undefined)
+
+        // Mock processUniqueDefinition to throw
+        ;(service as any).processUniqueDefinition = jest.fn().mockRejectedValue(new Error('Test unique error'))
+
+        await expect(service.refreshAllAttributes(fusionAccount)).rejects.toThrow('Test unique error')
+
+        expect(logErrorSpy).toHaveBeenCalledWith(
+            'Error generating unique attribute uniqueAttr for account: John Doe (IdentityFusion)',
+            'Test unique error'
+        )
+    })
+})

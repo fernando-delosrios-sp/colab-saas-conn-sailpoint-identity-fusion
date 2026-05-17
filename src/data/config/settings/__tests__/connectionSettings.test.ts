@@ -6,7 +6,7 @@ describe('connectionSettings applySettings', () => {
         const config = {
             clientId: 'id',
             clientSecret: 'secret',
-            spConnectorInstanceId: 'inst'
+            spConnectorInstanceId: 'inst',
         } as unknown as FusionConfigBuild
 
         expect(() => applySettings(config)).toThrow('Base URL is required in configuration')
@@ -17,7 +17,7 @@ describe('connectionSettings applySettings', () => {
             baseurl: 'file:///etc/passwd',
             clientId: 'id',
             clientSecret: 'secret',
-            spConnectorInstanceId: 'inst'
+            spConnectorInstanceId: 'inst',
         } as unknown as FusionConfigBuild
 
         expect(() => applySettings(config)).toThrow('Base URL must use http or https protocol')
@@ -28,7 +28,7 @@ describe('connectionSettings applySettings', () => {
             baseurl: 'http://localhost:8000',
             clientId: 'id',
             clientSecret: 'secret',
-            spConnectorInstanceId: 'inst'
+            spConnectorInstanceId: 'inst',
         } as unknown as FusionConfigBuild
 
         expect(() => applySettings(config)).not.toThrow()
@@ -39,7 +39,7 @@ describe('connectionSettings applySettings', () => {
             baseurl: 'https://example.com',
             clientId: 'id',
             clientSecret: 'secret',
-            spConnectorInstanceId: 'inst'
+            spConnectorInstanceId: 'inst',
         } as unknown as FusionConfigBuild
 
         expect(() => applySettings(config)).not.toThrow()
