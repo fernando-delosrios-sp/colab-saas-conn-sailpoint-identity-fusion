@@ -51,4 +51,15 @@ describe('wrapConnectorError', () => {
             type: ConnectorErrorType.Generic,
         })
     })
+
+    it('should wrap a null exception with a ConnectorError', async () => {
+        await expect(
+            wrapConnectorError(async () => {
+                throw null
+            }, 'Context message')
+        ).rejects.toMatchObject({
+            message: 'Context message: null',
+            type: ConnectorErrorType.Generic,
+        })
+    })
 })
