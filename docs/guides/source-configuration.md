@@ -51,7 +51,11 @@ Including identities in your scope affects your baseline for matching and what i
 !!! note
 Machine accounts (`isMachine=true`) are not supported for managed-source processing. Because `isMachine` is not an ISC account-list API filter, the connector applies this exclusion client-side and skips those accounts after fetching.
 
-!!! note "Execution order" 1. `Accounts API filter` (server-side, ISC) 2. `Accounts JMESPath filter` (client-side, page-wise on `{ "accounts": [...] }`) 3. Built-in machine account exclusion (`isMachine=true`)
+!!! note "Execution order"
+
+    1. `Accounts API filter` (server-side, ISC)
+    2. `Accounts JMESPath filter` (client-side, page-wise on `{ "accounts": [...] }`)
+    3. Built-in machine account exclusion (`isMachine=true`)
 
 !!! tip
 You can use the **Aggregate before processing** option to ensure a managed source has newer data than the last time Identity Fusion ran and/or synchronize aggregation schedules. If you don't need the absolute latest data blocking the aggregation response, consider **Delayed aggregation** to speed up the account list operation.

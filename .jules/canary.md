@@ -27,3 +27,6 @@
 
 **Learning:** Dense paragraphs inside admonitions (like the identity scope tip) are hard to scan, especially when describing distinct configuration states (e.g., "Not included" vs "Included"). Using Markdown bullet points with bold prefixes improves clarity. Also, MkDocs material admonitions require 4-space indentation for all block content.
 **Action:** When converting verbose explanatory text into MkDocs admonitions, format distinct states or choices as bulleted lists, ensuring 4-space indentation to satisfy both Material theme parsing and readability standards.
+## 2026-05-18 - MkDocs Admonition Inner Formatting
+**Learning:** Inner content within MkDocs Material admonitions (like numbered lists) must be properly separated by newlines and indented by 4 spaces. Placing a list on the same line as the admonition declaration (e.g., `!!! note "Title" 1. item`) prevents correct rendering.
+**Action:** Ensure all content inside admonitions is moved to a new line and indented with 4 spaces.
