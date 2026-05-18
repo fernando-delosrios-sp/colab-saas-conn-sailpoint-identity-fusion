@@ -153,14 +153,14 @@ export class FormService {
         }
         this._formsFound = activeForms.length
 
-        this._fetchedFormInstances = await Promise.all(
-            activeForms.map(async (form) => {
-                this.log.debug(`Fetching instances for form definition: ${form.id} (${form.name || 'unknown'})`)
-                const instances = await this.fetchFormInstancesByDefinitionId(form.id)
-                this.log.debug(`Fetched ${instances.length} instance(s) for form definition: ${form.id}`)
-                return instances
-            })
-        )
+        // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
+        // to prevent API rate limiting issues when iterating over a large number of forms
+        this._fetchedFormInstances = await promiseAllBatched(activeForms, async (form) => {
+            this.log.debug(`Fetching instances for form definition: ${form.id} (${form.name || 'unknown'})`)
+            const instances = await this.fetchFormInstancesByDefinitionId(form.id)
+            this.log.debug(`Fetched ${instances.length} instance(s) for form definition: ${form.id}`)
+            return instances
+        })
     }
 
     /**
