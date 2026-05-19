@@ -1,7 +1,6 @@
 import { ServiceRegistry } from '../../../services/serviceRegistry'
 import { fetchAndProcessForReport, generateReport } from '../generateReport'
 import * as corePipeline from '../corePipeline'
-import { FusionAccount } from '../../../model/account'
 import { AggregationStats } from '../../../services/fusionService/types'
 
 jest.mock('../corePipeline', () => ({
@@ -90,31 +89,21 @@ describe('generateReport helpers', () => {
 
     describe('generateReport', () => {
         it('should fetch ServiceRegistry.getCurrent() if not provided, and call generateAndSendFusionReport', async () => {
-            const mockFusionAccount = {} as FusionAccount
-            await generateReport(mockFusionAccount)
+            await generateReport()
 
             expect(ServiceRegistry.getCurrent).toHaveBeenCalled()
-            expect(mockReportsService.generateAndSendFusionReport).toHaveBeenCalledWith(
-                mockFusionAccount,
-                false,
-                undefined
-            )
+            expect(mockReportsService.generateAndSendFusionReport).toHaveBeenCalledWith(false, undefined)
         })
 
         it('should use provided serviceRegistry and call generateAndSendFusionReport with all args', async () => {
-            const mockFusionAccount = {} as FusionAccount
             const mockStats = {} as AggregationStats
 
             jest.spyOn(ServiceRegistry, 'getCurrent').mockClear()
 
-            await generateReport(mockFusionAccount, true, mockServiceRegistry as ServiceRegistry, mockStats)
+            await generateReport(true, mockServiceRegistry as ServiceRegistry, mockStats)
 
             expect(ServiceRegistry.getCurrent).not.toHaveBeenCalled()
-            expect(mockReportsService.generateAndSendFusionReport).toHaveBeenCalledWith(
-                mockFusionAccount,
-                true,
-                mockStats
-            )
+            expect(mockReportsService.generateAndSendFusionReport).toHaveBeenCalledWith(true, mockStats)
         })
     })
 })

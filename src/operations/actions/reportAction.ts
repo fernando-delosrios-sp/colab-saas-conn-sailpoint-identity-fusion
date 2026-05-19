@@ -11,12 +11,12 @@ import { ActionChange } from './types'
  * @param serviceRegistry - Request-scoped registry (required for concurrent updates to avoid global state)
  */
 export const reportAction = async (
-    fusionAccount: FusionAccount,
+    _fusionAccount: FusionAccount,
     change: ActionChange,
     serviceRegistry: ServiceRegistry
 ): Promise<void> => {
     if (change.op === AttributeChangeOp.Add) {
         const stats = await fetchAndProcessForReport(serviceRegistry)
-        await generateReport(fusionAccount, false, serviceRegistry, stats)
+        await generateReport(false, serviceRegistry, stats)
     }
 }

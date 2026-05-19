@@ -1,5 +1,4 @@
 import { SourceType } from '../model/config'
-import { FusionAccount } from '../model/account'
 import { FusionDecision } from '../model/form'
 import { readNumber, readString } from '../utils/safeRead'
 import { createUrlContext } from '../utils/url'
@@ -475,7 +474,6 @@ export class ReportService {
      * Generate and send the standard fusion report for aggregation or ad-hoc fusion runs.
      */
     public async generateAndSendFusionReport(
-        fusionAccount: FusionAccount,
         includeNonMatches: boolean,
         aggregationStats?: AggregationStats
     ): Promise<void> {
@@ -490,13 +488,13 @@ export class ReportService {
             const priorPhases = aggregationStats.phaseTiming ?? []
             stats.phaseTiming = [...priorPhases, ...reportPhaseTimer.getPhaseBreakdown()]
             report.stats = stats
-            await this.messaging.sendReport(report, fusionAccount, 'aggregation')
+            await this.messaging.sendReport(report, 'aggregation')
             return
         }
 
         const report = this.fusion.generateReport(includeNonMatches, undefined)
         report.fusionReviewDecisions = this.buildFusionReviewDecisions()
-        await this.messaging.sendReport(report, fusionAccount, 'fusion')
+        await this.messaging.sendReport(report, 'fusion')
         this.identities.clear()
     }
 

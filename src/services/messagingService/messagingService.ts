@@ -19,7 +19,6 @@ import { createUrlContext, getUIOriginFromBaseUrl, UrlContext } from '../../util
 import { normalizeEmailValue, sanitizeRecipients } from './email'
 import { IdentityService } from '../identityService'
 import { SourceService } from '../sourceService'
-import type { FusionAccount } from '../../model/account'
 import { FusionReport } from '../fusionService/types'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import { readString } from '../../utils/safeRead'
@@ -383,27 +382,13 @@ export class MessagingService {
     }
 
     /**
-     * Send report email for accounts with matches
+     * Send report email to all global owners (source owner + governance group members).
      */
     public async sendReport(
         report: FusionReport,
-        fusionAccount: FusionAccount | undefined,
         reportType: 'aggregation' | 'fusion'
     ): Promise<void> {
-        // Recipients:
-        // - the initiating fusion account (if we can resolve an email)
-        // - the fusion source owner (always)
         const recipientEmails = new Set<string>()
-
-        if (fusionAccount?.email) {
-            recipientEmails.add(fusionAccount.email)
-        } else if (fusionAccount && this.identities && fusionAccount.identityId) {
-            // Try to get email from identity (only if identityId exists)
-            const identity = this.identities.getIdentityById(fusionAccount.identityId)
-            if (identity?.attributes?.email) {
-                recipientEmails.add(identity.attributes.email)
-            }
-        }
 
         // Add all global owners (source owner + governance group members) as recipients
         if (this.identities) {

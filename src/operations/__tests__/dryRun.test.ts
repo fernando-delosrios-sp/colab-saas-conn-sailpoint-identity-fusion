@@ -17,8 +17,10 @@ function createRegistry() {
         },
         log: {
             info: jest.fn(),
+            debug: jest.fn(),
             crash: jest.fn(),
             timer: jest.fn().mockImplementation(() => timer),
+            metric: jest.fn(),
             getAggregationIssueSummary: jest.fn(() => ({
                 warningCount: 1,
                 errorCount: 0,
@@ -306,19 +308,14 @@ describe('dryRun', () => {
         expect(summary.totals.fusionAccountsExisting).toBe(2)
     })
 
-    it('fetches fusion owner identity when fusionOwnerIsGlobalReviewer and owner not in cache', async () => {
+    it('passes owner ids to fetchIdentities when fusionOwnerIsGlobalReviewer', async () => {
         const registry = createRegistry()
         registry.sources.fetchGlobalOwnerIdentityIds = jest.fn().mockResolvedValue(['owner-missing-1'])
         registry.fusion.fusionOwnerIsGlobalReviewer = true
-        registry.identities.getIdentityById = jest.fn().mockReturnValue(undefined)
-        registry.identities.fetchIdentityById = jest.fn().mockResolvedValue({
-            id: 'owner-missing-1',
-            name: 'Fusion Owner',
-        })
 
         await dryRun(registry, { schema: { attributes: [] }, includeMatched: true } as any)
 
-        expect(registry.identities.fetchIdentityById).toHaveBeenCalledWith('owner-missing-1')
+        expect(registry.identities.fetchIdentities).toHaveBeenCalledWith(['owner-missing-1'])
     })
 
     it('emits synthetic deferred row when deferred managed account id is not on any fusion ISC row', async () => {
