@@ -5,7 +5,7 @@
         "outDir": "dist",
         "rootDir": "src",
         "strict": true,
-        "moduleResolution": "node",
+        // "moduleResolution": "node",
         "types": ["node", "jest"],
         "esModuleInterop": true,
         "skipLibCheck": true,

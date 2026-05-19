@@ -383,6 +383,43 @@ export class AttributeService {
     }
 
     /**
+     * Refreshes reverse correlation attributes for all sources configured with
+     * correlationMode 'reverse'. Sets the attribute to the first missing account's
+     * schema.id for sources with missing accounts, and clears it for sources without.
+     *
+     * This is called alongside refreshNormalAttributes to ensure reverse correlation
+     * attributes stay in sync with the current state of missing accounts.
+     *
+     * @param fusionAccount - The fusion account to refresh reverse correlation attributes for
+     */
+    public refreshReverseCorrelationAttributes(fusionAccount: FusionAccount): void {
+        const reverseSources = this.sourceConfigs.filter((sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute)
+        if (reverseSources.length === 0) return
+
+        const missingIds = fusionAccount.missingAccountIds
+        const hasUnknownMissingSourceInfo = missingIds.some((accountId) => !fusionAccount.getManagedAccountInfo(accountId))
+
+        for (const sc of reverseSources) {
+            if (hasUnknownMissingSourceInfo) continue
+
+            const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
+            if (missingForSource.length > 0) {
+                const firstAccountId = missingForSource[0]
+                const info = fusionAccount.getManagedAccountInfo(firstAccountId)
+                if (info) {
+                    fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
+                    this.log.debug(
+                        `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
+                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                    )
+                }
+            } else {
+                fusionAccount.clearReverseCorrelationAttribute(sc.correlationAttribute!)
+            }
+        }
+    }
+
+    /**
      * Refreshes only unique attribute definitions.
      * Unique attributes are only generated for new accounts; existing values are preserved
      * unless needsReset is set (e.g. when re-enabling a previously disabled account).

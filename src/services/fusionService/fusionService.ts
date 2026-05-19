@@ -167,16 +167,6 @@ export class FusionService {
     }
 
     /**
-     * Keep managed-account analysis under the platform command-expiration window.
-     * Derive a conservative budget from keep-alive cadence to preserve a safety buffer.
-     */
-    private managedAccountPhaseBudgetMs(): number {
-        const keepAliveMs = this.config.processingWait ?? 60 * 1000
-        const derivedBudgetMs = keepAliveMs * 20
-        return Math.max(10 * 60 * 1000, Math.min(25 * 60 * 1000, derivedBudgetMs))
-    }
-
-    /**
      * Populate match / deferred / non-match report slices during managed-account analysis.
      * SDKs may report `commandType` as account list for custom commands; `custom:dryrun` must still capture slices.
      */
@@ -565,6 +555,7 @@ export class FusionService {
 
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)
+        this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
 
         // Per-source correlation for missing accounts during aggregation
         await this.applyPerSourceCorrelationIfNeeded(fusionAccount, authorizedLinkDecision)
@@ -617,11 +608,9 @@ export class FusionService {
         forceDirectCorrelation: boolean = false
     ): Promise<void> {
         const missingIds = fusionAccount.missingAccountIds
-        const validatedReverseSources = new Set<string>()
         const canDirectCorrelate = Boolean(fusionAccount.identityId)
 
         const directCorrelateIds: string[] = []
-        const bySource = new Map<string, string[]>()
 
         for (const accountId of missingIds) {
             const info = fusionAccount.getManagedAccountInfo(accountId)
@@ -639,15 +628,8 @@ export class FusionService {
                 if (canDirectCorrelate) {
                     directCorrelateIds.push(accountId)
                 }
-            } else if (mode === 'reverse') {
-                let ids = bySource.get(info.source.name)
-                if (!ids) {
-                    ids = []
-                    bySource.set(info.source.name, ids)
-                }
-                ids.push(accountId)
             }
-            // mode === 'none': skip
+            // mode === 'reverse' and 'none': skip (reverse correlation is handled via refreshReverseCorrelationAttributes)
         }
 
         // Recovery path: if decision payload has source context but account metadata is missing
@@ -675,42 +657,6 @@ export class FusionService {
                 `No per-source direct-correlation targets for ${fusionAccount.name}; forcing direct correlation for ${missingIds.length} missing account(s) due to explicit correlated action`
             )
             await this.identities.correlateAccounts(fusionAccount, [...missingIds])
-        }
-
-        // Reverse correlation: set attribute to first missing account nativeIdentity per source
-        for (const [sourceName, accountIds] of bySource) {
-            const sourceConfig = this.sources.getSourceConfig(sourceName)
-            if (!sourceConfig?.correlationAttribute) continue
-            if (!validatedReverseSources.has(sourceName)) {
-                await this.sources.assertReverseCorrelationReady(sourceConfig)
-                validatedReverseSources.add(sourceName)
-            }
-
-            const firstAccountId = accountIds[0]
-            const info = fusionAccount.getManagedAccountInfo(firstAccountId)
-            if (info) {
-                fusionAccount.setReverseCorrelationAttribute(sourceConfig.correlationAttribute, info.schema.id)
-                this.log.debug(
-                    `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.schema.id}" ` +
-                    `for fusion account ${fusionAccount.name} (source: ${sourceName}, ${accountIds.length} missing)`
-                )
-            }
-        }
-
-        // Clear reverse correlation attributes for sources with no missing accounts
-        const hasUnknownMissingSourceInfo = missingIds.some(
-            (accountId) => !fusionAccount.getManagedAccountInfo(accountId)
-        )
-        for (const sc of this.config.sources) {
-            if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
-                if (hasUnknownMissingSourceInfo) {
-                    continue
-                }
-                const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
-                if (missingForSource.length === 0) {
-                    fusionAccount.clearReverseCorrelationAttribute(sc.correlationAttribute)
-                }
-            }
         }
     }
 
@@ -883,6 +829,7 @@ export class FusionService {
 
             this.attributes.mapAttributes(fusionAccount)
             await this.attributes.refreshNormalAttributes(fusionAccount)
+            this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
 
             // Keep fusion display aligned with identity label precedence.
             const identityDisplayName =
@@ -1094,6 +1041,7 @@ export class FusionService {
         )
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)
+        this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
 
         // Authorized decisions update/merge an existing identity-backed fusion account in-place.
         if (isAuthorizedDecision) {
@@ -1170,7 +1118,7 @@ export class FusionService {
     public async processManagedAccounts(): Promise<void> {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
-        const { processManagedAccountsStartedAt, phaseBudgetMs, batchSize } = this.initializeManagedAccountPhase(map)
+        const { processManagedAccountsStartedAt, batchSize } = this.initializeManagedAccountPhase(map)
         await this.runCorrelatedManagedAccountPrePass(map, batchSize)
         this._linkedAccountKeyIndex = undefined
 
@@ -1182,7 +1130,6 @@ export class FusionService {
         const processed = await this.runUncorrelatedManagedAccountPass(
             queuedAccounts,
             batchSize,
-            phaseBudgetMs,
             processManagedAccountsStartedAt
         )
         this.logManagedAccountsPhaseSummary(processed, processManagedAccountsStartedAt)
@@ -1190,11 +1137,9 @@ export class FusionService {
 
     private initializeManagedAccountPhase(map: Map<string, Account>): {
         processManagedAccountsStartedAt: number
-        phaseBudgetMs: number
         batchSize: number
     } {
         const processManagedAccountsStartedAt = Date.now()
-        const phaseBudgetMs = this.managedAccountPhaseBudgetMs()
         const batchSize = Math.max(1, this.managedAccountsBatchSize)
 
         this.newManagedAccountsCount = map.size
@@ -1211,7 +1156,7 @@ export class FusionService {
 
         this.buildLinkedAccountKeyIndex()
 
-        return { processManagedAccountsStartedAt, phaseBudgetMs, batchSize }
+        return { processManagedAccountsStartedAt, batchSize }
     }
 
     private validateManagedSourceReviewers(): void {
@@ -1271,14 +1216,14 @@ export class FusionService {
     private async runUncorrelatedManagedAccountPass(
         queuedAccounts: Account[],
         batchSize: number,
-        phaseBudgetMs: number,
         processManagedAccountsStartedAt: number
     ): Promise<number> {
         const initialQueueSize = queuedAccounts.length
         const logProgressEvery = Math.max(1, Math.min(this.managedAccountsBatchSize, initialQueueSize))
         let processed = 0
 
-        const parallelAccounts: Account[] = []
+        const parallelAccounts: Account[] =
+         []
         const deferredGroups = new Map<string, Account[]>()
         for (const account of queuedAccounts) {
             if (this.isDeferredMatchingEnabledForSource(account.sourceName ?? undefined)) {
@@ -1289,20 +1234,6 @@ export class FusionService {
             } else {
                 parallelAccounts.push(account)
             }
-        }
-
-        const hasTimeBudgetExpired = (): boolean => {
-            const elapsed = Date.now() - processManagedAccountsStartedAt
-            if (processed > 0 && elapsed >= phaseBudgetMs) {
-                const remaining = Math.max(0, initialQueueSize - processed)
-                this.log.info(
-                    `Managed accounts phase reached soft time budget (${PhaseTimer.formatElapsed(
-                        phaseBudgetMs
-                    )}). Pausing with ${processed}/${initialQueueSize} analyzed and ${remaining} still queued for the next aggregation run.`
-                )
-                return true
-            }
-            return false
         }
 
         const logProgressIfNeeded = (): void => {
@@ -1317,7 +1248,6 @@ export class FusionService {
 
         const runParallelAccounts = async (): Promise<void> => {
             for (let i = 0; i < parallelAccounts.length; i += batchSize) {
-                if (hasTimeBudgetExpired()) break
                 const batch = parallelAccounts.slice(i, i + batchSize)
                 await Promise.all(batch.map((account) => this.processManagedAccount(account)))
                 processed += batch.length
@@ -1335,7 +1265,6 @@ export class FusionService {
 
                     // Phase A: preprocess + identity scoring in parallel for this source.
                     for (let i = 0; i < accounts.length; i += batchSize) {
-                        if (hasTimeBudgetExpired()) break
                         const batch = accounts.slice(i, i + batchSize)
                         const phaseAResults = await Promise.all(
                             batch.map((account) => this.analyzeManagedAccountIdentityPhase(account))
@@ -1356,7 +1285,6 @@ export class FusionService {
 
                     // Phase B: preserve same-aggregation visibility for this source only.
                     for (const analysis of deferredPhaseSequentialQueue) {
-                        if (hasTimeBudgetExpired()) break
                         await this.analyzeManagedAccountDeferredPhase(analysis)
                         await this.completeManagedAccountFromAnalysis(analysis, true)
                         processed += 1
@@ -1854,6 +1782,7 @@ export class FusionService {
         }
         this.log.debug(`No match found for managed account: ${name} [${sourceName}]`)
         if (sourceType === SourceType.Authoritative && this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
+            this.setFusionAccount(fusionAccount)
             this.registerCurrentRunUnmatchedCandidate(fusionAccount)
         }
         if (!this.shouldCaptureManagedAccountReportData()) return
@@ -2280,7 +2209,6 @@ export class FusionService {
         if (!nativeIdentity || !this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) return
         const sourceKey = this.deferredMatchingSourceKey(fusionAccount.sourceName)
         if (!sourceKey) return
-        this.fusionAccountMap.set(nativeIdentity, fusionAccount)
         const setForSource = this.currentRunUnmatchedFusionNativeIdentitiesBySource.get(sourceKey) ?? new Set<string>()
         setForSource.add(nativeIdentity)
         this.currentRunUnmatchedFusionNativeIdentitiesBySource.set(sourceKey, setForSource)
@@ -2363,6 +2291,7 @@ export class FusionService {
 
         this.attributes.mapAttributes(fusionAccount)
         await this.attributes.refreshNormalAttributes(fusionAccount)
+        this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
 
         return fusionAccount
     }
