@@ -1,4 +1,5 @@
 import { assert } from '../../utils/assert'
+import { promiseAllBatched } from '../../services/fusionService/collections'
 import { FusionAccount } from '../../model/account'
 import { AttributeOperations } from '../../services/attributeService/types'
 import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
@@ -70,27 +71,23 @@ export const rebuildFusionAccount = async (
         log.info(
             `Cascade aggregation enabled: triggering aggregation for ${uniqueSourceIds.size} source(s) before fetching managed accounts`
         )
-        await Promise.all(
-            Array.from(uniqueSourceIds).map(async (sourceId) => {
-                const sourceInfo = sources.getSourceById(sourceId)
-                if (!sourceInfo?.isManaged) return
-                const disableOptimization = sourceInfo?.config?.optimizedAggregation === false
-                log.info(`Cascade: aggregating managed source ${sourceInfo.name ?? sourceId}`)
-                try {
-                    await sources.aggregateManagedSource(sourceId, disableOptimization)
-                } catch (error) {
-                    log.error(
-                        `Cascade aggregation failed for source ${sourceInfo.name ?? sourceId}: ${error instanceof Error ? error.message : String(error)}. Continuing with main process.`
-                    )
-                }
-            })
-        )
+        await promiseAllBatched(Array.from(uniqueSourceIds), async (sourceId) => {
+            const sourceInfo = sources.getSourceById(sourceId)
+            if (!sourceInfo?.isManaged) return
+            const disableOptimization = sourceInfo?.config?.optimizedAggregation === false
+            log.info(`Cascade: aggregating managed source ${sourceInfo.name ?? sourceId}`)
+            try {
+                await sources.aggregateManagedSource(sourceId, disableOptimization)
+            } catch (error) {
+                log.error(
+                    `Cascade aggregation failed for source ${sourceInfo.name ?? sourceId}: ${error instanceof Error ? error.message : String(error)}. Continuing with main process.`
+                )
+            }
+        })
     }
 
-    await Promise.all(
-        parsedKeys.map(async (parsed) => {
-            await sources.fetchManagedAccount(parsed.sourceId, parsed.nativeIdentity)
-        })
-    )
+    await promiseAllBatched(parsedKeys, async (parsed) => {
+        await sources.fetchManagedAccount(parsed.sourceId, parsed.nativeIdentity)
+    })
     return await fusion.processFusionAccount(account, attributeOperations)
 }
