@@ -34,16 +34,10 @@ Expected golden artifacts:
 
 ## Execution
 
-Run the scenario runner:
-
-```bash
-node test-data/scenarios/scenarioRunner.js "test-data/scenarios/std-account-list-001"
-```
-
 Run tests:
 
 ```bash
-npm test -- src/operations/__tests__/accountList.test.ts src/operations/__tests__/scenarioRunner.smokeMatrix.test.ts src/services/fusionService/__tests__/fusionService.test.ts
+npm test -- src/operations/__tests__/accountList.test.ts src/services/fusionService/__tests__/fusionService.test.ts
 ```
 
 ## Required assertions
