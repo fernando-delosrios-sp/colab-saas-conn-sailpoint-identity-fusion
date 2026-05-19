@@ -94,7 +94,6 @@ app.get('/', (req, res) => {
     res.json({
         status: 'ok',
         message: 'Remote log server is running',
-        logFile: LOG_FILE,
         requests: requestCount,
     })
 })

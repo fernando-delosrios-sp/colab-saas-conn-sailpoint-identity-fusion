@@ -47,6 +47,8 @@
 
 **Learning:** Unbounded `Promise.all(array.map(fn))` in methods like `fetchManagedAccounts`, `aggregateManagedSources`, and `aggregateDelayedSources` initiates thousands of concurrent asynchronous requests when iterating over potentially large arrays (e.g. `managedSources`). This results in memory exhaustion and external API rate limit triggers.
 **Action:** Replaced these unbounded `Promise.all` mapping blocks with `promiseAllBatched` to bound concurrency while maintaining parallel execution benefits.
+
 ## 2026-05-18 - Prevent unbounded parallel execution in form service
+
 **Learning:** Unbounded `Promise.all(array.map(fn))` in `src/services/formService/formService.ts` during form instance retrieval initiates concurrent asynchronous requests over arrays (e.g. `activeForms`), which can result in API rate limit triggers when there are a large number of forms.
 **Action:** Replaced the unbounded `Promise.all` mapping block with `promiseAllBatched(activeForms, fn)` to bound concurrency while maintaining parallel execution benefits.

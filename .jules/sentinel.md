@@ -33,3 +33,9 @@
 **Vulnerability:** The `sanitizeLog` function in `log-server.js` only stripped `\r` and `\n` characters to prevent Log Injection attacks. An attacker could bypass this by using other Unicode line terminators (like \u2028 or \u2029) or ASCII control characters (like \u0085 Next Line) to inject new log entries. Additionally, passing non-string data (e.g., an array or object without a `replace` method) would crash the server, causing Denial of Service.
 **Learning:** Robust sanitization must handle type coercion explicitly before executing string methods. It must also account for a comprehensive range of ASCII control characters and Unicode line separators, not just `\r\n`.
 **Prevention:** Convert unknown input explicitly to strings (e.g., using `String()`) before executing string prototype methods. Utilize comprehensive regular expressions (e.g., `/[\x00-\x08\x0A-\x1F\x7F\u0085\u2028\u2029]+/g`) to sanitize log injection attack vectors thoroughly.
+
+## 2026-05-19 - Information Disclosure in log-server.js Endpoint
+
+**Vulnerability:** The `/` health check endpoint in the `log-server.js` proxy inadvertently included the `logFile` property in its JSON response payload. This exposed the internal host file system directory structure (e.g., `logs/remote-logs.txt`) directly to unauthenticated clients over HTTP.
+**Learning:** Returning debug information or configuration parameters (like file paths) in public-facing health check API endpoints constitutes an Information Disclosure vulnerability.
+**Prevention:** Sanitize API responses by explicitly omitting sensitive internal configuration keys (like local file paths, connection strings, or system architectures) from outbound HTTP payloads.
