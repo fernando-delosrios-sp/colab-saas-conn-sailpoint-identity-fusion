@@ -33,6 +33,7 @@ export class RecordingService {
     private static instance?: RecordingService
 
     private readonly chainName: string
+    private readonly recordingDir: string
     private readonly steps: RecordedStep[] = []
     private currentStep: RecordedStep | null = null
     private stepIndex = 0
@@ -43,14 +44,48 @@ export class RecordingService {
         private readonly config: FusionConfig
     ) {
         this.chainName = process.env.RECORD_CHAIN_NAME ?? `recording-${Date.now()}`
+        this.recordingDir = path.resolve('test-data', 'recordings', this.chainName)
         this.log.info(`RecordingService initialized — chain "${this.chainName}"`)
 
-        process.on('SIGINT', () => {
-            void this.finalize().then(() => process.exit(0))
+        this.reloadSteps()
+
+        process.on('SIGINT', async () => {
+            await this.finalize()
+            process.exit(0)
         })
-        process.on('SIGTERM', () => {
-            void this.finalize().then(() => process.exit(0))
+        process.on('SIGTERM', async () => {
+            await this.finalize()
+            process.exit(0)
         })
+    }
+
+    private reloadSteps(): void {
+        const stepsFile = path.join(this.recordingDir, 'steps.ndjson')
+        if (!fs.existsSync(stepsFile)) return
+
+        try {
+            const content = fs.readFileSync(stepsFile, 'utf-8').trim()
+            if (!content) return
+            for (const line of content.split('\n')) {
+                if (!line) continue
+                const step = JSON.parse(line) as RecordedStep
+                this.steps.push(step)
+                const match = step.stepId.match(/^step-(\d+)$/)
+                if (match) {
+                    const num = parseInt(match[1], 10)
+                    if (num > this.stepIndex) this.stepIndex = num
+                }
+            }
+            this.log.info(`Reloaded ${this.steps.length} previously-recorded step(s) from ${stepsFile}`)
+        } catch (err) {
+            this.log.warn(`Failed to reload steps from ${stepsFile}: ${err}`)
+        }
+    }
+
+    private persistStep(step: RecordedStep): void {
+        fs.mkdirSync(this.recordingDir, { recursive: true })
+        const stepsFile = path.join(this.recordingDir, 'steps.ndjson')
+        fs.appendFileSync(stepsFile, JSON.stringify(step) + '\n')
     }
 
     static init(log: LogService, config: FusionConfig): RecordingService {
@@ -103,6 +138,10 @@ export class RecordingService {
         }
 
         this.log.debug(`Recording step ${this.stepIndex}: ${operation}`)
+        if (process.env.VERBOSE_RECORDING === 'true') {
+            const passInfo = this.currentStep.pass ? ` (pass ${this.currentStep.pass})` : ''
+            console.log(`[Recording] → ${operation}${passInfo} started`)
+        }
     }
 
     endOperation(sources: SourceService, identities: IdentityService, forms: FormService): void {
@@ -111,10 +150,15 @@ export class RecordingService {
         this.currentStep.stateAfter = this.snapshotState(sources, identities, forms)
         this.currentStep.duration = Date.now() - new Date(this.currentStep.timestamp).getTime()
         this.steps.push({ ...this.currentStep })
+        this.persistStep(this.currentStep)
 
         this.log.debug(
             `Recorded step ${this.currentStep.stepId} — ${this.currentStep.output.length} output(s), ${this.currentStep.duration}ms`
         )
+        if (process.env.VERBOSE_RECORDING === 'true') {
+            const passInfo = this.currentStep.pass ? ` (pass ${this.currentStep.pass})` : ''
+            console.log(`[Recording] ← ${this.currentStep.operation}${passInfo} completed — ${this.currentStep.duration}ms, ${this.currentStep.output.length} outputs`)
+        }
         this.currentStep = null
     }
 
@@ -161,6 +205,13 @@ export class RecordingService {
         const scenario = this.buildScenario()
         const filePath = path.join(dir, 'scenario.json')
         fs.writeFileSync(filePath, JSON.stringify(scenario, null, 2) + '\n')
+
+        const stepsFile = path.join(dir, 'steps.ndjson')
+        try {
+            fs.unlinkSync(stepsFile)
+        } catch {
+            /* best-effort */
+        }
 
         this.log.info(`Recording "${this.chainName}" finalized — ${this.steps.length} steps → ${filePath}`)
         return filePath
