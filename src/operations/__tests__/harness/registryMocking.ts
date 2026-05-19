@@ -21,6 +21,7 @@ export function createRegistry() {
             debug: jest.fn(),
             crash: jest.fn(),
             timer: jest.fn(() => timer),
+            metric: jest.fn(),
         },
         identities: {
             fetchIdentityByName: jest.fn().mockResolvedValue({ id: 'id-1', name: 'Alice Doe' }),

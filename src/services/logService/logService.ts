@@ -456,6 +456,21 @@ export class LogService {
         return new PhaseTimer(this)
     }
 
+    /**
+     * Logs a performance metric with duration and optional structured data.
+     * Use this for sub-operation timing (e.g., individual API calls, batch operations).
+     * PhaseTimer should be used for high-level phase tracking instead.
+     *
+     * @param name - Metric identifier (e.g., 'outputPhase.sendAccounts')
+     * @param startedAt - Timestamp when the operation started (from Date.now())
+     * @param data - Optional structured metadata (e.g., { count: 500, batchSize: 100 })
+     */
+    metric(name: string, startedAt: number, data?: Record<string, any>): void {
+        const durationMs = Date.now() - startedAt
+        const dataStr = data ? ' ' + Object.entries(data).map(([k, v]) => `${k}=${v}`).join(' ') : ''
+        this.info(`Performance metric: ${name} durationMs=${durationMs}${dataStr}`)
+    }
+
     getLogLevel(): LogLevel {
         return this.configuredLevel
     }

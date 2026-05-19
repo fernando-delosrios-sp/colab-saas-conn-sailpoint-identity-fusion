@@ -118,3 +118,49 @@ describe('PhaseTimer breakdown', () => {
         jest.useRealTimers()
     })
 })
+
+describe('LogService.metric', () => {
+    beforeEach(() => {
+        mockLogger.level = 'info'
+        mockLogger.info.mockClear()
+    })
+
+    it('logs duration without data', () => {
+        jest.useFakeTimers()
+        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const startedAt = Date.now()
+        jest.advanceTimersByTime(1234)
+        log.metric('test.operation', startedAt)
+        expect(mockLogger.info).toHaveBeenCalledWith(
+            expect.stringContaining('Performance metric: test.operation durationMs=1234')
+        )
+        jest.useRealTimers()
+    })
+
+    it('logs duration with structured data', () => {
+        jest.useFakeTimers()
+        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const startedAt = Date.now()
+        jest.advanceTimersByTime(567)
+        log.metric('outputPhase.sendAccounts', startedAt, { count: 500, batchSize: 100 })
+        expect(mockLogger.info).toHaveBeenCalledWith(
+            expect.stringContaining('Performance metric: outputPhase.sendAccounts durationMs=567 count=500 batchSize=100')
+        )
+        jest.useRealTimers()
+    })
+
+    it('logs duration with single data field', () => {
+        jest.useFakeTimers()
+        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const startedAt = Date.now()
+        jest.advanceTimersByTime(89)
+        log.metric('outputPhase.saveAttributeState', startedAt)
+        expect(mockLogger.info).toHaveBeenCalledWith(
+            expect.stringContaining('Performance metric: outputPhase.saveAttributeState durationMs=89')
+        )
+        jest.useRealTimers()
+    })
+})
