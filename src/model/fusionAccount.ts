@@ -1085,6 +1085,7 @@ export class FusionAccount {
         const label = FusionAccount.identityLabelFromIdentity(identity)
         if (label) {
             this._identityDisplayName = label
+            this._name = label
         }
         this._attributeBag.identity = identity.attributes ?? {}
         this._identityId = identity.id ?? undefined

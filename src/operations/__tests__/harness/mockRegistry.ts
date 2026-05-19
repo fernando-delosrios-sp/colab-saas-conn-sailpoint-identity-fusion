@@ -104,8 +104,10 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         config: { sources: sourceConfigs },
         log: {
             info: jest.fn(),
+            debug: jest.fn(),
             crash: jest.fn(),
             timer: jest.fn(() => timer),
+            metric: jest.fn(),
         },
         res: { send: jest.fn() },
         schemas,

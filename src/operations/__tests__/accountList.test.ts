@@ -134,29 +134,18 @@ describe('accountList setup phase', () => {
         expect(sources.setupReverseCorrelationSources).toHaveBeenCalledTimes(1)
     })
 
-    it('hydrates missing global owners with bounded concurrency', async () => {
+    it('passes global owner ids to fetchIdentities when fusionOwnerIsGlobalReviewer', async () => {
         const { registry, sources, identities, fusion } = createMockRegistry([])
         const input = { schema: { attributes: [] } } as any
 
         ;(fusion as any).fusionOwnerIsGlobalReviewer = true
         const globalOwnerIds = Array.from({ length: 61 }, (_, i) => `identity-${i + 1}`)
         ;(sources as any).fetchGlobalOwnerIdentityIds = jest.fn().mockResolvedValue(globalOwnerIds)
-        identities.getIdentityById.mockReturnValue(undefined)
-
-        let inFlight = 0
-        let maxInFlight = 0
-        identities.fetchIdentityById.mockImplementation(async () => {
-            inFlight += 1
-            maxInFlight = Math.max(maxInFlight, inFlight)
-            await new Promise((resolve) => setTimeout(resolve, 1))
-            inFlight -= 1
-        })
 
         await accountList(registry, input)
 
         expect((sources as any).fetchGlobalOwnerIdentityIds).toHaveBeenCalledTimes(1)
-        expect(identities.fetchIdentityById).toHaveBeenCalledTimes(globalOwnerIds.length)
-        expect(maxInFlight).toBeLessThanOrEqual(25)
+        expect(identities.fetchIdentities).toHaveBeenCalledWith(globalOwnerIds)
     })
 
     it('schedules delayed aggregation via workflow callback path', async () => {

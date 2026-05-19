@@ -100,7 +100,7 @@ export class IdentityService {
     /**
      * Fetch identities and cache them
      */
-    public async fetchIdentities(): Promise<void> {
+    public async fetchIdentities(additionalIdentityIds?: string[]): Promise<void> {
         if (!this.includeIdentities) {
             this.log.info('Identity fetching disabled by configuration, skipping identity fetch.')
             return
@@ -125,6 +125,10 @@ export class IdentityService {
         } else {
             this.log.info('No identity scope query defined, skipping identity fetch.')
             this.identitiesById = new Map()
+        }
+
+        if (additionalIdentityIds?.length) {
+            await this.hydrateMissingIdentitiesById(additionalIdentityIds)
         }
     }
 

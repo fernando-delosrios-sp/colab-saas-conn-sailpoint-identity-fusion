@@ -1,6 +1,5 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
-import { FusionAccount } from '../../model/account'
-import { AggregationStats, FusionReport } from '../../services/fusionService/types'
+import { AggregationStats } from '../../services/fusionService/types'
 import { setupPhase, fetchPhase, refreshPhase, processPhase, uniqueAttributesPhase } from './corePipeline'
 
 /**
@@ -48,7 +47,7 @@ export async function fetchAndProcessForReport(serviceRegistry: ServiceRegistry)
 }
 
 /**
- * Builds and sends a fusion report email for the given fusion account.
+ * Builds and sends a fusion report email.
  *
  * Data (fusion accounts, identities, managed accounts) must already be in memory.
  * Callers that need to self-fetch should call {@link fetchAndProcessForReport} first
@@ -56,9 +55,10 @@ export async function fetchAndProcessForReport(serviceRegistry: ServiceRegistry)
  *
  * Aggregation and account-action reports use `includeNonMatches: false` so unmatched managed
  * accounts are not listed per row; {@link FusionReportStats} still carries consolidated counters.
+ *
+ * Recipients are resolved automatically from global owners (source owner + governance group).
  */
 export const generateReport = async (
-    fusionAccount: FusionAccount,
     includeNonMatches: boolean = false,
     serviceRegistry?: ServiceRegistry,
     aggregationStats?: AggregationStats
@@ -67,5 +67,5 @@ export const generateReport = async (
         serviceRegistry = ServiceRegistry.getCurrent()
     }
     const { reports } = serviceRegistry
-    await reports.generateAndSendFusionReport(fusionAccount, includeNonMatches, aggregationStats)
+    await reports.generateAndSendFusionReport(includeNonMatches, aggregationStats)
 }

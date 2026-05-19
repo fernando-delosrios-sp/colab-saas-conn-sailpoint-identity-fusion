@@ -145,6 +145,7 @@ describe('corePipeline setupPhase', () => {
         registry.sources.managedSources = []
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
+        registry.fusion.isReset = jest.fn().mockReturnValue(false)
 
         await expect(setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })).rejects.toThrow(
             'Fusion source not found'

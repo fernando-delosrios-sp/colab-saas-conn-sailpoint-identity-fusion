@@ -1,8 +1,6 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
-import { promiseAllBatched } from '../../services/fusionService/collections'
-import { defaults } from '../../data/config/defaults'
 
 export type PipelineMode =
     | { kind: 'aggregation' } // full persistent run — accountList (includes optional aggregation report)
@@ -128,14 +126,16 @@ function countManagedAccountsByType(sources: ServiceRegistry['sources']): {
 
 /** Phase 2: Fetch all data in parallel. */
 export async function fetchPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<FetchResult> {
-    const { log, identities, sources, forms, fusion, messaging, config } = serviceRegistry
+    const { log, identities, sources, forms, fusion, messaging } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
     const ownerIncluded = fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer
 
     log.info('Fetching identities, managed accounts, and dependencies')
 
+    const ownerIds = ownerIncluded ? await sources.fetchGlobalOwnerIdentityIds() : []
+
     const fetchTasks: Array<Promise<void>> = [
-        identities.fetchIdentities(),
+        identities.fetchIdentities(ownerIds),
         sources.fetchManagedAccounts(),
         sources.fetchFusionAccounts(),
         forms.fetchFormInstancesData(isPersistent),
@@ -154,25 +154,6 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
     const processFormDataStartedAt = Date.now()
     await forms.processFetchedFormData()
     log.metric('fetchPhase.processFormData', processFormDataStartedAt)
-
-    if (ownerIncluded) {
-        const globalOwnerFetchStartedAt = Date.now()
-        const globalOwnerIds = await sources.fetchGlobalOwnerIdentityIds()
-        const missingGlobalOwnerIds = globalOwnerIds.filter((id) => !identities.getIdentityById(id))
-        const ownerFetchBatchSize = config.managedAccountsBatchSize ?? defaults.managedAccountsBatchSize
-        await promiseAllBatched(
-            missingGlobalOwnerIds,
-            async (id) => {
-                await identities.fetchIdentityById(id)
-            },
-            ownerFetchBatchSize
-        )
-        log.metric('fetchPhase.globalOwnerHydration', globalOwnerFetchStartedAt, {
-            totalIds: globalOwnerIds.length,
-            fetchedIds: missingGlobalOwnerIds.length,
-            batchSize: ownerFetchBatchSize,
-        })
-    }
 
     const {
         managedAccountsFound,
@@ -266,29 +247,57 @@ export async function reportPhase(
     options: CorePipelineOptions
 ): Promise<void> {
     void options
-    const { fusion, sources } = serviceRegistry
+    const { log, fusion } = serviceRegistry
 
-    // We can generate the report in memory for customReport, but only write/send if persistent
     if (!fusion.fusionReportOnAggregation) return
 
-    if (sources.hasFusionSource) {
-        const fusionOwner = sources.fusionSourceOwner
-        if (fusionOwner && fusionOwner.id) {
-            const fusionOwnerAccount = fusion.getFusionIdentity(fusionOwner.id)
-            if (fusionOwnerAccount) {
-                // Aggregation reports: stats only for non-matches; per-account unmatched rows are omitted (see generateReport includeNonMatches).
-                await generateReport(fusionOwnerAccount, false, serviceRegistry, {
-                    identitiesFound: fetchResult.identitiesFound,
-                    managedAccountsFound: fetchResult.managedAccountsFound,
-                    managedAccountsFoundAuthoritative: fetchResult.managedAccountsFoundAuthoritative,
-                    managedAccountsFoundRecord: fetchResult.managedAccountsFoundRecord,
-                    managedAccountsFoundOrphan: fetchResult.managedAccountsFoundOrphan,
-                    totalProcessingTime: timer.totalElapsed(),
-                    phaseTiming: timer.getPhaseBreakdown(),
-                })
-            }
-        }
+    log.info('Generating aggregation report')
+    const reportStartedAt = Date.now()
+
+    const stats = {
+        identitiesFound: fetchResult.identitiesFound,
+        managedAccountsFound: fetchResult.managedAccountsFound,
+        managedAccountsFoundAuthoritative: fetchResult.managedAccountsFoundAuthoritative,
+        managedAccountsFoundRecord: fetchResult.managedAccountsFoundRecord,
+        managedAccountsFoundOrphan: fetchResult.managedAccountsFoundOrphan,
+        totalProcessingTime: timer.totalElapsed(),
+        phaseTiming: timer.getPhaseBreakdown(),
     }
+
+    // Aggregation reports: stats only for non-matches; per-account unmatched rows are omitted (see generateReport includeNonMatches).
+    await generateReport(false, serviceRegistry, stats)
+
+    log.metric('reportPhase.generateReport', reportStartedAt)
+}
+
+async function sendAccountsToPlatform(
+    fusion: ServiceRegistry['fusion'],
+    res: ServiceRegistry['res']
+): Promise<number> {
+    return fusion.forEachISCAccount((account) => res.send(account))
+}
+
+async function savePersistentState(
+    attributes: ServiceRegistry['attributes'],
+    sources: ServiceRegistry['sources']
+): Promise<void> {
+    await attributes.saveState()
+    await sources.saveBatchCumulativeCount()
+}
+
+async function scheduleDelayedAggregations(
+    sources: ServiceRegistry['sources'],
+    messaging: ServiceRegistry['messaging']
+): Promise<void> {
+    await sources.aggregateDelayedSources((params) => messaging.scheduleDelayedAggregation(params))
+}
+
+async function completeFormCleanup(forms: ServiceRegistry['forms']): Promise<void> {
+    await forms.cleanUpForms()
+}
+
+async function finalizeFormOperations(forms: ServiceRegistry['forms']): Promise<void> {
+    await forms.awaitPendingDeleteOperations()
 }
 
 /** Phase 6: Cleanup, send accounts to platform, save state. Only mostly used by accountList. */
@@ -298,44 +307,38 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
 
     sources.clearManagedAccounts()
 
-    if (isPersistent) {
-        await forms.cleanUpForms()
-        log.info('Form cleanup queued')
+    if (!isPersistent) {
+        sources.clearFusionAccounts()
+        log.info('Account caches cleared from memory')
+        return 0
     }
 
-    let count = 0
-    if (isPersistent) {
-        log.info('Sending accounts to platform')
-        const sendAccountsStartedAt = Date.now()
-        count = await fusion.forEachISCAccount((account) => res.send(account))
-        log.info(`Sent ${count} account(s) to platform`)
-        log.metric('outputPhase.sendAccounts', sendAccountsStartedAt, { count })
+    const formCleanupStartedAt = Date.now()
+    await completeFormCleanup(forms)
+    log.info('Form cleanup queued')
+    log.metric('outputPhase.formCleanup', formCleanupStartedAt)
 
-        const saveAttributesStartedAt = Date.now()
-        await attributes.saveState()
-        log.info('Attribute state saved')
-        log.metric('outputPhase.saveAttributeState', saveAttributesStartedAt)
-        const saveCumulativeCountStartedAt = Date.now()
-        await sources.saveBatchCumulativeCount()
-        log.info('Batch cumulative count saved')
-        log.metric('outputPhase.saveBatchCumulativeCount', saveCumulativeCountStartedAt)
-    }
+    log.info('Sending accounts to platform')
+    const sendAccountsStartedAt = Date.now()
+    const count = await sendAccountsToPlatform(fusion, res)
+    log.info(`Sent ${count} account(s) to platform`)
+    log.metric('outputPhase.sendAccounts', sendAccountsStartedAt, { count })
+
+    const saveStateStartedAt = Date.now()
+    await savePersistentState(attributes, sources)
+    log.info('Attribute state saved')
+    log.info('Batch cumulative count saved')
+    log.metric('outputPhase.savePersistentState', saveStateStartedAt)
 
     sources.clearFusionAccounts()
     log.info('Account caches cleared from memory')
 
-    if (isPersistent) {
-        await sources.aggregateDelayedSources(async ({ sourceId, delayMinutes, disableOptimization }) => {
-            await messaging.scheduleDelayedAggregation({
-                sourceId,
-                delayMinutes,
-                disableOptimization,
-            })
-        })
+    const scheduleAggregationStartedAt = Date.now()
+    await scheduleDelayedAggregations(sources, messaging)
+    log.metric('outputPhase.scheduleDelayedAggregations', scheduleAggregationStartedAt)
 
-        await forms.awaitPendingDeleteOperations()
-        log.info('Queued form deletions completed')
-    }
+    await finalizeFormOperations(forms)
+    log.info('Queued form deletions completed')
 
     return count
 }
