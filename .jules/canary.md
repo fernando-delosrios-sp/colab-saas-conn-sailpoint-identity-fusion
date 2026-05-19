@@ -30,3 +30,7 @@
 ## 2026-05-18 - MkDocs Admonition Inner Formatting
 **Learning:** Inner content within MkDocs Material admonitions (like numbered lists) must be properly separated by newlines and indented by 4 spaces. Placing a list on the same line as the admonition declaration (e.g., `!!! note "Title" 1. item`) prevents correct rendering.
 **Action:** Ensure all content inside admonitions is moved to a new line and indented with 4 spaces.
+
+## 2026-05-19 - Convert Warning Admonition to MkDocs Material Format
+**Learning:** The previous note about the upgrade in `docs/operations/account-list.md` was buried in a list and not properly highlighted using the available MkDocs Material admonition styles.
+**Action:** Converted the list item into a `!!! warning "Upgrade note: Fusion review form definitions"` block with proper 4-space indentation to make this critical upgrade information stand out clearly.
