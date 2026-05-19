@@ -260,25 +260,24 @@ export class FusionService {
      *
      * @returns Empty array (registration is done via setFusionAccount; return kept for API consistency)
      */
-    public async preProcessFusionAccounts(): Promise<FusionAccount[]> {
-        const { fusionAccounts } = this.sources
-        const startedAt = Date.now()
-        this.log.info(
-            `Pre-processing fusion accounts: loading ${fusionAccounts.length} fusion account record(s) from sources and registering them for fusion`
-        )
-        const results: FusionAccount[] = []
-        await forEachBatched(fusionAccounts, async (x: Account) => {
-            const fusionAccount = FusionAccount.fromFusionAccount(x)
-            this.setFusionAccount(fusionAccount)
-            results.push(fusionAccount)
-        })
-        this.log.info(
-            `Fusion account pre-process finished: ${results.length} account(s) loaded and registered | SECTION DURATION ${PhaseTimer.formatElapsed(
-                Date.now() - startedAt
-            )}`
-        )
-        return results
-    }
+     public async preProcessFusionAccounts(): Promise<FusionAccount[]> {
+         const { fusionAccounts } = this.sources
+         const startedAt = Date.now()
+         this.log.info(
+             `Pre-processing fusion accounts: loading ${fusionAccounts.length} fusion account record(s) from sources and registering them for fusion`
+         )
+         const results: FusionAccount[] = []
+         await forEachBatched(fusionAccounts, async (x: Account) => {
+             const fusionAccount = FusionAccount.fromFusionAccount(x)
+             this.setFusionAccount(fusionAccount)
+             results.push(fusionAccount)
+         })
+         this.log.info(
+             `Fusion account pre-process finished: ${results.length} account(s) loaded and registered`
+         )
+         this.log.metric('FusionService.preProcessFusionAccounts', startedAt, { count: results.length })
+         return results
+     }
 
     /**
      * Process all fusion accounts from sources.
@@ -300,39 +299,38 @@ export class FusionService {
      *
      * @returns Processed fusion accounts
      */
-    public async processFusionAccounts(): Promise<FusionAccount[]> {
-        const { fusionAccounts } = this.sources
-        const startedAt = Date.now()
-        const total = fusionAccounts.length
-        const batchSize = this.fusionParallelBatchSize()
-        const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
-        const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
-        let batchIndex = 0
-        this.log.info(
-            `Processing fusion accounts: for each of ${total} fusion account(s), match managed accounts from the work queue and build fusion layers`
-        )
-        const results = await promiseAllBatched(
-            fusionAccounts,
-            async (x: Account) => {
-                return await this.processFusionAccount(x)
-            },
-            batchSize,
-            (processed, ttl) => {
-                batchIndex++
-                if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
-                    this.log.info(
-                        `Fusion accounts progress: ${processed}/${ttl} processed | RUN ELAPSED ${PhaseTimer.formatElapsed(Date.now() - startedAt)}`
-                    )
-                }
-            }
-        )
-        this.log.info(
-            `Fusion accounts phase finished: ${results.length} fusion account(s) processed (managed accounts matched and layered) | SECTION DURATION ${PhaseTimer.formatElapsed(
-                Date.now() - startedAt
-            )}`
-        )
-        return results
-    }
+     public async processFusionAccounts(): Promise<FusionAccount[]> {
+         const { fusionAccounts } = this.sources
+         const startedAt = Date.now()
+         const total = fusionAccounts.length
+         const batchSize = this.fusionParallelBatchSize()
+         const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
+         const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
+         let batchIndex = 0
+         this.log.info(
+             `Processing fusion accounts: for each of ${total} fusion account(s), match managed accounts from the work queue and build fusion layers`
+         )
+         const results = await promiseAllBatched(
+             fusionAccounts,
+             async (x: Account) => {
+                 return await this.processFusionAccount(x)
+             },
+             batchSize,
+             (processed, ttl) => {
+                 batchIndex++
+                 if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
+                     this.log.info(
+                         `Fusion accounts progress: ${processed}/${ttl} processed`
+                     )
+                 }
+             }
+         )
+         this.log.info(
+             `Fusion accounts phase finished: ${results.length} fusion account(s) processed (managed accounts matched and layered)`
+         )
+         this.log.metric('FusionService.processFusionAccounts', startedAt, { count: results.length })
+         return results
+     }
 
     /**
      * Reconcile transient entitlements derived from pending form instances.
@@ -407,38 +405,33 @@ export class FusionService {
     /**
      * Refresh unique attributes for all fusion accounts and identities in batches.
      */
-    public async refreshUniqueAttributes(): Promise<void> {
-        const batchSize = this.managedAccountsBatchSize
-        const allAccounts = [...this.fusionAccounts, ...this.fusionIdentities]
-        const total = allAccounts.length
-        const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
-        const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
-        const startedAt = Date.now()
-        this.log.info(
-            `Unique-attribute generation: refreshing uniqueness for ${total} fusion and identity-backed account(s), ${totalBatches} batch(es) of up to ${batchSize}`
-        )
-        let batchIndex = 0
-        while (allAccounts.length > 0) {
-            batchIndex += 1
-            const batch = allAccounts.splice(0, batchSize)
-            const batchStarted = Date.now()
-            await Promise.all(batch.map((account) => this.attributes.refreshUniqueAttributes(account)))
-            const done = total - allAccounts.length
-            if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || allAccounts.length === 0) {
-                this.log.info(
-                    `Unique-attribute generation progress: ${done}/${total} account(s) done — batch ${batchIndex}/${totalBatches} ` +
-                        `| LAST BATCH ${PhaseTimer.formatElapsed(Date.now() - batchStarted)} | RUN ELAPSED ${PhaseTimer.formatElapsed(
-                            Date.now() - startedAt
-                        )}`
-                )
-            }
-        }
-        this.log.info(
-            `Unique-attribute generation finished: uniqueness refreshed for ${total} account(s) | SECTION DURATION ${PhaseTimer.formatElapsed(
-                Date.now() - startedAt
-            )}`
-        )
-    }
+     public async refreshUniqueAttributes(): Promise<void> {
+         const batchSize = this.managedAccountsBatchSize
+         const allAccounts = [...this.fusionAccounts, ...this.fusionIdentities]
+         const total = allAccounts.length
+         const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
+         const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
+         const startedAt = Date.now()
+         this.log.info(
+             `Unique-attribute generation: refreshing uniqueness for ${total} fusion and identity-backed account(s), ${totalBatches} batch(es) of up to ${batchSize}`
+         )
+         let batchIndex = 0
+         while (allAccounts.length > 0) {
+             batchIndex += 1
+             const batch = allAccounts.splice(0, batchSize)
+             await Promise.all(batch.map((account) => this.attributes.refreshUniqueAttributes(account)))
+             const done = total - allAccounts.length
+             if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || allAccounts.length === 0) {
+                 this.log.info(
+                     `Unique-attribute generation progress: ${done}/${total} account(s) done — batch ${batchIndex}/${totalBatches}`
+                 )
+             }
+         }
+         this.log.info(
+             `Unique-attribute generation finished: uniqueness refreshed for ${total} account(s)`
+         )
+         this.log.metric('FusionService.refreshUniqueAttributes', startedAt, { count: total })
+     }
 
     /**
      * Process a single fusion account.
@@ -743,55 +736,54 @@ export class FusionService {
      *
      * @returns Fusion accounts for identities that did not already have one
      */
-    public async processIdentities(): Promise<FusionAccount[]> {
-        const { identities } = this.identities
-        this.identitiesProcessedCount = identities.length
-        const startedAt = Date.now()
-        const total = identities.length
-        const batchSize = this.fusionParallelBatchSize()
-        const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
-        const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
-        let batchIndex = 0
-        this.log.info(
-            `Processing identity documents: creating or merging fusion accounts for ${total} ISC identity document(s)`
-        )
-        const results = await promiseAllBatched(
-            identities,
-            (x) => this.processIdentity(x),
-            batchSize,
-            (processed, ttl) => {
-                batchIndex++
-                if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
-                    this.log.info(
-                        `Identity documents progress: ${processed}/${ttl} processed | RUN ELAPSED ${PhaseTimer.formatElapsed(Date.now() - startedAt)}`
-                    )
-                }
-            }
-        )
-        const { managedSources } = this.sources
-        managedSources.forEach((source) => {
-            this.sourcesByName.set(source.name, source)
-        })
+     public async processIdentities(): Promise<FusionAccount[]> {
+         const { identities } = this.identities
+         this.identitiesProcessedCount = identities.length
+         const startedAt = Date.now()
+         const total = identities.length
+         const batchSize = this.fusionParallelBatchSize()
+         const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
+         const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
+         let batchIndex = 0
+         this.log.info(
+             `Processing identity documents: creating or merging fusion accounts for ${total} ISC identity document(s)`
+         )
+         const results = await promiseAllBatched(
+             identities,
+             (x) => this.processIdentity(x),
+             batchSize,
+             (processed, ttl) => {
+                 batchIndex++
+                 if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
+                     this.log.info(
+                         `Identity documents progress: ${processed}/${ttl} processed`
+                     )
+                 }
+             }
+         )
+         const { managedSources } = this.sources
+         managedSources.forEach((source) => {
+             this.sourcesByName.set(source.name, source)
+         })
 
-        if (this.fusionOwnerIsGlobalReviewer) {
-            const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
-            for (const reviewerId of globalOwnerIds) {
-                const reviewer = this.fusionIdentityMap.get(reviewerId)
-                if (reviewer) {
-                    managedSources.forEach((source) => {
-                        this.setReviewerForSource(reviewer, source.id!)
-                    })
-                    this.populateReviewerFusionReviewsFromPending(reviewer)
-                }
-            }
-        }
-        this.log.info(
-            `Identity documents phase finished: ${identities.length} identity document(s) processed (fusion accounts created or updated from identities) | SECTION DURATION ${PhaseTimer.formatElapsed(
-                Date.now() - startedAt
-            )}`
-        )
-        return compact(results)
-    }
+         if (this.fusionOwnerIsGlobalReviewer) {
+             const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
+             for (const reviewerId of globalOwnerIds) {
+                 const reviewer = this.fusionIdentityMap.get(reviewerId)
+                 if (reviewer) {
+                     managedSources.forEach((source) => {
+                         this.setReviewerForSource(reviewer, source.id!)
+                     })
+                     this.populateReviewerFusionReviewsFromPending(reviewer)
+                 }
+             }
+         }
+         this.log.info(
+             `Identity documents phase finished: ${identities.length} identity document(s) processed (fusion accounts created or updated from identities)`
+         )
+         this.log.metric('FusionService.processIdentities', startedAt, { count: identities.length })
+         return compact(results)
+     }
 
     /**
      * Process a single identity.
@@ -949,21 +941,20 @@ export class FusionService {
      *
      * @returns The fusion accounts produced by the new identity decisions
      */
-    public async processFusionIdentityDecisions(): Promise<FusionAccount[]> {
-        const { fusionIdentityDecisions } = this.forms
-        const startedAt = Date.now()
-        this.log.info(
-            `Processing fusion identity decisions: applying ${fusionIdentityDecisions.length} reviewer form decision(s) (new identity or merge into existing)`
-        )
+     public async processFusionIdentityDecisions(): Promise<FusionAccount[]> {
+         const { fusionIdentityDecisions } = this.forms
+         const startedAt = Date.now()
+         this.log.info(
+             `Processing fusion identity decisions: applying ${fusionIdentityDecisions.length} reviewer form decision(s) (new identity or merge into existing)`
+         )
 
-        const results = await promiseAllBatched(fusionIdentityDecisions, (x) => this.processFusionIdentityDecision(x))
-        this.log.info(
-            `Fusion identity decisions phase finished: ${fusionIdentityDecisions.length} decision(s) applied | SECTION DURATION ${PhaseTimer.formatElapsed(
-                Date.now() - startedAt
-            )}`
-        )
-        return compact(results)
-    }
+         const results = await promiseAllBatched(fusionIdentityDecisions, (x) => this.processFusionIdentityDecision(x))
+         this.log.info(
+             `Fusion identity decisions phase finished: ${fusionIdentityDecisions.length} decision(s) applied`
+         )
+         this.log.metric('FusionService.processFusionIdentityDecisions', startedAt, { count: fusionIdentityDecisions.length })
+         return compact(results)
+     }
 
     /**
      * Processes a single fusion identity decision (reviewer form response).
@@ -1355,12 +1346,13 @@ export class FusionService {
     }
 
     private logManagedAccountsPhaseSummary(processed: number, processManagedAccountsStartedAt: number): void {
-        const totalElapsed = Date.now() - processManagedAccountsStartedAt
         this.log.info(
-            `Managed accounts phase finished: ${processed} analyzed (matching workflow complete) | SECTION DURATION ${PhaseTimer.formatElapsed(
-                totalElapsed
-            )} | MATCH SCORING TIME ${PhaseTimer.formatElapsed(this.currentRunMatchScoringMs)} (similarity scoring vs candidate identities)`
+            `Managed accounts phase finished: ${processed} analyzed (matching workflow complete)`
         )
+        this.log.metric('FusionService.processManagedAccounts', processManagedAccountsStartedAt, {
+            analyzed: processed,
+            matchScoringMs: this.currentRunMatchScoringMs,
+        })
     }
 
     /**
@@ -1655,11 +1647,10 @@ export class FusionService {
             }
         }
         const totalMs = Date.now() - analyzeUncorrelatedStartedAt
-        this.log.info(
-            `Performance metric: FusionService.analyzeUncorrelatedAccounts durationMs=${totalMs} analyzed=${
-                results.length
-            } matchScoringMs=${this.currentRunMatchScoringMs}`
-        )
+        this.log.metric('FusionService.analyzeUncorrelatedAccounts', analyzeUncorrelatedStartedAt, {
+            analyzed: results.length,
+            matchScoringMs: this.currentRunMatchScoringMs,
+        })
         return results
     }
 
@@ -2000,57 +1991,55 @@ export class FusionService {
      * @param send - Callback invoked with each account output (e.g. res.send)
      * @returns Number of accounts sent
      */
-    public async forEachISCAccount(send: (account: StdAccountListOutput) => void): Promise<number> {
-        const shouldFilter = this.deleteEmpty
-        const batchSize = this.fusionParallelBatchSize()
-        const forEachStartedAt = Date.now()
-        let count = 0
-        const eligibleAccounts: FusionAccount[] = []
+     public async forEachISCAccount(send: (account: StdAccountListOutput) => void): Promise<number> {
+         const shouldFilter = this.deleteEmpty
+         const batchSize = this.fusionParallelBatchSize()
+         const forEachStartedAt = Date.now()
+         let count = 0
+         const eligibleAccounts: FusionAccount[] = []
 
-        for (const account of this.fusionAccountMap.values()) {
-            if (shouldFilter && account.isOrphan()) continue
-            eligibleAccounts.push(account)
-        }
-        for (const identity of this.fusionIdentityMap.values()) {
-            if (shouldFilter && identity.isOrphan()) continue
-            eligibleAccounts.push(identity)
-        }
+         for (const account of this.fusionAccountMap.values()) {
+             if (shouldFilter && account.isOrphan()) continue
+             eligibleAccounts.push(account)
+         }
+         for (const identity of this.fusionIdentityMap.values()) {
+             if (shouldFilter && identity.isOrphan()) continue
+             eligibleAccounts.push(identity)
+         }
 
-        const totalEligible = eligibleAccounts.length
-        const totalBatches = Math.ceil(totalEligible / batchSize)
-        const logProgressEveryBatch = Math.max(1, Math.min(50, Math.ceil(totalBatches / 20) || 1))
-        for (let i = 0; i < eligibleAccounts.length; i += batchSize) {
-            const batch = eligibleAccounts.slice(i, i + batchSize)
-            const outputBatch = await Promise.all(batch.map((account) => this.getISCAccount(account, false)))
-            for (const output of outputBatch) {
-                if (output) {
-                    send(output)
-                    count++
-                }
-            }
-            const processedInLoop = Math.min(i + batch.length, totalEligible)
-            const currentBatch = Math.floor(i / batchSize) + 1
-            if (
-                currentBatch === 1 ||
-                currentBatch % logProgressEveryBatch === 0 ||
-                currentBatch === totalBatches ||
-                processedInLoop === totalEligible
-            ) {
-                this.log.info(
-                    `Sending accounts progress: batches ${currentBatch}/${totalBatches} | eligible processed ${processedInLoop}/${totalEligible} | sent ${count} | RUN ELAPSED ${PhaseTimer.formatElapsed(
-                        Date.now() - forEachStartedAt
-                    )}`
-                )
-            }
-            await yieldToEventLoop()
-        }
-        this.log.info(
-            `Performance metric: FusionService.forEachISCAccount durationMs=${
-                Date.now() - forEachStartedAt
-            } eligible=${totalEligible} sent=${count} batchSize=${batchSize}`
-        )
-        return count
-    }
+         const totalEligible = eligibleAccounts.length
+         const totalBatches = Math.ceil(totalEligible / batchSize)
+         const logProgressEveryBatch = Math.max(1, Math.min(50, Math.ceil(totalBatches / 20) || 1))
+         for (let i = 0; i < eligibleAccounts.length; i += batchSize) {
+             const batch = eligibleAccounts.slice(i, i + batchSize)
+             const outputBatch = await Promise.all(batch.map((account) => this.getISCAccount(account, false)))
+             for (const output of outputBatch) {
+                 if (output) {
+                     send(output)
+                     count++
+                 }
+             }
+             const processedInLoop = Math.min(i + batch.length, totalEligible)
+             const currentBatch = Math.floor(i / batchSize) + 1
+             if (
+                 currentBatch === 1 ||
+                 currentBatch % logProgressEveryBatch === 0 ||
+                 currentBatch === totalBatches ||
+                 processedInLoop === totalEligible
+             ) {
+                 this.log.info(
+                     `Sending accounts progress: batches ${currentBatch}/${totalBatches} | eligible processed ${processedInLoop}/${totalEligible} | sent ${count}`
+                 )
+             }
+             await yieldToEventLoop()
+         }
+         this.log.metric('FusionService.forEachISCAccount', forEachStartedAt, {
+             eligible: totalEligible,
+             sent: count,
+             batchSize,
+         })
+         return count
+     }
 
     /**
      * Converts a fusion account to the ISC account output format.

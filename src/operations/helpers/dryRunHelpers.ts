@@ -54,7 +54,7 @@ export type DryRunIssueSummary = {
 
 export type DryRunHelpersContext = {
     config?: { baseurl?: string; managedAccountsBatchSize?: number }
-    log: { info: (message: string) => void }
+    log: { info: (message: string) => void; metric: (name: string, startedAt: number, data?: Record<string, any>) => void }
     res: { send: (payload: unknown) => void }
     reports: {
         ensureReportOutputDirectoryExists: () => Promise<string>
@@ -350,6 +350,7 @@ export const prepareDryRunOutputData = async (
     const analyzedUncorrelatedAccounts: FusionAccount[] = []
     const uniqueRefreshStartedAt = Date.now()
     await refreshUniqueAttributesForDryRun(context, analyzedUncorrelatedAccounts, runtimeOptions)
+    context.log.metric('dryRun.refreshUniqueAttributes', uniqueRefreshStartedAt)
     const uniqueAttributesElapsedMs = Date.now() - uniqueRefreshStartedAt
     return { analyzedUncorrelatedAccounts, uniqueAttributesElapsedMs }
 }

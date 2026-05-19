@@ -2,6 +2,7 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
 import { promiseAllBatched } from '../../services/fusionService/collections'
+import { defaults } from '../../data/config/defaults'
 
 export type PipelineMode =
     | { kind: 'aggregation' } // full persistent run — accountList (includes optional aggregation report)
@@ -18,8 +19,6 @@ export interface FetchResult {
     managedAccountsFoundRecord: number
     managedAccountsFoundOrphan: number
 }
-
-const GLOBAL_OWNER_FETCH_BATCH_SIZE = 25
 
 async function applyPersistentFusionReset(serviceRegistry: ServiceRegistry): Promise<void> {
     const { forms, fusion, sources } = serviceRegistry
@@ -40,6 +39,8 @@ export async function setupPhase(
 ): Promise<boolean> {
     const { log, fusion, schemas, sources, attributes, config } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
+    const isReset = fusion.isReset()
+    const forceAttributeRefresh = isPersistent && config.forceAttributeRefresh
 
     await sources.fetchAllSources(isPersistent)
     log.info(`Loaded ${sources.managedSources.length} managed source(s)`)
@@ -53,7 +54,7 @@ export async function setupPhase(
         await sources.setProcessLock()
     }
 
-    if (fusion.isReset()) {
+    if (isReset) {
         log.info('Reset flag detected, disabling reset and exiting')
         if (isPersistent) {
             await applyPersistentFusionReset(serviceRegistry)
@@ -61,7 +62,7 @@ export async function setupPhase(
         return false
     }
 
-    if (isPersistent && config.forceAttributeRefresh) {
+    if (forceAttributeRefresh) {
         log.info('Force attribute refresh flag detected, disabling flag for next run')
         await fusion.disableForceAttributeRefresh()
     }
@@ -82,16 +83,12 @@ export async function setupPhase(
             await schemas.setFusionAccountSchema(undefined)
             log.debug('Fusion account schema refreshed after reverse correlation setup')
             log.info(`Reverse correlation setup completed for ${reverseCorrelationCount} source(s)`)
-            log.info(
-                `Performance metric: reverseCorrelationSetup durationMs=${Date.now() - reverseCorrelationStartedAt} sources=${reverseCorrelationCount}`
-            )
+            log.metric('reverseCorrelationSetup', reverseCorrelationStartedAt, { sources: reverseCorrelationCount })
         }
         const aggregateManagedSourcesStartedAt = Date.now()
         await sources.aggregateManagedSources()
         log.info('Managed sources aggregated')
-        log.info(
-            `Performance metric: aggregateManagedSources durationMs=${Date.now() - aggregateManagedSourcesStartedAt} sources=${sources.managedSources.length}`
-        )
+        log.metric('aggregateManagedSources', aggregateManagedSourcesStartedAt, { sources: sources.managedSources.length })
     }
 
     await attributes.initializeCounters()
@@ -100,10 +97,40 @@ export async function setupPhase(
     return true
 }
 
+function countManagedAccountsByType(sources: ServiceRegistry['sources']): {
+    managedAccountsFound: number
+    managedAccountsFoundAuthoritative: number
+    managedAccountsFoundRecord: number
+    managedAccountsFoundOrphan: number
+} {
+    let managedAccountsFoundAuthoritative = 0
+    let managedAccountsFoundRecord = 0
+    let managedAccountsFoundOrphan = 0
+
+    for (const account of sources.managedAccountsById.values()) {
+        const sourceType = sources.getSourceByNameSafe(account.sourceName)?.sourceType ?? SourceType.Authoritative
+        if (sourceType === SourceType.Record) {
+            managedAccountsFoundRecord++
+        } else if (sourceType === SourceType.Orphan) {
+            managedAccountsFoundOrphan++
+        } else {
+            managedAccountsFoundAuthoritative++
+        }
+    }
+
+    return {
+        managedAccountsFound: sources.managedAccountsById.size,
+        managedAccountsFoundAuthoritative,
+        managedAccountsFoundRecord,
+        managedAccountsFoundOrphan,
+    }
+}
+
 /** Phase 2: Fetch all data in parallel. */
 export async function fetchPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<FetchResult> {
-    const { log, identities, sources, forms, fusion, messaging } = serviceRegistry
+    const { log, identities, sources, forms, fusion, messaging, config } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
+    const ownerIncluded = fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer
 
     log.info('Fetching identities, managed accounts, and dependencies')
 
@@ -120,56 +147,46 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
 
     const fetchAllStartedAt = Date.now()
     await Promise.all(fetchTasks)
-    log.info(
-        `Performance metric: fetchPhase.parallelFetch durationMs=${Date.now() - fetchAllStartedAt} taskCount=${fetchTasks.length}`
-    )
+    log.metric('fetchPhase.parallelFetch', fetchAllStartedAt, { taskCount: fetchTasks.length })
 
     // Form instance processing must run after managed accounts are loaded
     log.info('Processing fetched form data')
     const processFormDataStartedAt = Date.now()
     await forms.processFetchedFormData()
-    log.info(`Performance metric: fetchPhase.processFormData durationMs=${Date.now() - processFormDataStartedAt}`)
+    log.metric('fetchPhase.processFormData', processFormDataStartedAt)
 
-    if (fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer) {
+    if (ownerIncluded) {
         const globalOwnerFetchStartedAt = Date.now()
         const globalOwnerIds = await sources.fetchGlobalOwnerIdentityIds()
         const missingGlobalOwnerIds = globalOwnerIds.filter((id) => !identities.getIdentityById(id))
+        const ownerFetchBatchSize = config.managedAccountsBatchSize ?? defaults.managedAccountsBatchSize
         await promiseAllBatched(
             missingGlobalOwnerIds,
             async (id) => {
                 await identities.fetchIdentityById(id)
             },
-            GLOBAL_OWNER_FETCH_BATCH_SIZE
+            ownerFetchBatchSize
         )
-        log.info(
-            `Performance metric: fetchPhase.globalOwnerHydration durationMs=${
-                Date.now() - globalOwnerFetchStartedAt
-            } totalIds=${globalOwnerIds.length} fetchedIds=${missingGlobalOwnerIds.length} batchSize=${GLOBAL_OWNER_FETCH_BATCH_SIZE}`
-        )
+        log.metric('fetchPhase.globalOwnerHydration', globalOwnerFetchStartedAt, {
+            totalIds: globalOwnerIds.length,
+            fetchedIds: missingGlobalOwnerIds.length,
+            batchSize: ownerFetchBatchSize,
+        })
     }
 
-    const identitiesFound = identities.identityCount
-    const managedAccountsFound = sources.managedAccountsById.size
-    let managedAccountsFoundAuthoritative = 0
-    let managedAccountsFoundRecord = 0
-    let managedAccountsFoundOrphan = 0
+    const {
+        managedAccountsFound,
+        managedAccountsFoundAuthoritative,
+        managedAccountsFoundRecord,
+        managedAccountsFoundOrphan,
+    } = countManagedAccountsByType(sources)
 
-    for (const account of sources.managedAccountsById.values()) {
-        const sourceType = sources.getSourceByNameSafe(account.sourceName)?.sourceType ?? SourceType.Authoritative
-        if (sourceType === SourceType.Record) {
-            managedAccountsFoundRecord++
-        } else if (sourceType === SourceType.Orphan) {
-            managedAccountsFoundOrphan++
-        } else {
-            managedAccountsFoundAuthoritative++
-        }
-    }
     log.info(
-        `Loaded ${sources.fusionAccountCount} fusion account(s), ${identitiesFound} identities, ${managedAccountsFound} managed account(s)`
+        `Loaded ${sources.fusionAccountCount} fusion account(s), ${identities.identityCount} identities, ${managedAccountsFound} managed account(s)`
     )
 
     return {
-        identitiesFound,
+        identitiesFound: identities.identityCount,
         managedAccountsFound,
         managedAccountsFoundAuthoritative,
         managedAccountsFoundRecord,
@@ -292,22 +309,16 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
         const sendAccountsStartedAt = Date.now()
         count = await fusion.forEachISCAccount((account) => res.send(account))
         log.info(`Sent ${count} account(s) to platform`)
-        log.info(
-            `Performance metric: outputPhase.sendAccounts durationMs=${Date.now() - sendAccountsStartedAt} count=${count}`
-        )
+        log.metric('outputPhase.sendAccounts', sendAccountsStartedAt, { count })
 
         const saveAttributesStartedAt = Date.now()
         await attributes.saveState()
         log.info('Attribute state saved')
-        log.info(
-            `Performance metric: outputPhase.saveAttributeState durationMs=${Date.now() - saveAttributesStartedAt}`
-        )
+        log.metric('outputPhase.saveAttributeState', saveAttributesStartedAt)
         const saveCumulativeCountStartedAt = Date.now()
         await sources.saveBatchCumulativeCount()
         log.info('Batch cumulative count saved')
-        log.info(
-            `Performance metric: outputPhase.saveBatchCumulativeCount durationMs=${Date.now() - saveCumulativeCountStartedAt}`
-        )
+        log.metric('outputPhase.saveBatchCumulativeCount', saveCumulativeCountStartedAt)
     }
 
     sources.clearFusionAccounts()
@@ -329,24 +340,4 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     return count
 }
 
-export async function executeSharedPipelinePhases(
-    serviceRegistry: ServiceRegistry,
-    schema: any,
-    options: CorePipelineOptions,
-    timer: import('../../services/logService').PhaseTimer
-): Promise<{ shouldContinue: boolean; fetchResult?: FetchResult }> {
-    const shouldContinue = await setupPhase(serviceRegistry, schema, options)
-    if (!shouldContinue) return { shouldContinue: false }
-    timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
 
-    const fetchResult = await fetchPhase(serviceRegistry, options)
-    timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
-
-    await refreshPhase(serviceRegistry, options)
-    timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
-
-    await processPhase(serviceRegistry, options)
-    timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
-
-    return { shouldContinue: true, fetchResult }
-}

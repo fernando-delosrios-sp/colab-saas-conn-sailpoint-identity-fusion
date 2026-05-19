@@ -2,8 +2,7 @@ import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { initializeDryRunExecution, prepareDryRunOutputData, streamDryRunRows } from './helpers/dryRunHelpers'
 import { buildDryRunSummary } from './helpers/buildDryRunPayload'
-import { CorePipelineOptions, executeSharedPipelinePhases } from './helpers/corePipeline'
-import { PhaseTimer } from '../services/logService'
+import { CorePipelineOptions, setupPhase, fetchPhase, refreshPhase, processPhase } from './helpers/corePipeline'
 
 /**
  * custom:dryrun command - non-persistent aggregation analysis output.
@@ -28,14 +27,20 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         if (!execution) return
         const { runtimeOptions, rowEmitter } = execution
 
-        // PHASES 1-4: Shared core pipeline
-        const { shouldContinue, fetchResult } = await executeSharedPipelinePhases(
-            serviceRegistry,
-            input.schema,
-            options,
-            timer
-        )
-        if (!shouldContinue || !fetchResult) return
+        // --- SHARED PIPELINE START (PHASES 1-4) — also executed in accountList ---
+        const shouldContinue = await setupPhase(serviceRegistry, input.schema, options)
+        if (!shouldContinue) return
+        timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
+
+        const fetchResult = await fetchPhase(serviceRegistry, options)
+        timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
+
+        await refreshPhase(serviceRegistry, options)
+        timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
+
+        await processPhase(serviceRegistry, options)
+        timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
+        // --- SHARED PIPELINE END ---
 
         const issueSummary = log.getAggregationIssueSummary()
         const { report } = reports.initializeDryRunReport({
@@ -49,11 +54,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         const outputPreparationStartedAt = Date.now()
         const preparedOutputData = await prepareDryRunOutputData(serviceRegistry, runtimeOptions)
         timer.recordElapsed('Unique attributes', preparedOutputData.uniqueAttributesElapsedMs)
-        log.info(
-            `PHASE 5: Output preparation — finalize dry-run analysis (${PhaseTimer.formatElapsed(
-                Date.now() - outputPreparationStartedAt
-            )})`
-        )
+        log.metric('dryRun.outputPreparation', outputPreparationStartedAt)
 
         // PHASE 6: Stream rows
         const streamStartedAt = Date.now()
@@ -65,7 +66,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             rowEmitter
         )
         const streamElapsedMs = Date.now() - streamStartedAt
-        log.info(`PHASE 6: Output — streaming enriched ISC account rows (${PhaseTimer.formatElapsed(streamElapsedMs)})`)
+        log.metric('dryRun.streaming', streamStartedAt, { sentRows, optionEmitCounter })
         timer.recordElapsed('Output', streamElapsedMs)
 
         // Final stats and report write/send

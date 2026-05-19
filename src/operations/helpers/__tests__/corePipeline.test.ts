@@ -54,7 +54,7 @@ describe('corePipeline phase split', () => {
         }
         const identities = { clear: jest.fn(() => callOrder.push('identities.clear')) }
         const sources = { managedAccountsById: new Map() }
-        const log = { info: jest.fn() }
+        const log = { info: jest.fn(), metric: jest.fn() }
         const registry = { fusion, identities, sources, log } as any
 
         await refreshPhase(registry, { mode: { kind: 'aggregation' } })
@@ -126,7 +126,7 @@ describe('corePipeline outputPhase', () => {
             fetchSender: jest.fn().mockResolvedValue(undefined),
             fetchDelayedAggregationSender: jest.fn().mockResolvedValue(undefined),
         }
-        const log = { info: jest.fn() }
+        const log = { info: jest.fn(), metric: jest.fn() }
         const serviceRegistry = { ...registry, forms, identities, sources, fusion, messaging, log }
 
         await fetchPhase(serviceRegistry, { mode: { kind: 'aggregation' } })
