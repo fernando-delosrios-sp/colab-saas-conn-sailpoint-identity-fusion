@@ -50,3 +50,6 @@
 ## 2026-05-18 - Prevent unbounded parallel execution in form service
 **Learning:** Unbounded `Promise.all(array.map(fn))` in `src/services/formService/formService.ts` during form instance retrieval initiates concurrent asynchronous requests over arrays (e.g. `activeForms`), which can result in API rate limit triggers when there are a large number of forms.
 **Action:** Replaced the unbounded `Promise.all` mapping block with `promiseAllBatched(activeForms, fn)` to bound concurrency while maintaining parallel execution benefits.
+## 2026-05-19 - Prevent unbounded parallel execution in rebuild fusion account helper
+**Learning:** Unbounded `Promise.all(array.map(fn))` in operations helpers (like `rebuildFusionAccount.ts`) when executing cascade aggregations (`sources.aggregateManagedSource`) or fetching multiple managed accounts (`sources.fetchManagedAccount`) causes concurrent requests to fan out aggressively. When the number of configured sources or linked accounts grows large, this triggers API rate limits and can lead to memory exhaustion.
+**Action:** Replaced unbounded `Promise.all(array.map(fn))` invocations with `promiseAllBatched(array, fn)` across data fetch operations to safely bound concurrency during rebuild tasks while maintaining the efficiency of parallel processing.
