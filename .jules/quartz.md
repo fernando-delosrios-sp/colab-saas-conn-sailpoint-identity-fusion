@@ -8,3 +8,6 @@
 ## 2024-05-18 - Missing Try/Catch Edge Case in MessagingService Origin Parse
 **Learning:** Testing private methods directly using `any` casting bypasses visibility restrictions and is often the best approach to cover internal code logic without exposing implementation details to the public API just for tests.
 **Action:** Created dedicated test file `messagingService.headerSubtitle.test.ts` to mock private URL parsing and ensure edge-case URL exceptions fall back correctly to undefined as implemented.
+## 2026-05-19 - Extracting Dense Fallbacks
+**Learning:** Dense, inline fallback chains (using `??` across multiple property checks) make inline sorting and mapping logic difficult to read when repeated.
+**Action:** Extract repeated fallback structures into small, locally-scoped helper methods to streamline loop logic and self-document the code's intent.

@@ -789,24 +789,20 @@ export const refreshUniqueAttributesForDryRun = async (
 
     // Also refresh analyzed managed accounts that only surface on the uncorrelated-queue path.
     if (analyzedUncorrelatedAccounts.length === 0) return
+
+    const getAccountSortKey = (account: any): string => {
+        return String(
+            readUnknown(account, 'originAccountId') ??
+                readPathString(account, ['attributes', 'originAccount']) ??
+                readUnknown(account, 'nativeIdentity') ??
+                readUnknown(account, 'key') ??
+                readUnknown(account, 'name') ??
+                ''
+        )
+    }
+
     const stableAnalyzed = [...analyzedUncorrelatedAccounts].sort((a: any, b: any) => {
-        const aKey = String(
-            readUnknown(a, 'originAccountId') ??
-                readPathString(a, ['attributes', 'originAccount']) ??
-                readUnknown(a, 'nativeIdentity') ??
-                readUnknown(a, 'key') ??
-                readUnknown(a, 'name') ??
-                ''
-        )
-        const bKey = String(
-            readUnknown(b, 'originAccountId') ??
-                readPathString(b, ['attributes', 'originAccount']) ??
-                readUnknown(b, 'nativeIdentity') ??
-                readUnknown(b, 'key') ??
-                readUnknown(b, 'name') ??
-                ''
-        )
-        return aKey.localeCompare(bKey)
+        return getAccountSortKey(a).localeCompare(getAccountSortKey(b))
     })
     for (let i = 0; i < stableAnalyzed.length; i += batchSize) {
         const batch = stableAnalyzed.slice(i, i + batchSize)
