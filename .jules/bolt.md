@@ -53,3 +53,6 @@
 ## 2026-05-19 - Prevent unbounded parallel execution in rebuild fusion account helper
 **Learning:** Unbounded `Promise.all(array.map(fn))` in operations helpers (like `rebuildFusionAccount.ts`) when executing cascade aggregations (`sources.aggregateManagedSource`) or fetching multiple managed accounts (`sources.fetchManagedAccount`) causes concurrent requests to fan out aggressively. When the number of configured sources or linked accounts grows large, this triggers API rate limits and can lead to memory exhaustion.
 **Action:** Replaced unbounded `Promise.all(array.map(fn))` invocations with `promiseAllBatched(array, fn)` across data fetch operations to safely bound concurrency during rebuild tasks while maintaining the efficiency of parallel processing.
+## 2024-05-20 - Use promiseAllBatched for API request batching
+**Learning:** Unbounded `Promise.all` on arrays can cause API rate limit failures or memory exhaustion, especially when iterating over a large set of items.
+**Action:** Replace `Promise.all` with `promiseAllBatched` when processing potentially large data sets with async operations.

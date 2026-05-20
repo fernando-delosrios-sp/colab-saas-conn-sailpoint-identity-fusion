@@ -23,6 +23,7 @@ import type { FusionAccount } from '../../model/account'
 import { FusionReport } from '../fusionService/types'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import { readString } from '../../utils/safeRead'
+import { promiseAllBatched } from '../fusionService/collections'
 import {
     registerHandlebarsHelpers,
     compileEmailTemplates,
@@ -671,28 +672,27 @@ export class MessagingService {
 
         await this.identities?.hydrateMissingIdentitiesById(validIds)
 
-        const results = await Promise.all(
-            validIds.map(async (identityId) => {
-                let identity = this.identities?.getIdentityById(identityId)
-                if (!identity) {
-                    try {
-                        identity = await this.identities?.fetchIdentityById(identityId)
-                    } catch (e) {
-                        this.log.warn(`Failed to fetch identity ${identityId}: ${e}`)
-                    }
+        // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
+        const results = await promiseAllBatched(validIds, async (identityId) => {
+            let identity = this.identities?.getIdentityById(identityId)
+            if (!identity) {
+                try {
+                    identity = await this.identities?.fetchIdentityById(identityId)
+                } catch (e) {
+                    this.log.warn(`Failed to fetch identity ${identityId}: ${e}`)
                 }
+            }
 
-                const attrs: any = identity?.attributes ?? {}
-                const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
-                const normalized = normalizeEmailValue(emailValue)
+            const attrs: any = identity?.attributes ?? {}
+            const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
+            const normalized = normalizeEmailValue(emailValue)
 
-                if (normalized.length === 0) {
-                    this.log.warn(`No email found for identity ${identityId}`)
-                }
+            if (normalized.length === 0) {
+                this.log.warn(`No email found for identity ${identityId}`)
+            }
 
-                return normalized
-            })
-        )
+            return normalized
+        })
 
         for (const normalized of results) {
             for (const e of normalized) {
