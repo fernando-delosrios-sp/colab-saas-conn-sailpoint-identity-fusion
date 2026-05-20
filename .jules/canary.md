@@ -34,3 +34,6 @@
 ## 2026-05-19 - Convert Warning Admonition to MkDocs Material Format
 **Learning:** The previous note about the upgrade in `docs/operations/account-list.md` was buried in a list and not properly highlighted using the available MkDocs Material admonition styles.
 **Action:** Converted the list item into a `!!! warning "Upgrade note: Fusion review form definitions"` block with proper 4-space indentation to make this critical upgrade information stand out clearly.
+## 2026-05-20 - MkDocs Admonition Inner Body Formatting
+**Learning:** MkDocs Material admonitions (e.g., `!!! note`, `!!! tip`) require their inner body text to be indented by exactly 4 spaces. If the indentation is missing, the body text is rendered as plain Markdown directly below the admonition title instead of being contained inside the styled callout box.
+**Action:** When adding or updating MkDocs Material admonitions, always ensure the body text is indented by 4 spaces.
