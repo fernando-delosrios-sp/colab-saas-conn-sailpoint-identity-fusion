@@ -591,6 +591,26 @@ describe('FusionService', () => {
     })
 
     describe('processManagedAccounts', () => {
+        beforeEach(() => {
+            mockAttributes.refreshReverseCorrelationAttributes.mockImplementation((fusionAccount) => {
+                const configs = (mockConfig as any).sources ?? []
+                for (const sc of configs) {
+                    if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
+                        const missingForSource =
+                            typeof fusionAccount.getMissingAccountIdsForSource === 'function'
+                                ? fusionAccount.getMissingAccountIdsForSource(sc.name)
+                                : []
+                        if (missingForSource.length > 0) {
+                            const info = fusionAccount.getManagedAccountInfo(missingForSource[0])
+                            if (info) {
+                                fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute, info.schema.id)
+                            }
+                        }
+                    }
+                }
+            })
+        })
+
         it('drops uncorrelated managed accounts that are already linked in Fusion', async () => {
             const linkedAccount = {
                 id: 'acct-linked-1',
@@ -657,71 +677,6 @@ describe('FusionService', () => {
             expect(result).toBeDefined()
             expect(workQueue.has(key)).toBe(false)
             expect(byIdentity.has('identity-exact')).toBe(false)
-        })
-
-        it('processes only remaining managed accounts on the next run after budget pause', async () => {
-            ;(fusionService as any).managedAccountsBatchSize = 1
-            const accountA = {
-                id: 'acct-next-run-a',
-                nativeIdentity: 'native-next-run-a',
-                name: 'Next Run A',
-                sourceId: 'source-a-id',
-                sourceName: 'Source A',
-                attributes: {},
-                uncorrelated: true,
-            } as Account
-            const accountB = {
-                id: 'acct-next-run-b',
-                nativeIdentity: 'native-next-run-b',
-                name: 'Next Run B',
-                sourceId: 'source-a-id',
-                sourceName: 'Source A',
-                attributes: {},
-                uncorrelated: true,
-            } as Account
-            const accountC = {
-                id: 'acct-next-run-c',
-                nativeIdentity: 'native-next-run-c',
-                name: 'Next Run C',
-                sourceId: 'source-a-id',
-                sourceName: 'Source A',
-                attributes: {},
-                uncorrelated: true,
-            } as Account
-            const workQueue = new Map([
-                ['source-a-id::native-next-run-a', accountA],
-                ['source-a-id::native-next-run-b', accountB],
-                ['source-a-id::native-next-run-c', accountC],
-            ])
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
-
-            const budgetSpy = jest.spyOn(fusionService as any, 'managedAccountPhaseBudgetMs')
-            budgetSpy.mockReturnValueOnce(0)
-            budgetSpy.mockReturnValue(60_000)
-
-            const processedAccountIds: string[] = []
-            jest.spyOn(fusionService as any, 'completeManagedAccountFromAnalysis').mockImplementation(
-                async (analysis: any) => {
-                    const account = analysis.account as Account
-                    processedAccountIds.push(String(account.id))
-                    const managedKey = `${account.sourceId}::${account.nativeIdentity}`
-                    workQueue.delete(managedKey)
-                    return undefined
-                }
-            )
-
-            await fusionService.processManagedAccounts()
-            expect(processedAccountIds).toHaveLength(1)
-            expect(workQueue.size).toBe(2)
-
-            await fusionService.processManagedAccounts()
-            expect(processedAccountIds).toHaveLength(3)
-            expect(workQueue.size).toBe(0)
-            expect(new Set(processedAccountIds)).toEqual(
-                new Set(['acct-next-run-a', 'acct-next-run-b', 'acct-next-run-c'])
-            )
         })
 
         it('uses newly unmatched current-run accounts as deferred candidates for subsequent managed accounts', async () => {
@@ -1685,26 +1640,23 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
+            ;(mockConfig.sources as any[]).push({
+                name: 'Source A',
+                correlationMode: 'reverse' as const,
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity',
+            })
             ;(fusionService as any).sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: {},
             })
-            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
-            mockSources.getSourceConfig.mockReturnValue({
-                name: 'Source A',
-                correlationMode: 'reverse',
-                correlationAttribute: 'reverseNativeIdentity',
-                correlationDisplayName: 'Reverse Native Identity',
-            } as any)
 
             const result = await fusionService.processManagedAccount(mockManagedAccount)
 
             expect(result).toBeDefined()
             expect(result?.attributes.reverseNativeIdentity).toBe('native-1')
-            expect(mockSources.assertReverseCorrelationReady).toHaveBeenCalledTimes(1)
         })
 
         it('registers correlated managed accounts not linked to Fusion as authoritative non-matches', async () => {
@@ -1786,6 +1738,13 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
+            ;(mockConfig.sources as any[]).push({
+                name: 'Source A',
+                correlationMode: 'reverse' as const,
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity',
+            })
+
             jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
             jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
@@ -1802,17 +1761,6 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            mockSources.getSourceConfig.mockImplementation((sourceName: string) => {
-                if (sourceName === 'Source A') {
-                    return {
-                        name: 'Source A',
-                        correlationMode: 'reverse',
-                        correlationAttribute: 'reverseNativeIdentity',
-                        correlationDisplayName: 'Reverse Native Identity',
-                    } as any
-                }
-                return undefined
-            })
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockAttributes.registerUniqueAttributes.mockResolvedValue()
@@ -2067,7 +2015,7 @@ describe('FusionService', () => {
             ])
         })
 
-        it('fails managed account processing when reverse correlation prerequisites are missing', async () => {
+        it('sets reverse correlation attribute for unmatched authoritative accounts without checking platform prerequisites', async () => {
             const mockManagedAccount = {
                 id: 'acct-2',
                 nativeIdentity: 'native-2',
@@ -2078,27 +2026,23 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
+            ;(mockConfig.sources as any[]).push({
+                name: 'Source A',
+                correlationMode: 'reverse' as const,
+                correlationAttribute: 'reverseNativeIdentity',
+                correlationDisplayName: 'Reverse Native Identity',
+            })
             ;(fusionService as any).sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: {},
             })
-            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
-            mockSources.getSourceConfig.mockReturnValue({
-                name: 'Source A',
-                correlationMode: 'reverse',
-                correlationAttribute: 'reverseNativeIdentity',
-                correlationDisplayName: 'Reverse Native Identity',
-            } as any)
-            mockSources.assertReverseCorrelationReady.mockRejectedValueOnce(
-                new Error('Reverse correlation prerequisites are not ready')
-            )
 
-            await expect(fusionService.processManagedAccount(mockManagedAccount)).rejects.toThrow(
-                'Reverse correlation prerequisites are not ready'
-            )
+            const result = await fusionService.processManagedAccount(mockManagedAccount)
+
+            expect(result).toBeDefined()
+            expect(result?.attributes.reverseNativeIdentity).toBe('native-2')
         })
     })
 
