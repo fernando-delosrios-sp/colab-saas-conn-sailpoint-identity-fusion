@@ -73,6 +73,7 @@ export class AttributeService {
     private readonly sourceConfigs: SourceConfig[]
     private readonly maxAttempts?: number
     private readonly forceAttributeRefresh: boolean
+    private readonly reverseSources: SourceConfig[]
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -108,6 +109,7 @@ export class AttributeService {
         this.uniqueAttributeNames = new Set(this.uniqueDefinitions.map((d) => d.name))
 
         this.setStateWrapper(config.fusionState)
+        this.reverseSources = this.sourceConfigs.filter((sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute)
     }
 
     // ------------------------------------------------------------------------
@@ -393,15 +395,7 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to refresh reverse correlation attributes for
      */
     public refreshReverseCorrelationAttributes(fusionAccount: FusionAccount): void {
-        const reverseSources = this.sourceConfigs.filter((sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute)
-        if (reverseSources.length === 0) return
-
-        const missingIds = fusionAccount.missingAccountIds
-        const hasUnknownMissingSourceInfo = missingIds.some((accountId) => !fusionAccount.getManagedAccountInfo(accountId))
-
-        for (const sc of reverseSources) {
-            if (hasUnknownMissingSourceInfo) continue
-
+        for (const sc of this.reverseSources) {
             const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
             if (missingForSource.length > 0) {
                 const firstAccountId = missingForSource[0]
