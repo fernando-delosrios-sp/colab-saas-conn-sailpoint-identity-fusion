@@ -73,6 +73,7 @@ export class AttributeService {
     private readonly sourceConfigs: SourceConfig[]
     private readonly maxAttempts?: number
     private readonly forceAttributeRefresh: boolean
+    private readonly reverseSources: SourceConfig[]
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -108,6 +109,7 @@ export class AttributeService {
         this.uniqueAttributeNames = new Set(this.uniqueDefinitions.map((d) => d.name))
 
         this.setStateWrapper(config.fusionState)
+        this.reverseSources = this.sourceConfigs.filter((sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute)
     }
 
     // ------------------------------------------------------------------------
@@ -378,6 +380,36 @@ export class AttributeService {
                     `Error generating normal attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
                     error instanceof Error ? error.message : readString(error, 'message', String(error))
                 )
+            }
+        }
+    }
+
+    /**
+     * Refreshes reverse correlation attributes for all sources configured with
+     * correlationMode 'reverse'. Sets the attribute to the first missing account's
+     * schema.id for sources with missing accounts, and clears it for sources without.
+     *
+     * This is called alongside refreshNormalAttributes to ensure reverse correlation
+     * attributes stay in sync with the current state of missing accounts.
+     *
+     * @param fusionAccount - The fusion account to refresh reverse correlation attributes for
+     */
+    public refreshReverseCorrelationAttributes(fusionAccount: FusionAccount): void {
+        if (fusionAccount.missingAccountIds.length === 0) return
+        for (const sc of this.reverseSources) {
+            const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
+            if (missingForSource.length > 0) {
+                const firstAccountId = missingForSource[0]
+                const info = fusionAccount.getManagedAccountInfo(firstAccountId)
+                if (info) {
+                    fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
+                    this.log.debug(
+                        `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
+                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                    )
+                }
+            } else {
+                fusionAccount.clearReverseCorrelationAttribute(sc.correlationAttribute!)
             }
         }
     }

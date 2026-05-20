@@ -22,9 +22,12 @@ coverage/
 reports/
 exportedObjects/
 site/
+*.tsbuildinfo
+.eslintcache
 
 # Test artifacts
 test/
+test-data/recordings
 
 # Local configs
 input.json
