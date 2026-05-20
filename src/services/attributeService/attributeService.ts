@@ -395,6 +395,7 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to refresh reverse correlation attributes for
      */
     public refreshReverseCorrelationAttributes(fusionAccount: FusionAccount): void {
+        if (fusionAccount.missingAccountIds.length === 0) return
         for (const sc of this.reverseSources) {
             const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
             if (missingForSource.length > 0) {
