@@ -245,28 +245,32 @@ function extractObjectValue(item: object): string | undefined {
     return hasValue(pick) ? String(pick) : undefined
 }
 
-export function toSetFromAttribute(attributes: Record<string, any> | null | undefined, key: string): Set<string> {
-    const raw = attributes?.[key]
-    const arr = Array.isArray(raw) ? raw : []
-
-    // Normalize common ISC representations:
-    // - string[] (plain multi-valued attributes)
-    // - { id: string }[] (entitlement references often come back as objects)
-    // - { value: string }[] / { name: string }[] (other SDK shapes)
-    const normalized: string[] = []
+/**
+ * Extracts string tokens from an array, normalizing common ISC representations:
+ * - string[] (plain multi-valued attributes)
+ * - { id: string }[] (entitlement references often come back as objects)
+ * - { value: string }[] / { name: string }[] (other SDK shapes)
+ */
+function extractStringTokens(arr: any[]): string[] {
+    const tokens: string[] = []
     for (const item of arr) {
         if (missing(item)) continue
         if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
-            normalized.push(String(item))
+            tokens.push(String(item))
             continue
         }
         if (typeof item === 'object') {
             const val = extractObjectValue(item)
-            if (val !== undefined) normalized.push(val)
+            if (val !== undefined) tokens.push(val)
         }
     }
+    return tokens
+}
 
-    return new Set(normalized)
+export function toSetFromAttribute(attributes: Record<string, any> | null | undefined, key: string): Set<string> {
+    const raw = attributes?.[key]
+    const arr = Array.isArray(raw) ? raw : []
+    return new Set(extractStringTokens(arr))
 }
 
 /**
@@ -277,19 +281,7 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
 export function normalizeActionTokens(raw: unknown): string[] {
     if (missing(raw)) return []
     if (Array.isArray(raw)) {
-        const out: string[] = []
-        for (const item of raw) {
-            if (missing(item)) continue
-            if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
-                out.push(String(item))
-                continue
-            }
-            if (typeof item === 'object') {
-                const val = extractObjectValue(item)
-                if (val !== undefined) out.push(val)
-            }
-        }
-        return out
+        return extractStringTokens(raw)
     }
     if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') {
         return [String(raw)]
