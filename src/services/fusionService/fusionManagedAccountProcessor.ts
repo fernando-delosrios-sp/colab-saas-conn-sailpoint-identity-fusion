@@ -5,6 +5,7 @@ import { SourceType } from '../../model/config'
 import { FusionConfig } from '../../model/config'
 import { buildManagedAccountKey, getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
+import { hasIdentityBackedMatches, hasNewUnmatchedPeerMatches } from './helpers'
 
 export interface FusionManagedAccountState {
     config: FusionConfig
@@ -20,8 +21,6 @@ export interface FusionManagedAccountState {
     handleExactMatch: (fusionAccount: FusionAccount, account: Account, identityId: string) => Promise<FusionAccount | undefined>
     handlePartialMatch: (fusionAccount: FusionAccount, sourceInfo?: SourceInfo) => Promise<FusionAccount | undefined>
     handleDeferredMatch: (fusionAccount: FusionAccount, account: Account) => FusionAccount | undefined
-    hasIdentityBackedMatches: (fusionAccount: FusionAccount) => boolean
-    hasNewUnmatchedPeerMatches: (fusionAccount: FusionAccount) => boolean
     logInfo: (message: string) => void
 }
 
@@ -58,10 +57,10 @@ export async function processManagedAccount(
     }
 
     const fusionAccount = await state.analyzeManagedAccount(account)
-    const hasIdentityBackedMatches = state.hasIdentityBackedMatches(fusionAccount)
-    const hasNewUnmatchedPeerMatches = state.hasNewUnmatchedPeerMatches(fusionAccount)
+    const identityBackedMatches = hasIdentityBackedMatches(fusionAccount)
+    const newUnmatchedPeerMatches = hasNewUnmatchedPeerMatches(fusionAccount)
 
-    if (hasIdentityBackedMatches) {
+    if (identityBackedMatches) {
         // Analysis-only runs (e.g. custom:dryrun): keep match report data but do not
         // register decisions or mutate fusion state as in a real aggregation.
         if (!state.isAggregationAccountListMode) {
@@ -75,7 +74,7 @@ export async function processManagedAccount(
         return await state.handlePartialMatch(fusionAccount, sourceInfo)
     }
 
-    if (hasNewUnmatchedPeerMatches) {
+    if (newUnmatchedPeerMatches) {
         return state.handleDeferredMatch(fusionAccount, account)
     }
 

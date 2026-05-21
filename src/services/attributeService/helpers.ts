@@ -227,7 +227,7 @@ export const buildAttributeMappingConfig = (
     defaultAttributeMerge: DefaultAttributeMergeMode
 ): AttributeMappingConfig => {
     // Check if attribute has specific configuration in attributeMaps
-    const attributeMap = attributeMaps?.find((mapping) => mapping.newAttribute === attributeName)
+    const attributeMap = attributeMaps?.find((am) => am.newAttribute === attributeName)
 
     if (attributeMap) {
         // Use attributeMap configuration
