@@ -202,8 +202,12 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
     const decisions = await fusion.processFusionIdentityDecisions()
     decisionsOp.done({ count: decisions.length })
 
-    identities.clear()
-    log.info('Identities cache cleared from memory')
+    if (process.env.RECORD_MODE !== 'true') {
+        identities.clear()
+        log.info('Identities cache cleared from memory')
+    } else {
+        log.info('Identities cache retained for recording')
+    }
 
     log.info('Processing managed accounts (Match)')
     await fusion.initializeManagedAccountProcessing()
@@ -314,10 +318,18 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     const { log, fusion, forms, sources, attributes, messaging, res } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
 
-    sources.clearManagedAccounts()
+    if (process.env.RECORD_MODE !== 'true') {
+        sources.clearManagedAccounts()
+    } else {
+        log.info('Managed accounts cache retained for recording')
+    }
 
     if (!isPersistent) {
-        sources.clearFusionAccounts()
+        if (process.env.RECORD_MODE !== 'true') {
+            sources.clearFusionAccounts()
+        } else {
+            log.info('Fusion accounts cache retained for recording')
+        }
         log.info('Account caches cleared from memory')
         return 0
     }
@@ -339,7 +351,11 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     log.info('Batch cumulative count saved')
     saveStateOp.done()
 
-    sources.clearFusionAccounts()
+    if (process.env.RECORD_MODE !== 'true') {
+        sources.clearFusionAccounts()
+    } else {
+        log.info('Fusion accounts cache retained for recording')
+    }
     log.info('Account caches cleared from memory')
 
     const scheduleAggregationOp = log.track('outputPhase.scheduleDelayedAggregations')
