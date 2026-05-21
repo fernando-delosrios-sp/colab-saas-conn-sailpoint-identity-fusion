@@ -24,6 +24,10 @@ import {
     fusionReportMatchCandidateAccountFields,
     getFusionIdentityConflictTrackingKey,
     mapScoreReportsForFusionReport,
+    createAutomaticAssignmentDecision,
+    formatFusionMatchDiscoveryLog,
+    hasIdentityBackedMatches as checkHasIdentityBackedMatches,
+    hasNewUnmatchedPeerMatches as checkHasNewUnmatchedPeerMatches,
 } from './helpers'
 import { AttributeOperations } from '../attributeService/types'
 import {
@@ -1241,45 +1245,10 @@ export class FusionService {
                 handleExactMatch: (fusion, acct, id) => this.handleExactMatch(fusion, acct, id),
                 handlePartialMatch: (fusion, info) => this.handlePartialMatch(fusion, info),
                 handleDeferredMatch: (fusion, acct) => this.handleDeferredMatch(fusion, acct),
-                hasIdentityBackedMatches: (fusion) => this.hasIdentityBackedMatches(fusion),
-                hasNewUnmatchedPeerMatches: (fusion) => this.hasNewUnmatchedPeerMatches(fusion),
                 logInfo: (msg) => this.log.info(msg),
             },
             account
         )
-    }
-
-    /**
-     * Builds a synthetic fusion decision when all attribute scores are 100 (exact match),
-     * skipping manual review (automatic assignment to the selected identity).
-     *
-     * @param fusionAccount - The fusion account being assigned
-     * @param account - The managed account
-     * @param identityId - The target identity ID
-     * @returns Synthetic FusionDecision for automatic assignment
-     */
-    private createAutomaticAssignmentDecision(
-        fusionAccount: FusionAccount,
-        account: Account,
-        identityId: string
-    ): FusionDecision {
-        const accountKey = getManagedAccountKeyFromAccount(account)
-        assert(accountKey, 'Managed account missing composite key for automatic assignment decision')
-        return {
-            submitter: { id: 'system', email: '', name: 'System (automatic assignment)' },
-            account: {
-                id: accountKey,
-                name: fusionAccount.name ?? account.name ?? '',
-                sourceName: fusionAccount.sourceName,
-                sourceId: readString(account, 'sourceId'),
-                nativeIdentity: account.nativeIdentity ?? undefined,
-            },
-            newIdentity: false,
-            identityId,
-            comments: 'Automatically assigned: exact attribute match (all rules 100, none skipped)',
-            finished: true,
-            automaticAssignment: true,
-        }
     }
 
     private async handleNoReviewerAccount(
@@ -1313,7 +1282,7 @@ export class FusionService {
         )
         // Prevent subsequent managed accounts from scoring against this identity
         this.autoAssignedIdentityIds.add(identityId)
-        const syntheticDecision = this.createAutomaticAssignmentDecision(fusionAccount, account, identityId)
+        const syntheticDecision = createAutomaticAssignmentDecision(fusionAccount, account, identityId)
         this.forms.registerFinishedDecision(syntheticDecision)
         return this.processFusionIdentityDecision(syntheticDecision)
     }
@@ -1352,7 +1321,7 @@ export class FusionService {
 
     private handleDeferredMatch(fusionAccount: FusionAccount, account: Account): undefined {
         const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'new-unmatched')
-        const { headline, summary } = FusionService.formatFusionMatchDiscoveryLog(deferredMatches, true)
+        const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
         this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}; skipping account for now`)
         this.removeManagedAccountFromWorkQueue(account)
         return undefined
@@ -1383,35 +1352,6 @@ export class FusionService {
     }
 
     /**
-     * Builds info-log headline and "- N candidate(s), M partial(s)" suffix from match scores.
-     * "candidate(s)" counts exact (all rules 100, none skipped); "partial(s)" are other matches in the set.
-     */
-    private static formatFusionMatchDiscoveryLog(
-        matches: ReadonlyArray<FusionMatch>,
-        deferred: boolean
-    ): { headline: string; summary: string } {
-        let exact = 0
-        for (const m of matches) {
-            if (isExactAttributeMatchScores(m.scores)) exact++
-        }
-        const partial = matches.length - exact
-        const segments: string[] = []
-        if (exact > 0) segments.push(`${exact} candidate(s)`)
-        if (partial > 0) segments.push(`${partial} partial(s)`)
-        const summary = segments.length > 0 ? segments.join(', ') : '0 candidate(s)'
-        if (deferred) {
-            return {
-                headline: exact > 0 ? 'DEFERRED EXACT MATCH FOUND' : 'DEFERRED MATCH FOUND',
-                summary,
-            }
-        }
-        return {
-            headline: exact > 0 ? 'EXACT MATCH FOUND' : 'MATCH FOUND',
-            summary,
-        }
-    }
-
-    /**
      * Full sequential scan of every loaded managed account, returning a FusionAccount per entry.
      * Used when correlating outside the primary fusion-ISC stream (e.g. dry-run emission for
      * uncorrelated / work-queue remainder). Iterates the map directly; runs sequentially so
@@ -1430,11 +1370,11 @@ public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
              const fusionAccount = await this.analyzeManagedAccount(account)
              if (
                  fusionAccount.isMatch &&
-                 !this.hasIdentityBackedMatches(fusionAccount) &&
-                 this.hasNewUnmatchedPeerMatches(fusionAccount)
+                 !checkHasIdentityBackedMatches(fusionAccount) &&
+                 checkHasNewUnmatchedPeerMatches(fusionAccount)
              ) {
                  const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'new-unmatched')
-                 const { headline, summary } = FusionService.formatFusionMatchDiscoveryLog(deferredMatches, true)
+                 const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
                  this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}`)
              }
              results.push(fusionAccount)
@@ -1489,7 +1429,7 @@ public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
                 this.config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
             )
             this.currentRunMatchScoringMs += Date.now() - identityScoringStarted
-            hasIdentityBackedMatches = this.hasIdentityBackedMatches(fusionAccount)
+            hasIdentityBackedMatches = checkHasIdentityBackedMatches(fusionAccount)
         } else {
             this.log.debug(
                 `Skipping Match scoring for record source account: ${name} [${sourceName}] ` +
@@ -1545,7 +1485,7 @@ public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
         if (!deferredPhaseExecuted) {
             return undefined
         }
-        if (this.hasNewUnmatchedPeerMatches(fusionAccount)) {
+        if (checkHasNewUnmatchedPeerMatches(fusionAccount)) {
             return this.handleDeferredMatch(fusionAccount, account)
         }
         return this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
@@ -1560,7 +1500,7 @@ public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
                 const identityMatches = fusionAccount.fusionMatches.filter(
                     (m) => (m.candidateType ?? 'identity') === 'identity'
                 )
-                const { headline, summary } = FusionService.formatFusionMatchDiscoveryLog(identityMatches, false)
+                const { headline, summary } = formatFusionMatchDiscoveryLog(identityMatches, false)
                 this.log.info(`${headline}: ${name} [${sourceName}] - ${summary}`)
             }
             if (!this.shouldCaptureManagedAccountReportData()) return
@@ -2353,14 +2293,5 @@ return { sent: count, eligible: totalEligible }
         this.clearAnalyzedAccounts()
 
         return report
-    }
-
-
-    private hasIdentityBackedMatches(fusionAccount: FusionAccount): boolean {
-        return fusionAccount.fusionMatches.some((match) => (match.candidateType ?? 'identity') === 'identity')
-    }
-
-    private hasNewUnmatchedPeerMatches(fusionAccount: FusionAccount): boolean {
-        return fusionAccount.fusionMatches.some((match) => match.candidateType === 'new-unmatched')
     }
 }

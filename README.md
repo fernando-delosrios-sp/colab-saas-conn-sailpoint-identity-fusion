@@ -392,6 +392,9 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+- (2026-05-21) Refactored `FusionService`, `FormService`, and `AttributeService` extracting helper functions to `helpers.ts` modules to improve maintainability and separate concerns.
+- (2026-05-21) Refactored `FusionAccount` logic and extracted validation logic.
+- (2026-05-21) Fixed `tsconfig.json` configuration for TypeScript compilation.
 - (2026-05-08) Refactored `execute` method in `src/services/proxyService.ts` to reduce complexity and improve maintainability.
 - (2026-05-08) Refactored `ensureIdentityProfileMapping` in `src/services/sourceService/sourceService.ts` for readability.
 - (2026-05-07) Added missing test cases for `trigramIndex.ts` to improve test coverage.
