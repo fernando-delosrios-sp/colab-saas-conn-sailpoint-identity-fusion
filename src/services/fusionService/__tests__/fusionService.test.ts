@@ -495,7 +495,8 @@ describe('FusionService', () => {
 
             fusionAccount.addIdentityLayer(identityDoc)
 
-            expect(fusionAccount.name).toBe('Authoritative Display Name')
+            expect(fusionAccount.name).toBe('Stale Name (from ref)')
+            expect(fusionAccount.identityDisplayName).toBe('Authoritative Display Name')
         })
     })
 
@@ -1799,7 +1800,8 @@ describe('FusionService', () => {
 
             const result = await fusionService.processFusionAccount(historicalAccount)
 
-            expect(result.name).toBe('Jane Q. Doe')
+            expect(result.name).toBe('30958535')
+            expect(result.identityDisplayName).toBe('Jane Q. Doe')
         })
 
         it('writes history when a newly associated managed account is picked up for an identity', async () => {
