@@ -357,7 +357,7 @@ export class FusionAccount {
         })
         fusionAccount._originSource = account.sourceName ?? undefined
         fusionAccount._originAccount = managedAccountKey
-        fusionAccount.setUncorrelated()
+        fusionAccount.setUncorrelatedStatus()
         fusionAccount.setUncorrelatedAccount(managedAccountKey)
         fusionAccount.setManagedAccount(account, false)
         fusionAccount.setNeedsReset(true)
@@ -397,7 +397,7 @@ export class FusionAccount {
         })
         fusionAccount._originSource = account.sourceName ?? undefined
         fusionAccount._originAccount = managedAccountKey
-        fusionAccount.setUncorrelated()
+        fusionAccount.setUncorrelatedStatus()
         fusionAccount.setUncorrelatedAccount(managedAccountKey)
         return fusionAccount
     }
@@ -889,19 +889,16 @@ export class FusionAccount {
      * so that getFusionAttributeSubset and downstream output include current values.
      */
     public syncCollectionAttributesToBag(): void {
-        this._attributeBag.current['reviews'] = Array.from(this._reviews)
-        this._attributeBag.current['accounts'] = Array.from(this._accountIds)
-        this._attributeBag.current['statuses'] = Array.from(this._statuses)
-        this._attributeBag.current['actions'] = Array.from(this._actions)
-        this._attributeBag.current['missing-accounts'] = Array.from(this._missingAccountIds)
-        this._attributeBag.current['sources'] = attrConcat(Array.from(this._sources))
-        this._attributeBag.current['history'] = [...this._history]
-        if (this._originSource !== undefined) {
-            this._attributeBag.current['originSource'] = this._originSource
-        }
-        if (this._originAccount !== undefined) {
-            this._attributeBag.current['originAccount'] = this._originAccount
-        }
+        const bag = this._attributeBag.current
+        bag['reviews'] = Array.from(this._reviews)
+        bag['accounts'] = Array.from(this._accountIds)
+        bag['statuses'] = Array.from(this._statuses)
+        bag['actions'] = Array.from(this._actions)
+        bag['missing-accounts'] = Array.from(this._missingAccountIds)
+        bag['sources'] = attrConcat(Array.from(this._sources))
+        bag['history'] = [...this._history]
+        if (this._originSource !== undefined) bag['originSource'] = this._originSource
+        if (this._originAccount !== undefined) bag['originAccount'] = this._originAccount
     }
 
     /** Queues a review URL for deferred addition (resolved during getISCAccount). */
@@ -1085,7 +1082,11 @@ export class FusionAccount {
         const label = FusionAccount.identityLabelFromIdentity(identity)
         if (label) {
             this._identityDisplayName = label
-            this._name = label
+            // The fusion account name is immutable once initialized (e.g. from historical platform account).
+            // Only assign the identity label to name if it is not already defined.
+            if (!this._name) {
+                this._name = label
+            }
         }
         this._attributeBag.identity = identity.attributes ?? {}
         this._identityId = identity.id ?? undefined
@@ -1094,17 +1095,16 @@ export class FusionAccount {
             this._needsRefresh = true
         }
 
-        identity.accounts?.forEach((account) => {
-            if (this.sourceConfigNamesSet.has(account.source?.name ?? '')) {
-                const managedAccountKey = buildManagedAccountKey({
-                    sourceId: account.source?.id,
-                    nativeIdentity: readString(account, 'nativeIdentity'),
-                })
-                if (managedAccountKey) {
-                    this.setCorrelatedAccount(managedAccountKey)
-                }
+        for (const account of identity.accounts ?? []) {
+            if (!this.sourceConfigNamesSet.has(account.source?.name ?? '')) continue
+            const managedAccountKey = buildManagedAccountKey({
+                sourceId: account.source?.id,
+                nativeIdentity: readString(account, 'nativeIdentity'),
+            })
+            if (managedAccountKey) {
+                this.setCorrelatedAccount(managedAccountKey)
             }
-        })
+        }
     }
 
     /**
@@ -1415,10 +1415,6 @@ export class FusionAccount {
         this._actions.delete('correlated')
     }
 
-    /** Sets the account as uncorrelated (no identity match). */
-    private setUncorrelated(): void {
-        this.setUncorrelatedStatus()
-    }
 
     /** Sets a specific account ID as uncorrelated and adds it to both account ID sets. */
     private setUncorrelatedAccount(accountId?: string): void {

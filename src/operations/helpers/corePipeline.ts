@@ -176,8 +176,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
 }
 
 /** Phase 3: Fusion account processing (existing fusion accounts). */
-export async function refreshPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<void> {
-    void options
+export async function refreshPhase(serviceRegistry: ServiceRegistry, _options: CorePipelineOptions): Promise<void> {
     const { log, fusion, sources } = serviceRegistry
 
     log.info('Refreshing Fusion accounts')
@@ -227,9 +226,8 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
 /** Phase 5: Unique attribute refresh. */
 export async function uniqueAttributesPhase(
     serviceRegistry: ServiceRegistry,
-    options: CorePipelineOptions
+    _options: CorePipelineOptions
 ): Promise<void> {
-    void options
     const { log, fusion, sources } = serviceRegistry
 
     const refreshOp = log.track('FusionService.refreshUniqueAttributes')
@@ -256,9 +254,8 @@ export async function reportPhase(
     serviceRegistry: ServiceRegistry,
     fetchResult: FetchResult,
     timer: ReturnType<ServiceRegistry['log']['timer']>,
-    options: CorePipelineOptions
+    _options: CorePipelineOptions
 ): Promise<void> {
-    void options
     const { log, fusion } = serviceRegistry
 
     if (!fusion.fusionReportOnAggregation) return
