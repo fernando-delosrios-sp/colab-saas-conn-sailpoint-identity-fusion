@@ -10,6 +10,16 @@ import {
 
 import { createRegistry as createMockRegistry } from '../../__tests__/harness/registryMocking'
 
+function mockTrackedOperation(log: { metric: jest.Mock }): { done: jest.Mock; elapsedMs: jest.Mock } {
+    return {
+        done: jest.fn((data?: Record<string, any>) => {
+            log.metric('tracked', 0, data)
+            return 0
+        }),
+        elapsedMs: jest.fn(() => 0),
+    }
+}
+
 function createRegistry() {
     const registry = createMockRegistry()
     registry.sources.managedAccountsById = new Map()
@@ -32,15 +42,25 @@ describe('corePipeline phase split', () => {
         const fusion = {
             processFusionAccounts: jest.fn(async () => {
                 callOrder.push('processFusionAccounts')
+                return []
             }),
             processIdentities: jest.fn(async () => {
                 callOrder.push('processIdentities')
+                return []
             }),
             processFusionIdentityDecisions: jest.fn(async () => {
                 callOrder.push('processFusionIdentityDecisions')
+                return []
             }),
-            processManagedAccounts: jest.fn(async () => {
-                callOrder.push('processManagedAccounts')
+            initializeManagedAccountProcessing: jest.fn(async () => {
+                callOrder.push('initializeManagedAccountProcessing')
+            }),
+            processCorrelatedManagedAccounts: jest.fn(async () => {
+                callOrder.push('processCorrelatedManagedAccounts')
+            }),
+            processUncorrelatedManagedAccounts: jest.fn(async () => {
+                callOrder.push('processUncorrelatedManagedAccounts')
+                return { processed: 0, matchScoringMs: 0 }
             }),
             awaitPendingDisableOperations: jest.fn(async () => {
                 callOrder.push('awaitPendingDisableOperations')
@@ -50,11 +70,14 @@ describe('corePipeline phase split', () => {
             }),
             refreshUniqueAttributes: jest.fn(async () => {
                 callOrder.push('refreshUniqueAttributes')
+                return 0
             }),
         }
-        const identities = { clear: jest.fn(() => callOrder.push('identities.clear')) }
+        const identities = { clear: jest.fn(() => callOrder.push('identities.clear')), identityCount: 0 }
         const sources = { managedAccountsById: new Map() }
-        const log = { info: jest.fn(), metric: jest.fn() }
+        const log = { info: jest.fn(), metric: jest.fn(), track: jest.fn() }
+        const trackedOp = mockTrackedOperation(log)
+        log.track.mockReturnValue(trackedOp)
         const registry = { fusion, identities, sources, log } as any
 
         await refreshPhase(registry, { mode: { kind: 'aggregation' } })
@@ -66,11 +89,16 @@ describe('corePipeline phase split', () => {
             'processIdentities',
             'processFusionIdentityDecisions',
             'identities.clear',
-            'processManagedAccounts',
+            'initializeManagedAccountProcessing',
+            'processCorrelatedManagedAccounts',
+            'processUncorrelatedManagedAccounts',
             'awaitPendingDisableOperations',
             'reconcilePendingFormState',
             'refreshUniqueAttributes',
         ])
+
+        expect(log.track).toHaveBeenCalledWith('refreshPhase.processFusionAccounts')
+        expect(trackedOp.done).toHaveBeenCalledWith({ count: 0 })
     })
 })
 
@@ -97,7 +125,7 @@ describe('corePipeline outputPhase', () => {
 
     it('skips form cleanup for non-persistent mode', async () => {
         const { registry, forms, fusion } = createRegistry()
-        fusion.forEachISCAccount.mockResolvedValue(2)
+        fusion.forEachISCAccount.mockResolvedValue({ sent: 0, eligible: 0 })
 
         await outputPhase(registry, { mode: { kind: 'dry-run' } })
 
@@ -126,7 +154,7 @@ describe('corePipeline outputPhase', () => {
             fetchSender: jest.fn().mockResolvedValue(undefined),
             fetchDelayedAggregationSender: jest.fn().mockResolvedValue(undefined),
         }
-        const log = { info: jest.fn(), metric: jest.fn() }
+        const log = { info: jest.fn(), metric: jest.fn(), track: jest.fn(() => ({ done: jest.fn(() => 0), elapsedMs: jest.fn(() => 0) })) }
         const serviceRegistry = { ...registry, forms, identities, sources, fusion, messaging, log }
 
         await fetchPhase(serviceRegistry, { mode: { kind: 'aggregation' } })

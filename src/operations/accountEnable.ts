@@ -46,7 +46,9 @@ export const accountEnable = async (serviceRegistry: ServiceRegistry, input: Std
         // Bulk-register unique values directly from raw accounts (lightweight, no FusionAccount hydration)
         attributes.registerUniqueValuesFromRawAccounts(sources.fusionAccounts)
         // Still need preProcessFusionAccounts to populate fusionIdentityMap
-        await fusion.preProcessFusionAccounts()
+        const preProcessOp = log.track('FusionService.preProcessFusionAccounts')
+        const preProcessedAccounts = await fusion.preProcessFusionAccounts()
+        preProcessOp.done({ count: preProcessedAccounts.length })
         timer.phase('Step 2: Pre-processing all fusion accounts to collect unique values')
 
         const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_RESET, {

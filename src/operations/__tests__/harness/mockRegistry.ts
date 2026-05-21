@@ -71,21 +71,25 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         processFetchedFormData: jest.fn().mockResolvedValue(undefined),
         cleanUpForms: jest.fn().mockResolvedValue(undefined),
         awaitPendingDeleteOperations: jest.fn().mockResolvedValue(undefined),
+        fusionIdentityDecisions: [],
     }
 
     const fusion = {
         isReset: jest.fn(() => false),
         disableReset: jest.fn().mockResolvedValue(undefined),
         resetState: jest.fn().mockResolvedValue(undefined),
-        processFusionAccounts: jest.fn().mockResolvedValue(undefined),
-        processIdentities: jest.fn().mockResolvedValue(undefined),
-        processFusionIdentityDecisions: jest.fn().mockResolvedValue(undefined),
+        processFusionAccounts: jest.fn().mockResolvedValue([]),
+        processIdentities: jest.fn().mockResolvedValue([]),
+        processFusionIdentityDecisions: jest.fn().mockResolvedValue([]),
+        initializeManagedAccountProcessing: jest.fn().mockResolvedValue(undefined),
+        processCorrelatedManagedAccounts: jest.fn().mockResolvedValue(undefined),
+        processUncorrelatedManagedAccounts: jest.fn().mockResolvedValue({ processed: 0, matchScoringMs: 0 }),
         processManagedAccounts: jest.fn().mockResolvedValue(undefined),
         awaitPendingDisableOperations: jest.fn().mockResolvedValue(undefined),
-        refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
+        refreshUniqueAttributes: jest.fn().mockResolvedValue(0),
         reconcilePendingFormState: jest.fn(),
         clearAnalyzedAccounts: jest.fn(),
-        forEachISCAccount: jest.fn().mockResolvedValue(0),
+        forEachISCAccount: jest.fn().mockResolvedValue({ sent: 0, eligible: 0 }),
         fusionReportOnAggregation: false,
     }
 
@@ -108,6 +112,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
             crash: jest.fn(),
             timer: jest.fn(() => timer),
             metric: jest.fn(),
+            track: jest.fn(() => ({ done: jest.fn(() => 0), elapsedMs: jest.fn(() => 0) })),
         },
         res: { send: jest.fn() },
         schemas,

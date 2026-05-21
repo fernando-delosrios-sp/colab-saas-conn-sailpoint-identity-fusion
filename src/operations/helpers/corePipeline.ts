@@ -75,18 +75,18 @@ export async function setupPhase(
 
     if (isPersistent) {
         sources.clearReverseCorrelationReadinessCache()
-        const reverseCorrelationStartedAt = Date.now()
+        const reverseCorrelationOp = log.track('reverseCorrelationSetup')
         const reverseCorrelationCount = await sources.setupReverseCorrelationSources()
         if (reverseCorrelationCount > 0) {
             await schemas.setFusionAccountSchema(undefined)
             log.debug('Fusion account schema refreshed after reverse correlation setup')
             log.info(`Reverse correlation setup completed for ${reverseCorrelationCount} source(s)`)
-            log.metric('reverseCorrelationSetup', reverseCorrelationStartedAt, { sources: reverseCorrelationCount })
+            reverseCorrelationOp.done({ sources: reverseCorrelationCount })
         }
-        const aggregateManagedSourcesStartedAt = Date.now()
+        const aggregateManagedSourcesOp = log.track('aggregateManagedSources')
         await sources.aggregateManagedSources()
         log.info('Managed sources aggregated')
-        log.metric('aggregateManagedSources', aggregateManagedSourcesStartedAt, { sources: sources.managedSources.length })
+        aggregateManagedSourcesOp.done({ sources: sources.managedSources.length })
     }
 
     await attributes.initializeCounters()
@@ -145,15 +145,15 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
         fetchTasks.push(messaging.fetchDelayedAggregationSender())
     }
 
-    const fetchAllStartedAt = Date.now()
+    const fetchAllOp = log.track('fetchPhase.parallelFetch')
     await Promise.all(fetchTasks)
-    log.metric('fetchPhase.parallelFetch', fetchAllStartedAt, { taskCount: fetchTasks.length })
+    fetchAllOp.done({ taskCount: fetchTasks.length })
 
     // Form instance processing must run after managed accounts are loaded
     log.info('Processing fetched form data')
-    const processFormDataStartedAt = Date.now()
+    const processFormDataOp = log.track('fetchPhase.processFormData')
     await forms.processFetchedFormData()
-    log.metric('fetchPhase.processFormData', processFormDataStartedAt)
+    processFormDataOp.done()
 
     const {
         managedAccountsFound,
@@ -181,7 +181,9 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry, options: Co
     const { log, fusion, sources } = serviceRegistry
 
     log.info('Refreshing Fusion accounts')
-    await fusion.processFusionAccounts()
+    const refreshOp = log.track('refreshPhase.processFusionAccounts')
+    const processedFusionAccounts = await fusion.processFusionAccounts()
+    refreshOp.done({ count: processedFusionAccounts.length })
 
     log.info(`Refresh phase complete - ${sources.managedAccountsById.size} unprocessed account(s) remaining`)
 }
@@ -192,16 +194,24 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
     const isPersistent = options.mode.kind === 'aggregation'
 
     log.info('Processing identities')
+    const identitiesOp = log.track('FusionService.processIdentities')
     await fusion.processIdentities()
+    identitiesOp.done({ count: identities.identityCount })
 
     log.info('Processing fusion identity decisions (new identity)')
-    await fusion.processFusionIdentityDecisions()
+    const decisionsOp = log.track('FusionService.processFusionIdentityDecisions')
+    const decisions = await fusion.processFusionIdentityDecisions()
+    decisionsOp.done({ count: decisions.length })
 
     identities.clear()
     log.info('Identities cache cleared from memory')
 
     log.info('Processing managed accounts (Match)')
-    await fusion.processManagedAccounts()
+    await fusion.initializeManagedAccountProcessing()
+    await fusion.processCorrelatedManagedAccounts()
+    const managedAccountsOp = log.track('FusionService.processManagedAccounts')
+    const { processed, matchScoringMs } = await fusion.processUncorrelatedManagedAccounts()
+    managedAccountsOp.done({ analyzed: processed, matchScoringMs })
 
     if (isPersistent) {
         log.info('Waiting for pending disable operations')
@@ -222,7 +232,9 @@ export async function uniqueAttributesPhase(
     void options
     const { log, fusion, sources } = serviceRegistry
 
-    await fusion.refreshUniqueAttributes()
+    const refreshOp = log.track('FusionService.refreshUniqueAttributes')
+    const count = await fusion.refreshUniqueAttributes()
+    refreshOp.done({ count })
 
     log.info(`Work queue processing complete - ${sources.managedAccountsById.size} unprocessed account(s) remaining`)
 }
@@ -252,7 +264,7 @@ export async function reportPhase(
     if (!fusion.fusionReportOnAggregation) return
 
     log.info('Generating aggregation report')
-    const reportStartedAt = Date.now()
+    const reportOp = log.track('reportPhase.generateReport')
 
     const stats = {
         identitiesFound: fetchResult.identitiesFound,
@@ -267,13 +279,13 @@ export async function reportPhase(
     // Aggregation reports: stats only for non-matches; per-account unmatched rows are omitted (see generateReport includeNonMatches).
     await generateReport(false, serviceRegistry, stats)
 
-    log.metric('reportPhase.generateReport', reportStartedAt)
+    reportOp.done()
 }
 
 async function sendAccountsToPlatform(
     fusion: ServiceRegistry['fusion'],
     res: ServiceRegistry['res']
-): Promise<number> {
+): Promise<{ sent: number; eligible: number }> {
     return fusion.forEachISCAccount((account) => res.send(account))
 }
 
@@ -313,34 +325,34 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
         return 0
     }
 
-    const formCleanupStartedAt = Date.now()
+    const formCleanupOp = log.track('outputPhase.formCleanup')
     await completeFormCleanup(forms)
     log.info('Form cleanup queued')
-    log.metric('outputPhase.formCleanup', formCleanupStartedAt)
+    formCleanupOp.done()
 
     log.info('Sending accounts to platform')
-    const sendAccountsStartedAt = Date.now()
-    const count = await sendAccountsToPlatform(fusion, res)
-    log.info(`Sent ${count} account(s) to platform`)
-    log.metric('outputPhase.sendAccounts', sendAccountsStartedAt, { count })
+    const sendAccountsOp = log.track('outputPhase.sendAccounts')
+    const { sent, eligible } = await sendAccountsToPlatform(fusion, res)
+    log.info(`Sent ${sent} account(s) to platform`)
+    sendAccountsOp.done({ sent, eligible })
 
-    const saveStateStartedAt = Date.now()
+    const saveStateOp = log.track('outputPhase.savePersistentState')
     await savePersistentState(attributes, sources)
     log.info('Attribute state saved')
     log.info('Batch cumulative count saved')
-    log.metric('outputPhase.savePersistentState', saveStateStartedAt)
+    saveStateOp.done()
 
     sources.clearFusionAccounts()
     log.info('Account caches cleared from memory')
 
-    const scheduleAggregationStartedAt = Date.now()
+    const scheduleAggregationOp = log.track('outputPhase.scheduleDelayedAggregations')
     await scheduleDelayedAggregations(sources, messaging)
-    log.metric('outputPhase.scheduleDelayedAggregations', scheduleAggregationStartedAt)
+    scheduleAggregationOp.done()
 
     await finalizeFormOperations(forms)
     log.info('Queued form deletions completed')
 
-    return count
+    return sent
 }
 
 

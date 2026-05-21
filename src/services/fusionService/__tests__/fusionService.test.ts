@@ -2771,7 +2771,7 @@ describe('FusionService', () => {
                 return { key: account.nativeIdentity, attributes: {}, disabled: false }
             })
 
-            const count = await fusionService.forEachISCAccount((account) => {
+            const { sent: count } = await fusionService.forEachISCAccount((account) => {
                 sentKeys.push(String(account.key))
             })
 

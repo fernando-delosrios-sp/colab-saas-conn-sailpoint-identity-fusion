@@ -21,7 +21,7 @@ jest.mock('@sailpoint/connector-sdk', () => {
     }
 })
 
-import { LogService, PhaseTimer } from '../logService'
+import { LogService, PhaseTimer, TrackedOperation } from '../logService'
 
 describe('LogService aggregation issue summary', () => {
     beforeEach(() => {
@@ -160,6 +160,66 @@ describe('LogService.metric', () => {
         log.metric('outputPhase.saveAttributeState', startedAt)
         expect(mockLogger.info).toHaveBeenCalledWith(
             expect.stringContaining('Performance metric: outputPhase.saveAttributeState durationMs=89')
+        )
+        jest.useRealTimers()
+    })
+})
+
+describe('TrackedOperation via LogService.track', () => {
+    beforeEach(() => {
+        mockLogger.level = 'info'
+        mockLogger.info.mockClear()
+    })
+
+    it('emits metric with duration on done()', () => {
+        jest.useFakeTimers()
+        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const op = log.track('test.operation')
+        jest.advanceTimersByTime(1234)
+        op.done()
+        expect(mockLogger.info).toHaveBeenCalledWith(
+            expect.stringContaining('Performance metric: test.operation durationMs=1234')
+        )
+        jest.useRealTimers()
+    })
+
+    it('emits metric with structured data on done()', () => {
+        jest.useFakeTimers()
+        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const op = log.track('outputPhase.sendAccounts')
+        jest.advanceTimersByTime(567)
+        op.done({ count: 500, batchSize: 100 })
+        expect(mockLogger.info).toHaveBeenCalledWith(
+            expect.stringContaining('Performance metric: outputPhase.sendAccounts durationMs=567 count=500 batchSize=100')
+        )
+        jest.useRealTimers()
+    })
+
+    it('returns elapsed ms from done()', () => {
+        jest.useFakeTimers()
+        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const op = log.track('test.elapsed')
+        jest.advanceTimersByTime(2500)
+        const elapsed = op.done()
+        expect(elapsed).toBe(2500)
+        jest.useRealTimers()
+    })
+
+    it('reports intermediate progress via elapsedMs() without emitting a metric', () => {
+        jest.useFakeTimers()
+        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const op = log.track('test.progress')
+        jest.advanceTimersByTime(500)
+        expect(op.elapsedMs()).toBe(500)
+        expect(mockLogger.info).not.toHaveBeenCalled()
+        jest.advanceTimersByTime(300)
+        op.done({ count: 3 })
+        expect(mockLogger.info).toHaveBeenCalledWith(
+            expect.stringContaining('Performance metric: test.progress durationMs=800 count=3')
         )
         jest.useRealTimers()
     })

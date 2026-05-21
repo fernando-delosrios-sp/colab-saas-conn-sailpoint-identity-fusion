@@ -48,6 +48,40 @@ export type PhaseTimingEntry = {
     elapsed: string
 }
 
+/**
+ * Tracks an operation for metric logging. Created via {@link LogService.track}.
+ * Call {@link done} when the operation completes to emit the performance metric.
+ * Use {@link elapsedMs} for intermediate progress checks without emitting a metric.
+ */
+export class TrackedOperation {
+    private log: LogService
+    private name: string
+    private startedAt: number
+
+    constructor(log: LogService, name: string) {
+        this.log = log
+        this.name = name
+        this.startedAt = Date.now()
+    }
+
+    /**
+     * Elapsed milliseconds since this operation was created.
+     * For intermediate progress logging; does NOT emit a metric.
+     */
+    elapsedMs(): number {
+        return Date.now() - this.startedAt
+    }
+
+    /**
+     * Emits the performance metric and returns elapsed milliseconds.
+     * Call once when the operation completes.
+     */
+    done(data?: Record<string, any>): number {
+        this.log.metric(this.name, this.startedAt, data)
+        return Date.now() - this.startedAt
+    }
+}
+
 export class PhaseTimer {
     private log: LogService
     private operationStart: number
@@ -457,9 +491,23 @@ export class LogService {
     }
 
     /**
+     * Starts tracking an operation for metric logging.
+     * Call {@link TrackedOperation.done} when the operation completes to emit the metric.
+     * For sub-operation timing; use {@link timer} for high-level phase tracking instead.
+     *
+     * @param name - Metric identifier (e.g., 'outputPhase.sendAccounts')
+     * @returns A {@link TrackedOperation} handle; call `.done(data?)` to emit the metric.
+     */
+    track(name: string): TrackedOperation {
+        return new TrackedOperation(this, name)
+    }
+
+    /**
      * Logs a performance metric with duration and optional structured data.
      * Use this for sub-operation timing (e.g., individual API calls, batch operations).
      * PhaseTimer should be used for high-level phase tracking instead.
+     *
+     * Prefer {@link track} for new code — it eliminates manual `Date.now()` tracking.
      *
      * @param name - Metric identifier (e.g., 'outputPhase.sendAccounts')
      * @param startedAt - Timestamp when the operation started (from Date.now())
