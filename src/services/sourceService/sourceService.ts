@@ -26,7 +26,7 @@ import { LogService } from '../logService'
 import { assert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
 import { getDateFromISOString } from '../../utils/date'
-import { readPathString, trimStr } from '../../utils/safeRead'
+import { coerceBoolean, readPathString, trimStr } from '../../utils/safeRead'
 import { buildSourceConfigPatch } from './helpers'
 import {
     buildIdentityAttributeCreateErrorMessage,
@@ -840,7 +840,7 @@ export class SourceService {
             })
         )
 
-        const disableOptimization = (source: SourceInfo) => source.config?.optimizedAggregation === false
+        const disableOptimization = (source: SourceInfo) => coerceBoolean(source.config?.optimizedAggregation) === false
 
         await Promise.all(
             aggregationChecks
@@ -872,7 +872,7 @@ export class SourceService {
         await Promise.all(
             delayedSources.map(async (source) => {
                 const delayMinutes = source.config?.aggregationDelay ?? 5
-                const disableOpt = source.config?.optimizedAggregation === false
+                const disableOpt = coerceBoolean(source.config?.optimizedAggregation) === false
 
                 this.log.info(
                     `Source ${source.name}: scheduling delayed aggregation in ${delayMinutes} minute(s), disableOptimization=${disableOpt}`

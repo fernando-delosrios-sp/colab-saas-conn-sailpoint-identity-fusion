@@ -2176,6 +2176,6 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.name).toBe('Hosting Identity Name')
+        expect(fusionAccount.attributes.name).toBe('fusion-account-slug')
     })
 })

@@ -43,6 +43,7 @@ function createRegistry() {
             preProcessFusionAccounts: jest.fn().mockResolvedValue(undefined),
             processIdentity: jest.fn().mockResolvedValue(undefined),
             getFusionIdentity: jest.fn().mockReturnValue(fusionIdentity),
+            normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
             reconcilePendingFormState: jest.fn(),
             getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-created' }),
         },
@@ -90,8 +91,7 @@ describe('accountCreate', () => {
             'Status set by accountCreate operation'
         )
         expect(executeActions).toHaveBeenCalledTimes(2)
-        expect(registry.forms.fetchFormData).toHaveBeenCalledTimes(1)
-        expect(registry.fusion.reconcilePendingFormState).toHaveBeenCalledTimes(1)
+        expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-created' })
     })
 

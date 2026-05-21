@@ -29,6 +29,7 @@ function createRegistry() {
             fetchFormData: jest.fn().mockResolvedValue(undefined),
         },
         fusion: {
+            normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
             reconcilePendingFormState: jest.fn(),
             getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-disabled' }),
         },
@@ -59,8 +60,7 @@ describe('accountDisable', () => {
         expect(registry.schemas.setFusionAccountSchema).toHaveBeenCalledTimes(1)
         expect(rebuildFusionAccount).toHaveBeenCalledWith('fusion-1', expect.any(Object), registry)
         expect(fusionAccount.disable).toHaveBeenCalledTimes(1)
-        expect(registry.forms.fetchFormData).toHaveBeenCalledTimes(1)
-        expect(registry.fusion.reconcilePendingFormState).toHaveBeenCalledTimes(1)
+        expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-disabled' })
     })
 })

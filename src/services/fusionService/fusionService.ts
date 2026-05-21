@@ -29,7 +29,7 @@ import {
     getManagedAccountKeyFromAccount,
     normalizeCompositeManagedAccountKey,
 } from '../../model/managedAccountKey'
-import { hasValue, readString, trimStr } from '../../utils/safeRead'
+import { coerceBoolean, hasValue, readString, trimStr } from '../../utils/safeRead'
 
 // ============================================================================
 // FusionService Class
@@ -1811,7 +1811,7 @@ export class FusionService {
         const sourceType = info?.sourceType ?? SourceType.Authoritative
         if (sourceType !== SourceType.Authoritative) return false
         if (!info?.config) return true
-        return info.config.deferredMatching !== false
+        return coerceBoolean(info.config.deferredMatching) ?? true
     }
 
     /**
@@ -1826,7 +1826,7 @@ export class FusionService {
         if (sourceType !== SourceType.Record) {
             return true
         }
-        return info?.config?.includeRecordAccountsForMatching !== false
+        return coerceBoolean(info?.config?.includeRecordAccountsForMatching) ?? true
     }
 
     /**
