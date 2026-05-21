@@ -245,6 +245,26 @@ function extractObjectValue(item: object): string | undefined {
     return hasValue(pick) ? String(pick) : undefined
 }
 
+/**
+ * Normalizes an array of mixed-type values (strings, numbers, booleans, or objects with id/value/name)
+ * into a flat array of string tokens.
+ */
+function normalizeMixedArray(arr: unknown[]): string[] {
+    const normalized: string[] = []
+    for (const item of arr) {
+        if (missing(item)) continue
+        if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+            normalized.push(String(item))
+            continue
+        }
+        if (typeof item === 'object' && item !== null) {
+            const val = extractObjectValue(item)
+            if (val !== undefined) normalized.push(val)
+        }
+    }
+    return normalized
+}
+
 export function toSetFromAttribute(attributes: Record<string, any> | null | undefined, key: string): Set<string> {
     const raw = attributes?.[key]
     const arr = Array.isArray(raw) ? raw : []
@@ -253,20 +273,7 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
     // - string[] (plain multi-valued attributes)
     // - { id: string }[] (entitlement references often come back as objects)
     // - { value: string }[] / { name: string }[] (other SDK shapes)
-    const normalized: string[] = []
-    for (const item of arr) {
-        if (missing(item)) continue
-        if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
-            normalized.push(String(item))
-            continue
-        }
-        if (typeof item === 'object') {
-            const val = extractObjectValue(item)
-            if (val !== undefined) normalized.push(val)
-        }
-    }
-
-    return new Set(normalized)
+    return new Set(normalizeMixedArray(arr))
 }
 
 /**
@@ -277,19 +284,7 @@ export function toSetFromAttribute(attributes: Record<string, any> | null | unde
 export function normalizeActionTokens(raw: unknown): string[] {
     if (missing(raw)) return []
     if (Array.isArray(raw)) {
-        const out: string[] = []
-        for (const item of raw) {
-            if (missing(item)) continue
-            if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
-                out.push(String(item))
-                continue
-            }
-            if (typeof item === 'object') {
-                const val = extractObjectValue(item)
-                if (val !== undefined) out.push(val)
-            }
-        }
-        return out
+        return normalizeMixedArray(raw)
     }
     if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') {
         return [String(raw)]
