@@ -13,7 +13,7 @@ import { Account } from 'sailpoint-api-client'
 import { CompoundKey, CompoundKeyType, SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { evaluateVelocityTemplate, normalize, padNumber, removeSpaces, switchCase } from './formatting'
 import { LockService } from '../lockService'
-import { RenderContext } from 'velocityjs/dist/src/type'
+type RenderContext = Record<string, any>
 import { v4 as uuidv4 } from 'uuid'
 import { assert } from '../../utils/assert'
 import { SourceService } from '../sourceService'

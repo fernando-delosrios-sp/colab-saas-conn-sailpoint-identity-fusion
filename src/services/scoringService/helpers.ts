@@ -4,7 +4,7 @@ import { ScoreReport } from './types'
 import { jaroWinkler, diceCoefficient } from './stringComparison'
 import { match as nameMatch, matchNormalized as nameMatchNormalized } from './nameMatching'
 import { evaluateVelocityTemplate } from '../attributeService/formatting'
-import type { RenderContext } from 'velocityjs/dist/src/type'
+type RenderContext = Record<string, any>
 import { missing, trimStr } from '../../utils/safeRead'
 
 // Module-level regex constants — compiled once, reused on every call (hot scoring loop)
