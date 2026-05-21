@@ -773,35 +773,51 @@ export class AttributeService {
      * 3) Any non-configured sources are appended in map insertion order.
      */
     private getOrderedAccountsForContext(fusionAccount: FusionAccount): Record<string, any>[] {
-        const { sources } = fusionAccount.attributeBag
-        if (sources.size === 0) return fusionAccount.attributeBag.accounts
+        const { sources, accounts } = fusionAccount.attributeBag
+        if (sources.size === 0) return accounts
 
+        const ordered = this.buildOrderedAccountList(sources)
+        return this.prioritizeMainAccount(ordered, fusionAccount)
+    }
+
+    private buildOrderedAccountList(sources: Map<string, Record<string, any>[]>): Record<string, any>[] {
         const ordered: Record<string, any>[] = []
         const seenSources = new Set<string>()
 
         for (const sourceConfig of this.sourceConfigs) {
             const sourceAccounts = sources.get(sourceConfig.name)
-            if (!sourceAccounts || sourceAccounts.length === 0) continue
-            ordered.push(...sourceAccounts)
-            seenSources.add(sourceConfig.name)
+            if (sourceAccounts?.length) {
+                ordered.push(...sourceAccounts)
+                seenSources.add(sourceConfig.name)
+            }
         }
 
         for (const [sourceName, sourceAccounts] of sources.entries()) {
-            if (seenSources.has(sourceName) || sourceAccounts.length === 0) continue
-            ordered.push(...sourceAccounts)
+            if (!seenSources.has(sourceName) && sourceAccounts.length > 0) {
+                ordered.push(...sourceAccounts)
+            }
         }
 
+        return ordered
+    }
+
+    private prioritizeMainAccount(
+        ordered: Record<string, any>[],
+        fusionAccount: FusionAccount
+    ): Record<string, any>[] {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
-        const prioritizedIndex = ordered.findIndex(
+        const index = ordered.findIndex(
             (account) =>
                 getManagedAccountSnapshotKey(account) === mainAccountId || trimStr(account?._id) === mainAccountId
         )
-        if (prioritizedIndex <= 0) return ordered
+        if (index <= 0) return ordered
 
-        const prioritizedAccount = ordered[prioritizedIndex]
-        return [prioritizedAccount, ...ordered.slice(0, prioritizedIndex), ...ordered.slice(prioritizedIndex + 1)]
+        const prioritized = ordered[index]
+        const before = ordered.slice(0, index)
+        const after = ordered.slice(index + 1)
+        return [prioritized, ...before, ...after]
     }
 
     private getMainAccountOverrideId(fusionAccount: FusionAccount): string | undefined {
@@ -974,23 +990,7 @@ export class AttributeService {
     ): Promise<string | undefined> {
         const counter = StateWrapper.getCounter()
         const digits = definition.digits ?? 1
-
-        // Ensure expression has $counter for disambiguation fallback (local only; do not mutate config).
-        // Skip auto-append for UUID-based expressions because UUID already
-        // provides uniqueness and appending counter can mutate intent.
-        // Skip when the template uses Velocity directives (#if, #set, …): appending `$counter`
-        // after `#end` breaks parsing and would defeat $isUnique-based expressions.
-        let effectiveExpression = definition.expression ?? ''
-        if (
-            effectiveExpression &&
-            !effectiveExpression.includes('$counter') &&
-            !effectiveExpression.includes('${counter}') &&
-            !effectiveExpression.includes('$UUID') &&
-            !effectiveExpression.includes('${UUID}') &&
-            !effectiveExpression.includes('#')
-        ) {
-            effectiveExpression = `${effectiveExpression}$counter`
-        }
+        const effectiveExpression = this.buildEffectiveExpression(definition)
         context.counter = ''
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -1012,6 +1012,21 @@ export class AttributeService {
 
         this.log.error(`Failed to generate unique value for attribute ${definition.name} after ${maxAttempts} attempts`)
         return undefined
+    }
+
+    private buildEffectiveExpression(definition: UniqueAttributeDefinition): string {
+        const expression = definition.expression ?? ''
+        if (!expression) return ''
+        if (
+            expression.includes('$counter') ||
+            expression.includes('${counter}') ||
+            expression.includes('$UUID') ||
+            expression.includes('${UUID}') ||
+            expression.includes('#')
+        ) {
+            return expression
+        }
+        return `${expression}$counter`
     }
 
     /**

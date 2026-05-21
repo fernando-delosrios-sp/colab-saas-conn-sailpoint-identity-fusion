@@ -221,17 +221,16 @@ export class IdentityService {
      * @returns The cached identity document, or undefined if not found
      */
     public getIdentityById(id?: string): IdentityDocument | undefined {
-        if (id) {
-            return this.identitiesById.get(id)
-        }
+        if (!id) return undefined
+        return this.identitiesById.get(id)
     }
 
     /**
      * Best-effort cache hydration for identity IDs not already present.
      * Failed fetches are ignored so reporting can proceed with partial display data.
      */
-    public async hydrateMissingIdentitiesById(ids: string[]): Promise<void> {
-        const missing = [...new Set(ids.filter((id) => id && !this.getIdentityById(id)))]
+    public async hydrateMissingIdentitiesById(identityIds: string[]): Promise<void> {
+        const missing = [...new Set(identityIds.filter((id) => id && !this.getIdentityById(id)))]
         await promiseAllBatched(missing, (id) => this.fetchIdentityById(id).catch(() => {}))
     }
 
@@ -251,7 +250,6 @@ export class IdentityService {
      */
     public async correlateAccounts(fusionAccount: FusionAccount, accountIdFilter?: string[]): Promise<boolean> {
         const { identityId } = fusionAccount
-        const { accountsApi } = this.client
 
         if (!identityId) {
             this.log.warn(`Cannot correlate fusion account ${fusionAccount.name}: no identity ID`)
@@ -269,53 +267,59 @@ export class IdentityService {
             `Triggering correlation for ${targetIds.length} account(s) for fusion account ${fusionAccount.name}`
         )
 
-        const accountIdsToCorrelate = [...targetIds]
-
-        for (const accountId of accountIdsToCorrelate) {
-            const iscAccountId = this.sources.resolveIscAccountIdForManagedKey(accountId)
-            if (!iscAccountId) {
-                this.log.warn(
-                    `Skipping correlation for managed key "${accountId}": ISC account id not found in loaded source data`
-                )
-                continue
-            }
-
-            // Optimistic: mark as correlated before the API call so the account
-            // output reflects a successful correlation without waiting for the queue.
-            // If the API call fails, the next aggregation will re-detect it as uncorrelated.
-            fusionAccount.setCorrelatedAccount(accountId)
-
-            const requestParameters: AccountsApiUpdateAccountRequest = {
-                id: iscAccountId,
-                requestBody: [
-                    {
-                        op: 'replace',
-                        path: '/identityId',
-                        value: identityId,
-                    },
-                ],
-            }
-
-            const correlationPromise = this.client
-                .execute(
-                    () => accountsApi.updateAccount(requestParameters),
-                    QueuePriority.LOW,
-                    `IdentityService>correlateAccounts ${accountId}`
-                )
-                .then(() => {
-                    this.log.debug(
-                        `Successfully correlated managed key ${accountId} (ISC id ${iscAccountId}) to identity ${identityId}`
-                    )
-                })
-                .catch((error) => {
-                    this.log.error(`Failed to correlate managed key ${accountId}: ${error}`)
-                })
-
-            fusionAccount.addCorrelationPromise(accountId, correlationPromise)
+        for (const accountId of targetIds) {
+            await this.correlateSingleAccount(fusionAccount, accountId, identityId)
         }
 
-        // Return immediately - correlation happens asynchronously
         return true
+    }
+
+    private async correlateSingleAccount(
+        fusionAccount: FusionAccount,
+        accountId: string,
+        identityId: string
+    ): Promise<void> {
+        const iscAccountId = this.sources.resolveIscAccountIdForManagedKey(accountId)
+        if (!iscAccountId) {
+            this.log.warn(
+                `Skipping correlation for managed key "${accountId}": ISC account id not found in loaded source data`
+            )
+            return
+        }
+
+        // Optimistic: mark as correlated before the API call so the account
+        // output reflects a successful correlation without waiting for the queue.
+        // If the API call fails, the next aggregation will re-detect it as uncorrelated.
+        fusionAccount.setCorrelatedAccount(accountId)
+
+        const correlationPromise = this.buildCorrelationPromise(accountId, iscAccountId, identityId)
+        fusionAccount.addCorrelationPromise(accountId, correlationPromise)
+    }
+
+    private buildCorrelationPromise(
+        accountId: string,
+        iscAccountId: string,
+        identityId: string
+    ): Promise<void> {
+        const requestParameters: AccountsApiUpdateAccountRequest = {
+            id: iscAccountId,
+            requestBody: [{ op: 'replace', path: '/identityId', value: identityId }],
+        }
+
+        return this.client
+            .execute(
+                () => this.client.accountsApi.updateAccount(requestParameters),
+                QueuePriority.LOW,
+                `IdentityService>correlateAccounts ${accountId}`
+            )
+            .then(() => {
+                this.log.debug(
+                    `Successfully correlated managed key ${accountId} (ISC id ${iscAccountId}) to identity ${identityId}`
+                )
+            })
+            .catch((error) => {
+                this.log.error(`Failed to correlate managed key ${accountId}: ${error}`)
+            })
     }
 
     // ------------------------------------------------------------------------
