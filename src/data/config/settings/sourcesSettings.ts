@@ -3,6 +3,7 @@
  */
 import type { SourceConfig } from '../../../model/config'
 import { assert, softAssert } from '../../../utils/assert'
+import { extractBoolean } from '../../../utils/attributes'
 import { readBoolean } from '../../../utils/safeRead'
 import type { FusionConfigBuild } from '../types'
 
@@ -49,7 +50,7 @@ export function applySettings(config: FusionConfigBuild): void {
                 accountFilter: sourceConfig.accountFilter ?? undefined,
                 accountJmespathFilter: sourceConfig.accountJmespathFilter ?? undefined,
                 correlationMode: sourceConfig.correlationMode ?? runtimeDefaults.source.correlationMode,
-                deferredMatching: sourceConfig.deferredMatching ?? runtimeDefaults.source.deferredMatching,
+                deferredMatching: extractBoolean(sourceConfig, 'deferredMatching') ?? runtimeDefaults.source.deferredMatching,
             }
         })
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)

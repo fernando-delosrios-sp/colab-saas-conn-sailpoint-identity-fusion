@@ -31,4 +31,34 @@ describe('sourcesSettings applySettings', () => {
 
         expect(config.sources![0].aggregationTimeout).toBe(runtimeDefaults.source.aggregationTimeoutMinutes)
     })
+
+    it('defaults deferredMatching to true when omitted', () => {
+        const config = {
+            sources: [{ name: 'A', enabled: true }],
+        } as unknown as FusionConfigBuild
+
+        applySettings(config)
+
+        expect(config.sources![0].deferredMatching).toBe(true)
+    })
+
+    it('normalizes string "false" to boolean false for deferredMatching', () => {
+        const config = {
+            sources: [{ name: 'A', enabled: true, deferredMatching: 'false' as unknown as boolean }],
+        } as unknown as FusionConfigBuild
+
+        applySettings(config)
+
+        expect(config.sources![0].deferredMatching).toBe(false)
+    })
+
+    it('normalizes string "true" to boolean true for deferredMatching', () => {
+        const config = {
+            sources: [{ name: 'A', enabled: true, deferredMatching: 'true' as unknown as boolean }],
+        } as unknown as FusionConfigBuild
+
+        applySettings(config)
+
+        expect(config.sources![0].deferredMatching).toBe(true)
+    })
 })
