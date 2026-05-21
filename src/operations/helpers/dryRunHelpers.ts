@@ -54,7 +54,7 @@ export type DryRunIssueSummary = {
 
 export type DryRunHelpersContext = {
     config?: { baseurl?: string; managedAccountsBatchSize?: number }
-    log: { info: (message: string) => void; metric: (name: string, startedAt: number, data?: Record<string, any>) => void }
+    log: { info: (message: string) => void; metric: (name: string, startedAt: number, data?: Record<string, any>) => void; track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number } }
     res: { send: (payload: unknown) => void }
     reports: {
         ensureReportOutputDirectoryExists: () => Promise<string>
@@ -78,13 +78,13 @@ export type DryRunHelpersContext = {
     }
     fusion: {
         generateReport: (includeNonMatches: boolean, stats?: AggregationStats) => FusionReport
-        forEachISCAccount: (callback: (account: StdAccountListOutput) => void) => Promise<number>
+        forEachISCAccount: (callback: (account: StdAccountListOutput) => void) => Promise<{ sent: number; eligible: number }>
         getISCAccount: (
             account: FusionAccount,
             includeUncorrelated: boolean
         ) => Promise<StdAccountListOutput | undefined>
         clearAnalyzedAccounts: () => void
-        refreshUniqueAttributes: () => Promise<void>
+        refreshUniqueAttributes: () => Promise<number>
     }
     schemas: { fusionIdentityAttribute?: string }
     attributes: { refreshUniqueAttributes: (account: FusionAccount) => Promise<void> }
@@ -348,10 +348,9 @@ export const prepareDryRunOutputData = async (
     // Do not run a second managed-account analysis pass during dry-run output prep.
     // This phase should only refresh unique attributes for accounts already processed upstream.
     const analyzedUncorrelatedAccounts: FusionAccount[] = []
-    const uniqueRefreshStartedAt = Date.now()
+    const uniqueRefreshOp = context.log.track('dryRun.refreshUniqueAttributes')
     await refreshUniqueAttributesForDryRun(context, analyzedUncorrelatedAccounts, runtimeOptions)
-    context.log.metric('dryRun.refreshUniqueAttributes', uniqueRefreshStartedAt)
-    const uniqueAttributesElapsedMs = Date.now() - uniqueRefreshStartedAt
+    const uniqueAttributesElapsedMs = uniqueRefreshOp.done()
     return { analyzedUncorrelatedAccounts, uniqueAttributesElapsedMs }
 }
 

@@ -21,6 +21,7 @@ function createRegistry() {
             crash: jest.fn(),
             timer: jest.fn().mockImplementation(() => timer),
             metric: jest.fn(),
+            track: jest.fn(() => ({ done: jest.fn(() => 0), elapsedMs: jest.fn(() => 0) })),
             getAggregationIssueSummary: jest.fn(() => ({
                 warningCount: 1,
                 errorCount: 0,
@@ -65,11 +66,11 @@ function createRegistry() {
             isReset: jest.fn(() => false),
             fusionOwnerIsGlobalReviewer: false,
             fusionReportOnAggregation: false,
-            processFusionAccounts: jest.fn().mockResolvedValue(undefined),
-            processIdentities: jest.fn().mockResolvedValue(undefined),
-            processFusionIdentityDecisions: jest.fn().mockResolvedValue(undefined),
+            processFusionAccounts: jest.fn().mockResolvedValue([]),
+            processIdentities: jest.fn().mockResolvedValue([]),
+            processFusionIdentityDecisions: jest.fn().mockResolvedValue([]),
             analyzeUncorrelatedAccounts: jest.fn().mockResolvedValue([]),
-            refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
+            refreshUniqueAttributes: jest.fn().mockResolvedValue(0),
             generateReport: jest.fn((_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
                 accounts: [
                     {
@@ -124,7 +125,7 @@ function createRegistry() {
                         statuses: ['nonMatched'],
                     },
                 })
-                return 2
+                return { sent: 2, eligible: 2 }
             }),
             getISCAccount: jest.fn(async (account: any) => ({
                 key: account.key,
@@ -137,7 +138,9 @@ function createRegistry() {
                 },
             })),
             clearAnalyzedAccounts: jest.fn(),
-            processManagedAccounts: jest.fn(),
+            initializeManagedAccountProcessing: jest.fn().mockResolvedValue(undefined),
+            processCorrelatedManagedAccounts: jest.fn().mockResolvedValue(undefined),
+            processUncorrelatedManagedAccounts: jest.fn().mockResolvedValue({ processed: 0, matchScoringMs: 0 }),
             reconcilePendingFormState: jest.fn(),
         },
         forms: {
@@ -150,7 +153,7 @@ function createRegistry() {
         attributes: {
             initializeCounters: jest.fn().mockResolvedValue(undefined),
             saveState: jest.fn(),
-            refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
+            refreshUniqueAttributes: jest.fn().mockResolvedValue(0),
         },
         messaging: {
             fetchSender: jest.fn().mockResolvedValue(undefined),
@@ -357,6 +360,7 @@ describe('dryRun', () => {
                     statuses: ['baseline'],
                 },
             })
+            return { sent: 1, eligible: 1 }
         })
 
         await dryRun(registry, { schema: { attributes: [] }, includeDeferred: true } as any)
@@ -526,7 +530,7 @@ describe('dryRun', () => {
                     statuses: [],
                 },
             })
-            return 3
+            return { sent: 3, eligible: 3 }
         })
 
         await dryRun(registry, { schema: { attributes: [] }, includeExact: true } as any)
@@ -626,7 +630,9 @@ describe('dryRun', () => {
         expect(registry.fusion.refreshUniqueAttributes).toHaveBeenCalled()
         expect(registry.forms.cleanUpForms).not.toHaveBeenCalled()
         expect(registry.attributes.saveState).not.toHaveBeenCalled()
-        expect(registry.fusion.processManagedAccounts).toHaveBeenCalled()
+        expect(registry.fusion.initializeManagedAccountProcessing).toHaveBeenCalled()
+        expect(registry.fusion.processCorrelatedManagedAccounts).toHaveBeenCalled()
+        expect(registry.fusion.processUncorrelatedManagedAccounts).toHaveBeenCalled()
     })
 
     it('skips supplemental analysis during output streaming', async () => {

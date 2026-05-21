@@ -51,13 +51,13 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         })
 
         // PHASE 5: Prepare output data and metadata
-        const outputPreparationStartedAt = Date.now()
+        const outputPreparationOp = log.track('dryRun.outputPreparation')
         const preparedOutputData = await prepareDryRunOutputData(serviceRegistry, runtimeOptions)
         timer.recordElapsed('Unique attributes', preparedOutputData.uniqueAttributesElapsedMs)
-        log.metric('dryRun.outputPreparation', outputPreparationStartedAt)
+        outputPreparationOp.done()
 
         // PHASE 6: Stream rows
-        const streamStartedAt = Date.now()
+        const streamOp = log.track('dryRun.streaming')
         const { sentRows, optionEmitCounter } = await streamDryRunRows(
             serviceRegistry,
             report,
@@ -65,8 +65,7 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
             runtimeOptions,
             rowEmitter
         )
-        const streamElapsedMs = Date.now() - streamStartedAt
-        log.metric('dryRun.streaming', streamStartedAt, { sentRows, optionEmitCounter })
+        const streamElapsedMs = streamOp.done({ sentRows, optionEmitCounter })
         timer.recordElapsed('Output', streamElapsedMs)
 
         // Final stats and report write/send

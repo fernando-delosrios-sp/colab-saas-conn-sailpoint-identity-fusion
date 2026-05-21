@@ -12,7 +12,11 @@ export function createRegistry() {
         addStatus: jest.fn(),
     }
 
-    return {
+    const trackedOp = {
+            done: jest.fn(() => 0),
+            elapsedMs: jest.fn(() => 0),
+        }
+        return {
         config: {
             sources: [],
         },
@@ -22,6 +26,7 @@ export function createRegistry() {
             crash: jest.fn(),
             timer: jest.fn(() => timer),
             metric: jest.fn(),
+            track: jest.fn(() => trackedOp),
         },
         identities: {
             fetchIdentityByName: jest.fn().mockResolvedValue({ id: 'id-1', name: 'Alice Doe' }),
@@ -47,16 +52,20 @@ export function createRegistry() {
             processFetchedFormData: jest.fn().mockResolvedValue(undefined),
             cleanUpForms: jest.fn().mockResolvedValue(undefined),
             awaitPendingDeleteOperations: jest.fn().mockResolvedValue(undefined),
+            fusionIdentityDecisions: [],
         },
         fusion: {
-            preProcessFusionAccounts: jest.fn().mockResolvedValue(undefined),
+            preProcessFusionAccounts: jest.fn().mockResolvedValue([]),
             processIdentity: jest.fn().mockResolvedValue(undefined),
             getFusionIdentity: jest.fn().mockReturnValue(fusionIdentity),
             normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
             getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-created' }),
             analyzeUncorrelatedAccounts: jest.fn(),
-            forEachISCAccount: jest.fn().mockResolvedValue(0),
-            refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
+            forEachISCAccount: jest.fn().mockResolvedValue({ sent: 0, eligible: 0 }),
+            refreshUniqueAttributes: jest.fn().mockResolvedValue(0),
+            initializeManagedAccountProcessing: jest.fn().mockResolvedValue(undefined),
+            processCorrelatedManagedAccounts: jest.fn().mockResolvedValue(undefined),
+            processUncorrelatedManagedAccounts: jest.fn().mockResolvedValue({ processed: 0, matchScoringMs: 0 }),
             processManagedAccounts: jest.fn().mockResolvedValue(undefined),
             generateReport: jest.fn(),
             clearAnalyzedAccounts: jest.fn(),
