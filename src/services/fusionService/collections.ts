@@ -68,6 +68,38 @@ export async function promiseAllBatched<T, R>(
 }
 
 /**
+ * Creates a progress callback for promiseAllBatched that logs at controlled intervals.
+ *
+ * @param log - Logger with an `info` method
+ * @param label - Human-readable label for the log message (e.g. "Fusion accounts")
+ * @param totalItems - Total number of items being processed
+ * @param batchSize - Number of items processed per batch
+ * @param opts.maxLogBuckets - Maximum number of progress log lines to emit (default: 20)
+ * @returns Callback suitable for passing to promiseAllBatched's onBatchComplete
+ */
+export function createBatchProgressLogger(
+    log: { info: (msg: string) => void },
+    label: string,
+    totalItems: number,
+    batchSize: number,
+    opts: { maxLogBuckets?: number } = {}
+): (processed: number, total: number) => void {
+    if (totalItems === 0) return () => {}
+
+    const totalBatches = Math.ceil(totalItems / batchSize)
+    const maxLogBuckets = opts.maxLogBuckets ?? 20
+    const logEveryBatch = totalBatches <= maxLogBuckets ? 1 : Math.ceil(totalBatches / maxLogBuckets)
+    let batchIndex = 0
+
+    return (processed: number, total: number) => {
+        batchIndex++
+        if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === total) {
+            log.info(`${label} progress: ${processed}/${total} processed`)
+        }
+    }
+}
+
+/**
  * Processes items in batches without collecting results (fire-and-forget style).
  * Useful when the mapping function has side effects but no meaningful return value.
  *
