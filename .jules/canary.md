@@ -34,3 +34,6 @@
 ## 2026-05-19 - Convert Warning Admonition to MkDocs Material Format
 **Learning:** The previous note about the upgrade in `docs/operations/account-list.md` was buried in a list and not properly highlighted using the available MkDocs Material admonition styles.
 **Action:** Converted the list item into a `!!! warning "Upgrade note: Fusion review form definitions"` block with proper 4-space indentation to make this critical upgrade information stand out clearly.
+## 2026-05-20 - MkDocs Admonition Inner Formatting
+**Learning:** Dense paragraphs inside MkDocs Material admonitions (like the identity scope tip or correlation strategies) are hard to scan. Converting them into 4-space indented bulleted lists vastly improves clarity and meets formatting requirements.
+**Action:** When refactoring verbose explanatory text into MkDocs admonitions, use concise titles and format distinct points or choices as bulleted lists, ensuring 4-space indentation for all block content.

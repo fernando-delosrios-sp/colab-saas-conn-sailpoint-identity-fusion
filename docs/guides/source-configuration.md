@@ -122,14 +122,22 @@ flowchart TD
 | **Delete accounts with no managed accounts left?** | Remove Fusion accounts when all contributing source accounts are removed | No       | Useful for automated cleanup when users leave                                                          |
 | **Skip accounts with missing unique ID?**          | Skip processing accounts without a fusion identity attribute value       | No       | Skipped accounts are logged for review; useful when some source accounts lack required identifier data |
 
-!!! note
-**Force attribute refresh on next aggregation?** is located at **Advanced Settings → Developer Settings**. It forces Normal-type attributes to refresh on the next aggregation run only, after which the option is automatically turned off. Applies only to Normal attributes; Unique attributes are only computed when a Fusion account is first created or when an existing account is activated. Can be expensive for large datasets.
+!!! note "Attribute refresh behavior"
+    **Force attribute refresh on next aggregation?** is located at **Advanced Settings → Developer Settings**.
 
-!!! tip
-When testing or onboarding large amounts of managed accounts, it is best to disable all kinds of managed account correlation. Already processed uncorrelated managed accounts are part of their associated Fusion accounts internally, so it doesn't interfere in the normal connector operation. Correlation is a heavy process and must be carefully planned. It's often a good idea to have mixed correlation strategies depending on the implementation stage or managed source.
+    - It forces Normal-type attributes to refresh on the next aggregation run only, after which the option is automatically turned off.
+    - Applies only to Normal attributes; Unique attributes are only computed when a Fusion account is first created or when an existing account is activated.
+    - Can be expensive for large datasets.
 
-!!! tip
-Remember that managed accounts must be uncorrelated for them to be evaluated for matches. Correlated managed accounts are directly included in your baseline.
+!!! tip "Correlation strategies for large datasets"
+    When testing or onboarding large amounts of managed accounts, it is best to disable all kinds of managed account correlation.
 
-!!! tip
-When failing to generate an account ID (`nativeIdentity`), the aggregation fails unless the **Skip accounts with missing unique ID?** option is enabled. All your Fusion accounts must have a valid ID, but you can deliberately generate an empty one with the skip option to prevent including that account in the final results.
+    - Already processed uncorrelated managed accounts are part of their associated Fusion accounts internally, so it doesn't interfere in the normal connector operation.
+    - Correlation is a heavy process and must be carefully planned. It's often a good idea to have mixed correlation strategies depending on the implementation stage or managed source.
+    - **Match evaluation requirement:** Remember that managed accounts must be uncorrelated for them to be evaluated for matches. Correlated managed accounts are directly included in your baseline.
+
+!!! tip "Handling missing unique IDs"
+    When failing to generate an account ID (`nativeIdentity`), the aggregation fails unless the **Skip accounts with missing unique ID?** option is enabled.
+
+    - All your Fusion accounts must have a valid ID.
+    - You can deliberately generate an empty one with the skip option to prevent including that account in the final results.
