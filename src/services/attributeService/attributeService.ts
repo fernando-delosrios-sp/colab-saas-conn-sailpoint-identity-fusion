@@ -60,7 +60,7 @@ function getManagedAccountSnapshotKey(account: Record<string, any> | undefined):
  * Combines functionality for mapping attributes from source accounts and generating unique IDs.
  */
 export class AttributeService {
-    private _attributeMappingConfig?: Map<string, AttributeMappingConfig>
+    private attributeMappingConfigCache?: Map<string, AttributeMappingConfig>
     private normalDefinitions: NormalAttributeDefinition[] = []
     private uniqueDefinitions: UniqueAttributeDefinition[] = []
     private uniqueAttributeNames: Set<string> = new Set()
@@ -105,11 +105,13 @@ export class AttributeService {
         this.normalDefinitions = config.normalAttributeDefinitions ? [...config.normalAttributeDefinitions] : []
         this.uniqueDefinitions = config.uniqueAttributeDefinitions ? [...config.uniqueAttributeDefinitions] : []
 
-        this.uniqueDefinitionByName = new Map(this.uniqueDefinitions.map((d) => [d.name, d]))
-        this.uniqueAttributeNames = new Set(this.uniqueDefinitions.map((d) => d.name))
+        this.uniqueDefinitionByName = new Map(this.uniqueDefinitions.map((definition) => [definition.name, definition]))
+        this.uniqueAttributeNames = new Set(this.uniqueDefinitions.map((definition) => definition.name))
 
         this.setStateWrapper(config.fusionState)
-        this.reverseSources = this.sourceConfigs.filter((sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute)
+        this.reverseSources = this.sourceConfigs.filter(
+            (sourceConfig) => sourceConfig.correlationMode === 'reverse' && sourceConfig.correlationAttribute
+        )
     }
 
     // ------------------------------------------------------------------------
@@ -184,13 +186,11 @@ export class AttributeService {
             })
         )
 
-        const finalCounters: { [key: string]: number } = {}
-        for (const def of counterDefinitions) {
-            const value = stateWrapper.state.get(def.name)
-            if (value !== undefined) {
-                finalCounters[def.name] = value
-            }
-        }
+        const finalCounters = Object.fromEntries(
+            counterDefinitions
+                .filter((def) => stateWrapper.state.has(def.name))
+                .map((def) => [def.name, stateWrapper.state.get(def.name)!])
+        )
         this.log.debug(`All incremental counters initialized. Current values: ${JSON.stringify(finalCounters)}`)
     }
 
@@ -227,9 +227,10 @@ export class AttributeService {
                 (accounts) => accounts.length > 0
             )
             const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
-            const sourceOrder = this.sourceConfigs.map((sc) => sc.name)
+            const sourceOrder = this.sourceConfigs.map((sourceConfig) => sourceConfig.name)
             let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
             const mappingTargets = this.getAttributeMappingTargetNames()
+
             for (const attribute of mappingTargets) {
                 if (
                     this.shouldSkipMappedAttribute(
@@ -242,36 +243,15 @@ export class AttributeService {
                     continue
                 }
 
-                const processingConfig = this.attributeMappingConfig.get(attribute)!
-                const processedValue = processAttributeMapping(
-                    processingConfig,
+                prioritizedAccount = this.processSingleAttributeMapping(
+                    attribute,
+                    fusionAccount,
                     sourceAttributeMap,
                     sourceOrder,
-                    prioritizedAccount
+                    prioritizedAccount,
+                    shouldPreserveCurrentWithoutContext,
+                    attributes
                 )
-                if (processedValue === undefined) {
-                    if (!shouldPreserveCurrentWithoutContext) {
-                        delete attributes[attribute]
-                    }
-                    // mainAccount is used as an override context selector; when no supporting
-                    // source value exists anymore, clear stale values so account mapping can update.
-                    if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {
-                        delete attributes[attribute]
-                        prioritizedAccount = undefined
-                    }
-                    continue
-                }
-
-                attributes[attribute] = processedValue
-                if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {
-                    const mainAccountId = trimStr(processedValue)
-                    prioritizedAccount = mainAccountId
-                        ? this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId)
-                        : undefined
-                }
-                if (attribute === 'history') {
-                    this.applyHistoryMapping(processedValue, fusionAccount)
-                }
             }
         }
 
@@ -282,6 +262,54 @@ export class AttributeService {
         }
 
         attributeBag.current = attributes
+    }
+
+    /**
+     * Process a single attribute mapping entry, updating the attributes bag and
+     * returning the (possibly updated) prioritized account for context selection.
+     */
+    private processSingleAttributeMapping(
+        attribute: string,
+        fusionAccount: FusionAccount,
+        sourceAttributeMap: Map<string, Record<string, any>[]>,
+        sourceOrder: string[],
+        prioritizedAccount: Record<string, any> | undefined,
+        shouldPreserveCurrentWithoutContext: boolean,
+        attributes: Record<string, any>
+    ): Record<string, any> | undefined {
+        const processingConfig = this.attributeMappingConfig.get(attribute)!
+        const processedValue = processAttributeMapping(
+            processingConfig,
+            sourceAttributeMap,
+            sourceOrder,
+            prioritizedAccount
+        )
+
+        if (processedValue === undefined) {
+            if (!shouldPreserveCurrentWithoutContext) {
+                delete attributes[attribute]
+            }
+            // mainAccount is used as an override context selector; when no supporting
+            // source value exists anymore, clear stale values so account mapping can update.
+            if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {
+                delete attributes[attribute]
+                return undefined
+            }
+            return prioritizedAccount
+        }
+
+        attributes[attribute] = processedValue
+
+        if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {
+            const mainAccountId = trimStr(processedValue)
+            return mainAccountId ? this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId) : undefined
+        }
+
+        if (attribute === 'history') {
+            this.applyHistoryMapping(processedValue, fusionAccount)
+        }
+
+        return prioritizedAccount
     }
 
     /**
@@ -396,20 +424,20 @@ export class AttributeService {
      */
     public refreshReverseCorrelationAttributes(fusionAccount: FusionAccount): void {
         if (fusionAccount.missingAccountIds.length === 0) return
-        for (const sc of this.reverseSources) {
-            const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
+        for (const sourceConfig of this.reverseSources) {
+            const missingForSource = fusionAccount.getMissingAccountIdsForSource(sourceConfig.name)
             if (missingForSource.length > 0) {
                 const firstAccountId = missingForSource[0]
                 const info = fusionAccount.getManagedAccountInfo(firstAccountId)
                 if (info) {
-                    fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
+                    fusionAccount.setReverseCorrelationAttribute(sourceConfig.correlationAttribute!, info.schema.id)
                     this.log.debug(
-                        `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                        `Set reverse correlation attribute "${sourceConfig.correlationAttribute}" = "${info.schema.id}" ` +
+                        `for fusion account ${fusionAccount.name} (source: ${sourceConfig.name})`
                     )
                 }
             } else {
-                fusionAccount.clearReverseCorrelationAttribute(sc.correlationAttribute!)
+                fusionAccount.clearReverseCorrelationAttribute(sourceConfig.correlationAttribute!)
             }
         }
     }
@@ -585,17 +613,17 @@ export class AttributeService {
     }
 
     private get attributeMappingConfig(): Map<string, AttributeMappingConfig> {
-        if (!this._attributeMappingConfig) {
-            this._attributeMappingConfig = new Map()
+        if (!this.attributeMappingConfigCache) {
+            this.attributeMappingConfigCache = new Map()
             const mappingTargets = this.getAttributeMappingTargetNames()
             for (const attrName of mappingTargets) {
-                this._attributeMappingConfig.set(
+                this.attributeMappingConfigCache.set(
                     attrName,
                     buildAttributeMappingConfig(attrName, this.attributeMaps, this.attributeMerge)
                 )
             }
         }
-        return this._attributeMappingConfig
+        return this.attributeMappingConfigCache
     }
 
     /**
@@ -628,9 +656,9 @@ export class AttributeService {
     public registerExistingValues(attributeName: string, values: string[]): void {
         if (values.length === 0) return
         const set = this.getUniqueValues(attributeName)
-        for (const v of values) {
-            if (hasValue(v)) {
-                set.add(String(v))
+        for (const value of values) {
+            if (hasValue(value)) {
+                set.add(String(value))
             }
         }
         this.log.debug(`Registered ${values.length} existing value(s) for attribute '${attributeName}'`)
@@ -651,13 +679,10 @@ export class AttributeService {
         if (this.uniqueDefinitions.length === 0) return
 
         for (const def of this.uniqueDefinitions) {
-            const values: string[] = []
-            for (const account of accounts) {
-                const value = account.attributes?.[def.name]
-                if (hasValue(value)) {
-                    values.push(String(value))
-                }
-            }
+            const values = accounts
+                .map((account) => account.attributes?.[def.name])
+                .filter(hasValue)
+                .map(String)
             this.registerExistingValues(def.name, values)
         }
 
@@ -704,6 +729,46 @@ export class AttributeService {
      * Velocity `$account`: origin snapshot (managed account shape or identity-backed).
      * `$originAccount` remains the origin key string (set on context above).
      */
+    /**
+     * Determine whether the origin account ID matches the hosting identity ID,
+     * indicating that this account is backed by a platform Identity.
+     */
+    private isOriginIdentityMatch(fusionAccount: FusionAccount, originId: string): boolean {
+        const identityBag = (fusionAccount.attributeBag.identity ?? {}) as Record<string, unknown>
+        const identityHasData = Object.keys(identityBag).length > 0
+        if (fusionAccount.originSource !== 'Identities' || !identityHasData) return false
+
+        const identityId = this.hostingIdentityId(fusionAccount, identityBag)
+        return trimStr(identityId) === originId
+    }
+
+    /**
+     * Build an identity-backed account object for Velocity `$account` when the origin
+     * is the hosting Identity rather than a managed source account.
+     */
+    private buildIdentityAccountContext(
+        fusionAccount: FusionAccount,
+        originId: string
+    ): Record<string, any> | undefined {
+        const identityBag = (fusionAccount.attributeBag.identity ?? {}) as Record<string, unknown>
+        const { fusionDisplayAttribute, fusionIdentityAttribute } = this.schemas
+
+        const configuredSchemaName = this.readAccountAttributeString(fusionAccount, fusionDisplayAttribute)
+        const configuredSchemaId = this.readAccountAttributeString(fusionAccount, fusionIdentityAttribute)
+        const identityName = this.hostingIdentityName(fusionAccount)
+        const identityId = this.hostingIdentityId(fusionAccount, identityBag)
+
+        return {
+            ...identityBag,
+            source: { name: 'Identities' },
+            schema: {
+                name: configuredSchemaName ?? identityName ?? originId,
+                id: configuredSchemaId ?? identityId ?? originId,
+            },
+            IIQDisabled: Boolean(fusionAccount.disabled),
+        }
+    }
+
     private resolveOriginAccountObjectForVelocity(
         fusionAccount: FusionAccount,
         orderedAccounts: Record<string, any>[]
@@ -712,37 +777,11 @@ export class AttributeService {
         const originId = trimStr(originIdRaw)
         if (!originId) return undefined
 
-        const { originSource } = fusionAccount
-        const identityBag = (fusionAccount.attributeBag.identity ?? {}) as Record<string, unknown>
-        const identityHasData = Object.keys(identityBag).length > 0
-        const { fusionDisplayAttribute, fusionIdentityAttribute } = this.schemas
-
-        const configuredSchemaName = this.readAccountAttributeString(fusionAccount, fusionDisplayAttribute)
-        const configuredSchemaId = this.readAccountAttributeString(fusionAccount, fusionIdentityAttribute)
-        const identityName = this.hostingIdentityName(fusionAccount)
-        const identityId = this.hostingIdentityId(fusionAccount, identityBag)
-
-        const schemaName = configuredSchemaName ?? identityName ?? originId
-        const schemaId = configuredSchemaId ?? identityId ?? originId
-
-        const identityIdTrimmed = trimStr(identityId)
-        const identityMatchesOrigin = identityIdTrimmed !== undefined && identityIdTrimmed === originId
-        if (originSource === 'Identities' && identityHasData && identityMatchesOrigin) {
-            return {
-                ...identityBag,
-                source: { name: 'Identities' },
-                schema: {
-                    name: schemaName,
-                    id: schemaId,
-                },
-                IIQDisabled: Boolean(fusionAccount.disabled),
-            }
+        if (this.isOriginIdentityMatch(fusionAccount, originId)) {
+            return this.buildIdentityAccountContext(fusionAccount, originId)
         }
 
-        const managed = orderedAccounts.find((account) => getManagedAccountSnapshotKey(account) === originId)
-        if (managed) return managed
-
-        return undefined
+        return orderedAccounts.find((account) => getManagedAccountSnapshotKey(account) === originId)
     }
 
     private readAccountAttributeString(fusionAccount: FusionAccount, attributeName: string): string | undefined {
@@ -777,11 +816,11 @@ export class AttributeService {
         const ordered: Record<string, any>[] = []
         const seenSources = new Set<string>()
 
-        for (const sc of this.sourceConfigs) {
-            const sourceAccounts = sources.get(sc.name)
+        for (const sourceConfig of this.sourceConfigs) {
+            const sourceAccounts = sources.get(sourceConfig.name)
             if (!sourceAccounts || sourceAccounts.length === 0) continue
             ordered.push(...sourceAccounts)
-            seenSources.add(sc.name)
+            seenSources.add(sourceConfig.name)
         }
 
         for (const [sourceName, sourceAccounts] of sources.entries()) {
@@ -963,6 +1002,19 @@ export class AttributeService {
      * Collision disambiguation mode: first attempt has empty $counter; on collision a
      * non-persistent counter increments (like old 'unique' type).
      */
+    /**
+     * Build the effective expression for collision disambiguation by auto-appending
+     * `$counter` when the original expression lacks counter, UUID, and Velocity directives.
+     */
+    private buildCollisionDisambiguationExpression(expression: string | undefined): string {
+        const baseExpression = expression ?? ''
+        if (!baseExpression) return baseExpression
+        if (baseExpression.includes('$counter') || baseExpression.includes('${counter}')) return baseExpression
+        if (baseExpression.includes('$UUID') || baseExpression.includes('${UUID}')) return baseExpression
+        if (baseExpression.includes('#')) return baseExpression
+        return `${baseExpression}$counter`
+    }
+
     private async generateWithCollisionDisambiguation(
         definition: UniqueAttributeDefinition,
         fusionAccount: FusionAccount,
@@ -978,17 +1030,7 @@ export class AttributeService {
         // provides uniqueness and appending counter can mutate intent.
         // Skip when the template uses Velocity directives (#if, #set, …): appending `$counter`
         // after `#end` breaks parsing and would defeat $isUnique-based expressions.
-        let effectiveExpression = definition.expression ?? ''
-        if (
-            effectiveExpression &&
-            !effectiveExpression.includes('$counter') &&
-            !effectiveExpression.includes('${counter}') &&
-            !effectiveExpression.includes('$UUID') &&
-            !effectiveExpression.includes('${UUID}') &&
-            !effectiveExpression.includes('#')
-        ) {
-            effectiveExpression = `${effectiveExpression}$counter`
-        }
+        const effectiveExpression = this.buildCollisionDisambiguationExpression(definition.expression)
         context.counter = ''
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -1059,18 +1101,6 @@ export class AttributeService {
     // ------------------------------------------------------------------------
 
     /**
-     * Process a single normal attribute definition for an account.
-     *
-     * Immutability guards for identity-linked accounts:
-     * - **id** (fusionIdentityAttribute): skipped entirely to prevent
-     *   disconnection between the existing Fusion account and subsequent updates.
-     * - **name** (fusionDisplayAttribute): locked to the hosting identity's name to
-     *   prevent destruction of the identity linkage.
-     *
-     * Generated values are written to both the account's attribute bag and the shared
-     * Velocity context, making them available to subsequent definitions in the same run.
-     */
-    /**
      * Process a single normal attribute definition for an account (Define phase of Map-Define-Match).
      *
      * Map-Define-Match Flow:
@@ -1102,18 +1132,17 @@ export class AttributeService {
 
         if (hasValue && !needsRefresh) return
 
-        // IMMUTABILITY GUARD: Keep nativeIdentity immutable for existing identity-linked accounts
-        if (hasValue && name === fusionIdentityAttribute && shouldKeepIdentityImmutable) {
+        // IMMUTABILITY GUARD: Keep identity attribute immutable for existing identity-linked accounts.
+        // If a value is already present, skip silently; if missing, log a warning before skipping.
+        if (name === fusionIdentityAttribute && shouldKeepIdentityImmutable) {
+            if (!hasValue) {
+                this.log.warn(`Skipping change of nativeIdentity for account: ${fusionAccount.name}`)
+            }
             return
         }
 
         // IMMUTABILITY GUARD: Keep display name immutable for existing accounts unless explicit reset is requested
         if (hasValue && name === fusionDisplayAttribute && !canResetDisplay) {
-            return
-        }
-
-        if (shouldKeepIdentityImmutable && name === fusionIdentityAttribute) {
-            this.log.warn(`Skipping change of nativeIdentity for account: ${fusionAccount.name}`)
             return
         }
 
@@ -1189,7 +1218,7 @@ export class AttributeService {
         const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
         const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
 
-        const prevIsUnique = context.isUnique
+        const previousIsUniqueFlag = context.isUnique
         context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value)
         try {
             // Don't regenerate unique values if the account is not being reset
@@ -1244,8 +1273,8 @@ export class AttributeService {
             fusionAccount.attributes[name] = value
             context[name] = value
         } finally {
-            if (prevIsUnique !== undefined) {
-                context.isUnique = prevIsUnique
+            if (previousIsUniqueFlag !== undefined) {
+                context.isUnique = previousIsUniqueFlag
             } else {
                 delete context.isUnique
             }
@@ -1272,15 +1301,15 @@ export class AttributeService {
 
     /** Match {@link evaluateTemplate} post-velocity transforms for a unique definition (including maxLength). */
     private applyUniqueValueOutputTransforms(definition: UniqueAttributeDefinition, raw: string): string {
-        let s = raw
-        if (definition.maxLength && s.length > definition.maxLength) {
-            s = s.substring(0, definition.maxLength)
+        let transformed = raw
+        if (definition.maxLength && transformed.length > definition.maxLength) {
+            transformed = transformed.substring(0, definition.maxLength)
         }
-        if (definition.trim) s = s.trim()
-        if (definition.case) s = switchCase(s, definition.case)
-        if (definition.spaces) s = removeSpaces(s)
-        if (definition.normalize) s = normalize(s)
-        return s
+        if (definition.trim) transformed = transformed.trim()
+        if (definition.case) transformed = switchCase(transformed, definition.case)
+        if (definition.spaces) transformed = removeSpaces(transformed)
+        if (definition.normalize) transformed = normalize(transformed)
+        return transformed
     }
 
     private async seedIncrementalCounterFromExistingValue(
