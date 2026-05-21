@@ -1070,6 +1070,23 @@ export class AttributeService {
      * Generated values are written to both the account's attribute bag and the shared
      * Velocity context, making them available to subsequent definitions in the same run.
      */
+    /**
+     * Process a single normal attribute definition for an account (Define phase of Map-Define-Match).
+     *
+     * Map-Define-Match Flow:
+     * - **Map**: Gathers and filters raw attributes from managed sources.
+     * - **Define**: Re-evaluates custom expressions (normal/unique) to generate core fusion fields.
+     * - **Match**: Correlates the generated fusion account with identities.
+     *
+     * Immutability guards for identity-linked accounts:
+     * - **id** (fusionIdentityAttribute): skipped entirely to prevent
+     *   disconnection between the existing Fusion account and subsequent updates.
+     * - **name** (fusionDisplayAttribute): locked to the hosting identity's name to
+     *   prevent destruction of the identity linkage.
+     *
+     * Generated values are written to both the account's attribute bag and the shared
+     * Velocity context, making them available to subsequent definitions in the same run.
+     */
     private async processNormalDefinition(
         definition: NormalAttributeDefinition,
         fusionAccount: FusionAccount,
@@ -1085,10 +1102,12 @@ export class AttributeService {
 
         if (hasValue && !needsRefresh) return
 
+        // IMMUTABILITY GUARD: Keep nativeIdentity immutable for existing identity-linked accounts
         if (hasValue && name === fusionIdentityAttribute && shouldKeepIdentityImmutable) {
             return
         }
 
+        // IMMUTABILITY GUARD: Keep display name immutable for existing accounts unless explicit reset is requested
         if (hasValue && name === fusionDisplayAttribute && !canResetDisplay) {
             return
         }
@@ -1098,6 +1117,8 @@ export class AttributeService {
             return
         }
 
+        // HOSTING IDENTITY DISPLAY ALIGNMENT:
+        // For accounts linked to a platform Identity, ensure the display name remains aligned with the identity name
         if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
             const label = this.hostingIdentityName(fusionAccount)
             if (label) {
@@ -1131,7 +1152,7 @@ export class AttributeService {
     }
 
     /**
-     * Process a single unique attribute definition for an account.
+     * Process a single unique attribute definition for an account (Define phase of Map-Define-Match).
      *
      * Existing unique values are preserved unless `needsReset` is set (triggered by
      * re-enabling a disabled account). This prevents accidental regeneration of stable
@@ -1143,6 +1164,11 @@ export class AttributeService {
      *   disconnection between the existing Fusion account and subsequent updates.
      * - **name** (fusionDisplayAttribute): locked to the hosting identity's name to
      *   prevent destruction of the identity linkage.
+     *
+     * State Lock Boundaries:
+     * - Disambiguation and unique value registration are wrapped in `locks.withLock`
+     *   using a key partitioned by the unique attribute (`unique:${definition.name}`).
+     *   This ensures thread safety and prevents collision of generated values across parallel operations.
      *
      * Generated values are written to both the account's attribute bag and the shared
      * Velocity context, making them available to subsequent unique definitions.

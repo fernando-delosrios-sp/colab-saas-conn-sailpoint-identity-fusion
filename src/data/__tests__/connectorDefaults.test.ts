@@ -12,7 +12,7 @@ describe('connector defaults alignment', () => {
         const spec = JSON.parse(readFileSync(specPath, 'utf8')) as {
             sourceConfigInitialValues?: Record<string, unknown>
         }
-        const { parallelBatchSize: _ignored, ...specInitialValues } = connectorSpecInitialValues
+        const specInitialValues = connectorSpecInitialValues
         expect(spec.sourceConfigInitialValues).toEqual(specInitialValues)
     })
 })
