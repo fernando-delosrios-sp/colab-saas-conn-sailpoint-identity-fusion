@@ -52,7 +52,7 @@ export class FusionAccount {
     // Core identity fields
     private _type: FusionAccountKind = FusionAccountKind.Fusion
     private _identityId?: string
-    private _managedKey?: string
+    private managedKey?: string
     private _key?: SimpleKeyType
 
     // Basic account information
@@ -80,17 +80,17 @@ export class FusionAccount {
     private _actions: Set<string> = new Set()
     private _reviews: Set<string> = new Set()
     private _sources: Set<string> = new Set()
-    private _previousAccountIds: Set<string> = new Set()
+    private previousAccountIds: Set<string> = new Set()
     private _correlationPromises: Array<Promise<unknown>> = []
     private _pendingReviewUrls: Set<string> = new Set()
-    private _reviewPromises: Array<Promise<string | undefined>> = []
+    private reviewPromises: Array<Promise<string | undefined>> = []
     private _fusionMatches: FusionMatch[] = []
     private _history: string[] = []
-    private _managedAccountInfo: Map<string, FusionManagedAccountInfo> = new Map()
+    private managedAccountInfo: Map<string, FusionManagedAccountInfo> = new Map()
 
     // Map & Define
     // Note: previous is initialized lazily only when needed to save memory for new accounts
-    private _sourceAttributeMapCache?: Map<string, Attributes[]>
+    private sourceAttributeMapCache?: Map<string, Attributes[]>
     private _attributeBag: FusionAttributeBag = {
         previous: {},
         current: {},
@@ -129,8 +129,7 @@ export class FusionAccount {
     // Factory Methods - Must be first to ensure proper initialization order
     // ============================================================================
 
-    /** Attribute keys that can be extracted into collection sets. 'accounts' -> _missingAccountIds. */
-    private static readonly COLLECTION_KEYS = ['accounts', 'reviews', 'statuses', 'actions'] as const
+    // ============================================================================
 
     /** Identity-side label: attributes.displayName || displayName || name || id. */
     private static identityLabelFromIdentity(identity: IdentityDocument): string | undefined {
@@ -154,28 +153,20 @@ export class FusionAccount {
      * Keeps legacy nativeIdentity as fallback when no composite can be recovered.
      */
     private static resolveCompositeKeyFromFusionRecord(account: Account): string | undefined {
-        const attrs = (account.attributes ?? {}) as Record<string, unknown>
-        const findComposite = (...candidates: Array<unknown>): string | undefined => {
-            for (const candidate of candidates) {
-                if (Array.isArray(candidate)) {
-                    for (const item of candidate) {
-                        const normalized = normalizeCompositeManagedAccountKey(String(item))
-                        if (normalized) return normalized
-                    }
-                    continue
-                }
-                const normalized = normalizeCompositeManagedAccountKey(String(candidate ?? ''))
-                if (normalized) return normalized
-            }
-            return undefined
-        }
+        const attributes = (account.attributes ?? {}) as Record<string, unknown>
+        const candidates = [
+            readString(attributes, 'originAccount'),
+            readString(attributes, 'mainAccount'),
+            attributes.accounts,
+            attributes['missing-accounts'],
+        ].flat()
 
-        return findComposite(
-            readString(attrs, 'originAccount'),
-            readString(attrs, 'mainAccount'),
-            attrs.accounts,
-            attrs['missing-accounts']
-        )
+        for (const candidate of candidates) {
+            if (candidate == null) continue
+            const normalized = normalizeCompositeManagedAccountKey(String(candidate))
+            if (normalized) return normalized
+        }
+        return undefined
     }
 
     /**
@@ -202,7 +193,7 @@ export class FusionAccount {
         if (config.type) this._type = config.type
         if (config.name) this._name = config.name
         else if (config.displayName) this._name = config.displayName
-        if (config.nativeIdentity) this._managedKey = config.nativeIdentity
+        if (config.nativeIdentity) this.managedKey = config.nativeIdentity
         if (config.sourceName) this._sourceName = config.sourceName
         if (config.identityDisplayName) this._identityDisplayName = config.identityDisplayName
         if (config.disabled !== undefined) this._disabled = config.disabled
@@ -220,24 +211,11 @@ export class FusionAccount {
             }
         }
         if (config.attributes) {
-            const attrs = config.attributes
-            for (const key of FusionAccount.COLLECTION_KEYS) {
-                const set = attributeToSet(attrs, key)
-                switch (key) {
-                    case 'accounts':
-                        this._missingAccountIds = set
-                        break
-                    case 'reviews':
-                        this._reviews = set
-                        break
-                    case 'statuses':
-                        this._statuses = set
-                        break
-                    case 'actions':
-                        this._actions = set
-                        break
-                }
-            }
+            const attributes = config.attributes
+            this._missingAccountIds = attributeToSet(attributes, 'accounts')
+            this._reviews = attributeToSet(attributes, 'reviews')
+            this._statuses = attributeToSet(attributes, 'statuses')
+            this._actions = attributeToSet(attributes, 'actions')
         }
     }
 
@@ -282,7 +260,7 @@ export class FusionAccount {
         // Capture the previously stored account IDs so we can later rebuild
         // the current and missing account sets based on which managed accounts
         // still exist in configured sources.
-        fusionAccount._previousAccountIds = attributeToSet(account.attributes, 'accounts')
+        fusionAccount.previousAccountIds = attributeToSet(account.attributes, 'accounts')
         // Load history from platform so accountUpdate/accountRead don't send back empty history.
         const historyAttr = account.attributes?.history
         if (Array.isArray(historyAttr) && historyAttr.length > 0) {
@@ -418,21 +396,21 @@ export class FusionAccount {
 
     /** The native identity (unique key) for this fusion account. Asserts non-null. */
     public get nativeIdentity(): string {
-        return this._managedKey!
+        return this.managedKey!
     }
 
     /**
      * Safe nativeIdentity accessor (may be undefined until key is set)
      */
     public get nativeIdentityOrUndefined(): string | undefined {
-        return this._managedKey
+        return this.managedKey
     }
 
     /**
      * Managed account key (sourceId::nativeIdentity) when this fusion account represents an uncorrelated managed account.
      */
     public get managedAccountId(): string | undefined {
-        return this._type === FusionAccountKind.Managed ? this._managedKey : undefined
+        return this._type === FusionAccountKind.Managed ? this.managedKey : undefined
     }
 
     /** The SDK simple key used for account output. Asserts non-null. */
@@ -635,14 +613,14 @@ export class FusionAccount {
      * Invalidated when sources change (via setManagedAccount).
      */
     public get sourceAttributeMap(): Map<string, Attributes[]> {
-        if (!this._sourceAttributeMapCache) {
+        if (!this.sourceAttributeMapCache) {
             const map = new Map<string, Attributes[]>()
             for (const [source, attrsArray] of this._attributeBag.sources.entries()) {
                 map.set(source, [...attrsArray])
             }
-            this._sourceAttributeMapCache = map
+            this.sourceAttributeMapCache = map
         }
-        return this._sourceAttributeMapCache
+        return this.sourceAttributeMapCache
     }
 
     // ============================================================================
@@ -668,7 +646,7 @@ export class FusionAccount {
     /** Sets the SDK key and updates the native identity to match. */
     public setKey(key: SimpleKeyType): void {
         this._key = key
-        this._managedKey = key.simple.id
+        this.managedKey = key.simple.id
     }
 
     // ============================================================================
@@ -740,12 +718,12 @@ export class FusionAccount {
 
     /** Get source and native identity info for a managed account by its ID. */
     public getManagedAccountInfo(accountId: string): FusionManagedAccountInfo | undefined {
-        return this._managedAccountInfo.get(accountId)
+        return this.managedAccountInfo.get(accountId)
     }
 
     /** Store source and schema id (native identity) for a managed account key. */
     public setManagedAccountInfo(accountId: string, sourceName: string, nativeIdentity: string): void {
-        this._managedAccountInfo.set(accountId, {
+        this.managedAccountInfo.set(accountId, {
             source: { name: sourceName },
             schema: { id: nativeIdentity },
         })
@@ -756,14 +734,10 @@ export class FusionAccount {
      * using the managed account info map for source lookup.
      */
     public getMissingAccountIdsForSource(sourceName: string): string[] {
-        const result: string[] = []
-        for (const id of this._missingAccountIds) {
-            const info = this._managedAccountInfo.get(id)
-            if (info && info.source.name === sourceName) {
-                result.push(id)
-            }
-        }
-        return result
+        return Array.from(this._missingAccountIds).filter((id) => {
+            const info = this.managedAccountInfo.get(id)
+            return info && info.source.name === sourceName
+        })
     }
 
     /** Sets the dedicated reverse correlation attribute value in the attribute bag. */
@@ -826,25 +800,15 @@ export class FusionAccount {
     /** Returns the source IDs this account's identity is configured to review. */
     public listReviewerSources(): string[] {
         const prefix = 'reviewer:'
-        const sourceIds: string[] = []
-        for (const action of this._actions) {
-            if (action.startsWith(prefix)) {
-                // Extract sourceId after 'reviewer:' without split() overhead
-                sourceIds.push(action.slice(prefix.length))
-            }
-        }
-        return sourceIds
+        return Array.from(this._actions)
+            .filter((action) => action.startsWith(prefix))
+            .map((action) => action.slice(prefix.length))
     }
 
     /** True when at least one source-scoped reviewer action remains on the account. */
     private _actionsHasReviewerScope(): boolean {
         const prefix = 'reviewer:'
-        for (const action of this._actions) {
-            if (action.startsWith(prefix)) {
-                return true
-            }
-        }
-        return false
+        return Array.from(this._actions).some((action) => action.startsWith(prefix))
     }
 
     // ============================================================================
@@ -911,7 +875,7 @@ export class FusionAccount {
     /** Adds a promise that will resolve to a review URL once the form is created. */
     public addReviewPromise(promise: Promise<string | undefined>): void {
         if (promise) {
-            this._reviewPromises.push(promise)
+            this.reviewPromises.push(promise)
         }
     }
 
@@ -942,10 +906,10 @@ export class FusionAccount {
      * Resolve all pending review promises
      */
     private async resolveReviewPromises(): Promise<void> {
-        if (this._reviewPromises.length === 0) return
+        if (this.reviewPromises.length === 0) return
 
-        const reviewResults = await Promise.allSettled(this._reviewPromises)
-        this._reviewPromises = []
+        const reviewResults = await Promise.allSettled(this.reviewPromises)
+        this.reviewPromises = []
 
         for (const result of reviewResults) {
             if (result.status === 'fulfilled' && result.value) {
@@ -1116,7 +1080,7 @@ export class FusionAccount {
      * 1. **Identity match** (indexed): Uses `accountsByIdentityId` to find correlated
      *    accounts in O(1) instead of scanning the full map.
      * 2. **Previous-run match** (scan): Iterates remaining accounts to find those
-     *    previously associated with this fusion account (`_previousAccountIds`).
+     *    previously associated with this fusion account (`previousAccountIds`).
      *
      * Claimed accounts are deleted from both maps so subsequent processing
      * phases (fusion → identity → managed) only see unprocessed accounts.
@@ -1134,17 +1098,14 @@ export class FusionAccount {
         addAssociationHistory = true,
         skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
     ): void {
-        // Build output set iteratively to avoid the intermediate Array.from + filter allocation.
-        const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> => {
-            const result = new Set<string>()
-            for (const value of input) {
-                const normalized = normalizeCompositeManagedAccountKey(value)
-                if (normalized !== undefined) result.add(normalized)
-            }
-            return result
-        }
+        const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> =>
+            new Set(
+                Array.from(input)
+                    .map(normalizeCompositeManagedAccountKey)
+                    .filter((key): key is string => key !== undefined)
+            )
 
-        this._previousAccountIds = normalizeManagedAccountKeySet(this._previousAccountIds)
+        this.previousAccountIds = normalizeManagedAccountKeySet(this.previousAccountIds)
         this._missingAccountIds = normalizeManagedAccountKeySet(this._missingAccountIds)
         this._accountIds = normalizeManagedAccountKeySet(this._accountIds)
 
@@ -1215,22 +1176,22 @@ export class FusionAccount {
         addAssociationHistory: boolean,
         skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
     ): void {
-        if (this._previousAccountIds.size === 0 && this._missingAccountIds.size === 0) return
+        if (this.previousAccountIds.size === 0 && this._missingAccountIds.size === 0) return
 
         for (const [id, account] of accountsById) {
-            if (this._previousAccountIds.has(id) || this._missingAccountIds.has(id)) {
-                this.setUncorrelatedAccount(id)
-                this.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
-                accountsById.delete(id)
-                // Also clean up the identity index
-                if (account.identityId) {
-                    const idSet = accountsByIdentityId.get(account.identityId)
-                    if (idSet) {
-                        idSet.delete(id)
-                        if (idSet.size === 0) accountsByIdentityId.delete(account.identityId)
-                    }
-                }
-            }
+            if (!this.previousAccountIds.has(id) && !this._missingAccountIds.has(id)) continue
+
+            this.setUncorrelatedAccount(id)
+            this.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
+            accountsById.delete(id)
+            
+            if (!account.identityId) continue
+            
+            const idSet = accountsByIdentityId.get(account.identityId)
+            if (!idSet) continue
+            
+            idSet.delete(id)
+            if (idSet.size === 0) accountsByIdentityId.delete(account.identityId)
         }
     }
 
@@ -1240,7 +1201,7 @@ export class FusionAccount {
      */
     private preserveMissingAccountContext(allAccountsById: Map<string, Account>): void {
         for (const accountId of this._missingAccountIds) {
-            if (this._managedAccountInfo.has(accountId)) continue
+            if (this.managedAccountInfo.has(accountId)) continue
             const account = allAccountsById.get(accountId)
             if (!account?.sourceName) continue
             const parsed = parseManagedAccountKey(accountId)
@@ -1257,7 +1218,7 @@ export class FusionAccount {
         const trackedIds = new Set<string>([
             ...this._accountIds,
             ...this._missingAccountIds,
-            ...this._previousAccountIds,
+            ...this.previousAccountIds,
         ])
         let removedAnyReference = false
 
@@ -1270,8 +1231,8 @@ export class FusionAccount {
                 removedAnyReference = true
                 this.addHistory(`Removed managed account missing reference: ${accountId}`)
             }
-            this._previousAccountIds.delete(accountId)
-            this._managedAccountInfo.delete(accountId)
+            this.previousAccountIds.delete(accountId)
+            this.managedAccountInfo.delete(accountId)
         }
         if (removedAnyReference) {
             // Deleting managed-account references changes mapping/definition context.
@@ -1342,7 +1303,7 @@ export class FusionAccount {
             Boolean(skipAssociationHistoryForManagedKeys?.has(normalizedKey)) ||
             Boolean(skipAssociationHistoryForManagedKeys?.has(accountId))
         const recordAssociationHistory = addAssociationHistory && !skipAssociationReplay
-        const isNewAccount = !this._previousAccountIds.has(accountId)
+        const isNewAccount = !this.previousAccountIds.has(accountId)
 
         if (isNewAccount) {
             this.setNeedsRefresh(true)
@@ -1388,7 +1349,7 @@ export class FusionAccount {
             this._attributeBag.sources.set(account.sourceName, existingSourceAccounts)
             this._attributeBag.accounts.push(contextAttributes)
             // Invalidate cached sourceAttributeMap since sources changed
-            this._sourceAttributeMapCache = undefined
+            this.sourceAttributeMapCache = undefined
             this._type = FusionAccountKind.Managed
         }
     }

@@ -124,26 +124,21 @@ export class FormService {
         const forms = await this.fetchFormsByName(this.fusionFormNamePattern)
         let activeForms = forms
         if (enableStaleFormCleanup) {
-            const staleForms: FormDefinitionResponseV2025[] = []
-            activeForms = []
-            for (const form of forms) {
-                if (this.isFormDefinitionStale(form)) {
-                    staleForms.push(form)
-                } else {
-                    activeForms.push(form)
-                }
-            }
+            const staleForms = forms.filter((form) => this.isFormDefinitionStale(form))
+            activeForms = forms.filter((form) => !this.isFormDefinitionStale(form))
+            
             this.log.debug(
                 `Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern} ` +
                     `(active=${activeForms.length}, stale=${staleForms.length})`
             )
+            
             for (const staleForm of staleForms) {
-                const staleFormId = staleForm.id
-                if (!staleFormId) continue
-                this.log.info(
-                    `Form definition ${staleFormId} is older than ${this.fusionFormExpirationDays} day(s), queuing deletion`
-                )
-                this.addFormToDelete(staleFormId)
+                if (staleForm.id) {
+                    this.log.info(
+                        `Form definition ${staleForm.id} is older than ${this.fusionFormExpirationDays} day(s), queuing deletion`
+                    )
+                    this.addFormToDelete(staleForm.id)
+                }
             }
         } else {
             this.log.debug(
@@ -369,13 +364,9 @@ export class FormService {
         if (!this.identities) return
 
         const normalizeEmail = (value: unknown): string | undefined => {
-            if (value === null || value === undefined) return undefined
+            if (value == null) return undefined
             if (Array.isArray(value)) {
-                for (const v of value) {
-                    const normalized = normalizeEmail(v)
-                    if (normalized) return normalized
-                }
-                return undefined
+                return value.map(normalizeEmail).find(Boolean)
             }
             return trimStr(value)
         }
@@ -442,16 +433,11 @@ export class FormService {
      * Extract recipient IDs from existing form instances
      */
     private extractExistingRecipientIds(instances: FormInstanceResponseV2025[]): Set<string> {
-        const recipientIds: string[] = []
-        for (const instance of instances) {
-            if (instance.recipients) {
-                for (const recipient of instance.recipients) {
-                    if (recipient.id) {
-                        recipientIds.push(recipient.id)
-                    }
-                }
-            }
-        }
+        const recipientIds = instances
+            .flatMap((instance) => instance.recipients ?? [])
+            .map((recipient) => recipient.id)
+            .filter((id): id is string => !!id)
+
         return new Set(recipientIds)
     }
 
@@ -462,22 +448,22 @@ export class FormService {
         existingInstances: FormInstanceResponseV2025[],
         reviewers: Set<FusionAccount>
     ): void {
-        const reviewerByIdentityId = new Map<string, FusionAccount>()
-        for (const r of reviewers) {
-            if (r.identityId) reviewerByIdentityId.set(r.identityId, r)
-        }
+        const reviewerByIdentityId = new Map(
+            Array.from(reviewers)
+                .filter((r) => r.identityId)
+                .map((r) => [r.identityId as string, r])
+        )
+
+        const finalStates = new Set(['COMPLETED', 'IN_PROGRESS', 'SUBMITTED', 'CANCELLED'])
 
         for (const instance of existingInstances) {
             if (!instance.state || !instance.recipients || !instance.standAloneFormUrl) continue
-            const state = instance.state.toUpperCase()
+            
             // Only pending instances should show up as active reviews on reviewer accounts.
-            if (state === 'COMPLETED' || state === 'IN_PROGRESS' || state === 'SUBMITTED' || state === 'CANCELLED')
-                continue
+            if (finalStates.has(instance.state.toUpperCase())) continue
 
             for (const recipient of instance.recipients) {
-                if (!recipient.id) {
-                    continue
-                }
+                if (!recipient.id) continue
 
                 const reviewer = reviewerByIdentityId.get(recipient.id)
                 if (reviewer) {
@@ -935,9 +921,9 @@ export class FormService {
         let context = this._pendingReviewContextByAccountId.get(accountId)
         if (!context) {
             context = {
-                forms: new Map<string, PendingReviewFormContext>(),
-                reviewerIds: new Set<string>(),
-                candidateIds: new Set<string>(),
+                forms: new Map(),
+                reviewerIds: new Set(),
+                candidateIds: new Set(),
             }
             this._pendingReviewContextByAccountId.set(accountId, context)
         }
