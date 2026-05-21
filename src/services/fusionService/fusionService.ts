@@ -454,13 +454,9 @@ export class FusionService {
 
         assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
 
-        // Use for...of instead of forEach for better performance
-        let isReviewer = false
-        for (const sourceId of fusionAccount.listReviewerSources()) {
-            this.setReviewerForSource(fusionAccount, sourceId)
-            isReviewer = true
-        }
-        if (isReviewer) {
+        const reviewerSources = fusionAccount.listReviewerSources()
+        reviewerSources.forEach((sourceId) => this.setReviewerForSource(fusionAccount, sourceId))
+        if (reviewerSources.length > 0) {
             this.populateReviewerFusionReviewsFromPending(fusionAccount)
         }
 
@@ -579,27 +575,19 @@ export class FusionService {
         const missingIds = fusionAccount.missingAccountIds
         const canDirectCorrelate = Boolean(fusionAccount.identityId)
 
-        const directCorrelateIds: string[] = []
-
-        for (const accountId of missingIds) {
-            const info = fusionAccount.getManagedAccountInfo(accountId)
-            if (!info) {
-                this.log.debug(
-                    `Skipping per-source correlation for missing managed key "${accountId}" on ${fusionAccount.name}: source context not available`
-                )
-                continue
-            }
-
-            const sourceConfig = this.sources.getSourceConfig(info.source.name)
-            const mode = sourceConfig?.correlationMode ?? 'none'
-
-            if (mode === 'correlate') {
-                if (canDirectCorrelate) {
-                    directCorrelateIds.push(accountId)
-                }
-            }
-            // mode === 'reverse' and 'none': skip (reverse correlation is handled via refreshReverseCorrelationAttributes)
-        }
+        const directCorrelateIds = canDirectCorrelate
+            ? missingIds.filter((accountId) => {
+                  const info = fusionAccount.getManagedAccountInfo(accountId)
+                  if (!info) {
+                      this.log.debug(
+                          `Skipping per-source correlation for missing managed key "${accountId}" on ${fusionAccount.name}: source context not available`
+                      )
+                      return false
+                  }
+                  const sourceConfig = this.sources.getSourceConfig(info.source.name)
+                  return (sourceConfig?.correlationMode ?? 'none') === 'correlate'
+              })
+            : []
 
         // Recovery path: if decision payload has source context but account metadata is missing
         // from the managed-account map, still include that assigned key for direct correlation.
@@ -793,17 +781,10 @@ export class FusionService {
      * an ISC identity is recreated with a new ID.
      */
     private hasIntersectingManagedAccounts(account: FusionAccount, identityAccountIds: Set<string>): boolean {
-        for (const id of account.accountIdsSet) {
-            if (identityAccountIds.has(id)) {
-                return true
-            }
-        }
-        for (const id of account.missingAccountIdsSet) {
-            if (identityAccountIds.has(id)) {
-                return true
-            }
-        }
-        return false
+        return (
+            Array.from(account.accountIdsSet).some((id) => identityAccountIds.has(id)) ||
+            Array.from(account.missingAccountIdsSet).some((id) => identityAccountIds.has(id))
+        )
     }
 
     private findFusionAccountByIdentityManagedAccounts(identity: IdentityDocument): FusionAccount | undefined {
@@ -1774,19 +1755,10 @@ public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
      * @returns Array of formatted account outputs ready for the platform
      */
     public async listISCAccounts(): Promise<StdAccountListOutput[]> {
-        const shouldFilter = this.deleteEmpty
-        const eligible: FusionAccount[] = []
-
-        for (const account of this.fusionAccountMap.values()) {
-            if (!shouldFilter || !account.isOrphan()) {
-                eligible.push(account)
-            }
-        }
-        for (const identity of this.fusionIdentityMap.values()) {
-            if (!shouldFilter || !identity.isOrphan()) {
-                eligible.push(identity)
-            }
-        }
+        const allAccounts = [...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()]
+        const eligible = this.deleteEmpty 
+            ? allAccounts.filter((account) => !account.isOrphan()) 
+            : allAccounts
 
         const results = await this.batchProcess(eligible, 'ISC accounts', (x) => this.getISCAccount(x))
         return compact(results)
@@ -1801,19 +1773,13 @@ public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
      * @returns Number of accounts sent and number of eligible accounts
      */
     public async forEachISCAccount(send: (account: StdAccountListOutput) => void): Promise<{ sent: number; eligible: number }> {
-        const shouldFilter = this.deleteEmpty
         const batchSize = this.fusionParallelBatchSize()
         let count = 0
-        const eligibleAccounts: FusionAccount[] = []
 
-         for (const account of this.fusionAccountMap.values()) {
-             if (shouldFilter && account.isOrphan()) continue
-             eligibleAccounts.push(account)
-         }
-         for (const identity of this.fusionIdentityMap.values()) {
-             if (shouldFilter && identity.isOrphan()) continue
-             eligibleAccounts.push(identity)
-         }
+        const allAccounts = [...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()]
+        const eligibleAccounts = this.deleteEmpty
+            ? allAccounts.filter((account) => !account.isOrphan())
+            : allAccounts
 
          const totalEligible = eligibleAccounts.length
          const totalBatches = Math.ceil(totalEligible / batchSize)
@@ -1995,12 +1961,10 @@ return { sent: count, eligible: totalEligible }
             if (index) {
                 if (index.has(key)) return true
             } else {
-                for (const fa of this.fusionAccountMap.values()) {
-                    if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) return true
-                }
-                for (const fa of this.fusionIdentityMap.values()) {
-                    if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) return true
-                }
+                const isLinked = [...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()].some(
+                    (fa) => fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)
+                )
+                if (isLinked) return true
             }
         }
         const identityId = account.identityId
