@@ -10,7 +10,7 @@ import { FusionAccount } from '../../model/account'
 import { attrConcat, AttributeService } from '../attributeService'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
-import { mapValuesToArray, forEachBatched, promiseAllBatched, compact, yieldToEventLoop } from './collections'
+import { mapValuesToArray, forEachBatched, promiseAllBatched, compact, yieldToEventLoop, createBatchProgressLogger } from './collections'
 import { FusionDecision } from '../../model/form'
 import { FusionMatch, MatchCandidateType, ScoringService } from '../scoringService'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
@@ -65,7 +65,7 @@ export class FusionService {
     private _reviewersBySourceId: Map<string, Set<FusionAccount>> = new Map()
     private _sourcesWithoutReviewers: Set<string> = new Set()
 
-    private readonly sourcesByName: Map<string, SourceInfo> = new Map()
+    private sourcesByName: Map<string, SourceInfo> = new Map()
     private readonly reset: boolean
     private readonly reportAttributes: string[]
     private readonly urlContext: UrlContext
@@ -146,6 +146,26 @@ export class FusionService {
      */
     private fusionParallelBatchSize(): number {
         return Math.max(1, Math.min(this.managedAccountsBatchSize, 12))
+    }
+
+    /**
+     * Wraps promiseAllBatched with the service's configured batch size and an
+     * automatically created progress logger. Removes the repetitive boilerplate
+     * of calculating batchSize / total and wiring up createBatchProgressLogger.
+     */
+    private async batchProcess<T, R>(
+        items: T[],
+        label: string,
+        fn: (item: T) => Promise<R>,
+        batchSize?: number
+    ): Promise<R[]> {
+        const size = batchSize ?? this.fusionParallelBatchSize()
+        return promiseAllBatched(
+            items,
+            fn,
+            size,
+            createBatchProgressLogger(this.log, label, items.length, size)
+        )
     }
 
     /**
@@ -289,34 +309,21 @@ export class FusionService {
      */
     public async processFusionAccounts(): Promise<FusionAccount[]> {
         const { fusionAccounts } = this.sources
-        const total = fusionAccounts.length
-         const batchSize = this.fusionParallelBatchSize()
-         const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
-         const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
-         let batchIndex = 0
-         this.log.info(
-             `Processing fusion accounts: for each of ${total} fusion account(s), match managed accounts from the work queue and build fusion layers`
-         )
-         const results = await promiseAllBatched(
-             fusionAccounts,
-             async (x: Account) => {
-                 return await this.processFusionAccount(x)
-             },
-             batchSize,
-             (processed, ttl) => {
-                 batchIndex++
-                 if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
-                     this.log.info(
-                         `Fusion accounts progress: ${processed}/${ttl} processed`
-                     )
-                 }
-             }
-         )
+        this.log.info(
+            `Processing fusion accounts: for each of ${fusionAccounts.length} fusion account(s), match managed accounts from the work queue and build fusion layers`
+        )
+        const results = await this.batchProcess(
+            fusionAccounts,
+            'Fusion accounts',
+            async (x: Account) => {
+                return await this.processFusionAccount(x)
+            }
+        )
         this.log.info(
             `Fusion accounts phase finished: ${results.length} fusion account(s) processed (managed accounts matched and layered)`
         )
         return results
-     }
+    }
 
     /**
      * Reconcile transient entitlements derived from pending form instances.
@@ -678,47 +685,18 @@ export class FusionService {
      *
      * @returns Fusion accounts for identities that did not already have one
      */
-     public async processIdentities(): Promise<FusionAccount[]> {
-         const { identities } = this.identities
-         this.identitiesProcessedCount = identities.length
-         const total = identities.length
-         const batchSize = this.fusionParallelBatchSize()
-         const totalBatches = total === 0 ? 0 : Math.ceil(total / batchSize)
-         const logEveryBatch = totalBatches <= 25 ? 1 : Math.ceil(totalBatches / 20)
-         let batchIndex = 0
-         this.log.info(
-             `Processing identity documents: creating or merging fusion accounts for ${total} ISC identity document(s)`
-         )
-         const results = await promiseAllBatched(
-             identities,
-             (x) => this.processIdentity(x),
-             batchSize,
-             (processed, ttl) => {
-                 batchIndex++
-                 if (batchIndex === 1 || batchIndex % logEveryBatch === 0 || processed === ttl) {
-                     this.log.info(
-                         `Identity documents progress: ${processed}/${ttl} processed`
-                     )
-                 }
-             }
-         )
-         const { managedSources } = this.sources
-         managedSources.forEach((source) => {
-             this.sourcesByName.set(source.name, source)
-         })
-
-         if (this.fusionOwnerIsGlobalReviewer) {
-             const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
-             for (const reviewerId of globalOwnerIds) {
-                 const reviewer = this.fusionIdentityMap.get(reviewerId)
-                 if (reviewer) {
-                     managedSources.forEach((source) => {
-                         this.setReviewerForSource(reviewer, source.id!)
-                     })
-                     this.populateReviewerFusionReviewsFromPending(reviewer)
-                 }
-             }
-         }
+    public async processIdentities(): Promise<FusionAccount[]> {
+        const { identities } = this.identities
+        this.identitiesProcessedCount = identities.length
+        this.log.info(
+            `Processing identity documents: creating or merging fusion accounts for ${identities.length} ISC identity document(s)`
+        )
+        const results = await this.batchProcess(
+            identities,
+            'Identity documents',
+            (x) => this.processIdentity(x)
+        )
+         await this.initializeSourceReviewers()
          this.log.info(
              `Identity documents phase finished: ${identities.length} identity document(s) processed (fusion accounts created or updated from identities)`
          )
@@ -888,7 +866,11 @@ export class FusionService {
              `Processing fusion identity decisions: applying ${fusionIdentityDecisions.length} reviewer form decision(s) (new identity or merge into existing)`
          )
 
-         const results = await promiseAllBatched(fusionIdentityDecisions, (x) => this.processFusionIdentityDecision(x))
+         const results = await this.batchProcess(
+            fusionIdentityDecisions,
+            'Fusion identity decisions',
+            (x) => this.processFusionIdentityDecision(x)
+        )
          this.log.info(
              `Fusion identity decisions phase finished: ${fusionIdentityDecisions.length} decision(s) applied`
          )
@@ -1111,7 +1093,7 @@ export class FusionService {
         }
     }
 
-    private async runCorrelatedManagedAccountPrePass(map: Map<string, Account>, batchSize: number): Promise<void> {
+    private async runCorrelatedManagedAccountPrePass(map: Map<string, Account>): Promise<void> {
         // Pre-pass: resolve all correlated managed accounts before uncorrelated scoring begins.
         // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion row)
         // are registered as non-matches in fusionIdentityMap here, so they are immediately visible
@@ -1124,11 +1106,12 @@ export class FusionService {
         this.log.info(
             `Pre-pass: resolving ${correlatedAccounts.length} correlated managed account(s) before uncorrelated scoring`
         )
-        for (let i = 0; i < correlatedAccounts.length; i += batchSize) {
-            const batch = correlatedAccounts.slice(i, i + batchSize)
-            await Promise.all(batch.map((account) => this.processManagedAccount(account)))
-            await yieldToEventLoop()
-        }
+        await this.batchProcess(
+            correlatedAccounts,
+            'Correlated managed accounts',
+            (account) => this.processManagedAccount(account),
+            this._managedAccountProcessingBatchSize
+        )
         this.log.info(`Pre-pass complete: ${map.size} uncorrelated account(s) queued for scoring`)
     }
 
@@ -1846,7 +1829,7 @@ public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
             }
         }
 
-        const results = await promiseAllBatched(eligible, (x) => this.getISCAccount(x))
+        const results = await this.batchProcess(eligible, 'ISC accounts', (x) => this.getISCAccount(x))
         return compact(results)
     }
 
@@ -2179,6 +2162,32 @@ return { sent: count, eligible: totalEligible }
     }
 
     /**
+     * Build the sources-by-name lookup and, when the fusion owner acts as a global reviewer,
+     * register every managed source as a reviewer source and populate pending reviews.
+     */
+    private async initializeSourceReviewers(): Promise<void> {
+        this.sourcesByName = new Map(
+            this.sources.managedSources.map((source) => [source.name, source])
+        )
+
+        if (!this.fusionOwnerIsGlobalReviewer) {
+            return
+        }
+
+        const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
+        for (const reviewerId of globalOwnerIds) {
+            const reviewer = this.fusionIdentityMap.get(reviewerId)
+            if (!reviewer) {
+                continue
+            }
+            for (const source of this.sources.managedSources) {
+                this.setReviewerForSource(reviewer, source.id!)
+            }
+            this.populateReviewerFusionReviewsFromPending(reviewer)
+        }
+    }
+
+    /**
      * Pre-process a managed account before processing or analysis.
      *
      * @param account - The managed source account to pre-process
@@ -2289,7 +2298,7 @@ return { sent: count, eligible: totalEligible }
     public async processCorrelatedManagedAccounts(): Promise<void> {
         this._ensureManagedAccountProcessingInitialized()
         const map = this.sources.managedAccountsById
-        await this.runCorrelatedManagedAccountPrePass(map, this._managedAccountProcessingBatchSize)
+        await this.runCorrelatedManagedAccountPrePass(map)
         this._linkedAccountKeyIndex = undefined
     }
 
@@ -2408,65 +2417,14 @@ return { sent: count, eligible: totalEligible }
      * @returns Complete fusion report with match/non-match accounts
      */
     public generateReport(includeNonMatches: boolean = false, stats?: FusionReportStats): FusionReport {
-        const accounts: FusionReportAccount[] = []
         const warnings = buildIdentityConflictWarningsFromMap(this.conflictingFusionIdentityAccounts)
 
-        // Report on managed accounts with matches (forms created)
-        for (const fusionAccount of this.matchAccounts) {
-            const fusionMatches = fusionAccount.fusionMatches
-            if (fusionMatches && fusionMatches.length > 0) {
-                const matches = fusionMatches.map((match) => ({
-                    ...fusionReportMatchCandidateAccountFields(match),
-                    identityName: match.identityName,
-                    identityId: match.identityId,
-                    identityUrl: this.urlContext.identity(match.identityId),
-                    isMatch: true,
-                    candidateType: match.candidateType,
-                    exact: isExactAttributeMatchScores(match.scores),
-                    scores: mapScoreReportsForFusionReport(match.scores),
-                }))
-                // Release fusionIdentity refs after extracting report data (on-demand report path)
-                fusionAccount.clearFusionIdentityReferences()
+        const matchAccounts = this.buildMatchAccounts()
+        const { failedAccounts, deferredAccounts } = this.prepareFailedAndDeferredAccounts()
+        const nonMatchAccounts = includeNonMatches ? this.buildNonMatchAccounts() : []
 
-                const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
-                accounts.push({
-                    ...buildMinimalFusionReportAccount(
-                        fusionAccount,
-                        this.urlContext,
-                        sourceInfo?.sourceType,
-                        this.reportAttributes,
-                        undefined,
-                        this.resolveReportAccountId(fusionAccount)
-                    ),
-                    fusionIdentityComparisons: this.fusionIdentityComparisonsByAccount.get(fusionAccount) ?? 0,
-                    matches,
-                })
-            }
-        }
-
-        // Sort in-place — these arrays are cleared just below, so no copy is needed.
-        this.failedMatchingAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
-
-        this.deferredMatchReportData.sort((a, b) => a.accountName.localeCompare(b.accountName))
-        for (const deferredAccount of this.deferredMatchReportData) {
-            deferredAccount.deferred = true
-        }
-
-        // Include non-matches if requested
-        const nonMatchAccounts: FusionReportAccount[] = includeNonMatches ? this.generateNonMatchAccounts() : []
-
-        // Sort matches alphabetically by account name
-        accounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
-
-        // Combine: identity-backed matches, deferred matches, failed matchings, then non-matches
-        const allAccounts = [
-            ...accounts,
-            ...this.deferredMatchReportData,
-            ...this.failedMatchingAccounts,
-            ...nonMatchAccounts,
-        ]
-
-        const matchAccountCount = accounts.length + this.deferredMatchReportData.length
+        const allAccounts = this.assembleReportSections(matchAccounts, deferredAccounts, failedAccounts, nonMatchAccounts)
+        const matchAccountCount = matchAccounts.length + deferredAccounts.length
 
         const report: FusionReport = {
             accounts: allAccounts,
@@ -2477,25 +2435,95 @@ return { sent: count, eligible: totalEligible }
             warnings,
         }
 
-        // Release memory from analyzed accounts after report generation
+        this.clearReportData()
+
+        return report
+    }
+
+    private buildMatchAccounts(): FusionReportAccount[] {
+        const accounts: FusionReportAccount[] = []
+
+        for (const fusionAccount of this.matchAccounts) {
+            const fusionMatches = fusionAccount.fusionMatches
+            if (!fusionMatches || fusionMatches.length === 0) continue
+
+            const matches = fusionMatches.map((match) => ({
+                ...fusionReportMatchCandidateAccountFields(match),
+                identityName: match.identityName,
+                identityId: match.identityId,
+                identityUrl: this.urlContext.identity(match.identityId),
+                isMatch: true,
+                candidateType: match.candidateType,
+                exact: isExactAttributeMatchScores(match.scores),
+                scores: mapScoreReportsForFusionReport(match.scores),
+            }))
+
+            // Release fusionIdentity refs after extracting report data (on-demand report path)
+            fusionAccount.clearFusionIdentityReferences()
+
+            const sourceInfo = this.sourcesByName.get(fusionAccount.sourceName)
+            accounts.push({
+                ...buildMinimalFusionReportAccount(
+                    fusionAccount,
+                    this.urlContext,
+                    sourceInfo?.sourceType,
+                    this.reportAttributes,
+                    undefined,
+                    this.resolveReportAccountId(fusionAccount)
+                ),
+                fusionIdentityComparisons: this.fusionIdentityComparisonsByAccount.get(fusionAccount) ?? 0,
+                matches,
+            })
+        }
+
+        accounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
+        return accounts
+    }
+
+    private prepareFailedAndDeferredAccounts(): {
+        failedAccounts: FusionReportAccount[]
+        deferredAccounts: FusionReportAccount[]
+    } {
+        this.failedMatchingAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
+
+        this.deferredMatchReportData.sort((a, b) => a.accountName.localeCompare(b.accountName))
+        for (const deferredAccount of this.deferredMatchReportData) {
+            deferredAccount.deferred = true
+        }
+
+        return {
+            failedAccounts: this.failedMatchingAccounts,
+            deferredAccounts: this.deferredMatchReportData,
+        }
+    }
+
+    private buildNonMatchAccounts(): FusionReportAccount[] {
+        const nonMatchAccounts = [...this.analyzedNonMatchReportData]
+        nonMatchAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
+        return nonMatchAccounts
+    }
+
+    private assembleReportSections(
+        matchAccounts: FusionReportAccount[],
+        deferredAccounts: FusionReportAccount[],
+        failedAccounts: FusionReportAccount[],
+        nonMatchAccounts: FusionReportAccount[]
+    ): FusionReportAccount[] {
+        return [
+            ...matchAccounts,
+            ...deferredAccounts,
+            ...failedAccounts,
+            ...nonMatchAccounts,
+        ]
+    }
+
+    private clearReportData(): void {
         this.log.debug('Clearing analyzed managed accounts from memory')
         this.analyzedNonMatchReportData = []
         this.matchAccounts = []
         this.deferredMatchReportData = []
         this.failedMatchingAccounts = []
         this.conflictingFusionIdentityAccounts = new Map()
-
-        return report
-    }
-
-    /**
-     * Generate non-match accounts for reporting.
-     * Uses pre-built minimal report entries; no filtering needed.
-     */
-    private generateNonMatchAccounts(): FusionReportAccount[] {
-        const nonMatchAccounts = [...this.analyzedNonMatchReportData]
-        nonMatchAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
-        return nonMatchAccounts
     }
 
     private hasIdentityBackedMatches(fusionAccount: FusionAccount): boolean {
