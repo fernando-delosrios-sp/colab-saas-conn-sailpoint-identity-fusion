@@ -843,7 +843,7 @@ export class FormService {
         )
 
         const ordered = [...fusionAccount.fusionMatches]
-            .sort(this._compareMatchesForForm)
+            .sort((a, b) => this._compareMatchesForForm(a, b))
             .slice(0, this.fusionMaxCandidatesForForm)
 
         return ordered.map((match) => {
