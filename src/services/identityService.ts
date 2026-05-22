@@ -101,12 +101,12 @@ export class IdentityService {
      * Fetch identities and cache them
      */
     public async fetchIdentities(additionalIdentityIds?: string[]): Promise<void> {
-        if (!this.includeIdentities) {
-            this.log.info('Identity fetching disabled by configuration, skipping identity fetch.')
+        if (!this.includeIdentities && !additionalIdentityIds?.length) {
+            this.log.info('Skipping identity fetch.')
             return
         }
 
-        if (this.identityScopeQuery) {
+        if (this.includeIdentities && this.identityScopeQuery) {
             this.log.info('Fetching identities.')
 
             const query = buildIdentityQuery(this.identityScopeQuery)
@@ -122,8 +122,8 @@ export class IdentityService {
                 )
                 this.identitiesById.delete('-')
             }, `Failed to fetch identities using scope query "${this.identityScopeQuery}"`)
-        } else {
-            this.log.info('No identity scope query defined, skipping identity fetch.')
+        } else if (this.includeIdentities) {
+            this.log.info('No identity scope query defined, skipping global identity fetch.')
             this.identitiesById = new Map()
         }
 
