@@ -1,17 +1,16 @@
 {
     "compilerOptions": {
-        "target": "ES2020",
+        "target": "ES2022",
         "module": "commonjs",
         "outDir": "dist",
         "rootDir": "src",
         "strict": true,
-        "moduleResolution": "bundler",
-        "types": ["node", "jest"],
+        "moduleResolution": "node",
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "sourceMap": true
     },
     "include": ["src/**/*"],
-    "exclude": ["node_modules", "**/*.spec.ts", "**/*.spec.js"]
+    "exclude": ["node_modules", "**/__tests__", "**/*.test.ts", "**/*.test.js"]
 }
