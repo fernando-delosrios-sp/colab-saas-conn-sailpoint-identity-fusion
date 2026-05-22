@@ -1280,7 +1280,7 @@ describe('FusionService', () => {
 
             await customReportFusion.analyzeManagedAccount(mockManagedAccount)
             const report = customReportFusion.generateReport(true)
-            expect(report.accounts.some((a) => a.deferred && a.accountId === 'source-a-id::native-dry-run-def')).toBe(
+            expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-run-def')).toBe(
                 true
             )
         })
