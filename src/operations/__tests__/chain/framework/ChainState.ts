@@ -101,8 +101,12 @@ export class ChainState {
     }
 
     getManagedAccounts(pass?: number): ChainManagedAccount[] {
+        const stateAccounts = this.state.managedAccounts
+        if (Array.isArray(stateAccounts)) {
+            return stateAccounts as unknown as ChainManagedAccount[]
+        }
         const key = pass ? `pass${pass}` : this.activePassKey()
-        return this.state.managedAccounts[key] ?? []
+        return stateAccounts[key] ?? []
     }
 
     private activePassKey(): string {
@@ -162,6 +166,26 @@ export class ChainState {
     }
 
     applyDelta(delta: Record<string, unknown>): void {
+        // Recordings store full state snapshots under these keys; treat them as replacements
+        if ('identities' in delta) {
+            this.state.identities = (delta.identities as ChainIdentity[]) ?? []
+        }
+        if ('managedAccounts' in delta) {
+            const ma = delta.managedAccounts
+            if (Array.isArray(ma)) {
+                ;(this.state as any).managedAccounts = ma
+            } else {
+                this.state.managedAccounts = (ma as Record<string, ChainManagedAccount[]>) ?? {}
+            }
+        }
+        if ('fusionAccounts' in delta) {
+            this.state.fusionAccounts = (delta.fusionAccounts as ChainFusionAccount[]) ?? []
+        }
+        if ('formDecisions' in delta) {
+            this.state.forms = (delta.formDecisions as Array<Record<string, unknown>>) ?? []
+        }
+
+        // Additive deltas used by manual scenarios
         const fusionAdd = delta.fusionAccountsAdd as ChainFusionAccount[] | undefined
         if (fusionAdd) {
             for (const account of fusionAdd) {
