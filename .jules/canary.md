@@ -27,10 +27,22 @@
 
 **Learning:** Dense paragraphs inside admonitions (like the identity scope tip) are hard to scan, especially when describing distinct configuration states (e.g., "Not included" vs "Included"). Using Markdown bullet points with bold prefixes improves clarity. Also, MkDocs material admonitions require 4-space indentation for all block content.
 **Action:** When converting verbose explanatory text into MkDocs admonitions, format distinct states or choices as bulleted lists, ensuring 4-space indentation to satisfy both Material theme parsing and readability standards.
+
 ## 2026-05-18 - MkDocs Admonition Inner Formatting
+
 **Learning:** Inner content within MkDocs Material admonitions (like numbered lists) must be properly separated by newlines and indented by 4 spaces. Placing a list on the same line as the admonition declaration (e.g., `!!! note "Title" 1. item`) prevents correct rendering.
 **Action:** Ensure all content inside admonitions is moved to a new line and indented with 4 spaces.
 
 ## 2026-05-19 - Convert Warning Admonition to MkDocs Material Format
+
 **Learning:** The previous note about the upgrade in `docs/operations/account-list.md` was buried in a list and not properly highlighted using the available MkDocs Material admonition styles.
 **Action:** Converted the list item into a `!!! warning "Upgrade note: Fusion review form definitions"` block with proper 4-space indentation to make this critical upgrade information stand out clearly.
+
+## 2024-05-22 - Material for MkDocs Admonition Indentation Constraint
+
+**Learning:** MkDocs Material admonitions (e.g., `!!! note`, `!!! tip`) require _all_ of their inner body text (including introductory sentences before lists) to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the admonition is nested inside a list (like at 4 spaces), its body must be indented at 8 spaces relative to the document root.
+**Action:** When creating or fixing admonitions, ensure a blank line follows the `!!!` declaration and that all contained text is appropriately indented.
+
+## 2024-05-22 - Material for MkDocs Admonition Indentation Constraint
+**Learning:** MkDocs Material admonitions (e.g., `!!! note`, `!!! tip`) require *all* of their inner body text (including introductory sentences before lists) to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the admonition is nested inside a list (like at 4 spaces), its body must be indented at 8 spaces relative to the document root.
+**Action:** When creating or fixing admonitions, ensure a blank line follows the `!!!` declaration and that all contained text is appropriately indented.
