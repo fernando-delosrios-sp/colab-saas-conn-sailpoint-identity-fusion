@@ -163,8 +163,8 @@ export class ReportService {
             reviewerId ? urlContext.identity(reviewerId) : undefined
         const resolveAccountUrl = (accountId?: string): string | undefined => {
             if (!accountId) return undefined
-            const reportAccountId = this.sources.resolveIscAccountIdForManagedKey(accountId) ?? accountId
-            return urlContext.humanAccount(reportAccountId)
+            const reportAccountId = this.sources.resolveIscAccountIdForManagedKey(accountId)
+            return reportAccountId ? urlContext.humanAccount(reportAccountId) : undefined
         }
         const resolveIdentityContext = (
             identityId?: string

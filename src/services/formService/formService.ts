@@ -606,7 +606,7 @@ export class FormService {
         try {
             const managedAccountKey = fusionAccount.managedAccountId
             const reportAccountId = managedAccountKey
-                ? (this.sources.resolveIscAccountIdForManagedKey(managedAccountKey) ?? managedAccountKey)
+                ? this.sources.resolveIscAccountIdForManagedKey(managedAccountKey)
                 : undefined
             await this.messaging.sendFusionEmail(formInstance, {
                 accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',

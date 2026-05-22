@@ -166,7 +166,7 @@ describe('fusionReportHelpers', () => {
 
     describe('buildMinimalFusionReportAccount', () => {
         const mockUrlContext: UrlContext = {
-            humanAccount: jest.fn((id) => `http://example.com/human/${id}`),
+            humanAccount: jest.fn((id) => (id ? `http://example.com/human/${id}` : undefined)),
         } as any
 
         beforeEach(() => {
@@ -189,7 +189,7 @@ describe('fusionReportHelpers', () => {
 
             expect(result).toEqual({
                 accountName: 'Test Acc',
-                accountUrl: 'http://example.com/human/acc1',
+                accountUrl: undefined,
                 accountSource: 'Source 1',
                 sourceType: SourceType.Record,
                 accountId: 'acc1',
@@ -200,7 +200,7 @@ describe('fusionReportHelpers', () => {
                 },
                 matches: [],
             })
-            expect(mockUrlContext.humanAccount).toHaveBeenCalledWith('acc1')
+            expect(mockUrlContext.humanAccount).toHaveBeenCalledWith(undefined)
         })
 
         it('should handle missing sourceType by falling back to Authoritative', () => {

@@ -8,7 +8,7 @@ import type { FusionMatch, ScoreReport } from '../scoringService/types'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import { Account } from 'sailpoint-api-client'
 import { FusionDecision } from '../../model/form'
-import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { getManagedAccountKeyFromAccount, isCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { assert } from '../../utils/assert'
 import { readString } from '../../utils/safeRead'
 import {
@@ -91,9 +91,12 @@ export function buildMinimalFusionReportAccount(
     accountIdOverride?: string
 ): FusionReportAccount {
     const reportAccountId = accountIdOverride ?? fusionAccount.managedAccountId
+    const accountUrlId = accountIdOverride && !isCompositeManagedAccountKey(accountIdOverride)
+        ? accountIdOverride
+        : undefined
     const row: FusionReportAccount = {
         accountName: getFusionReportAccountLabel(fusionAccount),
-        accountUrl: urlContext.humanAccount(reportAccountId),
+        accountUrl: urlContext.humanAccount(accountUrlId),
         accountSource: fusionAccount.sourceName,
         sourceType: (sourceType as FusionReportAccount['sourceType']) ?? SourceType.Authoritative,
         accountId: reportAccountId,
