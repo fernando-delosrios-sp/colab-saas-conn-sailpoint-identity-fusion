@@ -202,6 +202,7 @@ export class ChainRunner {
         return {
             registry: {},
             state: this.state,
+            config: this.scenario.config as Record<string, unknown>,
             options: {
                 pass: step.pass ?? 1,
                 stepId: step.id,

@@ -16,14 +16,23 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     const state = context.state
     const pass = step.pass ?? 1
 
-    const sourceConfigs: SourceConfigLike[] = (
-        (step.expectedStateDelta?.sources as Array<Record<string, unknown>>) ?? []
-    ).map((s) => ({
+    const scenarioSources = (context.config?.sources as Array<Record<string, unknown>>) ?? []
+    const sourceConfigs: SourceConfigLike[] = scenarioSources.map((s) => ({
         name: (s.name as string) ?? 'unknown',
         correlationMode: (s.correlationMode as SourceConfigLike['correlationMode']) ?? 'none',
+        sourceType: (s.sourceType as SourceConfigLike['sourceType']) ?? 'authoritative',
     }))
 
     const { registry } = createBaseOperationRegistry(sourceConfigs)
+
+    // Mock fetchAllSources to populate managedSources from config
+    registry.sources.fetchAllSources = jest.fn().mockImplementation(async () => {
+        registry.sources.managedSources = scenarioSources.map((s) => ({
+            id: (s.id as string) ?? `source-${s.name}`,
+            name: s.name as string,
+            config: s,
+        })) as any[]
+    })
 
     const managedAccounts = state.getManagedAccounts(pass)
     if (managedAccounts.length > 0) {
@@ -67,6 +76,15 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         registry.sources.fetchFusionAccounts = jest.fn().mockImplementation(async () => {
             registry.sources.fusionAccountsByNativeIdentity = fusionMap
             registry.sources.fusionAccounts = fusionAccounts
+        })
+    }
+
+    // Mock form fetch methods to populate from recorded state
+    const forms = state.getForms()
+    if (forms.length > 0) {
+        registry.forms.fetchFormInstancesData = jest.fn().mockResolvedValue(undefined)
+        registry.forms.processFetchedFormData = jest.fn().mockImplementation(async () => {
+            registry.forms.fusionIdentityDecisions = forms
         })
     }
 

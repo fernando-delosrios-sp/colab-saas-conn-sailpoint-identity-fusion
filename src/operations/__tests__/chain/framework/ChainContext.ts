@@ -28,6 +28,7 @@ export interface MockRegistry {
 export interface ChainContext {
     registry: MockRegistry
     state: ChainState
+    config?: Record<string, unknown>
     options: {
         pass: number
         stepId: string
