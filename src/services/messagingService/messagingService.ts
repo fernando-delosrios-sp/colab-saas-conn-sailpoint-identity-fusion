@@ -320,8 +320,9 @@ export class MessagingService {
         const accountName = context?.accountName || String(formInputName || formInputAccount || 'Unknown Account')
         const accountSource = context?.accountSource || String(formInputSource || 'Unknown')
         const pickedAccountAttributes = pickAttributes(context?.accountAttributes, this.reportAttributes)
-        const rawAccountId = context?.accountId || String(formInputAccount || '')
-        const accountId = this.sources.resolveIscAccountIdForManagedKey(rawAccountId)
+        const accountId = context?.accountId
+            ? context.accountId
+            : this.sources.resolveIscAccountIdForManagedKey(String(formInputAccount || ''))
         const accountUrl = this.urlContext.humanAccount(accountId || undefined)
         const accountEmail = context?.accountEmail
 

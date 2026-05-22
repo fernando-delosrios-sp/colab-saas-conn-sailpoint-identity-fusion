@@ -53,6 +53,7 @@ export class FusionAccount {
     private _type: FusionAccountKind = FusionAccountKind.Fusion
     private _identityId?: string
     private managedKey?: string
+    private _iscAccountId?: string
     private _key?: SimpleKeyType
 
     // Basic account information
@@ -189,6 +190,7 @@ export class FusionAccount {
         attributes?: Attributes | null
         identityId?: string | null
         modified?: string
+        iscAccountId?: string | null
     }): void {
         if (config.type) this._type = config.type
         if (config.name) this._name = config.name
@@ -199,6 +201,7 @@ export class FusionAccount {
         if (config.disabled !== undefined) this._disabled = config.disabled
         if (config.needsRefresh !== undefined) this._needsRefresh = config.needsRefresh
         if (config.identityId != null) this._identityId = config.identityId
+        if (config.iscAccountId != null) this._iscAccountId = config.iscAccountId
         if (config.modified !== undefined) this._modified = config.modified
         if (config.sources) {
             this._sources = Array.isArray(config.sources) ? new Set(config.sources) : config.sources
@@ -247,6 +250,7 @@ export class FusionAccount {
             attributes: account.attributes ?? undefined,
             identityId: account.identityId ?? undefined,
             modified: account.modified ?? '',
+            iscAccountId: account.id,
         })
         // Restore persisted origin metadata from existing fusion account attributes.
         if (typeof account.attributes?.originSource === 'string') {
@@ -332,6 +336,7 @@ export class FusionAccount {
             needsRefresh: true,
             sources: sourceSet,
             attributes: account.attributes ?? undefined,
+            iscAccountId: account.id,
         })
         fusionAccount._originSource = account.sourceName ?? undefined
         fusionAccount._originAccount = managedAccountKey
@@ -411,6 +416,14 @@ export class FusionAccount {
      */
     public get managedAccountId(): string | undefined {
         return this._type === FusionAccountKind.Managed ? this.managedKey : undefined
+    }
+
+    /**
+     * ISC platform account id. Available when this fusion account represents a managed account
+     * that was loaded from source data. Used for building report links to the ISC UI.
+     */
+    public get iscAccountId(): string | undefined {
+        return this._iscAccountId
     }
 
     /** The SDK simple key used for account output. Asserts non-null. */
@@ -1304,6 +1317,8 @@ export class FusionAccount {
             Boolean(skipAssociationHistoryForManagedKeys?.has(accountId))
         const recordAssociationHistory = addAssociationHistory && !skipAssociationReplay
         const isNewAccount = !this.previousAccountIds.has(accountId)
+
+        if (account.id) this._iscAccountId = account.id
 
         if (isNewAccount) {
             this.setNeedsRefresh(true)

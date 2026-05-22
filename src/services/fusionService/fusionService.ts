@@ -1631,9 +1631,11 @@ public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
 
     /**
      * Reports should link to the ISC account id (not managed key).
-     * Returns undefined when the account isn't present in source caches.
+     * Prefers the account's stored ISC id; falls back to source cache lookup.
      */
     private resolveReportAccountId(fusionAccount: FusionAccount): string | undefined {
+        const iscId = fusionAccount.iscAccountId
+        if (iscId) return iscId
         const managedKey = fusionAccount.managedAccountId
         if (!managedKey) return undefined
         return this.sources.resolveIscAccountIdForManagedKey(managedKey)
