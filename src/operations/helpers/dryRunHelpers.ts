@@ -446,7 +446,7 @@ export const streamEnrichedOutputRows = async (
             pendingReviewByAccountId,
             context.config?.baseurl,
             (accountId?: string) =>
-                accountId ? (context.sources.resolveIscAccountIdForManagedKey(accountId) ?? accountId) : undefined
+                accountId ? context.sources.resolveIscAccountIdForManagedKey(accountId) : undefined
         )
         addEnrichedRowToGroups(
             enriched,
@@ -493,7 +493,7 @@ export const streamUncorrelatedAnalyzedRows = async (
             pendingReviewByAccountId,
             context.config?.baseurl,
             (accountId?: string) =>
-                accountId ? (context.sources.resolveIscAccountIdForManagedKey(accountId) ?? accountId) : undefined
+                accountId ? context.sources.resolveIscAccountIdForManagedKey(accountId) : undefined
         )
         addEnrichedRowToGroups(
             enriched,
@@ -552,7 +552,7 @@ export const streamOrphanDeferredReportRows = async (
             pendingReviewByAccountId,
             context.config?.baseurl,
             (accountId?: string) =>
-                accountId ? (context.sources.resolveIscAccountIdForManagedKey(accountId) ?? accountId) : undefined
+                accountId ? context.sources.resolveIscAccountIdForManagedKey(accountId) : undefined
         )
         addEnrichedRowToGroups(
             enriched,
