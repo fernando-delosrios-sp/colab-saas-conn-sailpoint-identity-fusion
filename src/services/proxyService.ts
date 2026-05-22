@@ -63,20 +63,23 @@ export class ProxyService {
 
         if (proxyEnabled && hasProxyPassword) {
             this.log.info('Running as proxy server')
-            if (this.config.proxyPassword) {
-                const serverPassword = process.env.PROXY_PASSWORD
-                const clientPassword = this.config.proxyPassword
-                const expectedHash = crypto
-                    .createHash('sha256')
-                    .update(serverPassword || '')
-                    .digest()
-                const actualHash = crypto
-                    .createHash('sha256')
-                    .update(clientPassword || '')
-                    .digest()
-                const isMatch = crypto.timingSafeEqual(expectedHash, actualHash)
-                assert(isMatch, 'Proxy password mismatch')
-            }
+
+            // 🛡️ Sentinel: Enforce strict proxy password validation. If the server requires
+            // a password, the client must provide one and it must match exactly.
+            const serverPassword = process.env.PROXY_PASSWORD || ''
+            const clientPassword = this.config.proxyPassword || ''
+
+            const expectedHash = crypto
+                .createHash('sha256')
+                .update(serverPassword)
+                .digest()
+            const actualHash = crypto
+                .createHash('sha256')
+                .update(clientPassword)
+                .digest()
+            const isMatch = crypto.timingSafeEqual(expectedHash, actualHash)
+            assert(isMatch, 'Proxy password mismatch')
+
             return true
         } else {
             return false

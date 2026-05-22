@@ -33,3 +33,8 @@
 **Vulnerability:** The `sanitizeLog` function in `log-server.js` only stripped `\r` and `\n` characters to prevent Log Injection attacks. An attacker could bypass this by using other Unicode line terminators (like \u2028 or \u2029) or ASCII control characters (like \u0085 Next Line) to inject new log entries. Additionally, passing non-string data (e.g., an array or object without a `replace` method) would crash the server, causing Denial of Service.
 **Learning:** Robust sanitization must handle type coercion explicitly before executing string methods. It must also account for a comprehensive range of ASCII control characters and Unicode line separators, not just `\r\n`.
 **Prevention:** Convert unknown input explicitly to strings (e.g., using `String()`) before executing string prototype methods. Utilize comprehensive regular expressions (e.g., `/[\x00-\x08\x0A-\x1F\x7F\u0085\u2028\u2029]+/g`) to sanitize log injection attack vectors thoroughly.
+
+## 2026-05-22 - Fix Authentication Bypass in ProxyService
+**Vulnerability:** The `ProxyService` (`src/services/proxyService.ts`) had a flawed password verification check. If the server expected a password (`process.env.PROXY_PASSWORD` was set), the validation logic `if (this.config.proxyPassword)` allowed clients sending an empty or missing `proxyPassword` to bypass the `crypto.timingSafeEqual` check completely, successfully authenticating.
+**Learning:** Security validations should fail by default if required input is missing, rather than conditionally validating only if the input is present.
+**Prevention:** Remove conditional wrappers around security assertions and ensure missing inputs fall through to proper failure modes.
