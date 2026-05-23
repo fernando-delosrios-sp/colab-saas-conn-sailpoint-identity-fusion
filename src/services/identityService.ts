@@ -296,11 +296,7 @@ export class IdentityService {
         fusionAccount.addCorrelationPromise(accountId, correlationPromise)
     }
 
-    private buildCorrelationPromise(
-        accountId: string,
-        iscAccountId: string,
-        identityId: string
-    ): Promise<void> {
+    private buildCorrelationPromise(accountId: string, iscAccountId: string, identityId: string): Promise<void> {
         const requestParameters: AccountsApiUpdateAccountRequest = {
             id: iscAccountId,
             requestBody: [{ op: 'replace', path: '/identityId', value: identityId }],

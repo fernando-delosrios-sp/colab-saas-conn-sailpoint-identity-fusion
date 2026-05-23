@@ -125,7 +125,14 @@ describe('sourcesSettings applySettings', () => {
 
     it('normalizes string "true" to boolean true for disableNonMatchingAccounts', () => {
         const config = {
-            sources: [{ name: 'A', enabled: true, sourceType: 'orphan', disableNonMatchingAccounts: 'true' as unknown as boolean }],
+            sources: [
+                {
+                    name: 'A',
+                    enabled: true,
+                    sourceType: 'orphan',
+                    disableNonMatchingAccounts: 'true' as unknown as boolean,
+                },
+            ],
         } as unknown as FusionConfigBuild
 
         applySettings(config)

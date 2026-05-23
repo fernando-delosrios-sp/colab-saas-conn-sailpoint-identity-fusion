@@ -154,7 +154,11 @@ describe('corePipeline outputPhase', () => {
             fetchSender: jest.fn().mockResolvedValue(undefined),
             fetchDelayedAggregationSender: jest.fn().mockResolvedValue(undefined),
         }
-        const log = { info: jest.fn(), metric: jest.fn(), track: jest.fn(() => ({ done: jest.fn(() => 0), elapsedMs: jest.fn(() => 0) })) }
+        const log = {
+            info: jest.fn(),
+            metric: jest.fn(),
+            track: jest.fn(() => ({ done: jest.fn(() => 0), elapsedMs: jest.fn(() => 0) })),
+        }
         const serviceRegistry = { ...registry, forms, identities, sources, fusion, messaging, log }
 
         await fetchPhase(serviceRegistry, { mode: { kind: 'aggregation' } })

@@ -17,6 +17,5 @@ export function applySettings(config: FusionConfigBuild): void {
     config.deleteEmpty = extractBoolean(config, 'deleteEmpty') ?? runtimeDefaults.deleteEmpty
     config.skipAccountsWithMissingId =
         extractBoolean(config, 'skipAccountsWithMissingId') ?? runtimeDefaults.skipAccountsWithMissingId
-    config.maxHistoryMessages =
-        config.maxHistoryMessages ?? connectorSpecInitialValues.maxHistoryMessages
+    config.maxHistoryMessages = config.maxHistoryMessages ?? connectorSpecInitialValues.maxHistoryMessages
 }

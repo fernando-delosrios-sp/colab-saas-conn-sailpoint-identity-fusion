@@ -351,5 +351,3 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
 
     return sent
 }
-
-

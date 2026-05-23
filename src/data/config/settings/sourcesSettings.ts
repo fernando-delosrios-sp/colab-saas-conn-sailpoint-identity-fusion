@@ -53,11 +53,14 @@ export function applySettings(config: FusionConfigBuild): void {
                 accountFilter: sourceConfig.accountFilter ?? undefined,
                 accountJmespathFilter: sourceConfig.accountJmespathFilter ?? undefined,
                 correlationMode: sourceConfig.correlationMode ?? runtimeDefaults.source.correlationMode,
-                deferredMatching: extractBoolean(sourceConfig, 'deferredMatching') ?? runtimeDefaults.source.deferredMatching,
+                deferredMatching:
+                    extractBoolean(sourceConfig, 'deferredMatching') ?? runtimeDefaults.source.deferredMatching,
                 includeRecordAccountsForMatching:
-                    extractBoolean(sourceConfig, 'includeRecordAccountsForMatching') ?? runtimeDefaults.source.includeRecordAccountsForMatching,
+                    extractBoolean(sourceConfig, 'includeRecordAccountsForMatching') ??
+                    runtimeDefaults.source.includeRecordAccountsForMatching,
                 disableNonMatchingAccounts:
-                    extractBoolean(sourceConfig, 'disableNonMatchingAccounts') ?? runtimeDefaults.source.disableNonMatchingAccounts,
+                    extractBoolean(sourceConfig, 'disableNonMatchingAccounts') ??
+                    runtimeDefaults.source.disableNonMatchingAccounts,
             }
         })
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)

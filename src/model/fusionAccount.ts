@@ -808,7 +808,12 @@ export class FusionAccount {
     /** True when at least one source-scoped reviewer action remains on the account. */
     private _actionsHasReviewerScope(): boolean {
         const prefix = 'reviewer:'
-        return Array.from(this._actions).some((action) => action.startsWith(prefix))
+        for (const action of this._actions) {
+            if (action.startsWith(prefix)) {
+                return true
+            }
+        }
+        return false
     }
 
     // ============================================================================
@@ -1184,12 +1189,12 @@ export class FusionAccount {
             this.setUncorrelatedAccount(id)
             this.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
             accountsById.delete(id)
-            
+
             if (!account.identityId) continue
-            
+
             const idSet = accountsByIdentityId.get(account.identityId)
             if (!idSet) continue
-            
+
             idSet.delete(id)
             if (idSet.size === 0) accountsByIdentityId.delete(account.identityId)
         }
@@ -1375,7 +1380,6 @@ export class FusionAccount {
         this._statuses.add('uncorrelated')
         this._actions.delete('correlated')
     }
-
 
     /** Sets a specific account ID as uncorrelated and adds it to both account ID sets. */
     private setUncorrelatedAccount(accountId?: string): void {

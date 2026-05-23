@@ -16,9 +16,22 @@ export interface FusionManagedAccountState {
     removeManagedAccountFromWorkQueue: (account: Account) => void
     preProcessManagedAccount: (account: Account) => Promise<FusionAccount>
     analyzeManagedAccount: (account: Account) => Promise<FusionAccount>
-    handleNoReviewerAccount: (account: Account, sourceType: SourceType, sourceInfo?: SourceInfo) => Promise<FusionAccount | undefined>
-    handleNonMatch: (fusionAccount: FusionAccount, account: Account, sourceType: SourceType, sourceInfo?: SourceInfo) => Promise<FusionAccount | undefined>
-    handleExactMatch: (fusionAccount: FusionAccount, account: Account, identityId: string) => Promise<FusionAccount | undefined>
+    handleNoReviewerAccount: (
+        account: Account,
+        sourceType: SourceType,
+        sourceInfo?: SourceInfo
+    ) => Promise<FusionAccount | undefined>
+    handleNonMatch: (
+        fusionAccount: FusionAccount,
+        account: Account,
+        sourceType: SourceType,
+        sourceInfo?: SourceInfo
+    ) => Promise<FusionAccount | undefined>
+    handleExactMatch: (
+        fusionAccount: FusionAccount,
+        account: Account,
+        identityId: string
+    ) => Promise<FusionAccount | undefined>
     handlePartialMatch: (fusionAccount: FusionAccount, sourceInfo?: SourceInfo) => Promise<FusionAccount | undefined>
     handleDeferredMatch: (fusionAccount: FusionAccount, account: Account) => FusionAccount | undefined
     logInfo: (message: string) => void

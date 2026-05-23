@@ -13,10 +13,10 @@ export function createRegistry() {
     }
 
     const trackedOp = {
-            done: jest.fn(() => 0),
-            elapsedMs: jest.fn(() => 0),
-        }
-        return {
+        done: jest.fn(() => 0),
+        elapsedMs: jest.fn(() => 0),
+    }
+    return {
         config: {
             sources: [],
         },

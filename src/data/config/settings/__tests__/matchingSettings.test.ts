@@ -3,7 +3,9 @@ import { applySettings, runtimeDefaults } from '../matchingSettings'
 
 describe('matchingSettings applySettings', () => {
     it('defaults fusionMergingExactMatch to false when omitted', () => {
-        const config = { matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }] } as unknown as FusionConfigBuild
+        const config = {
+            matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }],
+        } as unknown as FusionConfigBuild
 
         applySettings(config)
 

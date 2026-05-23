@@ -384,10 +384,7 @@ export class MessagingService {
     /**
      * Send report email to all global owners (source owner + governance group members).
      */
-    public async sendReport(
-        report: FusionReport,
-        reportType: 'aggregation' | 'fusion'
-    ): Promise<void> {
+    public async sendReport(report: FusionReport, reportType: 'aggregation' | 'fusion'): Promise<void> {
         const recipientEmails = new Set<string>()
 
         // Add all global owners (source owner + governance group members) as recipients
@@ -796,7 +793,11 @@ export class MessagingService {
             const response = await workflowsApi.createWorkflow({ createWorkflowRequestV2025 })
             return response.data
         }
-        const workflowData = await this.client.execute(createWorkflowFn, undefined, `MessagingService>createWorkflow name=${createWorkflowRequestV2025.name}`)
+        const workflowData = await this.client.execute(
+            createWorkflowFn,
+            undefined,
+            `MessagingService>createWorkflow name=${createWorkflowRequestV2025.name}`
+        )
         assert(workflowData, 'Failed to create workflow')
         assert(workflowData.id, 'Workflow ID is required')
 
@@ -820,7 +821,11 @@ export class MessagingService {
             const response = await workflowsApi.testWorkflow(requestParameters)
             return response
         }
-        const response = await this.client.execute(testWorkflowFn, undefined, `MessagingService>testWorkflow id=${requestParameters.id}`)
+        const response = await this.client.execute(
+            testWorkflowFn,
+            undefined,
+            `MessagingService>testWorkflow id=${requestParameters.id}`
+        )
         assert(response, 'Workflow response is required')
         this.log.debug(`Workflow executed. Response code ${response.status}`)
         return response
