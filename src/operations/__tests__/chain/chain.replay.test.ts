@@ -15,11 +15,19 @@ import { accountUpdate } from '../../../operations/accountUpdate'
 import { ServiceRegistry } from '../../../services/serviceRegistry'
 import { MockRegistry } from './framework/ChainContext'
 
+let mockActiveRegistry: any = null
+
 jest.mock('../../../services/serviceRegistry', () => ({
     ServiceRegistry: {
-        setCurrent: jest.fn(),
-        clear: jest.fn(),
-        getCurrent: jest.fn(),
+        setCurrent: jest.fn((reg) => {
+            mockActiveRegistry = reg
+        }),
+        getCurrent: jest.fn(() => {
+            return mockActiveRegistry
+        }),
+        clear: jest.fn(() => {
+            mockActiveRegistry = null
+        }),
     },
 }))
 
@@ -37,12 +45,10 @@ function registerAllStepFns(): void {
         const replayCtx = buildReplayContext(step, context)
         const registry = replayCtx.registry as unknown as MockRegistry
 
-        ;(ServiceRegistry.setCurrent as jest.Mock).mockImplementation(() => undefined)
-
         try {
             await accountDiscoverSchema(registry as any)
-        } catch {
-            // operation may fail with incomplete mocks; outputs still captured
+        } catch (err) {
+            console.error(`Error in accountDiscoverSchema for ${step.id}:`, err)
         }
 
         return {
@@ -55,12 +61,10 @@ function registerAllStepFns(): void {
         const replayCtx = buildReplayContext(step, context)
         const registry = replayCtx.registry as unknown as MockRegistry
 
-        ;(ServiceRegistry.setCurrent as jest.Mock).mockImplementation(() => undefined)
-
         try {
             await entitlementList(registry as any, (step.input ?? { type: 'status' }) as any)
-        } catch {
-            // mock path
+        } catch (err) {
+            console.error(`Error in entitlementList for ${step.id}:`, err)
         }
 
         return {
@@ -74,12 +78,15 @@ function registerAllStepFns(): void {
         const registry = replayCtx.registry as unknown as MockRegistry
 
         context.state.setPassIndex(step.pass ?? 1)
-        ;(ServiceRegistry.setCurrent as jest.Mock).mockImplementation(() => undefined)
 
         try {
             await accountList(registry as any, (step.input ?? { schema: { attributes: [] } }) as any)
-        } catch {
-            // mock path
+            if (registry.log.crash.mock.calls.length > 0) {
+                const call = registry.log.crash.mock.calls[0]
+                console.error(`CRASH DETECTED in accountList for ${step.id}:`, call[0], call[1]?.stack || call[1])
+            }
+        } catch (err) {
+            console.error(`Error in accountList for ${step.id}:`, err)
         }
 
         return {
@@ -93,12 +100,10 @@ function registerAllStepFns(): void {
         const replayCtx = buildReplayContext(step, context)
         const registry = replayCtx.registry as unknown as MockRegistry
 
-        ;(ServiceRegistry.setCurrent as jest.Mock).mockImplementation(() => undefined)
-
         try {
             await accountCreate(registry as any, (step.input ?? {}) as any)
-        } catch {
-            // mock path
+        } catch (err) {
+            console.error(`Error in accountCreate for ${step.id}:`, err)
         }
 
         return {
@@ -111,12 +116,10 @@ function registerAllStepFns(): void {
         const replayCtx = buildReplayContext(step, context)
         const registry = replayCtx.registry as unknown as MockRegistry
 
-        ;(ServiceRegistry.setCurrent as jest.Mock).mockImplementation(() => undefined)
-
         try {
             await accountDisable(registry as any, (step.input ?? {}) as any)
-        } catch {
-            // mock path
+        } catch (err) {
+            console.error(`Error in accountDisable for ${step.id}:`, err)
         }
 
         return {
@@ -129,12 +132,10 @@ function registerAllStepFns(): void {
         const replayCtx = buildReplayContext(step, context)
         const registry = replayCtx.registry as unknown as MockRegistry
 
-        ;(ServiceRegistry.setCurrent as jest.Mock).mockImplementation(() => undefined)
-
         try {
             await accountEnable(registry as any, (step.input ?? {}) as any)
-        } catch {
-            // mock path
+        } catch (err) {
+            console.error(`Error in accountEnable for ${step.id}:`, err)
         }
 
         return {
@@ -147,12 +148,10 @@ function registerAllStepFns(): void {
         const replayCtx = buildReplayContext(step, context)
         const registry = replayCtx.registry as unknown as MockRegistry
 
-        ;(ServiceRegistry.setCurrent as jest.Mock).mockImplementation(() => undefined)
-
         try {
             await accountRead(registry as any, (step.input ?? {}) as any)
-        } catch {
-            // mock path
+        } catch (err) {
+            console.error(`Error in accountRead for ${step.id}:`, err)
         }
 
         return {
@@ -165,12 +164,14 @@ function registerAllStepFns(): void {
         const replayCtx = buildReplayContext(step, context)
         const registry = replayCtx.registry as unknown as MockRegistry
 
-        ;(ServiceRegistry.setCurrent as jest.Mock).mockImplementation(() => undefined)
-
         try {
             await accountUpdate(registry as any, (step.input ?? {}) as any)
-        } catch {
-            // mock path
+            if (registry.log.crash.mock.calls.length > 0) {
+                const call = registry.log.crash.mock.calls[0]
+                console.error(`CRASH DETECTED in accountUpdate for ${step.id}:`, call[0], call[1]?.stack || call[1])
+            }
+        } catch (err) {
+            console.error(`Error in accountUpdate for ${step.id}:`, err)
         }
 
         return {
@@ -194,25 +195,31 @@ describe('Identity Fusion NG - Recorded Chain Replay', () => {
     } else {
         it.each(recordings)('replays recording: %s', async (scenarioPath) => {
             const runner = new ChainRunner(scenarioPath)
+            const scenario = (runner as any).scenario
+            const mas = scenario.initialState.managedAccounts
+            const found17 = mas.filter((m: any) => String(m.nativeIdentity) === "17")
+            const found18 = mas.filter((m: any) => String(m.nativeIdentity) === "18")
+            console.log("Brian (17) MA:", found17)
+            console.log("Brian (18) MA:", found18)
 
             const results = await runner.executeAll()
 
             expect(results.success).toBe(true)
             expect(results.stepsFailed).toBe(0)
 
-            for (const stepResult of results.stepResults) {
+            const steps = runner.getSteps()
+            for (let i = 0; i < results.stepResults.length; i++) {
+                const stepResult = results.stepResults[i]
                 expect(stepResult.success).toBe(true)
                 const output = stepResult.output as Record<string, unknown>
-                const step = runner.getSteps().find((s) => s.id === stepResult.stepId)
+                const step = steps[i]
                 if (step?.expectedOutput) {
                     const { match, drift } = compareOutputs(
                         (output?.outputs as unknown[]) ?? [],
                         step.expectedOutput,
-                        stepResult.stepId
+                        `${stepResult.stepId} (index ${i})`
                     )
-                    if (!match) {
-                        console.warn(`Drift detected in ${stepResult.stepId}:`, drift)
-                    }
+                    expect(drift).toEqual([])
                 }
             }
         })
