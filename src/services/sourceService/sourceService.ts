@@ -1861,10 +1861,11 @@ export class SourceService {
             )
             const profile = profiles.find((p: any) => p.id === profileId)
             const transforms = profile?.identityAttributeConfig?.attributeTransforms ?? []
-            const verified = transforms.some((t: any) =>
-                this.isDesiredIdentityProfileTransform(t, attributeName, fusionSourceName, fusionSourceId)
-            )
-            if (verified) {
+            if (
+                transforms.some((t: any) =>
+                    this.isDesiredIdentityProfileTransform(t, attributeName, fusionSourceName, fusionSourceId)
+                )
+            ) {
                 return true
             }
             if (attempt < maxAttempts) {

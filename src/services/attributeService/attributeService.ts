@@ -164,9 +164,7 @@ export class AttributeService {
      */
     public async initializeCounters(): Promise<void> {
         const stateWrapper = this.getStateWrapper()
-        const counterDefinitions = this.uniqueDefinitions.filter(
-            (definition) => definition.useIncrementalCounter
-        )
+        const counterDefinitions = this.uniqueDefinitions.filter((definition) => definition.useIncrementalCounter)
         if (counterDefinitions.length === 0) return
 
         this.log.debug(`Initializing ${counterDefinitions.length} incremental counter attributes`)
@@ -407,7 +405,7 @@ export class AttributeService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -440,11 +438,10 @@ export class AttributeService {
         // Also refresh when any unique attribute value is missing or empty, to recover from
         // failed generation on a prior run (e.g. $account resolved to an identity object
         // that lacked the managed-account attributes referenced by the expression).
-        const hasMissingUniqueAttribute = this.uniqueDefinitions.some(
-            (def) => !isValidAttributeValue(fusionAccount.attributes[def.name])
-        )
-
-        const shouldRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || hasMissingUniqueAttribute
+        const shouldRefresh =
+            fusionAccount.needsRefresh ||
+            fusionAccount.needsReset ||
+            this.uniqueDefinitions.some((def) => !isValidAttributeValue(fusionAccount.attributes[def.name]))
         if (!shouldRefresh) return
 
         this.log.debug(`Refreshing unique attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`)
@@ -753,11 +750,7 @@ export class AttributeService {
 
     private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
         const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
-        return (
-            trimStr(identityBag?.name) ??
-            trimStr(fusionAccount.identityDisplayName) ??
-            trimStr(fusionAccount.name)
-        )
+        return trimStr(identityBag?.name) ?? trimStr(fusionAccount.identityDisplayName) ?? trimStr(fusionAccount.name)
     }
 
     private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
@@ -801,10 +794,7 @@ export class AttributeService {
         return ordered
     }
 
-    private prioritizeMainAccount(
-        ordered: Record<string, any>[],
-        fusionAccount: FusionAccount
-    ): Record<string, any>[] {
+    private prioritizeMainAccount(ordered: Record<string, any>[], fusionAccount: FusionAccount): Record<string, any>[] {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
