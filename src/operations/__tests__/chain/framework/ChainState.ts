@@ -15,11 +15,13 @@ export interface ChainIdentity {
 export interface ChainManagedAccount {
     id: string
     nativeIdentity?: string
+    sourceId?: string
     sourceName: string
     name?: string
     disabled?: boolean
     attributes?: Record<string, unknown>
     identity?: { id: string; name: string }
+    identityId?: string
     sourceOwner?: { id: string; name: string }
 }
 
@@ -57,7 +59,7 @@ export interface StepResult {
 
 export class ChainState {
     private state: ChainStateSnapshot
-    private stepResults: Map<string, StepResult> = new Map()
+    private stepResults: StepResult[] = []
     private passIndex = 0
 
     constructor(initialState?: ChainStateSnapshot) {
@@ -154,35 +156,83 @@ export class ChainState {
     }
 
     recordStepResult(result: StepResult): void {
-        this.stepResults.set(result.stepId, result)
+        this.stepResults.push(result)
     }
 
     getStepResult(stepId: string): StepResult | undefined {
-        return this.stepResults.get(stepId)
+        return this.stepResults.find((r) => r.stepId === stepId)
     }
 
     getAllStepResults(): StepResult[] {
-        return Array.from(this.stepResults.values())
+        return this.stepResults
     }
 
     applyDelta(delta: Record<string, unknown>): void {
-        // Recordings store full state snapshots under these keys; treat them as replacements
         if ('identities' in delta) {
-            this.state.identities = (delta.identities as ChainIdentity[]) ?? []
+            const identities = delta.identities as ChainIdentity[]
+            if (Array.isArray(identities)) {
+                for (const identity of identities) {
+                    this.addIdentity(identity)
+                }
+            }
         }
         if ('managedAccounts' in delta) {
             const ma = delta.managedAccounts
             if (Array.isArray(ma)) {
-                ;(this.state as any).managedAccounts = ma
-            } else {
-                this.state.managedAccounts = (ma as Record<string, ChainManagedAccount[]>) ?? {}
+                const stateAccounts = this.state.managedAccounts
+                if (Array.isArray(stateAccounts)) {
+                    for (const account of ma) {
+                        this.addOrUpdateManagedAccount(account, stateAccounts as unknown as ChainManagedAccount[])
+                    }
+                } else {
+                    const key = this.activePassKey()
+                    if (!stateAccounts[key]) {
+                        stateAccounts[key] = []
+                    }
+                    for (const account of ma) {
+                        this.addOrUpdateManagedAccount(account, stateAccounts[key])
+                    }
+                }
+            } else if (ma && typeof ma === 'object') {
+                const stateAccounts = this.state.managedAccounts
+                if (Array.isArray(stateAccounts)) {
+                    for (const passAccounts of Object.values(ma as Record<string, ChainManagedAccount[]>)) {
+                        for (const account of passAccounts) {
+                            this.addOrUpdateManagedAccount(account, stateAccounts as unknown as ChainManagedAccount[])
+                        }
+                    }
+                } else {
+                    for (const [key, passAccounts] of Object.entries(ma as Record<string, ChainManagedAccount[]>)) {
+                        if (!stateAccounts[key]) {
+                            stateAccounts[key] = []
+                        }
+                        for (const account of passAccounts) {
+                            this.addOrUpdateManagedAccount(account, stateAccounts[key])
+                        }
+                    }
+                }
             }
         }
         if ('fusionAccounts' in delta) {
-            this.state.fusionAccounts = (delta.fusionAccounts as ChainFusionAccount[]) ?? []
+            const fusionAccounts = delta.fusionAccounts as ChainFusionAccount[]
+            if (Array.isArray(fusionAccounts)) {
+                for (const account of fusionAccounts) {
+                    this.addFusionAccount(account)
+                }
+            }
         }
         if ('formDecisions' in delta) {
-            this.state.forms = (delta.formDecisions as Array<Record<string, unknown>>) ?? []
+            const forms = delta.formDecisions as Array<Record<string, unknown>>
+            if (Array.isArray(forms)) {
+                for (const form of forms) {
+                    const existingIndex = this.state.forms.findIndex((f) => f.id === form.id)
+                    if (existingIndex >= 0) {
+                        this.state.forms[existingIndex] = { ...this.state.forms[existingIndex], ...form }
+                    } else {
+                        this.state.forms.push(form)
+                    }
+                }
+            }
         }
 
         // Additive deltas used by manual scenarios
@@ -198,6 +248,25 @@ export class ChainState {
             for (const identity of identityAdd) {
                 this.addIdentity(identity)
             }
+        }
+    }
+
+    private addOrUpdateManagedAccount(account: ChainManagedAccount, array: ChainManagedAccount[]): void {
+        const existing = array.find((a) => {
+            if (account.id && a.id === account.id) {
+                return true
+            }
+            const aSource = a.sourceId || a.sourceName
+            const accSource = account.sourceId || account.sourceName
+            if (aSource && accSource && aSource === accSource && a.nativeIdentity === account.nativeIdentity) {
+                return true
+            }
+            return false
+        })
+        if (existing) {
+            Object.assign(existing, account)
+        } else {
+            array.push(account)
         }
     }
 

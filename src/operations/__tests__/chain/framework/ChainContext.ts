@@ -33,4 +33,5 @@ export interface ChainContext {
         pass: number
         stepId: string
     }
+    scenario?: any
 }

@@ -98,9 +98,13 @@ export class ChainRunner {
         return this.getReferenceValues()[stepId]
     }
 
-    async executeStep(stepId: string): Promise<StepResult> {
-        const step = this.scenario.steps.find((s) => s.id === stepId)
+    async executeStep(stepOrId: StepDefinition | string): Promise<StepResult> {
+        const step = typeof stepOrId === 'string'
+            ? this.scenario.steps.find((s) => s.id === stepOrId)
+            : stepOrId
+
         if (!step) {
+            const stepId = typeof stepOrId === 'string' ? stepOrId : 'unknown'
             return {
                 stepId,
                 operation: 'unknown',
@@ -158,7 +162,7 @@ export class ChainRunner {
         let failed = 0
 
         for (const step of this.scenario.steps) {
-            const result = await this.executeStep(step.id)
+            const result = await this.executeStep(step)
             results.push(result)
             if (!result.success) {
                 failed++
@@ -179,7 +183,7 @@ export class ChainRunner {
         let failed = 0
 
         for (const step of this.scenario.steps) {
-            const result = await this.executeStep(step.id)
+            const result = await this.executeStep(step)
             results.push(result)
             if (!result.success) {
                 failed++
@@ -207,6 +211,7 @@ export class ChainRunner {
                 pass: step.pass ?? 1,
                 stepId: step.id,
             },
+            scenario: this.scenario,
         } as unknown as ChainContext
     }
 

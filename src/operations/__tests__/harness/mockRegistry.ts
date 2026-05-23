@@ -39,7 +39,9 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         aggregateManagedSources: jest.fn().mockResolvedValue(undefined),
         aggregateDelayedSources: jest.fn().mockResolvedValue(undefined),
         fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
+        fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
         fetchManagedAccounts: jest.fn().mockResolvedValue(undefined),
+        fetchManagedAccount: jest.fn().mockResolvedValue(undefined),
         saveBatchCumulativeCount: jest.fn().mockResolvedValue(undefined),
         clearManagedAccounts: jest.fn(),
         clearFusionAccounts: jest.fn(),
@@ -48,6 +50,8 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         managedSources: [],
         managedAccountsById: new Map(),
         managedAccountsAllById: new Map(),
+        managedAccountsByIdentityId: new Map(),
+        fusionAccountsByNativeIdentity: new Map(),
         fusionAccountCount: 0,
         hasFusionSource: true,
         fusionSourceOwner: { id: 'fusion-owner' },
@@ -79,7 +83,19 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         disableReset: jest.fn().mockResolvedValue(undefined),
         resetState: jest.fn().mockResolvedValue(undefined),
         processFusionAccounts: jest.fn().mockResolvedValue([]),
+        processFusionAccount: jest.fn().mockImplementation(async (account) => account),
         processIdentities: jest.fn().mockResolvedValue([]),
+        processIdentity: jest.fn().mockResolvedValue(undefined),
+        getFusionIdentity: jest.fn().mockImplementation((id) => ({
+            nativeIdentity: id,
+            addStatus: jest.fn(),
+            enable: jest.fn(),
+            disable: jest.fn(),
+        })),
+        preProcessFusionAccounts: jest.fn().mockResolvedValue([]),
+        normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
+        getISCAccount: jest.fn().mockImplementation(async (account) => account),
+        correlateMissingAccountsPerSource: jest.fn().mockResolvedValue(undefined),
         processFusionIdentityDecisions: jest.fn().mockResolvedValue([]),
         initializeManagedAccountProcessing: jest.fn().mockResolvedValue(undefined),
         processCorrelatedManagedAccounts: jest.fn().mockResolvedValue(undefined),
@@ -101,6 +117,8 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
 
     const attributes = {
         initializeCounters: jest.fn().mockResolvedValue(undefined),
+        registerUniqueValuesFromRawAccounts: jest.fn(),
+        refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
         saveState: jest.fn().mockResolvedValue(undefined),
     }
 

@@ -252,7 +252,9 @@ export class AttributeService {
                     prioritizedAccount
                 )
                 if (processedValue === undefined) {
-                    if (!shouldPreserveCurrentWithoutContext) {
+                    if (fusionAccount.isIdentity && fusionAccount.attributeBag.identity[attribute] !== undefined) {
+                        attributes[attribute] = fusionAccount.attributeBag.identity[attribute]
+                    } else if (!shouldPreserveCurrentWithoutContext) {
                         delete attributes[attribute]
                     }
                     // mainAccount is used as an override context selector; when no supporting
@@ -867,7 +869,16 @@ export class AttributeService {
             return undefined
         }
 
-        let value = evaluateVelocityTemplate(expression, context, definition.maxLength)
+        let value: any
+        try {
+            value = evaluateVelocityTemplate(expression, context, definition.maxLength)
+        } catch (error) {
+            this.log.error(
+                `Failed to evaluate velocity template for attribute ${definition.name}: ${error instanceof Error ? error.message : String(error)}`
+            )
+            return undefined
+        }
+
         if (!value) {
             this.log.error(`Failed to evaluate velocity template for attribute ${definition.name}`)
             return undefined
