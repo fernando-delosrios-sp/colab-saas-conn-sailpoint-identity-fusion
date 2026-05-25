@@ -64,26 +64,134 @@ export function format(date: Date | string | number, formatStr?: string): string
 /**
  * Parse a date from various formats
  */
-export function parse(dateStr: string | Date | number): Date {
-    const d = new Date(dateStr)
+export function parse(dateStr: string | Date | number, formatStr?: string): Date {
+    if (dateStr instanceof Date) {
+        return new Date(dateStr)
+    }
 
-    if (isNaN(d.getTime())) {
+    if (typeof dateStr === 'number') {
+        const d = new Date(dateStr)
+        if (isNaN(d.getTime())) {
+            throw new Error('Invalid date')
+        }
+        return d
+    }
+
+    if (typeof dateStr !== 'string') {
         throw new Error('Invalid date')
     }
 
-    return d
-}
-
-/**
- * Parse an ISO-8601 date string.
- * Kept for compatibility with date-fns style usage in Velocity templates.
- */
-export function parseISO(dateStr: string): Date {
-    const d = new Date(dateStr)
-    if (isNaN(d.getTime())) {
-        throw new Error('Invalid ISO date')
+    if (!formatStr) {
+        const d = new Date(dateStr)
+        if (isNaN(d.getTime())) {
+            throw new Error('Invalid date')
+        }
+        return d
     }
-    return d
+
+    // Escape regex characters in the format string
+    const escapedFormat = formatStr.replace(/[\\^$*+?.()|[\]{}]/g, '\\$&')
+
+    // Supported date-fns token patterns (longest first to match correctly)
+    const tokens = ['yyyy', 'yy', 'MM', 'M', 'dd', 'd', 'HH', 'H', 'mm', 'm', 'ss', 's']
+    const tokenRegex = new RegExp(tokens.join('|'), 'g')
+    const matchedTokens: string[] = []
+
+    const pattern = escapedFormat.replace(tokenRegex, (match) => {
+        matchedTokens.push(match)
+        switch (match) {
+            case 'yyyy': return '(\\d{4})'
+            case 'yy': return '(\\d{2})'
+            case 'MM': return '(\\d{2})'
+            case 'M': return '(\\d{1,2})'
+            case 'dd': return '(\\d{2})'
+            case 'd': return '(\\d{1,2})'
+            case 'HH': return '(\\d{2})'
+            case 'H': return '(\\d{1,2})'
+            case 'mm': return '(\\d{2})'
+            case 'm': return '(\\d{1,2})'
+            case 'ss': return '(\\d{2})'
+            case 's': return '(\\d{1,2})'
+            default: return match
+        }
+    })
+
+    const regex = new RegExp(`^${pattern}$`)
+    const match = dateStr.match(regex)
+    if (!match) {
+        throw new Error('Invalid date')
+    }
+
+    let year = 1970
+    let month = 0
+    let day = 1
+    let hour = 0
+    let minute = 0
+    let second = 0
+
+    let yearSet = false
+    let monthSet = false
+    let daySet = false
+    let hourSet = false
+    let minuteSet = false
+    let secondSet = false
+
+    for (let i = 0; i < matchedTokens.length; i++) {
+        const token = matchedTokens[i]
+        const val = parseInt(match[i + 1], 10)
+        switch (token) {
+            case 'yyyy':
+                year = val
+                yearSet = true
+                break
+            case 'yy':
+                year = val >= 50 ? 1900 + val : 2000 + val
+                yearSet = true
+                break
+            case 'MM':
+            case 'M':
+                month = val - 1
+                monthSet = true
+                break
+            case 'dd':
+            case 'd':
+                day = val
+                daySet = true
+                break
+            case 'HH':
+            case 'H':
+                hour = val
+                hourSet = true
+                break
+            case 'mm':
+            case 'm':
+                minute = val
+                minuteSet = true
+                break
+            case 'ss':
+            case 's':
+                second = val
+                secondSet = true
+                break
+        }
+    }
+
+    if (monthSet && (month < 0 || month > 11)) throw new Error('Invalid date')
+    if (daySet && (day < 1 || day > 31)) throw new Error('Invalid date')
+    if (hourSet && (hour < 0 || hour > 23)) throw new Error('Invalid date')
+    if (minuteSet && (minute < 0 || minute > 59)) throw new Error('Invalid date')
+    if (secondSet && (second < 0 || second > 59)) throw new Error('Invalid date')
+
+    const parsedDate = new Date(year, month, day, hour, minute, second)
+    if (isNaN(parsedDate.getTime())) {
+        throw new Error('Invalid date')
+    }
+
+    if (yearSet && parsedDate.getFullYear() !== year) throw new Error('Invalid date')
+    if (monthSet && parsedDate.getMonth() !== month) throw new Error('Invalid date')
+    if (daySet && parsedDate.getDate() !== day) throw new Error('Invalid date')
+
+    return parsedDate
 }
 
 /**
@@ -217,7 +325,6 @@ export function isValid(date: any): boolean {
 export const Datefns = {
     format,
     parse,
-    parseISO,
     getYear,
     addDays,
     addMonths,
