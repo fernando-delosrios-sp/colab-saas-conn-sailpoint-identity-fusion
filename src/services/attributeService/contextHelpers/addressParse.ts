@@ -1,5 +1,5 @@
 import { logger } from '@sailpoint/connector-sdk'
-import { State, City } from '../geoData'
+import { State, City } from './geo/geoData'
 // @ts-expect-error - no types available
 import parseAddressString from 'parse-address-string'
 
