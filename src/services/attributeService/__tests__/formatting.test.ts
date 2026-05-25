@@ -495,6 +495,88 @@ describe('evaluateVelocityTemplate', () => {
             const result = evaluateVelocityTemplate('#set($p=$JSON.parse($raw))$JSON.stringify($p)', context)
             expect(result).toBeUndefined()
         })
+
+        it('should demonstrate why $foreach.first fails (throws Error)', () => {
+            const context = {
+                NERMActiveAssignmentArray: JSON.stringify([
+                    { start_date: '05/01/2026', end_date: '05/30/2026' },
+                    { start_date: '06/01/2026', end_date: '06/30/2026' }
+                ])
+            }
+            const expr = `
+#set( $assignments = $JSON.parse($NERMActiveAssignmentArray) )
+#foreach( $assignment in $assignments )
+    #if( $foreach.first )
+        #set( $latestAssignment = $assignment )
+    #else
+        #set( $currentLatestIso = $Datefns.parse($latestAssignment.end_date, 'MM/dd/yyyy') )
+        #set( $nextDateIso = $Datefns.parse($assignment.end_date, 'MM/dd/yyyy') )
+        #if( $Datefns.isAfter($nextDateIso, $currentLatestIso) )
+            #set( $latestAssignment = $assignment )
+        #end
+    #end
+#end
+$latestAssignment.end_date
+            `.trim()
+            
+            expect(() => evaluateVelocityTemplate(expr, context)).toThrow()
+        })
+
+        it('should successfully get latest assignment using $foreach.index == 0', () => {
+            const context = {
+                NERMActiveAssignmentArray: JSON.stringify([
+                    { start_date: '05/01/2026', end_date: '05/30/2026' },
+                    { start_date: '06/01/2026', end_date: '06/15/2026' },
+                    { start_date: '06/01/2026', end_date: '06/30/2026' }
+                ])
+            }
+            const expr = `
+#set( $assignments = $JSON.parse($NERMActiveAssignmentArray) )
+#foreach( $assignment in $assignments )
+    #if( $foreach.index == 0 )
+        #set( $latestAssignment = $assignment )
+    #else
+        #set( $currentLatestIso = $Datefns.parse($latestAssignment.end_date, 'MM/dd/yyyy') )
+        #set( $nextDateIso = $Datefns.parse($assignment.end_date, 'MM/dd/yyyy') )
+        #if( $Datefns.isAfter($nextDateIso, $currentLatestIso) )
+            #set( $latestAssignment = $assignment )
+        #end
+    #end
+#end
+$latestAssignment.end_date
+            `.trim()
+            
+            const result = evaluateVelocityTemplate(expr, context)
+            expect(result?.trim()).toBe('06/30/2026')
+        })
+
+        it('should successfully get earliest assignment using $foreach.index == 0', () => {
+            const context = {
+                NERMActiveAssignmentArray: JSON.stringify([
+                    { start_date: '06/01/2026', end_date: '06/30/2026' },
+                    { start_date: '05/01/2026', end_date: '05/30/2026' },
+                    { start_date: '05/15/2026', end_date: '05/20/2026' }
+                ])
+            }
+            const expr = `
+#set( $assignments = $JSON.parse($NERMActiveAssignmentArray) )
+#foreach( $assignment in $assignments )
+    #if( $foreach.index == 0 )
+        #set( $earliestAssignment = $assignment )
+    #else
+        #set( $currentEarliestIso = $Datefns.parse($earliestAssignment.start_date, 'MM/dd/yyyy') )
+        #set( $nextDateIso = $Datefns.parse($assignment.start_date, 'MM/dd/yyyy') )
+        #if( $Datefns.isBefore($nextDateIso, $currentEarliestIso) )
+            #set( $earliestAssignment = $assignment )
+        #end
+    #end
+#end
+$earliestAssignment.start_date
+            `.trim()
+            
+            const result = evaluateVelocityTemplate(expr, context)
+            expect(result?.trim()).toBe('05/01/2026')
+        })
     })
 
     // ========================================================================
