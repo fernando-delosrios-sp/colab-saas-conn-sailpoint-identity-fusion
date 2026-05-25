@@ -47,10 +47,14 @@
 
 **Learning:** Unbounded `Promise.all(array.map(fn))` in methods like `fetchManagedAccounts`, `aggregateManagedSources`, and `aggregateDelayedSources` initiates thousands of concurrent asynchronous requests when iterating over potentially large arrays (e.g. `managedSources`). This results in memory exhaustion and external API rate limit triggers.
 **Action:** Replaced these unbounded `Promise.all` mapping blocks with `promiseAllBatched` to bound concurrency while maintaining parallel execution benefits.
+
 ## 2026-05-18 - Prevent unbounded parallel execution in form service
+
 **Learning:** Unbounded `Promise.all(array.map(fn))` in `src/services/formService/formService.ts` during form instance retrieval initiates concurrent asynchronous requests over arrays (e.g. `activeForms`), which can result in API rate limit triggers when there are a large number of forms.
 **Action:** Replaced the unbounded `Promise.all` mapping block with `promiseAllBatched(activeForms, fn)` to bound concurrency while maintaining parallel execution benefits.
+
 ## 2026-05-19 - Prevent unbounded parallel execution in rebuild fusion account helper
+
 **Learning:** Unbounded `Promise.all(array.map(fn))` in operations helpers (like `rebuildFusionAccount.ts`) when executing cascade aggregations (`sources.aggregateManagedSource`) or fetching multiple managed accounts (`sources.fetchManagedAccount`) causes concurrent requests to fan out aggressively. When the number of configured sources or linked accounts grows large, this triggers API rate limits and can lead to memory exhaustion.
 **Action:** Replaced unbounded `Promise.all(array.map(fn))` invocations with `promiseAllBatched(array, fn)` across data fetch operations to safely bound concurrency during rebuild tasks while maintaining the efficiency of parallel processing.
 
@@ -58,3 +62,8 @@
 
 **Learning:** Iterating over `Set` objects using `Array.from(set).some(...)` creates unnecessary intermediate arrays, leading to heap allocations and garbage collection overhead, especially in hot loops like `hasIntersectingManagedAccounts`.
 **Action:** Replace `Array.from(set).some(...)` with a direct `for...of` loop over the `Set` to prevent allocations and maintain the same short-circuiting logic without the memory overhead.
+
+## 2026-05-25 - Prevent unbounded parallel execution when resolving recipient emails
+
+**Learning:** Unbounded `Promise.all(array.map(fn))` in `src/services/messagingService/messagingService.ts` during recipient email resolution initiates concurrent asynchronous requests over arrays (e.g., `validIds`), which can result in API rate limit triggers when there are a large number of identities.
+**Action:** Replaced the unbounded `Promise.all` mapping block with `promiseAllBatched(validIds, fn)` to bound concurrency while maintaining parallel execution benefits.

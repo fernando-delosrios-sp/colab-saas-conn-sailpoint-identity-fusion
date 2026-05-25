@@ -157,7 +157,9 @@ export class RecordingService {
         )
         if (process.env.VERBOSE_RECORDING === 'true') {
             const passInfo = this.currentStep.pass ? ` (pass ${this.currentStep.pass})` : ''
-            console.log(`[Recording] ← ${this.currentStep.operation}${passInfo} completed — ${this.currentStep.duration}ms, ${this.currentStep.output.length} outputs`)
+            console.log(
+                `[Recording] ← ${this.currentStep.operation}${passInfo} completed — ${this.currentStep.duration}ms, ${this.currentStep.output.length} outputs`
+            )
         }
         this.currentStep = null
     }

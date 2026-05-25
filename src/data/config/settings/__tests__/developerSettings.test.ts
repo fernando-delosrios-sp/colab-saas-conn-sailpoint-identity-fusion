@@ -67,7 +67,10 @@ describe('developerSettings applySettings', () => {
     })
 
     it('normalizes string "true" to boolean true for externalLoggingEnabled', () => {
-        const config = { externalLoggingEnabled: 'true' as unknown as boolean, externalLoggingUrl: 'http://localhost' } as unknown as FusionConfigBuild
+        const config = {
+            externalLoggingEnabled: 'true' as unknown as boolean,
+            externalLoggingUrl: 'http://localhost',
+        } as unknown as FusionConfigBuild
 
         applySettings(config)
 

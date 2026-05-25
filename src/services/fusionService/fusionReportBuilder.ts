@@ -35,12 +35,7 @@ export function buildFusionReport(
     const { failedAccounts, deferredAccounts } = prepareFailedAndDeferredAccounts(state)
     const nonMatchAccounts = includeNonMatches ? buildNonMatchAccounts(state) : []
 
-    const allAccounts = [
-        ...matchAccounts,
-        ...deferredAccounts,
-        ...failedAccounts,
-        ...nonMatchAccounts,
-    ]
+    const allAccounts = [...matchAccounts, ...deferredAccounts, ...failedAccounts, ...nonMatchAccounts]
     const matchAccountCount = matchAccounts.length + deferredAccounts.length
 
     return {

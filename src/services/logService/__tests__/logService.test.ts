@@ -146,7 +146,9 @@ describe('LogService.metric', () => {
         jest.advanceTimersByTime(567)
         log.metric('outputPhase.sendAccounts', startedAt, { count: 500, batchSize: 100 })
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('Performance metric: outputPhase.sendAccounts durationMs=567 count=500 batchSize=100')
+            expect.stringContaining(
+                'Performance metric: outputPhase.sendAccounts durationMs=567 count=500 batchSize=100'
+            )
         )
         jest.useRealTimers()
     })
@@ -192,7 +194,9 @@ describe('TrackedOperation via LogService.track', () => {
         jest.advanceTimersByTime(567)
         op.done({ count: 500, batchSize: 100 })
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('Performance metric: outputPhase.sendAccounts durationMs=567 count=500 batchSize=100')
+            expect.stringContaining(
+                'Performance metric: outputPhase.sendAccounts durationMs=567 count=500 batchSize=100'
+            )
         )
         jest.useRealTimers()
     })

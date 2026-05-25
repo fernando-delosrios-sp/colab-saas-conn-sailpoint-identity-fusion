@@ -44,5 +44,6 @@
 **Action:** When creating or fixing admonitions, ensure a blank line follows the `!!!` declaration and that all contained text is appropriately indented.
 
 ## 2024-05-22 - Material for MkDocs Admonition Indentation Constraint
-**Learning:** MkDocs Material admonitions (e.g., `!!! note`, `!!! tip`) require *all* of their inner body text (including introductory sentences before lists) to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the admonition is nested inside a list (like at 4 spaces), its body must be indented at 8 spaces relative to the document root.
+
+**Learning:** MkDocs Material admonitions (e.g., `!!! note`, `!!! tip`) require _all_ of their inner body text (including introductory sentences before lists) to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the admonition is nested inside a list (like at 4 spaces), its body must be indented at 8 spaces relative to the document root.
 **Action:** When creating or fixing admonitions, ensure a blank line follows the `!!!` declaration and that all contained text is appropriately indented.

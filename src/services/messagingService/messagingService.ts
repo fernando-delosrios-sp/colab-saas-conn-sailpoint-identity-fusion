@@ -20,6 +20,7 @@ import { normalizeEmailValue, sanitizeRecipients } from './email'
 import { IdentityService } from '../identityService'
 import { SourceService } from '../sourceService'
 import { FusionReport } from '../fusionService/types'
+import { promiseAllBatched } from '../fusionService/collections'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import { readString } from '../../utils/safeRead'
 import {
@@ -384,10 +385,7 @@ export class MessagingService {
     /**
      * Send report email to all global owners (source owner + governance group members).
      */
-    public async sendReport(
-        report: FusionReport,
-        reportType: 'aggregation' | 'fusion'
-    ): Promise<void> {
+    public async sendReport(report: FusionReport, reportType: 'aggregation' | 'fusion'): Promise<void> {
         const recipientEmails = new Set<string>()
 
         // Add all global owners (source owner + governance group members) as recipients
@@ -656,28 +654,27 @@ export class MessagingService {
 
         await this.identities?.hydrateMissingIdentitiesById(validIds)
 
-        const results = await Promise.all(
-            validIds.map(async (identityId) => {
-                let identity = this.identities?.getIdentityById(identityId)
-                if (!identity) {
-                    try {
-                        identity = await this.identities?.fetchIdentityById(identityId)
-                    } catch (e) {
-                        this.log.warn(`Failed to fetch identity ${identityId}: ${e}`)
-                    }
+        // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
+        const results = await promiseAllBatched(validIds, async (identityId) => {
+            let identity = this.identities?.getIdentityById(identityId)
+            if (!identity) {
+                try {
+                    identity = await this.identities?.fetchIdentityById(identityId)
+                } catch (e) {
+                    this.log.warn(`Failed to fetch identity ${identityId}: ${e}`)
                 }
+            }
 
-                const attrs: any = identity?.attributes ?? {}
-                const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
-                const normalized = normalizeEmailValue(emailValue)
+            const attrs: any = identity?.attributes ?? {}
+            const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
+            const normalized = normalizeEmailValue(emailValue)
 
-                if (normalized.length === 0) {
-                    this.log.warn(`No email found for identity ${identityId}`)
-                }
+            if (normalized.length === 0) {
+                this.log.warn(`No email found for identity ${identityId}`)
+            }
 
-                return normalized
-            })
-        )
+            return normalized
+        })
 
         for (const normalized of results) {
             for (const e of normalized) {
@@ -796,7 +793,11 @@ export class MessagingService {
             const response = await workflowsApi.createWorkflow({ createWorkflowRequestV2025 })
             return response.data
         }
-        const workflowData = await this.client.execute(createWorkflowFn, undefined, `MessagingService>createWorkflow name=${createWorkflowRequestV2025.name}`)
+        const workflowData = await this.client.execute(
+            createWorkflowFn,
+            undefined,
+            `MessagingService>createWorkflow name=${createWorkflowRequestV2025.name}`
+        )
         assert(workflowData, 'Failed to create workflow')
         assert(workflowData.id, 'Workflow ID is required')
 
@@ -820,7 +821,11 @@ export class MessagingService {
             const response = await workflowsApi.testWorkflow(requestParameters)
             return response
         }
-        const response = await this.client.execute(testWorkflowFn, undefined, `MessagingService>testWorkflow id=${requestParameters.id}`)
+        const response = await this.client.execute(
+            testWorkflowFn,
+            undefined,
+            `MessagingService>testWorkflow id=${requestParameters.id}`
+        )
         assert(response, 'Workflow response is required')
         this.log.debug(`Workflow executed. Response code ${response.status}`)
         return response
