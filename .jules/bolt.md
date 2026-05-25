@@ -53,3 +53,11 @@
 ## 2026-05-19 - Prevent unbounded parallel execution in rebuild fusion account helper
 **Learning:** Unbounded `Promise.all(array.map(fn))` in operations helpers (like `rebuildFusionAccount.ts`) when executing cascade aggregations (`sources.aggregateManagedSource`) or fetching multiple managed accounts (`sources.fetchManagedAccount`) causes concurrent requests to fan out aggressively. When the number of configured sources or linked accounts grows large, this triggers API rate limits and can lead to memory exhaustion.
 **Action:** Replaced unbounded `Promise.all(array.map(fn))` invocations with `promiseAllBatched(array, fn)` across data fetch operations to safely bound concurrency during rebuild tasks while maintaining the efficiency of parallel processing.
+
+## 2026-05-22 - Prevent Heap Allocations in Hot Loops
+
+**Learning:** Iterating over `Set` objects using `Array.from(set).some(...)` creates unnecessary intermediate arrays, leading to heap allocations and garbage collection overhead, especially in hot loops like `hasIntersectingManagedAccounts`.
+**Action:** Replace `Array.from(set).some(...)` with a direct `for...of` loop over the `Set` to prevent allocations and maintain the same short-circuiting logic without the memory overhead.
+## 2026-05-24 - Avoid Array.from(set) chaining for iteration
+**Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
+**Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.

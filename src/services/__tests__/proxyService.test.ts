@@ -36,6 +36,42 @@ describe('ProxyService.isProxyMode', () => {
     })
 })
 
+describe('ProxyService.isProxyService', () => {
+    const originalProxyPassword = process.env.PROXY_PASSWORD
+
+    afterEach(() => {
+        if (originalProxyPassword === undefined) {
+            delete process.env.PROXY_PASSWORD
+        } else {
+            process.env.PROXY_PASSWORD = originalProxyPassword
+        }
+    })
+
+    it('throws error when server requires password but client provides none', () => {
+        process.env.PROXY_PASSWORD = 'server_secret'
+        const config = {
+            proxyEnabled: true,
+            proxyPassword: '', // Client provides empty password
+        }
+        const mockLog = { info: jest.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        expect(() => service.isProxyService()).toThrow('Proxy password mismatch')
+    })
+
+    it('returns true when passwords match', () => {
+        process.env.PROXY_PASSWORD = 'secret_password'
+        const config = {
+            proxyEnabled: true,
+            proxyPassword: 'secret_password',
+        }
+        const mockLog = { info: jest.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        expect(service.isProxyService()).toBe(true)
+    })
+})
+
 describe('ProxyService.performFetch', () => {
     let originalFetch: typeof global.fetch
 
