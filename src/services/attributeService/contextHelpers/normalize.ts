@@ -1,13 +1,11 @@
 import { logger } from '@sailpoint/connector-sdk'
-import { Datefns } from './dateUtils'
 import { CountryCode, parsePhoneNumberFromString } from 'libphonenumber-js'
-import { State, City } from './geoData'
-// @ts-expect-error - no types available
-import parseAddressString from 'parse-address-string'
-import { capitalizeFirst } from '../../utils'
+import { State } from '../geoData'
+import { capitalizeFirst } from '../../../utils'
+import { parseAddressSync } from './addressParse'
 
 /** Lowercase name particles treated as non-capitalised in proper-case formatting. */
-const NAME_PARTICLES = new Set(['van', 'von', 'de', 'del', 'della', 'di', 'da', 'le', 'la'])
+const NAME_PARTICLES = new Set(['van', 'von', 'de', 'del', 'della', 'di', 'da', 'le', 'la', 'der', 'den', 'du', 'y'])
 
 /**
  * Wraps a Normalize helper that may return undefined or throw.
@@ -27,94 +25,10 @@ function withNormalizeFallback<T extends (...args: any[]) => string | undefined>
             return result
         } catch (error) {
             const msg = error instanceof Error ? error.message : String(error)
-            logger.debug(`Normalize.${helperName} threw for input ${JSON.stringify(args[0])}: ${msg}`)
+            logger.error(`Normalize.${helperName} threw unexpected error for input ${JSON.stringify(args[0])}: ${msg}`)
             return ''
         }
     }
-}
-
-interface ParsedAddress {
-    street_address1?: string
-    street_address2?: string
-    city?: string
-    state?: string
-    postal_code?: string
-    country?: string
-}
-
-// ============================================================================
-// Address Helpers (using city-state for US cities)
-// ============================================================================
-
-// Cache for US cities to avoid repeated filtering
-// Key: lowercase city name, Value: { stateName, stateCode }
-const usCityCache = new Map<string, { stateName?: string; stateCode: string } | null>()
-
-// Pre-populate cache on first use
-let usCitiesCached = false
-const ensureUsCitiesCached = (): void => {
-    if (usCitiesCached) return
-
-    const usCities = City.getCitiesOfCountry('US')
-    if (!usCities) return
-
-    // Build a map of city name -> state info
-    for (const city of usCities) {
-        const key = city.name.toLowerCase()
-        // Only store first occurrence of each city name
-        if (!usCityCache.has(key)) {
-            const state = State.getStateByCodeAndCountry(city.stateCode, 'US')
-            usCityCache.set(key, {
-                stateName: state?.name,
-                stateCode: city.stateCode,
-            })
-        }
-    }
-
-    usCitiesCached = true
-}
-
-/**
- * Get state code from city name (US only)
- * @param city - City name (e.g., 'Seattle')
- * @returns State code (e.g., 'WA') or undefined
- */
-const getCityState = (city: string): string | undefined => {
-    if (!city) return undefined
-
-    ensureUsCitiesCached()
-
-    const key = city.trim().toLowerCase()
-    const cached = usCityCache.get(key)
-    return cached?.stateName
-}
-
-const getCityStateCode = (city: string): string | undefined => {
-    if (!city) return undefined
-
-    ensureUsCitiesCached()
-
-    const key = city.trim().toLowerCase()
-    const cached = usCityCache.get(key)
-    return cached?.stateCode
-}
-
-/**
- * Parse address string into components (synchronous)
- * @param addressString - Full address to parse
- * @returns Parsed address components or null if parsing fails
- */
-const parseAddressSync = (addressString: string): ParsedAddress | null => {
-    let result: ParsedAddress | null = null
-    let error: Error | null = null
-
-    // Call the callback-based function synchronously
-    parseAddressString(addressString, (err: Error | null, parsed: ParsedAddress | null) => {
-        error = err
-        result = parsed
-    })
-
-    return error ? null : result
 }
 
 type AmbiguousDateOrder = 'DMY' | 'MDY' | 'YMD'
@@ -419,13 +333,7 @@ const normalizeAddress = (address: string): string | undefined => {
     return address.trim()
 }
 
-const AddressParse = {
-    getCityState,
-    getCityStateCode,
-    parse: parseAddressSync,
-}
-
-const Normalize = {
+export const Normalize = {
     date: withNormalizeFallback('date', normalizeDate),
     phone: withNormalizeFallback('phone', normalizePhoneNumber),
     name: withNormalizeFallback('name', properCaseName),
@@ -433,36 +341,3 @@ const Normalize = {
     ssn: withNormalizeFallback('ssn', normalizeSSN),
     address: withNormalizeFallback('address', normalizeAddress),
 }
-
-/**
- * Serialize / deserialize JSON in Velocity templates. stringify returns '' on failure;
- * parse returns undefined for invalid input, non-strings, or empty trimmed text.
- */
-const JSON = {
-    stringify(value: unknown): string {
-        try {
-            const s = globalThis.JSON.stringify(value)
-            if (s === undefined) return ''
-            return s
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error)
-            logger.debug(`JSON.stringify failed: ${msg}`)
-            return ''
-        }
-    },
-    parse(text: unknown): unknown {
-        if (text === null || text === undefined) return undefined
-        if (typeof text !== 'string') return undefined
-        const trimmed = text.trim()
-        if (!trimmed) return undefined
-        try {
-            return globalThis.JSON.parse(trimmed)
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error)
-            logger.debug(`JSON.parse failed for input ${JSON.stringify(trimmed)}: ${msg}`)
-            return undefined
-        }
-    },
-}
-
-export const contextHelpers = { Datefns, Math, AddressParse, Normalize, JSON }
