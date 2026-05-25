@@ -38,3 +38,7 @@
 **Vulnerability:** The `ProxyService` (`src/services/proxyService.ts`) had a flawed password verification check. If the server expected a password (`process.env.PROXY_PASSWORD` was set), the validation logic `if (this.config.proxyPassword)` allowed clients sending an empty or missing `proxyPassword` to bypass the `crypto.timingSafeEqual` check completely, successfully authenticating.
 **Learning:** Security validations should fail by default if required input is missing, rather than conditionally validating only if the input is present.
 **Prevention:** Remove conditional wrappers around security assertions and ensure missing inputs fall through to proper failure modes.
+## 2026-05-23 - Fix SSRF Vulnerability in LogService
+**Vulnerability:** The LogService (`src/services/logService/logService.ts`) fetched data directly from a user-configured `externalLoggingUrl` without validating the scheme, making it vulnerable to Server-Side Request Forgery (SSRF) if a user supplied a malicious URL scheme like `file://` or an internal metadata endpoint.
+**Learning:** External or user-provided URLs must always be validated prior to making network requests, especially in Node.js where `fetch` or HTTP clients might attempt to resolve arbitrary schemes or hostnames.
+**Prevention:** Enforce strict URL scheme validation (e.g., checking for `http://` or `https://`) whenever initializing requests with configured URLs.
