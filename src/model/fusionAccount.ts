@@ -734,10 +734,15 @@ export class FusionAccount {
      * using the managed account info map for source lookup.
      */
     public getMissingAccountIdsForSource(sourceName: string): string[] {
-        return Array.from(this._missingAccountIds).filter((id) => {
+        // ⚡ Bolt: Iterate Set directly to prevent Array.from heap allocation
+        const result: string[] = []
+        for (const id of this._missingAccountIds) {
             const info = this.managedAccountInfo.get(id)
-            return info && info.source.name === sourceName
-        })
+            if (info && info.source.name === sourceName) {
+                result.push(id)
+            }
+        }
+        return result
     }
 
     /** Sets the dedicated reverse correlation attribute value in the attribute bag. */
@@ -800,15 +805,26 @@ export class FusionAccount {
     /** Returns the source IDs this account's identity is configured to review. */
     public listReviewerSources(): string[] {
         const prefix = 'reviewer:'
-        return Array.from(this._actions)
-            .filter((action) => action.startsWith(prefix))
-            .map((action) => action.slice(prefix.length))
+        // ⚡ Bolt: Iterate Set directly to prevent Array.from heap allocation
+        const result: string[] = []
+        for (const action of this._actions) {
+            if (action.startsWith(prefix)) {
+                result.push(action.slice(prefix.length))
+            }
+        }
+        return result
     }
 
     /** True when at least one source-scoped reviewer action remains on the account. */
     private _actionsHasReviewerScope(): boolean {
         const prefix = 'reviewer:'
-        return Array.from(this._actions).some((action) => action.startsWith(prefix))
+        // ⚡ Bolt: Iterate Set directly to prevent Array.from heap allocation
+        for (const action of this._actions) {
+            if (action.startsWith(prefix)) {
+                return true
+            }
+        }
+        return false
     }
 
     // ============================================================================
@@ -1098,12 +1114,17 @@ export class FusionAccount {
         addAssociationHistory = true,
         skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
     ): void {
-        const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> =>
-            new Set(
-                Array.from(input)
-                    .map(normalizeCompositeManagedAccountKey)
-                    .filter((key): key is string => key !== undefined)
-            )
+        const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> => {
+            // ⚡ Bolt: Iterate Set directly to prevent Array.from heap allocation
+            const result = new Set<string>()
+            for (const key of input) {
+                const normalized = normalizeCompositeManagedAccountKey(key)
+                if (normalized !== undefined) {
+                    result.add(normalized)
+                }
+            }
+            return result
+        }
 
         this.previousAccountIds = normalizeManagedAccountKeySet(this.previousAccountIds)
         this._missingAccountIds = normalizeManagedAccountKeySet(this._missingAccountIds)
@@ -1184,12 +1205,12 @@ export class FusionAccount {
             this.setUncorrelatedAccount(id)
             this.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
             accountsById.delete(id)
-            
+
             if (!account.identityId) continue
-            
+
             const idSet = accountsByIdentityId.get(account.identityId)
             if (!idSet) continue
-            
+
             idSet.delete(id)
             if (idSet.size === 0) accountsByIdentityId.delete(account.identityId)
         }
@@ -1375,7 +1396,6 @@ export class FusionAccount {
         this._statuses.add('uncorrelated')
         this._actions.delete('correlated')
     }
-
 
     /** Sets a specific account ID as uncorrelated and adds it to both account ID sets. */
     private setUncorrelatedAccount(accountId?: string): void {
