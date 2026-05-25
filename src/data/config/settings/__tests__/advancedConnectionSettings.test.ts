@@ -1,5 +1,5 @@
 import type { FusionConfigBuild } from '../../types'
-import { applySettings, connectorSpecInitialValues } from '../advancedConnectionSettings'
+import { applySettings } from '../advancedConnectionSettings'
 
 describe('advancedConnectionSettings applySettings', () => {
     it('defaults enableQueue to true when omitted', () => {
