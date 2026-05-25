@@ -1,5 +1,5 @@
 import type { FusionConfigBuild } from '../../types'
-import { applySettings, runtimeDefaults } from '../developerSettings'
+import { applySettings } from '../developerSettings'
 
 describe('developerSettings applySettings', () => {
     it('defaults reset to false when omitted', () => {

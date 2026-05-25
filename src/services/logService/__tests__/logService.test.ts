@@ -21,7 +21,7 @@ jest.mock('@sailpoint/connector-sdk', () => {
     }
 })
 
-import { LogService, PhaseTimer, TrackedOperation } from '../logService'
+import { LogService, PhaseTimer } from '../logService'
 
 describe('LogService aggregation issue summary', () => {
     beforeEach(() => {

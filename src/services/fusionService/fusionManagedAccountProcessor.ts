@@ -3,7 +3,7 @@ import { FusionAccount } from '../../model/account'
 import { SourceInfo } from '../sourceService'
 import { SourceType } from '../../model/config'
 import { FusionConfig } from '../../model/config'
-import { buildManagedAccountKey, getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import { hasIdentityBackedMatches, hasNewUnmatchedPeerMatches } from './helpers'
 

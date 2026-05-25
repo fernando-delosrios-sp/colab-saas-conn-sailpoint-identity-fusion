@@ -1,5 +1,5 @@
 import type { FusionConfigBuild } from '../../types'
-import { applySettings, runtimeDefaults } from '../matchingSettings'
+import { applySettings } from '../matchingSettings'
 
 describe('matchingSettings applySettings', () => {
     it('defaults fusionMergingExactMatch to false when omitted', () => {

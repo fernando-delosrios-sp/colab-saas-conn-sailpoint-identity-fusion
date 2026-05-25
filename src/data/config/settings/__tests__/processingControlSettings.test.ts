@@ -1,5 +1,5 @@
 import type { FusionConfigBuild } from '../../types'
-import { applySettings, runtimeDefaults } from '../processingControlSettings'
+import { applySettings } from '../processingControlSettings'
 
 describe('processingControlSettings applySettings', () => {
     it('defaults deleteEmpty to false when omitted', () => {
