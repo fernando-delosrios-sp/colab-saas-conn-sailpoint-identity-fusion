@@ -76,8 +76,8 @@ describe('evaluateVelocityTemplate', () => {
         it('should handle van particle (van der Berg pattern)', () => {
             const context = { lastName: 'VAN DER BERG' }
             const result = evaluateVelocityTemplate('$Normalize.name($lastName)', context)
-            // Note: 'der' is not in the particles list, so it gets capitalized
-            expect(result).toBe('van Der Berg')
+            // Note: 'der' is in the particles list, so it remains lowercase
+            expect(result).toBe('van der Berg')
         })
 
         it('should handle de particle (de la Cruz pattern)', () => {
@@ -143,8 +143,8 @@ describe('evaluateVelocityTemplate', () => {
         it('should normalize full name with particle', () => {
             const context = { fullName: 'HANS VAN DER BERG' }
             const result = evaluateVelocityTemplate('$Normalize.fullName($fullName)', context)
-            // Note: 'der' is not in the particles list, so it gets capitalized
-            expect(result).toBe('Hans van Der Berg')
+            // Note: 'der' is in the particles list, so it remains lowercase
+            expect(result).toBe('Hans van der Berg')
         })
     })
 
