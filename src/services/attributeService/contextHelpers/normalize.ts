@@ -1,6 +1,6 @@
 import { logger } from '@sailpoint/connector-sdk'
 import { CountryCode, parsePhoneNumberFromString } from 'libphonenumber-js'
-import { State } from '../geoData'
+import { State } from './geo/geoData'
 import { capitalizeFirst } from '../../../utils'
 import { parseAddressSync } from './addressParse'
 
