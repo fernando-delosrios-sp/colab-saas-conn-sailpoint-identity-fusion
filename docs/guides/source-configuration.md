@@ -12,7 +12,8 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
 | **Identity Scope Query**             | Search/filter query to limit which identities are evaluated                | Yes (when include identities enabled) | Uses [ISC search syntax](https://documentation.sailpoint.com/saas/help/search/building-query.html); examples: `*` (all), `attributes.cloudLifecycleState:active`, `source.name:"Workday"` |
 
 !!! tip "Identity scope behavior"
-Including identities in your scope affects your baseline for matching and what is available in expressions:
+
+    Including identities in your scope affects your baseline for matching and what is available in expressions:
 
     - **Not included:** Your baseline consists *only* of managed accounts previously processed by Fusion that became an identity.
     - **Included:** Your baseline immediately includes all existing identities matching the query, plus any managed accounts that turn into identities over time. The `$identity` object also becomes available in the Fusion attribute definition context.
@@ -49,7 +50,8 @@ Including identities in your scope affects your baseline for matching and what i
 | **Correlation display name**           | UI display name for the correlation attribute                         | Yes (for reverse mode)      | Human-readable name.                                                                                                                                                                                                                                                                                     |
 
 !!! note
-Machine accounts (`isMachine=true`) are not supported for managed-source processing. Because `isMachine` is not an ISC account-list API filter, the connector applies this exclusion client-side and skips those accounts after fetching.
+
+    Machine accounts (`isMachine=true`) are not supported for managed-source processing. Because `isMachine` is not an ISC account-list API filter, the connector applies this exclusion client-side and skips those accounts after fetching.
 
 !!! note "Execution order"
 
@@ -58,10 +60,12 @@ Machine accounts (`isMachine=true`) are not supported for managed-source process
     3. Built-in machine account exclusion (`isMachine=true`)
 
 !!! tip
-You can use the **Aggregate before processing** option to ensure a managed source has newer data than the last time Identity Fusion ran and/or synchronize aggregation schedules. If you don't need the absolute latest data blocking the aggregation response, consider **Delayed aggregation** to speed up the account list operation.
+
+    You can use the **Aggregate before processing** option to ensure a managed source has newer data than the last time Identity Fusion ran and/or synchronize aggregation schedules. If you don't need the absolute latest data blocking the aggregation response, consider **Delayed aggregation** to speed up the account list operation.
 
 !!! note "Cross-guide note"
-If you keep **Include record accounts in Match** enabled, record sources participate in Match scoring using your global Match rules. See [Match guide](match.md) for threshold, mandatory rule, and skip-if-missing tuning.
+
+    If you keep **Include record accounts in Match** enabled, record sources participate in Match scoring using your global Match rules. See [Match guide](match.md) for threshold, mandatory rule, and skip-if-missing tuning.
 
 <details>
 <summary><b>View Graphic: Source Types & Flow</b></summary>
@@ -123,13 +127,17 @@ flowchart TD
 | **Skip accounts with missing unique ID?**          | Skip processing accounts without a fusion identity attribute value       | No       | Skipped accounts are logged for review; useful when some source accounts lack required identifier data |
 
 !!! note
-**Force attribute refresh on next aggregation?** is located at **Advanced Settings → Developer Settings**. It forces Normal-type attributes to refresh on the next aggregation run only, after which the option is automatically turned off. Applies only to Normal attributes; Unique attributes are only computed when a Fusion account is first created or when an existing account is activated. Can be expensive for large datasets.
+
+    **Force attribute refresh on next aggregation?** is located at **Advanced Settings → Developer Settings**. It forces Normal-type attributes to refresh on the next aggregation run only, after which the option is automatically turned off. Applies only to Normal attributes; Unique attributes are only computed when a Fusion account is first created or when an existing account is activated. Can be expensive for large datasets.
 
 !!! tip
-When testing or onboarding large amounts of managed accounts, it is best to disable all kinds of managed account correlation. Already processed uncorrelated managed accounts are part of their associated Fusion accounts internally, so it doesn't interfere in the normal connector operation. Correlation is a heavy process and must be carefully planned. It's often a good idea to have mixed correlation strategies depending on the implementation stage or managed source.
+
+    When testing or onboarding large amounts of managed accounts, it is best to disable all kinds of managed account correlation. Already processed uncorrelated managed accounts are part of their associated Fusion accounts internally, so it doesn't interfere in the normal connector operation. Correlation is a heavy process and must be carefully planned. It's often a good idea to have mixed correlation strategies depending on the implementation stage or managed source.
 
 !!! tip
-Remember that managed accounts must be uncorrelated for them to be evaluated for matches. Correlated managed accounts are directly included in your baseline.
+
+    Remember that managed accounts must be uncorrelated for them to be evaluated for matches. Correlated managed accounts are directly included in your baseline.
 
 !!! tip
-When failing to generate an account ID (`nativeIdentity`), the aggregation fails unless the **Skip accounts with missing unique ID?** option is enabled. All your Fusion accounts must have a valid ID, but you can deliberately generate an empty one with the skip option to prevent including that account in the final results.
+
+    When failing to generate an account ID (`nativeIdentity`), the aggregation fails unless the **Skip accounts with missing unique ID?** option is enabled. All your Fusion accounts must have a valid ID, but you can deliberately generate an empty one with the skip option to prevent including that account in the final results.
