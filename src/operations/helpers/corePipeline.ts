@@ -83,7 +83,8 @@ export async function setupPhase(
     if (isPersistent) {
         sources.clearReverseCorrelationReadinessCache()
         const reverseCorrelationOp = log.track('reverseCorrelationSetup')
-        const reverseCorrelationCount = await sources.setupReverseCorrelationSources()
+        const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
+        const reverseCorrelationCount = await sources.setupReverseCorrelationSources(schemaAttrNames)
         if (reverseCorrelationCount > 0) {
             await schemas.setFusionAccountSchema(undefined)
             log.debug('Fusion account schema refreshed after reverse correlation setup')
