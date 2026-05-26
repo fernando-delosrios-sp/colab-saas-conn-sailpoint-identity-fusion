@@ -1,16 +1,7 @@
 import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { AggregationTracker } from '../services/fusionService'
-import {
-    type CorePipelineOptions,
-    setupPhase,
-    fetchPhase,
-    refreshPhase,
-    processPhase,
-    uniqueAttributesPhase,
-    reportPhase,
-    outputPhase,
-} from './helpers/corePipeline'
+import { PipelineRunner } from './helpers/corePipeline'
 
 /**
  * Account list operation - Main entry point for identity fusion processing.
@@ -26,48 +17,24 @@ import {
  */
 export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
-    const { log, sources } = serviceRegistry
+    const { log } = serviceRegistry
     const tracker = new AggregationTracker()
-    const options: CorePipelineOptions = { mode: { kind: 'aggregation' }, tracker }
-
-    let processLockAcquired = false
 
     try {
-        const timer = log.timer()
         log.info('Starting aggregation')
+        const result = await PipelineRunner.run(serviceRegistry, {
+            mode: { kind: 'aggregation' },
+            schema: input.schema,
+            tracker,
+            targetPhase: 'report',
+        })
 
-        // --- SHARED PIPELINE START (PHASES 1-4) — also executed in dryRun ---
-        const shouldContinue = await setupPhase(serviceRegistry, input.schema, options)
-        processLockAcquired = true
-        if (!shouldContinue) return
-        timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
+        if (!result.shouldContinue) return
 
-        const fetchResult = await fetchPhase(serviceRegistry, options)
-        timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
-
-        await refreshPhase(serviceRegistry, options)
-        timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
-
-        await processPhase(serviceRegistry, options)
-        timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
-        // --- SHARED PIPELINE END ---
-
-        await uniqueAttributesPhase(serviceRegistry, options)
-        timer.phase('PHASE 5: Unique attributes', 'info', 'Unique attributes')
-
-        const count = await outputPhase(serviceRegistry, options)
-        timer.phase('PHASE 6: Output (send accounts, persist state)', 'info', 'Output')
-
-        await reportPhase(serviceRegistry, fetchResult, timer, options)
-        timer.phase('PHASE 7: Report (fusion report)', 'info', 'Report')
-
-        timer.end(`✓ Account list operation completed successfully - ${count} account(s) processed`)
+        result.timer.end(`✓ Account list operation completed successfully - ${result.outputCount ?? 0} account(s) processed`)
     } catch (error) {
         if (error instanceof ConnectorError) throw error
-        log.crash('Failed to list accounts', error)
-    } finally {
-        if (processLockAcquired) {
-            await sources.releaseProcessLock()
-        }
+        // Unexpected errors are crashed via log.crash inside PipelineRunner.run
+        throw error
     }
 }

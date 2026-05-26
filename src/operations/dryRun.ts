@@ -3,7 +3,7 @@ import { ServiceRegistry } from '../services/serviceRegistry'
 import { AggregationTracker } from '../services/fusionService'
 import { initializeDryRunExecution, prepareDryRunOutputData, streamDryRunRows } from './helpers/dryRunHelpers'
 import { buildDryRunSummary } from './helpers/buildDryRunPayload'
-import { CorePipelineOptions, setupPhase, fetchPhase, refreshPhase, processPhase } from './helpers/corePipeline'
+import { PipelineRunner } from './helpers/corePipeline'
 
 /**
  * custom:dryrun command - non-persistent aggregation analysis output.
@@ -20,29 +20,23 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, reports } = serviceRegistry
     const tracker = new AggregationTracker()
-    const options: CorePipelineOptions = { mode: { kind: 'dry-run' }, tracker }
 
     try {
-        const timer = log.timer()
         log.info('Starting custom:dryrun')
         const execution = await initializeDryRunExecution(serviceRegistry, input, reports)
         if (!execution) return
         const { runtimeOptions, rowEmitter } = execution
 
-        // --- SHARED PIPELINE START (PHASES 1-4) — also executed in accountList ---
-        const shouldContinue = await setupPhase(serviceRegistry, input.schema, options)
-        if (!shouldContinue) return
-        timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
+        // Run setup, fetch, refresh, and process phases (Phases 1-4)
+        const result = await PipelineRunner.run(serviceRegistry, {
+            mode: { kind: 'dry-run' },
+            schema: input.schema,
+            tracker,
+            targetPhase: 'process',
+        })
 
-        const fetchResult = await fetchPhase(serviceRegistry, options)
-        timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
-
-        await refreshPhase(serviceRegistry, options)
-        timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
-
-        await processPhase(serviceRegistry, options)
-        timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
-        // --- SHARED PIPELINE END ---
+        if (!result.shouldContinue || !result.fetchResult) return
+        const { fetchResult, timer } = result
 
         const issueSummary = log.getAggregationIssueSummary()
         const { report } = reports.initializeDryRunReport({

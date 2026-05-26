@@ -4,11 +4,9 @@ import * as corePipeline from '../corePipeline'
 import { AggregationStats } from '../../../services/fusionService/types'
 
 jest.mock('../corePipeline', () => ({
-    setupPhase: jest.fn(),
-    fetchPhase: jest.fn(),
-    refreshPhase: jest.fn(),
-    processPhase: jest.fn(),
-    uniqueAttributesPhase: jest.fn(),
+    PipelineRunner: {
+        run: jest.fn(),
+    },
 }))
 
 describe('generateReport helpers', () => {
@@ -40,26 +38,24 @@ describe('generateReport helpers', () => {
     })
     describe('fetchAndProcessForReport', () => {
         it('should return empty stats if setupPhase returns false', async () => {
-            ;(corePipeline.setupPhase as jest.Mock).mockResolvedValue(false)
+            ;(corePipeline.PipelineRunner.run as jest.Mock).mockResolvedValue({
+                shouldContinue: false,
+                timer: mockTimer,
+            })
 
             const result = await fetchAndProcessForReport(mockServiceRegistry as ServiceRegistry)
 
-            expect(corePipeline.setupPhase).toHaveBeenCalledWith(mockServiceRegistry, undefined, {
+            expect(corePipeline.PipelineRunner.run).toHaveBeenCalledWith(mockServiceRegistry, {
                 mode: { kind: 'dry-run' },
+                targetPhase: 'uniqueAttributes',
             })
             expect(result).toEqual({
                 identitiesFound: 0,
                 managedAccountsFound: 0,
                 totalProcessingTime: 1234,
             })
-            expect(corePipeline.fetchPhase).not.toHaveBeenCalled()
-            expect(corePipeline.refreshPhase).not.toHaveBeenCalled()
-            expect(corePipeline.processPhase).not.toHaveBeenCalled()
-            expect(corePipeline.uniqueAttributesPhase).not.toHaveBeenCalled()
         })
         it('should execute all phases and return stats if setupPhase returns true', async () => {
-            ;(corePipeline.setupPhase as jest.Mock).mockResolvedValue(true)
-
             const mockFetchResult = {
                 identitiesFound: 10,
                 managedAccountsFound: 20,
@@ -67,18 +63,19 @@ describe('generateReport helpers', () => {
                 managedAccountsFoundRecord: 15,
                 managedAccountsFoundOrphan: 2,
             }
-            ;(corePipeline.fetchPhase as jest.Mock).mockResolvedValue(mockFetchResult)
+            ;(corePipeline.PipelineRunner.run as jest.Mock).mockResolvedValue({
+                shouldContinue: true,
+                fetchResult: mockFetchResult,
+                timer: mockTimer,
+            })
 
             const result = await fetchAndProcessForReport(mockServiceRegistry as ServiceRegistry)
 
-            const expectedOptions = { mode: { kind: 'dry-run' } }
-            expect(corePipeline.setupPhase).toHaveBeenCalledWith(mockServiceRegistry, undefined, expectedOptions)
-            expect(corePipeline.fetchPhase).toHaveBeenCalledWith(mockServiceRegistry, expectedOptions)
-            expect(corePipeline.refreshPhase).toHaveBeenCalledWith(mockServiceRegistry, expectedOptions)
-            expect(corePipeline.processPhase).toHaveBeenCalledWith(mockServiceRegistry, expectedOptions)
-            expect(corePipeline.uniqueAttributesPhase).toHaveBeenCalledWith(mockServiceRegistry, expectedOptions)
+            expect(corePipeline.PipelineRunner.run).toHaveBeenCalledWith(mockServiceRegistry, {
+                mode: { kind: 'dry-run' },
+                targetPhase: 'uniqueAttributes',
+            })
 
-            expect(mockTimer.phase).toHaveBeenCalledTimes(5)
             expect(result).toEqual({
                 ...mockFetchResult,
                 totalProcessingTime: 1234,
