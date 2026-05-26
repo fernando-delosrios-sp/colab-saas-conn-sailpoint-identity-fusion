@@ -1,3 +1,4 @@
+import { ConnectorError } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
@@ -372,6 +373,109 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     log.info('Queued form deletions completed')
 
     return sent
+}
+
+export type PipelinePhase =
+    | 'setup'
+    | 'fetch'
+    | 'refresh'
+    | 'process'
+    | 'uniqueAttributes'
+    | 'output'
+    | 'report'
+
+export interface PipelineRunOptions {
+    mode: PipelineMode
+    schema?: any
+    tracker?: AggregationTracker
+    targetPhase?: PipelinePhase
+}
+
+export interface PipelineRunResult {
+    shouldContinue: boolean
+    fetchResult?: FetchResult
+    outputCount?: number
+    timer: ReturnType<ServiceRegistry['log']['timer']>
+}
+
+export class PipelineRunner {
+    static async run(
+        serviceRegistry: ServiceRegistry,
+        options: PipelineRunOptions
+    ): Promise<PipelineRunResult> {
+        const { log, sources } = serviceRegistry
+        const mode = options.mode
+        const isPersistent = mode.kind === 'aggregation'
+        const timer = log.timer()
+
+        let processLockAcquired = false
+        let shouldContinue = true
+        let fetchResult: FetchResult | undefined
+        let outputCount = 0
+
+        const targetPhase = options.targetPhase ?? (isPersistent ? 'report' : 'process')
+        const pipelineOptions: CorePipelineOptions = {
+            mode,
+            tracker: options.tracker
+        }
+
+        try {
+            // Phase 1: Setup
+            shouldContinue = await setupPhase(serviceRegistry, options.schema, pipelineOptions)
+            if (isPersistent) {
+                processLockAcquired = true
+            }
+            if (!shouldContinue) {
+                return { shouldContinue: false, timer }
+            }
+            timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
+            if (targetPhase === 'setup') return { shouldContinue: true, timer }
+
+            // Phase 2: Fetch
+            fetchResult = await fetchPhase(serviceRegistry, pipelineOptions)
+            timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
+            if (targetPhase === 'fetch') return { shouldContinue: true, fetchResult, timer }
+
+            // Phase 3: Refresh
+            await refreshPhase(serviceRegistry, pipelineOptions)
+            timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
+            if (targetPhase === 'refresh') return { shouldContinue: true, fetchResult, timer }
+
+            // Phase 4: Process
+            await processPhase(serviceRegistry, pipelineOptions)
+            timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
+            if (targetPhase === 'process') return { shouldContinue: true, fetchResult, timer }
+
+            // Phase 5: Unique Attributes
+            await uniqueAttributesPhase(serviceRegistry, pipelineOptions)
+            timer.phase('PHASE 5: Unique attributes', 'info', 'Unique attributes')
+            if (targetPhase === 'uniqueAttributes') return { shouldContinue: true, fetchResult, timer }
+
+            // Phase 6: Output
+            outputCount = await outputPhase(serviceRegistry, pipelineOptions)
+            timer.phase('PHASE 6: Output (send accounts, persist state)', 'info', 'Output')
+            if (targetPhase === 'output') return { shouldContinue: true, fetchResult, outputCount, timer }
+
+            // Phase 7: Report
+            if (fetchResult) {
+                await reportPhase(serviceRegistry, fetchResult, timer, pipelineOptions)
+            }
+            timer.phase('PHASE 7: Report (fusion report)', 'info', 'Report')
+
+            return { shouldContinue: true, fetchResult, outputCount, timer }
+        } catch (error) {
+            if (isPersistent) {
+                if (!(error instanceof ConnectorError)) {
+                    log.crash('Failed to list accounts', error as any)
+                }
+            }
+            throw error
+        } finally {
+            if (processLockAcquired) {
+                await sources.releaseProcessLock()
+            }
+        }
+    }
 }
 
 

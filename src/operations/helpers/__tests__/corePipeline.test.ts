@@ -6,6 +6,7 @@ import {
     processPhase,
     setupPhase,
     uniqueAttributesPhase,
+    PipelineRunner,
 } from '../corePipeline'
 
 import { createRegistry as createMockRegistry } from '../../__tests__/harness/registryMocking'
@@ -291,3 +292,92 @@ describe('corePipeline setupPhase', () => {
         expect(registry.sources.aggregateManagedSources).toHaveBeenCalled()
     })
 })
+
+describe('PipelineRunner.run', () => {
+    let mockServiceRegistry: any
+    let mockTimer: any
+
+    beforeEach(() => {
+        const setup = createRegistry()
+        mockServiceRegistry = setup.registry
+
+        mockTimer = {
+            phase: jest.fn(),
+            end: jest.fn(),
+            totalElapsed: jest.fn().mockReturnValue(100),
+            getPhaseBreakdown: jest.fn().mockReturnValue({}),
+        }
+
+        mockServiceRegistry.log = {
+            timer: jest.fn().mockReturnValue(mockTimer),
+            info: jest.fn(),
+            crash: jest.fn(),
+            track: jest.fn(() => ({
+                done: jest.fn(() => 0),
+                elapsedMs: jest.fn(() => 0),
+            })),
+            metric: jest.fn(),
+        } as any
+
+        mockServiceRegistry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.sources.releaseProcessLock = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.sources.resetBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.sources.fetchManagedAccounts = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.sources.fetchGlobalOwnerIdentityIds = jest.fn().mockResolvedValue([])
+        mockServiceRegistry.sources.saveBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
+
+        mockServiceRegistry.fusion.isReset = jest.fn().mockReturnValue(false)
+        mockServiceRegistry.fusion.disableReset = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.fusion.resetState = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.fusion.disableForceAttributeRefresh = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.fusion.processFusionAccounts = jest.fn().mockResolvedValue([])
+        mockServiceRegistry.fusion.processIdentities = jest.fn().mockResolvedValue([])
+        mockServiceRegistry.fusion.processFusionIdentityDecisions = jest.fn().mockResolvedValue([])
+        mockServiceRegistry.fusion.awaitPendingDisableOperations = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.fusion.reconcilePendingFormState = jest.fn()
+
+        mockServiceRegistry.schemas.loadFusionAccountSchemaFromSource = jest.fn().mockResolvedValue(undefined)
+
+        mockServiceRegistry.forms.deleteExistingForms = jest.fn().mockResolvedValue(undefined)
+
+        mockServiceRegistry.identities.fetchIdentities = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.identities.clear = jest.fn()
+        mockServiceRegistry.identities.identityCount = 0
+
+        mockServiceRegistry.messaging.fetchDelayedAggregationSender = jest.fn().mockResolvedValue(undefined)
+    })
+
+    it('runs up to the specified targetPhase', async () => {
+        const result = await PipelineRunner.run(mockServiceRegistry, {
+            mode: { kind: 'dry-run' },
+            targetPhase: 'process',
+        })
+
+        expect(result.shouldContinue).toBe(true)
+        expect(mockTimer.phase).toHaveBeenCalledTimes(4) // setup, fetch, refresh, process
+        expect(mockServiceRegistry.fusion.refreshUniqueAttributes).not.toHaveBeenCalled()
+    })
+
+    it('runs all phases up to report by default in persistent aggregation mode', async () => {
+        const result = await PipelineRunner.run(mockServiceRegistry, {
+            mode: { kind: 'aggregation' },
+        })
+
+        expect(result.shouldContinue).toBe(true)
+        expect(mockTimer.phase).toHaveBeenCalledTimes(7) // setup, fetch, refresh, process, uniqueAttributes, output, report
+        expect(mockServiceRegistry.sources.releaseProcessLock).toHaveBeenCalled()
+    })
+
+    it('aborts execution early if setupPhase returns shouldContinue = false (reset flag)', async () => {
+        mockServiceRegistry.fusion.isReset.mockReturnValue(true)
+
+        const result = await PipelineRunner.run(mockServiceRegistry, {
+            mode: { kind: 'aggregation' },
+        })
+
+        expect(result.shouldContinue).toBe(false)
+        expect(mockTimer.phase).not.toHaveBeenCalled()
+        expect(mockServiceRegistry.sources.releaseProcessLock).toHaveBeenCalled()
+    })
+})
+

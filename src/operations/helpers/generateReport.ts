@@ -1,6 +1,6 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { AggregationStats } from '../../services/fusionService/types'
-import { setupPhase, fetchPhase, refreshPhase, processPhase, uniqueAttributesPhase } from './corePipeline'
+import { PipelineRunner } from './corePipeline'
 
 /**
  * Self-contained fetch + process for standalone report triggers (e.g. reportAction).
@@ -12,29 +12,17 @@ import { setupPhase, fetchPhase, refreshPhase, processPhase, uniqueAttributesPha
  * @returns AggregationStats ready to pass to generateReport.
  */
 export async function fetchAndProcessForReport(serviceRegistry: ServiceRegistry): Promise<AggregationStats> {
-    const { log } = serviceRegistry
-    const options = { mode: { kind: 'dry-run' } as const }
-    const timer = log.timer()
+    const result = await PipelineRunner.run(serviceRegistry, {
+        mode: { kind: 'dry-run' },
+        targetPhase: 'uniqueAttributes',
+    })
 
-    const shouldContinue = await setupPhase(serviceRegistry, undefined, options)
-    if (!shouldContinue) {
+    if (!result.shouldContinue || !result.fetchResult) {
         // Reset flag was set — return empty stats; caller should check or ignore report
-        return { identitiesFound: 0, managedAccountsFound: 0, totalProcessingTime: timer.totalElapsed() }
+        return { identitiesFound: 0, managedAccountsFound: 0, totalProcessingTime: result.timer.totalElapsed() }
     }
-    timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
 
-    const fetchResult = await fetchPhase(serviceRegistry, options)
-    timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
-
-    await refreshPhase(serviceRegistry, options)
-    timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
-
-    await processPhase(serviceRegistry, options)
-    timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
-
-    await uniqueAttributesPhase(serviceRegistry, options)
-    timer.phase('PHASE 5: Unique attributes', 'info', 'Unique attributes')
-
+    const { fetchResult, timer } = result
     return {
         identitiesFound: fetchResult.identitiesFound,
         managedAccountsFound: fetchResult.managedAccountsFound,
