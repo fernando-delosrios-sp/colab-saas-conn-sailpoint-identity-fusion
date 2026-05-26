@@ -1,3 +1,5 @@
+import { AggregationTracker } from '../../../services/fusionService/aggregationTracker'
+
 export function createRegistry() {
     const timer = {
         phase: jest.fn(),
@@ -16,7 +18,8 @@ export function createRegistry() {
             done: jest.fn(() => 0),
             elapsedMs: jest.fn(() => 0),
         }
-        return {
+    let activeTracker: any = null
+    return {
         config: {
             sources: [],
         },
@@ -55,6 +58,8 @@ export function createRegistry() {
             fusionIdentityDecisions: [],
         },
         fusion: {
+            setTracker: jest.fn().mockImplementation((t) => { activeTracker = t }),
+            getTracker: jest.fn().mockImplementation(() => activeTracker || new AggregationTracker()),
             preProcessFusionAccounts: jest.fn().mockResolvedValue([]),
             processIdentity: jest.fn().mockResolvedValue(undefined),
             getFusionIdentity: jest.fn().mockReturnValue(fusionIdentity),
@@ -68,7 +73,6 @@ export function createRegistry() {
             processUncorrelatedManagedAccounts: jest.fn().mockResolvedValue({ processed: 0, matchScoringMs: 0 }),
             processManagedAccounts: jest.fn().mockResolvedValue(undefined),
             generateReport: jest.fn(),
-            clearAnalyzedAccounts: jest.fn(),
         },
         attributes: {
             initializeCounters: jest.fn().mockResolvedValue(undefined),

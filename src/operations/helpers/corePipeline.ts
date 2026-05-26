@@ -1,6 +1,7 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
+import { AggregationTracker } from '../../services/fusionService'
 
 export type PipelineMode =
     | { kind: 'aggregation' } // full persistent run — accountList (includes optional aggregation report)
@@ -8,6 +9,7 @@ export type PipelineMode =
 
 export interface CorePipelineOptions {
     mode: PipelineMode
+    tracker?: AggregationTracker
 }
 
 export interface FetchResult {
@@ -39,6 +41,10 @@ export async function setupPhase(
     const isPersistent = options.mode.kind === 'aggregation'
     const isReset = fusion.isReset()
     const forceAttributeRefresh = isPersistent && config.forceAttributeRefresh
+
+    if (options.tracker) {
+        fusion.setTracker(options.tracker)
+    }
 
     await sources.fetchAllSources(isPersistent)
     log.info(`Loaded ${sources.managedSources.length} managed source(s)`)

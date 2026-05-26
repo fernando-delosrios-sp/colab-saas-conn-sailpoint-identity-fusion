@@ -25,6 +25,7 @@ import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
 import { buildFusionReport } from './fusionReportBuilder'
 import { processManagedAccount, hasAllAttributeScoresPerfect } from './fusionManagedAccountProcessor'
+import { AggregationTracker } from './aggregationTracker'
 import {
     buildMinimalFusionReportAccount,
     fusionReportMatchCandidateAccountFields,
@@ -64,16 +65,7 @@ type ManagedAccountAnalysisContext = {
 export class FusionService {
     private fusionIdentityMap: Map<string, FusionAccount> = new Map()
     private fusionAccountMap: Map<string, FusionAccount> = new Map()
-    // Managed accounts with matches (forms created for review)
-    private matchAccounts: FusionAccount[] = []
-    // Minimal report data for deferred matches against current-run unmatched candidates
-    private deferredMatchReportData: FusionReportAccount[] = []
-    // Minimal report data for non-matches (avoids holding full FusionAccount objects)
-    private analyzedNonMatchReportData: FusionReportAccount[] = []
-    // Accounts where form creation failed (excessive candidates or runtime error)
-    private failedMatchingAccounts: FusionReportAccount[] = []
-    // Correlated identities seen with more than one Fusion account in the same run
-    private conflictingFusionIdentityAccounts: Map<string, Map<string, string>> = new Map()
+    private _tracker?: AggregationTracker
     private _reviewersBySourceId: Map<string, Set<FusionAccount>> = new Map()
     private _sourcesWithoutReviewers: Set<string> = new Set()
 
@@ -87,8 +79,6 @@ export class FusionService {
     private readonly configSourceNames: Set<string>
     public readonly fusionOwnerIsGlobalReviewer: boolean
     public readonly fusionReportOnAggregation: boolean
-    public newManagedAccountsCount: number = 0
-    public identitiesProcessedCount: number = 0
     private readonly managedAccountsBatchSize: number
     public readonly commandType?: StandardCommand
     /** Connector operation name (e.g. `custom:dryrun`) — used when SDK commandType alone is ambiguous. */
@@ -100,8 +90,6 @@ export class FusionService {
      * `fusionMergingExactMatch` is enabled, preventing duplicate assignments or spurious form creation.
      */
     private readonly autoAssignedIdentityIds: Set<string> = new Set()
-    /** Per analyzed managed-account fusion object: how many identity comparisons ran (for report rows). */
-    private readonly fusionIdentityComparisonsByAccount = new WeakMap<FusionAccount, number>()
     /** Accumulates Match scoring duration within a single managed-account analysis pass. */
     private currentRunMatchScoringMs = 0
     /**
@@ -226,6 +214,41 @@ export class FusionService {
      */
     public getFusionIdentity(identityId: string): FusionAccount | undefined {
         return this.fusionIdentityMap.get(identityId)
+    }
+
+    /**
+     * Sets the AggregationTracker instance to record report state.
+     */
+    public setTracker(tracker: AggregationTracker): void {
+        this._tracker = tracker
+    }
+
+    /**
+     * Retrieves the AggregationTracker instance.
+     */
+    public get tracker(): AggregationTracker {
+        this.log.assert(!!this._tracker, 'AggregationTracker has not been set on FusionService')
+        if (!this._tracker) {
+            this.log.crash('AggregationTracker has not been set on FusionService')
+        }
+        return this._tracker!
+    }
+
+    /**
+     * Retrieves the AggregationTracker instance, throwing if not set.
+     * @deprecated Use the tracker getter instead.
+     */
+    public getTracker(): AggregationTracker {
+        return this.tracker
+    }
+
+    /** Helper getters for stats that delegate to tracker if available */
+    public get newManagedAccountsCount(): number {
+        return this._tracker?.newManagedAccountsCount ?? 0
+    }
+
+    public get identitiesProcessedCount(): number {
+        return this._tracker?.identitiesProcessedCount ?? 0
     }
 
     /**
@@ -659,7 +682,7 @@ export class FusionService {
      */
     public async processIdentities(): Promise<FusionAccount[]> {
         const { identities } = this.identities
-        this.identitiesProcessedCount = identities.length
+        this.tracker.identitiesProcessedCount = identities.length
         this.log.info(
             `Processing identity documents: creating or merging fusion accounts for ${identities.length} ISC identity document(s)`
         )
@@ -1021,7 +1044,7 @@ export class FusionService {
      * - Uses per-phase snapshots to avoid iterator invalidation while work-queue entries are removed
      * - Configurable batch size (managedAccountsBatchSize, default 50) limits concurrent in-flight objects
      * - Non-matches store minimal report data; full FusionAccount only for matches
-     * - Arrays cleared by generateReport() or clearAnalyzedAccounts() after use
+     * - Tracker state cleared by generateReport() after use
      * - Processes bounded batches to improve throughput while preserving shared-state updates.
      *
      * @returns Empty array (side effects register accounts in fusionAccountMap/fusionIdentityMap)
@@ -1479,7 +1502,8 @@ export class FusionService {
     private recordManagedAccountAnalysis(analysis: ManagedAccountAnalysisContext): void {
         const { account, fusionAccount, sourceType, hasIdentityBackedMatches, fusionIdentityComparisons } = analysis
         const { name, sourceName } = account
-        this.fusionIdentityComparisonsByAccount.set(fusionAccount, fusionIdentityComparisons)
+        const tracker = this.tracker
+        tracker.fusionIdentityComparisonsByAccount.set(fusionAccount, fusionIdentityComparisons)
         if (fusionAccount.isMatch) {
             if (hasIdentityBackedMatches) {
                 const identityMatches = fusionAccount.fusionMatches.filter(
@@ -1491,7 +1515,7 @@ export class FusionService {
             if (!this.shouldCaptureManagedAccountReportData()) return
             const reportAccountId = this.resolveReportAccountId(fusionAccount)
             if (hasIdentityBackedMatches) {
-                this.matchAccounts.push(fusionAccount)
+                tracker.matchAccounts.push(fusionAccount)
                 return
             }
             const deferredMatches = fusionAccount.fusionMatches
@@ -1519,7 +1543,7 @@ export class FusionService {
                         scores: mapScoreReportsForFusionReport(match.scores),
                     }
                 })
-            this.deferredMatchReportData.push({
+            tracker.deferredMatchReportData.push({
                 ...buildMinimalFusionReportAccount(
                     fusionAccount,
                     this.urlContext,
@@ -1543,7 +1567,7 @@ export class FusionService {
             this.registerCurrentRunUnmatchedCandidate(fusionAccount)
         }
         if (!this.shouldCaptureManagedAccountReportData()) return
-        this.analyzedNonMatchReportData.push({
+        tracker.analyzedNonMatchReportData.push({
             ...buildMinimalFusionReportAccount(
                 fusionAccount,
                 this.urlContext,
@@ -1593,7 +1617,7 @@ export class FusionService {
     private trackFailedMatching(fusionAccount: FusionAccount, error: string): void {
         this.log.error(`Failed matching for account ${fusionAccount.name} [${fusionAccount.sourceName}]: ${error}`)
         if (this.shouldCaptureManagedAccountReportData()) {
-            this.failedMatchingAccounts.push({
+            this.tracker.failedMatchingAccounts.push({
                 ...buildMinimalFusionReportAccount(
                     fusionAccount,
                     this.urlContext,
@@ -1602,7 +1626,7 @@ export class FusionService {
                     error,
                     this.resolveReportAccountId(fusionAccount)
                 ),
-                fusionIdentityComparisons: this.fusionIdentityComparisonsByAccount.get(fusionAccount) ?? 0,
+                fusionIdentityComparisons: this.tracker.fusionIdentityComparisonsByAccount.get(fusionAccount) ?? 0,
             })
         }
     }
@@ -1613,8 +1637,8 @@ export class FusionService {
      */
     private removeMatchAccount(managedAccountId?: string): void {
         if (!managedAccountId) return
-        const idx = this.matchAccounts.findIndex((x) => x.managedAccountId === managedAccountId)
-        if (idx !== -1) this.matchAccounts.splice(idx, 1)
+        const idx = this.tracker.matchAccounts.findIndex((x) => x.managedAccountId === managedAccountId)
+        if (idx !== -1) this.tracker.matchAccounts.splice(idx, 1)
     }
 
     /**
@@ -1642,33 +1666,7 @@ export class FusionService {
     // Public Cleanup Methods
     // ------------------------------------------------------------------------
 
-    /**
-     * Clear analyzed managed account arrays to free memory.
-     *
-     * Memory Optimization:
-     * analyzedNonMatchReportData and matchAccounts accumulate during
-     * processManagedAccounts. They are also cleared inside generateReport(), but
-     * when no report is generated, these arrays would persist for the lifetime of the operation. This method
-     * ensures they are always released regardless of report configuration.
-     *
-     * Safe to call multiple times (idempotent).
-     */
-    public clearAnalyzedAccounts(): void {
-        if (
-            this.analyzedNonMatchReportData.length > 0 ||
-            this.matchAccounts.length > 0 ||
-            this.deferredMatchReportData.length > 0 ||
-            this.failedMatchingAccounts.length > 0 ||
-            this.conflictingFusionIdentityAccounts.size > 0
-        ) {
-            this.log.debug('Clearing analyzed managed accounts from memory')
-            this.analyzedNonMatchReportData = []
-            this.matchAccounts = []
-            this.deferredMatchReportData = []
-            this.failedMatchingAccounts = []
-            this.conflictingFusionIdentityAccounts = new Map()
-        }
-    }
+
 
     // ------------------------------------------------------------------------
     // Public Output/Listing Methods
@@ -2119,7 +2117,7 @@ export class FusionService {
         this._managedAccountProcessingBatchSize = Math.max(1, this.managedAccountsBatchSize)
         this._managedAccountProcessingStartedAt = Date.now()
 
-        this.newManagedAccountsCount = map.size
+        this.tracker.newManagedAccountsCount = map.size
         this.currentRunUnmatchedFusionNativeIdentitiesBySource.clear()
         this.autoAssignedIdentityIds.clear()
         this.currentRunMatchScoringMs = 0
@@ -2173,10 +2171,11 @@ export class FusionService {
         existingAccount: FusionAccount,
         newAccount: FusionAccount
     ): void {
-        let accounts = this.conflictingFusionIdentityAccounts.get(identityId)
+        const tracker = this.tracker
+        let accounts = tracker.conflictingFusionIdentityAccounts.get(identityId)
         if (!accounts) {
             accounts = new Map()
-            this.conflictingFusionIdentityAccounts.set(identityId, accounts)
+            tracker.conflictingFusionIdentityAccounts.set(identityId, accounts)
         }
 
         const existingKey = getFusionIdentityConflictTrackingKey(existingAccount)
@@ -2248,36 +2247,33 @@ export class FusionService {
      * Generate a fusion report with all accounts that have matches.
      *
      * Memory Optimization:
-     * After generating the report, this method clears the analyzedNonMatchReportData
-     * and matchAccounts arrays to free memory. These arrays hold
-     * references to all managed accounts that were analyzed during processManagedAccounts,
-     * which could be thousands of objects. Clearing them as soon as the report is
-     * generated significantly reduces memory footprint.
+     * After generating the report, this method clears the tracker to free memory.
      *
+     * @param tracker - The AggregationTracker instance to build the report from
      * @param includeNonMatches - When true, append per-account rows for managed non-matches (e.g. custom:dryrun). Email reports omit these.
      * @param stats - Optional processing statistics to include in the report
      * @returns Complete fusion report with match/non-match accounts
      */
-    public generateReport(includeNonMatches: boolean = false, stats?: FusionReportStats): FusionReport {
+    public generateReport(tracker: AggregationTracker, includeNonMatches: boolean = false, stats?: FusionReportStats): FusionReport {
         const report = buildFusionReport(
             {
-                conflictingFusionIdentityAccounts: this.conflictingFusionIdentityAccounts,
-                matchAccounts: this.matchAccounts,
-                failedMatchingAccounts: this.failedMatchingAccounts,
-                deferredMatchReportData: this.deferredMatchReportData,
-                analyzedNonMatchReportData: this.analyzedNonMatchReportData,
-                newManagedAccountsCount: this.newManagedAccountsCount,
+                conflictingFusionIdentityAccounts: tracker.conflictingFusionIdentityAccounts,
+                matchAccounts: tracker.matchAccounts,
+                failedMatchingAccounts: tracker.failedMatchingAccounts,
+                deferredMatchReportData: tracker.deferredMatchReportData,
+                analyzedNonMatchReportData: tracker.analyzedNonMatchReportData,
+                newManagedAccountsCount: tracker.newManagedAccountsCount,
                 urlContext: this.urlContext,
                 sourcesByName: this.sourcesByName,
                 reportAttributes: this.reportAttributes,
-                fusionIdentityComparisonsByAccount: this.fusionIdentityComparisonsByAccount,
+                fusionIdentityComparisonsByAccount: tracker.fusionIdentityComparisonsByAccount,
                 resolveReportAccountId: (account) => this.resolveReportAccountId(account),
             },
             includeNonMatches,
             stats
         )
 
-        this.clearAnalyzedAccounts()
+        tracker.clear()
 
         return report
     }

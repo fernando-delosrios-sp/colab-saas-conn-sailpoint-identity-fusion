@@ -1,5 +1,6 @@
 import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
+import { AggregationTracker } from '../services/fusionService'
 import { initializeDryRunExecution, prepareDryRunOutputData, streamDryRunRows } from './helpers/dryRunHelpers'
 import { buildDryRunSummary } from './helpers/buildDryRunPayload'
 import { CorePipelineOptions, setupPhase, fetchPhase, refreshPhase, processPhase } from './helpers/corePipeline'
@@ -18,7 +19,8 @@ import { CorePipelineOptions, setupPhase, fetchPhase, refreshPhase, processPhase
 export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, reports } = serviceRegistry
-    const options: CorePipelineOptions = { mode: { kind: 'dry-run' } }
+    const tracker = new AggregationTracker()
+    const options: CorePipelineOptions = { mode: { kind: 'dry-run' }, tracker }
 
     try {
         const timer = log.timer()
@@ -100,7 +102,6 @@ export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccount
         }
 
         serviceRegistry.res.send(summary)
-        serviceRegistry.fusion.clearAnalyzedAccounts()
         serviceRegistry.sources.clearManagedAccounts()
         serviceRegistry.sources.clearFusionAccounts()
 

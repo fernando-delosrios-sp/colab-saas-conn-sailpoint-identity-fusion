@@ -1,3 +1,5 @@
+import { AggregationTracker } from '../../../services/fusionService/aggregationTracker'
+
 export type SourceConfigLike = {
     name: string
     correlationMode: 'none' | 'correlate' | 'reverse'
@@ -78,7 +80,10 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         fusionIdentityDecisions: [],
     }
 
+    let activeTracker: any = null
     const fusion = {
+        setTracker: jest.fn().mockImplementation((t) => { activeTracker = t }),
+        getTracker: jest.fn().mockImplementation(() => activeTracker || new AggregationTracker()),
         isReset: jest.fn(() => false),
         disableReset: jest.fn().mockResolvedValue(undefined),
         resetState: jest.fn().mockResolvedValue(undefined),
@@ -104,7 +109,6 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         awaitPendingDisableOperations: jest.fn().mockResolvedValue(undefined),
         refreshUniqueAttributes: jest.fn().mockResolvedValue(0),
         reconcilePendingFormState: jest.fn(),
-        clearAnalyzedAccounts: jest.fn(),
         forEachISCAccount: jest.fn().mockResolvedValue({ sent: 0, eligible: 0 }),
         fusionReportOnAggregation: false,
     }

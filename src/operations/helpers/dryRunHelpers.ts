@@ -4,7 +4,8 @@ import * as path from 'path'
 import { finished, pipeline } from 'stream/promises'
 import { StdAccountListInput, StdAccountListOutput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
-import { AggregationStats, FusionReport, FusionReportAccount } from '../../services/fusionService/types'
+import { AggregationStats, FusionReport, FusionReportAccount, FusionReportStats } from '../../services/fusionService/types'
+import { AggregationTracker } from '../../services/fusionService/aggregationTracker'
 import { isExactAttributeMatchScores } from '../../services/scoringService/exactMatch'
 import { FusionAccount } from '../../model/account'
 import { readArray, readBoolean, readPathString, readUnknown, trimStr } from '../../utils/safeRead'
@@ -77,13 +78,12 @@ export type DryRunHelpersContext = {
         clearFusionAccounts: () => void
     }
     fusion: {
-        generateReport: (includeNonMatches: boolean, stats?: AggregationStats) => FusionReport
+        generateReport: (tracker: AggregationTracker, includeNonMatches?: boolean, stats?: FusionReportStats) => FusionReport
         forEachISCAccount: (callback: (account: StdAccountListOutput) => void) => Promise<{ sent: number; eligible: number }>
         getISCAccount: (
             account: FusionAccount,
             includeUncorrelated: boolean
         ) => Promise<StdAccountListOutput | undefined>
-        clearAnalyzedAccounts: () => void
         refreshUniqueAttributes: () => Promise<number>
     }
     schemas: { fusionIdentityAttribute?: string }
@@ -409,7 +409,6 @@ export const finalizeDryRun = async (
     }
 
     res.send(summary)
-    fusion.clearAnalyzedAccounts()
     sources.clearManagedAccounts()
     sources.clearFusionAccounts()
 
