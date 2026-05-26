@@ -40,7 +40,7 @@ import {
     buildIscAccountsQueryFilter,
 } from './accountFilters'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
-import { ServiceRegistry } from '../serviceRegistry'
+
 
 type ReverseCorrelationArtifact =
     | 'fusion_schema_attribute'
@@ -1271,13 +1271,11 @@ export class SourceService {
      * Set up reverse correlation for multiple sources sequentially.
      * Kept serial to preserve deterministic ordering and avoid cross-source readiness races.
      */
-    public async setupReverseCorrelationSources(): Promise<number> {
+    public async setupReverseCorrelationSources(schemaAttrNames: Set<string>): Promise<number> {
         const reverseCorrelationSources = this.sources.filter((sc) => sc.correlationMode === 'reverse')
         if (reverseCorrelationSources.length === 0) {
             return 0
         }
-        const schemas = ServiceRegistry.getCurrent().schemas
-        const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
         for (const sc of reverseCorrelationSources) {
             try {
                 await this.ensureReverseCorrelationSetup(sc, schemaAttrNames)

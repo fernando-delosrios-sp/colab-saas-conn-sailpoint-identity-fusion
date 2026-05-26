@@ -42,11 +42,12 @@ export function createRegistry() {
             fusionAccountsByNativeIdentity: new Map(),
             hasFusionSource: true,
             clearReverseCorrelationReadinessCache: jest.fn(),
-            setupReverseCorrelationSources: jest.fn().mockResolvedValue(0),
+            setupReverseCorrelationSources: jest.fn().mockImplementation((_schemaAttrNames: Set<string>) => Promise.resolve(0)),
             aggregateManagedSources: jest.fn().mockResolvedValue(undefined),
         },
         schemas: {
             setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
+            getManagedSourceSchemaAttributeNames: jest.fn().mockResolvedValue(new Set<string>()),
             fusionDisplayAttribute: 'name',
         },
         forms: {
