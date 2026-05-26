@@ -1,4 +1,5 @@
 import { FusionService } from '../fusionService'
+import { AggregationTracker } from '../aggregationTracker'
 import { LogService } from '../../logService'
 import { IdentityService } from '../../identityService'
 import { SourceService } from '../../sourceService'
@@ -129,6 +130,7 @@ describe('FusionService', () => {
             mockSchemas,
             StandardCommand.StdAccountList
         )
+        fusionService.setTracker(new AggregationTracker())
 
         // Mock ServiceRegistry
         jest.spyOn(ServiceRegistry, 'getCurrent').mockReturnValue({
@@ -1208,8 +1210,10 @@ describe('FusionService', () => {
                 return n
             })
 
+            const tracker = new AggregationTracker()
+            fusionService.setTracker(tracker)
             await fusionService.analyzeManagedAccount(mockManagedAccount)
-            const report = fusionService.generateReport(true)
+            const report = fusionService.generateReport(tracker, true)
             expect(report.accounts.some((a) => a.deferred && a.accountId === 'source-a-id::native-no-report-cap')).toBe(
                 false
             )
@@ -1228,6 +1232,7 @@ describe('FusionService', () => {
                 StandardCommand.StdAccountList,
                 'custom:dryrun'
             )
+            customReportFusion.setTracker(new AggregationTracker())
 
             const mockManagedAccount = {
                 id: 'acct-dry-run-def',
@@ -1278,8 +1283,10 @@ describe('FusionService', () => {
                 return n
             })
 
+            const tracker = new AggregationTracker()
+            customReportFusion.setTracker(tracker)
             await customReportFusion.analyzeManagedAccount(mockManagedAccount)
-            const report = customReportFusion.generateReport(true)
+            const report = customReportFusion.generateReport(tracker, true)
             expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-run-def')).toBe(
                 true
             )
@@ -1333,13 +1340,15 @@ describe('FusionService', () => {
                     { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
                 ],
             } as any)
-            ;(fusionService as any).matchAccounts = [analyzed]
+            const tracker = new AggregationTracker()
+            fusionService.setTracker(tracker)
+            tracker.matchAccounts = [analyzed]
             jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
             jest.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
 
             await fusionService.processManagedAccount(account)
 
-            expect((fusionService as any).matchAccounts).toHaveLength(0)
+            expect(tracker.matchAccounts).toHaveLength(0)
         })
 
         it('registers synthetic automatic-assignment decisions for reporting', async () => {
@@ -1393,6 +1402,7 @@ describe('FusionService', () => {
                 undefined,
                 'accountList'
             )
+            accountListFusion.setTracker(new AggregationTracker())
             const account = {
                 id: 'acct-perfect-opctx-1',
                 nativeIdentity: 'acct-perfect-opctx-1',
@@ -1477,6 +1487,7 @@ describe('FusionService', () => {
                 mockSchemas,
                 undefined
             )
+            analysisFusion.setTracker(new AggregationTracker())
             const reviewer = FusionAccount.fromIdentity({ id: 'rev-1', name: 'Rev', attributes: {} } as any)
             analysisFusion.reviewersBySourceId.set('source-a-id', new Set([reviewer]))
             ;(analysisFusion as any).sourcesByName.set('Source A', {
@@ -1524,6 +1535,7 @@ describe('FusionService', () => {
                 mockSchemas,
                 undefined
             )
+            analysisFusion.setTracker(new AggregationTracker())
             ;(analysisFusion as any).sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
@@ -1572,6 +1584,7 @@ describe('FusionService', () => {
                 mockSchemas,
                 undefined
             )
+            analysisFusion.setTracker(new AggregationTracker())
             ;(analysisFusion as any).sourcesByName.set('OrphanSrc', {
                 id: 'orphan-src-id',
                 name: 'OrphanSrc',
@@ -2181,6 +2194,8 @@ describe('FusionService', () => {
 
     describe('identity conflict warnings', () => {
         it('logs warning and includes identity conflict details in report', () => {
+            const tracker = new AggregationTracker()
+            fusionService.setTracker(tracker)
             const accountA = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-a',
                 identityId: 'identity-duplicate',
@@ -2205,7 +2220,7 @@ describe('FusionService', () => {
                 expect.stringContaining('More than one Fusion account was found for identity identity-duplicate')
             )
 
-            const report = fusionService.generateReport()
+            const report = fusionService.generateReport(tracker)
             const conflictWarnings = report.warnings?.identityConflicts
 
             expect(conflictWarnings?.affectedIdentities).toBe(1)
@@ -2216,6 +2231,8 @@ describe('FusionService', () => {
         })
 
         it('does not warn when the same correlated account key is updated', () => {
+            const tracker = new AggregationTracker()
+            fusionService.setTracker(tracker)
             const original = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-a',
                 identityId: 'identity-1',
@@ -2238,11 +2255,13 @@ describe('FusionService', () => {
 
             expect(mockLog.warn).not.toHaveBeenCalled()
 
-            const report = fusionService.generateReport()
+            const report = fusionService.generateReport(tracker)
             expect(report.warnings).toBeUndefined()
         })
 
         it('clears identity conflict warning payload after report generation', () => {
+            const tracker = new AggregationTracker()
+            fusionService.setTracker(tracker)
             const accountA = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-a',
                 identityId: 'identity-duplicate',
@@ -2263,10 +2282,10 @@ describe('FusionService', () => {
             fusionService.setFusionAccount(accountA)
             fusionService.setFusionAccount(accountB)
 
-            const firstReport = fusionService.generateReport()
+            const firstReport = fusionService.generateReport(tracker)
             expect(firstReport.warnings?.identityConflicts?.affectedIdentities).toBe(1)
 
-            const secondReport = fusionService.generateReport()
+            const secondReport = fusionService.generateReport(tracker)
             expect(secondReport.warnings).toBeUndefined()
         })
     })

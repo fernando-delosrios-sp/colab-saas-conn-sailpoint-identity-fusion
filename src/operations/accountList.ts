@@ -1,5 +1,6 @@
 import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
+import { AggregationTracker } from '../services/fusionService'
 import {
     type CorePipelineOptions,
     setupPhase,
@@ -26,7 +27,8 @@ import {
 export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, sources } = serviceRegistry
-    const options: CorePipelineOptions = { mode: { kind: 'aggregation' } }
+    const tracker = new AggregationTracker()
+    const options: CorePipelineOptions = { mode: { kind: 'aggregation' }, tracker }
 
     let processLockAcquired = false
 
@@ -59,8 +61,6 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         await reportPhase(serviceRegistry, fetchResult, timer, options)
         timer.phase('PHASE 7: Report (fusion report)', 'info', 'Report')
 
-        // Report generation consumes analyzed-account slices; clear them after report/output complete.
-        serviceRegistry.fusion.clearAnalyzedAccounts()
         timer.end(`✓ Account list operation completed successfully - ${count} account(s) processed`)
     } catch (error) {
         if (error instanceof ConnectorError) throw error

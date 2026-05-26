@@ -6,6 +6,7 @@ import { PhaseTimer } from './logService'
 import { mkdir, writeFile } from 'fs/promises'
 import * as path from 'path'
 import type { FusionService } from './fusionService'
+import { AggregationTracker } from './fusionService/aggregationTracker'
 import type { AggregationStats, FusionReport, FusionReportDecision, FusionReportStats } from './fusionService/types'
 import type { FormService } from './formService'
 import type { IdentityService } from './identityService'
@@ -365,7 +366,8 @@ export class ReportService {
             totalProcessingTime,
             phaseTiming,
         })
-        const report = this.fusion.generateReport(includeNonMatches, preStreamingStats)
+        const tracker = this.fusion.tracker
+        const report = this.fusion.generateReport(tracker, includeNonMatches, preStreamingStats)
         return { report, preStreamingStats }
     }
 
@@ -482,7 +484,8 @@ export class ReportService {
         if (aggregationStats) {
             const reportPhaseTimer = this.log.timer()
             const stats = this.buildFusionReportStats(aggregationStats)
-            const report = this.fusion.generateReport(includeNonMatches, stats)
+            const tracker = this.fusion.tracker
+            const report = this.fusion.generateReport(tracker, includeNonMatches, stats)
             report.fusionReviewDecisions = this.buildFusionReviewDecisions()
             reportPhaseTimer.phase('PHASE 7: Report (fusion report)', 'info', 'Report')
             const priorPhases = aggregationStats.phaseTiming ?? []
@@ -492,7 +495,8 @@ export class ReportService {
             return
         }
 
-        const report = this.fusion.generateReport(includeNonMatches, undefined)
+        const tracker = this.fusion.tracker
+        const report = this.fusion.generateReport(tracker, includeNonMatches, undefined)
         report.fusionReviewDecisions = this.buildFusionReviewDecisions()
         await this.messaging.sendReport(report, 'fusion')
         this.identities.clear()

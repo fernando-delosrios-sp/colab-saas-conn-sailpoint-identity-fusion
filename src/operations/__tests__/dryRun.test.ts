@@ -2,6 +2,7 @@ import { dryRun } from '../dryRun'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { LogService } from '../../services/logService'
 import type { FusionReport } from '../../services/fusionService/types'
+import { AggregationTracker } from '../../services/fusionService/aggregationTracker'
 import {
     compileEmailTemplates,
     registerHandlebarsHelpers,
@@ -11,6 +12,7 @@ import {
 function createRegistry() {
     const logForTimer = new LogService({ spConnDebugLoggingEnabled: false })
     const timer = logForTimer.timer()
+    let activeTracker: any = null
     const registry: any = {
         config: {
             baseurl: 'https://tenant.example.api.identitynow.com',
@@ -63,6 +65,8 @@ function createRegistry() {
             fusionIdentityAttribute: 'id',
         },
         fusion: {
+            setTracker: jest.fn().mockImplementation((t) => { activeTracker = t }),
+            getTracker: jest.fn().mockImplementation(() => activeTracker || new AggregationTracker()),
             isReset: jest.fn(() => false),
             fusionOwnerIsGlobalReviewer: false,
             fusionReportOnAggregation: false,
@@ -71,7 +75,7 @@ function createRegistry() {
             processFusionIdentityDecisions: jest.fn().mockResolvedValue([]),
             analyzeUncorrelatedAccounts: jest.fn().mockResolvedValue([]),
             refreshUniqueAttributes: jest.fn().mockResolvedValue(0),
-            generateReport: jest.fn((_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
+            generateReport: jest.fn((tracker: any, _includeNonMatches?: boolean, stats?: Record<string, unknown>) => ({
                 accounts: [
                     {
                         accountId: 'acc-1',
@@ -137,7 +141,6 @@ function createRegistry() {
                     statuses: [],
                 },
             })),
-            clearAnalyzedAccounts: jest.fn(),
             initializeManagedAccountProcessing: jest.fn().mockResolvedValue(undefined),
             processCorrelatedManagedAccounts: jest.fn().mockResolvedValue(undefined),
             processUncorrelatedManagedAccounts: jest.fn().mockResolvedValue({ processed: 0, matchScoringMs: 0 }),
@@ -201,7 +204,8 @@ function createRegistry() {
                     fusionAccountsFound: registry.sources.fusionAccountCount,
                     totalFusionAccounts: registry.fusion.totalFusionAccountCount,
                 }
-                const report = registry.fusion.generateReport(includeNonMatches ?? true, preStreamingStats)
+                const tracker = registry.fusion.getTracker()
+                const report = registry.fusion.generateReport(tracker, includeNonMatches ?? true, preStreamingStats)
                 return { report, preStreamingStats }
             }
         ),
@@ -278,7 +282,7 @@ describe('dryRun', () => {
             includeDecisions: true,
         } as any)
 
-        expect(registry.fusion.generateReport).toHaveBeenCalledWith(true, expect.any(Object))
+        expect(registry.fusion.generateReport).toHaveBeenCalledWith(expect.any(AggregationTracker), true, expect.any(Object))
         expect(registry.res.send).toHaveBeenCalledTimes(3)
 
         const firstRow = registry.res.send.mock.calls[0][0]
@@ -325,7 +329,7 @@ describe('dryRun', () => {
         const registry = createRegistry()
 
         registry.fusion.generateReport.mockImplementation(
-            (_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
+            (tracker: any, _includeNonMatches?: boolean, stats?: Record<string, unknown>) => ({
                 accounts: [
                     {
                         accountId: 'acc-orphan-deferred',
@@ -442,7 +446,7 @@ describe('dryRun', () => {
         registry.sources.managedAccountsById.set('acc-3', { id: 'acc-3', sourceName: 'HR' })
 
         registry.fusion.generateReport.mockImplementation(
-            (_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
+            (tracker: any, _includeNonMatches?: boolean, stats?: Record<string, unknown>) => ({
                 accounts: [
                     {
                         accountId: 'acc-1',
@@ -674,7 +678,7 @@ describe('dryRun', () => {
             recordElapsed: timer.recordElapsed.bind(timer),
         })
         registry.fusion.generateReport.mockImplementation(
-            (_includeNonMatches: boolean, stats?: Record<string, unknown>) => ({
+            (tracker: any, _includeNonMatches?: boolean, stats?: Record<string, unknown>) => ({
                 accounts: [
                     {
                         accountId: 'acc-no-identity-match',
