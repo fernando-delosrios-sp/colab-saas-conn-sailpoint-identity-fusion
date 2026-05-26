@@ -3,7 +3,10 @@ import { ChainContext, MockRegistry } from '../framework/ChainContext'
 import { createBaseOperationRegistry, SourceConfigLike } from '../../harness/mockRegistry'
 import { FusionAccount } from '../../../../model/fusionAccount'
 import { buildManagedAccountKey } from '../../../../model/managedAccountKey'
-import { processAttributeMapping, buildAttributeMappingConfig } from '../../../../services/attributeService/helpers'
+import {
+    processAttributeMapping as _processAttributeMapping,
+    buildAttributeMappingConfig as _buildAttributeMappingConfig,
+} from '../../../../services/attributeService/helpers'
 import { AttributeService } from '../../../../services/attributeService/attributeService'
 import { SchemaService } from '../../../../services/schemaService/schemaService'
 
@@ -19,11 +22,7 @@ export function getExpectedOutput(stepId: string): unknown {
 
 function findIdentityIdForIscAccount(iscAccount: any, state: any): string | undefined {
     const attributes = iscAccount.attributes ?? {}
-    const accounts = [
-        ...(attributes.accounts ?? []),
-        attributes.originAccount,
-        attributes.mainAccount
-    ].filter(Boolean)
+    const accounts = [...(attributes.accounts ?? []), attributes.originAccount, attributes.mainAccount].filter(Boolean)
 
     for (const accId of accounts) {
         if (accId.includes('::')) {
@@ -41,9 +40,9 @@ function findIdentityIdForIscAccount(iscAccount: any, state: any): string | unde
                     }
                 }
             }
-            const ma = allManaged.find((m: any) =>
-                m.nativeIdentity === nativeIdentity &&
-                (m.sourceId === sourceId || m.sourceName === sourceId)
+            const ma = allManaged.find(
+                (m: any) =>
+                    m.nativeIdentity === nativeIdentity && (m.sourceId === sourceId || m.sourceName === sourceId)
             )
             if (ma?.identityId) {
                 return ma.identityId
@@ -61,9 +60,7 @@ function findIdentityIdForIscAccount(iscAccount: any, state: any): string | unde
 
     const displayName = attributes.displayName
     if (displayName) {
-        const identity = state.getIdentities().find((i: any) =>
-            i.displayName === displayName || i.name === displayName
-        )
+        const identity = state.getIdentities().find((i: any) => i.displayName === displayName || i.name === displayName)
         if (identity) {
             return identity.id
         }
@@ -72,9 +69,9 @@ function findIdentityIdForIscAccount(iscAccount: any, state: any): string | unde
     const name = attributes.name
     if (name) {
         const cleanName = name.replace(/\s*\[.*\]\s*$/, '')
-        const identity = state.getIdentities().find((i: any) =>
-            i.name === cleanName || i.displayName === cleanName || i.name === name
-        )
+        const identity = state
+            .getIdentities()
+            .find((i: any) => i.name === cleanName || i.displayName === cleanName || i.name === name)
         if (identity) {
             return identity.id
         }
@@ -186,17 +183,13 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
 
     const { registry } = createBaseOperationRegistry(sourceConfigs)
     registry.log.error = jest.fn().mockImplementation((...args) => {
-        console.error("LOG.ERROR:", ...args)
+        console.error('LOG.ERROR:', ...args)
     })
     registry.log.warn = jest.fn().mockImplementation((...args) => {
-        console.warn("LOG.WARN:", ...args)
+        console.warn('LOG.WARN:', ...args)
     })
 
-    const schemaService = new SchemaService(
-        context.config as any,
-        registry.log as any,
-        registry.sources as any
-    )
+    const schemaService = new SchemaService(context.config as any, registry.log as any, registry.sources as any)
     registry.schemas = schemaService as any
 
     // Mock fetchAllSources to populate managedSources from config
@@ -234,32 +227,40 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         registry.sources.managedAccountsByIdentityId = byIdentity
     })
 
-    registry.sources.fetchManagedAccount = jest.fn().mockImplementation(async (sourceId: string, nativeIdentity: string) => {
-        const account = managedAccounts.find(
-            (a: any) => a.nativeIdentity === nativeIdentity && 
-            (a.sourceId === sourceId || a.sourceName === sourceId || `source-${a.sourceName}` === sourceId)
-        )
-        if (account) {
-            const key = buildManagedAccountKey(account) || account.id
-            registry.sources.managedAccountsById.set(key, account)
-            registry.sources.managedAccountsAllById.set(key, account)
-            const identityId = account.identityId || account.identity?.id
-            if (identityId) {
-                let set = registry.sources.managedAccountsByIdentityId.get(identityId)
-                if (!set) {
-                    set = new Set<string>()
-                    registry.sources.managedAccountsByIdentityId.set(identityId, set)
+    registry.sources.fetchManagedAccount = jest
+        .fn()
+        .mockImplementation(async (sourceId: string, nativeIdentity: string) => {
+            const account = managedAccounts.find(
+                (a: any) =>
+                    a.nativeIdentity === nativeIdentity &&
+                    (a.sourceId === sourceId || a.sourceName === sourceId || `source-${a.sourceName}` === sourceId)
+            )
+            if (account) {
+                const key = buildManagedAccountKey(account) || account.id
+                registry.sources.managedAccountsById.set(key, account)
+                registry.sources.managedAccountsAllById.set(key, account)
+                const identityId = account.identityId || account.identity?.id
+                if (identityId) {
+                    let set = registry.sources.managedAccountsByIdentityId.get(identityId)
+                    if (!set) {
+                        set = new Set<string>()
+                        registry.sources.managedAccountsByIdentityId.set(identityId, set)
+                    }
+                    set.add(key)
                 }
-                set.add(key)
             }
-        }
-    })
+        })
 
     const getOrBuildIdentity = (id: string) => {
-        console.log("getOrBuildIdentity called for id:", id);
+        console.log('getOrBuildIdentity called for id:', id)
         const existing = state.getIdentityById(id)
         if (existing && existing.accounts && existing.accounts.length > 0) {
-            console.log("getOrBuildIdentity: found existing with accounts:", existing.id, "accounts count:", existing.accounts.length);
+            console.log(
+                'getOrBuildIdentity: found existing with accounts:',
+                existing.id,
+                'accounts count:',
+                existing.accounts.length
+            )
             return existing
         }
 
@@ -277,11 +278,9 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             }
         }
 
-        const relatedAccounts = allManaged.filter(
-            (m: any) => m.identityId === id || m.identity?.id === id
-        )
+        const relatedAccounts = allManaged.filter((m: any) => m.identityId === id || m.identity?.id === id)
 
-        console.log("getOrBuildIdentity: related accounts count:", relatedAccounts.length);
+        console.log('getOrBuildIdentity: related accounts count:', relatedAccounts.length)
 
         if (relatedAccounts.length === 0) {
             return existing || undefined
@@ -289,7 +288,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
 
         const firstAccount = relatedAccounts[0]
         const identityName = firstAccount.identity?.name || firstAccount.name || id
-        
+
         let email: string | undefined = undefined
         for (const acc of relatedAccounts) {
             const mailVal = acc.attributes?.mail || acc.attributes?.email || acc.attributes?.emailAddress
@@ -309,7 +308,12 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         }))
 
         if (existing) {
-            console.log("getOrBuildIdentity: updating existing identity:", existing.id, "with accounts count:", accounts.length);
+            console.log(
+                'getOrBuildIdentity: updating existing identity:',
+                existing.id,
+                'with accounts count:',
+                accounts.length
+            )
             existing.accounts = accounts
             if (!existing.attributes) {
                 existing.attributes = {}
@@ -331,7 +335,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             accounts,
         }
 
-        console.log("getOrBuildIdentity: created new dynamic identity:", id, "with accounts count:", accounts.length);
+        console.log('getOrBuildIdentity: created new dynamic identity:', id, 'with accounts count:', accounts.length)
         state.addIdentity(dynamicIdentity)
 
         return dynamicIdentity
@@ -343,7 +347,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     registry.identities.fetchIdentityByName = jest.fn().mockImplementation(async (name: string) => {
         const existing = state.getIdentityByName(name)
         if (existing) return existing
-        
+
         const allManaged: any[] = []
         const snapshot = state.getSnapshot()
         if (snapshot?.managedAccounts) {
@@ -367,11 +371,11 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         return null
     })
     registry.identities.getIdentityById = jest.fn().mockImplementation((id: string) => {
-        console.log("registry.identities.getIdentityById mock called for id:", id);
+        console.log('registry.identities.getIdentityById mock called for id:', id)
         return getOrBuildIdentity(id)
     })
     registry.identities.fetchIdentityById = jest.fn().mockImplementation(async (id: string) => {
-        console.log("registry.identities.fetchIdentityById mock called for id:", id);
+        console.log('registry.identities.fetchIdentityById mock called for id:', id)
         return getOrBuildIdentity(id)
     })
 
@@ -424,7 +428,9 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     })
 
     registry.sources.getSourceById = jest.fn().mockImplementation((sourceId: string) => {
-        const src = scenarioSources.find((s) => s.id === sourceId || s.name === sourceId || `source-${s.name}` === sourceId)
+        const src = scenarioSources.find(
+            (s) => s.id === sourceId || s.name === sourceId || `source-${s.name}` === sourceId
+        )
         if (src) {
             return {
                 id: (src.id as string) ?? `source-${src.name}`,
@@ -449,8 +455,6 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
 
     // Mock the fusion service behavior specifically for replay runs
     const activeFusionIdentities = new Map<string, any>()
-
-
 
     const attributeService = new AttributeService(
         context.config as any,
@@ -493,12 +497,14 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     registry.fusion.processFusionAccounts = jest.fn().mockImplementation(async () => {
         const processed = []
         const faList = state.getFusionAccounts()
-        console.log("processFusionAccounts mock: got raw accounts count:", faList.length)
+        console.log('processFusionAccounts mock: got raw accounts count:', faList.length)
         for (const rawAccount of faList) {
             const processedFa = await registry.fusion.processFusionAccount(rawAccount)
             const nativeId = rawAccount.nativeIdentity // Use rawAccount's nativeIdentity to match what's in state
             const existingInState = state.getFusionAccount(nativeId)
-            console.log(`processFusionAccounts mock: processed account nativeId=${nativeId}, existingInState=${!!existingInState}`)
+            console.log(
+                `processFusionAccounts mock: processed account nativeId=${nativeId}, existingInState=${!!existingInState}`
+            )
             if (existingInState) {
                 processedFa.syncCollectionAttributesToBag()
                 existingInState.attributes = { ...processedFa.attributes }
@@ -518,7 +524,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     })
 
     registry.fusion.processIdentity = jest.fn().mockImplementation(async (identity) => {
-        console.log("processIdentity mock called for:", identity.id, "attributes:", JSON.stringify(identity.attributes))
+        console.log('processIdentity mock called for:', identity.id, 'attributes:', JSON.stringify(identity.attributes))
         const fusionAccount = FusionAccount.fromIdentity(identity)
         fusionAccount.addIdentityLayer(identity)
         fusionAccount.addManagedAccountLayer(
@@ -551,7 +557,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
                 disabled: fusionAccount.disabled,
             }
             state.addFusionAccount(rawAccount)
-            console.log("processIdentity mock: added raw fusion account to state:", nativeId)
+            console.log('processIdentity mock: added raw fusion account to state:', nativeId)
         }
 
         return fusionAccount
@@ -560,9 +566,9 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     registry.fusion.processIdentities = jest.fn().mockImplementation(async () => {
         const processed = []
         const ids = state.getIdentities()
-        console.log("processIdentities mock: got identities count:", ids.length)
+        console.log('processIdentities mock: got identities count:', ids.length)
         for (const identity of ids) {
-            const existingFa = state.getFusionAccounts().find(fa => fa.identityId === identity.id)
+            const existingFa = state.getFusionAccounts().find((fa) => fa.identityId === identity.id)
             console.log(`processIdentities mock: identity=${identity.id}, existingFa=${!!existingFa}`)
             if (!existingFa) {
                 const processedFa = await registry.fusion.processIdentity(identity)
@@ -602,7 +608,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
                 key: fusionAccount.key || {
                     simple: {
                         id: nativeId,
-                    }
+                    },
                 },
                 attributes: { ...fusionAccount.attributes },
                 disabled: fusionAccount.disabled,
@@ -614,12 +620,21 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         }
 
         const attributes = registry.schemas.getFusionAttributeSubset(fusionAccount.attributes)
-        console.log("getISCAccount returning attributes for", nativeId, "keys:", Object.keys(attributes), "accounts:", attributes.accounts, "raw_accounts:", fusionAccount.attributes.accounts)
+        console.log(
+            'getISCAccount returning attributes for',
+            nativeId,
+            'keys:',
+            Object.keys(attributes),
+            'accounts:',
+            attributes.accounts,
+            'raw_accounts:',
+            fusionAccount.attributes.accounts
+        )
         return {
             key: fusionAccount.key || {
                 simple: {
                     id: nativeId,
-                }
+                },
             },
             attributes,
             disabled: fusionAccount.disabled,
@@ -629,10 +644,12 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     registry.fusion.forEachISCAccount = jest.fn().mockImplementation(async (send: (account: any) => void) => {
         let sent = 0
         const faList = state.getFusionAccounts()
-        console.log("forEachISCAccount mock: state.getFusionAccounts() count:", faList.length)
+        console.log('forEachISCAccount mock: state.getFusionAccounts() count:', faList.length)
         for (const account of faList) {
             const iscAccount = await registry.fusion.getISCAccount(account)
-            console.log(`forEachISCAccount mock: getISCAccount for nativeId=${account.nativeIdentity} produced iscAccount=${!!iscAccount}`)
+            console.log(
+                `forEachISCAccount mock: getISCAccount for nativeId=${account.nativeIdentity} produced iscAccount=${!!iscAccount}`
+            )
             if (iscAccount) {
                 send(iscAccount)
                 sent++
@@ -671,7 +688,7 @@ function sanitizeHistoryDates(val: any): any {
         const copy: any = {}
         for (const [k, v] of Object.entries(val)) {
             if (k === 'history' && Array.isArray(v)) {
-                copy[k] = v.map(h => typeof h === 'string' ? h.replace(/^\[\d{4}-\d{2}-\d{2}\]/, '[DATE]') : h)
+                copy[k] = v.map((h) => (typeof h === 'string' ? h.replace(/^\[\d{4}-\d{2}-\d{2}\]/, '[DATE]') : h))
             } else {
                 copy[k] = sanitizeHistoryDates(v)
             }
@@ -707,14 +724,20 @@ export function compareOutputs(
         try {
             const expectedObj = expectedArray[i] as Record<string, unknown>
             const actualObj = actual[i] as Record<string, unknown>
-            
+
             // Handle primitives or nulls if they are in the array
-            if (typeof expectedObj !== 'object' || expectedObj === null || 
-                typeof actualObj !== 'object' || actualObj === null) {
+            if (
+                typeof expectedObj !== 'object' ||
+                expectedObj === null ||
+                typeof actualObj !== 'object' ||
+                actualObj === null
+            ) {
                 const expectedSanitized = sanitizeHistoryDates(expectedObj)
                 const actualSanitized = sanitizeHistoryDates(actualObj)
                 if (JSON.stringify(expectedSanitized) !== JSON.stringify(actualSanitized)) {
-                    drift.push(`${stepId}[${i}]: expected ${JSON.stringify(expectedSanitized)}, got ${JSON.stringify(actualSanitized)}`)
+                    drift.push(
+                        `${stepId}[${i}]: expected ${JSON.stringify(expectedSanitized)}, got ${JSON.stringify(actualSanitized)}`
+                    )
                 }
                 continue
             }
@@ -723,7 +746,7 @@ export function compareOutputs(
             for (const key of keys) {
                 const expectedVal = expectedObj[key]
                 const actualVal = actualObj[key]
-                
+
                 const expectedSanitized = sanitizeHistoryDates(expectedVal)
                 const actualSanitized = sanitizeHistoryDates(actualVal)
 
