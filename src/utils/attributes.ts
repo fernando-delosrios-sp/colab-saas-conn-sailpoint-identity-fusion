@@ -1,4 +1,4 @@
-import { hasValue, isDefined, missing, readUnknown, trimStr } from './safeRead'
+import { hasValue, isDefined, missing, trimStr } from './safeRead'
 
 /**
  * Attribute utility functions for picking, filtering, and transforming attributes.
@@ -241,7 +241,7 @@ export function extractArray<T = any>(attributes: Record<string, any>, key: stri
  * // Returns: Set()
  */
 function extractObjectValue(item: object): string | undefined {
-    const pick = readUnknown(item, 'id') ?? readUnknown(item, 'value') ?? readUnknown(item, 'name')
+    const pick = getFirstValidAttribute(item as Record<string, any>, 'id', 'value', 'name')
     return hasValue(pick) ? String(pick) : undefined
 }
 
