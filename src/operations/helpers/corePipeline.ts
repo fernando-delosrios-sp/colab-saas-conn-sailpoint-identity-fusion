@@ -409,10 +409,11 @@ export class PipelineRunner {
         const isPersistent = mode.kind === 'aggregation'
         const timer = log.timer()
 
+        let shouldContinue: boolean;
+        let fetchResult: FetchResult | undefined;
+        let outputCount: number;
+
         let processLockAcquired = false
-        let shouldContinue = true
-        let fetchResult: FetchResult | undefined
-        let outputCount = 0
 
         const targetPhase = options.targetPhase ?? (isPersistent ? 'report' : 'process')
         const pipelineOptions: CorePipelineOptions = {

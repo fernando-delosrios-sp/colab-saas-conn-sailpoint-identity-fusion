@@ -140,7 +140,7 @@ export class AttributeService {
             await this.locks.waitForAllPendingOperations()
         }
         const stateWrapper = this.getStateWrapper()
-        this.log.debug(`Reading state - StateWrapper has ${stateWrapper.state.size} entries`)
+        this.log.debug(`Reading state - StateWrapper has ${stateWrapper.getSize()} entries`)
 
         const state = stateWrapper.getState()
         this.log.debug(`getState() returned: ${JSON.stringify(state)}`)
@@ -171,7 +171,7 @@ export class AttributeService {
 
         this.log.debug(`Initializing ${counterDefinitions.length} incremental counter attributes`)
         const existingCounters = Object.fromEntries(
-            Array.from(stateWrapper.state.entries()).filter(([key]) =>
+            Array.from(stateWrapper.entries()).filter(([key]) =>
                 counterDefinitions.some((definition) => definition.name === key)
             )
         )
@@ -188,7 +188,7 @@ export class AttributeService {
 
         const finalCounters: { [key: string]: number } = {}
         for (const definition of counterDefinitions) {
-            const value = stateWrapper.state.get(definition.name)
+            const value = stateWrapper.get(definition.name)
             if (value !== undefined) {
                 finalCounters[definition.name] = value
             }
@@ -1324,14 +1324,14 @@ export class AttributeService {
         const key = definition.name
         const lockKey = `counter:${key}`
         await this.locks.withLock(lockKey, async () => {
-            const current = stateWrapper.state.get(key)
+            const current = stateWrapper.get(key)
             if (current === undefined) {
                 const start = definition.counterStart ?? 1
                 await stateWrapper.initCounter(key, start)
             }
-            const nextCurrent = stateWrapper.state.get(key) ?? 0
+            const nextCurrent = stateWrapper.get(key) ?? 0
             if (parsed > nextCurrent) {
-                stateWrapper.state.set(key, parsed)
+                stateWrapper.set(key, parsed)
             }
         })
     }

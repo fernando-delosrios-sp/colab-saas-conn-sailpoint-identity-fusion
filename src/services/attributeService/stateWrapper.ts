@@ -9,7 +9,7 @@ import { LockService } from '../lockService'
  * Wrapper for managing counter state across connector runs
  */
 export class StateWrapper {
-    state: Map<string, number> = new Map()
+    private state: Map<string, number> = new Map()
     private locks?: LockService
 
     constructor(state?: any, locks?: LockService) {
@@ -50,7 +50,6 @@ export class StateWrapper {
         logger.debug(`Getting counter for key: ${key}`)
         return async () => {
             const lockKey = `counter:${key}`
-
             return await this.locks!.withLock(lockKey, async () => {
                 const currentValue = this.state.get(key)
 
@@ -94,7 +93,6 @@ export class StateWrapper {
      */
     async initCounter(key: string, start: number): Promise<void> {
         const lockKey = `counter:${key}`
-
         if (this.locks) {
             await this.locks.withLock(lockKey, async () => {
                 this._doInit(key, start)
@@ -108,7 +106,35 @@ export class StateWrapper {
     /**
      * Get the state as a plain object for saving
      */
-    getState(): { [key: string]: number } {
+    public getState(): { [key: string]: number } {
         return Object.fromEntries(this.state)
+    }
+
+    /**
+     * Get number of entries in the state map.
+     */
+    public getSize(): number {
+        return this.state.size
+    }
+
+    /**
+     * Get an iterator over [key, value] entries.
+     */
+    public entries(): Iterable<[string, number]> {
+        return this.state.entries()
+    }
+
+    /**
+     * Get value for a key.
+     */
+    public get(key: string): number | undefined {
+        return this.state.get(key)
+    }
+
+    /**
+     * Set value for a key.
+     */
+    public set(key: string, value: number): void {
+        this.state.set(key, value)
     }
 }

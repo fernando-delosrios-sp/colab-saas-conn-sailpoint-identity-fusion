@@ -10,9 +10,10 @@ import { accountList } from '../../../operations/accountList'
 import { accountCreate } from '../../../operations/accountCreate'
 import { accountDisable } from '../../../operations/accountDisable'
 import { accountEnable } from '../../../operations/accountEnable'
+import { AggregationTracker as _AggregationTracker } from '../../services/fusionService'
 import { accountRead } from '../../../operations/accountRead'
 import { accountUpdate } from '../../../operations/accountUpdate'
-import { ServiceRegistry } from '../../../services/serviceRegistry'
+import { ServiceRegistry as _ServiceRegistry } from '../../../services/serviceRegistry'
 import { MockRegistry } from './framework/ChainContext'
 
 let mockActiveRegistry: any = null
@@ -32,12 +33,12 @@ jest.mock('../../../services/serviceRegistry', () => ({
 }))
 
 function availableRecordings(): string[] {
-    const dir = path.resolve('test-data', 'recordings')
-    if (!fs.existsSync(dir)) return []
+    const _dir = path.resolve('test-data', 'recordings')
+    if (!fs.existsSync(_dir)) return []
     return fs
-        .readdirSync(dir, { withFileTypes: true })
-        .filter((d) => d.isDirectory() && fs.existsSync(path.join(dir, d.name, 'scenario.json')))
-        .map((d) => path.join(dir, d.name, 'scenario.json'))
+        .readdirSync(_dir, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && fs.existsSync(path.join(_dir, d.name, 'scenario.json')))
+        .map((d) => path.join(_dir, d.name, 'scenario.json'))
 }
 
 function registerAllStepFns(): void {
@@ -182,18 +183,18 @@ function registerAllStepFns(): void {
 }
 
 describe('Identity Fusion NG - Recorded Chain Replay', () => {
-    const recordings = availableRecordings()
+    const _matchScoringMs = availableRecordings()
 
     beforeAll(() => {
         registerAllStepFns()
     })
 
-    if (recordings.length === 0) {
+    if (_matchScoringMs.length === 0) {
         it.skip('no recordings available — run npm run record to create one', () => {
             // placeholder
         })
     } else {
-        it.each(recordings)('replays recording: %s', async (scenarioPath) => {
+        it.each(_matchScoringMs)('replays recording: %s', async (scenarioPath) => {
             const runner = new ChainRunner(scenarioPath)
             const scenario = (runner as any).scenario
             const mas = scenario.initialState.managedAccounts
@@ -211,11 +212,11 @@ describe('Identity Fusion NG - Recorded Chain Replay', () => {
             for (let i = 0; i < results.stepResults.length; i++) {
                 const stepResult = results.stepResults[i]
                 expect(stepResult.success).toBe(true)
-                const output = stepResult.output as Record<string, unknown>
+                const _output = stepResult.output as Record<string, unknown>
                 const step = steps[i]
                 if (step?.expectedOutput) {
-                    const { match, drift } = compareOutputs(
-                        (output?.outputs as unknown[]) ?? [],
+                    const { _match, drift } = compareOutputs(
+                        (_output?.outputs as unknown[]) ?? [],
                         step.expectedOutput,
                         `${stepResult.stepId} (index ${i})`
                     )
@@ -227,9 +228,9 @@ describe('Identity Fusion NG - Recorded Chain Replay', () => {
 
     describe('Scenario Structure Validation', () => {
         it('validates scenario JSON structure when recordings exist', () => {
-            if (recordings.length === 0) return
+            if (_matchScoringMs.length === 0) return
 
-            const runner = new ChainRunner(recordings[0])
+            const runner = new ChainRunner(_matchScoringMs[0])
 
             const config = runner.getConfig()
             expect(config).toBeDefined()
@@ -248,12 +249,12 @@ describe('Identity Fusion NG - Recorded Chain Replay', () => {
         })
 
         it('reference values have expected keys', () => {
-            if (recordings.length === 0) return
+            if (_matchScoringMs.length === 0) return
 
-            const runner = new ChainRunner(recordings[0])
+            const runner = new ChainRunner(_matchScoringMs[0])
             const refValues = runner.getReferenceValues()
 
-            for (const [stepId, refs] of Object.entries(refValues)) {
+            for (const [_stepId, refs] of Object.entries(refValues)) {
                 expect(refs.outputCount).toBeDefined()
                 expect(refs.durationMs).toBeDefined()
                 expect(refs.managedAccountsCount).toBeDefined()
