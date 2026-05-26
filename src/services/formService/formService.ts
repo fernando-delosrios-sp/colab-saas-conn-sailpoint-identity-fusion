@@ -20,6 +20,7 @@ import { MessagingService } from '../messagingService'
 import { SourceService } from '../sourceService'
 import { assert, softAssert } from '../../utils/assert'
 import { readString, readUnknown, trimStr } from '../../utils/safeRead'
+import { getFirstValidAttribute } from '../../utils/attributes'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
 import {
@@ -409,7 +410,7 @@ export class FormService {
             if (doc) {
                 const attrs = readUnknown(doc, 'attributes')
                 const hydrated = normalizeEmail(
-                    readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail') ?? readUnknown(attrs, 'emailAddress')
+                    getFirstValidAttribute(attrs as Record<string, any>, 'email', 'mail', 'emailAddress')
                 )
                 if (hydrated) {
                     ;(c.attributes as Record<string, unknown>).email = hydrated
