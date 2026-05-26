@@ -22,7 +22,7 @@ import { FusionDecision } from '../../model/form'
 import { MatchCandidateType, ScoringService } from '../scoringService'
 import { SchemaService } from '../schemaService'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
-import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
+import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats } from './types'
 import { buildFusionReport } from './fusionReportBuilder'
 import { processManagedAccount, hasAllAttributeScoresPerfect } from './fusionManagedAccountProcessor'
 import { AggregationTracker } from './aggregationTracker'
@@ -1052,7 +1052,7 @@ export class FusionService {
     public async processManagedAccounts(): Promise<void> {
         await this.initializeManagedAccountProcessing()
         await this.processCorrelatedManagedAccounts()
-        const { processed, matchScoringMs } = await this.processUncorrelatedManagedAccounts()
+        const { processed } = await this.processUncorrelatedManagedAccounts()
         this.log.info(`Managed accounts phase finished: ${processed} analyzed (matching workflow complete)`)
     }
 

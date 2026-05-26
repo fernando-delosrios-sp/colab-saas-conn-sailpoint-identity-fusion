@@ -215,7 +215,7 @@ export class ChainRunner {
         } as unknown as ChainContext
     }
 
-    private buildStateDelta(step: StepDefinition, output: unknown): Record<string, unknown> {
+    private buildStateDelta(step: StepDefinition, _output: unknown): Record<string, unknown> {
         const delta: Record<string, unknown> = {}
 
         if (step.expectedStateDelta) {

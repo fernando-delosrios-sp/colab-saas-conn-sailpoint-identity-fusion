@@ -6,7 +6,7 @@
  */
 
 // Compile RegExp patterns once at module level for better performance
-const TOKEN_PATTERNS: Record<string, RegExp> = {
+const _TOKEN_PATTERNS: Record<string, RegExp> = {
     yyyy: /yyyy/g,
     yy: /yy/g,
     MM: /MM/g,
