@@ -927,24 +927,18 @@ export class FusionService {
         // New-identity decisions branch by source policy: record keeps uniqueness reservation only,
         // orphan may queue disable action, authoritative emits a new fusion account.
         if (fusionDecision.newIdentity) {
-            if (sourceType === SourceType.Record) {
-                this.log.debug(
-                    `Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`
-                )
-                await this.attributes.registerUniqueAttributes(fusionAccount)
-                return undefined
-            }
-            if (sourceType === SourceType.Orphan) {
-                this.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
-                const sourceInfo = this.sourcesByName.get(fusionDecision.account.sourceName)
-                if (sourceInfo?.config?.disableNonMatchingAccounts) {
-                    const decisionManagedKey = trimStr(fusionDecision.account.id) ?? ''
-                    const managedAccount = decisionManagedKey
-                        ? this.sources.managedAccountsById.get(decisionManagedKey)
-                        : undefined
-                    if (managedAccount) {
-                        this.queueDisableOperation(managedAccount)
-                    }
+            const sourceInfo = this.sourcesByName.get(fusionDecision.account.sourceName)
+            const decisionManagedKey = trimStr(fusionDecision.account.id) ?? ''
+            const managedAccount = decisionManagedKey
+                ? this.sources.managedAccountsById.get(decisionManagedKey)
+                : undefined
+            if (await this.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccount)) {
+                if (sourceType === SourceType.Record) {
+                    this.log.debug(
+                        `Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`
+                    )
+                } else if (sourceType === SourceType.Orphan) {
+                    this.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
                 }
                 return undefined
             }
@@ -1294,21 +1288,40 @@ export class FusionService {
         return isExactAttributeMatchScores(match.scores)
     }
 
+    /**
+     * Applies the no-match source-type policy for Record and Orphan sources.
+     * Returns true when the account was handled (caller should return undefined),
+     * false when the source is Authoritative and the caller should proceed.
+     */
+    private async handleNonAuthoritativeNoMatch(
+        fusionAccount: FusionAccount,
+        sourceType: SourceType,
+        sourceInfo: SourceInfo | undefined,
+        account?: Account
+    ): Promise<boolean> {
+        if (sourceType === SourceType.Record) {
+            await this.attributes.registerUniqueAttributes(fusionAccount)
+            return true
+        }
+        if (sourceType === SourceType.Orphan) {
+            if (sourceInfo?.config?.disableNonMatchingAccounts && account) {
+                this.queueDisableOperation(account)
+            }
+            return true
+        }
+        return false
+    }
+
     private async handleNoReviewerAccount(
         account: Account,
         sourceType: SourceType,
         sourceInfo: SourceInfo | undefined
     ): Promise<FusionAccount | undefined> {
         const fusionAccount = await this.preProcessManagedAccount(account)
-        if (sourceType !== SourceType.Authoritative) {
+        if (await this.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, account)) {
             this.log.debug(
                 `Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`
             )
-            if (sourceType === SourceType.Record) {
-                await this.attributes.registerUniqueAttributes(fusionAccount)
-            } else if (sourceType === SourceType.Orphan && sourceInfo?.config?.disableNonMatchingAccounts) {
-                this.queueDisableOperation(account)
-            }
             return undefined
         }
         return this.finalizeAuthoritativeUnmatched(fusionAccount)
@@ -1376,14 +1389,7 @@ export class FusionService {
         sourceType: SourceType,
         sourceInfo: SourceInfo | undefined
     ): Promise<FusionAccount | undefined> {
-        if (sourceType === SourceType.Record) {
-            await this.attributes.registerUniqueAttributes(fusionAccount)
-            return undefined
-        }
-        if (sourceType === SourceType.Orphan) {
-            if (sourceInfo?.config?.disableNonMatchingAccounts) {
-                this.queueDisableOperation(account)
-            }
+        if (await this.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, account)) {
             return undefined
         }
         await this.finalizeAuthoritativeUnmatched(fusionAccount)
