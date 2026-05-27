@@ -3,7 +3,19 @@ import { SchemaService } from '../schemaService'
 describe('SchemaService', () => {
     let schemaService: SchemaService
 
+    let mockClient: any
+    let mockSources: any
+
     beforeEach(() => {
+        mockClient = {
+            identityAttributesApi: {
+                listIdentityAttributes: jest.fn().mockResolvedValue({ data: [] }),
+            },
+            execute: jest.fn().mockImplementation((fn) => fn()),
+        }
+        mockSources = {
+            managedSources: [],
+        }
         // Minimal mock setup
         schemaService = new SchemaService(
             {
@@ -11,7 +23,8 @@ describe('SchemaService', () => {
                 sources: [],
             } as any,
             { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any,
-            {} as any
+            mockSources as any,
+            mockClient as any
         )
     })
 
@@ -63,6 +76,63 @@ describe('SchemaService', () => {
             const singleDef = { name: 'name', type: 'string', multi: false }
             expect((schemaService as any).castAttributeValue(null, multiDef)).toBeNull()
             expect((schemaService as any).castAttributeValue(undefined, singleDef)).toBeNull()
+        })
+    })
+
+    describe('buildDynamicSchema', () => {
+        it('should fetch and include identity schema attributes when includeIdentities is true/default', async () => {
+            mockClient.identityAttributesApi.listIdentityAttributes.mockResolvedValue({
+                data: [
+                    { name: 'empId', displayName: 'Employee ID', type: 'STRING', multi: false },
+                    { name: 'groups', displayName: 'Groups', type: 'STRING', multi: true },
+                ],
+            })
+
+            const schema = await schemaService.buildDynamicSchema()
+            
+            // Check that the returned attributes contain the converted identity attributes
+            const empIdAttr = schema.attributes.find((a) => a.name === 'empId')
+            expect(empIdAttr).toEqual({
+                name: 'empId',
+                description: 'Employee ID',
+                type: 'string',
+                multi: false,
+                entitlement: false,
+            })
+
+            const groupsAttr = schema.attributes.find((a) => a.name === 'groups')
+            expect(groupsAttr).toEqual({
+                name: 'groups',
+                description: 'Groups',
+                type: 'string',
+                multi: true,
+                entitlement: false,
+            })
+        })
+
+        it('should not include identity schema attributes when includeIdentities is false', async () => {
+            // Re-instantiate with includeIdentities: false
+            schemaService = new SchemaService(
+                {
+                    attributeMerge: 'list',
+                    sources: [],
+                    includeIdentities: false,
+                } as any,
+                { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any,
+                mockSources as any,
+                mockClient as any
+            )
+
+            mockClient.identityAttributesApi.listIdentityAttributes.mockResolvedValue({
+                data: [
+                    { name: 'empId', displayName: 'Employee ID', type: 'STRING', multi: false },
+                ],
+            })
+
+            const schema = await schemaService.buildDynamicSchema()
+            const empIdAttr = schema.attributes.find((a) => a.name === 'empId')
+            expect(empIdAttr).toBeUndefined()
+            expect(mockClient.identityAttributesApi.listIdentityAttributes).not.toHaveBeenCalled()
         })
     })
 })

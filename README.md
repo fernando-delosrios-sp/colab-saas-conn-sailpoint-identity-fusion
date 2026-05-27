@@ -366,7 +366,7 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
 | **originSource**     | string               | No    | Name of the source that originally created this account. Set once at creation and never modified. Equals the managed account source name when the account originates from a source account, or `Identities` when it originates from an identity. Useful for auditing and tracing account provenance. |
 | **originAccount**    | string               | No    | Identity ID or managed account key (`sourceId::nativeIdentity`) that originally created this Fusion account. Set once at creation and never modified. Legacy raw account IDs are supported for backwards compatibility. Pairs with `**$account`\*\* in Velocity for the origin snapshot object.      |
 
-> **Note:** In addition to these standard attributes, the discovered schema includes any attributes defined via **Attribute Mapping** and **Attribute Definition** settings.
+> **Note:** In addition to these standard attributes, the discovered schema includes any attributes defined via **Attribute Mapping** and **Attribute Definition** settings, as well as all identity schema attributes when identities are in scope.
 
 > **Tip:** Do not include attributes you don't need in your schema, and do not remove internal attributes.
 
@@ -394,6 +394,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ### 2.2.0
 
+- (2026-05-27) Enhanced schema discovery to dynamically include identity schema attributes when identities are in scope.
 - (2026-05-21) Refactored `FusionService`, `FormService`, and `AttributeService` extracting helper functions to `helpers.ts` modules to improve maintainability and separate concerns.
 - (2026-05-21) Refactored `FusionAccount` logic and extracted validation logic.
 - (2026-05-21) Fixed `tsconfig.json` configuration for TypeScript compilation.

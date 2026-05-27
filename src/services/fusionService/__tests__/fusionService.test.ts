@@ -66,7 +66,7 @@ describe('FusionService', () => {
             mockIdentities
         ) as jest.Mocked<FormService>
         const mockLocks = {} as any
-        mockSchemas = new SchemaService(mockConfig, mockLog, mockSources) as jest.Mocked<SchemaService>
+        mockSchemas = new SchemaService(mockConfig, mockLog, mockSources, mockClient) as jest.Mocked<SchemaService>
         mockAttributes = new AttributeService(
             mockConfig,
             mockSchemas,

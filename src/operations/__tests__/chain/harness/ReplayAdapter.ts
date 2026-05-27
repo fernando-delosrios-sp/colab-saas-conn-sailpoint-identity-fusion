@@ -189,7 +189,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         console.warn('LOG.WARN:', ...args)
     })
 
-    const schemaService = new SchemaService(context.config as any, registry.log as any, registry.sources as any)
+    const schemaService = new SchemaService(context.config as any, registry.log as any, registry.sources as any, registry.client as any)
     registry.schemas = schemaService as any
 
     // Mock fetchAllSources to populate managedSources from config
