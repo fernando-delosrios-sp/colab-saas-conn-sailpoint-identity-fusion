@@ -1,6 +1,10 @@
 // Main service export
 export { ClientService } from './clientService'
 
+// Adapters
+export type { IscApiAdapter } from './iscApiAdapter'
+export { SdkApiAdapter } from './sdkApiAdapter'
+
 // Queue exports
 export { ApiQueue } from './queue'
 

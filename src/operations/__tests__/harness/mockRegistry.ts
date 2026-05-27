@@ -1,4 +1,6 @@
 import { AggregationTracker } from '../../../services/fusionService/aggregationTracker'
+import { FakeApiAdapter } from '../chain/harness/fakeApiAdapter'
+import { ClientService } from '../../../services/clientService'
 
 export type SourceConfigLike = {
     name: string
@@ -126,6 +128,9 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         saveState: jest.fn().mockResolvedValue(undefined),
     }
 
+    const fakeAdapter = new FakeApiAdapter(sourceConfigs as any)
+    const client = new ClientService(fakeAdapter, null, { sources: sourceConfigs } as any, { info: jest.fn(), debug: jest.fn(), error: jest.fn(), warn: jest.fn() } as any)
+
     const registry = {
         config: { sources: sourceConfigs },
         log: {
@@ -144,7 +149,8 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         fusion,
         messaging,
         attributes,
+        client,
     } as any
 
-    return { registry, timer, schemas, sources, identities, forms, fusion }
+    return { registry, timer, schemas, sources, identities, forms, fusion, client }
 }

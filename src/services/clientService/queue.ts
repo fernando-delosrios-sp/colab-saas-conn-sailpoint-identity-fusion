@@ -25,6 +25,7 @@ export class ApiQueue {
     private activeRequests: number = 0
     private activeItems: Map<string, QueueItem> = new Map()
     private processing: boolean = false
+    private nextRequestTime: number = 0
     private stats: QueueStats = {
         totalProcessed: 0,
         totalFailed: 0,
@@ -192,13 +193,16 @@ export class ApiQueue {
         this.pushStat('wait', waitTime)
 
         // Throttle: ensure minimum time between requests
-        const timeSinceLastRequest = Date.now() - this.lastRequestTime
-        if (timeSinceLastRequest < this.minRequestInterval) {
-            await this.sleep(this.minRequestInterval - timeSinceLastRequest)
+        const now = Date.now()
+        const targetTime = Math.max(now, this.nextRequestTime)
+        this.nextRequestTime = targetTime + this.minRequestInterval
+        
+        const delay = targetTime - now
+        if (delay > 0) {
+            await this.sleep(delay)
         }
 
         const startTime = Date.now()
-        this.lastRequestTime = Date.now()
 
         try {
             if (item.abortSignal?.aborted) {
