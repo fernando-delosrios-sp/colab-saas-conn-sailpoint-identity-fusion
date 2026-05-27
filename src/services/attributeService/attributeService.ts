@@ -1147,7 +1147,7 @@ export class AttributeService {
 
         // HOSTING IDENTITY DISPLAY ALIGNMENT:
         // For accounts linked to a platform Identity, ensure the display name remains aligned with the identity name
-        if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
+        if ((fusionAccount.fromIdentity || fusionAccount.isIdentity) && name === fusionDisplayAttribute) {
             const label = this.hostingIdentityName(fusionAccount)
             if (label) {
                 this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
@@ -1237,7 +1237,7 @@ export class AttributeService {
             }
 
             // Set identity name for display attribute if the account is an identity
-            if (fusionAccount.fromIdentity && isFusionDisplayAttribute) {
+            if ((fusionAccount.fromIdentity || fusionAccount.isIdentity) && isFusionDisplayAttribute) {
                 const label = this.hostingIdentityName(fusionAccount)
                 if (label) {
                     this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
