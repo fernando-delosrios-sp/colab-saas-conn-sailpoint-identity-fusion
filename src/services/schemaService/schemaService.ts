@@ -11,6 +11,7 @@ import {
 import { LogService } from '../logService'
 import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
+import { compact } from '../../utils/safeRead'
 import { fusionAccountSchemaAttributes } from '../../data/schema'
 import { isAccountSchema, apiSchemaToAccountSchema } from './helpers'
 import { promiseAllBatched } from '../fusionService/collections'
@@ -81,9 +82,9 @@ export class SchemaService {
         const type = (schemaDef.type ?? 'string').toLowerCase()
 
         if (isMulti) {
-            // Multi-valued: ensure the value is an array, then cast each element
+            // Multi-valued: ensure the value is an array, filter null/undefined, then cast each element
             const arr = Array.isArray(value) ? value : [value]
-            return arr.map((v) => this.castScalar(v, type)) as string[] | number[]
+            return compact(arr).map((v) => this.castScalar(v, type)) as string[] | number[]
         } else {
             // Single-valued: if value is an array, join it into a string
             const scalar = Array.isArray(value) ? value.join(', ') : value

@@ -1,6 +1,6 @@
 import { Attributes } from '@sailpoint/connector-sdk'
 import { AttributeMap, AttributeMergeMode, DefaultAttributeMergeMode } from '../../model/config'
-import { hasValue } from '../../utils/safeRead'
+import { hasValue, compact } from '../../utils/safeRead'
 import { AttributeMappingConfig } from './types'
 
 // ============================================================================
@@ -38,18 +38,19 @@ export const attrSplit = (text: string): string[] => {
  * @param list - Array of strings to concatenate
  * @param alreadyProcessed - If true, assumes list is already sorted with unique values (for performance)
  */
-export const attrConcat = (list: string[], alreadyProcessed: boolean = false): string => {
+export const attrConcat = (list: string[]): string => {
     if (list.length === 0) {
         return ''
     }
 
     // If already sorted with unique values (e.g., from processAttributeMapping), skip redundant work
-    const unique = alreadyProcessed ? list : Array.from(new Set(list)).sort()
+    const unique = Array.from(new Set(list))
 
     // Filter out empty strings to prevent empty brackets like "[] [Source]"
     return unique
-        .filter(Boolean)
+        .filter((x) => x !== '')
         .map((x) => `[${x}]`)
+        .sort()
         .join(' ')
 }
 
@@ -155,19 +156,19 @@ const processMultiValueMerge = (
     const { sourceAttributes, attributeName, attributeMerge } = config
     const attributeNames = Array.from(new Set([...sourceAttributes, attributeName]))
     const allValues = collectAllAttributeValues(sourceAttributeMap, sourceOrder, attributeNames)
+    const existingValues = compact(allValues)
 
-    if (allValues.length === 0) {
+    if (existingValues.length === 0) {
         return undefined
     }
 
-    // Extract unique values and sort once for both 'list' and 'concatenate' strategies
-    const uniqueSorted = [...new Set(allValues)].sort()
-
     if (attributeMerge === AttributeMergeMode.List) {
-        return uniqueSorted
+        return allValues
     }
-    // Pass true to skip redundant uniqueness filtering/sorting since we already did it above
-    return attrConcat(uniqueSorted, true)
+
+    // For Concatenate: flatten arrays one level so attrConcat receives string[]
+    const flattened = existingValues.flatMap((v) => (Array.isArray(v) ? v : [v]))
+    return attrConcat(flattened)
 }
 
 /**
@@ -177,8 +178,8 @@ const collectAllAttributeValues = (
     sourceAttributeMap: Map<string, Attributes[]>,
     sourceOrder: string[],
     attributeNames: string[]
-): string[] => {
-    const allValues: string[] = []
+): any[] => {
+    const allValues: any[] = []
 
     for (const sourceName of sourceOrder) {
         const accounts = sourceAttributeMap.get(sourceName)
@@ -194,23 +195,24 @@ const collectAllAttributeValues = (
 }
 
 /**
- * Extract and split all attribute values from a list of accounts
+ * Extract attribute values from a list of accounts.
+ * - Strings are split via attrSplit (bracketed format)
+ * - Arrays are passed through as-is (flattening deferred to output stage)
+ * - Non-string scalars are wrapped in an array
  */
-const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: string[]): string[] => {
-    const values: string[] = []
+const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: string[]): any[] => {
+    const values: any[] = []
 
     for (const account of accounts) {
         for (const attribute of attributeNames) {
             const value = account[attribute]
             if (hasValue(value)) {
-                let splitValues: string[]
+                let splitValues: any[]
                 if (typeof value === 'string') {
                     splitValues = attrSplit(value)
                 } else if (Array.isArray(value)) {
-                    // Flatten arrays one level: stringify each element, filtering null/undefined
+                    // Pass arrays through as-is; flattening happens at getISCAccount
                     splitValues = value
-                        .filter((v): v is NonNullable<typeof v> => v !== null && v !== undefined)
-                        .map((v) => String(v))
                 } else {
                     // Convert non-string scalar values to strings
                     splitValues = [String(value)]

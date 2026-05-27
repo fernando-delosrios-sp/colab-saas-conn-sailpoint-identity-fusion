@@ -34,8 +34,8 @@ describe('attributeService helpers', () => {
             expect(attrConcat(['B', 'A', 'B'])).toBe('[A] [B]')
         })
 
-        it('should skip extracting unique values/sorting when alreadyProcessed', () => {
-            expect(attrConcat(['C', 'A', 'B'], true)).toBe('[C] [A] [B]')
+        it('should always sort and dedupe', () => {
+            expect(attrConcat(['C', 'A', 'B'])).toBe('[A] [B] [C]')
         })
 
         it('should filter empty strings', () => {
@@ -126,7 +126,7 @@ describe('attributeService helpers', () => {
             expect(processAttributeMapping(config, map, ['Empty'])).toBeUndefined()
         })
 
-        it('should flatten array values for "list" merge', () => {
+        it('should preserve array values in source order for "list" merge', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ roles: ['Admin', 'User'] }])
             map.set('S2', [{ roles: ['Manager'] }])
@@ -136,11 +136,11 @@ describe('attributeService helpers', () => {
                 attributeMerge: AttributeMergeMode.List,
             }
             const result = processAttributeMapping(config, map, ['S1', 'S2'])
-            expect(result).toEqual(['Admin', 'Manager', 'User'])
+            expect(result).toEqual(['Admin', 'User', 'Manager'])
             expect(result).toHaveLength(3)
         })
 
-        it('should flatten array values for "concatenate" merge', () => {
+        it('should flatten and dedupe array values for "concatenate" merge', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ roles: ['Admin', 'User'] }])
             map.set('S2', [{ roles: ['Manager'] }])
@@ -166,7 +166,7 @@ describe('attributeService helpers', () => {
             expect(result).toEqual(['A', 'B', 'C', 'D'])
         })
 
-        it('should filter null and undefined from array values', () => {
+        it('should preserve null and undefined in "list" merge (filtered at output stage)', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ items: [null, 'A', undefined, 'B'] as any[] }])
             const config = {
@@ -175,7 +175,19 @@ describe('attributeService helpers', () => {
                 attributeMerge: AttributeMergeMode.List,
             }
             const result = processAttributeMapping(config, map, ['S1'])
-            expect(result).toEqual(['A', 'B'])
+            expect(result).toEqual([null, 'A', undefined, 'B'])
+        })
+
+        it('should filter null and undefined for "concatenate" merge', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('S1', [{ items: [null, 'A', undefined, 'B'] as any[] }])
+            const config = {
+                attributeName: 'items',
+                sourceAttributes: ['items'],
+                attributeMerge: AttributeMergeMode.Concatenate,
+            }
+            const result = processAttributeMapping(config, map, ['S1'])
+            expect(result).toBe('[A] [B]')
         })
     })
 
