@@ -8,7 +8,7 @@ import { AttributeMappingConfig } from './types'
 // ============================================================================
 
 // Pre-compiled regex for better performance
-const BRACKET_REGEX = /\[([^ ].+?)\]/g
+const BRACKET_REGEX = /\[([^ ].*?)\]/g
 const ORIGIN_SOURCE_TOKEN = '$originSource'
 
 /**
@@ -206,8 +206,13 @@ const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: strin
                 let splitValues: string[]
                 if (typeof value === 'string') {
                     splitValues = attrSplit(value)
+                } else if (Array.isArray(value)) {
+                    // Flatten arrays one level: stringify each element, filtering null/undefined
+                    splitValues = value
+                        .filter((v): v is NonNullable<typeof v> => v !== null && v !== undefined)
+                        .map((v) => String(v))
                 } else {
-                    // Convert non-string values to strings
+                    // Convert non-string scalar values to strings
                     splitValues = [String(value)]
                 }
                 values.push(...splitValues)

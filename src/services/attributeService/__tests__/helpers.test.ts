@@ -125,6 +125,58 @@ describe('attributeService helpers', () => {
             }
             expect(processAttributeMapping(config, map, ['Empty'])).toBeUndefined()
         })
+
+        it('should flatten array values for "list" merge', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('S1', [{ roles: ['Admin', 'User'] }])
+            map.set('S2', [{ roles: ['Manager'] }])
+            const config = {
+                attributeName: 'roles',
+                sourceAttributes: ['roles'],
+                attributeMerge: AttributeMergeMode.List,
+            }
+            const result = processAttributeMapping(config, map, ['S1', 'S2'])
+            expect(result).toEqual(['Admin', 'Manager', 'User'])
+            expect(result).toHaveLength(3)
+        })
+
+        it('should flatten array values for "concatenate" merge', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('S1', [{ roles: ['Admin', 'User'] }])
+            map.set('S2', [{ roles: ['Manager'] }])
+            const config = {
+                attributeName: 'roles',
+                sourceAttributes: ['roles'],
+                attributeMerge: AttributeMergeMode.Concatenate,
+            }
+            const result = processAttributeMapping(config, map, ['S1', 'S2'])
+            expect(result).toBe('[Admin] [Manager] [User]')
+        })
+
+        it('should handle mixed string and array values', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('S1', [{ tags: '[A] [B]' }])
+            map.set('S2', [{ tags: ['C', 'D'] }])
+            const config = {
+                attributeName: 'tags',
+                sourceAttributes: ['tags'],
+                attributeMerge: AttributeMergeMode.List,
+            }
+            const result = processAttributeMapping(config, map, ['S1', 'S2'])
+            expect(result).toEqual(['A', 'B', 'C', 'D'])
+        })
+
+        it('should filter null and undefined from array values', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('S1', [{ items: [null, 'A', undefined, 'B'] as any[] }])
+            const config = {
+                attributeName: 'items',
+                sourceAttributes: ['items'],
+                attributeMerge: AttributeMergeMode.List,
+            }
+            const result = processAttributeMapping(config, map, ['S1'])
+            expect(result).toEqual(['A', 'B'])
+        })
     })
 
     describe('buildAttributeMappingConfig', () => {
