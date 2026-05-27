@@ -10,6 +10,7 @@ import {
 } from '../../model/config'
 import { LogService } from '../logService'
 import { SourceService } from '../sourceService'
+import { ClientService, QueuePriority } from '../clientService'
 import { assert } from '../../utils/assert'
 import { compact } from '../../utils/safeRead'
 import { fusionAccountSchemaAttributes } from '../../data/schema'
@@ -34,11 +35,13 @@ export class SchemaService {
      * @param config - Fusion configuration containing attribute merge strategy and definitions
      * @param log - Logger instance
      * @param sources - Source service for fetching source schemas
+     * @param client - Client service for API calls
      */
     constructor(
-        config: FusionConfig,
+        private config: FusionConfig,
         private log: LogService,
-        private sources: SourceService
+        private sources: SourceService,
+        private client: ClientService
     ) {
         this.attributeMerge = config.attributeMerge
         this.normalAttributeDefinitions = config.normalAttributeDefinitions ?? []
@@ -330,6 +333,31 @@ export class SchemaService {
     }
 
     /**
+     * Fetches and converts identity attributes into SchemaAttributes.
+     */
+    private async fetchIdentitySchemaAttributes(): Promise<SchemaAttribute[]> {
+        const { identityAttributesApi } = this.client
+        const listCall = async () => {
+            const response = await identityAttributesApi.listIdentityAttributes()
+            return response.data ?? []
+        }
+
+        const identityAttrs = (await this.client.execute(
+            listCall,
+            QueuePriority.HIGH,
+            'SchemaService>fetchIdentitySchemaAttributes'
+        )) ?? []
+
+        return identityAttrs.map((attr) => ({
+            name: attr.name,
+            description: attr.displayName || `${attr.name} from Identity`,
+            type: attr.type ? attr.type.toLowerCase() : 'string',
+            multi: attr.multi ?? false,
+            entitlement: false,
+        }))
+    }
+
+    /**
      * Builds the fusion account schema from managed sources, attribute mappings,
      * and attribute definitions. Used for schema discovery.
      *
@@ -368,11 +396,27 @@ export class SchemaService {
             accountSchemaAttributes.push(...attributes)
         }
 
+        // Define identity schema attributes when identities are in scope
+        const identitySchemaAttributes: SchemaAttribute[] = []
+        if (this.config.includeIdentities !== false) {
+            try {
+                const attrs = await this.fetchIdentitySchemaAttributes()
+                identitySchemaAttributes.push(...attrs)
+            } catch (err) {
+                this.log.error(
+                    `Failed to fetch identity attributes: ${err instanceof Error ? err.message : String(err)}`
+                )
+            }
+        }
+
         const attributeMap = new Map<string, SchemaAttribute>()
         fusionAttributes.forEach((attribute) => {
             attributeMap.set(String(attribute.name!).toLowerCase(), attribute)
         })
         accountSchemaAttributes.forEach((attribute) => {
+            attributeMap.set(String(attribute.name!).toLowerCase(), attribute)
+        })
+        identitySchemaAttributes.forEach((attribute) => {
             attributeMap.set(String(attribute.name!).toLowerCase(), attribute)
         })
         attributeMappingAttributes.forEach((attribute) => {
