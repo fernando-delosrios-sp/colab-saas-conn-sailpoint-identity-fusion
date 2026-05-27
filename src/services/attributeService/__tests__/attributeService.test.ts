@@ -2171,6 +2171,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             sourceName: 'Fusion',
             fromIdentity: true,
             isIdentity: true,
+            identityName: 'Hosting Identity Name',
             sources: ['HR'],
             history: [],
             importHistory: jest.fn(),
@@ -2178,7 +2179,47 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
+        service.applyDisplayAttributeOverride(fusionAccount)
         expect(fusionAccount.attributes.name).toBe('Hosting Identity Name')
+    })
+
+    it('correlated display attribute aligns with hosting identity name even when normalDefinitions is empty', async () => {
+        const { sourceService, log, locks } = baseDeps()
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+        const service = new AttributeService(config, fusionSchemas, sourceService, log, locks)
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: { name: 'Hosting Identity Name Correlated' },
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'fusion-account-slug',
+            sourceName: 'Fusion',
+            fromIdentity: false,
+            isIdentity: true,
+            identityName: 'Hosting Identity Name Correlated',
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        service.applyDisplayAttributeOverride(fusionAccount)
+        expect(fusionAccount.attributes.name).toBe('Hosting Identity Name Correlated')
     })
 })
 

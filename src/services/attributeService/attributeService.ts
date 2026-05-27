@@ -419,6 +419,26 @@ export class AttributeService {
     }
 
     /**
+     * Overrides the display attribute of the fusion account to the hosting identity name
+     * when the account is correlated to an Identity (either originated from identities
+     * or linked/correlated to an identity), regardless of mapping and definition.
+     */
+    public applyDisplayAttributeOverride(fusionAccount: FusionAccount): void {
+        const { fusionDisplayAttribute } = this.schemas
+        if (!fusionDisplayAttribute) return
+
+        if (fusionAccount.fromIdentity || fusionAccount.isIdentity) {
+            const label = fusionAccount.identityName
+            if (label) {
+                this.log.info(
+                    `Setting identity name for attribute: ${fusionDisplayAttribute} for account: ${fusionAccount.name}`
+                )
+                fusionAccount.attributes[fusionDisplayAttribute] = label
+            }
+        }
+    }
+
+    /**
      * Refreshes only unique attribute definitions.
      * Unique attributes are only generated for new accounts; existing values are preserved
      * unless needsReset is set (e.g. when re-enabling a previously disabled account).
@@ -723,8 +743,8 @@ export class AttributeService {
 
         const configuredSchemaName = this.readAccountAttributeString(fusionAccount, fusionDisplayAttribute)
         const configuredSchemaId = this.readAccountAttributeString(fusionAccount, fusionIdentityAttribute)
-        const identityName = this.hostingIdentityName(fusionAccount)
-        const identityId = this.hostingIdentityId(fusionAccount, identityBag)
+        const identityName = fusionAccount.identityName
+        const identityId = fusionAccount.identityId ?? trimStr(identityBag.id)
 
         const schemaName = configuredSchemaName ?? identityName ?? originId
         const schemaId = configuredSchemaId ?? identityId ?? originId
@@ -753,18 +773,7 @@ export class AttributeService {
         return trimStr(fusionAccount.attributes[attributeName])
     }
 
-    private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
-        const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
-        return (
-            trimStr(identityBag?.name) ??
-            trimStr(fusionAccount.identityDisplayName) ??
-            trimStr(fusionAccount.name)
-        )
-    }
 
-    private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
-        return trimStr(fusionAccount.identityId) ?? trimStr(identity.id)
-    }
 
     /**
      * Build a deterministic accounts array for attribute-definition context.
@@ -1148,7 +1157,7 @@ export class AttributeService {
         // HOSTING IDENTITY DISPLAY ALIGNMENT:
         // For accounts linked to a platform Identity, ensure the display name remains aligned with the identity name
         if ((fusionAccount.fromIdentity || fusionAccount.isIdentity) && name === fusionDisplayAttribute) {
-            const label = this.hostingIdentityName(fusionAccount)
+            const label = fusionAccount.identityName
             if (label) {
                 this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
                 fusionAccount.attributes[name] = label
@@ -1238,7 +1247,7 @@ export class AttributeService {
 
             // Set identity name for display attribute if the account is an identity
             if ((fusionAccount.fromIdentity || fusionAccount.isIdentity) && isFusionDisplayAttribute) {
-                const label = this.hostingIdentityName(fusionAccount)
+                const label = fusionAccount.identityName
                 if (label) {
                     this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
                     fusionAccount.attributes[name] = label

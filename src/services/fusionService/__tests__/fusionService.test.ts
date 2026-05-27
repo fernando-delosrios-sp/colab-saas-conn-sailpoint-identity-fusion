@@ -265,6 +265,7 @@ describe('FusionService', () => {
             const identityId = 'identity-claimed-1'
             const mockAccount = {
                 nativeIdentity: 'fusion-claimed-1',
+                sourceId: 'mock-source',
                 identityId,
                 attributes: {
                     id: 'fusion-claimed-1',
@@ -291,6 +292,7 @@ describe('FusionService', () => {
         it('does not call deleteIdentity for uncorrelated fusion accounts (no identityId)', async () => {
             const mockAccount = {
                 nativeIdentity: 'fusion-uncorrelated-1',
+                sourceId: 'mock-source',
                 identityId: undefined,
                 attributes: {
                     id: 'fusion-uncorrelated-1',
@@ -316,6 +318,7 @@ describe('FusionService', () => {
             const identityId = 'identity-dedup-1'
             const mockFusionAccount = {
                 nativeIdentity: 'fusion-dedup-1',
+                sourceId: 'mock-source',
                 identityId,
                 attributes: {
                     id: 'fusion-dedup-1',
@@ -437,6 +440,7 @@ describe('FusionService', () => {
         it('hydrates identity name from prior fusion account identity reference when Identity document is unavailable', () => {
             const prior = {
                 nativeIdentity: 'fusion-identity-1',
+                sourceId: 'mock-source',
                 name: '',
                 attributes: {
                     id: 'fusion-identity-1',
@@ -459,6 +463,7 @@ describe('FusionService', () => {
         it('does not derive identity display label from account.name when identity reference is absent', () => {
             const prior = {
                 nativeIdentity: 'fusion-identity-no-ref',
+                sourceId: 'mock-source',
                 name: 'Managed Account Name',
                 attributes: {
                     id: 'fusion-identity-no-ref',
