@@ -153,10 +153,9 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 | Category                  | Fields                                                     | Purpose                               |
 | ------------------------- | ---------------------------------------------------------- | ------------------------------------- |
 | **Provisioning & timing** | Provisioning timeout, Processing wait time                 | Max wait times for operations         |
-| **Queue**                 | Enable queue, Max concurrent requests, Requests per second | Rate limiting and concurrency control |
+| **Queue**                 | Max concurrent requests, Requests per second | Rate limiting and concurrency control |
 | **Retry**                 | Enable retry, API request retries, Retry delay             | Automatic retry for failed requests   |
 | **Batch sizing**          | Batch size                                                 | Tune page size and throughput balance |
-| **Priority**              | Enable priority processing                                 | Prioritize important requests         |
 
 **Screenshot placeholder:** Advanced Connection Settings interface.
 
@@ -188,11 +187,10 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 
 ### Queue (rate limiting and concurrency)
 
-**Enable queue?** = Yes activates queue management with rate limiting and concurrency control.
+Queue management provides rate limiting and concurrency control.
 
 | Field                           | Default | Range   | Purpose                    |
 | ------------------------------- | ------- | ------- | -------------------------- |
-| **Enable queue?**               | Yes     | Boolean | Activates queue system     |
 | **Maximum concurrent requests** | 10      | 1–10    | Max simultaneous API calls |
 | **Requests per second**         | 10      | 1–12    | Rate limit (throttle)      |
 
@@ -303,41 +301,6 @@ HTTP 429 retry (rate limit):
 
 **Trade-off:** Larger batch sizes reduce round trips but can increase payload size and per-call latency.
 
-### Priority processing
-
-**Enable priority processing?** = Yes prioritizes important requests in queue.
-
-| Field                           | Default                  | Purpose                        |
-| ------------------------------- | ------------------------ | ------------------------------ |
-| **Enable priority processing?** | Yes (when queue enabled) | Prioritize critical operations |
-
-**How priority works:**
-
-```
-Priority levels (internal):
-- High: Critical operations (e.g., account enable/disable)
-- Medium: Standard operations (e.g., account update)
-- Low: Background operations (e.g., history updates)
-
-Priority enabled:
-1. Queue sorts by priority
-2. High priority requests processed first
-3. Within same priority: FIFO (first in, first out)
-
-Priority disabled:
-- All requests FIFO regardless of importance
-```
-
-**When to disable:**
-
-| Scenario                      | Recommendation         |
-| ----------------------------- | ---------------------- |
-| Standard operation            | Keep enabled (default) |
-| All operations equal priority | Disable                |
-| FIFO strictly required        | Disable                |
-
----
-
 ## Part 3: Configuration patterns
 
 ### Pattern 1: Production with many accounts (recommended)
@@ -353,14 +316,12 @@ Developer Settings:
 
 Advanced Connection Settings:
 - Provisioning timeout: 600 seconds
-- Enable queue: Yes
 - Max concurrent requests: 15
 - Enable retry: Yes
 - API request retries: 20
 - Requests per second: 10
 - Retry delay: 1000ms
 - Batch size: 250
-- Enable priority: Yes
 ```
 
 **Rationale:**
@@ -377,14 +338,12 @@ Advanced Connection Settings:
 ```
 Advanced Connection Settings:
 - Provisioning timeout: 1800 seconds (30 min)
-- Enable queue: Yes
 - Max concurrent requests: 10
 - Enable retry: Yes
 - API request retries: 20
 - Requests per second: 10
 - Retry delay: 2000ms
 - Batch size: 250
-- Enable priority: Yes
 ```
 
 **Rationale:**
@@ -400,21 +359,18 @@ Advanced Connection Settings:
 
 ```
 Advanced Connection Settings:
-- Enable queue: Yes
 - Max concurrent requests: 5
 - Enable retry: Yes
 - API request retries: 20
 - Requests per second: 5
 - Retry delay: 3000ms
 - Batch size: 100
-- Enable priority: Yes
 ```
 
 **Rationale:**
 
 - Low concurrency and RPS respect rate limits
 - Many retries with longer delay
-- Priority ensures critical operations complete first
 
 ### Pattern 4: Development/testing
 
@@ -428,7 +384,6 @@ Developer Settings:
 
 Advanced Connection Settings:
 - Provisioning timeout: 300
-- Enable queue: No (or Yes with defaults)
 - Enable retry: Yes
 - API request retries: 10
 - Retry delay: 1000ms
@@ -520,14 +475,13 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 | ------------------------- | ------------------------------------- | --------------------------------------- |
 | **Developer Settings**    | Reset accounts, External logging      | Testing, troubleshooting, monitoring    |
 | **Provisioning & timing** | Provisioning timeout, Processing wait | Operation timeouts                      |
-| **Queue**                 | Enable queue, Max concurrent, RPS     | Rate limiting, concurrency control      |
+| **Queue**                 | Max concurrent, RPS     | Rate limiting, concurrency control      |
 | **Retry**                 | Enable retry, Retries, Delay          | Resilience, handling transient failures |
 | **Batch sizing**          | Batch size                            | Throughput and payload-size tuning      |
-| **Priority**              | Enable priority processing            | Critical operation prioritization       |
 
 **Best practices:**
 
-1. **Production:** Enable queue and retry, tune batch size, configure external logging
+1. **Production:** Enable retry, tune batch size, configure external logging
 2. **Rate limits:** Lower RPS and concurrency; enable retry with longer delay
 3. **Performance:** Increase concurrency and batch size (within rate limits)
 4. **Testing:** Use Debug logging; enable reset once then disable

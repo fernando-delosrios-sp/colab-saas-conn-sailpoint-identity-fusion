@@ -66,7 +66,7 @@ function createRegistry() {
         },
         fusion: {
             setTracker: jest.fn().mockImplementation((t) => { activeTracker = t }),
-            getTracker: jest.fn().mockImplementation(() => activeTracker || new AggregationTracker()),
+            get tracker() { return activeTracker || new AggregationTracker() },
             isReset: jest.fn(() => false),
             fusionOwnerIsGlobalReviewer: false,
             fusionReportOnAggregation: false,
@@ -204,7 +204,7 @@ function createRegistry() {
                     fusionAccountsFound: registry.sources.fusionAccountCount,
                     totalFusionAccounts: registry.fusion.totalFusionAccountCount,
                 }
-                const tracker = registry.fusion.getTracker()
+                const tracker = registry.fusion.tracker
                 const report = registry.fusion.generateReport(tracker, includeNonMatches ?? true, preStreamingStats)
                 return { report, preStreamingStats }
             }

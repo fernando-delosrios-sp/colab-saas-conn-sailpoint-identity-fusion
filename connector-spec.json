@@ -497,7 +497,6 @@
                     "type": "section",
                     "sectionTitle": "Normal Attribute Definitions",
                     "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional per-definition refresh. Post-template options: case, character normalization, spaces, trim, max length.<br><br><strong>Context:</strong> mapped attributes as <code>$name</code>; <code>$identity</code>; <code>$previous</code> (previous generated account state); <code>$accounts</code> (ordered by configured sources, then insertion order; valid <code>mainAccount</code> moves that snapshot to index 0); snapshots contain source attributes plus nested <code>source</code> (<code>id</code>, <code>name</code>), nested <code>schema</code> (<code>id</code> = native identity, <code>name</code> = display), and <code>IIQDisabled</code>. <code>$account</code> is the origin snapshot (managed shape or identity-backed when origin is Identities; if Identities and managed accounts exist, <code>$accounts[0]</code> is used). <code>$originAccount</code> is the origin composite key string. <code>$sources</code> maps source name → list of snapshots. <strong>Order:</strong> top to bottom; each result is available to the next.<br><br><strong>Helpers:</strong> <code>$Math</code> (round, floor, max, …); <code>$Datefns</code> (format, addDays, differenceInDays, …); <code>$Normalize</code> (phone, date, name, fullName, ssn, address); <code>$AddressParse</code> (parse, getCityState, getCityStateCode); <code>$JSON</code> (stringify, parse).",
-
                     "items": [
                         {
                             "key": "normalAttributeDefinitions",
@@ -992,21 +991,12 @@
                             "helpKey": "Maximum time (in seconds) to wait for a provisioning operation to complete. Increase this if you experience timeouts with large batches. Default: 300"
                         },
                         {
-                            "key": "enableQueue",
-                            "label": "Enable queue?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Manage the flow of API requests to avoid overloading the server. Controls how many requests run at once and how fast they are sent"
-                        },
-                        {
                             "key": "maxConcurrentRequests",
                             "label": "Maximum concurrent requests",
                             "type": "number",
                             "required": false,
                             "min": "1",
                             "max": "10",
-                            "parentKey": "enableQueue",
-                            "parentValue": "true",
                             "helpKey": "How many requests can run at the same time. Lower values are safer for rate-limited APIs. Default: 8"
                         },
                         {
@@ -1016,8 +1006,6 @@
                             "required": false,
                             "min": "1",
                             "max": "12",
-                            "parentKey": "enableQueue",
-                            "parentValue": "true",
                             "helpKey": "Maximum number of requests sent per second. Reduce this if you are getting rate-limit errors. Default: 8"
                         },
                         {
@@ -1062,13 +1050,6 @@
                             "min": "1",
                             "max": "250",
                             "helpKey": "Number of requests to group in each batch. Default: 250"
-                        },
-                        {
-                            "key": "enablePriority",
-                            "label": "Enable priority processing?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Process critical operations (like saving data) before less urgent ones (like logging). Recommended for best performance"
                         }
                     ]
                 },
