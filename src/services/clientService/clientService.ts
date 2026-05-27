@@ -1,7 +1,5 @@
-import FormData from 'form-data'
-import https from 'https'
 import { ApiQueue } from './queue'
-import { QueueConfig, QueuePriority, QueueStats, QueuedItemInfo } from './types'
+import { QueuePriority, QueueStats, QueuedItemInfo } from './types'
 import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
 import {
@@ -21,7 +19,7 @@ import {
     WorkflowsV2025Api,
 } from 'sailpoint-api-client'
 import { readNumber } from '../../utils/safeRead'
-import { createRetriesConfig } from './helpers'
+import { IscApiAdapter } from './iscApiAdapter'
 /**
  * ClientService provides a lean, centralized client for API operations.
  *
@@ -34,9 +32,6 @@ import { createRetriesConfig } from './helpers'
  * (SourceService, IdentityService, etc.) which use this client.
  */
 export class ClientService {
-    protected readonly queue: ApiQueue | null
-    public readonly config: Configuration
-    protected readonly enableQueue: boolean
     private readonly pageSize: number
     private readonly sailPointListMax: number
     private readonly statsLoggingIntervalMs: number
@@ -46,53 +41,12 @@ export class ClientService {
     /** Handle for the stats logging interval so it can be cleared in dispose(). */
     private statsLoggingInterval?: ReturnType<typeof setInterval>
 
-    // Lazy-loaded API instances
-    private _accountsApi?: AccountsV2025Api
-    private _identitiesApi?: IdentitiesV2025Api
-    private _searchApi?: SearchApi
-    private _sourcesApi?: SourcesV2025Api
-    private _customFormsApi?: CustomFormsV2025Api
-    private _workflowsApi?: WorkflowsV2025Api
-    private _entitlementsApi?: EntitlementsV2025Api
-    private _transformsApi?: TransformsApi
-    private _governanceGroupsApi?: GovernanceGroupsV2025Api
-    private _taskManagementApi?: TaskManagementV2025Api
-    private _identityProfilesApi?: IdentityProfilesV2025Api
-    private _identityAttributesApi?: IdentityAttributesV2025Api
-
     constructor(
+        private adapter: IscApiAdapter,
+        protected readonly queue: ApiQueue | null,
         fusionConfig: FusionConfig,
         protected log: LogService
     ) {
-        const tokenUrl = new URL(fusionConfig.baseurl).origin + fusionConfig.tokenUrlPath
-
-        // Determine if queue and retry are enabled
-        this.enableQueue = fusionConfig.enableQueue ?? false
-        const enableRetry = fusionConfig.enableRetry ?? false
-
-        // Only enable retry in axios config if enableRetry is true
-        const maxRetries = enableRetry ? (fusionConfig.maxRetries ?? fusionConfig.retriesConstant) : 0
-        // When the queue is enabled it acts as the sole retry authority (exponential backoff + jitter
-        // via calculateRetryDelay). Enabling axios-retry at the same time would cause a single failed
-        // request to be retried by axios first and then retried again by the queue after axios
-        // exhausts its own budget — multiplying the effective retry count unexpectedly.
-        const axiosRetries = this.enableQueue && enableRetry ? 0 : maxRetries
-        const retriesConfig = createRetriesConfig(axiosRetries)
-
-        // Inject https agent with keepAlive: true to reuse TCP connections
-        const agent = new https.Agent({ keepAlive: true })
-
-        this.config = new Configuration({ ...fusionConfig, tokenUrl, baseOptions: { httpsAgent: agent } } as any)
-        this.config.retriesConfig = retriesConfig
-        // form-data extends EventEmitter; with axios-retry, retries add error listeners to the same
-        // FormData instance. Set formDataCtor so multipart API calls create instances with higher limit.
-        this.config.formDataCtor = class extends FormData {
-            constructor() {
-                super()
-                if (typeof this.setMaxListeners === 'function') this.setMaxListeners(25)
-            }
-        }
-
         // Apply a hard timeout at the client layer to avoid indefinite hangs.
         // Use provisioningTimeout (seconds) as the global per-request timeout.
         // If not set or <= 0, no timeout wrapper is applied.
@@ -106,31 +60,20 @@ export class ClientService {
         this.sailPointListMax = fusionConfig.sailPointListMax
         this.statsLoggingIntervalMs = fusionConfig.statsLoggingIntervalMs
         const parallelBatchSize = fusionConfig.parallelBatchSize ?? 8
+        const requestsPerSecond = fusionConfig.requestsPerSecond ?? fusionConfig.requestsPerSecondConstant
+        const maxConcurrentRequests = fusionConfig.maxConcurrentRequests ?? Math.max(10, requestsPerSecond * 2)
 
-        // Only initialize the queue if enableQueue is true
-        if (this.enableQueue) {
-            const requestsPerSecond = fusionConfig.requestsPerSecond ?? fusionConfig.requestsPerSecondConstant
-            const maxConcurrentRequests = fusionConfig.maxConcurrentRequests ?? Math.max(10, requestsPerSecond * 2)
-
+        if (this.queue) {
             // parallelBatchSize caps concurrent page fetches in paginateParallel at the
             // smaller of the configured value and maxConcurrentRequests.
             this.parallelBatchSize = Math.min(parallelBatchSize, maxConcurrentRequests)
 
-            const queueConfig: QueueConfig = {
-                requestsPerSecond,
-                maxConcurrentRequests,
-                maxRetries: enableRetry ? maxRetries : 0,
-                enablePriority: fusionConfig.enablePriority ?? true,
-            }
-
-            this.queue = new ApiQueue(queueConfig)
             this.startStatsLogging()
             this.log.info(
-                `API client ready: queue ${queueConfig.requestsPerSecond} req/s, ` +
-                    `max concurrent: ${queueConfig.maxConcurrentRequests}, retries: ${queueConfig.maxRetries}, keep-alive: true`
+                `API client ready: queue enabled, ` +
+                    `max concurrent: ${maxConcurrentRequests}, keep-alive: true`
             )
         } else {
-            this.queue = null
             this.parallelBatchSize = parallelBatchSize
             this.log.info('API client ready (direct calls, no queue, keep-alive: true)')
         }
@@ -140,52 +83,56 @@ export class ClientService {
     // API Instance Getters (Lazy Initialization)
     // -------------------------------------------------------------------------
 
+    public get config(): Configuration {
+        return this.adapter.config
+    }
+
     public get accountsApi(): AccountsV2025Api {
-        return (this._accountsApi ??= new AccountsV2025Api(this.config))
+        return this.adapter.accountsApi
     }
 
     public get identitiesApi(): IdentitiesV2025Api {
-        return (this._identitiesApi ??= new IdentitiesV2025Api(this.config))
+        return this.adapter.identitiesApi
     }
 
     public get searchApi(): SearchApi {
-        return (this._searchApi ??= new SearchApi(this.config))
+        return this.adapter.searchApi
     }
 
     public get sourcesApi(): SourcesV2025Api {
-        return (this._sourcesApi ??= new SourcesV2025Api(this.config))
+        return this.adapter.sourcesApi
     }
 
     public get customFormsApi(): CustomFormsV2025Api {
-        return (this._customFormsApi ??= new CustomFormsV2025Api(this.config))
+        return this.adapter.customFormsApi
     }
 
     public get workflowsApi(): WorkflowsV2025Api {
-        return (this._workflowsApi ??= new WorkflowsV2025Api(this.config))
+        return this.adapter.workflowsApi
     }
 
     public get entitlementsApi(): EntitlementsV2025Api {
-        return (this._entitlementsApi ??= new EntitlementsV2025Api(this.config))
+        return this.adapter.entitlementsApi
     }
 
     public get transformsApi(): TransformsApi {
-        return (this._transformsApi ??= new TransformsApi(this.config))
+        return this.adapter.transformsApi
     }
 
     public get governanceGroupsApi(): GovernanceGroupsV2025Api {
-        return (this._governanceGroupsApi ??= new GovernanceGroupsV2025Api(this.config))
+        return this.adapter.governanceGroupsApi
     }
 
     public get taskManagementApi(): TaskManagementV2025Api {
-        return (this._taskManagementApi ??= new TaskManagementV2025Api(this.config))
+        return this.adapter.taskManagementApi
     }
 
     public get identityProfilesApi(): IdentityProfilesV2025Api {
-        return (this._identityProfilesApi ??= new IdentityProfilesV2025Api(this.config))
+        return this.adapter.identityProfilesApi
     }
 
     public get identityAttributesApi(): IdentityAttributesV2025Api {
-        return (this._identityAttributesApi ??= new IdentityAttributesV2025Api(this.config))
+        return this.adapter.identityAttributesApi
     }
 
     /**
@@ -472,7 +419,7 @@ export class ClientService {
             const pageContext = context ? `${context} [page ${pageNum}]` : `search [page ${pageNum}]`
             const response = await this.execute<{ data: unknown[] }>(
                 () =>
-                    this.searchApi.searchPost({
+                    this.adapter.searchApi.searchPost({
                         search: searchAfter ? { ...baseSearch, searchAfter } : baseSearch,
                         limit: pageSize,
                         count: isFirstPage ? true : undefined,

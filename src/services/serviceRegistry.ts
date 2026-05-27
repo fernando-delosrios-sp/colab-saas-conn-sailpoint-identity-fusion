@@ -2,7 +2,7 @@ import { Context, ConnectorError, ConnectorErrorType, Response, StandardCommand 
 import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
 import { InMemoryLockService, LockService } from './lockService'
-import { ClientService } from './clientService'
+import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
 import { SourceService } from './sourceService'
 import { FusionService } from './fusionService'
 import { IdentityService } from './identityService'
@@ -61,8 +61,22 @@ export class ServiceRegistry {
         const logConfig = operationContext ? { ...config, operationContext } : config
         this.log = context.logService ?? new LogService(logConfig)
         this.locks = context.lockService ?? new InMemoryLockService(this.log)
-        this.client = context.connectionService ?? new ClientService(this.config, this.log)
-        this.log.setQueue(this.client.getQueue())
+
+        if (context.connectionService) {
+            this.client = context.connectionService
+            this.log.setQueue(this.client.getQueue())
+        } else {
+            const adapter = new SdkApiAdapter(this.config, this.log)
+            const queueConfig = this.config.enableQueue ? {
+                requestsPerSecond: this.config.requestsPerSecond ?? this.config.requestsPerSecondConstant,
+                maxConcurrentRequests: this.config.maxConcurrentRequests ?? Math.max(10, (this.config.requestsPerSecond ?? this.config.requestsPerSecondConstant) * 2),
+                maxRetries: this.config.enableRetry ? (this.config.maxRetries ?? this.config.retriesConstant) : 0,
+                enablePriority: this.config.enablePriority ?? true,
+            } : null
+            const queue = queueConfig ? new ApiQueue(queueConfig) : null
+            this.client = new ClientService(adapter, queue, this.config, this.log)
+            this.log.setQueue(queue)
+        }
 
         // Initialize services that don't depend on others
         this.sources = context.sourceService ?? new SourceService(this.config, this.log, this.client)
