@@ -215,7 +215,7 @@ const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: strin
                     splitValues = value
                 } else {
                     // Convert non-string scalar values to strings
-                    splitValues = [String(value)]
+                    splitValues = [value]
                 }
                 values.push(...splitValues)
             }
