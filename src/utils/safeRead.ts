@@ -88,6 +88,13 @@ export function readArray<T = unknown>(source: unknown, key: string, fallback?: 
     return Array.isArray(value) ? (value as T[]) : fallback
 }
 
+/** Removes `null` and `undefined` entries from an array, narrowing the element type. */
+export function compact<T>(arr: readonly (T | null | undefined)[]): T[]
+export function compact(arr: readonly unknown[]): unknown[]
+export function compact<T>(arr: readonly (T | null | undefined)[] | readonly unknown[]): T[] {
+    return arr.filter((v): v is T => v !== null && v !== undefined) as T[]
+}
+
 export function readPathString(source: unknown, path: string[]): string | undefined
 export function readPathString(source: unknown, path: string[], fallback: string): string
 export function readPathString(source: unknown, path: string[], fallback?: string): string | undefined {
