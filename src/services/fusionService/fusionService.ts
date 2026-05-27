@@ -7,7 +7,7 @@ import { defaultFusionMaxCandidatesForForm, defaults } from '../../data/config'
 import { IdentityService } from '../identityService'
 import { SourceInfo, SourceService } from '../sourceService'
 import { FusionAccount, FusionAccountKind } from '../../model/account'
-import { attrConcat, AttributeService } from '../attributeService'
+import { AttributeService } from '../attributeService'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
 import {
@@ -192,6 +192,16 @@ export class FusionService {
         )
     }
 
+    /**
+     * Applies the standard attribute processing pipeline to a fusion account:
+     * map source attributes, refresh normal attributes, then refresh reverse correlation attributes.
+     */
+    private async applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void> {
+        this.attributes.mapAttributes(fusionAccount)
+        await this.attributes.refreshNormalAttributes(fusionAccount)
+        this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
+    }
+
     // ------------------------------------------------------------------------
     // Public Reset/Configuration Methods
     // ------------------------------------------------------------------------
@@ -231,14 +241,6 @@ export class FusionService {
             this.log.crash('AggregationTracker has not been set on FusionService')
         }
         return this._tracker!
-    }
-
-    /**
-     * Retrieves the AggregationTracker instance, throwing if not set.
-     * @deprecated Use the tracker getter instead.
-     */
-    public getTracker(): AggregationTracker {
-        return this.tracker
     }
 
     /** Helper getters for stats that delegate to tracker if available */
@@ -539,9 +541,7 @@ export class FusionService {
         )
         fusionAccount.setNeedsReset(resetDefinition)
 
-        this.attributes.mapAttributes(fusionAccount)
-        await this.attributes.refreshNormalAttributes(fusionAccount)
-        this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
+        await this.applyAttributeProcessing(fusionAccount)
 
         // Per-source correlation for missing accounts during aggregation
         await this.applyPerSourceCorrelationIfNeeded(fusionAccount, authorizedLinkDecision)
@@ -769,9 +769,7 @@ export class FusionService {
                 this.shouldPruneDeletedManagedAccounts()
             )
 
-            this.attributes.mapAttributes(fusionAccount)
-            await this.attributes.refreshNormalAttributes(fusionAccount)
-            this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
+            await this.applyAttributeProcessing(fusionAccount)
 
             // Keep fusion display aligned with identity label precedence.
             const identityDisplayName =
@@ -917,9 +915,7 @@ export class FusionService {
             this.shouldPruneDeletedManagedAccounts(),
             !suppressAssociationHistoryForAuthorizedDecision
         )
-        this.attributes.mapAttributes(fusionAccount)
-        await this.attributes.refreshNormalAttributes(fusionAccount)
-        this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
+        await this.applyAttributeProcessing(fusionAccount)
 
         // Authorized decisions update/merge an existing identity-backed fusion account in-place.
         if (isAuthorizedDecision) {
@@ -1818,31 +1814,7 @@ export class FusionService {
         }
 
         const attributes = this.schemas.getFusionAttributeSubset(fusionAccount.attributes)
-        const schemaAttributes = new Set(this.schemas.listSchemaAttributeNames())
         const disabled = fusionAccount.disabled
-
-        // Data-driven collection attribute overrides — all follow the same pattern.
-        const collectionOverrides: Record<string, any> = {
-            sources: attrConcat(Array.from(fusionAccount.sources)),
-            accounts: Array.from(fusionAccount.accountIds),
-            history: fusionAccount.history,
-            'missing-accounts': Array.from(fusionAccount.missingAccountIds),
-            reviews: Array.from(fusionAccount.reviews),
-            statuses: Array.from(fusionAccount.statuses),
-            actions: Array.from(fusionAccount.actions),
-        }
-        for (const [key, value] of Object.entries(collectionOverrides)) {
-            if (schemaAttributes.has(key)) {
-                attributes[key] = value
-            }
-        }
-        // Conditional overrides: only set when the value is truthy (not just when schema declares the attribute).
-        if (fusionAccount.originSource && schemaAttributes.has('originSource')) {
-            attributes.originSource = fusionAccount.originSource
-        }
-        if (fusionAccount.originAccountId && schemaAttributes.has('originAccount')) {
-            attributes.originAccount = fusionAccount.originAccountId
-        }
 
         return {
             key: fusionAccount.key,
@@ -2087,9 +2059,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromManagedAccount(account)
         this.log.debug(`Pre-processing managed account: ${account.name} [${account.sourceName}]`)
 
-        this.attributes.mapAttributes(fusionAccount)
-        await this.attributes.refreshNormalAttributes(fusionAccount)
-        this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
+        await this.applyAttributeProcessing(fusionAccount)
 
         return fusionAccount
     }

@@ -74,7 +74,7 @@ Connection Settings
 | **Personal Access Token ID**        | Client ID from your PAT                        | Yes                              | Must have required API permissions for sources, identities, accounts, workflows/forms |
 | **Personal Access Token secret**    | Client secret from your PAT                    | Yes                              | Keep secure; rotate as needed                                                         |
 | **API request retries**             | Maximum retry attempts for failed API requests | No (shown when retry is enabled) | Default: 20; also configurable from Advanced Settings                                 |
-| **Requests per second**             | Maximum API requests per second (throttling)   | No (shown when queue is enabled) | Default: 8; also configurable from Advanced Settings                                  |
+| **Requests per second**             | Maximum API requests per second (throttling)   | No                               | Default: 8; also configurable from Advanced Settings                                  |
 
 > **Note:** **API request retries** and **Requests per second** also appear in **Advanced Settings → Advanced Connection Settings**. They control the same underlying settings; Connection Settings provides quick access, while Advanced Settings groups them with related queue and retry options.
 
@@ -246,14 +246,12 @@ Advanced Settings - Connection
 | Field                              | Description                                                        | Required                         | Notes                                                                                 |
 | ---------------------------------- | ------------------------------------------------------------------ | -------------------------------- | ------------------------------------------------------------------------------------- |
 | **Provisioning timeout (seconds)** | Maximum wait time for provisioning operations                      | Yes                              | Default: 300; increase for large batches or slow APIs                                 |
-| **Enable queue?**                  | Enable queue management for API requests                           | No                               | Enables rate limiting and concurrency control                                         |
-| **Maximum concurrent requests**    | Maximum simultaneous API requests                                  | No (required when queue enabled) | Default: 10; adjust based on API capacity and tenant limits                           |
-| **Requests per second**            | Maximum API requests per second (throttling)                       | No (required when queue enabled) | Default: 8; reduce if rate-limited (HTTP 429), increase only when tenant limits allow |
+| **Maximum concurrent requests**    | Maximum simultaneous API requests                                  | No                               | Default: 10; adjust based on API capacity and tenant limits                           |
+| **Requests per second**            | Maximum API requests per second (throttling)                       | No                               | Default: 8; reduce if rate-limited (HTTP 429), increase only when tenant limits allow |
 | **Enable retry?**                  | Enable automatic retry for failed API requests                     | No                               | Recommended for production; handles transient failures                                |
 | **Processing wait time (seconds)** | Interval between keep-alive signals during long-running operations | Yes                              | Default: 60; used for account list and account update to prevent timeouts             |
 | **Retry delay (milliseconds)**     | Base delay between retry attempts                                  | Yes                              | Default: 1000; for HTTP 429, uses `Retry-After` header when present                   |
 | **Batch size**                     | API page size used for account retrieval and queue throughput      | Yes                              | Default: 250; valid range 1-250                                                       |
-| **Enable priority processing?**    | Prioritize important requests in queue                             | No                               | Default: enabled when queue is enabled; ensures critical operations process first     |
 
 #### Proxy Settings Section
 

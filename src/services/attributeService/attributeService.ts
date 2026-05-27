@@ -297,7 +297,7 @@ export class AttributeService {
         fusionIdentityAttribute: string,
         fusionDisplayAttribute: string
     ): boolean {
-        if (attribute === ORIGIN_ACCOUNT_ATTRIBUTE || attribute === ORIGIN_SOURCE_ATTRIBUTE) return true
+        if (this.isSystemProvenanceAttribute(attribute)) return true
         const { current } = fusionAccount.attributeBag
         const hasExistingValue = isValidAttributeValue(current[attribute])
         const canResetDisplay = fusionAccount.needsReset && attribute === fusionDisplayAttribute
@@ -426,16 +426,34 @@ export class AttributeService {
     public applyDisplayAttributeOverride(fusionAccount: FusionAccount): void {
         const { fusionDisplayAttribute } = this.schemas
         if (!fusionDisplayAttribute) return
+        this.applyDisplayAttributeOverrideIfApplicable(fusionAccount, fusionDisplayAttribute)
+    }
 
-        if (fusionAccount.fromIdentity || fusionAccount.isIdentity) {
-            const label = fusionAccount.identityName
-            if (label) {
-                this.log.info(
-                    `Setting identity name for attribute: ${fusionDisplayAttribute} for account: ${fusionAccount.name}`
-                )
-                fusionAccount.attributes[fusionDisplayAttribute] = label
-            }
+    /**
+     * If the account is identity-linked and the attribute is the display attribute,
+     * override the value with the identity name and return true to signal that
+     * further template evaluation for this attribute should be skipped.
+     */
+    private applyDisplayAttributeOverrideIfApplicable(
+        fusionAccount: FusionAccount,
+        attributeName: string
+    ): boolean {
+        const { fusionDisplayAttribute } = this.schemas
+        if (attributeName !== fusionDisplayAttribute) return false
+        if (!fusionAccount.fromIdentity && !fusionAccount.isIdentity) return false
+
+        const label = fusionAccount.identityName
+        if (label) {
+            this.log.info(
+                `Setting identity name for attribute: ${attributeName} for account: ${fusionAccount.name}`
+            )
+            fusionAccount.attributes[attributeName] = label
         }
+        return true
+    }
+
+    private isSystemProvenanceAttribute(name: string): boolean {
+        return name === ORIGIN_ACCOUNT_ATTRIBUTE || name === ORIGIN_SOURCE_ATTRIBUTE
     }
 
     /**
@@ -1130,7 +1148,7 @@ export class AttributeService {
         context: Record<string, any>
     ): Promise<void> {
         const { name, refresh } = definition
-        if (name === ORIGIN_ACCOUNT_ATTRIBUTE || name === ORIGIN_SOURCE_ATTRIBUTE) return
+        if (this.isSystemProvenanceAttribute(name)) return
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
         const needsRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || refresh
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
@@ -1156,14 +1174,7 @@ export class AttributeService {
 
         // HOSTING IDENTITY DISPLAY ALIGNMENT:
         // For accounts linked to a platform Identity, ensure the display name remains aligned with the identity name
-        if ((fusionAccount.fromIdentity || fusionAccount.isIdentity) && name === fusionDisplayAttribute) {
-            const label = fusionAccount.identityName
-            if (label) {
-                this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
-                fusionAccount.attributes[name] = label
-            }
-            return
-        }
+        if (this.applyDisplayAttributeOverrideIfApplicable(fusionAccount, name)) return
 
         const value = this.evaluateTemplate(definition, context, fusionAccount.name)
         if (value === undefined) {
@@ -1216,13 +1227,12 @@ export class AttributeService {
         context: Record<string, any>
     ): Promise<void> {
         const { name } = definition
-        if (name === ORIGIN_ACCOUNT_ATTRIBUTE || name === ORIGIN_SOURCE_ATTRIBUTE) return
+        if (this.isSystemProvenanceAttribute(name)) return
 
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
         const existingValue = fusionAccount.attributes[name]
         const hasValue = isValidAttributeValue(existingValue)
         const isFusionIdentityAttribute = name === fusionIdentityAttribute
-        const isFusionDisplayAttribute = name === fusionDisplayAttribute
         const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
         const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
 
@@ -1246,14 +1256,7 @@ export class AttributeService {
             }
 
             // Set identity name for display attribute if the account is an identity
-            if ((fusionAccount.fromIdentity || fusionAccount.isIdentity) && isFusionDisplayAttribute) {
-                const label = fusionAccount.identityName
-                if (label) {
-                    this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
-                    fusionAccount.attributes[name] = label
-                }
-                return
-            }
+            if (this.applyDisplayAttributeOverrideIfApplicable(fusionAccount, name)) return
 
             if (hasValue) {
                 this.getUniqueValues(name).delete(String(existingValue))
