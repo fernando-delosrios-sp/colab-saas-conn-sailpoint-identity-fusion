@@ -58,15 +58,15 @@ describe('StateWrapper', () => {
             const wrapper = new StateWrapper(invalidState)
 
             expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Failed to convert state object to Map'))
-            expect(wrapper.state).toBeInstanceOf(Map)
-            expect(wrapper.state.size).toBe(0)
+            expect((wrapper as any).state).toBeInstanceOf(Map)
+            expect((wrapper as any).state.size).toBe(0)
         })
 
         it('should initialize with an empty Map when no state is provided', () => {
             const wrapper = new StateWrapper()
             expect(logger.debug).toHaveBeenCalledWith('Initializing with empty state (no previous counter values)')
-            expect(wrapper.state).toBeInstanceOf(Map)
-            expect(wrapper.state.size).toBe(0)
+            expect((wrapper as any).state).toBeInstanceOf(Map)
+            expect((wrapper as any).state.size).toBe(0)
         })
 
         it('should load counter values from valid state', () => {
@@ -74,10 +74,10 @@ describe('StateWrapper', () => {
             const wrapper = new StateWrapper(validState)
 
             expect(logger.debug).toHaveBeenCalledWith('Loaded 2 counter values from state')
-            expect(wrapper.state).toBeInstanceOf(Map)
-            expect(wrapper.state.size).toBe(2)
-            expect(wrapper.state.get('counter1')).toBe(5)
-            expect(wrapper.state.get('counter2')).toBe(10)
+            expect((wrapper as any).state).toBeInstanceOf(Map)
+            expect((wrapper as any).state.size).toBe(2)
+            expect((wrapper as any).state.get('counter1')).toBe(5)
+            expect((wrapper as any).state.get('counter2')).toBe(10)
         })
     })
 })

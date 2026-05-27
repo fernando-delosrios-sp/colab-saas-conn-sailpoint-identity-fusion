@@ -10,7 +10,7 @@ import { accountList } from '../../../operations/accountList'
 import { accountCreate } from '../../../operations/accountCreate'
 import { accountDisable } from '../../../operations/accountDisable'
 import { accountEnable } from '../../../operations/accountEnable'
-import { AggregationTracker as _AggregationTracker } from '../../services/fusionService'
+import { AggregationTracker as _AggregationTracker } from '../../../services/fusionService'
 import { accountRead } from '../../../operations/accountRead'
 import { accountUpdate } from '../../../operations/accountUpdate'
 import { ServiceRegistry as _ServiceRegistry } from '../../../services/serviceRegistry'
@@ -215,7 +215,7 @@ describe('Identity Fusion NG - Recorded Chain Replay', () => {
                 const _output = stepResult.output as Record<string, unknown>
                 const step = steps[i]
                 if (step?.expectedOutput) {
-                    const { _match, drift } = compareOutputs(
+                    const { match, drift } = compareOutputs(
                         (_output?.outputs as unknown[]) ?? [],
                         step.expectedOutput,
                         `${stepResult.stepId} (index ${i})`

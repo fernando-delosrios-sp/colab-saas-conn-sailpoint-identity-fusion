@@ -14,6 +14,14 @@ export type FusionManagedAccountInfo = {
     schema: { id: string }
 }
 
+/** Correlated platform identity information at runtime. */
+export interface IdentityInfo {
+    id: string
+    name: string
+    displayName: string
+}
+
+
 /**
  * Container for all attribute layers associated with a fusion account.
  * Tracks current and previous attribute values, identity attributes,
