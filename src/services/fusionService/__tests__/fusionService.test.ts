@@ -648,7 +648,8 @@ describe('FusionService', () => {
         })
 
         it('removes exact-match auto-assigned managed accounts from both work queue maps', async () => {
-            mockConfig.fusionMergingExactMatch = true
+            mockConfig.fusionEnableAutoAssignment = true
+            mockConfig.fusionAutoAssignmentScore = 100
             const account = {
                 id: 'acct-exact-queue-1',
                 nativeIdentity: 'native-exact-queue-1',
@@ -675,7 +676,10 @@ describe('FusionService', () => {
                 identityId: 'identity-exact',
                 identityName: 'Exact Identity',
                 candidateType: 'identity',
-                scores: [{ attribute: 'name', algorithm: 'exact', score: 100, isMatch: true }] as any,
+                scores: [
+                    { attribute: 'name', algorithm: 'exact', score: 100, isMatch: true },
+                    { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }
+                ] as any,
             } as any)
             jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
             jest.spyOn(fusionService as any, 'isCorrelatedManagedAccountLinkedInFusion').mockReturnValue(false)
@@ -1325,7 +1329,8 @@ describe('FusionService', () => {
         })
 
         it('removes perfect automatically assigned accounts from manual-review report list', async () => {
-            ;(fusionService as any).config.fusionMergingExactMatch = true
+            ;(fusionService as any).config.fusionEnableAutoAssignment = true
+            ;(fusionService as any).config.fusionAutoAssignmentScore = 100
             const account = {
                 id: 'acct-perfect-1',
                 nativeIdentity: 'acct-perfect-1',
@@ -1341,9 +1346,10 @@ describe('FusionService', () => {
                 identityId: 'identity-perfect-1',
                 identityName: 'Perfect Identity',
                 scores: [
-                    { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
-                    { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
-                ],
+                    { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' },
+                    { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' },
+                    { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }
+                ] as any,
             } as any)
             const tracker = new AggregationTracker()
             fusionService.setTracker(tracker)
@@ -1357,7 +1363,8 @@ describe('FusionService', () => {
         })
 
         it('registers synthetic automatic-assignment decisions for reporting', async () => {
-            ;(fusionService as any).config.fusionMergingExactMatch = true
+            ;(fusionService as any).config.fusionEnableAutoAssignment = true
+            ;(fusionService as any).config.fusionAutoAssignmentScore = 100
             const account = {
                 id: 'acct-perfect-report-1',
                 nativeIdentity: 'acct-perfect-report-1',
@@ -1373,9 +1380,10 @@ describe('FusionService', () => {
                 identityId: 'identity-perfect-report-1',
                 identityName: 'Perfect Report Identity',
                 scores: [
-                    { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
-                    { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
-                ],
+                    { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' },
+                    { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' },
+                    { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }
+                ] as any,
             } as any)
             jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
             jest.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
@@ -1387,14 +1395,14 @@ describe('FusionService', () => {
                 expect.objectContaining({
                     newIdentity: false,
                     identityId: 'identity-perfect-report-1',
-                    comments: 'Automatically assigned: exact attribute match (all rules 100, none skipped)',
+                    comments: 'Automatically assigned: combined score met or exceeded threshold',
                     automaticAssignment: true,
                 })
             )
         })
 
         it('applies exact-match automatic assignment in accountList context even when commandType is missing', async () => {
-            const cfg = { ...mockConfig, fusionMergingExactMatch: true } as unknown as FusionConfig
+            const cfg = { ...mockConfig, fusionEnableAutoAssignment: true, fusionAutoAssignmentScore: 100 } as unknown as FusionConfig
             const accountListFusion = new FusionService(
                 cfg,
                 mockLog,
@@ -1422,9 +1430,10 @@ describe('FusionService', () => {
                 identityId: 'identity-perfect-opctx-1',
                 identityName: 'Perfect OpCtx Identity',
                 scores: [
-                    { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
-                    { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
-                ],
+                    { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' },
+                    { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' },
+                    { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }
+                ] as any,
             } as any)
             jest.spyOn(accountListFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
             const processDecision = jest
@@ -1444,7 +1453,8 @@ describe('FusionService', () => {
         })
 
         it('does not assign automatically when a rule was skipped (missing)', async () => {
-            ;(fusionService as any).config.fusionMergingExactMatch = true
+            ;(fusionService as any).config.fusionEnableAutoAssignment = true
+            ;(fusionService as any).config.fusionAutoAssignmentScore = 100
             ;(fusionService as any).sourcesByName.set('LH2', {
                 id: 'src-lh2',
                 name: 'LH2',
@@ -1528,7 +1538,7 @@ describe('FusionService', () => {
         })
 
         it('does not apply automatic assignment for perfect scores when commandType is not StdAccountList', async () => {
-            const cfg = { ...mockConfig, fusionMergingExactMatch: true } as unknown as FusionConfig
+            const cfg = { ...mockConfig, fusionEnableAutoAssignment: true, fusionAutoAssignmentScore: 100 } as unknown as FusionConfig
             const analysisFusion = new FusionService(
                 cfg,
                 mockLog,

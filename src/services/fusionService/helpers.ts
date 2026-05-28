@@ -201,7 +201,7 @@ export function createAutomaticAssignmentDecision(
         },
         newIdentity: false,
         identityId,
-        comments: 'Automatically assigned: exact attribute match (all rules 100, none skipped)',
+        comments: 'Automatically assigned: combined score met or exceeded threshold',
         finished: true,
         automaticAssignment: true,
     }

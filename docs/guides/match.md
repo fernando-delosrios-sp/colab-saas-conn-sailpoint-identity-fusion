@@ -42,7 +42,7 @@ Use Identity Fusion for Match when you face these challenges:
 | --------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | **Access profiles for reviewers**       | Create access profile per source with reviewer entitlement             | Assign reviewers per source for targeted notifications                        |
 | **Fusion report access profile**        | Access profile with "Fusion report" entitlement                        | Allow specific users to view potential match reports                          |
-| **Automatic assignment (exact scores)** | **Attribute Matching Settings → Automatically assign on exact match?** | Assign without manual review when every rule scores 100 and none were skipped |
+| **Automatic assignment**                  | **Attribute Matching Settings → Enable automatic assignment**          | Assign without manual review when the combined score meets the automatic assignment match score |
 
 **Screenshot placeholder:** High-level Match flow diagram.
 
@@ -131,8 +131,8 @@ Configure **Attribute Matching Settings → Matching Settings** to define match 
 
 | Field                                    | Purpose                                                  | Recommended value                                  |
 | ---------------------------------------- | -------------------------------------------------------- | -------------------------------------------------- |
-| **Minimum combined match score [0-100]** | Global floor for the weighted combined match score       | 80 (start); tune with false positive/negative rate |
-| **Automatically assign on exact match?** | Skip review when every real rule is 100 and none skipped | No initially; enable after tuning                  |
+| **Manual review match score [0-100]** | Global floor for the weighted combined match score       | 80 (start); tune with false positive/negative rate |
+| **Enable automatic assignment** | Skip review when the combined score meets the automatic assignment match score | No initially; enable after tuning                  |
 | **Fusion attribute matches**             | List of identity attributes to compare                   | At least 2 attributes (e.g. name + email)          |
 
 **Screenshot placeholder:** Attribute Matching Settings - Matching section.
@@ -151,7 +151,7 @@ For each attribute you want to use in match detection, add a **Fusion attribute 
 | **Matching algorithm**         | Similarity calculation method                                  | See [Matching algorithms](matching-algorithms.md) for details                                                                                   |
 | **Minimum similarity [0-100]** | Threshold for this rule; also its weight in the combined score | 75–85 (name); 90–100 (email). Higher values are stricter and count more in the blend.                                                           |
 | **Mandatory match?**           | Must meet this rule’s minimum for a potential match            | Yes for critical identifiers; passing mandatories still contribute weighted score like other rules.                                             |
-| **Skip match if missing**      | Skip when either value is missing                              | Default: Yes. Skipped rules do not affect the combined score. Automatic assignment on exact match requires no skipped rules and all scores 100. |
+| **Skip match if missing**      | Skip when either value is missing                              | Default: Yes. Skipped rules do not affect the combined score. |
 
 !!! tip "Example edge cases"
 
@@ -208,16 +208,16 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 - Name similarity: 85, minimum 80 → weight 80
 - Email similarity: 90, minimum 90 → weight 90
 - Combined: (85×80 + 90×90) / (80+90) ≈ 87.6
-- Minimum combined match score: 80
+- Manual review match score: 80
 → Potential match if all mandatory rules pass (87.6 ≥ 80)
 ```
 
-### Automatic assignment (exact scores)
+### Automatic assignment (thresholds)
 
 | Field                                    | Value | Effect                                                                     |
 | ---------------------------------------- | ----- | -------------------------------------------------------------------------- |
-| **Automatically assign on exact match?** | No    | All potential matches go to manual review                                  |
-| **Automatically assign on exact match?** | Yes   | Exact matches are assigned without review; borderline cases still reviewed |
+| **Enable automatic assignment** | No    | All potential matches go to manual review                                  |
+| **Enable automatic assignment** | Yes   | Threshold matches are assigned without review; borderline cases still reviewed |
 
 **When to enable automatic assignment:**
 
@@ -405,7 +405,7 @@ For each Fusion account (new or updated):
         - Calculate similarity score using specified algorithm
     - Compute **combined match score**: weighted mean of each evaluated rule’s similarity, weights = that rule’s minimum similarity (`fusionScore`; 0 → weight 1)
     - Every evaluated **mandatory** rule must meet its minimum or the candidate is not a match
-    - If combined score ≥ **minimum combined match score** and mandatory rules pass → potential match (non-mandatory rules may be below their minimum but still contribute their raw similarity to the blend)
+    - If combined score ≥ **manual review match score** and mandatory rules pass → potential match (non-mandatory rules may be below their minimum but still contribute their raw similarity to the blend)
 3. Sort identities by similarity score (highest first)
 
 **Step 4: Decision point**
@@ -414,7 +414,7 @@ For each potential match:
 
 | Condition                                                                                                                                             | Action                                                              |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| **Automatically assign on exact match?** = Yes, **every** real rule was evaluated (none skipped), and **all** attribute similarity scores are **100** | Skip review form; assign and apply (same as an authorized decision) |
+| **Enable automatic assignment** = Yes, and **combined score** ≥ **Automatic assignment match score** | Skip review form; assign and apply (same as an authorized decision) |
 | Else                                                                                                                                                  | Create review form; notify reviewers                                |
 
 **Step 5–6: Manual review**
@@ -459,7 +459,7 @@ On next aggregation:
 | **3. Review results**              | Check review forms: Are matches obvious? Many false positives?                | Calibrate                                      |
 | **4. Adjust**                      | Lower thresholds if missing matches; raise if too many false positives        | Fine-tune                                      |
 | **5. Full rollout**                | Remove **Aggregation batch size** limit; run on all accounts                  | Production                                     |
-| **6. Enable automatic assignment** | Once confident, enable **Automatically assign on exact match?**               | Reduce manual burden                           |
+| **6. Enable automatic assignment** | Once confident, set an automatic assignment threshold and toggle **Enable automatic assignment** | Reduce manual burden                           |
 
 ### Monitoring and metrics
 
@@ -478,7 +478,7 @@ Track these metrics to assess Match effectiveness:
 | ---------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | **No matches found**         | Zero review forms despite expecting matches | Lower **Similarity score** thresholds; check **Identity Scope Query** returns identities |
 | **Too many false positives** | Many obvious non-duplicates flagged         | Raise **Similarity score** thresholds; use **Mandatory match?** for critical attributes  |
-| **Reviewer overload**        | Hundreds of review forms                    | Enable **Automatically assign on exact match?**; raise thresholds                        |
+| **Reviewer overload**        | Hundreds of review forms                    | Enable **Enable automatic assignment** and configure an appropriate assignment threshold |
 | **Forms expiring**           | Forms timing out before review              | Increase **Manual review expiration days**; notify reviewers                             |
 | **Incorrect algorithm**      | Matches don't make sense                    | Switch algorithm (see [Matching algorithms](matching-algorithms.md))                     |
 

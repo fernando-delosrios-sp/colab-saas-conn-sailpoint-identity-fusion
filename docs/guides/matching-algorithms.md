@@ -410,7 +410,7 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 | ------------------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | **High false positives** | Many forms for obvious non-duplicates | Raise thresholds; add mandatory matches for critical attributes                                |
 | **High false negatives** | Missing obvious matches               | Lower thresholds; add more attributes; try different algorithms                                |
-| **Borderline cases**     | Many ambiguous matches                | Enable **Automatically assign on exact match?** for obvious ones; manual review for borderline |
+| **Borderline cases**     | Many ambiguous matches                | Toggle **Enable automatic assignment** for obvious ones; manual review for borderline |
 
 **Screenshot placeholder:** Review form showing per-attribute similarity scores.
 
@@ -420,13 +420,13 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 
 ---
 
-## Automatic assignment (exact scores)
+## Automatic assignment
 
 ### When to use
 
-**Automatically assign on exact match?** = Yes
+**Enable automatic assignment** = Yes
 
-**Effect:** Candidates that are an **exact attribute match** (every real rule scored 100 with none skipped) are assigned to that identity without manual review.
+**Effect:** Candidates whose combined score meets or exceeds the **Automatic assignment match score** threshold are assigned to that identity without manual review.
 
 | Enable when...                         | Keep disabled when...                   |
 | -------------------------------------- | --------------------------------------- |
@@ -435,7 +435,7 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 | Review burden is high (>50 forms/week) | You want manual approval for all merges |
 | Obvious matches are common             | Data quality is poor                    |
 
-**When it runs:** When **Automatically assign on exact match?** is enabled, the connector skips the review form when **every** real rule was evaluated (**none** skipped for missing values) and **all** attribute similarity scores are **100**.
+**When it runs:** When **Enable automatic assignment** is enabled, the connector skips the review form when the candidate's combined score meets or exceeds the **Automatic assignment match score**.
 
 ---
 

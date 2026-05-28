@@ -284,9 +284,11 @@ export type UniqueAttributeDefinitionSettingsMenu = UniqueAttributeDefinitionSet
 export interface MatchingSettingsSection {
     matchingConfigs?: MatchingConfig[]
     /** Minimum weighted combined match score (0-100). Required for matching. */
-    fusionAverageScore?: number
+    fusionManualReviewScore?: number
     /** When true, exact attribute matches skip manual review (automatic assignment to the matched identity). */
-    fusionMergingExactMatch: boolean
+    fusionEnableAutoAssignment: boolean
+    /** Automatic assignment match score threshold. Matches equal to or above this score are automatically assigned. */
+    fusionAutoAssignmentScore?: number
 }
 
 /** Configuration for the manual review workflow and fusion reports. */

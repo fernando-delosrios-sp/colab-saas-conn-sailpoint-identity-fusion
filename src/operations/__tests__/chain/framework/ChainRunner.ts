@@ -19,8 +19,8 @@ export interface ScenararioConfig {
     normalAttributeDefinitions?: Array<Record<string, unknown>>
     attributeMaps?: Array<Record<string, unknown>>
     matchingConfigs?: Array<Record<string, unknown>>
-    fusionAverageScore?: number
-    fusionMergingExactMatch?: boolean
+    fusionManualReviewScore?: number
+    fusionEnableAutoAssignment?: boolean
     fusionOwnerIsGlobalReviewer?: boolean
     fusionFormExpirationDays?: number
     includeIdentities?: boolean
