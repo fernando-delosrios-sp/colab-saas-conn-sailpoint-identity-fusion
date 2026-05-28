@@ -18,7 +18,7 @@ import * as uniqueAttributeDefinitionsSettings from './settings/uniqueAttributeD
 export const connectorSpecInitialValues = {
     ...connectionSettings.connectorSpecInitialValues,
     fusionFormExpirationDays: reviewSettings.connectorSpecInitialValues.fusionFormExpirationDays,
-    fusionAverageScore: matchingSettings.connectorSpecInitialValues.fusionAverageScore,
+    fusionManualReviewScore: matchingSettings.connectorSpecInitialValues.fusionManualReviewScore,
     provisioningTimeout: advancedConnectionSettings.connectorSpecInitialValues.provisioningTimeout,
     managedAccountsBatchSize: advancedConnectionSettings.connectorSpecInitialValues.managedAccountsBatchSize,
     fusionMaxCandidatesForForm: reviewSettings.connectorSpecInitialValues.fusionMaxCandidatesForForm,

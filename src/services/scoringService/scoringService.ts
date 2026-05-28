@@ -57,8 +57,8 @@ export const COMBINED_SCORE_ROW_ATTRIBUTE = 'Combined score'
  */
 export class ScoringService {
     private readonly matchingConfigs: MatchingConfig[]
-    private readonly fusionAverageScore: number
-    private readonly fusionMergingExactMatch: boolean
+    private readonly fusionManualReviewScore: number
+    private readonly fusionEnableAutoAssignment: boolean
     private readonly fusionMaxIdentityMatchCandidates: number
     private readonly fusionScoreMap: Map<string, number>
 
@@ -88,8 +88,8 @@ export class ScoringService {
      */
     constructor(config: FusionConfig, _log: LogService) {
         this.matchingConfigs = config.matchingConfigs ?? []
-        this.fusionAverageScore = config.fusionAverageScore ?? 0
-        this.fusionMergingExactMatch = config.fusionMergingExactMatch ?? false
+        this.fusionManualReviewScore = config.fusionManualReviewScore ?? 0
+        this.fusionEnableAutoAssignment = config.fusionEnableAutoAssignment ?? false
         this.fusionMaxIdentityMatchCandidates = config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
         this.fusionScoreMap = config.fusionScoreMap ?? new Map()
     }
@@ -294,7 +294,7 @@ export class ScoringService {
         // continuing to score after a perfect match is found: the first exact match
         // wins and all subsequent comparisons would be discarded. Early exit here
         // avoids O(n) identity comparisons for every exact-match account.
-        const earlyExitOnExactMatch = this.fusionMergingExactMatch && candidateType === MatchCandidateType.Identity
+        const earlyExitOnExactMatch = this.fusionEnableAutoAssignment && candidateType === MatchCandidateType.Identity
         const maxIdentity =
             candidateType === MatchCandidateType.Identity
                 ? (maxIdentityMatches ?? this.fusionMaxIdentityMatchCandidates)
@@ -482,7 +482,7 @@ export class ScoringService {
                 !hasFailedMandatory &&
                 i + 1 < this.matchingConfigs.length &&
                 ScoringService.maxAchievableCombinedScore(weightedSum, weightTotal, i + 1, this.matchingConfigs) <
-                    this.fusionAverageScore
+                    this.fusionManualReviewScore
             ) {
                 for (let r = i + 1; r < this.matchingConfigs.length; r++) {
                     scores.push(
@@ -498,7 +498,7 @@ export class ScoringService {
 
         const combinedScore = weightTotal > 0 ? weightedSum / weightTotal : 0
         const hasContributing = weightTotal > 0
-        const combinedPasses = hasContributing && combinedScore >= this.fusionAverageScore && !hasFailedMandatory
+        const combinedPasses = hasContributing && combinedScore >= this.fusionManualReviewScore && !hasFailedMandatory
 
         if (weightTotal > 0) {
             for (const s of scores) {
@@ -511,7 +511,7 @@ export class ScoringService {
         const combinedReport: ScoreReport = {
             attribute: COMBINED_SCORE_ROW_ATTRIBUTE,
             algorithm: WEIGHTED_MEAN_ALGORITHM,
-            fusionScore: this.fusionAverageScore,
+            fusionScore: this.fusionManualReviewScore,
             mandatory: true,
             score: Math.round(combinedScore * 100) / 100,
             isMatch: combinedPasses,

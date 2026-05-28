@@ -1,44 +1,44 @@
 import { readSettings } from '../matchingSettings'
 
 describe('matchingSettings readSettings', () => {
-    it('defaults fusionMergingExactMatch to false when omitted', () => {
+    it('defaults fusionEnableAutoAssignment to false when omitted', () => {
         const raw = { matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }] }
 
         const result = readSettings(raw)
 
-        expect(result.fusionMergingExactMatch).toBe(false)
+        expect(result.fusionEnableAutoAssignment).toBe(false)
     })
 
-    it('normalizes string "true" to boolean true for fusionMergingExactMatch', () => {
+    it('normalizes string "true" to boolean true for fusionEnableAutoAssignment', () => {
         const raw = {
-            fusionMergingExactMatch: 'true' as unknown as boolean,
+            fusionEnableAutoAssignment: 'true' as unknown as boolean,
             matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }],
         } 
 
         const result = readSettings(raw)
 
-        expect(result.fusionMergingExactMatch).toBe(true)
+        expect(result.fusionEnableAutoAssignment).toBe(true)
     })
 
-    it('normalizes string "false" to boolean false for fusionMergingExactMatch', () => {
+    it('normalizes string "false" to boolean false for fusionEnableAutoAssignment', () => {
         const raw = {
-            fusionMergingExactMatch: 'false' as unknown as boolean,
+            fusionEnableAutoAssignment: 'false' as unknown as boolean,
             matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }],
         } 
 
         const result = readSettings(raw)
 
-        expect(result.fusionMergingExactMatch).toBe(false)
+        expect(result.fusionEnableAutoAssignment).toBe(false)
     })
 
-    it('preserves boolean false for fusionMergingExactMatch', () => {
+    it('preserves boolean false for fusionEnableAutoAssignment', () => {
         const raw = {
-            fusionMergingExactMatch: false,
+            fusionEnableAutoAssignment: false,
             matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }],
         } 
 
         const result = readSettings(raw)
 
-        expect(result.fusionMergingExactMatch).toBe(false)
+        expect(result.fusionEnableAutoAssignment).toBe(false)
     })
 })

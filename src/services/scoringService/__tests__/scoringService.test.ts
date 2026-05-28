@@ -45,7 +45,7 @@ describe('ScoringService mandatory matching behavior', () => {
         const service = new ScoringService(
             {
                 matchingConfigs: baseMatchingConfigs,
-                fusionAverageScore: 50,
+                fusionManualReviewScore: 50,
             } as any,
             { crash: jest.fn() } as any
         )
@@ -60,7 +60,7 @@ describe('ScoringService mandatory matching behavior', () => {
         const service = new ScoringService(
             {
                 matchingConfigs: baseMatchingConfigs,
-                fusionAverageScore: 90,
+                fusionManualReviewScore: 90,
             } as any,
             { crash: jest.fn() } as any
         )
@@ -107,7 +107,7 @@ describe('ScoringService mandatory matching behavior', () => {
                         fusionScore: 100,
                     },
                 ],
-                fusionAverageScore: 80,
+                fusionManualReviewScore: 80,
             } as any,
             { crash: jest.fn() } as any
         )
@@ -134,7 +134,7 @@ describe('ScoringService mandatory matching behavior', () => {
                     { attribute: 'firstname', algorithm: 'jaro-winkler', fusionScore: 60 },
                     { attribute: 'lastname', algorithm: 'jaro-winkler', fusionScore: 60 },
                 ],
-                fusionAverageScore: 70,
+                fusionManualReviewScore: 70,
             } as any,
             { crash: jest.fn() } as any
         )
@@ -175,7 +175,7 @@ describe('ScoringService max identity match candidates', () => {
                         fusionScore: 80,
                     },
                 ],
-                fusionAverageScore: 80,
+                fusionManualReviewScore: 80,
             } as any,
             { crash: jest.fn() } as any
         )
@@ -224,7 +224,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
                         skipMatchIfMissing: true,
                     },
                 ],
-                fusionAverageScore: 80,
+                fusionManualReviewScore: 80,
             } as any,
             log
         )
@@ -256,7 +256,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
                         skipMatchIfMissing: false,
                     },
                 ],
-                fusionAverageScore: 0,
+                fusionManualReviewScore: 0,
             } as any,
             log
         )
@@ -293,7 +293,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
                         skipMatchIfMissing: true,
                     },
                 ],
-                fusionAverageScore: 80,
+                fusionManualReviewScore: 80,
             } as any,
             log
         )
@@ -334,7 +334,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
                         skipMatchIfMissing: false,
                     },
                 ],
-                fusionAverageScore: 80,
+                fusionManualReviewScore: 80,
             } as any,
             log
         )
@@ -370,7 +370,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
                         fusionScore: 80,
                     },
                 ],
-                fusionAverageScore: 80,
+                fusionManualReviewScore: 80,
             } as any,
             log
         )
@@ -410,7 +410,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
                         fusionScore: 80,
                     },
                 ],
-                fusionAverageScore: 80,
+                fusionManualReviewScore: 80,
             } as any,
             log
         )
@@ -434,7 +434,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
 describe('ScoringService combined-score early exit', () => {
     const log = { crash: jest.fn() } as any
 
-    it('does not evaluate later rules when perfect future scores cannot reach fusionAverageScore', async () => {
+    it('does not evaluate later rules when perfect future scores cannot reach fusionManualReviewScore', async () => {
         const scoreDiceSpy = jest.spyOn(scoringHelpers, 'scoreDice')
 
         const service = new ScoringService(
@@ -443,7 +443,7 @@ describe('ScoringService combined-score early exit', () => {
                     { attribute: 'a', algorithm: 'dice', fusionScore: 10, mandatory: false },
                     { attribute: 'b', algorithm: 'dice', fusionScore: 10, mandatory: false },
                 ],
-                fusionAverageScore: 90,
+                fusionManualReviewScore: 90,
             } as any,
             log
         )
@@ -478,7 +478,7 @@ describe('ScoringService deferred candidate matching', () => {
                         fusionScore: 90,
                     },
                 ],
-                fusionAverageScore: 80,
+                fusionManualReviewScore: 80,
             } as any,
             { crash: jest.fn() } as any
         )
@@ -510,7 +510,7 @@ describe('ScoringService deferred candidate matching', () => {
                         fusionScore: 90,
                     },
                 ],
-                fusionAverageScore: 80,
+                fusionManualReviewScore: 80,
             } as any,
             { crash: jest.fn() } as any
         )
@@ -554,7 +554,7 @@ describe('ScoringService deferred candidate matching', () => {
                         fusionScore: 90,
                     },
                 ],
-                fusionAverageScore: 80,
+                fusionManualReviewScore: 80,
             } as any,
             { crash: jest.fn() } as any
         )

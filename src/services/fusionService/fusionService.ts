@@ -21,7 +21,9 @@ import {
 import { FusionDecision } from '../../model/form'
 import { MatchCandidateType, ScoringService } from '../scoringService'
 import { SchemaService } from '../schemaService'
+import { FusionMatch } from '../scoringService/types'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
+import { COMBINED_SCORE_ROW_ATTRIBUTE, WEIGHTED_MEAN_ALGORITHM } from '../scoringService/scoringService'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats } from './types'
 import { buildFusionReport } from './fusionReportBuilder'
 import { AggregationTracker } from './aggregationTracker'
@@ -86,7 +88,7 @@ export class FusionService {
     /**
      * Identity IDs that were auto-assigned via exact match in the current `processManagedAccounts` run.
      * Used to skip already-claimed identities during subsequent managed account scoring when
-     * `fusionMergingExactMatch` is enabled, preventing duplicate assignments or spurious form creation.
+     * `fusionEnableAutoAssignment` is enabled, preventing duplicate assignments or spurious form creation.
      */
     private readonly autoAssignedIdentityIds: Set<string> = new Set()
     /** Accumulates Match scoring duration within a single managed-account analysis pass. */
@@ -1274,9 +1276,9 @@ export class FusionService {
                 fusionAccount.clearFusionIdentityReferences()
                 return undefined
             }
-            const perfectMatch = fusionAccount.fusionMatches.find((m) => this.hasAllAttributeScoresPerfect(m))
-            if (this.config.fusionMergingExactMatch && perfectMatch?.identityId) {
-                return this.handleExactMatch(fusionAccount, account, perfectMatch.identityId)
+            const bestMatch = this.getBestAutoAssignMatch(fusionAccount.fusionMatches)
+            if (this.config.fusionEnableAutoAssignment && bestMatch?.identityId) {
+                return this.handleExactMatch(fusionAccount, account, bestMatch.identityId)
             }
             return await this.handlePartialMatch(fusionAccount, sourceInfo)
         }
@@ -1289,11 +1291,26 @@ export class FusionService {
     }
 
     /**
-     * Returns true when every configured rule was evaluated (none skipped) and scored 100.
-     * Excludes synthetic combined rows (`weighted-mean` / legacy `average`).
+     * Finds the match with the highest combined score that meets or exceeds the automatic assignment threshold.
      */
-    private hasAllAttributeScoresPerfect(match: any): boolean {
-        return isExactAttributeMatchScores(match.scores)
+    private getBestAutoAssignMatch(matches: FusionMatch[]): FusionMatch | undefined {
+        if (this.config.fusionAutoAssignmentScore === undefined) return undefined
+
+        let bestMatch: FusionMatch | undefined
+        let highestScore = -1
+
+        for (const m of matches) {
+            const combinedReport = m.scores.find(
+                (s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE && s.algorithm === WEIGHTED_MEAN_ALGORITHM
+            )
+            const score = combinedReport?.score ?? 0
+
+            if (score >= this.config.fusionAutoAssignmentScore && score > highestScore) {
+                highestScore = score
+                bestMatch = m
+            }
+        }
+        return bestMatch
     }
 
     /**
@@ -1472,7 +1489,7 @@ export class FusionService {
 
         if (recordMatchingEnabled) {
             const excludeIds =
-                this.config.fusionMergingExactMatch && this.autoAssignedIdentityIds.size > 0
+                this.config.fusionEnableAutoAssignment && this.autoAssignedIdentityIds.size > 0
                     ? this.autoAssignedIdentityIds
                     : undefined
             const candidateSet = this.scoring.getCandidates(fusionAccount, excludeIds)
@@ -1532,9 +1549,9 @@ export class FusionService {
                 fusionAccount.clearFusionIdentityReferences()
                 return undefined
             }
-            const perfectMatch = fusionAccount.fusionMatches.find((m) => this.hasAllAttributeScoresPerfect(m))
-            if (this.config.fusionMergingExactMatch && perfectMatch?.identityId) {
-                return this.handleExactMatch(fusionAccount, account, perfectMatch.identityId)
+            const bestMatch = this.getBestAutoAssignMatch(fusionAccount.fusionMatches)
+            if (this.config.fusionEnableAutoAssignment && bestMatch?.identityId) {
+                return this.handleExactMatch(fusionAccount, account, bestMatch.identityId)
             }
             return this.handlePartialMatch(fusionAccount, sourceInfo)
         }

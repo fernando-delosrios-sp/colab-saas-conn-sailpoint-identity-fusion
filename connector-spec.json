@@ -17,7 +17,7 @@
     "showDebugLoggingOption": true,
     "sourceConfigInitialValues": {
         "fusionFormExpirationDays": 7,
-        "fusionAverageScore": 80,
+        "fusionManualReviewScore": 80,
         "provisioningTimeout": 300,
         "managedAccountsBatchSize": 100,
         "fusionMaxCandidatesForForm": 3,
@@ -737,18 +737,25 @@
                     "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><ul><li><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.</li><li><strong>Thresholds & weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.</li><li><strong>Strictness:</strong> Enforce mandatory rules or optionally assign to the matched identity without manual review when scores are an exact attribute match (every real rule scored 100 with none skipped).</li></ul>",
                     "items": [
                         {
-                            "key": "fusionAverageScore",
-                            "label": "Minimum combined match score [0-100]",
+                            "key": "fusionManualReviewScore",
+                            "label": "Manual review match score [0-100]",
                             "type": "number",
                             "required": true,
                             "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match. Mandatory rules must still meet their own minimums."
                         },
                         {
-                            "key": "fusionMergingExactMatch",
-                            "label": "Automatically assign on exact match?",
+                            "key": "fusionEnableAutoAssignment",
+                            "label": "Enable automatic assignment",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "When every configured attribute rule scores 100 and none were skipped (exact attribute match), assign the managed account to that identity without a review form. Merge and correlation behave like a link-to-existing review, but the fusion account receives the Auto status entitlement only (not Authorized). Only enable when you are confident your matching rules produce accurate results."
+                            "helpKey": "When enabled, assign the managed account to the matched identity without a review form if the combined score meets or exceeds the automatic assignment match score. Merge and correlation behave like a link-to-existing review, but the fusion account receives the Auto status entitlement only (not Authorized)."
+                        },
+                        {
+                            "key": "fusionAutoAssignmentScore",
+                            "label": "Automatic assignment match score [0-100]",
+                            "type": "number",
+                            "required": false,
+                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically assigned. Must be greater than or equal to the manual review score."
                         },
                         {
                             "key": "matchingConfigs",
