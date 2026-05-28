@@ -1,4 +1,6 @@
+import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
+import { assert } from '../../utils/assert'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing } from '../../model/config'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { countIdentityBackedFusionMatches } from '../formService/helpers'
@@ -58,6 +60,7 @@ export class ScoringService {
     private readonly fusionAverageScore: number
     private readonly fusionMergingExactMatch: boolean
     private readonly fusionMaxIdentityMatchCandidates: number
+    private readonly fusionScoreMap: Map<string, number>
 
     /**
      * Per-account cache of LIG3-normalized attribute values.
@@ -88,6 +91,7 @@ export class ScoringService {
         this.fusionAverageScore = config.fusionAverageScore ?? 0
         this.fusionMergingExactMatch = config.fusionMergingExactMatch ?? false
         this.fusionMaxIdentityMatchCandidates = config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
+        this.fusionScoreMap = config.fusionScoreMap ?? new Map()
     }
 
     /**
@@ -96,6 +100,19 @@ export class ScoringService {
     static blendWeight(fusionScore?: number): number {
         const t = fusionScore ?? 0
         return t <= 0 ? 1 : t
+    }
+
+    /**
+     * Retrieves the configured fusion score threshold for a specific attribute.
+     * Throws an error if the attribute is not configured in the matching rules.
+     */
+    getScore(attribute?: string): number {
+        assert(attribute, 'Attribute is required to get fusion score')
+        const score = this.fusionScoreMap.get(attribute)
+        if (score === undefined) {
+            throw new ConnectorError(`Fusion score not found for attribute: ${attribute}`, ConnectorErrorType.NotFound)
+        }
+        return score
     }
 
     /**

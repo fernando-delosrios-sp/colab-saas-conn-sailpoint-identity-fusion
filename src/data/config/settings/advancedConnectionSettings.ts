@@ -4,7 +4,7 @@
 import { extractBoolean } from '../../../utils/attributes'
 import { internalConfig } from '../internal'
 import { connectorSpecInitialValues as matchingInitialValues } from './matchingSettings'
-import type { FusionConfigBuild } from '../types'
+import type { AdvancedConnectionSettingsSection } from '../../../model/config'
 
 export const connectorSpecInitialValues = {
     provisioningTimeout: 300,
@@ -23,19 +23,23 @@ export const runtimeDefaults = {
     parallelBatchSize: 8,
 } as const
 
-export function applySettings(config: FusionConfigBuild): void {
-    config.enableQueue = extractBoolean(config, 'enableQueue') ?? connectorSpecInitialValues.enableQueue
-    config.enableRetry = extractBoolean(config, 'enableRetry') ?? connectorSpecInitialValues.enableRetry
-    config.maxRetries = config.maxRetries ?? internalConfig.clientService.retriesConstant
-    config.requestsPerSecond = config.requestsPerSecond ?? connectorSpecInitialValues.requestsPerSecond
-    config.maxConcurrentRequests = config.maxConcurrentRequests ?? connectorSpecInitialValues.maxConcurrentRequests
-    config.retryDelay = config.retryDelay ?? connectorSpecInitialValues.retryDelay
-    config.parallelBatchSize = config.parallelBatchSize ?? runtimeDefaults.parallelBatchSize
-    config.pageSize = config.batchSize ?? internalConfig.clientService.pageSize
-    config.enablePriority = extractBoolean(config, 'enablePriority') ?? matchingInitialValues.enablePriority
+export function readSettings(raw: Record<string, unknown>): AdvancedConnectionSettingsSection {
     const processingWaitSeconds =
-        config.processingWait !== undefined
-            ? config.processingWait
+        raw.processingWait !== undefined
+            ? (raw.processingWait as number)
             : internalConfig.clientService.processingWaitConstant / 1000
-    config.processingWait = processingWaitSeconds * 1000
+
+    return {
+        enableQueue: extractBoolean(raw, 'enableQueue') ?? connectorSpecInitialValues.enableQueue,
+        enableRetry: extractBoolean(raw, 'enableRetry') ?? connectorSpecInitialValues.enableRetry,
+        maxRetries: (raw.maxRetries as number | undefined) ?? internalConfig.clientService.retriesConstant,
+        requestsPerSecond: (raw.requestsPerSecond as number | undefined) ?? connectorSpecInitialValues.requestsPerSecond,
+        maxConcurrentRequests: (raw.maxConcurrentRequests as number | undefined) ?? connectorSpecInitialValues.maxConcurrentRequests,
+        retryDelay: (raw.retryDelay as number | undefined) ?? connectorSpecInitialValues.retryDelay,
+        parallelBatchSize: (raw.parallelBatchSize as number | undefined) ?? runtimeDefaults.parallelBatchSize,
+        batchSize: (raw.batchSize as number | undefined) ?? internalConfig.clientService.pageSize,
+        enablePriority: extractBoolean(raw, 'enablePriority') ?? matchingInitialValues.enablePriority,
+        processingWait: processingWaitSeconds * 1000,
+        provisioningTimeout: (raw.provisioningTimeout as number | undefined) ?? connectorSpecInitialValues.provisioningTimeout,
+    }
 }

@@ -1,7 +1,7 @@
 /**
  * connector-spec.json -> Attribute Definition Settings -> Normal Attribute Definitions
  */
-import type { FusionConfigBuild } from '../types'
+import type { NormalAttributeDefinitionSettingsSection, NormalAttributeDefinition } from '../../../model/config'
 
 export const connectorSpecInitialValues = {
     refresh: false,
@@ -11,6 +11,8 @@ export const connectorSpecInitialValues = {
 
 export const runtimeDefaults = {} as const
 
-export function applySettings(config: FusionConfigBuild): void {
-    config.normalAttributeDefinitions = config.normalAttributeDefinitions ?? []
+export function readSettings(raw: Record<string, unknown>): NormalAttributeDefinitionSettingsSection {
+    return {
+        normalAttributeDefinitions: (raw.normalAttributeDefinitions as NormalAttributeDefinition[]) ?? [],
+    }
 }

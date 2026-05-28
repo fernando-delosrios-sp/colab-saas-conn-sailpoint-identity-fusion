@@ -14,20 +14,19 @@ import * as reviewSettings from './settings/reviewSettings'
 import * as scopeSettings from './settings/scopeSettings'
 import * as sourcesSettings from './settings/sourcesSettings'
 import * as uniqueAttributeDefinitionsSettings from './settings/uniqueAttributeDefinitionsSettings'
-import type { FusionConfigBuild } from './types'
 
 const settingsPipeline = [
-    sourcesSettings.applySettings,
-    processingControlSettings.applySettings,
-    scopeSettings.applySettings,
-    attributeMappingDefinitionsSettings.applySettings,
-    normalAttributeDefinitionsSettings.applySettings,
-    uniqueAttributeDefinitionsSettings.applySettings,
-    matchingSettings.applySettings,
-    reviewSettings.applySettings,
-    developerSettings.applySettings,
-    advancedConnectionSettings.applySettings,
-    proxySettings.applySettings,
+    sourcesSettings.readSettings,
+    processingControlSettings.readSettings,
+    scopeSettings.readSettings,
+    attributeMappingDefinitionsSettings.readSettings,
+    normalAttributeDefinitionsSettings.readSettings,
+    uniqueAttributeDefinitionsSettings.readSettings,
+    matchingSettings.readSettings,
+    reviewSettings.readSettings,
+    developerSettings.readSettings,
+    advancedConnectionSettings.readSettings,
+    proxySettings.readSettings,
 ] as const
 
 /**
@@ -39,18 +38,18 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
     const sourceConfig = await readConfig()
     assert(sourceConfig, 'Failed to read source configuration')
 
-    const config = {
+    const rawConfig = {
         ...sourceConfig,
         ...getInternalConfigFlat(),
-    } as FusionConfigBuild
+    }
 
-    connectionSettings.applySettings(config)
+    const connectionFragment = connectionSettings.readSettings(rawConfig)
 
     logger.debug('Configuration loaded, applying defaults')
 
-    for (const applySettings of settingsPipeline) {
-        applySettings(config)
-    }
+    const fragments = settingsPipeline.map((read) => read(rawConfig))
 
-    return config as FusionConfig
+    const config = Object.assign({}, rawConfig, connectionFragment, ...fragments) as FusionConfig
+
+    return config
 }

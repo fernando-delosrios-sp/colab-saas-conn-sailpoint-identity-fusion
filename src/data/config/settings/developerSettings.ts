@@ -7,7 +7,7 @@ import { extractBoolean } from '../../../utils/attributes'
 import { internalConfig } from '../internal'
 import { connectorSpecInitialValues as advancedInitialValues } from './advancedConnectionSettings'
 import { defaultFusionMaxCandidatesForForm } from './reviewSettings'
-import type { FusionConfigBuild } from '../types'
+import type { DeveloperSettingsSection } from '../../../model/config'
 
 export const connectorSpecInitialValues = {
     externalLoggingLevel: 'info' as const,
@@ -20,13 +20,27 @@ export const runtimeDefaults = {
     concurrencyCheckEnabled: true,
 } as const
 
-export function applySettings(config: FusionConfigBuild): void {
-    config.reset = extractBoolean(config, 'reset') ?? runtimeDefaults.reset
-    config.managedAccountsBatchSize =
-        config.managedAccountsBatchSize ?? advancedInitialValues.managedAccountsBatchSize
+export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSection {
+    const externalLoggingEnabled = extractBoolean(raw, 'externalLoggingEnabled') ?? runtimeDefaults.externalLoggingEnabled
+    const externalLoggingUrl = raw.externalLoggingUrl as string | undefined
+    const externalLoggingLevel = (raw.externalLoggingLevel as 'error' | 'warn' | 'info' | 'debug' | undefined) ?? connectorSpecInitialValues.externalLoggingLevel
+
+    if (externalLoggingEnabled) {
+        assert(externalLoggingUrl, 'External logging URL is required when external logging is enabled')
+        assert(
+            externalLoggingUrl.toLowerCase().startsWith('http://') ||
+                externalLoggingUrl.toLowerCase().startsWith('https://'),
+            'External logging URL must use http or https protocol'
+        )
+        assert(
+            ['error', 'warn', 'info', 'debug'].includes(externalLoggingLevel || ''),
+            'External logging level must be one of: error, warn, info, debug'
+        )
+    }
+
     const rawMaxCandidates =
-        config.fusionMaxCandidatesForForm !== undefined
-            ? Number(config.fusionMaxCandidatesForForm)
+        raw.fusionMaxCandidatesForForm !== undefined
+            ? Number(raw.fusionMaxCandidatesForForm)
             : defaultFusionMaxCandidatesForForm()
     assert(
         Number.isFinite(rawMaxCandidates) &&
@@ -34,26 +48,17 @@ export function applySettings(config: FusionConfigBuild): void {
             rawMaxCandidates <= internalConfig.formService.fusionMaxCandidatesForFormMax,
         `fusionMaxCandidatesForForm must be between ${internalConfig.formService.fusionMaxCandidatesForFormMin} and ${internalConfig.formService.fusionMaxCandidatesForFormMax}`
     )
-    config.fusionMaxCandidatesForForm = Math.trunc(rawMaxCandidates)
-    config.concurrencyCheckEnabled = extractBoolean(config, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled
-    config.forceAttributeRefresh = extractBoolean(config, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh
-    config.provisioningTimeout = config.provisioningTimeout ?? advancedInitialValues.provisioningTimeout
-    config.externalLoggingEnabled = extractBoolean(config, 'externalLoggingEnabled') ?? runtimeDefaults.externalLoggingEnabled
-    config.externalLoggingUrl = config.externalLoggingUrl ?? undefined
-    config.externalLoggingLevel = config.externalLoggingLevel ?? connectorSpecInitialValues.externalLoggingLevel
-
-    if (config.externalLoggingEnabled) {
-        assert(config.externalLoggingUrl, 'External logging URL is required when external logging is enabled')
-        assert(
-            config.externalLoggingUrl.toLowerCase().startsWith('http://') ||
-                config.externalLoggingUrl.toLowerCase().startsWith('https://'),
-            'External logging URL must use http or https protocol'
-        )
-        assert(
-            ['error', 'warn', 'info', 'debug'].includes(config.externalLoggingLevel || ''),
-            'External logging level must be one of: error, warn, info, debug'
-        )
-    }
 
     logger.info('Configuration validation completed successfully')
+
+    return {
+        reset: extractBoolean(raw, 'reset') ?? runtimeDefaults.reset,
+        managedAccountsBatchSize: (raw.managedAccountsBatchSize as number | undefined) ?? advancedInitialValues.managedAccountsBatchSize,
+        fusionMaxCandidatesForForm: Math.trunc(rawMaxCandidates),
+        concurrencyCheckEnabled: extractBoolean(raw, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled,
+        forceAttributeRefresh: extractBoolean(raw, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh,
+        externalLoggingEnabled,
+        externalLoggingUrl,
+        externalLoggingLevel,
+    }
 }

@@ -1,11 +1,10 @@
 /**
  * connector-spec.json -> Source Settings -> Sources
  */
-import type { SourceConfig } from '../../../model/config'
+import type { SourceConfig, SourcesSection } from '../../../model/config'
 import { assert, softAssert } from '../../../utils/assert'
 import { extractBoolean } from '../../../utils/attributes'
 import { readBoolean } from '../../../utils/safeRead'
-import type { FusionConfigBuild } from '../types'
 
 export const connectorSpecInitialValues = {
     aggregationMode: 'none' as const,
@@ -27,10 +26,10 @@ export const runtimeDefaults = {
     },
 } as const
 
-export function applySettings(config: FusionConfigBuild): void {
-    config.sources = config.sources ?? []
+export function readSettings(raw: Record<string, unknown>): SourcesSection {
+    const rawSources = (raw.sources as SourceConfig[]) ?? []
 
-    config.sources = config.sources
+    const sources = rawSources
         .map((sourceConfig: SourceConfig) => {
             assert(sourceConfig, 'Source configuration is required')
             assert(sourceConfig.name, 'Source name is required')
@@ -62,5 +61,7 @@ export function applySettings(config: FusionConfigBuild): void {
         })
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)
 
-    softAssert(config.sources.length > 0, 'No sources configured - no Match will be performed', 'warn')
+    softAssert(sources.length > 0, 'No sources configured - no Match will be performed', 'warn')
+
+    return { sources }
 }

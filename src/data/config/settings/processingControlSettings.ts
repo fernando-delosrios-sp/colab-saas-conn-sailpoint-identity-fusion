@@ -2,7 +2,7 @@
  * connector-spec.json -> Source Settings -> Processing Control
  */
 import { extractBoolean } from '../../../utils/attributes'
-import type { FusionConfigBuild } from '../types'
+import type { ProcessingControlSection } from '../../../model/config'
 
 export const connectorSpecInitialValues = {
     maxHistoryMessages: 10,
@@ -13,10 +13,11 @@ export const runtimeDefaults = {
     skipAccountsWithMissingId: false,
 } as const
 
-export function applySettings(config: FusionConfigBuild): void {
-    config.deleteEmpty = extractBoolean(config, 'deleteEmpty') ?? runtimeDefaults.deleteEmpty
-    config.skipAccountsWithMissingId =
-        extractBoolean(config, 'skipAccountsWithMissingId') ?? runtimeDefaults.skipAccountsWithMissingId
-    config.maxHistoryMessages =
-        config.maxHistoryMessages ?? connectorSpecInitialValues.maxHistoryMessages
+export function readSettings(raw: Record<string, unknown>): ProcessingControlSection {
+    return {
+        deleteEmpty: extractBoolean(raw, 'deleteEmpty') ?? runtimeDefaults.deleteEmpty,
+        skipAccountsWithMissingId: extractBoolean(raw, 'skipAccountsWithMissingId') ?? runtimeDefaults.skipAccountsWithMissingId,
+        maxHistoryMessages: (raw.maxHistoryMessages as number | undefined) ?? connectorSpecInitialValues.maxHistoryMessages,
+        cascadeAggregationEnabled: raw.cascadeAggregationEnabled as boolean | undefined,
+    }
 }
