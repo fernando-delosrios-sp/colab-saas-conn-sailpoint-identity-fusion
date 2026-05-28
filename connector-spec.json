@@ -739,7 +739,7 @@
                             "key": "fusionManualReviewScore",
                             "label": "Manual review match score [0-100]",
                             "type": "number",
-                            "required": true,
+                            "required": false,
                             "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match. Mandatory rules must still meet their own minimums."
                         },
                         {
@@ -755,7 +755,7 @@
                             "parentKey": "fusionEnableAutoAssignment",
                             "parentValue": "true",
                             "type": "number",
-                            "required": false,
+                            "required": true,
                             "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically assigned. Must be greater than or equal to the manual review score."
                         },
                         {
@@ -1017,24 +1017,6 @@
                             "helpKey": "Maximum number of requests sent per second. Reduce this if you are getting rate-limit errors. Default: 8"
                         },
                         {
-                            "key": "enableRetry",
-                            "label": "Enable retry?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Automatically retry requests that fail due to temporary errors (e.g. timeouts or rate limits). Recommended for production use"
-                        },
-                        {
-                            "key": "maxRetries",
-                            "label": "API request retries",
-                            "type": "number",
-                            "required": false,
-                            "min": "0",
-                            "max": "20",
-                            "parentKey": "enableRetry",
-                            "parentValue": "true",
-                            "helpKey": "How many times to retry a failed request before giving up. Default: 20"
-                        },
-                        {
                             "key": "processingWait",
                             "label": "Processing wait time (seconds)",
                             "type": "number",
@@ -1058,6 +1040,24 @@
                             "min": "1",
                             "max": "250",
                             "helpKey": "Number of requests to group in each batch. Default: 250"
+                        },
+                        {
+                            "key": "enableRetry",
+                            "label": "Enable retry?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "Automatically retry requests that fail due to temporary errors (e.g. timeouts or rate limits). Recommended for production use"
+                        },
+                        {
+                            "key": "maxRetries",
+                            "label": "API request retries",
+                            "type": "number",
+                            "required": false,
+                            "min": "0",
+                            "max": "20",
+                            "parentKey": "enableRetry",
+                            "parentValue": "true",
+                            "helpKey": "How many times to retry a failed request before giving up. Default: 20"
                         }
                     ]
                 },
