@@ -7,6 +7,7 @@ import {
     maxDisplayCharsForAccountAttributeValue,
     truncateWithEllipsis,
 } from './accountAttributeValueDisplay'
+import { translate } from './localization'
 
 /**
  * Register Handlebars helpers for common operations (email/report templates).
@@ -39,6 +40,11 @@ export const registerHandlebarsHelpers = (): void => {
             return JSON.stringify(value)
         }
         return String(value)
+    })
+
+    Handlebars.registerHelper('i18n', function(this: any, key: string, options: any) {
+        const locale = options?.data?.root?.locale
+        return translate(key, locale)
     })
 
     const emailAddressPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -151,11 +157,12 @@ export const registerHandlebarsHelpers = (): void => {
         )
     })
 
-    Handlebars.registerHelper('sourceTypeLabel', (sourceType: string) => {
+    Handlebars.registerHelper('sourceTypeLabel', function(this: any, sourceType: string, options: any) {
+        const locale = options?.data?.root?.locale
         const labels: Record<string, string> = {
-            authoritative: 'Authoritative',
-            record: 'Record',
-            orphan: 'Orphan',
+            authoritative: translate('authoritative', locale),
+            record: translate('record', locale),
+            orphan: translate('orphan', locale),
         }
         return labels[sourceType] ?? sourceType
     })
@@ -172,27 +179,28 @@ export const registerHandlebarsHelpers = (): void => {
         return out
     })
 
-    Handlebars.registerHelper('processingStatsCards', (reportDate: Date | string, stats: Record<string, any>) => {
+    Handlebars.registerHelper('processingStatsCards', function(this: any, reportDate: Date | string, stats: Record<string, any>, options: any) {
+        const locale = options?.data?.root?.locale
         if (!stats || typeof stats !== 'object') return []
         const cards: Array<{ label: string; value: string }> = []
-        const pushCard = (label: string, value: any): void => {
+        const pushCard = (labelKey: string, value: any): void => {
             if (missing(value)) return
-            cards.push({ label, value: String(value) })
+            cards.push({ label: translate(labelKey, locale), value: String(value) })
         }
         const formattedDate = reportDate ? formatDateYmd(reportDate) : undefined
 
-        pushCard('Report Date', formattedDate)
-        pushCard('Total Processing Time', stats.totalProcessingTime)
-        pushCard('Used Memory', stats.usedMemory)
-        pushCard('Fusion Accounts Found', stats.fusionAccountsFound)
-        pushCard('Identities Found', stats.identitiesFound)
-        pushCard('Managed Accounts Found', stats.managedAccountsFound)
-        pushCard('Managed Accounts Processed', stats.managedAccountsProcessed)
-        pushCard('Identities Processed', stats.identitiesProcessed)
-        pushCard('Fusion Reviews Processed', stats.fusionReviewsProcessed)
-        pushCard('Fusion Reviews Found', stats.fusionReviewsFound)
-        pushCard('Fusion Review Instances Found', stats.fusionReviewInstancesFound)
-        pushCard('Fusion Automatic Matches', stats.fusionAutomaticMatches)
+        pushCard('report_date', formattedDate)
+        pushCard('total_processing_time', stats.totalProcessingTime)
+        pushCard('used_memory', stats.usedMemory)
+        pushCard('fusion_accounts_found', stats.fusionAccountsFound)
+        pushCard('identities_found', stats.identitiesFound)
+        pushCard('managed_accounts_found', stats.managedAccountsFound)
+        pushCard('managed_accounts_processed', stats.managedAccountsProcessed)
+        pushCard('identities_processed', stats.identitiesProcessed)
+        pushCard('fusion_reviews_processed', stats.fusionReviewsProcessed)
+        pushCard('fusion_reviews_found', stats.fusionReviewsFound)
+        pushCard('fusion_review_instances_found', stats.fusionReviewInstancesFound)
+        pushCard('fusion_automatic_matches', stats.fusionAutomaticMatches)
 
         return cards
     })

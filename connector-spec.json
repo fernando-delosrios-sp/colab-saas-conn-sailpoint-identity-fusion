@@ -19,7 +19,6 @@
         "fusionFormExpirationDays": 7,
         "provisioningTimeout": 300,
         "managedAccountsBatchSize": 100,
-        "fusionManualReviewScore": 80,
         "fusionMaxCandidatesForForm": 3,
         "includeIdentities": true,
         "identityScopeQuery": "*",
@@ -900,6 +899,73 @@
                             "type": "toggle",
                             "required": false,
                             "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-type breakdown metrics"
+                        },
+                        {
+                            "key": "enableLocalization",
+                            "label": "Enable localized user communications?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "Translate emails, reports, and Fusion reviews to the recipient's preferred language. This depends on an identity language attribute."
+                        },
+                        {
+                            "key": "defaultLanguage",
+                            "label": "Default Language",
+                            "type": "select",
+                            "required": false,
+                            "parentKey": "enableLocalization",
+                            "parentValue": "true",
+                            "helpKey": "The default language to use when the recipient's language cannot be determined.",
+                            "options": [
+                                {
+                                    "label": "English",
+                                    "value": "en"
+                                },
+                                {
+                                    "label": "Spanish",
+                                    "value": "es"
+                                },
+                                {
+                                    "label": "French",
+                                    "value": "fr"
+                                },
+                                {
+                                    "label": "German",
+                                    "value": "de"
+                                },
+                                {
+                                    "label": "Chinese",
+                                    "value": "zh"
+                                },
+                                {
+                                    "label": "Japanese",
+                                    "value": "ja"
+                                },
+                                {
+                                    "label": "Portuguese",
+                                    "value": "pt"
+                                },
+                                {
+                                    "label": "Italian",
+                                    "value": "it"
+                                },
+                                {
+                                    "label": "Russian",
+                                    "value": "ru"
+                                },
+                                {
+                                    "label": "Arabic",
+                                    "value": "ar"
+                                }
+                            ]
+                        },
+                        {
+                            "key": "identityLanguageAttribute",
+                            "label": "Identity Language Attribute",
+                            "type": "text",
+                            "required": false,
+                            "parentKey": "enableLocalization",
+                            "parentValue": "true",
+                            "helpKey": "Identity attribute containing the user's preferred language. Recognizes common language formats (e.g. 'en', 'eng', 'english', 'en-US')."
                         }
                     ]
                 }
