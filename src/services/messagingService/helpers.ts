@@ -235,8 +235,11 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
                                 <tr>
                                   <td style="padding-top:5px;">
-                                    {{#if exact}}
-                                    <span style="display:inline-block; vertical-align:middle; margin-right:6px; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "exact"}}</span>
+                                    {{#if auto}}
+                                    <span style="display:inline-block; vertical-align:middle; margin-right:6px; padding:2px 8px; border-radius:6px; background:#dcfce7; color:#166534; border:1px solid #86efac; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "auto"}}</span>
+                                    {{/if}}
+                                    {{#if manual}}
+                                    <span style="display:inline-block; vertical-align:middle; margin-right:6px; padding:2px 8px; border-radius:6px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "manual"}}</span>
                                     {{/if}}
                                     {{#if ../deferred}}
                                     <span style="display:inline-block; vertical-align:middle; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "deferred"}}</span>
@@ -471,8 +474,11 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                                                 {{else}}
                                                                                 {{identityName}}
                                                                                 {{/if}}
-                                                                              {{#if exact}}
-                                                                              <span style="display:inline-block; vertical-align:middle; margin:4px 0 0 6px; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "exact"}}</span>
+                                                                              {{#if auto}}
+                                                                              <span style="display:inline-block; vertical-align:middle; margin:4px 0 0 6px; padding:2px 8px; border-radius:6px; background:#dcfce7; color:#166534; border:1px solid #86efac; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "auto"}}</span>
+                                                                              {{/if}}
+                                                                              {{#if manual}}
+                                                                              <span style="display:inline-block; vertical-align:middle; margin:4px 0 0 6px; padding:2px 8px; border-radius:6px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "manual"}}</span>
                                                                               {{/if}}
                                                                                 {{#if ../deferred}}
                                                                                 <span style="display:inline-block; vertical-align:middle; margin:6px 0 0 6px; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "deferred"}}</span>

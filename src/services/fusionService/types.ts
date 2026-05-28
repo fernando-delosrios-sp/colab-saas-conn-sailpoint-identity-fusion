@@ -40,8 +40,15 @@ export type FusionReportMatch = {
     isMatch: boolean
     /** Candidate source used for downstream diagnostics/reporting. */
     candidateType?: 'identity' | 'new-unmatched'
-    /** True when every configured rule scored 100 with none skipped (exact attribute match). */
+    /** 
+     * True when every configured rule scored 100 with none skipped (exact attribute match).
+     * @deprecated Use auto or manual instead.
+     */
     exact?: boolean
+    /** True when the candidate meets the auto-assignment score threshold. */
+    auto?: boolean
+    /** True when the candidate only meets the manual-review score threshold. */
+    manual?: boolean
     /** Per-attribute score breakdown */
     scores?: FusionReportScore[]
 }
