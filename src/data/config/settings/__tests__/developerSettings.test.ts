@@ -1,76 +1,75 @@
-import type { FusionConfigBuild } from '../../types'
-import { applySettings } from '../developerSettings'
+import { readSettings } from '../developerSettings'
 
-describe('developerSettings applySettings', () => {
+describe('developerSettings readSettings', () => {
     it('defaults reset to false when omitted', () => {
-        const config = {} as unknown as FusionConfigBuild
+        const raw = {}
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.reset).toBe(false)
+        expect(result.reset).toBe(false)
     })
 
     it('normalizes string "true" to boolean true for reset', () => {
-        const config = { reset: 'true' as unknown as boolean } as unknown as FusionConfigBuild
+        const raw = { reset: 'true' as unknown as boolean }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.reset).toBe(true)
+        expect(result.reset).toBe(true)
     })
 
     it('normalizes string "false" to boolean false for reset', () => {
-        const config = { reset: 'false' as unknown as boolean } as unknown as FusionConfigBuild
+        const raw = { reset: 'false' as unknown as boolean }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.reset).toBe(false)
+        expect(result.reset).toBe(false)
     })
 
     it('defaults concurrencyCheckEnabled to true when omitted', () => {
-        const config = {} as unknown as FusionConfigBuild
+        const raw = {}
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.concurrencyCheckEnabled).toBe(true)
+        expect(result.concurrencyCheckEnabled).toBe(true)
     })
 
     it('normalizes string "false" to boolean false for concurrencyCheckEnabled', () => {
-        const config = { concurrencyCheckEnabled: 'false' as unknown as boolean } as unknown as FusionConfigBuild
+        const raw = { concurrencyCheckEnabled: 'false' as unknown as boolean }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.concurrencyCheckEnabled).toBe(false)
+        expect(result.concurrencyCheckEnabled).toBe(false)
     })
 
     it('defaults forceAttributeRefresh to false when omitted', () => {
-        const config = {} as unknown as FusionConfigBuild
+        const raw = {}
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.forceAttributeRefresh).toBe(false)
+        expect(result.forceAttributeRefresh).toBe(false)
     })
 
     it('normalizes string "true" to boolean true for forceAttributeRefresh', () => {
-        const config = { forceAttributeRefresh: 'true' as unknown as boolean } as unknown as FusionConfigBuild
+        const raw = { forceAttributeRefresh: 'true' as unknown as boolean }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.forceAttributeRefresh).toBe(true)
+        expect(result.forceAttributeRefresh).toBe(true)
     })
 
     it('defaults externalLoggingEnabled to false when omitted', () => {
-        const config = {} as unknown as FusionConfigBuild
+        const raw = {}
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.externalLoggingEnabled).toBe(false)
+        expect(result.externalLoggingEnabled).toBe(false)
     })
 
     it('normalizes string "true" to boolean true for externalLoggingEnabled', () => {
-        const config = { externalLoggingEnabled: 'true' as unknown as boolean, externalLoggingUrl: 'http://localhost' } as unknown as FusionConfigBuild
+        const raw = { externalLoggingEnabled: 'true' as unknown as boolean, externalLoggingUrl: 'http://localhost' }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.externalLoggingEnabled).toBe(true)
+        expect(result.externalLoggingEnabled).toBe(true)
     })
 })

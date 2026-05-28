@@ -1,45 +1,44 @@
-import type { FusionConfigBuild } from '../../types'
-import { applySettings } from '../matchingSettings'
+import { readSettings } from '../matchingSettings'
 
-describe('matchingSettings applySettings', () => {
+describe('matchingSettings readSettings', () => {
     it('defaults fusionMergingExactMatch to false when omitted', () => {
-        const config = { matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }] } as unknown as FusionConfigBuild
+        const raw = { matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }] }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.fusionMergingExactMatch).toBe(false)
+        expect(result.fusionMergingExactMatch).toBe(false)
     })
 
     it('normalizes string "true" to boolean true for fusionMergingExactMatch', () => {
-        const config = {
+        const raw = {
             fusionMergingExactMatch: 'true' as unknown as boolean,
             matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }],
-        } as unknown as FusionConfigBuild
+        } 
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.fusionMergingExactMatch).toBe(true)
+        expect(result.fusionMergingExactMatch).toBe(true)
     })
 
     it('normalizes string "false" to boolean false for fusionMergingExactMatch', () => {
-        const config = {
+        const raw = {
             fusionMergingExactMatch: 'false' as unknown as boolean,
             matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }],
-        } as unknown as FusionConfigBuild
+        } 
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.fusionMergingExactMatch).toBe(false)
+        expect(result.fusionMergingExactMatch).toBe(false)
     })
 
     it('preserves boolean false for fusionMergingExactMatch', () => {
-        const config = {
+        const raw = {
             fusionMergingExactMatch: false,
             matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }],
-        } as unknown as FusionConfigBuild
+        } 
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.fusionMergingExactMatch).toBe(false)
+        expect(result.fusionMergingExactMatch).toBe(false)
     })
 })

@@ -1,7 +1,7 @@
 /**
  * connector-spec.json -> Attribute Definition Settings -> Unique Attribute Definitions
  */
-import type { FusionConfigBuild } from '../types'
+import type { UniqueAttributeDefinitionSettingsSection, UniqueAttributeDefinition } from '../../../model/config'
 
 export const connectorSpecInitialValues = {
     maxAttempts: 20,
@@ -16,8 +16,9 @@ export const runtimeDefaults = {
     trim: false,
 } as const
 
-export function applySettings(config: FusionConfigBuild): void {
-    config.uniqueAttributeDefinitions = config.uniqueAttributeDefinitions ?? []
-    config.trim = config.trim ?? runtimeDefaults.trim
-    config.maxAttempts = config.maxAttempts ?? connectorSpecInitialValues.maxAttempts
+export function readSettings(raw: Record<string, unknown>): UniqueAttributeDefinitionSettingsSection {
+    return {
+        uniqueAttributeDefinitions: (raw.uniqueAttributeDefinitions as UniqueAttributeDefinition[]) ?? [],
+        maxAttempts: (raw.maxAttempts as number | undefined) ?? connectorSpecInitialValues.maxAttempts,
+    }
 }

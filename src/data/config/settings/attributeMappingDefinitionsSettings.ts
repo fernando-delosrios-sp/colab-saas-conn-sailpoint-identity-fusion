@@ -1,8 +1,7 @@
 /**
  * connector-spec.json -> Attribute Mapping Settings -> Attribute Mapping Definitions
  */
-import type { FusionConfigBuild } from '../types'
-import { AttributeMergeMode } from '../../../model/config'
+import { AttributeMergeMode, type AttributeMappingDefinitionsSection, type AttributeMap, type DefaultAttributeMergeMode } from '../../../model/config'
 
 export const connectorSpecInitialValues = {
     attributeMerge: AttributeMergeMode.First,
@@ -10,6 +9,9 @@ export const connectorSpecInitialValues = {
 
 export const runtimeDefaults = {} as const
 
-export function applySettings(config: FusionConfigBuild): void {
-    config.attributeMaps = config.attributeMaps ?? []
+export function readSettings(raw: Record<string, unknown>): AttributeMappingDefinitionsSection {
+    return {
+        attributeMerge: (raw.attributeMerge as DefaultAttributeMergeMode) ?? connectorSpecInitialValues.attributeMerge,
+        attributeMaps: (raw.attributeMaps as AttributeMap[]) ?? [],
+    }
 }

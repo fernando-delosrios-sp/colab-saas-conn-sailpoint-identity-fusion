@@ -1,68 +1,67 @@
-import type { FusionConfigBuild } from '../../types'
-import { applySettings } from '../advancedConnectionSettings'
+import { readSettings } from '../advancedConnectionSettings'
 
-describe('advancedConnectionSettings applySettings', () => {
+describe('advancedConnectionSettings readSettings', () => {
     it('defaults enableQueue to true when omitted', () => {
-        const config = {} as unknown as FusionConfigBuild
+        const raw = {}
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.enableQueue).toBe(true)
+        expect(result.enableQueue).toBe(true)
     })
 
     it('normalizes string "false" to boolean false for enableQueue', () => {
-        const config = { enableQueue: 'false' as unknown as boolean } as unknown as FusionConfigBuild
+        const raw = { enableQueue: 'false' as unknown as boolean }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.enableQueue).toBe(false)
+        expect(result.enableQueue).toBe(false)
     })
 
     it('normalizes string "true" to boolean true for enableQueue', () => {
-        const config = { enableQueue: 'true' as unknown as boolean } as unknown as FusionConfigBuild
+        const raw = { enableQueue: 'true' as unknown as boolean }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.enableQueue).toBe(true)
+        expect(result.enableQueue).toBe(true)
     })
 
     it('defaults enableRetry to true when omitted', () => {
-        const config = {} as unknown as FusionConfigBuild
+        const raw = {}
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.enableRetry).toBe(true)
+        expect(result.enableRetry).toBe(true)
     })
 
     it('normalizes string "false" to boolean false for enableRetry', () => {
-        const config = { enableRetry: 'false' as unknown as boolean } as unknown as FusionConfigBuild
+        const raw = { enableRetry: 'false' as unknown as boolean }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.enableRetry).toBe(false)
+        expect(result.enableRetry).toBe(false)
     })
 
     it('defaults enablePriority to true when omitted', () => {
-        const config = {} as unknown as FusionConfigBuild
+        const raw = {}
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.enablePriority).toBe(true)
+        expect(result.enablePriority).toBe(true)
     })
 
     it('normalizes string "false" to boolean false for enablePriority', () => {
-        const config = { enablePriority: 'false' as unknown as boolean } as unknown as FusionConfigBuild
+        const raw = { enablePriority: 'false' as unknown as boolean }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.enablePriority).toBe(false)
+        expect(result.enablePriority).toBe(false)
     })
 
     it('preserves boolean values for enableQueue', () => {
-        const config = { enableQueue: false } as unknown as FusionConfigBuild
+        const raw = { enableQueue: false }
 
-        applySettings(config)
+        const result = readSettings(raw)
 
-        expect(config.enableQueue).toBe(false)
+        expect(result.enableQueue).toBe(false)
     })
 })
