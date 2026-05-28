@@ -76,9 +76,9 @@ export class SchemaService {
      * - Values are cast to the target type (`string`, `boolean`, `int`/`long`).
      */
     private castAttributeValue(
-        value: boolean | string | string[] | number | number[] | null | undefined,
+        value: any,
         schemaDef: SchemaAttribute
-    ): boolean | string | string[] | number | number[] | null {
+    ): any {
         if (value === null || value === undefined) return null
 
         const isMulti = schemaDef.multi === true
@@ -87,11 +87,32 @@ export class SchemaService {
         if (isMulti) {
             // Multi-valued: ensure the value is an array, filter null/undefined, then cast each element
             const arr = Array.isArray(value) ? value : [value]
-            return compact(arr).map((v) => this.castScalar(v, type)) as string[] | number[]
+            return compact(arr).map((v) => {
+                if (type === 'string' && typeof v === 'object' && v !== null) {
+                    return JSON.stringify(v)
+                }
+                return this.castScalar(v as boolean | string | number, type)
+            })
         } else {
-            // Single-valued: if value is an array, join it into a string
-            const scalar = Array.isArray(value) ? value.join(', ') : value
-            return this.castScalar(scalar, type)
+            if (type === 'string') {
+                if (typeof value === 'object' && value !== null) {
+                    if (Array.isArray(value)) {
+                        const isObjectArray = value.some(v => typeof v === 'object' && v !== null)
+                        if (isObjectArray) {
+                            return JSON.stringify(value)
+                        } else {
+                            return value.join(',')
+                        }
+                    } else {
+                        return JSON.stringify(value)
+                    }
+                } else {
+                    return String(value)
+                }
+            } else {
+                const scalar = Array.isArray(value) ? value.join(',') : value
+                return this.castScalar(scalar as boolean | string | number, type)
+            }
         }
     }
 
