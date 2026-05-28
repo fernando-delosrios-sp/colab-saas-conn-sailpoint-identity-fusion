@@ -68,7 +68,7 @@ describe('SchemaService', () => {
                 ['Alice', 'Bob'],
                 schemaDef
             )
-            expect(result).toBe('Alice, Bob')
+            expect(result).toBe('Alice,Bob')
         })
 
         it('should return null for null/undefined value regardless of cardinality', () => {

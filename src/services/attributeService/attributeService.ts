@@ -889,7 +889,7 @@ export class AttributeService {
         context: RenderContext,
         accountName?: string,
         expressionOverride?: string
-    ): string | undefined {
+    ): any {
         const expression = expressionOverride ?? definition.expression
         if (!expression) {
             this.log.error(`Expression is required for attribute ${definition.name}`)
@@ -922,12 +922,20 @@ export class AttributeService {
             return undefined
         }
 
-        if (definition.trim) value = value.trim()
-        if (definition.case) value = switchCase(value, definition.case)
-        if (definition.spaces) value = removeSpaces(value)
-        if (definition.normalize) value = normalize(value)
+        if (definition.trim && typeof value === 'string') value = value.trim()
+        if (definition.case && typeof value === 'string') value = switchCase(value, definition.case)
+        if (definition.spaces && typeof value === 'string') value = removeSpaces(value)
+        if (definition.normalize && typeof value === 'string') value = normalize(value)
 
-        this.log.debug(`[${accountName}] ${definition.name} = ${value}`)
+        try {
+            if (typeof value === 'string') {
+                value = JSON.parse(value)
+            }
+        } catch {
+            // Keep as string if parsing fails
+        }
+
+        this.log.debug(`[${accountName}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`)
 
         return value
     }
@@ -952,7 +960,7 @@ export class AttributeService {
         definition: UniqueAttributeDefinition,
         fusionAccount: FusionAccount,
         context: Record<string, any>
-    ): Promise<string | undefined> {
+    ): Promise<any> {
         const lockKey = `unique:${definition.name}`
 
         return await this.locks.withLock(lockKey, async () => {
@@ -988,7 +996,7 @@ export class AttributeService {
         context: Record<string, any>,
         registeredValues: Set<string>,
         maxAttempts: number
-    ): Promise<string | undefined> {
+    ): Promise<any> {
         const stateWrapper = this.getStateWrapper()
         const counterFn = stateWrapper.getCounter(definition.name)
         const digits = definition.digits ?? 1
@@ -1000,11 +1008,12 @@ export class AttributeService {
             this.injectUUIDIfNeeded(definition, context)
 
             const value = this.evaluateTemplate(definition, context, fusionAccount.name)
-            if (!value) return undefined
+            if (value === undefined || value === null) return undefined
 
-            if (!registeredValues.has(value)) {
-                registeredValues.add(value)
-                this.log.debug(`Generated unique value (incremental) for attribute ${definition.name}: ${value}`)
+            const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
+            if (!registeredValues.has(strValue)) {
+                registeredValues.add(strValue)
+                this.log.debug(`Generated unique value (incremental) for attribute ${definition.name}: ${strValue}`)
                 return value
             }
 
@@ -1025,7 +1034,7 @@ export class AttributeService {
         context: Record<string, any>,
         registeredValues: Set<string>,
         maxAttempts: number
-    ): Promise<string | undefined> {
+    ): Promise<any> {
         const counter = StateWrapper.getCounter()
         const digits = definition.digits ?? 1
         const effectiveExpression = this.buildEffectiveExpression(definition)
@@ -1035,15 +1044,16 @@ export class AttributeService {
             this.injectUUIDIfNeeded(definition, context)
 
             const value = this.evaluateTemplate(definition, context, fusionAccount.name, effectiveExpression)
-            if (!value) return undefined
+            if (value === undefined || value === null) return undefined
 
-            if (!registeredValues.has(value)) {
-                registeredValues.add(value)
-                this.log.debug(`Generated unique value for attribute ${definition.name}: ${value}`)
+            const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
+            if (!registeredValues.has(strValue)) {
+                registeredValues.add(strValue)
+                this.log.debug(`Generated unique value for attribute ${definition.name}: ${strValue}`)
                 return value
             }
 
-            this.log.debug(`Value ${value} already exists for unique attribute: ${definition.name}`)
+            this.log.debug(`Value ${strValue} already exists for unique attribute: ${definition.name}`)
             context.counter = padNumber(counter(), digits)
             this.log.debug(`Regenerating unique attribute: ${definition.name} (attempt ${attempt + 1})`)
         }

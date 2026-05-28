@@ -19,6 +19,7 @@
         "fusionFormExpirationDays": 7,
         "provisioningTimeout": 300,
         "managedAccountsBatchSize": 100,
+        "fusionManualReviewScore": 80,
         "fusionMaxCandidatesForForm": 3,
         "includeIdentities": true,
         "identityScopeQuery": "*",
