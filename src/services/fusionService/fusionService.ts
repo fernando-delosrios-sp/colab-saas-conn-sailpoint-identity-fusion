@@ -2323,6 +2323,7 @@ export class FusionService {
                 reportAttributes: this.reportAttributes,
                 fusionIdentityComparisonsByAccount: tracker.fusionIdentityComparisonsByAccount,
                 resolveReportAccountId: (account) => this.resolveReportAccountId(account),
+                fusionAutoAssignmentScore: this.config.fusionAutoAssignmentScore,
             },
             includeNonMatches,
             stats

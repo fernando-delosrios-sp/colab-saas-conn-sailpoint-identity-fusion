@@ -25,6 +25,7 @@ const replacements = [
   ['>M<br>A<br>T<br>C<br>H<br>E<br>S<', '>{{{i18n "matches_vertical"}}}<'],
   ['>Error<', '>{{i18n "error"}}<'],
   ['>Exact<', '>{{i18n "exact"}}<'],
+  ['>Manual<', '>{{i18n "manual"}}<'],
   ['>Deferred<', '>{{i18n "deferred"}}<'],
   ['>Attribute<', '>{{i18n "attribute"}}<'],
   ['>Algorithm<', '>{{i18n "algorithm"}}<'],

@@ -22,7 +22,7 @@ All row inclusion flags default to `false`:
 - `includeExisting`
 - `includeNonMatched`
 - `includeMatched`
-- `includeExact`
+- `includeExact` (historical flag, maps to auto-assignment matches)
 - `includeDeferred`
 - `includeReview`
 - `includeDecisions`

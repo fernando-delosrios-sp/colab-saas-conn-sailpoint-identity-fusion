@@ -6,6 +6,7 @@ import {
     mapScoreReportsForFusionReport,
 } from './helpers'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
+import { COMBINED_SCORE_ROW_ATTRIBUTE, WEIGHTED_MEAN_ALGORITHM } from '../scoringService/scoringService'
 import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
 import { UrlContext } from '../../utils/url'
 import { SourceInfo } from '../sourceService'
@@ -22,6 +23,7 @@ export interface FusionReportState {
     reportAttributes: string[]
     fusionIdentityComparisonsByAccount: WeakMap<FusionAccount, number>
     resolveReportAccountId: (account: FusionAccount) => string | undefined
+    fusionAutoAssignmentScore?: number
 }
 
 export function buildFusionReport(
@@ -60,16 +62,26 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
         const fusionMatches = fusionAccount.fusionMatches
         if (!fusionMatches || fusionMatches.length === 0) continue
 
-        const matches = fusionMatches.map((match) => ({
-            ...fusionReportMatchCandidateAccountFields(match),
-            identityName: match.identityName,
-            identityId: match.identityId,
-            identityUrl: state.urlContext.identity(match.identityId),
-            isMatch: true,
-            candidateType: match.candidateType,
-            exact: isExactAttributeMatchScores(match.scores),
-            scores: mapScoreReportsForFusionReport(match.scores),
-        }))
+        const matches = fusionMatches.map((match) => {
+            const combinedReport = match.scores.find(
+                (s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE && s.algorithm === WEIGHTED_MEAN_ALGORITHM
+            )
+            const score = combinedReport?.score ?? 0
+            const auto = state.fusionAutoAssignmentScore !== undefined && score >= state.fusionAutoAssignmentScore
+
+            return {
+                ...fusionReportMatchCandidateAccountFields(match),
+                identityName: match.identityName,
+                identityId: match.identityId,
+                identityUrl: state.urlContext.identity(match.identityId),
+                isMatch: true,
+                candidateType: match.candidateType,
+                exact: isExactAttributeMatchScores(match.scores),
+                auto,
+                manual: !auto,
+                scores: mapScoreReportsForFusionReport(match.scores),
+            }
+        })
 
         // Release fusionIdentity refs after extracting report data (on-demand report path)
         fusionAccount.clearFusionIdentityReferences()
