@@ -297,6 +297,9 @@ export interface ReviewSettingsSection {
     fusionFormExpirationDays: number
     fusionOwnerIsGlobalReviewer?: boolean
     fusionReportOnAggregation?: boolean
+    enableLocalization?: boolean
+    defaultLanguage?: string
+    identityLanguageAttribute?: string
 }
 
 /** Combined Attribute Matching Settings: matching rules and review workflow. */

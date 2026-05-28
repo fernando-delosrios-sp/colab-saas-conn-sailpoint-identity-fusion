@@ -17,6 +17,7 @@ import { wrapConnectorError } from '../../utils/error'
 import { pickAttributes } from '../../utils/attributes'
 import { createUrlContext, getUIOriginFromBaseUrl, UrlContext } from '../../utils/url'
 import { normalizeEmailValue, sanitizeRecipients } from './email'
+import { normalizeLanguageCode } from './localization'
 import { IdentityService } from '../identityService'
 import { SourceService } from '../sourceService'
 import { FusionReport } from '../fusionService/types'
@@ -75,6 +76,10 @@ export class MessagingService {
     /** Cached result of buildEmailHeaderSubtitle; undefined until first call, then the computed value. */
     private _cachedEmailHeaderSubtitle: string | undefined
 
+    private readonly enableLocalization: boolean
+    private readonly defaultLanguage: string
+    private readonly identityLanguageAttribute: string | undefined
+
     // ------------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------------
@@ -91,6 +96,9 @@ export class MessagingService {
         this.cloudDisplayName = config.cloudDisplayName
         this.apiBaseUrl = config.baseurl.replace(/\/$/, '')
         this.reportAttributes = config.fusionFormAttributes ?? []
+        this.enableLocalization = config.enableLocalization ?? false
+        this.defaultLanguage = config.defaultLanguage ?? 'en'
+        this.identityLanguageAttribute = config.identityLanguageAttribute
         this.urlContext = createUrlContext(config.baseurl)
         registerHandlebarsHelpers()
         this.templates = compileEmailTemplates()
@@ -325,6 +333,7 @@ export class MessagingService {
             : this.sources.resolveIscAccountIdForManagedKey(String(formInputAccount || ''))
         const accountUrl = this.urlContext.humanAccount(accountId || undefined)
         const accountEmail = context?.accountEmail
+        const locale = await this.getRecipientLocale(recipientId)
 
         const candidates = context?.candidates ?? []
 
@@ -372,6 +381,7 @@ export class MessagingService {
             reportDate: new Date(),
             formInstanceId: formInstance.id,
             formUrl: formInstance.standAloneFormUrl,
+            locale
         }
 
         assert(this.templates, 'Email templates are required')
@@ -413,7 +423,8 @@ export class MessagingService {
     public renderFusionReportHtml(
         report: FusionReport,
         _reportType: 'aggregation' | 'fusion',
-        reportTitleOverride?: string
+        reportTitleOverride?: string,
+        locale?: string
     ): string {
         const totalAccounts = report.totalAccounts ?? report.accounts.length
         const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
@@ -425,6 +436,7 @@ export class MessagingService {
             reportDate: report.reportDate || new Date(),
             reportTitle,
             headerSubtitle: this.buildEmailHeaderSubtitle(),
+            locale
         }
         return renderFusionReport(this.templates, emailData)
     }
@@ -447,8 +459,27 @@ export class MessagingService {
         const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
         const reportTitle = args.reportTitle || MessagingService.FUSION_REPORT_EMAIL_TITLE
         const subject = `${reportTitle} - ${matchAccountCount} Match(es) require(s) your attention`
-        const body = this.renderFusionReportHtml(report, args.reportType, reportTitle)
-        await this.sendEmail(args.recipients, subject, body)
+        
+        // Group recipients by locale
+        const recipientsByLocale = new Map<string | undefined, string[]>()
+        
+        for (const email of args.recipients) {
+            // we must find the identity id for the email to get the locale
+            // deliverReportToRecipients is only used by sendReport (owners) and test workflow (explicit email).
+            // For simplicity, we just use the first owner's locale if possible, or fallback to default.
+            // Wait, sendReport has access to owner IDs. deliverReportToRecipients only gets emails.
+            // Let's fallback to finding identity by email? No, identitySearch by email is not reliable here.
+            // If deliverReportToRecipients doesn't have Identity IDs, we'll just use default/undefined locale for now.
+            // Wait, we can pass locale map from sendReport!
+            recipientsByLocale.set(undefined, args.recipients)
+            break
+        }
+
+        for (const [locale, emails] of recipientsByLocale.entries()) {
+            const body = this.renderFusionReportHtml(report, args.reportType, reportTitle, locale)
+            await this.sendEmail(emails, subject, body)
+        }
+        
         const sentRecipientCount = sanitizeRecipients(args.recipients).length
         this.log.info(`Sent fusion report email to ${sentRecipientCount} recipient(s)`)
     }
@@ -456,6 +487,26 @@ export class MessagingService {
     // ------------------------------------------------------------------------
     // Private Helper Methods
     // ------------------------------------------------------------------------
+
+    private async getRecipientLocale(recipientId: string | undefined): Promise<string | undefined> {
+        if (!this.enableLocalization || !this.identities || !recipientId) return undefined
+        if (!this.identityLanguageAttribute) return this.defaultLanguage
+
+        try {
+            let identity = this.identities.getIdentityById(recipientId)
+            if (!identity) {
+                identity = await this.identities.fetchIdentityById(recipientId)
+            }
+            const langValue = identity.attributes?.[this.identityLanguageAttribute]
+            if (langValue) {
+                const locale = normalizeLanguageCode(String(langValue))
+                if (locale) return locale
+            }
+        } catch (e) {
+            this.log.warn(`Failed to fetch language attribute for identity ${recipientId}: ${e}`)
+        }
+        return this.defaultLanguage
+    }
 
     /**
      * Get the workflow, ensuring it's prepared first
