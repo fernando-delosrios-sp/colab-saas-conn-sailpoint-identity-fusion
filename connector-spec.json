@@ -17,7 +17,6 @@
     "showDebugLoggingOption": true,
     "sourceConfigInitialValues": {
         "fusionFormExpirationDays": 7,
-        "fusionManualReviewScore": 80,
         "provisioningTimeout": 300,
         "managedAccountsBatchSize": 100,
         "fusionMaxCandidatesForForm": 3,
@@ -753,6 +752,8 @@
                         {
                             "key": "fusionAutoAssignmentScore",
                             "label": "Automatic assignment match score [0-100]",
+                            "parentKey": "fusionEnableAutoAssignment",
+                            "parentValue": "true",
                             "type": "number",
                             "required": false,
                             "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically assigned. Must be greater than or equal to the manual review score."
