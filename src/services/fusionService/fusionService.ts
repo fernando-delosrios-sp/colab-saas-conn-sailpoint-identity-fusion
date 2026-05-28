@@ -503,11 +503,11 @@ export class FusionService {
             this.log.debug(`Applied identity layer for ${fusionAccount.name}: identityId=${identityId}`)
         }
 
-        // Replayed link-to-existing assignment already records a decision history line; do not append
-        // the generic "Associated managed account …" for that same managed key (persisted accounts
-        // list can lag identity until the next account write).
+        // Replayed assignments and new identity decisions already record a decision history line;
+        // do not append the generic "Associated managed account …" for that same managed key
+        // (persisted accounts list can lag identity until the next account write).
         let skipAssociationHistoryForManagedKeys: ReadonlySet<string> | undefined
-        if (authorizedLinkDecision && !authorizedLinkDecision.newIdentity) {
+        if (authorizedLinkDecision) {
             const rawKey = trimStr(authorizedLinkDecision.account.id) ?? ''
             const normalized = normalizeCompositeManagedAccountKey(rawKey)
             if (normalized) {
@@ -907,13 +907,21 @@ export class FusionService {
         // must preserve immutable mapped fields (for example display/account name).
         fusionAccount.setNeedsReset(Boolean(fusionDecision.newIdentity))
         fusionAccount.addFusionDecisionLayer(fusionDecision)
-        const suppressAssociationHistoryForAuthorizedDecision = isAuthorizedDecision
+        // The decision already records a history message. Do not add the generic
+        // "Associated managed account ..." line for the decided account itself.
+        const rawDecisionKey = trimStr(fusionDecision.account.id) ?? ''
+        const normalizedDecisionKey = normalizeCompositeManagedAccountKey(rawDecisionKey)
+        const skipAssociationHistoryForManagedKeys = normalizedDecisionKey
+            ? new Set([normalizedDecisionKey])
+            : undefined
+
         fusionAccount.addManagedAccountLayer(
             this.sources.managedAccountsById,
             this.sources.managedAccountsByIdentityId,
             this.sources.managedAccountsAllById,
             this.shouldPruneDeletedManagedAccounts(),
-            !suppressAssociationHistoryForAuthorizedDecision
+            true,
+            skipAssociationHistoryForManagedKeys
         )
         await this.applyAttributeProcessing(fusionAccount)
 
