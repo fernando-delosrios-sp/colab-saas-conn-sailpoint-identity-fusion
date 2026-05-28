@@ -396,7 +396,7 @@
                             "label": "Default attribute merge from multiple sources",
                             "type": "radio",
                             "required": true,
-                            "helpKey": "When multiple sources provide the same attribute, choose how to combine them. 'First found' uses the value from the highest-priority source. 'Keep a list' stores all values. 'Concatenate' joins values into a single text",
+                            "helpKey": "When multiple sources provide the same attribute, choose how to combine them. 'First found' uses the value from the highest-priority source. 'Keep a list of values' stores all values. 'Concatenate different values ([a] [b])' joins values into a single text",
                             "options": [
                                 {
                                     "label": "First found",
@@ -903,7 +903,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance.</strong><br><br><ul><li><strong>Reset & refresh:</strong> Rebuild all Fusion accounts from scratch or force recalculate all Normal-type attributes on every run.</li><li><strong>Batch limits:</strong> Optimize memory usage vs throughput during match detection.</li><li><strong>Misc:</strong> Prevent multiple runs overlapping or stream logs to monitoring services.</li></ul>",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance.</strong><br><br><ul><li><strong>Reset accounts?:</strong> Rebuild all Fusion accounts from scratch.</li><li><strong>Force attribute refresh on next aggregation?:</strong> Recalculate all Normal-type attributes on the next run.</li><li><strong>Managed accounts batch size:</strong> Optimize memory usage vs throughput during match detection.</li><li><strong>Enable concurrency check?:</strong> Prevent multiple runs overlapping.</li><li><strong>Enable external logging?:</strong> Stream logs to monitoring services.</li></ul>",
                     "items": [
                         {
                             "key": "reset",
@@ -981,7 +981,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Advanced Connection Settings",
-                    "sectionHelpMessage": "<strong>Fine-tune API and queue behavior.</strong><br><br><ul><li><strong>Provisioning timeout:</strong> Max wait for operations (default: 300s).</li><li><strong>Queue:</strong> Enable rate limiting and concurrency control.</li><li><strong>Retry:</strong> Auto-retry failed requests (recommended).</li><li><strong>Processing wait time:</strong> Keep-alive interval for long operations.</li><li><strong>Batching:</strong> Group requests for efficiency.</li></ul>",
+                    "sectionHelpMessage": "<strong>Fine-tune API and queue behavior.</strong><br><br><ul><li><strong>Provisioning timeout (seconds):</strong> Max wait for operations (default: 300s).</li><li><strong>Maximum concurrent requests</strong> and <strong>Requests per second:</strong> Enable rate limiting and concurrency control.</li><li><strong>Enable retry?:</strong> Auto-retry failed requests (recommended).</li><li><strong>Processing wait time (seconds):</strong> Keep-alive interval for long operations.</li><li><strong>Batch size:</strong> Group requests for efficiency.</li></ul>",
                     "items": [
                         {
                             "key": "provisioningTimeout",
@@ -1056,7 +1056,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Proxy Settings",
-                    "sectionHelpMessage": "<strong>Delegate processing to external server.</strong><br><br>Run connector logic on your own infrastructure.<br><ul><li><strong>Proxy URL:</strong> External endpoint.</li><li><strong>Proxy password:</strong> Secret for authentication (must match PROXY_PASSWORD env var on proxy).</li></ul>",
+                    "sectionHelpMessage": "<strong>Delegate processing to external server.</strong><br><br>Run connector logic on your own infrastructure.<br><ul><li><strong>Enable proxy mode?:</strong> Route all processing through your own server.</li><li><strong>Proxy URL:</strong> External endpoint.</li><li><strong>Proxy password:</strong> Secret for authentication (must match PROXY_PASSWORD env var on proxy).</li></ul>",
                     "items": [
                         {
                             "key": "proxyEnabled",
