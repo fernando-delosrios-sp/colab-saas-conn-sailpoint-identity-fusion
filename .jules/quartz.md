@@ -16,3 +16,7 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2026-05-28 - Consolidating Repeated Attribute Fallbacks
+
+**Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `originAccountId` vs `nativeIdentity` vs `key`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan, especially inside inline sorting callbacks.
+**Action:** Extract `readUnknown(account, 'originAccountId') ?? readUnknown(...)` fallback chains into clearly named local helper functions (e.g., `getAccountSortKey`) to encapsulate the extraction logic and significantly improve readability within dense blocks.
