@@ -50,3 +50,8 @@
 ## 2024-05-24 - MkDocs Material Admonition Syntax
 **Learning:** MkDocs Material admonitions (e.g., `!!! warning`, `!!! tip`) require *all* of their inner body text to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the indentation is missing, the admonition will break.
 **Action:** Always add an empty line after the `!!!` line and indent the following text block by 4 spaces.
+
+## 2026-05-28 - MkDocs Admonition Conversion
+
+**Learning:** When reviewing documentation for clarity, look for plain-text formatting (e.g., inline bolded text like "**Without a baseline:**") that serves the structural purpose of an admonition, but isn't utilizing MkDocs Material syntax.
+**Action:** Convert these plain-text notes into standard Material for MkDocs admonitions (`!!! warning "Without a baseline"`) with the inner block correctly indented by 4 spaces, to improve the page's visual hierarchy.
