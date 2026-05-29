@@ -28,4 +28,6 @@ All row inclusion flags default to `false`:
 - `includeDecisions`
 - `writeToDisk`
 
-`summary` is always included in the response.
+!!! note
+
+    `summary` is always included in the response.
