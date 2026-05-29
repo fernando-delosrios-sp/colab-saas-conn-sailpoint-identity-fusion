@@ -16,3 +16,6 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2024-05-29 - Extract Duplicate Sort Key logic
+**Learning:** Extracting common key extraction logic into a small local helper function significantly reduces duplication and clarifies sorting intentions.
+**Action:** When encountering repeated complex inline logic, extract it into a small local helper variable.
