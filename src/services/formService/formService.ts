@@ -727,7 +727,11 @@ export class FormService {
             return matchingInstances
         }
 
-        const formInstances = await this.client.execute(searchFormInstancesByTenant, undefined, `FormService>searchFormInstancesByTenant formDef=${formDefinitionId ?? 'all'}`)
+        const formInstances = await this.client.execute(
+            searchFormInstancesByTenant,
+            undefined,
+            `FormService>searchFormInstancesByTenant formDef=${formDefinitionId ?? 'all'}`
+        )
         return formInstances ?? []
     }
 
@@ -758,7 +762,11 @@ export class FormService {
             return response.data
         }
 
-        const formInstance = await this.client.execute(patchFormInstanceState, undefined, `FormService>setFormInstanceState id=${formInstanceID} state=${state}`)
+        const formInstance = await this.client.execute(
+            patchFormInstanceState,
+            undefined,
+            `FormService>setFormInstanceState id=${formInstanceID} state=${state}`
+        )
         return formInstance
     }
 
@@ -1320,11 +1328,13 @@ export class FormService {
     }
 
     private readFormDefinitionTimestamp(form: FormDefinitionResponseV2025): Date | undefined {
-        const rawTimestamp =
-            readUnknown(form, 'modified') ??
-            readUnknown(form, 'modifiedAt') ??
-            readUnknown(form, 'created') ??
-            readUnknown(form, 'createdAt')
+        const rawTimestamp = getFirstValidAttribute(
+            form as Record<string, any>,
+            'modified',
+            'modifiedAt',
+            'created',
+            'createdAt'
+        )
 
         if (!rawTimestamp) {
             this.log.warn(`Form definition ${form.id || 'unknown'} missing timestamp fields; skipping stale check`)
@@ -1456,7 +1466,11 @@ export class FormService {
         }
 
         this.log.debug(`Executing form creation through client...`)
-        const formInstance = await this.client.execute(createFormDefinition, undefined, `FormService>createFormDefinition name=${form.body.name}`)
+        const formInstance = await this.client.execute(
+            createFormDefinition,
+            undefined,
+            `FormService>createFormDefinition name=${form.body.name}`
+        )
         assert(formInstance, 'Failed to create form definition')
         assert(formInstance.id, 'Form definition ID is missing')
 
@@ -1513,7 +1527,11 @@ export class FormService {
             return response.data
         }
 
-        const response = await this.client.execute(createFormInstanceCall, undefined, `FormService>createFormInstance formDef=${formDefinitionId}`)
+        const response = await this.client.execute(
+            createFormInstanceCall,
+            undefined,
+            `FormService>createFormInstance formDef=${formDefinitionId}`
+        )
         assert(response, 'Failed to create form instance')
         this.log.debug(`Form instance created successfully: ${response.id || 'unknown'}`)
         this._formInstancesCreated++
@@ -1534,7 +1552,11 @@ export class FormService {
         const deleteFormDefinition = async () => {
             await customFormsApi.deleteFormDefinition({ formDefinitionID })
         }
-        await this.client.execute(deleteFormDefinition, undefined, `FormService>deleteFormDefinition id=${formDefinitionID}`)
+        await this.client.execute(
+            deleteFormDefinition,
+            undefined,
+            `FormService>deleteFormDefinition id=${formDefinitionID}`
+        )
         this.log.debug(`Form definition deleted successfully: ${formDefinitionID}`)
     }
 }

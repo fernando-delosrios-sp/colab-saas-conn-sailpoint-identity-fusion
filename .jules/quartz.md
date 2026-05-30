@@ -16,3 +16,6 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2026-05-30 - Extract Account Key Helper in Sorting
+**Learning:** Duplicate fallback chains used to extract account identifiers inside sort comparators (e.g. `readUnknown(a, 'originAccountId') ?? readPathString(a, ...) ?? ...`) make the code hard to read and scan.
+**Action:** Extract this logic into a small, well-named local helper function (like `getAccountKey`) before the sort block to make the sorting intent obvious and keep the code DRY.
