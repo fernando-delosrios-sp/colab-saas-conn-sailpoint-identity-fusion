@@ -16,3 +16,8 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2026-05-30 - Using Local Helpers for Property Fallback Chains\n\n**Learning:** When sorting complex objects based on a multi-property fallback key, duplicating the  fallback chain makes the logic hard to read and prone to errors.\n**Action:** Extract the complex property fallback chain into a small, well-named local closure helper inside the parent function or  callback to reduce duplication and clarify intent.\n
+## 2026-05-30 - Using Local Helpers for Property Fallback Chains
+
+**Learning:** When sorting complex objects based on a multi-property fallback key, duplicating the `readUnknown` fallback chain makes the logic hard to read and prone to errors.
+**Action:** Extract the complex property fallback chain into a small, well-named local closure helper inside the parent function or `.sort()` callback to reduce duplication and clarify intent.
