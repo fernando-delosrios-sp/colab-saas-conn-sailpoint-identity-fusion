@@ -16,3 +16,7 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2026-06-04 - Extracting Duplicate Sort Keys
+
+**Learning:** When sorting complex objects based on a multi-property fallback key (e.g., `readUnknown(a, 'id') ?? readUnknown(a, 'name')`), the fallback chain is often duplicated for both `a` and `b` arguments in the `.sort()` callback.
+**Action:** Extract the complex property fallback chain into a small, well-named local closure helper (like `getSortKey`) inside the parent function or `.sort()` callback to reduce duplication and clarify intent.
