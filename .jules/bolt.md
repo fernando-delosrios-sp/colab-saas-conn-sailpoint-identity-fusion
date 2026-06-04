@@ -61,3 +61,7 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+
+## 2026-06-04 - [Avoid intermediate array creation when combining maps]
+**Learning:** When combining Map values to iterate over them, creating a new array using the spread operator `[...map1.values(), ...map2.values()]` incurs significant performance penalties due to memory allocation and garbage collection. This is exceptionally detrimental when calling it repeatedly.
+**Action:** Used an iterative generator function (`allFusionAccounts`) with `yield* map.values()` to iterate directly over the elements. This avoids intermediary array allocations while combining both Maps safely for iteration.

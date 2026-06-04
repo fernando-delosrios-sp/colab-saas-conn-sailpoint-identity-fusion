@@ -401,7 +401,7 @@ export class FusionService {
      * Refresh unique attributes for all fusion accounts and identities in batches.
      */
     public async refreshUniqueAttributes(): Promise<number> {
-        const allAccounts = [...this.fusionAccounts, ...this.fusionIdentities]
+        const allAccounts = Array.from(this.allFusionAccounts())
         await this.batchProcess(
             allAccounts,
             'Unique-attribute generation',
@@ -1684,8 +1684,12 @@ export class FusionService {
      * @returns Array of formatted account outputs ready for the platform
      */
     public async listISCAccounts(): Promise<StdAccountListOutput[]> {
-        const allAccounts = [...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()]
-        const eligible = this.deleteEmpty ? allAccounts.filter((account) => !account.isOrphan()) : allAccounts
+        const eligible = []
+        for (const account of this.allFusionAccounts()) {
+            if (!this.deleteEmpty || !account.isOrphan()) {
+                eligible.push(account)
+            }
+        }
 
         const results = await this.batchProcess(eligible, 'ISC accounts', (x) => this.getISCAccount(x))
         return compact(results)
@@ -1705,8 +1709,12 @@ export class FusionService {
         const batchSize = this.fusionParallelBatchSize()
         let count = 0
 
-        const allAccounts = [...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()]
-        const eligibleAccounts = this.deleteEmpty ? allAccounts.filter((account) => !account.isOrphan()) : allAccounts
+        const eligibleAccounts = []
+        for (const account of this.allFusionAccounts()) {
+            if (!this.deleteEmpty || !account.isOrphan()) {
+                eligibleAccounts.push(account)
+            }
+        }
 
         const totalEligible = eligibleAccounts.length
         const totalBatches = Math.ceil(totalEligible / batchSize)
@@ -1888,10 +1896,9 @@ export class FusionService {
             if (index) {
                 if (index.has(key)) return true
             } else {
-                const isLinked = [...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()].some(
-                    (fa) => fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)
-                )
-                if (isLinked) return true
+                for (const fa of this.allFusionAccounts()) {
+                    if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) return true
+                }
             }
         }
         const identityId = account.identityId
@@ -2084,6 +2091,15 @@ export class FusionService {
      */
     public get fusionAccounts(): FusionAccount[] {
         return mapValuesToArray(this.fusionAccountMap)
+    }
+
+    /**
+     * Returns an iterable over all fusion accounts (both correlated identities and uncorrelated accounts).
+     * Avoids creating an intermediate array when only iteration is needed.
+     */
+    public *allFusionAccounts(): IterableIterator<FusionAccount> {
+        yield* this.fusionAccountMap.values()
+        yield* this.fusionIdentityMap.values()
     }
 
     /** Total number of fusion accounts (correlated identities + uncorrelated accounts) */
