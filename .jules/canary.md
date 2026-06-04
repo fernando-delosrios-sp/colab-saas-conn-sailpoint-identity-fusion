@@ -50,3 +50,6 @@
 ## 2024-05-24 - MkDocs Material Admonition Syntax
 **Learning:** MkDocs Material admonitions (e.g., `!!! warning`, `!!! tip`) require *all* of their inner body text to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the indentation is missing, the admonition will break.
 **Action:** Always add an empty line after the `!!!` line and indent the following text block by 4 spaces.
+## 2024-05-24 - MkDocs Admonition Consistency
+**Learning:** The documentation uses "Behavior Notes" sections across multiple operation files (`account-create.md`, `account-disable.md`, `account-enable.md`, `account-list.md`, `account-update.md`). Some of these notes contain critical operational details (like `nativeIdentity` immutability) but are just bullet points instead of utilizing Material admonitions (`!!! note`).
+**Action:** Convert critical standalone notes in these "Behavior Notes" sections into `!!! note` admonitions, or convert the entire "Behavior Notes" section into a set of admonitions or standard MkDocs structures to improve visibility.
