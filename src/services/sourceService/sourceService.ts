@@ -370,7 +370,11 @@ export class SourceService {
      * Get fusion source info
      */
     public getFusionSource(): SourceInfo | undefined {
-        return Array.from(this.sourcesById.values()).find((s) => !s.isManaged)
+        // ⚡ Bolt: Replace Array.from + find with native for...of to prevent full iteration and heap allocations, allowing true short-circuiting
+        for (const s of this.sourcesById.values()) {
+            if (!s.isManaged) return s
+        }
+        return undefined
     }
 
     /**
