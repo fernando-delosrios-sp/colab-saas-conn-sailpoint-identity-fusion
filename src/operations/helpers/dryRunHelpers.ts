@@ -789,25 +789,21 @@ export const refreshUniqueAttributesForDryRun = async (
 
     // Also refresh analyzed managed accounts that only surface on the uncorrelated-queue path.
     if (analyzedUncorrelatedAccounts.length === 0) return
-    const stableAnalyzed = [...analyzedUncorrelatedAccounts].sort((a: any, b: any) => {
-        const aKey = String(
-            readUnknown(a, 'originAccountId') ??
-                readPathString(a, ['attributes', 'originAccount']) ??
-                readUnknown(a, 'nativeIdentity') ??
-                readUnknown(a, 'key') ??
-                readUnknown(a, 'name') ??
+
+    const getSortKey = (acc: any) =>
+        String(
+            readUnknown(acc, 'originAccountId') ??
+                readPathString(acc, ['attributes', 'originAccount']) ??
+                readUnknown(acc, 'nativeIdentity') ??
+                readUnknown(acc, 'key') ??
+                readUnknown(acc, 'name') ??
                 ''
         )
-        const bKey = String(
-            readUnknown(b, 'originAccountId') ??
-                readPathString(b, ['attributes', 'originAccount']) ??
-                readUnknown(b, 'nativeIdentity') ??
-                readUnknown(b, 'key') ??
-                readUnknown(b, 'name') ??
-                ''
-        )
-        return aKey.localeCompare(bKey)
-    })
+
+    const stableAnalyzed = [...analyzedUncorrelatedAccounts].sort((a: any, b: any) =>
+        getSortKey(a).localeCompare(getSortKey(b))
+    )
+
     for (let i = 0; i < stableAnalyzed.length; i += batchSize) {
         const batch = stableAnalyzed.slice(i, i + batchSize)
         await Promise.all(batch.map((account) => attributes.refreshUniqueAttributes(account)))
