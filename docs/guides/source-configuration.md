@@ -126,9 +126,12 @@ flowchart TD
 | **Delete accounts with no managed accounts left?** | Remove Fusion accounts when all contributing source accounts are removed | No       | Useful for automated cleanup when users leave                                                          |
 | **Skip accounts with missing unique ID?**          | Skip processing accounts without a fusion identity attribute value       | No       | Skipped accounts are logged for review; useful when some source accounts lack required identifier data |
 
-!!! note
+!!! note "Force attribute refresh"
 
-    **Force attribute refresh on next aggregation?** is located at **Advanced Settings → Developer Settings**. It forces Normal-type attributes to refresh on the next aggregation run only, after which the option is automatically turned off. Applies only to Normal attributes; Unique attributes are only computed when a Fusion account is first created or when an existing account is activated. Can be expensive for large datasets.
+    The **Force attribute refresh on next aggregation?** option (located at **Advanced Settings → Developer Settings**) behaves as follows:
+
+    - **Normal attributes:** Forces a refresh on the next aggregation run only, then automatically turns off. Can be expensive for large datasets.
+    - **Unique attributes:** Not affected. These are only computed when a Fusion account is first created or when an existing account is activated.
 
 !!! tip
 
