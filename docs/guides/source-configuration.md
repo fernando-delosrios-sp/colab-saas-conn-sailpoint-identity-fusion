@@ -132,7 +132,9 @@ flowchart TD
 
 !!! tip
 
-    When testing or onboarding large amounts of managed accounts, it is best to disable all kinds of managed account correlation. Already processed uncorrelated managed accounts are part of their associated Fusion accounts internally, so it doesn't interfere in the normal connector operation. Correlation is a heavy process and must be carefully planned. It's often a good idea to have mixed correlation strategies depending on the implementation stage or managed source.
+    - **Testing and onboarding:** When onboarding large amounts of managed accounts, it is best to disable all kinds of managed account correlation.
+    - **Existing accounts:** Already processed uncorrelated managed accounts are part of their associated Fusion accounts internally, so it doesn't interfere in the normal connector operation.
+    - **Performance:** Correlation is a heavy process and must be carefully planned. It's often a good idea to have mixed correlation strategies depending on the implementation stage or managed source.
 
 !!! tip
 
