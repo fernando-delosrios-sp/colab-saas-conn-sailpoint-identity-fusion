@@ -319,10 +319,22 @@ export function isValid(date: any): boolean {
 }
 
 /**
+ * Parse ISO date string
+ */
+export function parseISO(date: string): Date | undefined {
+    const d = new Date(date)
+    if (isNaN(d.getTime())) {
+        return
+    }
+    return d
+}
+
+/**
  * Export all functions as a namespace for Velocity context
  * This mimics the date-fns import pattern
  */
 export const Datefns = {
+    parseISO,
     format,
     parse,
     getYear,

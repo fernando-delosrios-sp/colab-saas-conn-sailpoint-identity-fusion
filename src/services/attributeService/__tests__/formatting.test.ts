@@ -604,6 +604,20 @@ $earliestAssignment.start_date
             expect(result?.length).toBe(10)
             expect(result?.endsWith('001')).toBe(true)
         })
+
+        it('should preserve counter when counter is not at the end', () => {
+            const context = { firstName: 'Christopher', counter: '001' }
+            const result = evaluateVelocityTemplate('$firstName$counter@domain.com', context, 20)
+            expect(result).toBe('Christ001@domain.com')
+            expect(result?.length).toBe(20)
+        })
+
+        it('should truncate suffix if suffix alone exceeds available length', () => {
+            const context = { firstName: 'Chris', counter: '001' }
+            const result = evaluateVelocityTemplate('$firstName$counter@verylongdomainname.com', context, 15)
+            expect(result).toBe('001@verylongdom')
+            expect(result?.length).toBe(15)
+        })
     })
 
     // ========================================================================

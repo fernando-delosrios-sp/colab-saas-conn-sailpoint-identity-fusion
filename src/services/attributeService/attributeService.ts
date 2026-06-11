@@ -988,8 +988,7 @@ export class AttributeService {
             !effectiveExpression.includes('$counter') &&
             !effectiveExpression.includes('${counter}') &&
             !effectiveExpression.includes('$UUID') &&
-            !effectiveExpression.includes('${UUID}') &&
-            !effectiveExpression.includes('#')
+            !effectiveExpression.includes('${UUID}')
         ) {
             effectiveExpression = `${effectiveExpression}$counter`
         }
