@@ -68,6 +68,19 @@ export function readBoolean(source: unknown, key: string, fallback?: boolean): b
     return typeof value === 'boolean' ? value : fallback
 }
 
+/**
+ * Coerces a value that may be a boolean or the string `"true"`/`"false"` into a
+ * proper boolean. Returns `undefined` for other values so callers can apply their
+ * own defaults. Use this when normalising connector-spec toggle values that may
+ * arrive as strings at runtime.
+ */
+export function coerceBoolean(value: unknown): boolean | undefined {
+    if (typeof value === 'boolean') return value
+    if (value === 'true') return true
+    if (value === 'false') return false
+    return undefined
+}
+
 export function readArray<T = unknown>(source: unknown, key: string): T[] | undefined
 export function readArray<T = unknown>(source: unknown, key: string, fallback: T[]): T[]
 export function readArray<T = unknown>(source: unknown, key: string, fallback?: T[]): T[] | undefined {

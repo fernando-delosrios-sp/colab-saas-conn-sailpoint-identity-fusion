@@ -9,8 +9,55 @@ jest.mock('../actions', () => ({
 import { createRegistry as createMockRegistry } from './harness/registryMocking'
 
 function createRegistry() {
-    const registry = createMockRegistry()
-    return registry
+    const fusionIdentity = {
+        nativeIdentity: 'fusion-id-1',
+        addStatus: jest.fn(),
+    }
+
+    const timer = {
+        phase: jest.fn(),
+        end: jest.fn(),
+    }
+
+    return {
+        log: {
+            info: jest.fn(),
+            debug: jest.fn(),
+            crash: jest.fn(),
+            timer: jest.fn(() => timer),
+        },
+        identities: {
+            fetchIdentityByName: jest.fn().mockResolvedValue({ id: 'id-1', name: 'Alice Doe' }),
+        },
+        sources: {
+            fetchAllSources: jest.fn().mockResolvedValue(undefined),
+            fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
+            fusionAccounts: [{ id: 'fusion-existing-1' }],
+        },
+        schemas: {
+            setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
+            fusionDisplayAttribute: 'name',
+        },
+        forms: {
+            fetchFormData: jest.fn().mockResolvedValue(undefined),
+        },
+        fusion: {
+            preProcessFusionAccounts: jest.fn().mockResolvedValue(undefined),
+            processIdentity: jest.fn().mockResolvedValue(undefined),
+            getFusionIdentity: jest.fn().mockReturnValue(fusionIdentity),
+            normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
+            reconcilePendingFormState: jest.fn(),
+            getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-created' }),
+        },
+        attributes: {
+            initializeCounters: jest.fn().mockResolvedValue(undefined),
+            registerUniqueValuesFromRawAccounts: jest.fn(),
+            refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
+        },
+        res: {
+            send: jest.fn(),
+        },
+    } as any
 }
 
 describe('accountCreate', () => {

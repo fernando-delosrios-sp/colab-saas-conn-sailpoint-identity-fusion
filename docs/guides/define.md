@@ -89,9 +89,11 @@ $Math.floor($Datefns.differenceInDays($Datefns.now(), $hireDate) / 365)
 **Counter format:** `{base value}{counter}` (e.g. `jsmith1`, `jsmith2`)
 **Zero-padding:** Use **Minimum counter digits** to pad counter (e.g. digits=3 → `jsmith001`)
 
+> **Note:** If a **Maximum length** is configured, the connector intelligently truncates the surrounding text to ensure the `$counter` is perfectly preserved without being chopped off, even if the counter is injected in the middle of a string.
+
 **`$isUnique(value)` helper:** Unique definitions can call `$isUnique(...)` inside the Velocity expression to test whether a candidate value is currently free after the same trim/case/spaces/normalize/maxLength rules are applied. Use this to choose between candidate formats before the connector falls back to automatic `$counter` disambiguation.
 
-> **Template safety note:** Keep Velocity directives on separate lines (`#if`, `#else`, `#end`, `#set`) to avoid parser ambiguities.
+> **Template safety note:** Keep Velocity directives on separate lines (`#if`, `#else`, `#end`, `#set`) to avoid parser ambiguities. The connector will automatically append `$counter` to expressions that do not explicitly include it, including templates containing Velocity conditionals, ensuring safe collision disambiguation.
 
 **Examples:**
 
@@ -195,7 +197,7 @@ Standard mathematical operations (`$Math.round(x)`, `$Math.floor(x)`, `$Math.cei
 
 #### $Datefns (date-fns library)
 
-Advanced date formatting and manipulation (`$Datefns.format(date, format)`, `$Datefns.addDays(date, n)`, `$Datefns.differenceInDays(date1, date2)`, etc.).
+Advanced date formatting and manipulation (`$Datefns.format(date, format)`, `$Datefns.parse(date, format)`, `$Datefns.addDays(date, n)`, `$Datefns.differenceInDays(date1, date2)`, etc.).
 
 #### $AddressParse (address parsing)
 

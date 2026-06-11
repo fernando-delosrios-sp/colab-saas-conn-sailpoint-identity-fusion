@@ -8,10 +8,31 @@ jest.mock('../helpers/rebuildFusionAccount', () => ({
 
 import { createRegistry as createMockRegistry } from './harness/registryMocking'
 
-function createRegistry() {
-    const registry = createMockRegistry()
-    Object.assign(registry.fusion, { getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-disabled' }) })
-    return registry
+    return {
+        log: {
+            info: jest.fn(),
+            debug: jest.fn(),
+            crash: jest.fn(),
+            timer: jest.fn(() => timer),
+        },
+        sources: {
+            fetchAllSources: jest.fn().mockResolvedValue(undefined),
+        },
+        schemas: {
+            setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
+        },
+        forms: {
+            fetchFormData: jest.fn().mockResolvedValue(undefined),
+        },
+        fusion: {
+            normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
+            reconcilePendingFormState: jest.fn(),
+            getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-disabled' }),
+        },
+        res: {
+            send: jest.fn(),
+        },
+    } as any
 }
 
 describe('accountDisable', () => {

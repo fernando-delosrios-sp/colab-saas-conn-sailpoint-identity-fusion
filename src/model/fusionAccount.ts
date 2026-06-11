@@ -303,7 +303,7 @@ export class FusionAccount {
     public static fromIdentity(identity: IdentityDocument): FusionAccount {
         const fusionAccount = new FusionAccount()
         const identityDisplayName = FusionAccount.identityLabelFromIdentity(identity)
-        const accountDisplayName = identityDisplayName
+        const accountDisplayName = identity.name
         fusionAccount.initializeBasicProperties({
             type: FusionAccountKind.Identity,
             nativeIdentity: identity.id,
@@ -1085,7 +1085,6 @@ export class FusionAccount {
         const label = FusionAccount.identityLabelFromIdentity(identity)
         if (label) {
             this._identityDisplayName = label
-            this._name = label
         }
         this._attributeBag.identity = identity.attributes ?? {}
         this._identityId = identity.id ?? undefined
