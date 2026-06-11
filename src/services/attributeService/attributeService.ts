@@ -164,17 +164,18 @@ export class AttributeService {
      */
     public async initializeCounters(): Promise<void> {
         const stateWrapper = this.getStateWrapper()
-        const counterDefinitions = this.uniqueDefinitions.filter(
-            (definition) => definition.useIncrementalCounter
-        )
+        const counterDefinitions = this.uniqueDefinitions.filter((definition) => definition.useIncrementalCounter)
         if (counterDefinitions.length === 0) return
 
         this.log.debug(`Initializing ${counterDefinitions.length} incremental counter attributes`)
-        const existingCounters = Object.fromEntries(
-            Array.from(stateWrapper.state.entries()).filter(([key]) =>
-                counterDefinitions.some((definition) => definition.name === key)
-            )
-        )
+        // ⚡ Bolt: Iterate Map directly to prevent Array.from heap allocation.
+        // Avoids O(N) intermediate array generation and garbage collection.
+        const existingCounters: Record<string, number> = {}
+        for (const [key, value] of stateWrapper.state.entries()) {
+            if (typeof value === 'number' && counterDefinitions.some((definition) => definition.name === key)) {
+                existingCounters[key] = value
+            }
+        }
         if (Object.keys(existingCounters).length > 0) {
             this.log.debug(`Preserving existing counter values: ${JSON.stringify(existingCounters)}`)
         }
@@ -225,9 +226,15 @@ export class AttributeService {
         }
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
-            const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some(
-                (accounts) => accounts.length > 0
-            )
+            // ⚡ Bolt: Iterate Map directly to prevent Array.from heap allocation.
+            // Avoids O(N) intermediate array generation and garbage collection.
+            let hasManagedAccountContext = false
+            for (const accounts of sourceAttributeMap.values()) {
+                if (accounts.length > 0) {
+                    hasManagedAccountContext = true
+                    break
+                }
+            }
             const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sourceConfig) => sourceConfig.name)
             let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
@@ -407,7 +414,7 @@ export class AttributeService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -753,11 +760,7 @@ export class AttributeService {
 
     private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
         const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
-        return (
-            trimStr(identityBag?.name) ??
-            trimStr(fusionAccount.identityDisplayName) ??
-            trimStr(fusionAccount.name)
-        )
+        return trimStr(identityBag?.name) ?? trimStr(fusionAccount.identityDisplayName) ?? trimStr(fusionAccount.name)
     }
 
     private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
@@ -801,10 +804,7 @@ export class AttributeService {
         return ordered
     }
 
-    private prioritizeMainAccount(
-        ordered: Record<string, any>[],
-        fusionAccount: FusionAccount
-    ): Record<string, any>[] {
+    private prioritizeMainAccount(ordered: Record<string, any>[], fusionAccount: FusionAccount): Record<string, any>[] {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
