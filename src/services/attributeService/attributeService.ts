@@ -1069,8 +1069,7 @@ export class AttributeService {
             expression.includes('$counter') ||
             expression.includes('${counter}') ||
             expression.includes('$UUID') ||
-            expression.includes('${UUID}') ||
-            expression.includes('#')
+            expression.includes('${UUID}')
         ) {
             return expression
         }
