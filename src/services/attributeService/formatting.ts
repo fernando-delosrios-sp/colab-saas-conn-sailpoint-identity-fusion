@@ -4,7 +4,7 @@ require('./velocityPrototypeGuard.cjs')
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const velocityjs = require('velocityjs') as typeof import('velocityjs').default
 import { transliterate } from 'transliteration'
-import type { RenderContext } from 'velocityjs/dist/src/type'
+export type RenderContext = Record<string, any>;
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from '@sailpoint/connector-sdk'
 import { contextHelpers } from './contextHelpers'
