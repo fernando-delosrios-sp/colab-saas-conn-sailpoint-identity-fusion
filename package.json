@@ -76,5 +76,10 @@
         "tabWidth": 4,
         "semi": false,
         "singleQuote": true
+    },
+    "lavamoat": {
+        "allowScripts": {
+            "jest>@jest/core>jest-resolve>unrs-resolver#1.12.2": false
+        }
     }
 }
