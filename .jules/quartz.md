@@ -16,3 +16,6 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2026-05-22 - Replacing verbose string fallback checks with logical OR chains
+**Learning:** Sequential `if` statements checking for truthy/presence of strings after trimming are unnecessarily verbose and hard to scan.
+**Action:** Replace `if (a) return a; if (b) return b;` fallback chains with a single logical OR (`||`) expression returning the first truthy value. Ensure to use `||` and not `??` since we want empty strings `""` to fall through.
