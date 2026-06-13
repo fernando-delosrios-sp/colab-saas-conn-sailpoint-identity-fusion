@@ -2,7 +2,7 @@
 
 This guide expands on the Identity Fusion NG Source Settings, detailing how to configure your identity scope, authoritative account sources, aggregation modes, correlation rules, and processing controls.
 
-#### Scope Section
+## Scope Section
 
 ![Source Settings](../assets/images/match-source-settings.png)
 
@@ -18,7 +18,7 @@ This guide expands on the Identity Fusion NG Source Settings, detailing how to c
     - **Not included:** Your baseline consists *only* of managed accounts previously processed by Fusion that became an identity.
     - **Included:** Your baseline immediately includes all existing identities matching the query, plus any managed accounts that turn into identities over time. The `$identity` object also becomes available in the Fusion attribute definition context.
 
-#### Sources Section
+## Sources Section
 
 ![Source Settings](../assets/images/match-source-settings.png)
 
@@ -116,7 +116,7 @@ flowchart TD
 
 </details>
 
-#### Processing Control Section
+## Processing Control Section
 
 ![Source Settings](../assets/images/match-source-settings.png)
 
