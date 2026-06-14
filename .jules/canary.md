@@ -50,3 +50,6 @@
 ## 2024-05-24 - MkDocs Material Admonition Syntax
 **Learning:** MkDocs Material admonitions (e.g., `!!! warning`, `!!! tip`) require *all* of their inner body text to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the indentation is missing, the admonition will break.
 **Action:** Always add an empty line after the `!!!` line and indent the following text block by 4 spaces.
+## 2024-05-25 - Converting Callouts to MkDocs Material Admonitions
+**Learning:** Found text blocks that manually emulated callouts using standard list syntax (e.g., `- **Exception:**` or `- **Best Practice:**`). These bypass the visual improvements offered by the MkDocs Material theme, resulting in lower readability and prominence on the page.
+**Action:** When finding raw markdown bullet callouts in `docs/**/*.md` files, convert them to native MkDocs Material admonitions (e.g., `!!! note "Exception"`, `!!! tip "Best Practice"`) and properly indent the inner body by 4 spaces. Ensure not to apply this conversion to the root `README.md` file.
