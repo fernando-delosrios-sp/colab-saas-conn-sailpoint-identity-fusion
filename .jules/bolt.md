@@ -61,3 +61,8 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+
+## 2026-06-14 - Prevent Heap Allocations in Hot Map and Set Extractions
+
+**Learning:** Extracting generator objects such as Map keys/values or Sets by using `Array.from(set)` or `Array.from(map.values())` creates an intermediate array in heap memory. This is highly inefficient when only iterating properties or when checking conditions (e.g., `Array.from().some(...)`).
+**Action:** Replace `Array.from` with direct ES6 generator consumption (e.g. `for...of` loops over `map.values()`) to bypass full heap allocation. To extract sets as arrays entirely, use `[...new Set()]` instead of `Array.from(new Set())`.
