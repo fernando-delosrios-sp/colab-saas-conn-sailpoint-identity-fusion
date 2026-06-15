@@ -16,3 +16,7 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2026-06-15 - Simplify Variable Fallback Chains
+
+**Learning:** Verbose sequential `if` statements checking for string presence and returning early create unnecessary lines of code and obscure the simple fallback intent.
+**Action:** Replace `if (val) return val;` sequential blocks with a single concise logical OR (`||`) expression returning the entire chain when the string validation logic allows for short-circuiting on falsy values.
