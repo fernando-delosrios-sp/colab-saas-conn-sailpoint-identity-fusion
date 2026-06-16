@@ -16,3 +16,7 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+
+## 2026-05-27 - Simplifying Redundant String Fallbacks
+**Learning:** Sequential string extraction with multiple fallback steps (like trying `name`, then `identityDisplayName`, then `displayName` from an object) frequently clutters reporting logic. Wrapping each lookup in `trimStr(value) ?? ''` and assigning them to separate intermediate variables makes the logic more verbose than necessary.
+**Action:** Use logical OR `||` to chain `trimStr` function results concisely, e.g. `return trimStr(a) || trimStr(b) || 'Unknown'`.
