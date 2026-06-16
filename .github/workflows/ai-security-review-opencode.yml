@@ -1,0 +1,63 @@
+# AI security review using OpenCode agent.
+# Skips AI follow-up branches (prefix ai/) to avoid loops.
+name: AI Security Review (OpenCode)
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ai-security-review-opencode-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-review:
+    name: Security review (OpenCode)
+    if: >
+      github.event.pull_request && !github.event.pull_request.draft
+      && !startsWith(github.event.pull_request.head.ref, 'ai/')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install OpenCode CLI
+        run: |
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: OpenCode security reviewer
+        if: env.OPENCODE_API_KEY != ''
+        run: |
+          opencode run "Review this pull request with focus on security:
+          - check input validation, sanitisation and output encoding
+          - verify secrets are not leaked in code, logs or error messages
+          - flag dependency vulnerabilities and insecure configurations
+          - assess authentication, authorisation and access-control boundaries
+          Keep feedback concrete and actionable.
+          Apply concrete, minimal, safe fixes directly in the codebase.
+          Return concise review findings and recommended fixes." --model opencode/minimax-m2.7
+      - name: Restore workflow files
+        run: git restore .github/workflows/ || true
+      - name: Create security follow-up PR
+        if: env.OPENCODE_API_KEY != ''
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: ai/security-review-opencode-${{ github.event.pull_request.number }}
+          base: ${{ github.event.pull_request.head.ref }}
+          title: "AI security follow-up (OpenCode) for #${{ github.event.pull_request.number }}"
+          body: |
+            Automated AI follow-up fixes for security based on PR #${{ github.event.pull_request.number }}.
+          commit-message: "chore(ai): apply security follow-up fixes (opencode)"
+          labels: ai, automated

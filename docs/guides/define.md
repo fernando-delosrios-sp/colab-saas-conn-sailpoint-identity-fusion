@@ -6,7 +6,6 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 
 ## When to use Attribute Definition
 
-
 | Goal                        | Use Attribute Definition                      | Example                                        |
 | --------------------------- | --------------------------------------------- | ---------------------------------------------- |
 | Generate unique usernames   | Yes (Unique type)                             | `jsmith`, `jsmith1`, `jsmith2`                 |
@@ -15,16 +14,13 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 | Computed attributes         | Yes (Normal type with expression)             | Full name from first + last; formatted dates   |
 | Normalize/format values     | Yes (Normal type with expression + utilities) | Parse address, format phone, proper case names |
 
-
 ---
 
 ## Global settings
 
-
 | Field                                             | Purpose                                     | Recommended value                                                                  |
 | ------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------- |
 | **Maximum attempts for unique Define generation** | Cap on retries for generating unique values | 100 (default); increase for large datasets with high collision risk (e.g. 200–500) |
-
 
 **Why this matters:** For **Unique** type attributes, if the generated value already exists, the connector appends a counter and retries. This setting prevents infinite loops if the expression always produces the same value.
 
@@ -34,22 +30,20 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 
 For each attribute you want to generate, add an **Attribute Definition**:
 
-
-| Field                             | Type                | Purpose                                  | Options / Example                                                     |
-| --------------------------------- | ------------------- | ---------------------------------------- | --------------------------------------------------------------------- |
-| **Attribute Name**                | String (required)   | Name of generated attribute              | `username`, `uuid`, `employeeNumber`, `fullName`, `formattedHireDate` |
-| **Apache Velocity expression**    | String (optional)   | Template to compute value                | `#set($i=$firstname.substring(0,1))$i$lastname`                       |
-| **Case selection**                | Dropdown (required) | Text case transformation                 | Do not change, Lower case, Upper case, Capitalize                     |
-| **Attribute Type**                | Dropdown (required) | Generation behavior                      | **Normal**, **Unique**, **UUID**, **Counter-based**                   |
-| **Counter start value**           | Integer             | Starting number (Counter type)           | 1, 1000, 50000                                                        |
-| **Minimum counter digits**        | Integer             | Zero-padding (Counter/Unique types)      | 3 → `001`, `002`; 5 → `00001`                                         |
-| **Maximum length**                | Integer (optional)  | Truncate to this length                  | 20; counter preserved at end for Unique/Counter                       |
-| **Normalize special characters?** | Boolean             | Remove special chars/quotes              | Yes for usernames/IDs                                                 |
-| **Remove spaces?**                | Boolean             | Remove all whitespace                    | Yes for usernames/IDs                                                 |
-| **Trim leading and trailing spaces?** | Boolean         | Strip leading/trailing whitespace        | Yes for most attributes                                               |
-| **Use incremental counter?**      | Boolean (optional)  | Unique type only: when `true`, `$counter` always increments instead of resetting on collision | Yes for counters that must never reuse a value; No (default) for collision-based disambiguation |
-| **Refresh on each aggregation?**  | Boolean             | Recalculate every run (Normal type only) | Yes if dynamic; No if stable                                          |
-
+| Field                                 | Type                | Purpose                                                                                       | Options / Example                                                                               |
+| ------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Attribute Name**                    | String (required)   | Name of generated attribute                                                                   | `username`, `uuid`, `employeeNumber`, `fullName`, `formattedHireDate`                           |
+| **Apache Velocity expression**        | String (optional)   | Template to compute value                                                                     | `#set($i=$firstname.substring(0,1))$i$lastname`                                                 |
+| **Case selection**                    | Dropdown (required) | Text case transformation                                                                      | Do not change, Lower case, Upper case, Capitalize                                               |
+| **Attribute Type**                    | Dropdown (required) | Generation behavior                                                                           | **Normal**, **Unique**, **UUID**, **Counter-based**                                             |
+| **Counter start value**               | Integer             | Starting number (Counter type)                                                                | 1, 1000, 50000                                                                                  |
+| **Minimum counter digits**            | Integer             | Zero-padding (Counter/Unique types)                                                           | 3 → `001`, `002`; 5 → `00001`                                                                   |
+| **Maximum length**                    | Integer (optional)  | Truncate to this length                                                                       | 20; counter preserved at end for Unique/Counter                                                 |
+| **Normalize special characters?**     | Boolean             | Remove special chars/quotes                                                                   | Yes for usernames/IDs                                                                           |
+| **Remove spaces?**                    | Boolean             | Remove all whitespace                                                                         | Yes for usernames/IDs                                                                           |
+| **Trim leading and trailing spaces?** | Boolean             | Strip leading/trailing whitespace                                                             | Yes for most attributes                                                                         |
+| **Use incremental counter?**          | Boolean (optional)  | Unique type only: when `true`, `$counter` always increments instead of resetting on collision | Yes for counters that must never reuse a value; No (default) for collision-based disambiguation |
+| **Refresh on each aggregation?**      | Boolean             | Recalculate every run (Normal type only)                                                      | Yes if dynamic; No if stable                                                                    |
 
 **Screenshot placeholder:** Attribute Definition with examples.
 Attribute definition example
@@ -62,12 +56,10 @@ Attribute definition example
 
 **Behavior:** Standard computed attribute; recalculated based on **Refresh on each aggregation?** setting.
 
-
 | Refresh setting | Behavior                       | Use case                                                            |
 | --------------- | ------------------------------ | ------------------------------------------------------------------- |
 | Yes             | Recalculated every aggregation | Dynamic values that should update (full name, age, formatted dates) |
 | No              | Calculated once; persisted     | Stable values (initial assignment, one-time calculations)           |
-
 
 **Examples:**
 
@@ -97,9 +89,11 @@ $Math.floor($Datefns.differenceInDays($Datefns.now(), $hireDate) / 365)
 **Counter format:** `{base value}{counter}` (e.g. `jsmith1`, `jsmith2`)
 **Zero-padding:** Use **Minimum counter digits** to pad counter (e.g. digits=3 → `jsmith001`)
 
+> **Note:** If a **Maximum length** is configured, the connector intelligently truncates the surrounding text to ensure the `$counter` is perfectly preserved without being chopped off, even if the counter is injected in the middle of a string.
+
 **`$isUnique(value)` helper:** Unique definitions can call `$isUnique(...)` inside the Velocity expression to test whether a candidate value is currently free after the same trim/case/spaces/normalize/maxLength rules are applied. Use this to choose between candidate formats before the connector falls back to automatic `$counter` disambiguation.
 
-> **Template safety note:** Keep Velocity directives on separate lines (`#if`, `#else`, `#end`, `#set`) to avoid parser ambiguities.
+> **Template safety note:** Keep Velocity directives on separate lines (`#if`, `#else`, `#end`, `#set`) to avoid parser ambiguities. The connector will automatically append `$counter` to expressions that do not explicitly include it, including templates containing Velocity conditionals, ensuring safe collision disambiguation.
 
 **Examples:**
 
@@ -182,20 +176,18 @@ The **Apache Velocity expression** field provides a powerful templating language
 
 ### Available data
 
-
-| Source                        | What you can access                                                                                                                       | Example                                            |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| **Mapped account attributes** | All attributes from Attribute Mapping                                                                                                     | `$jobTitle`, `$department`, `$email`               |
-| **Source account attributes** | Direct source attributes (if no mapping)                                                                                                  | `$firstname`, `$lastname`, `$hireDate`             |
-| **Identity attributes**       | When Include identities = Yes                                                                                                             | `$identity.firstname`, `$identity.employeeNumber`  |
+| Source                        | What you can access                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Example                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Mapped account attributes** | All attributes from Attribute Mapping                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `$jobTitle`, `$department`, `$email`                                       |
+| **Source account attributes** | Direct source attributes (if no mapping)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `$firstname`, `$lastname`, `$hireDate`                                     |
+| **Identity attributes**       | When Include identities = Yes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `$identity.firstname`, `$identity.employeeNumber`                          |
 | **$accounts**                 | Managed account snapshots: source **`attributes`** plus **`_id`** (composite key `sourceId::nativeIdentity`), nested **`source`** (`id`, `name` — managed accounts only for `id`), nested **`schema`** (`id` = native identity, `name` = display name), and **`IIQDisabled`**. Top-level **`$originAccount`** is the same composite key for the origin row only. Ordered by configured source order, then account insertion order, then unknown sources. If `mainAccount` contains a valid managed account key, that account is moved to index 0. | `$accounts[0]._id`, `$accounts[0].source.name`, `$accounts[0].schema.name` |
-| **$sources**                  | Managed account snapshots grouped by source name                                                                                          | `$sources.get("Workday")`                          |
-| **$previous**                 | Previous generated account state                                                                                                          | `$previous.username`                               |
-| **$originSource**             | Source that originally created the Fusion account (when available)                                                                        | `Identities`, `Workday`                            |
-| **$originAccount**            | String id of the identity or managed account that originally created the Fusion account (same as the `originAccount` attribute) | Use as a scalar in expressions                     |
-| **$account**                  | Snapshot for the origin only: same shape as `$accounts[]` entries when the origin is a managed account; when the origin is **Identities** and identity attributes are available, identity-backed fields are used first (then synthetic identity row if needed). Use **`$originAccount`** for the composite key or identity id string. Identity-backed rows use **`source.name`** = **`Identities`** (no `source.id`) and **`schema`** for display name and id (`_id` matches the identity id). | `$originAccount`, `$account.schema.name`, `$account.source.name`                |
-| **Special variables**         | `$counter` (Counter type only)                                                                                                            | `$counter` in expression for Counter type          |
-
+| **$sources**                  | Managed account snapshots grouped by source name                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `$sources.get("Workday")`                                                  |
+| **$previous**                 | Previous generated account state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `$previous.username`                                                       |
+| **$originSource**             | Source that originally created the Fusion account (when available)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `Identities`, `Workday`                                                    |
+| **$originAccount**            | String id of the identity or managed account that originally created the Fusion account (same as the `originAccount` attribute)                                                                                                                                                                                                                                                                                                                                                                                                                   | Use as a scalar in expressions                                             |
+| **$account**                  | Snapshot for the origin only: same shape as `$accounts[]` entries when the origin is a managed account; when the origin is **Identities** and identity attributes are available, identity-backed fields are used first (then synthetic identity row if needed). Use **`$originAccount`** for the composite key or identity id string. Identity-backed rows use **`source.name`** = **`Identities`** (no `source.id`) and **`schema`** for display name and id (`_id` matches the identity id).                                                    | `$originAccount`, `$account.schema.name`, `$account.source.name`           |
+| **Special variables**         | `$counter` (Counter type only)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `$counter` in expression for Counter type                                  |
 
 ### Available utilities
 
@@ -205,7 +197,7 @@ Standard mathematical operations (`$Math.round(x)`, `$Math.floor(x)`, `$Math.cei
 
 #### $Datefns (date-fns library)
 
-Advanced date formatting and manipulation (`$Datefns.format(date, format)`, `$Datefns.addDays(date, n)`, `$Datefns.differenceInDays(date1, date2)`, etc.).
+Advanced date formatting and manipulation (`$Datefns.format(date, format)`, `$Datefns.parse(date, format)`, `$Datefns.addDays(date, n)`, `$Datefns.differenceInDays(date1, date2)`, etc.).
 
 #### $AddressParse (address parsing)
 
@@ -225,14 +217,12 @@ For ambiguous numeric dates, `Normalize.date` accepts an optional priority argum
 
 Understanding the sequence helps design correct configurations:
 
-
 | Step | Phase                 | Action                                                | Example                                                                                |
 | ---- | --------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | 1    | **Attribute Mapping** | Merge per mapping rules (MAP)                         | Map `[title, jobTitle]` → `jobTitle`, merge: first found → "Engineer"                  |
 | 2    | **Normal Define**     | Generate non-unique attributes from mapped data       | Generate `fullName` from `$firstname $lastname` → "John Smith"                         |
 | 3    | **Match / Scoring**   | Compare normal attributes against existing identities | Normal attributes feed into Match scoring                                              |
 | 4    | **Unique Define**     | Generate unique attributes with collision detection   | Generate `username` from `$firstname.$lastname` → "jsmith" (or "jsmith1" on collision) |
-
 
 **Key insights:**
 
@@ -272,4 +262,3 @@ One can purposely generate an **empty** `nativeIdentity` in conjunction with the
   $email
 #end
 ```
-

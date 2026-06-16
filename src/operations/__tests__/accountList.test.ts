@@ -244,7 +244,6 @@ describe('accountList two-pass aggregation lifecycle', () => {
         expect(fusion.processFusionIdentityDecisions).toHaveBeenCalledTimes(1)
         expect(sources.releaseProcessLock).toHaveBeenCalledTimes(1)
         expect(res.send).toHaveBeenCalledTimes(scenario.passData.pass1.outputAccounts.length)
-
         ;(res.send as jest.Mock).mockClear()
         setPass('pass2')
         await accountList(registry, input)

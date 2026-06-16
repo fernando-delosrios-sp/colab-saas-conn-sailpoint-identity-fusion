@@ -4,16 +4,13 @@ Identity Fusion NG Framework
 
 ## Start here
 
-
 | Page                                                   | Description                                   |
 | ------------------------------------------------------ | --------------------------------------------- |
 | [Get started](get-started.md)                          | Shortest path from new source to aggregation. |
 | [Map, define, and match](concepts/map-define-match.md) | How the processing pipeline fits together.    |
 | [Guides overview](guides/index.md)                     | Full list of configuration guides.            |
 
-
 ## Guide index
-
 
 | Guide                                                                               | Description                                                                                                  |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -25,4 +22,3 @@ Identity Fusion NG Framework
 | [Advanced connection settings](guides/advanced-connection-settings.md)              | Queue, retry, batch sizing, timeouts, and external logging.                                                  |
 | [Proxy mode](guides/proxy-mode.md)                                                  | Run connector logic on an external server and connect ISC via proxy.                                         |
 | [Troubleshooting](guides/troubleshooting.md)                                        | Common issues, checks, and recovery steps.                                                                   |
-

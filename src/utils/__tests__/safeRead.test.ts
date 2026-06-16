@@ -1,5 +1,6 @@
 import {
     asRecord,
+    coerceBoolean,
     hasValue,
     isDefined,
     isNullish,
@@ -78,5 +79,26 @@ describe('safeRead', () => {
         expect(readPathString(source, ['account', 'missing'], 'n/a')).toBe('n/a')
         expect(readPathNumber(source, ['account', 'stats', 'total'])).toBe(2)
         expect(readPathNumber(source, ['account', 'stats', 'missing'], 0)).toBe(0)
+    })
+
+    describe('coerceBoolean', () => {
+        it('returns boolean values unchanged', () => {
+            expect(coerceBoolean(true)).toBe(true)
+            expect(coerceBoolean(false)).toBe(false)
+        })
+
+        it('normalizes string "true" and "false" to booleans', () => {
+            expect(coerceBoolean('true')).toBe(true)
+            expect(coerceBoolean('false')).toBe(false)
+        })
+
+        it('returns undefined for unrecognized values', () => {
+            expect(coerceBoolean(undefined)).toBeUndefined()
+            expect(coerceBoolean(null)).toBeUndefined()
+            expect(coerceBoolean('yes')).toBeUndefined()
+            expect(coerceBoolean('no')).toBeUndefined()
+            expect(coerceBoolean(1)).toBeUndefined()
+            expect(coerceBoolean(0)).toBeUndefined()
+        })
     })
 })

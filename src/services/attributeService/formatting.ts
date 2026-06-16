@@ -4,7 +4,8 @@ require('./velocityPrototypeGuard.cjs')
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const velocityjs = require('velocityjs') as typeof import('velocityjs').default
 import { transliterate } from 'transliteration'
-import type { RenderContext } from 'velocityjs/dist/src/type'
+export type RenderContext = Record<string, any>;
+import { v4 as uuidv4 } from 'uuid'
 import { logger } from '@sailpoint/connector-sdk'
 import { contextHelpers } from './contextHelpers'
 
@@ -90,7 +91,7 @@ export const evaluateVelocityTemplate = (
 }
 
 /**
- * Truncate result to maxLength, preserving counter if present
+ * Truncate result to maxLength, smartly preserving counter anywhere in the string
  */
 const truncateResultToMaxLength = (
     result: string,
@@ -98,52 +99,54 @@ const truncateResultToMaxLength = (
     context: RenderContext,
     maxLength: number
 ): string => {
-    // If counter is present and at the end of expression, preserve it
-    if (hasCounterAtEnd(context, expression)) {
-        return truncateWithCounterPreserved(result, context, maxLength, expression)
-    }
-
-    // Simple truncation if no counter or counter is not at the end
     if (context.counter && context.counter !== '') {
+        const originalCounter = String(context.counter)
+        const counterLength = originalCounter.length
+
+        const velocity = templateCache.get(expression)
+        if (velocity) {
+            const marker = `<<COUNTER_${uuidv4()}>>`
+            const testContext = Object.assign(Object.create(null), { ...context, counter: marker })
+            const testResult = velocity.render(testContext)
+
+            const markerIndex = testResult.indexOf(marker)
+            if (markerIndex !== -1) {
+                const prefixLength = markerIndex
+                const suffixLength = testResult.length - (markerIndex + marker.length)
+
+                const prefix = result.substring(0, prefixLength)
+                const suffix = result.substring(result.length - suffixLength)
+
+                const availableLength = maxLength - counterLength
+                if (availableLength < 0) {
+                    logger.error(
+                        `Maximum length ${maxLength} is less than counter length ${counterLength} for expression: ${expression}`
+                    )
+                    return result.substring(0, maxLength)
+                }
+
+                let finalPrefix = prefix
+                let finalSuffix = suffix
+
+                if (prefix.length + suffix.length > availableLength) {
+                    if (suffix.length <= availableLength) {
+                        finalPrefix = prefix.substring(0, availableLength - suffix.length)
+                    } else {
+                        finalPrefix = ''
+                        finalSuffix = suffix.substring(0, availableLength)
+                    }
+                }
+
+                return finalPrefix + originalCounter + finalSuffix
+            }
+        }
+
         logger.error(
-            `Counter variable is not found at the end of the expression: ${expression}. Cannot truncate the result to the maximum length.`
+            `Counter variable is not found in the evaluated expression: ${expression}. Cannot intelligently preserve counter.`
         )
     }
 
     return result.substring(0, maxLength)
-}
-
-/**
- * Check if counter exists in context and is at the end of expression
- */
-const hasCounterAtEnd = (context: RenderContext, expression: string): boolean => {
-    const hasCounter = context.counter && context.counter !== ''
-    const counterAtEnd = expression.endsWith('$counter') || expression.endsWith('${counter}')
-    return hasCounter && counterAtEnd
-}
-
-/**
- * Truncate result preserving counter at the end
- */
-const truncateWithCounterPreserved = (
-    result: string,
-    context: RenderContext,
-    maxLength: number,
-    expression: string
-): string => {
-    const originalCounter = context.counter!
-    const originalCounterLength = originalCounter.toString().length
-    const availableLength = maxLength - originalCounterLength
-
-    if (availableLength < 0) {
-        logger.error(
-            `Maximum length ${maxLength} is less than counter length ${originalCounterLength} for expression: ${expression}`
-        )
-        return result.substring(0, maxLength)
-    }
-
-    const truncatedBase = result.substring(0, availableLength)
-    return truncatedBase + originalCounter
 }
 
 /**

@@ -12,11 +12,19 @@ describe('rebuildFusionAccount', () => {
         const getIdentityById = jest.fn().mockReturnValue({
             id: 'identity-1',
             accounts: [
-                { id: 'acct-existing', source: { id: 'source-a-id', name: 'Source A' }, accountId: 'user-from-identity' },
+                {
+                    id: 'acct-existing',
+                    source: { id: 'source-a-id', name: 'Source A' },
+                    accountId: 'user-from-identity',
+                },
                 { id: 'acct-other', source: { name: 'Source B' } },
                 { id: 'acct-unknown', source: { name: 'Unknown Source' } },
                 { id: 'acct-nosource' },
-                { id: 'acct-existing', source: { id: 'source-a-id', name: 'Source A' }, accountId: 'user-from-identity' },
+                {
+                    id: 'acct-existing',
+                    source: { id: 'source-a-id', name: 'Source A' },
+                    accountId: 'user-from-identity',
+                },
             ],
         })
 

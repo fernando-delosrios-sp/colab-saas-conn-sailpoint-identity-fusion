@@ -6,37 +6,9 @@ jest.mock('../helpers/rebuildFusionAccount', () => ({
     rebuildFusionAccount: jest.fn(),
 }))
 
-function createRegistry() {
-    const timer = {
-        phase: jest.fn(),
-        end: jest.fn(),
-    }
+import { createRegistry as createMockRegistry } from './harness/registryMocking'
 
-    return {
-        log: {
-            info: jest.fn(),
-            debug: jest.fn(),
-            crash: jest.fn(),
-            timer: jest.fn(() => timer),
-        },
-        sources: {
-            fetchAllSources: jest.fn().mockResolvedValue(undefined),
-        },
-        schemas: {
-            setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
-        },
-        forms: {
-            fetchFormData: jest.fn().mockResolvedValue(undefined),
-        },
-        fusion: {
-            reconcilePendingFormState: jest.fn(),
-            getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-disabled' }),
-        },
-        res: {
-            send: jest.fn(),
-        },
-    } as any
-}
+const createRegistry = createMockRegistry;
 
 describe('accountDisable', () => {
     beforeEach(() => {
@@ -59,8 +31,7 @@ describe('accountDisable', () => {
         expect(registry.schemas.setFusionAccountSchema).toHaveBeenCalledTimes(1)
         expect(rebuildFusionAccount).toHaveBeenCalledWith('fusion-1', expect.any(Object), registry)
         expect(fusionAccount.disable).toHaveBeenCalledTimes(1)
-        expect(registry.forms.fetchFormData).toHaveBeenCalledTimes(1)
-        expect(registry.fusion.reconcilePendingFormState).toHaveBeenCalledTimes(1)
+        expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-disabled' })
     })
 })

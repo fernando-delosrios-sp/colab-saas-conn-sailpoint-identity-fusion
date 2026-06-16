@@ -1,0 +1,50 @@
+# Wrapper: runs all four Cursor-based AI review workflows in parallel.
+name: AI Cursor Review
+
+on:
+    workflow_call:
+    workflow_dispatch:
+
+permissions:
+    contents: write
+    pull-requests: write
+
+concurrency:
+    group: ai-cursor-review-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  docs:
+    name: Docs review (Cursor)
+    uses: ./.github/workflows/ai-docs-review-cursor.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+
+  performance:
+    name: Performance review (Cursor)
+    uses: ./.github/workflows/ai-performance-review-cursor.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+
+  security:
+    name: Security review (Cursor)
+    uses: ./.github/workflows/ai-security-review-cursor.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+
+  refactor:
+    name: Refactor review (Cursor)
+    uses: ./.github/workflows/ai-refactor-review-cursor.yml
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write

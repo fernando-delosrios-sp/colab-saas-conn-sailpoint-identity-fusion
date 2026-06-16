@@ -7,12 +7,7 @@ import { PhaseTimer } from './logService'
 import { mkdir, writeFile } from 'fs/promises'
 import * as path from 'path'
 import type { FusionService } from './fusionService'
-import type {
-    AggregationStats,
-    FusionReport,
-    FusionReportDecision,
-    FusionReportStats,
-} from './fusionService/types'
+import type { AggregationStats, FusionReport, FusionReportDecision, FusionReportStats } from './fusionService/types'
 import type { FormService } from './formService'
 import type { IdentityService } from './identityService'
 import type { LogService } from './logService'
@@ -262,7 +257,10 @@ export class ReportService {
      * @param baseReport Raw report generated from fusion aggregation results.
      * @param aggregationStats Current aggregation metrics to fold into report stats.
      */
-    public buildEmailReportFromFusionReport(baseReport: FusionReport, aggregationStats: AggregationStats): FusionReport {
+    public buildEmailReportFromFusionReport(
+        baseReport: FusionReport,
+        aggregationStats: AggregationStats
+    ): FusionReport {
         const reportDecisions = this.buildFusionReviewDecisions()
         const stats = this.buildFusionReportStats(aggregationStats)
         const accounts = (baseReport.accounts ?? []).filter((account) => {
@@ -420,9 +418,9 @@ export class ReportService {
     }): Promise<
         | undefined
         | {
-            reportHtmlOutputPath?: string
-            statsWithPhaseTiming: AggregationStats
-        }
+              reportHtmlOutputPath?: string
+              statsWithPhaseTiming: AggregationStats
+          }
     > {
         const { report, finalDryRunStats, reportPhaseStartedAt } = params
         const runtimeOptions = this.dryRunRuntimeOptions

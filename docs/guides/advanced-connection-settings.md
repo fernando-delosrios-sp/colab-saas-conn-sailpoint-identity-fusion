@@ -8,11 +8,11 @@ Advanced Settings provide fine-grained control over API behavior, resilience, pe
 
 Advanced Settings are organized into three sections:
 
-| Section                          | Purpose                                                     | When to configure                                                  |
-| -------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------ |
-| **Developer Settings**           | Reset accounts, external logging                            | Testing, troubleshooting, centralized monitoring                   |
+| Section                          | Purpose                                                         | When to configure                                                  |
+| -------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **Developer Settings**           | Reset accounts, external logging                                | Testing, troubleshooting, centralized monitoring                   |
 | **Advanced Connection Settings** | API behavior: queue, retry, batch sizing, timeouts, concurrency | Production tuning, rate limit management, performance optimization |
-| **Proxy Settings**               | Delegate processing to external server                      | Custom deployment requirements (see [Proxy mode](proxy-mode.md))   |
+| **Proxy Settings**               | Delegate processing to external server                          | Custom deployment requirements (see [Proxy mode](proxy-mode.md))   |
 
 **Screenshot placeholder:** Advanced Settings menu interface.
 
@@ -28,16 +28,16 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 
 ### Configuration fields
 
-| Field                                      | Type     | Purpose                                           | Default | Risk level                                    |
-| ------------------------------------------ | -------- | ------------------------------------------------- | ------- | --------------------------------------------- |
-| **Reset accounts?**                        | Boolean  | Force rebuild of all Fusion accounts from scratch | No      | ⚠️ **HIGH** — Deletes all Fusion account data |
-| **Managed accounts batch size**            | Number   | Number of uncorrelated managed accounts per batch | 50      | Low                                           |
-| **Max match candidates per review form**   | Number   | Limit of potential matches shown on review form   | From `connector-spec.json` `sourceConfigInitialValues` | Low                                           |
-| **Force attribute refresh on next aggregation?** | Boolean | Recalculate Normal-type attributes on the next aggregation only (auto-disabled after that run) | No      | Medium                                        |
-| **Enable concurrency check?**              | Boolean  | Prevent concurrent aggregations                   | Yes     | Low                                           |
-| **Enable external logging?**               | Boolean  | Send connector logs to external endpoint          | No      | Low                                           |
-| **External logging URL**                   | URL      | Endpoint for external log aggregation             | None    | Low (if endpoint secured)                     |
-| **External logging level**                 | Dropdown | Minimum log level to send                         | None    | Low                                           |
+| Field                                            | Type     | Purpose                                                                                        | Default                                                | Risk level                                    |
+| ------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------- |
+| **Reset accounts?**                              | Boolean  | Force rebuild of all Fusion accounts from scratch                                              | No                                                     | ⚠️ **HIGH** — Deletes all Fusion account data |
+| **Managed accounts batch size**                  | Number   | Number of uncorrelated managed accounts per batch                                              | 50                                                     | Low                                           |
+| **Max match candidates per review form**         | Number   | Limit of potential matches shown on review form                                                | From `connector-spec.json` `sourceConfigInitialValues` | Low                                           |
+| **Force attribute refresh on next aggregation?** | Boolean  | Recalculate Normal-type attributes on the next aggregation only (auto-disabled after that run) | No                                                     | Medium                                        |
+| **Enable concurrency check?**                    | Boolean  | Prevent concurrent aggregations                                                                | Yes                                                    | Low                                           |
+| **Enable external logging?**                     | Boolean  | Send connector logs to external endpoint                                                       | No                                                     | Low                                           |
+| **External logging URL**                         | URL      | Endpoint for external log aggregation                                                          | None                                                   | Low (if endpoint secured)                     |
+| **External logging level**                       | Dropdown | Minimum log level to send                                                                      | None                                                   | Low                                           |
 
 **Screenshot placeholder:** Developer Settings interface.
 
@@ -155,7 +155,7 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 | **Provisioning & timing** | Provisioning timeout, Processing wait time                 | Max wait times for operations         |
 | **Queue**                 | Enable queue, Max concurrent requests, Requests per second | Rate limiting and concurrency control |
 | **Retry**                 | Enable retry, API request retries, Retry delay             | Automatic retry for failed requests   |
-| **Batch sizing**          | Batch size                                                  | Tune page size and throughput balance |
+| **Batch sizing**          | Batch size                                                 | Tune page size and throughput balance |
 | **Priority**              | Enable priority processing                                 | Prioritize important requests         |
 
 **Screenshot placeholder:** Advanced Connection Settings interface.
@@ -198,20 +198,20 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 
 **When to enable queue:**
 
-| Scenario                        | Enable?  | Configuration                 |
-| ------------------------------- | -------- | ----------------------------- |
-| Production (>500 accounts)      | Yes      | Max concurrent: 10; RPS: 10    |
+| Scenario                        | Enable?  | Configuration                        |
+| ------------------------------- | -------- | ------------------------------------ |
+| Production (>500 accounts)      | Yes      | Max concurrent: 10; RPS: 10          |
 | Large dataset (>5,000 accounts) | Yes      | Start at max concurrent: 10; RPS: 10 |
-| ISC API rate limits             | Yes      | RPS ≤ ISC limit; enable retry |
-| HTTP 429 errors                 | Yes      | Lower RPS; enable retry       |
-| Testing/development             | Optional | Default settings usually fine |
+| ISC API rate limits             | Yes      | RPS ≤ ISC limit; enable retry        |
+| HTTP 429 errors                 | Yes      | Lower RPS; enable retry              |
+| Testing/development             | Optional | Default settings usually fine        |
 
 **Tuning guidelines:**
 
 | Metric                      | Initial value | Adjust if...                                                                          |
 | --------------------------- | ------------- | ------------------------------------------------------------------------------------- |
 | **Max concurrent requests** | 10            | HTTP 429 errors → decrease to 5–8; slow aggregation and no errors → increase to 15–20 |
-| **Requests per second**     | 10            | HTTP 429 errors → decrease to 4–6; increase carefully toward tenant limits              |
+| **Requests per second**     | 10            | HTTP 429 errors → decrease to 4–6; increase carefully toward tenant limits            |
 
 **Interaction with Connection Settings:**
 
@@ -287,17 +287,17 @@ HTTP 429 retry (rate limit):
 
 `Batch size` controls the account pagination size used for list retrieval and throughput tuning.
 
-| Field            | Default | Range | Purpose                                              |
-| ---------------- | ------- | ----- | ---------------------------------------------------- |
-| **Batch size**   | 250     | 1–250 | Number of records fetched per page/request iteration |
+| Field          | Default | Range | Purpose                                              |
+| -------------- | ------- | ----- | ---------------------------------------------------- |
+| **Batch size** | 250     | 1–250 | Number of records fetched per page/request iteration |
 
 **Tuning guidance:**
 
-| Scenario                                  | Batch size |
-| ----------------------------------------- | ---------- |
+| Scenario                                   | Batch size |
+| ------------------------------------------ | ---------- |
 | Large datasets with stable API performance | 250        |
-| Rate-limited or unstable tenants          | 100–200    |
-| Troubleshooting memory spikes/timeouts    | 50–100     |
+| Rate-limited or unstable tenants           | 100–200    |
+| Troubleshooting memory spikes/timeouts     | 50–100     |
 
 **Trade-off:** Larger batch sizes reduce round trips but can increase payload size and per-call latency.
 
@@ -473,13 +473,13 @@ Advanced Connection Settings:
 
 ### Optimization workflow
 
-| Step                   | Action                                                                           | Goal                |
-| ---------------------- | -------------------------------------------------------------------------------- | ------------------- |
-| 1. Baseline            | Run aggregation with default settings; record metrics                            | Establish baseline  |
-| 2. Identify bottleneck | Check: HTTP 429? Slow API? High queue wait?                                      | Find constraint     |
+| Step                   | Action                                                                              | Goal                |
+| ---------------------- | ----------------------------------------------------------------------------------- | ------------------- |
+| 1. Baseline            | Run aggregation with default settings; record metrics                               | Establish baseline  |
+| 2. Identify bottleneck | Check: HTTP 429? Slow API? High queue wait?                                         | Find constraint     |
 | 3. Adjust              | Lower RPS if 429; increase concurrency if slow; tune batch size for payload profile | Relieve bottleneck  |
-| 4. Test                | Run aggregation with new settings; compare metrics                               | Measure improvement |
-| 5. Iterate             | Repeat steps 2–4 until satisfactory                                              | Optimize            |
+| 4. Test                | Run aggregation with new settings; compare metrics                                  | Measure improvement |
+| 5. Iterate             | Repeat steps 2–4 until satisfactory                                                 | Optimize            |
 
 ---
 
@@ -489,7 +489,7 @@ Advanced Connection Settings:
 | ------------------------------- | -------------------------------------- | ------------------------------------------------------------ |
 | **HTTP 429 (rate limit)**       | RPS too high                           | Lower RPS; ensure retry enabled                              |
 | **Aggregation timeout**         | Provisioning timeout too low; slow API | Increase timeout; check ISC performance                      |
-| **Slow aggregation**            | Low concurrency; suboptimal page size | Increase max concurrent requests; tune batch size            |
+| **Slow aggregation**            | Low concurrency; suboptimal page size  | Increase max concurrent requests; tune batch size            |
 | **Accounts stuck processing**   | Timeout; unfinished run                | Increase timeout; retry aggregation (auto-resets stuck flag) |
 | **External logs not appearing** | Wrong URL; endpoint down               | Verify URL; check endpoint availability                      |
 | **Reset not working**           | Didn't disable after reset             | Reset works once; must disable to prevent repeat             |

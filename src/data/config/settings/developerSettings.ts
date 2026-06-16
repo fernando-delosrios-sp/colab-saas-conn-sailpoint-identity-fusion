@@ -3,6 +3,7 @@
  */
 import { logger } from '@sailpoint/connector-sdk'
 import { assert } from '../../../utils/assert'
+import { extractBoolean } from '../../../utils/attributes'
 import { internalConfig } from '../internal'
 import { connectorSpecInitialValues as advancedInitialValues } from './advancedConnectionSettings'
 import { defaultFusionMaxCandidatesForForm } from './reviewSettings'
@@ -20,7 +21,7 @@ export const runtimeDefaults = {
 } as const
 
 export function applySettings(config: FusionConfigBuild): void {
-    config.reset = config.reset ?? runtimeDefaults.reset
+    config.reset = extractBoolean(config, 'reset') ?? runtimeDefaults.reset
     config.managedAccountsBatchSize =
         config.managedAccountsBatchSize ?? advancedInitialValues.managedAccountsBatchSize
     const rawMaxCandidates =
@@ -34,10 +35,10 @@ export function applySettings(config: FusionConfigBuild): void {
         `fusionMaxCandidatesForForm must be between ${internalConfig.formService.fusionMaxCandidatesForFormMin} and ${internalConfig.formService.fusionMaxCandidatesForFormMax}`
     )
     config.fusionMaxCandidatesForForm = Math.trunc(rawMaxCandidates)
-    config.concurrencyCheckEnabled = config.concurrencyCheckEnabled ?? runtimeDefaults.concurrencyCheckEnabled
-    config.forceAttributeRefresh = config.forceAttributeRefresh ?? runtimeDefaults.forceAttributeRefresh
+    config.concurrencyCheckEnabled = extractBoolean(config, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled
+    config.forceAttributeRefresh = extractBoolean(config, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh
     config.provisioningTimeout = config.provisioningTimeout ?? advancedInitialValues.provisioningTimeout
-    config.externalLoggingEnabled = config.externalLoggingEnabled ?? runtimeDefaults.externalLoggingEnabled
+    config.externalLoggingEnabled = extractBoolean(config, 'externalLoggingEnabled') ?? runtimeDefaults.externalLoggingEnabled
     config.externalLoggingUrl = config.externalLoggingUrl ?? undefined
     config.externalLoggingLevel = config.externalLoggingLevel ?? connectorSpecInitialValues.externalLoggingLevel
 

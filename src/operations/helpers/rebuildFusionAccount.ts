@@ -51,9 +51,7 @@ export const rebuildFusionAccount = async (
         Array.from(accountIds).map(async (id: string) => {
             const parsed = parseManagedAccountKey(id)
             if (!parsed) {
-                log.warn(
-                    `Skipping legacy non-composite managed account reference during fusion account rebuild: ${id}`
-                )
+                log.warn(`Skipping legacy non-composite managed account reference during fusion account rebuild: ${id}`)
                 return
             }
             await sources.fetchManagedAccount(parsed.sourceId, parsed.nativeIdentity)

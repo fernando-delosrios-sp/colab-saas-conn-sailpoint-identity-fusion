@@ -22,7 +22,7 @@ export const resolveIdentitiesSelectLabel = (
     identityDocument?: IdentityDocument
 ): string => {
     const fromIndex = identityDocument?.attributes
-        ? trimStr((identityDocument.attributes as Record<string, unknown>).displayName) ?? ''
+        ? (trimStr((identityDocument.attributes as Record<string, unknown>).displayName) ?? '')
         : ''
     if (fromIndex) return fromIndex
 
@@ -37,7 +37,7 @@ export const resolveIdentitiesSelectLabel = (
     if (identityDocument) {
         logger.error(
             `[formBuilder] Candidate identity ${identityId} has no attributes.displayName for identities SELECT; ` +
-            `form conditions may not match the dropdown. Using identity.name (or identityId) as fallback label.`
+                `form conditions may not match the dropdown. Using identity.name (or identityId) as fallback label.`
         )
     }
     return identityId
@@ -115,7 +115,8 @@ export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: 
 export const buildFormName = (fusionAccount: FusionAccount, fusionFormNamePattern: string): string => {
     const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
     const source = `[${fusionAccount.sourceName}]`
-    const accountIdentifier = trimStr(fusionAccount.nativeIdentity) || trimStr(fusionAccount.managedAccountId) || 'unknown'
+    const accountIdentifier =
+        trimStr(fusionAccount.nativeIdentity) || trimStr(fusionAccount.managedAccountId) || 'unknown'
     return `${fusionFormNamePattern} - ${accountName} ${source} (${accountIdentifier})`
 }
 

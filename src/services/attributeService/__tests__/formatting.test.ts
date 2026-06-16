@@ -30,8 +30,7 @@ describe('evaluateVelocityTemplate', () => {
 
         it('does not expose Function via Date.constructor prototype chain (SSTI / RCE)', () => {
             const context = { d: new Date('2020-01-01T00:00:00.000Z') }
-            const malicious =
-                '#set($f=$d.constructor.constructor("return \\"pwned\\""))$f()'
+            const malicious = '#set($f=$d.constructor.constructor("return \\"pwned\\""))$f()'
             const result = evaluateVelocityTemplate(malicious, context)
             expect(result).not.toBe('pwned')
             expect(result == null || String(result).includes('pwned')).toBe(false)
@@ -477,10 +476,7 @@ describe('evaluateVelocityTemplate', () => {
 
         it('should parse JSON and allow downstream use via #set', () => {
             const context = { raw: '{"role":"admin","id":7}' }
-            const result = evaluateVelocityTemplate(
-                '#set($p=$JSON.parse($raw))$p.role:$p.id',
-                context
-            )
+            const result = evaluateVelocityTemplate('#set($p=$JSON.parse($raw))$p.role:$p.id', context)
             expect(result).toBe('admin:7')
         })
 
@@ -494,6 +490,88 @@ describe('evaluateVelocityTemplate', () => {
             const context = { raw: 'not json' }
             const result = evaluateVelocityTemplate('#set($p=$JSON.parse($raw))$JSON.stringify($p)', context)
             expect(result).toBeUndefined()
+        })
+
+        it('should demonstrate why $foreach.first fails (throws Error)', () => {
+            const context = {
+                NERMActiveAssignmentArray: JSON.stringify([
+                    { start_date: '05/01/2026', end_date: '05/30/2026' },
+                    { start_date: '06/01/2026', end_date: '06/30/2026' }
+                ])
+            }
+            const expr = `
+#set( $assignments = $JSON.parse($NERMActiveAssignmentArray) )
+#foreach( $assignment in $assignments )
+    #if( $foreach.first )
+        #set( $latestAssignment = $assignment )
+    #else
+        #set( $currentLatestIso = $Datefns.parse($latestAssignment.end_date, 'MM/dd/yyyy') )
+        #set( $nextDateIso = $Datefns.parse($assignment.end_date, 'MM/dd/yyyy') )
+        #if( $Datefns.isAfter($nextDateIso, $currentLatestIso) )
+            #set( $latestAssignment = $assignment )
+        #end
+    #end
+#end
+$latestAssignment.end_date
+            `.trim()
+            
+            expect(() => evaluateVelocityTemplate(expr, context)).toThrow()
+        })
+
+        it('should successfully get latest assignment using $foreach.index == 0', () => {
+            const context = {
+                NERMActiveAssignmentArray: JSON.stringify([
+                    { start_date: '05/01/2026', end_date: '05/30/2026' },
+                    { start_date: '06/01/2026', end_date: '06/15/2026' },
+                    { start_date: '06/01/2026', end_date: '06/30/2026' }
+                ])
+            }
+            const expr = `
+#set( $assignments = $JSON.parse($NERMActiveAssignmentArray) )
+#foreach( $assignment in $assignments )
+    #if( $foreach.index == 0 )
+        #set( $latestAssignment = $assignment )
+    #else
+        #set( $currentLatestIso = $Datefns.parse($latestAssignment.end_date, 'MM/dd/yyyy') )
+        #set( $nextDateIso = $Datefns.parse($assignment.end_date, 'MM/dd/yyyy') )
+        #if( $Datefns.isAfter($nextDateIso, $currentLatestIso) )
+            #set( $latestAssignment = $assignment )
+        #end
+    #end
+#end
+$latestAssignment.end_date
+            `.trim()
+            
+            const result = evaluateVelocityTemplate(expr, context)
+            expect(result?.trim()).toBe('06/30/2026')
+        })
+
+        it('should successfully get earliest assignment using $foreach.index == 0', () => {
+            const context = {
+                NERMActiveAssignmentArray: JSON.stringify([
+                    { start_date: '06/01/2026', end_date: '06/30/2026' },
+                    { start_date: '05/01/2026', end_date: '05/30/2026' },
+                    { start_date: '05/15/2026', end_date: '05/20/2026' }
+                ])
+            }
+            const expr = `
+#set( $assignments = $JSON.parse($NERMActiveAssignmentArray) )
+#foreach( $assignment in $assignments )
+    #if( $foreach.index == 0 )
+        #set( $earliestAssignment = $assignment )
+    #else
+        #set( $currentEarliestIso = $Datefns.parse($earliestAssignment.start_date, 'MM/dd/yyyy') )
+        #set( $nextDateIso = $Datefns.parse($assignment.start_date, 'MM/dd/yyyy') )
+        #if( $Datefns.isBefore($nextDateIso, $currentEarliestIso) )
+            #set( $earliestAssignment = $assignment )
+        #end
+    #end
+#end
+$earliestAssignment.start_date
+            `.trim()
+            
+            const result = evaluateVelocityTemplate(expr, context)
+            expect(result?.trim()).toBe('05/01/2026')
         })
     })
 
@@ -521,6 +599,20 @@ describe('evaluateVelocityTemplate', () => {
             expect(result).toBe('Christo001')
             expect(result?.length).toBe(10)
             expect(result?.endsWith('001')).toBe(true)
+        })
+
+        it('should preserve counter when counter is not at the end', () => {
+            const context = { firstName: 'Christopher', counter: '001' }
+            const result = evaluateVelocityTemplate('$firstName$counter@domain.com', context, 20)
+            expect(result).toBe('Christ001@domain.com')
+            expect(result?.length).toBe(20)
+        })
+
+        it('should truncate suffix if suffix alone exceeds available length', () => {
+            const context = { firstName: 'Chris', counter: '001' }
+            const result = evaluateVelocityTemplate('$firstName$counter@verylongdomainname.com', context, 15)
+            expect(result).toBe('001@verylongdom')
+            expect(result?.length).toBe(15)
         })
     })
 

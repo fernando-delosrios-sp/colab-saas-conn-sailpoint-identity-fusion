@@ -3,6 +3,7 @@
  */
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
 import { assert, softAssert } from '../../../utils/assert'
+import { extractBoolean } from '../../../utils/attributes'
 import type { FusionConfigBuild } from '../types'
 
 export const connectorSpecInitialValues = {
@@ -18,7 +19,8 @@ export const runtimeDefaults = {
 export function applySettings(config: FusionConfigBuild): void {
     config.matchingConfigs = config.matchingConfigs ?? []
 
-    config.fusionMergingExactMatch = config.fusionMergingExactMatch ?? runtimeDefaults.fusionMergingExactMatch
+    config.fusionMergingExactMatch =
+        extractBoolean(config, 'fusionMergingExactMatch') ?? runtimeDefaults.fusionMergingExactMatch
     config.fusionAverageScore = config.fusionAverageScore ?? connectorSpecInitialValues.fusionAverageScore
 
     assert(
@@ -48,10 +50,7 @@ export function applySettings(config: FusionConfigBuild): void {
         assert(attribute, 'Attribute is required to get fusion score')
         const score = config.fusionScoreMap!.get(attribute)
         if (score === undefined) {
-            throw new ConnectorError(
-                `Fusion score not found for attribute: ${attribute}`,
-                ConnectorErrorType.NotFound
-            )
+            throw new ConnectorError(`Fusion score not found for attribute: ${attribute}`, ConnectorErrorType.NotFound)
         }
         return score
     }

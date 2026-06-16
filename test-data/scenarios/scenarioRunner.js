@@ -258,8 +258,14 @@ function runScenario(scenarioDir) {
 
     writeJson(pass1GeneratedPath, pass1)
     writeJson(pass2GeneratedPath, pass2)
-    writeJson(pass1SideEffectsGeneratedPath, { correlatedAccounts: pass1.correlatedAccounts, decisions: pass1.decisionsApplied })
-    writeJson(pass2SideEffectsGeneratedPath, { correlatedAccounts: pass2.correlatedAccounts, decisions: pass2.decisionsApplied })
+    writeJson(pass1SideEffectsGeneratedPath, {
+        correlatedAccounts: pass1.correlatedAccounts,
+        decisions: pass1.decisionsApplied,
+    })
+    writeJson(pass2SideEffectsGeneratedPath, {
+        correlatedAccounts: pass2.correlatedAccounts,
+        decisions: pass2.decisionsApplied,
+    })
 
     ensureExpected(scenarioDir, outputFiles.pass1Expected ?? 'output.pass1.expected.json', pass1)
     ensureExpected(scenarioDir, outputFiles.pass2Expected ?? 'output.pass2.expected.json', pass2)

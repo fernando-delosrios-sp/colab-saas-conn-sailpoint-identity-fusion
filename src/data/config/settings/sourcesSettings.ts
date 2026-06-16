@@ -3,6 +3,7 @@
  */
 import type { SourceConfig } from '../../../model/config'
 import { assert, softAssert } from '../../../utils/assert'
+import { extractBoolean } from '../../../utils/attributes'
 import { readBoolean } from '../../../utils/safeRead'
 import type { FusionConfigBuild } from '../types'
 
@@ -21,6 +22,8 @@ export const runtimeDefaults = {
         optimizedAggregation: true,
         correlationMode: 'none' as const,
         deferredMatching: true,
+        includeRecordAccountsForMatching: true,
+        disableNonMatchingAccounts: false,
     },
 } as const
 
@@ -34,24 +37,27 @@ export function applySettings(config: FusionConfigBuild): void {
             if (readBoolean(sourceConfig, 'forceAggregation', false) && !sourceConfig.aggregationMode) {
                 sourceConfig.aggregationMode = 'before'
             }
-            const rawTimeout =
-                sourceConfig.aggregationTimeout ?? runtimeDefaults.source.aggregationTimeoutMinutes
+            const rawTimeout = sourceConfig.aggregationTimeout ?? runtimeDefaults.source.aggregationTimeoutMinutes
             const aggregationTimeout =
                 typeof rawTimeout === 'number' && Number.isFinite(rawTimeout) && rawTimeout >= 0
                     ? rawTimeout
                     : runtimeDefaults.source.aggregationTimeoutMinutes
             return {
                 ...sourceConfig,
-                enabled: sourceConfig.enabled ?? runtimeDefaults.source.enabled,
+                enabled: extractBoolean(sourceConfig, 'enabled') ?? runtimeDefaults.source.enabled,
                 aggregationMode: sourceConfig.aggregationMode ?? runtimeDefaults.source.aggregationMode,
                 aggregationTimeout,
                 aggregationDelay: sourceConfig.aggregationDelay ?? runtimeDefaults.source.aggregationDelay,
                 optimizedAggregation:
-                    sourceConfig.optimizedAggregation ?? runtimeDefaults.source.optimizedAggregation,
+                    extractBoolean(sourceConfig, 'optimizedAggregation') ?? runtimeDefaults.source.optimizedAggregation,
                 accountFilter: sourceConfig.accountFilter ?? undefined,
                 accountJmespathFilter: sourceConfig.accountJmespathFilter ?? undefined,
                 correlationMode: sourceConfig.correlationMode ?? runtimeDefaults.source.correlationMode,
-                deferredMatching: sourceConfig.deferredMatching ?? runtimeDefaults.source.deferredMatching,
+                deferredMatching: extractBoolean(sourceConfig, 'deferredMatching') ?? runtimeDefaults.source.deferredMatching,
+                includeRecordAccountsForMatching:
+                    extractBoolean(sourceConfig, 'includeRecordAccountsForMatching') ?? runtimeDefaults.source.includeRecordAccountsForMatching,
+                disableNonMatchingAccounts:
+                    extractBoolean(sourceConfig, 'disableNonMatchingAccounts') ?? runtimeDefaults.source.disableNonMatchingAccounts,
             }
         })
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)

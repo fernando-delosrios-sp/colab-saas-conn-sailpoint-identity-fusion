@@ -6,6 +6,8 @@ jest.mock('../actions', () => ({
     executeActions: jest.fn(),
 }))
 
+import { createRegistry as createMockRegistry } from './harness/registryMocking'
+
 function createRegistry() {
     const fusionIdentity = {
         nativeIdentity: 'fusion-id-1',
@@ -43,6 +45,7 @@ function createRegistry() {
             preProcessFusionAccounts: jest.fn().mockResolvedValue(undefined),
             processIdentity: jest.fn().mockResolvedValue(undefined),
             getFusionIdentity: jest.fn().mockReturnValue(fusionIdentity),
+            normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
             reconcilePendingFormState: jest.fn(),
             getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-created' }),
         },
@@ -82,7 +85,9 @@ describe('accountCreate', () => {
 
         expect(registry.identities.fetchIdentityByName).toHaveBeenCalledWith('Alice Doe')
         expect(registry.sources.fetchFusionAccounts).toHaveBeenCalledTimes(1)
-        expect(registry.attributes.registerUniqueValuesFromRawAccounts).toHaveBeenCalledWith(registry.sources.fusionAccounts)
+        expect(registry.attributes.registerUniqueValuesFromRawAccounts).toHaveBeenCalledWith(
+            registry.sources.fusionAccounts
+        )
         expect(registry.fusion.preProcessFusionAccounts).toHaveBeenCalledTimes(1)
         expect(registry.fusion.processIdentity).toHaveBeenCalledWith({ id: 'id-1', name: 'Alice Doe' })
         expect(registry.fusion.getFusionIdentity().addStatus).toHaveBeenCalledWith(
@@ -90,8 +95,7 @@ describe('accountCreate', () => {
             'Status set by accountCreate operation'
         )
         expect(executeActions).toHaveBeenCalledTimes(2)
-        expect(registry.forms.fetchFormData).toHaveBeenCalledTimes(1)
-        expect(registry.fusion.reconcilePendingFormState).toHaveBeenCalledTimes(1)
+        expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-created' })
     })
 

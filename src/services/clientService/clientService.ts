@@ -249,7 +249,9 @@ export class ClientService {
             return await fn()
         } catch (error: unknown) {
             // Extract meaningful details from API errors (axios-style responses)
-            const err = error as { response?: { status?: number; statusText?: string; data?: { message?: string; detailCode?: string } } }
+            const err = error as {
+                response?: { status?: number; statusText?: string; data?: { message?: string; detailCode?: string } }
+            }
             const status = err.response?.status
             const statusText = err.response?.statusText
             const apiMessage = err.response?.data?.message || err.response?.data?.detailCode

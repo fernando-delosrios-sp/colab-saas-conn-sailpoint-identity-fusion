@@ -4,7 +4,7 @@ import { ScoreReport } from './types'
 import { jaroWinkler, diceCoefficient } from './stringComparison'
 import { match as nameMatch, matchNormalized as nameMatchNormalized } from './nameMatching'
 import { evaluateVelocityTemplate } from '../attributeService/formatting'
-import type { RenderContext } from 'velocityjs/dist/src/type'
+export type RenderContext = Record<string, any>;
 import { missing, trimStr } from '../../utils/safeRead'
 
 // Module-level regex constants — compiled once, reused on every call (hot scoring loop)
@@ -70,9 +70,8 @@ export const scoreDoubleMetaphone = (
     const accountCodes = doubleMetaphone(accountAttribute)
     const identityCodes = doubleMetaphone(identityAttribute)
 
-    let score = 0
-    let comment = ''
-
+    let score: number;
+    let comment: string;
     if (accountCodes[0] === identityCodes[0] && accountCodes[0]) {
         score = 100
         comment = 'Primary codes match'
@@ -190,7 +189,7 @@ export function scoreLIG3Normalized(normA: string, normB: string, matching: Matc
     const threshold = matching.fusionScore ?? 0
     const isMatch = score >= threshold
 
-    let comment = ''
+    let comment: string
     if (score >= 95) {
         comment = 'Very high similarity'
     } else if (score >= 80) {
@@ -207,11 +206,8 @@ export function scoreLIG3Normalized(normA: string, normB: string, matching: Matc
 }
 
 /** Public entry point: normalizes both sides then delegates to {@link scoreLIG3Normalized}. */
-export const scoreLIG3 = (
-    accountAttribute: string,
-    identityAttribute: string,
-    matching: MatchingConfig
-): ScoreReport => scoreLIG3Normalized(normalizeLIG3(accountAttribute), normalizeLIG3(identityAttribute), matching)
+export const scoreLIG3 = (accountAttribute: string, identityAttribute: string, matching: MatchingConfig): ScoreReport =>
+    scoreLIG3Normalized(normalizeLIG3(accountAttribute), normalizeLIG3(identityAttribute), matching)
 
 function calculateLIG3Similarity(s1: string, s2: string): number {
     const len1 = s1.length

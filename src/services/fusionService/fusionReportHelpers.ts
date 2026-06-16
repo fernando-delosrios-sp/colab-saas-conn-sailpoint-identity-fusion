@@ -44,7 +44,9 @@ export function getFusionIdentityConflictTrackingKey(fusionAccount: FusionAccoun
 }
 
 /** Fusion candidate keys for report / dry-run rows (works after `fusionIdentity` refs are cleared). */
-export function fusionReportMatchCandidateAccountFields(match: FusionMatch): Pick<FusionReportMatch, 'accountId' | 'accountName'> {
+export function fusionReportMatchCandidateAccountFields(
+    match: FusionMatch
+): Pick<FusionReportMatch, 'accountId' | 'accountName'> {
     const fi = match.fusionIdentity
     if (fi) {
         const accountId = trimStr(fi.identityId ?? fi.nativeIdentityOrUndefined)

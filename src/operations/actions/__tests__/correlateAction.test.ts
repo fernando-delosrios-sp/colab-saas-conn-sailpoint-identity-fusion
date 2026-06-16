@@ -12,11 +12,7 @@ describe('correlateAction', () => {
             fusion: { correlateMissingAccountsPerSource: jest.fn().mockResolvedValue(undefined) },
         } as any
 
-        await correlateAction(
-            fusionAccount,
-            { op: AttributeChangeOp.Add, value: 'correlated' },
-            serviceRegistry
-        )
+        await correlateAction(fusionAccount, { op: AttributeChangeOp.Add, value: 'correlated' }, serviceRegistry)
 
         expect(serviceRegistry.fusion.correlateMissingAccountsPerSource).toHaveBeenCalledWith(fusionAccount)
         expect(fusionAccount.removeAction).not.toHaveBeenCalled()
@@ -32,11 +28,7 @@ describe('correlateAction', () => {
             fusion: { correlateMissingAccountsPerSource: jest.fn().mockResolvedValue(undefined) },
         } as any
 
-        await correlateAction(
-            fusionAccount,
-            { op: AttributeChangeOp.Remove, value: 'correlated' },
-            serviceRegistry
-        )
+        await correlateAction(fusionAccount, { op: AttributeChangeOp.Remove, value: 'correlated' }, serviceRegistry)
 
         expect(fusionAccount.removeAction).toHaveBeenCalledWith('correlated')
         expect(serviceRegistry.fusion.correlateMissingAccountsPerSource).not.toHaveBeenCalled()

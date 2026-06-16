@@ -33,7 +33,6 @@ export const connectorSpecInitialValues = {
     processingWait: advancedConnectionSettings.connectorSpecInitialValues.processingWait,
     retryDelay: advancedConnectionSettings.connectorSpecInitialValues.retryDelay,
     batchSize: advancedConnectionSettings.connectorSpecInitialValues.batchSize,
-    parallelBatchSize: advancedConnectionSettings.connectorSpecInitialValues.parallelBatchSize,
     ...developerSettings.connectorSpecInitialValues,
     ...proxySettings.connectorSpecInitialValues,
     ...uniqueAttributeDefinitionsSettings.connectorSpecInitialValues,
@@ -49,4 +48,5 @@ export const defaults = {
     ...processingControlSettings.runtimeDefaults,
     ...matchingSettings.runtimeDefaults,
     ...developerSettings.runtimeDefaults,
+    ...advancedConnectionSettings.runtimeDefaults,
 } as const

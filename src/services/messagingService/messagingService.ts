@@ -73,6 +73,9 @@ export class MessagingService {
     /** UTF-8 byte length of JSON-serialized workflow from getWorkflow; undefined if not measured yet or call failed. */
     private emailSenderWorkflowDefinitionBytes: number | undefined
 
+    /** Cached result of buildEmailHeaderSubtitle; undefined until first call, then the computed value. */
+    private _cachedEmailHeaderSubtitle: string | undefined
+
     // ------------------------------------------------------------------------
     // Constructor
     // ------------------------------------------------------------------------
@@ -96,6 +99,10 @@ export class MessagingService {
 
     /** Hostname from UI origin plus fusion source display name for email headers. */
     private buildEmailHeaderSubtitle(): string | undefined {
+        if (this._cachedEmailHeaderSubtitle !== undefined) {
+            return this._cachedEmailHeaderSubtitle
+        }
+
         let host: string | undefined
         try {
             const origin = getUIOriginFromBaseUrl(this.apiBaseUrl) ?? this.apiBaseUrl
@@ -111,10 +118,12 @@ export class MessagingService {
             }
         }
         if (!host) {
+            this._cachedEmailHeaderSubtitle = undefined
             return undefined
         }
         const sourceName = this.sources.getFusionSource()?.name ?? 'Fusion source'
-        return `${host} - ${sourceName}`
+        this._cachedEmailHeaderSubtitle = `${host} - ${sourceName}`
+        return this._cachedEmailHeaderSubtitle
     }
 
     // ------------------------------------------------------------------------
@@ -313,9 +322,7 @@ export class MessagingService {
         const accountSource = context?.accountSource || String(formInputSource || 'Unknown')
         const pickedAccountAttributes = pickAttributes(context?.accountAttributes, this.reportAttributes)
         const rawAccountId = context?.accountId || String(formInputAccount || '')
-        const accountId =
-            this.sources.resolveIscAccountIdForManagedKey(rawAccountId) ||
-            rawAccountId
+        const accountId = this.sources.resolveIscAccountIdForManagedKey(rawAccountId) || rawAccountId
         const accountUrl = this.urlContext.humanAccount(accountId || undefined)
         const accountEmail = context?.accountEmail
 
@@ -652,33 +659,42 @@ export class MessagingService {
     private async getRecipientEmails(identityIds: (string | undefined)[]): Promise<string[]> {
         const emails = new Set<string>()
 
-        for (const identityId of identityIds) {
-            if (!identityId) {
-                continue
-            }
+        if (!this.identities) {
+            this.log.warn('IdentityService not available, cannot fetch recipient emails')
+            return Array.from(emails)
+        }
 
-            if (!this.identities) {
-                this.log.warn('IdentityService not available, cannot fetch recipient emails')
-                continue
-            }
+        const validIds = identityIds.filter((id): id is string => Boolean(id))
+        if (validIds.length === 0) {
+            return Array.from(emails)
+        }
 
-            let identity = this.identities.getIdentityById(identityId)
-            if (!identity) {
-                try {
-                    identity = await this.identities.fetchIdentityById(identityId)
-                } catch (e) {
-                    this.log.warn(`Failed to fetch identity ${identityId}: ${e}`)
+        const results = await Promise.all(
+            validIds.map(async (identityId) => {
+                let identity = this.identities?.getIdentityById(identityId)
+                if (!identity) {
+                    try {
+                        identity = await this.identities?.fetchIdentityById(identityId)
+                    } catch (e) {
+                        this.log.warn(`Failed to fetch identity ${identityId}: ${e}`)
+                    }
                 }
-            }
 
-            const attrs: any = identity?.attributes ?? {}
-            const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
-            const normalized = normalizeEmailValue(emailValue)
+                const attrs: any = identity?.attributes ?? {}
+                const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
+                const normalized = normalizeEmailValue(emailValue)
 
-            if (normalized.length > 0) {
-                normalized.forEach((e) => emails.add(e))
-            } else {
-                this.log.warn(`No email found for identity ${identityId}`)
+                if (normalized.length === 0) {
+                    this.log.warn(`No email found for identity ${identityId}`)
+                }
+
+                return normalized
+            })
+        )
+
+        for (const normalized of results) {
+            for (const e of normalized) {
+                emails.add(e)
             }
         }
 

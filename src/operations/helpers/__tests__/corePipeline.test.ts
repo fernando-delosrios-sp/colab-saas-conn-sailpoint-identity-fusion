@@ -1,47 +1,26 @@
-import { fetchPhase, outputPhase, outputPreparationPhase, refreshPhase, processPhase, uniqueAttributesPhase } from '../corePipeline'
+import {
+    fetchPhase,
+    outputPhase,
+    outputPreparationPhase,
+    refreshPhase,
+    processPhase,
+    uniqueAttributesPhase,
+} from '../corePipeline'
+
+import { createRegistry as createMockRegistry } from '../../__tests__/harness/registryMocking'
 
 function createRegistry() {
-    const forms = {
-        fetchFormInstancesData: jest.fn().mockResolvedValue(undefined),
-        processFetchedFormData: jest.fn().mockResolvedValue(undefined),
-        cleanUpForms: jest.fn().mockResolvedValue(undefined),
-        awaitPendingDeleteOperations: jest.fn().mockResolvedValue(undefined),
-    }
-
-    const fusion = {
-        clearAnalyzedAccounts: jest.fn(),
-        forEachISCAccount: jest.fn().mockResolvedValue(0),
-        refreshUniqueAttributes: jest.fn().mockResolvedValue(undefined),
-    }
-
-    const sources = {
-        clearManagedAccounts: jest.fn(),
-        clearFusionAccounts: jest.fn(),
-        managedAccountsById: new Map(),
-        saveBatchCumulativeCount: jest.fn().mockResolvedValue(undefined),
-        aggregateDelayedSources: jest.fn().mockResolvedValue(undefined),
-    }
-
-    const attributes = {
-        saveState: jest.fn().mockResolvedValue(undefined),
-    }
-
-    const messaging = {
-        scheduleDelayedAggregation: jest.fn().mockResolvedValue(undefined),
-    }
-
+    const registry = createMockRegistry()
+    registry.sources.managedAccountsById = new Map()
+    registry.sources.clearManagedAccounts = jest.fn()
+    registry.sources.saveBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
+    registry.sources.clearFusionAccounts = jest.fn()
+    registry.sources.aggregateDelayedSources = jest.fn().mockResolvedValue(undefined)
     return {
-        registry: {
-            log: { info: jest.fn() },
-            fusion,
-            forms,
-            sources,
-            attributes,
-            messaging,
-            res: { send: jest.fn() },
-        } as any,
-        forms,
-        fusion,
+        registry,
+        forms: registry.forms,
+        fusion: registry.fusion,
+        sources: registry.sources
     }
 }
 
@@ -126,7 +105,11 @@ describe('corePipeline outputPhase', () => {
 
     it('passes stale cleanup flag only for persistent fetch runs', async () => {
         const { registry, forms } = createRegistry()
-        const identities = { fetchIdentities: jest.fn().mockResolvedValue(undefined), identityCount: 0, getIdentityById: jest.fn() }
+        const identities = {
+            fetchIdentities: jest.fn().mockResolvedValue(undefined),
+            identityCount: 0,
+            getIdentityById: jest.fn(),
+        }
         const sources = {
             fetchManagedAccounts: jest.fn().mockResolvedValue(undefined),
             fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
@@ -137,7 +120,10 @@ describe('corePipeline outputPhase', () => {
             fetchGlobalOwnerIdentityIds: jest.fn().mockResolvedValue([]),
         }
         const fusion = { fusionReportOnAggregation: false, fusionOwnerIsGlobalReviewer: false }
-        const messaging = { fetchSender: jest.fn().mockResolvedValue(undefined), fetchDelayedAggregationSender: jest.fn().mockResolvedValue(undefined) }
+        const messaging = {
+            fetchSender: jest.fn().mockResolvedValue(undefined),
+            fetchDelayedAggregationSender: jest.fn().mockResolvedValue(undefined),
+        }
         const log = { info: jest.fn() }
         const serviceRegistry = { ...registry, forms, identities, sources, fusion, messaging, log }
 

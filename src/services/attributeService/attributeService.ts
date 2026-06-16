@@ -13,7 +13,7 @@ import { Account } from 'sailpoint-api-client'
 import { CompoundKey, CompoundKeyType, SimpleKey, SimpleKeyType, StandardCommand } from '@sailpoint/connector-sdk'
 import { evaluateVelocityTemplate, normalize, padNumber, removeSpaces, switchCase } from './formatting'
 import { LockService } from '../lockService'
-import { RenderContext } from 'velocityjs/dist/src/type'
+export type RenderContext = Record<string, any>;
 import { v4 as uuidv4 } from 'uuid'
 import { assert } from '../../utils/assert'
 import { SourceService } from '../sourceService'
@@ -73,6 +73,7 @@ export class AttributeService {
     private readonly sourceConfigs: SourceConfig[]
     private readonly maxAttempts?: number
     private readonly forceAttributeRefresh: boolean
+    private readonly reverseSources: SourceConfig[]
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -108,6 +109,7 @@ export class AttributeService {
         this.uniqueAttributeNames = new Set(this.uniqueDefinitions.map((d) => d.name))
 
         this.setStateWrapper(config.fusionState)
+        this.reverseSources = this.sourceConfigs.filter((sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute)
     }
 
     // ------------------------------------------------------------------------
@@ -383,6 +385,36 @@ export class AttributeService {
     }
 
     /**
+     * Refreshes reverse correlation attributes for all sources configured with
+     * correlationMode 'reverse'. Sets the attribute to the first missing account's
+     * schema.id for sources with missing accounts, and clears it for sources without.
+     *
+     * This is called alongside refreshNormalAttributes to ensure reverse correlation
+     * attributes stay in sync with the current state of missing accounts.
+     *
+     * @param fusionAccount - The fusion account to refresh reverse correlation attributes for
+     */
+    public refreshReverseCorrelationAttributes(fusionAccount: FusionAccount): void {
+        if (fusionAccount.missingAccountIds.length === 0) return
+        for (const sc of this.reverseSources) {
+            const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
+            if (missingForSource.length > 0) {
+                const firstAccountId = missingForSource[0]
+                const info = fusionAccount.getManagedAccountInfo(firstAccountId)
+                if (info) {
+                    fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
+                    this.log.debug(
+                        `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
+                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                    )
+                }
+            } else {
+                fusionAccount.clearReverseCorrelationAttribute(sc.correlationAttribute!)
+            }
+        }
+    }
+
+    /**
      * Refreshes only unique attribute definitions.
      * Unique attributes are only generated for new accounts; existing values are preserved
      * unless needsReset is set (e.g. when re-enabling a previously disabled account).
@@ -511,7 +543,7 @@ export class AttributeService {
         if (this.skipAccountsWithMissingId && !uniqueId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -631,7 +663,7 @@ export class AttributeService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} raw account(s) ` +
-            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -676,8 +708,7 @@ export class AttributeService {
         fusionAccount: FusionAccount,
         orderedAccounts: Record<string, any>[]
     ): Record<string, any> | undefined {
-        const originIdRaw =
-            fusionAccount.originAccountId ?? fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE]
+        const originIdRaw = fusionAccount.originAccountId ?? fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE]
         const originId = trimStr(originIdRaw)
         if (!originId) return undefined
 
@@ -763,8 +794,7 @@ export class AttributeService {
 
         const prioritizedIndex = ordered.findIndex(
             (account) =>
-                getManagedAccountSnapshotKey(account) === mainAccountId ||
-                trimStr(account?._id) === mainAccountId
+                getManagedAccountSnapshotKey(account) === mainAccountId || trimStr(account?._id) === mainAccountId
         )
         if (prioritizedIndex <= 0) return ordered
 
@@ -792,9 +822,7 @@ export class AttributeService {
     ): Record<string, any> | undefined {
         for (const accounts of sourceAttributeMap.values()) {
             const match = accounts.find(
-                (account) =>
-                    getManagedAccountSnapshotKey(account) === accountId ||
-                    trimStr(account?._id) === accountId
+                (account) => getManagedAccountSnapshotKey(account) === accountId || trimStr(account?._id) === accountId
             )
             if (match) return match
         }
@@ -956,8 +984,7 @@ export class AttributeService {
             !effectiveExpression.includes('$counter') &&
             !effectiveExpression.includes('${counter}') &&
             !effectiveExpression.includes('$UUID') &&
-            !effectiveExpression.includes('${UUID}') &&
-            !effectiveExpression.includes('#')
+            !effectiveExpression.includes('${UUID}')
         ) {
             effectiveExpression = `${effectiveExpression}$counter`
         }

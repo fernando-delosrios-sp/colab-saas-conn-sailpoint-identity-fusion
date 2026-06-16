@@ -6,36 +6,12 @@ jest.mock('../helpers/rebuildFusionAccount', () => ({
     rebuildFusionAccount: jest.fn(),
 }))
 
-function createRegistry() {
-    const timer = {
-        phase: jest.fn(),
-        end: jest.fn(),
-    }
+import { createRegistry as createMockRegistry } from './harness/registryMocking'
 
-    return {
-        log: {
-            info: jest.fn(),
-            debug: jest.fn(),
-            crash: jest.fn(),
-            timer: jest.fn(() => timer),
-        },
-        sources: {
-            fetchAllSources: jest.fn().mockResolvedValue(undefined),
-        },
-        schemas: {
-            setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
-        },
-        forms: {
-            fetchFormData: jest.fn().mockResolvedValue(undefined),
-        },
-        fusion: {
-            normalizePendingFormStateForOutput: jest.fn().mockResolvedValue(undefined),
-            getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-1' }),
-        },
-        res: {
-            send: jest.fn(),
-        },
-    } as any
+function createRegistry() {
+    const registry = createMockRegistry()
+    Object.assign(registry.fusion, { getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-1' }) })
+    return registry
 }
 
 describe('accountRead', () => {

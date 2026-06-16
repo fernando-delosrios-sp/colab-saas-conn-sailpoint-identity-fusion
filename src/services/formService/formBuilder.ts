@@ -145,10 +145,7 @@ export const buildFormInput = (
     // 2. name / displayName — fusion row title (ISC Account.name; displayName aliases name)
     // 3. managedAccountIdentifier — managed account key when labels are unavailable
     const preferredAccountLabel =
-        fusionAccount.identityDisplayName ||
-        fusionAccount.name ||
-        fusionAccount.displayName ||
-        managedAccountIdentifier
+        fusionAccount.identityDisplayName || fusionAccount.name || fusionAccount.displayName || managedAccountIdentifier
     if (!fusionAccount.identityDisplayName && !fusionAccount.name && !fusionAccount.displayName) {
         logger.error(
             `[formBuilder] Missing identityDisplayName/name for fusion account. Using managed account key fallback: ${managedAccountIdentifier}`
