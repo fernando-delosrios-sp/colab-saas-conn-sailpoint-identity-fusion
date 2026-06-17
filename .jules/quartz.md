@@ -16,3 +16,6 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2026-06-17 - Simplify Fallback Chains with Logical OR
+**Learning:** Repetitive variable assignments and `if` statements for fallback chains (e.g., checking multiple `trimStr()` results) bloat code and obscure intent. Since `trimStr` returns `undefined` rather than an empty string when empty, a simple logical OR (`||`) chain achieves the same short-circuiting behavior concisely.
+**Action:** Replace multi-line truthy fallback chains with a single `return` statement using a logical OR (`||`) sequence.
