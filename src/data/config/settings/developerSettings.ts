@@ -22,8 +22,7 @@ export const runtimeDefaults = {
 
 export function applySettings(config: FusionConfigBuild): void {
     config.reset = extractBoolean(config, 'reset') ?? runtimeDefaults.reset
-    config.managedAccountsBatchSize =
-        config.managedAccountsBatchSize ?? advancedInitialValues.managedAccountsBatchSize
+    config.managedAccountsBatchSize = config.managedAccountsBatchSize ?? advancedInitialValues.managedAccountsBatchSize
     const rawMaxCandidates =
         config.fusionMaxCandidatesForForm !== undefined
             ? Number(config.fusionMaxCandidatesForForm)
@@ -35,20 +34,26 @@ export function applySettings(config: FusionConfigBuild): void {
         `fusionMaxCandidatesForForm must be between ${internalConfig.formService.fusionMaxCandidatesForFormMin} and ${internalConfig.formService.fusionMaxCandidatesForFormMax}`
     )
     config.fusionMaxCandidatesForForm = Math.trunc(rawMaxCandidates)
-    config.concurrencyCheckEnabled = extractBoolean(config, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled
-    config.forceAttributeRefresh = extractBoolean(config, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh
+    config.concurrencyCheckEnabled =
+        extractBoolean(config, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled
+    config.forceAttributeRefresh =
+        extractBoolean(config, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh
     config.provisioningTimeout = config.provisioningTimeout ?? advancedInitialValues.provisioningTimeout
-    config.externalLoggingEnabled = extractBoolean(config, 'externalLoggingEnabled') ?? runtimeDefaults.externalLoggingEnabled
+    config.externalLoggingEnabled =
+        extractBoolean(config, 'externalLoggingEnabled') ?? runtimeDefaults.externalLoggingEnabled
     config.externalLoggingUrl = config.externalLoggingUrl ?? undefined
     config.externalLoggingLevel = config.externalLoggingLevel ?? connectorSpecInitialValues.externalLoggingLevel
 
     if (config.externalLoggingEnabled) {
         assert(config.externalLoggingUrl, 'External logging URL is required when external logging is enabled')
-        assert(
-            config.externalLoggingUrl.toLowerCase().startsWith('http://') ||
-                config.externalLoggingUrl.toLowerCase().startsWith('https://'),
-            'External logging URL must use http or https protocol'
-        )
+        let isValidExtUrl = false
+        try {
+            const parsedUrl = new URL(config.externalLoggingUrl)
+            isValidExtUrl = parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:'
+        } catch {
+            // Ignored
+        }
+        assert(isValidExtUrl, 'External logging URL must use http or https protocol')
         assert(
             ['error', 'warn', 'info', 'debug'].includes(config.externalLoggingLevel || ''),
             'External logging level must be one of: error, warn, info, debug'
