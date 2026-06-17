@@ -135,9 +135,9 @@ What type of attribute are you comparing?
 
 | String 1               | String 2               | Score | Note                                        |
 | ---------------------- | ---------------------- | ----- | ------------------------------------------- |
-| john.smith@company.com | john.smyth@company.com | 95    | High due to strong prefix match             |
-| john.smith@company.com | jane.smith@company.com | 82    | Lower due to prefix mismatch (john vs jane) |
-| smithj@company.com     | smithjo@company.com    | 97    | Very close; prefix nearly identical         |
+| `john.smith@company.com` | `john.smyth@company.com` | 95    | High due to strong prefix match             |
+| `john.smith@company.com` | `jane.smith@company.com` | 82    | Lower due to prefix mismatch (john vs jane) |
+| `smithj@company.com`     | `smithjo@company.com`    | 97    | Very close; prefix nearly identical         |
 
 **When to use:**
 
@@ -600,15 +600,23 @@ The rows below are **fictional** composites. **Source A** and **Source B** stand
 
 Before relying entirely on matching algorithms, consider enabling the **Normalize special characters?** transformation during the _Define_ phase. Normalization transliterates international accents and strips erratic punctuation (like apostrophes in "O'Conner" or hyphens).
 
-- **Why it matters:** Algorithms like `Jaro-Winkler` and `Dice` are strictly mechanically based on characters. "Renée" vs "Renee" scores poorly under Dice (50%) but scores 100% when normalized. `LIG3` penalizes punctuation as unmapped insertions (dropping scores to ~64%), which the normalizer effortlessly resolves.
-- **Exception**: The `Enhanced Name Matcher` natively handles accents and unicode transliteration, so it is less reliant on upstream normalization.
+!!! info "Why it matters"
+
+    Algorithms like `Jaro-Winkler` and `Dice` are strictly mechanically based on characters. "Renée" vs "Renee" scores poorly under Dice (50%) but scores 100% when normalized. `LIG3` penalizes punctuation as unmapped insertions (dropping scores to ~64%), which the normalizer effortlessly resolves.
+
+!!! note "Exception"
+
+    The `Enhanced Name Matcher` natively handles accents and unicode transliteration, so it is less reliant on upstream normalization.
 
 ### Dates
 
 Dates are notoriously poor candidates for pure string-matching algorithms due to format variance (e.g. `10/05/1990` vs `1990-10-05` vs `Oct 5th 1990`).
 
 - String matching models (like `LIG3` or `Dice`) treat dates entirely as structural tokens which often drop similarity bounds below 50% if the standard is mixed.
-- **Best Practice:** Do not match raw dates using these algorithms. Standardize the date formats (either into epoch arrays or ISO standard strings) upstream using Velocity templates or the Map engine.
+
+!!! tip "Best Practice"
+
+    Do not match raw dates using these algorithms. Standardize the date formats (either into epoch arrays or ISO standard strings) upstream using Velocity templates or the Map engine.
 
 ### Long Addresses
 
