@@ -1,0 +1,20 @@
+schema: intent-driven
+
+#context: |
+#  Repository purpose: Package reusable OpenSpec schemas.
+#  Quality gate: After every implementation/apply that changes schemas, run
+#  `openspec schema review <schema-name>` for each affected schema before
+#  considering the work complete.
+
+rules:
+  proposal:
+    - Must use grill-me skill
+  design:
+    - Must use c4-diagrams skill
+  adr:
+    - Must use architectural-decision-records skill
+  spec:
+    - Must use gherkin-authoring skill
+  tasks:
+    - Add a required verification task: run `openspec schema review <schema-name>` for each affected schema.
+    - Do not mark apply complete until all required schema review commands pass.
