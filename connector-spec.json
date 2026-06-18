@@ -17,6 +17,7 @@
     "showDebugLoggingOption": true,
     "sourceConfigInitialValues": {
         "fusionFormExpirationDays": 7,
+        "fusionManualReviewScore": 80,
         "provisioningTimeout": 300,
         "managedAccountsBatchSize": 100,
         "fusionMaxCandidatesForForm": 3,
