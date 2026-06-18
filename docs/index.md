@@ -1,14 +1,14 @@
 # Identity Fusion NG
 
-> **Disclaimer:** Identity Fusion NG is the newest Identity Fusion version and supersedes any Identity Fusion v1.x previous release. Version 1.x is now **deprecated**. For those needing to upgrade an existing deployment, please refer to the [migration guide](docs/guides/migration-from-previous-fusion.md).
+> **Disclaimer:** Identity Fusion NG is the newest Identity Fusion version and supersedes any Identity Fusion v1.x previous release. Version 1.x is now **deprecated**. For those needing to upgrade an existing deployment, please refer to the [migration guide](./guides/migration-from-previous-fusion.md).
 
-![Identity Fusion NG Framework](docs/assets/images/Identity_Fusion_NG_Framework.png)
+![Identity Fusion NG Framework](./assets/images/Identity_Fusion_NG_Framework.png)
 
 **Documentation**
 
 - Full documentation site: [GitHub Pages](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/)
-- Source docs in this repository: [documentation folder](docs/README.md)
-- Start here for the core concepts and architecture: [Identity Fusion NG Framework](docs/collateral/Identity_Fusion_NG_Framework.pdf)
+- Source docs in this repository: [documentation folder](./README.md)
+- Start here for the core concepts and architecture: [Identity Fusion NG Framework](./collateral/Identity_Fusion_NG_Framework.pdf)
 
 Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consolidates account data from one or more managed sources, lets you **map** attributes into a single Fusion account schema, **define** derived and unique values (including Velocity-based computation), and optionally **match** new or changed accounts to existing identities so you can avoid duplicate identities without brittle exact-match correlation alone.
 
@@ -22,10 +22,10 @@ Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consol
 
 | Step                                   | Resource                                                              |
 | -------------------------------------- | --------------------------------------------------------------------- |
-| Shortest path to a first aggregation   | [Get started](docs/get-started.md)                                    |
-| How Map → Define → Match fits together | [Concepts: map, define, and match](docs/concepts/map-define-match.md) |
-| Full guide list                        | [Guides overview](docs/guides/index.md)                               |
-| Connector operations (APIs ISC calls)  | [Connector operations reference](docs/operations/index.md)            |
+| Shortest path to a first aggregation   | [Get started](./get-started.md)                                    |
+| How Map → Define → Match fits together | [Concepts: map, define, and match](./concepts/map-define-match.md) |
+| Full guide list                        | [Guides overview](./guides/index.md)                               |
+| Connector operations (APIs ISC calls)  | [Connector operations reference](./operations/index.md)            |
 
 Identity Fusion NG addresses the complex challenge of identity and account data aggregation through a streamlined **map-define-match framework**. This concept represents the high-level operation of the connector, which can execute all three steps or just one, but always in this logical sequence:
 
@@ -84,7 +84,7 @@ Connection Settings
 
 Controls which identities and sources are in scope and how processing is managed.
 
-For an in-depth explanation of source types, aggregation rules, correlation modes, and account lifecycle, see the [Source configuration](docs/guides/source-configuration.md) guide.
+For an in-depth explanation of source types, aggregation rules, correlation modes, and account lifecycle, see the [Source configuration](./guides/source-configuration.md) guide.
 
 | Section                | Description                                                                                                                                                                                               |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -96,7 +96,7 @@ For an in-depth explanation of source types, aggregation rules, correlation mode
 >
 > Filter references: [Accounts list API](https://developer.sailpoint.com/docs/api/v2025/list-accounts), [JMESPath](https://jmespath.org/).
 >
-> Source behavior note: for sources of type **Records**, **Include record accounts in Match** can be turned off to run Map/Define and unique registration without Match scoring. See the per-source options in [Source configuration](docs/guides/source-configuration.md).
+> Source behavior note: for sources of type **Records**, **Include record accounts in Match** can be turned off to run Map/Define and unique registration without Match scoring. See the per-source options in [Source configuration](./guides/source-configuration.md).
 
 ### Attribute Mapping Settings
 
@@ -138,7 +138,7 @@ Attribute Definition Settings
 
 | Field                                      | Description                                                | Required | Notes                                                        |
 | ------------------------------------------ | ---------------------------------------------------------- | -------- | ------------------------------------------------------------ |
-| **Maximum attempts for unique definition** | Maximum attempts to define a unique value before giving up | No       | Default: 100; prevents infinite loops with unique/UUID types |
+| **Maximum attempts for unique definition** | Maximum attempts to define a unique value before giving up | No       | Default: 20; prevents infinite loops with unique attributes |
 | **Attribute Definitions**                  | List of attribute definition rules                         | No       | Each definition specifies how an attribute is built          |
 
 **Per-attribute definition configuration:**
@@ -148,16 +148,16 @@ Attribute Definition Settings - Per-attribute definition
 | Field                                 | Description                                       | Required                   | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | ------------------------------------- | ------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Attribute Name**                    | Name of the account attribute to define           | Yes                        | Will appear in the discovered schema                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| **Apache Velocity expression**        | Template expression to define the attribute value | No                         | Context includes: mapped account attributes, `$accounts`, `$sources`, `$previous`, optional `$identity`, `$originSource`, `$originAccount` (id), `$account` (origin snapshot object), plus `$Math`, `$Datefns` (format, parse, add/sub days/months/years, isBefore, isAfter, differenceInDays, etc.), `$AddressParse` (getCityState, getCityStateCode, parse), and `$Normalize` (date, phone, name, fullName, ssn, address). Example: `#set($initial = $firstname.substring(0, 1))$initial$lastname` |
+| **Apache Velocity expression**        | Template expression to define the attribute value | Yes                        | For **Normal** definitions: reference any mapped attribute by name; context includes `$accounts`, `$sources` (Map — use `$sources.get('SourceName')`), `$previous`, optional `$identity` (including `$identity.name`), `$name` (identity name fallback for identity-based accounts when no mapped `name` attribute exists), `$originSource`, `$originAccount` (id), `$account` (origin snapshot — may differ from `$accounts[0]` when `mainAccount` is set), plus helpers `$Math`, `$Datefns`, `$AddressParse`, `$Normalize`, `$JSON`. For **Unique** definitions: same context plus outputs from normal definitions that ran first; use `$counter` for an automatic number suffix on collision (auto-append is skipped when the expression contains Velocity directives like `#if`/`#set`/`#end` — include `$counter` explicitly in that case), `$UUID` for a fresh v4 random ID, or `$isUnique(value)` to test whether a candidate value is free before falling back to `$counter`. Example: `#set($initial = $firstname.substring(0, 1))$initial$lastname` |
 | **Case selection**                    | Case transformation to apply                      | Yes                        | Options: **Do not change**, **Lower case**, **Upper case**, **Capitalize**                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **Attribute Type**                    | Type of attribute                                 | Yes                        | **Normal** (standard attribute), **Unique** (must be unique across accounts; counter added if collision), **UUID** (generates immutable UUID), **Counter-based** (increments with each use)                                                                                                                                                                                                                                                                                                          |
-| **Counter start value**               | Starting value for counter                        | Yes (counter type)         | Example: 1, 1000, etc.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| **Minimum counter digits ($counter)** | Minimum digits for counter (zero-padded)          | Yes (counter/unique types) | Example: 3 → `001`, `002`; for unique type, counter is appended on collision                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **Maximum length**                    | Maximum length for defined value                  | No                         | Truncates to this length; for unique/counter types, counter is preserved at end                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Attribute Type**                    | Type of attribute                                 | Yes                        | **Normal** (standard computed attribute) or **Unique** (must be unique across accounts). UUID and incremental counter are sub-modes of **Unique**: include `$UUID` in the expression for UUID generation; toggle **Use incremental counter?** for sequential IDs.                                                                                                                                                                                                                              |
+| **Counter start value**               | Starting value for the persistent counter         | Yes (when useIncrementalCounter is on) | First number in the sequence; example 1, 1000, etc.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **Minimum counter digits ($counter)** | Minimum digits for counter (zero-padded)          | Yes (unique)               | Example: 3 → `001`, `002`; for unique type, counter is appended on collision (renders empty on the first try, padded suffix on subsequent attempts)                                                                                                                                                                                                                                                                                                                                                    |
+| **Maximum length**                    | Maximum length for defined value                  | No                         | Truncates to this length; for unique definitions, the counter is preserved at end                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **Normalize special characters?**     | Remove special characters and quotes              | No                         | Useful for IDs and usernames                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **Remove spaces?**                    | Remove all spaces from value                      | No                         | Useful for IDs and usernames                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **Trim leading and trailing spaces?** | Remove leading/trailing whitespace from value     | No                         | Cleans up extra whitespace from source data                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **Refresh on each aggregation?**      | Recalculate value every aggregation               | No                         | Only available for **Normal** type; unique/UUID/counter preserve state                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **Refresh on each aggregation?**      | Recalculate value every aggregation               | No                         | Only available for **Normal** type; unique attributes preserve state                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 **Note:** When an account is **enabled**, all attributes (including unique) are force refreshed and recalculated (internal mechanism to reset unique attributes).
 
@@ -173,7 +173,7 @@ Attribute Definition Settings - Per-attribute definition
 
 > **Tip:** Remember that normal attributes are automatically refreshed when new data is found. You don't need to force global or individual attribute refresh unless there's a good reason, like troubleshooting, testing, or if the attribute definition is time-sensitive.
 
-> **Note:** In Velocity context, managed account snapshots (`$accounts` and `$sources`) include each source account’s `**attributes**` plus `**_id**` (composite managed key `sourceId::nativeIdentity`), nested `**source**` (`id`, `name` — ISC source id and name on managed rows), nested `**schema**` (`id` = native identity, `name` = display name from ISC `name` / `nativeIdentity`), and `**IIQDisabled**` (IdentityIQ-style disabled flag where `true` means disabled). The same composite key is available as top-level `**$originAccount**` for the origin only — it is the row’s `**_id**` on managed snapshots. Identity-backed rows (when the origin is Identities) use `**source.name**` = `Identities` (no `source.id`) and the same `**schema**` shape for display name and id. `$accounts` is deterministic: sources follow configured order, accounts keep insertion order within each source, and non-configured sources are appended. `**$account**` is the origin snapshot (managed shape or identity-backed when the origin is `Identities`).
+> **Note:** In Velocity context, managed account snapshots (`$accounts` and `$sources`) include each source account’s `**attributes**` plus the nested `**source**` (`id`, `name` — ISC source id and name on managed rows), nested `**schema**` (`id` = native identity, `name` = display name from ISC `name` / `nativeIdentity`), and `**IIQDisabled**` (IdentityIQ-style disabled flag where `true` means disabled). The composite managed key (`sourceId::nativeIdentity`) is also available on each snapshot as `**_id**` for legacy access, and as the top-level `**$originAccount**` for the origin row only. Identity-backed rows (when the origin is Identities) use `**source.name**` = `Identities` (no `source.id`) and the same `**schema**` shape for display name and id. `$accounts` is deterministic: sources follow configured order, accounts keep insertion order within each source, and non-configured sources are appended. `$sources` is a Map keyed by source name — use `$sources.get('SourceName')` to access a source's snapshots. `**$account**` is the origin snapshot (managed shape or identity-backed when the origin is `Identities`); note that `$account` may differ from `$accounts[0]` when the `mainAccount` mapped attribute is set.
 
 ### Attribute Matching Settings
 
@@ -267,7 +267,7 @@ Advanced Settings - Proxy
 
 ---
 
-For detailed field-by-field guidance and usage patterns, see the [usage guides](docs/guides/index.md) linked above.
+For detailed field-by-field guidance and usage patterns, see the [usage guides](./guides/index.md) linked above.
 
 ---
 
@@ -275,14 +275,14 @@ For detailed field-by-field guidance and usage patterns, see the [usage guides](
 
 | Topic                                                                                    | Description                                                                                                  |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [Map](docs/guides/map.md)                                                                | Attribute mapping, merging, and consolidation from multiple sources.                                         |
-| [Define](docs/guides/define.md)                                                          | Attribute definitions (Velocity computed attributes, unique identifiers, UUIDs, counters).                   |
-| [Match](docs/guides/match.md)                                                            | Detect and resolve potential matching identities using one or more sources.                                  |
-| [Source configuration](docs/guides/source-configuration.md)                              | In-depth guide on source settings, scope, aggregation timing, and correlation modes.                         |
-| [Migration from previous Identity Fusion](docs/guides/migration-from-previous-fusion.md) | Migrate from an earlier Identity Fusion version: add the old source as managed, align schemas, then migrate. |
-| [Advanced connection settings](docs/guides/advanced-connection-settings.md)              | Queue, retry, batch sizing, rate limiting, and logging.                                                      |
-| [Proxy mode](docs/guides/proxy-mode.md)                                                  | Run connector logic on an external server and connect ISC to it via proxy.                                   |
-| [Troubleshooting](docs/guides/troubleshooting.md)                                        | Common issues, logs, and recovery steps.                                                                     |
+| [Map](./guides/map.md)                                                                | Attribute mapping, merging, and consolidation from multiple sources.                                         |
+| [Define](./guides/define.md)                                                          | Attribute definitions (Velocity computed attributes, unique identifiers, UUIDs, counters).                   |
+| [Match](./guides/match.md)                                                            | Detect and resolve potential matching identities using one or more sources.                                  |
+| [Source configuration](./guides/source-configuration.md)                              | In-depth guide on source settings, scope, aggregation timing, and correlation modes.                         |
+| [Migration from previous Identity Fusion](./guides/migration-from-previous-fusion.md) | Migrate from an earlier Identity Fusion version: add the old source as managed, align schemas, then migrate. |
+| [Advanced connection settings](./guides/advanced-connection-settings.md)              | Queue, retry, batch sizing, rate limiting, and logging.                                                      |
+| [Proxy mode](./guides/proxy-mode.md)                                                  | Run connector logic on an external server and connect ISC to it via proxy.                                   |
+| [Troubleshooting](./guides/troubleshooting.md)                                        | Common issues, logs, and recovery steps.                                                                     |
 
 ---
 
@@ -293,13 +293,13 @@ For detailed field-by-field guidance and usage patterns, see the [usage guides](
 3. **Configure connection** — Set Identity Security Cloud API URL and Personal Access Token (ID and secret). Use **Review and Test** to verify connectivity.
 4. **Configure the connector** — Depending on your goal:
 
-- **Map & Define only:** Set [Source Settings](docs/guides/source-configuration.md) (identity scope and/or sources), [Attribute Mapping Settings](docs/guides/map.md) for the **Map** step, and [Attribute Definition Settings](docs/guides/define.md) for the **Define** step.
-    - **Match:** Configure [sources and baseline](docs/guides/source-configuration.md), then [Attribute Matching Settings](docs/guides/match.md) (matching and review) for the **Match** step.
+- **Map & Define only:** Set [Source Settings](./guides/source-configuration.md) (identity scope and/or sources), [Attribute Mapping Settings](./guides/map.md) for the **Map** step, and [Attribute Definition Settings](./guides/define.md) for the **Define** step.
+    - **Match:** Configure [sources and baseline](./guides/source-configuration.md), then [Attribute Matching Settings](./guides/match.md) (matching and review) for the **Match** step.
 
 5. **Discover schema** — Run **Discover Schema** so ISC has the combined account schema.
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 
-For step-by-step instructions and UI details, see the [Map](docs/guides/map.md), [Define](docs/guides/define.md), and [Match](docs/guides/match.md) guides.
+For step-by-step instructions and UI details, see the [Map](./guides/map.md), [Define](./guides/define.md), and [Match](./guides/match.md) guides.
 
 ---
 
@@ -392,7 +392,17 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
-- (2026-04-30) Added AI-powered PR review workflows using Cursor and OpenCode agents for docs, performance, security, and refactor reviews; added `.github/workflows/README.md` with workflow documentation.
+### 2.1.7 - 2026-06-18
+
+- Identity-origin accounts are now orphaned only when their origin identity is outside the configured identity scope.
+- Identity-origin accounts now set the Fusion identity attribute to the source identity id.
+- Consolidated UUID and incremental-counter generation as sub-modes of the Unique attribute type.
+- Added `$isUnique(value)` helper for Unique Velocity expressions.
+- Improved Velocity context for identity-backed accounts and `$sources` Map access.
+- Updated connector-spec help text and `docs/guides/define.md` for the new Unique/UUID/counter behavior.
+- Updated dependencies and npm `allowScripts` policy; added OpenSec support.
+- Added AI-powered PR review workflows using Cursor and OpenCode agents.
+- Refactored `getManagedAccountKeyFromAccount` to return `buildManagedAccountKey` directly.
 
 ### 2.1.6 - 2026-04-29
 
@@ -405,4 +415,4 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## License
 
-Distributed under the MIT License. See [LICENSE.txt](LICENSE.txt) for more information.
+Distributed under the MIT License. See [LICENSE.txt](./LICENSE.txt) for more information.

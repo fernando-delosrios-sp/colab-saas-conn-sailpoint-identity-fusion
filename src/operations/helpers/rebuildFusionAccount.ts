@@ -30,6 +30,23 @@ export const rebuildFusionAccount = async (
     const account = fusionAccountsMap.get(nativeIdentity)
     assert(account, 'Fusion account not found')
     assert(account.identityId, 'Identity ID not found')
+
+    const attrs = (account.attributes ?? {}) as Record<string, unknown>
+    const originSource =
+        typeof attrs.originSource === 'string'
+            ? attrs.originSource
+            : typeof attrs.sourceOrigin === 'string'
+              ? attrs.sourceOrigin
+              : undefined
+    const statuses = Array.isArray(attrs.statuses) ? attrs.statuses : []
+    const isIdentityOrigin =
+        originSource === 'Identities' ||
+        (account.identityId !== undefined && statuses.includes('baseline'))
+    let originIdentityInScope: boolean | undefined
+    if (isIdentityOrigin) {
+        originIdentityInScope = await identities.isIdentityInScope(account.identityId)
+    }
+
     await identities.fetchIdentityById(account.identityId)
     const accountIds = new Set<string>([
         ...(account.attributes?.accounts ?? []),
@@ -57,5 +74,5 @@ export const rebuildFusionAccount = async (
             await sources.fetchManagedAccount(parsed.sourceId, parsed.nativeIdentity)
         })
     )
-    return await fusion.processFusionAccount(account, attributeOperations)
+    return await fusion.processFusionAccount(account, attributeOperations, originIdentityInScope)
 }

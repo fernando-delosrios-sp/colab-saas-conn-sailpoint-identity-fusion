@@ -65,6 +65,8 @@ export class FusionAccount {
     private _originSource?: string
     /** Identity id or managed account key (sourceId::nativeIdentity) that created this fusion account (immutable). */
     private _originAccount?: string
+    /** Whether the origin identity (for identity-origin accounts) was found in the configured identity scope. */
+    private _originIdentityInScope?: boolean
 
     // State flags
     private _uncorrelated = false
@@ -479,6 +481,14 @@ export class FusionAccount {
         return this._originAccount
     }
 
+    /**
+     * Whether the origin identity (for identity-origin accounts) was found in the
+     * configured identity scope. Undefined until explicitly set by a processing layer.
+     */
+    public get originIdentityInScope(): boolean | undefined {
+        return this._originIdentityInScope
+    }
+
     // ============================================================================
     // Accessors - State Flags
     // ============================================================================
@@ -689,6 +699,14 @@ export class FusionAccount {
 
     public setSourceName(sourceName: string): void {
         this._sourceName = sourceName
+    }
+
+    /**
+     * Records whether this account's origin identity (for identity-origin accounts)
+     * was found in the configured identity scope. Used by orphan detection.
+     */
+    public setOriginIdentityInScope(inScope: boolean): void {
+        this._originIdentityInScope = inScope
     }
 
     // ============================================================================
@@ -1201,11 +1219,21 @@ export class FusionAccount {
             }
         }
 
-        // Update orphan status based on final account state
-        // An account is orphaned if it has no managed accounts and is not a baseline identity
-        if (this._accountIds.size === 0 && !this._statuses.has('baseline')) {
-            this._statuses.add('orphan')
-            this._needsRefresh = false
+        // Update orphan status based on final account state.
+        // Managed-origin accounts are orphaned when they have no managed accounts.
+        // Identity-origin accounts are orphaned when they have no managed accounts AND
+        // their origin identity is not present in the configured identity scope.
+        if (this._accountIds.size === 0) {
+            if (this.fromIdentity) {
+                const originIdentityId = this._originAccount ?? this._identityId
+                if (originIdentityId && !this._originIdentityInScope) {
+                    this._statuses.add('orphan')
+                    this._needsRefresh = false
+                }
+            } else {
+                this._statuses.add('orphan')
+                this._needsRefresh = false
+            }
         } else {
             this._statuses.delete('orphan')
         }

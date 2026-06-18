@@ -577,6 +577,26 @@ describe('FusionService', () => {
             expect(result?.attributes.displayName).toBe('Jane Q. Doe')
         })
 
+        it('sets fusion identity attribute from identity.id', async () => {
+            Object.defineProperty(mockSchemas, 'fusionIdentityAttribute', {
+                get: jest.fn(() => 'id'),
+                configurable: true,
+            })
+
+            const mockIdentity = {
+                id: 'identity-id-1',
+                name: 'Jane Doe',
+            } as unknown as IdentityDocument
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const result = await fusionService.processIdentity(mockIdentity)
+
+            expect(result).toBeDefined()
+            expect(result?.attributes.id).toBe('identity-id-1')
+        })
+
         it('should skip existing identities', async () => {
             const mockIdentity = {
                 id: 'identity-1',
@@ -2782,6 +2802,209 @@ describe('FusionService', () => {
             expect(count).toBe(accounts.length)
             expect(maxInFlight).toBeLessThanOrEqual(12)
             expect(sentKeys).toEqual(accounts.map((x) => x.nativeIdentity))
+        })
+    })
+
+    describe('identity-origin orphan detection', () => {
+        beforeEach(() => {
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockAttributes.registerUniqueAttributes.mockResolvedValue()
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+        })
+
+        it('marks identity-origin account orphan when origin identity is out of scope', async () => {
+            const identityId = 'identity-orphan-1'
+            const historicalAccount = {
+                nativeIdentity: 'fusion-orphan-1',
+                identityId,
+                name: 'Fusion Identity Orphan',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {
+                    originSource: 'Identities',
+                    originAccount: identityId,
+                    accounts: [],
+                    statuses: ['baseline'],
+                },
+            } as unknown as Account
+
+            mockIdentities.getIdentityById.mockReturnValue(undefined)
+            mockIdentities.hasIdentityInScope.mockReturnValue(false)
+
+            const result = await fusionService.processFusionAccount(historicalAccount)
+
+            expect(result.statuses).toContain('orphan')
+            expect(result.statuses).toContain('baseline')
+        })
+
+        it('does not mark identity-origin account orphan when origin identity is in scope', async () => {
+            const identityId = 'identity-in-scope-1'
+            const historicalAccount = {
+                nativeIdentity: 'fusion-in-scope-1',
+                identityId,
+                name: 'Fusion Identity In Scope',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {
+                    originSource: 'Identities',
+                    originAccount: identityId,
+                    accounts: [],
+                    statuses: ['baseline'],
+                },
+            } as unknown as Account
+
+            mockIdentities.getIdentityById.mockReturnValue(undefined)
+            mockIdentities.hasIdentityInScope.mockReturnValue(true)
+
+            const result = await fusionService.processFusionAccount(historicalAccount)
+
+            expect(result.statuses).not.toContain('orphan')
+            expect(result.statuses).toContain('baseline')
+        })
+
+        it('does not mark identity-origin account orphan when managed accounts remain', async () => {
+            const identityId = 'identity-with-accounts-1'
+            const managedKey = 'source-a-id::native-with-accounts-1'
+            const historicalAccount = {
+                nativeIdentity: 'fusion-with-accounts-1',
+                identityId,
+                name: 'Fusion Identity With Accounts',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {
+                    originSource: 'Identities',
+                    originAccount: identityId,
+                    accounts: [managedKey],
+                    statuses: ['baseline'],
+                },
+            } as unknown as Account
+
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+                new Map([
+                    [
+                        managedKey,
+                        {
+                            id: 'acct-with-accounts-1',
+                            name: 'Managed Account',
+                            nativeIdentity: 'native-with-accounts-1',
+                            sourceId: 'source-a-id',
+                            sourceName: 'Source A',
+                            identityId,
+                            attributes: {},
+                        } as unknown as Account,
+                    ],
+                ])
+            )
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
+                new Map([[identityId, new Set([managedKey])]])
+            )
+            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+                new Map([
+                    [
+                        managedKey,
+                        {
+                            id: 'acct-with-accounts-1',
+                            name: 'Managed Account',
+                            nativeIdentity: 'native-with-accounts-1',
+                            sourceId: 'source-a-id',
+                            sourceName: 'Source A',
+                            identityId,
+                            attributes: {},
+                        } as unknown as Account,
+                    ],
+                ])
+            )
+            mockIdentities.getIdentityById.mockReturnValue(undefined)
+            mockIdentities.hasIdentityInScope.mockReturnValue(false)
+
+            const result = await fusionService.processFusionAccount(historicalAccount)
+
+            expect(result.statuses).not.toContain('orphan')
+            expect(result.statuses).toContain('baseline')
+            expect(result.accountIds).toContain(managedKey)
+        })
+
+        it('sets originIdentityInScope true for new identity accounts', async () => {
+            const mockIdentity = {
+                id: 'identity-new-scope-1',
+                name: 'New Identity',
+            } as IdentityDocument
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const result = await fusionService.processIdentity(mockIdentity)
+
+            expect(result).toBeDefined()
+            expect(result?.originIdentityInScope).toBe(true)
+            expect(result?.statuses).not.toContain('orphan')
+        })
+
+        it('honors caller-provided originIdentityInScope over cache lookup', async () => {
+            const identityId = 'identity-caller-scope-1'
+            const historicalAccount = {
+                nativeIdentity: 'fusion-caller-scope-1',
+                identityId,
+                name: 'Fusion Caller Scope',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {
+                    originSource: 'Identities',
+                    originAccount: identityId,
+                    accounts: [],
+                    statuses: ['baseline'],
+                },
+            } as unknown as Account
+
+            mockIdentities.getIdentityById.mockReturnValue(undefined)
+            mockIdentities.hasIdentityInScope.mockReturnValue(true)
+
+            const result = await fusionService.processFusionAccount(historicalAccount, undefined, false)
+
+            expect(result.originIdentityInScope).toBe(false)
+            expect(result.statuses).toContain('orphan')
+            expect(mockIdentities.hasIdentityInScope).not.toHaveBeenCalled()
+        })
+    })
+
+    describe('deleteEmpty filtering', () => {
+        it('filters identity-origin orphan accounts when deleteEmpty is enabled', async () => {
+            const orphanIdentity = FusionAccount.fromIdentity({
+                id: 'identity-orphan-filter-1',
+                name: 'Orphan Identity',
+            } as IdentityDocument)
+            orphanIdentity.addStatus('orphan')
+            orphanIdentity.setKey({ simple: { id: 'identity-orphan-filter-1' } })
+
+            const inScopeIdentity = FusionAccount.fromIdentity({
+                id: 'identity-in-scope-filter-1',
+                name: 'In Scope Identity',
+            } as IdentityDocument)
+            inScopeIdentity.setKey({ simple: { id: 'identity-in-scope-filter-1' } })
+
+            fusionService.setFusionAccount(orphanIdentity)
+            fusionService.setFusionAccount(inScopeIdentity)
+
+            // Override deleteEmpty on the service instance
+            ;(fusionService as any).deleteEmpty = true
+
+            jest.spyOn(fusionService as any, 'getISCAccount').mockImplementation(async (...args: any[]) => {
+                const account = args[0] as FusionAccount
+                return {
+                    key: account.key,
+                    attributes: { statuses: account.statuses },
+                    disabled: false,
+                }
+            })
+
+            const sent: any[] = []
+            const count = await fusionService.forEachISCAccount((account) => sent.push(account))
+
+            expect(count).toBe(1)
+            expect(sent[0].key).toEqual({ simple: { id: 'identity-in-scope-filter-1' } })
         })
     })
 })

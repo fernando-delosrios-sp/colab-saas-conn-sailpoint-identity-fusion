@@ -22,6 +22,7 @@ describe('accountDisable', () => {
 
     it('disables a fusion account and returns updated ISC account', async () => {
         const registry = createRegistry()
+        registry.fusion.getISCAccount.mockResolvedValue({ id: 'isc-disabled' })
         const fusionAccount = { nativeIdentity: 'fusion-1', disable: jest.fn() }
         ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
 

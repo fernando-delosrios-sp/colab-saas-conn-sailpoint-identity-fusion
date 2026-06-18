@@ -684,7 +684,16 @@ export class AttributeService {
         const context: Record<string, any> = { ...fusionAccount.attributeBag.current }
         const orderedAccounts = this.getOrderedAccountsForContext(fusionAccount)
 
-        context.identity = fusionAccount.attributeBag.identity
+        context.identity = { ...fusionAccount.attributeBag.identity }
+        if (fusionAccount.fromIdentity) {
+            const identityName = trimStr(fusionAccount.name)
+            if (identityName) {
+                context.identity.name = identityName
+                if (!trimStr(context.name)) {
+                    context.name = identityName
+                }
+            }
+        }
         context.accounts = orderedAccounts
         context.previous = fusionAccount.attributeBag.previous
         context.sources = fusionAccount.attributeBag.sources
@@ -730,6 +739,7 @@ export class AttributeService {
         if (originSource === 'Identities' && identityHasData && identityMatchesOrigin) {
             return {
                 ...identityBag,
+                name: schemaName,
                 source: { name: 'Identities' },
                 schema: {
                     name: schemaName,
@@ -751,10 +761,17 @@ export class AttributeService {
 
     private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
         const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
+        if (fusionAccount.fromIdentity) {
+            return (
+                trimStr(fusionAccount.name) ??
+                trimStr(identityBag?.name) ??
+                trimStr(fusionAccount.identityDisplayName)
+            )
+        }
         return (
-            trimStr(fusionAccount.name) ??
+            trimStr(fusionAccount.identityDisplayName) ??
             trimStr(identityBag?.name) ??
-            trimStr(fusionAccount.identityDisplayName)
+            trimStr(fusionAccount.name)
         )
     }
 
@@ -1045,7 +1062,9 @@ export class AttributeService {
         if (attributeName === fusionIdentityAttribute) {
             const fromTop = trimStr(fusionAccount.originAccountId)
             if (fromTop !== undefined) return fromTop
-            return trimStr(fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE])
+            const fromOrigin = trimStr(fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE])
+            if (fromOrigin !== undefined) return fromOrigin
+            return uuidv4()
         }
         if (attributeName === fusionDisplayAttribute) {
             return trimStr(fusionAccount.name)
@@ -1097,7 +1116,7 @@ export class AttributeService {
             return
         }
 
-        if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
+        if (fusionAccount.isIdentity && name === fusionDisplayAttribute) {
             const label = this.hostingIdentityName(fusionAccount)
             if (label) {
                 this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
@@ -1182,7 +1201,7 @@ export class AttributeService {
             }
 
             // Set identity name for display attribute if the account is an identity
-            if (fusionAccount.fromIdentity && isFusionDisplayAttribute) {
+            if (fusionAccount.isIdentity && isFusionDisplayAttribute) {
                 const label = this.hostingIdentityName(fusionAccount)
                 if (label) {
                     this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
