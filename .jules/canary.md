@@ -50,3 +50,8 @@
 ## 2024-05-24 - MkDocs Material Admonition Syntax
 **Learning:** MkDocs Material admonitions (e.g., `!!! warning`, `!!! tip`) require *all* of their inner body text to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the indentation is missing, the admonition will break.
 **Action:** Always add an empty line after the `!!!` line and indent the following text block by 4 spaces.
+
+## 2026-06-18 - Document formatting for readability
+
+**Learning:** Dense paragraphs inside warning admonitions are hard to scan, and markdownlint complains about bare URLs in tables.
+**Action:** Break dense admonition paragraphs into bulleted lists with bold prefixes for readability, ensuring 4-space nested indentation for admonitions. Wrap raw emails/URLs in backticks to fix markdownlint errors.
