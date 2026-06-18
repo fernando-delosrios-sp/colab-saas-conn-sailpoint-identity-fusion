@@ -1888,9 +1888,19 @@ export class FusionService {
             if (index) {
                 if (index.has(key)) return true
             } else {
-                const isLinked = [...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()].some(
-                    (fa) => fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)
-                )
+                // ⚡ Bolt: Avoid massive array allocation when scanning loaded accounts
+                function* iterateAllFusionAccounts(thisRef: FusionService) {
+                    yield* thisRef.fusionAccountMap.values()
+                    yield* thisRef.fusionIdentityMap.values()
+                }
+
+                let isLinked = false
+                for (const fa of iterateAllFusionAccounts(this)) {
+                    if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) {
+                        isLinked = true
+                        break
+                    }
+                }
                 if (isLinked) return true
             }
         }

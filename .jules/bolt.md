@@ -61,3 +61,6 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+## 2026-06-18 - Array Allocation Overhead in V8
+**Learning:** In hot loops, allocating large intermediate arrays using `Array.from(map.values())` or spreading iterables like `[...map.values()]` prior to calling `.some()` causes unnecessary heap allocation and heavy GC overhead. This is especially true for large Maps (e.g., Fusion's account and identity maps).
+**Action:** Iterate directly over the iterables using `for...of` loops and manual `break` statements. If combining multiple iterables, use a generator function with `yield*` rather than array spread syntax.
