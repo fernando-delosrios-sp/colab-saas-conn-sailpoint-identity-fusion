@@ -1,6 +1,7 @@
 {
     "name": "Identity Fusion NG",
     "description": "Identity Fusion NG is a connector that allows you to manage Identity Fusion accounts by mapping account attributes from multiple sources, defining new attributes and unique identifiers, and matching accounts with existing identities to prevent duplicates.",
+    "version": "2.1.7",
     "commands": [
         "std:test-connection",
         "std:account:list",
@@ -17,7 +18,7 @@
     "showDebugLoggingOption": true,
     "sourceConfigInitialValues": {
         "fusionFormExpirationDays": 7,
-        "fusionManualReviewScore": 80,
+        "fusionAverageScore": 80,
         "provisioningTimeout": 300,
         "managedAccountsBatchSize": 100,
         "fusionMaxCandidatesForForm": 3,
@@ -369,14 +370,6 @@
                             "type": "toggle",
                             "required": false,
                             "helpKey": "Skip accounts that are missing a unique identity value. These accounts will be logged so you can review them later"
-                        },
-                        {
-                            "key": "cascadeAggregationEnabled",
-                            "label": "Enable cascade aggregation for single account read",
-                            "type": "toggle",
-                            "value": "false",
-                            "required": false,
-                            "helpKey": "When enabled, triggers aggregation of managed sources before fetching managed accounts during single account operations (e.g., accountRead). This ensures the most up-to-date account data is fetched before processing the fusion account. Errors during cascade aggregation are logged but do not stop the main process."
                         }
                     ]
                 }
@@ -396,7 +389,7 @@
                             "label": "Default attribute merge from multiple sources",
                             "type": "radio",
                             "required": true,
-                            "helpKey": "When multiple sources provide the same attribute, choose how to combine them. 'First found' uses the value from the highest-priority source. 'Keep a list of values' stores all values. 'Concatenate different values ([a] [b])' joins values into a single text",
+                            "helpKey": "When multiple sources provide the same attribute, choose how to combine them. 'First found' uses the value from the highest-priority source. 'Keep a list' stores all values. 'Concatenate' joins values into a single text",
                             "options": [
                                 {
                                     "label": "First found",
@@ -496,7 +489,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Normal Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional per-definition refresh. Post-template options: case, character normalization, spaces, trim, max length.<br><br><strong>Context:</strong> mapped attributes as <code>$name</code>; <code>$identity</code>; <code>$previous</code> (previous generated account state); <code>$accounts</code> (ordered by configured sources, then insertion order; valid <code>mainAccount</code> moves that snapshot to index 0); snapshots contain source attributes plus nested <code>source</code> (<code>id</code>, <code>name</code>), nested <code>schema</code> (<code>id</code> = native identity, <code>name</code> = display), and <code>IIQDisabled</code>. <code>$account</code> is the origin snapshot (managed shape or identity-backed when origin is Identities; if Identities and managed accounts exist, <code>$accounts[0]</code> is used). <code>$originAccount</code> is the origin composite key string. <code>$sources</code> maps source name → list of snapshots. <strong>Order:</strong> top to bottom; each result is available to the next.<br><br><strong>Helpers:</strong> <code>$Math</code> (round, floor, max, …); <code>$Datefns</code> (format, addDays, differenceInDays, …); <code>$Normalize</code> (phone, date, name, fullName, ssn, address); <code>$AddressParse</code> (parse, getCityState, getCityStateCode); <code>$JSON</code> (stringify, parse).",
+                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional per-definition refresh. Post-template options: case, character normalization, spaces, trim, max length.<br><br><strong>Context:</strong><br><ul><li>Mapped attributes as <code>$name</code></li><li><code>$identity</code></li><li><code>$accounts</code> — ordered by configured sources, then insertion order within each source; non-configured sources are appended</li><li><code>$account</code> — the origin snapshot (managed match, or identity-backed row when the origin is <code>Identities</code>). <code>$account</code> may differ from <code>$accounts[0]</code> because <code>$accounts</code> follows the configured source order, not the origin</li><li><code>$previous</code></li></ul><br><strong>Snapshot shape:</strong><br><ul><li>Each <code>$accounts[]</code> entry (and the per-source list in <code>$sources</code>) includes the source account attributes plus:<ul><li><code>source.id</code> / <code>source.name</code></li><li><code>schema.id</code> (native identity) / <code>schema.name</code> (display name)</li></ul></li><li>Identity-backed rows use <code>source.name = \"Identities\"</code> with no <code>source.id</code></li></ul><br><strong>Sources map:</strong><br><ul><li><code>$sources</code> is a Map keyed by source name — access values with dot access, e.g. <code>$sources.SourceName</code></li></ul><br><strong>Order:</strong><br><ul><li>Top to bottom; each result is available to the next</li></ul><br><strong>Helpers:</strong><br><ul><li><code>$Math</code></li><li><code>$Datefns</code> — <code>format</code>, <code>parse</code>, <code>parseISO</code>, <code>getYear</code>, <code>addDays</code>/<code>Months</code>/<code>Years</code>, <code>subDays</code>/<code>Months</code>/<code>Years</code>, <code>isBefore</code>, <code>isAfter</code>, <code>isEqual</code>, <code>differenceInDays</code>, <code>startOfDay</code>, <code>endOfDay</code>, <code>now</code>, <code>isValid</code></li><li><code>$Normalize</code> — <code>date</code>, <code>phone</code>, <code>name</code>, <code>fullName</code>, <code>ssn</code>, <code>address</code></li><li><code>$AddressParse</code> — <code>getCityState</code>, <code>getCityStateCode</code>, <code>parse</code></li><li><code>$JSON</code> — <code>stringify</code> / <code>parse</code> ( <code>parse</code> returns <code>undefined</code> for null/non-string/empty/invalid input; <code>stringify</code> returns empty string on failure)</li></ul>",
                     "items": [
                         {
                             "key": "normalAttributeDefinitions",
@@ -527,7 +520,7 @@
                                             "label": "Apache Velocity expression",
                                             "type": "textarea",
                                             "required": true,
-                                            "helpKey": "Velocity template that defines the attribute value. Reference mapped attributes by name. Managed snapshots in $accounts / $sources / $account contain source attributes plus nested source (id, name), schema (id = native identity, name = display), and IIQDisabled. Identity-backed origin rows use source.name = Identities (no source.id). Example: #set($i=$firstname.substring(0, 1))$i$lastname produces 'jsmith' from John Smith."
+                                            "helpKey": "Velocity template that defines the attribute value. Reference any mapped attribute by name (e.g. $firstname, $lastname, $email). $account is the origin snapshot (managed match, or identity-backed row when the origin is Identities). $accounts[0] is the first snapshot in the ordered list and may differ from $account because $accounts follows the configured source order, not the origin. Managed account snapshots in $accounts / $sources / $account include source (id, name) and schema (id = native identity, name = display); identity-backed $account rows use source.name = Identities (no source.id). Available helpers: $Math, $Datefns, $Normalize, $AddressParse, $JSON (see the section help for the full method list). Example: #set($i=$firstname.substring(0, 1))$i$lastname produces 'jsmith' from 'John Smith'"
                                         },
                                         {
                                             "key": "refresh",
@@ -579,9 +572,9 @@
                                         },
                                         {
                                             "key": "trim",
-                                            "label": "Trim leading and trailing white space?",
+                                            "label": "Trim leading and trailing spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove extra white space at the beginning and end of the defined value"
+                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value"
                                         },
                                         {
                                             "key": "maxLength",
@@ -600,7 +593,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Unique Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define persistent unique attributes</strong> (e.g. identifiers). Values stay until account <strong>reset</strong> (disable/re-enable). Runs <strong>after</strong> normal definitions on refresh — same Velocity context plus normal-definition outputs; list order applies.<br><br><strong>Helpers:</strong> <code>$Math</code> (round, floor, max, …); <code>$Datefns</code> (format, addDays, differenceInDays, …); <code>$Normalize</code> (phone, date, name, fullName, ssn, address); <code>$AddressParse</code> (parse, getCityState, getCityStateCode); <code>$JSON</code> (stringify, parse). Bad inputs usually render empty.<br><br><strong>Unique variables:</strong> <code>$UUID</code> — fresh v4 each attempt when referenced. <code>$counter</code> — <strong>Collision mode</strong> (default): first attempt omits the counter; on conflict, appends a zero-padded suffix up to <strong>Maximum attempts</strong>. <strong>Incremental mode</strong> (<em>Use incremental counter</em>): always appends the next counter from state, starting at <strong>Counter start value</strong>. Existing values are reused unless the account refreshes, resets, or the unique value is empty.",
+                    "sectionHelpMessage": "<strong>Define persistent unique attributes</strong> (e.g. identifiers). Values stay until account <strong>reset</strong> (e.g. disable/re-enable). Runs <strong>after</strong> normal definitions on refresh — same Velocity context plus outputs from normal definitions that run first; list order applies within unique definitions too.<br><br><strong>Unique variables:</strong> <code>$counter</code> — collision mode renders the empty string on the first try and a padded suffix on subsequent attempts (padding per <strong>Minimum counter digits</strong>), retries capped by <strong>Maximum attempts</strong>; auto-appended if missing and no <code>$UUID</code> — but the auto-append is <strong>skipped</strong> when the expression contains Velocity directives (<code>#if</code>, <code>#set</code>, <code>#else</code>, <code>#end</code>, etc.) because appending after <code>#end</code> would break parsing; in that case include <code>$counter</code> explicitly. <code>$UUID</code>: a fresh v4 is generated per attempt when the expression references it. <code>$isUnique(value)</code>: a helper injected into unique expressions that returns true when the value (after applying the same case / trim / spaces / normalize / maxLength transforms the definition would apply) is not already registered as in use — useful for choosing between candidate formats before the connector falls back to automatic <code>$counter</code> disambiguation.<br><br><strong>Use incremental counter?</strong>: when on, the counter is persistent (survives across aggregations) and always increments; the first number comes from <strong>Counter start value</strong> (default 1). When off (default), the connector uses collision-based disambiguation described above.<br><br><strong>Sub-modes of Unique:</strong> include <code>$UUID</code> in the expression for UUID generation (the expression is required); toggle <strong>Use incremental counter?</strong> for sequential IDs.<br><br><strong>Helpers:</strong> <code>$Normalize</code> (<code>date</code>, <code>phone</code>, <code>name</code>, <code>fullName</code>, <code>ssn</code>, <code>address</code>) — <code>$Normalize.date(date, ambiguousPriority?)</code> accepts an optional priority string like <code>\"MM-dd-yyyy,dd-MM-yyyy\"</code> for ambiguous dates; <code>$Normalize.phone(phone, defaultCountry?)</code> accepts an optional default country code (e.g. <code>\"GB\"</code>) used when the input lacks an international prefix. <code>$AddressParse</code> (<code>getCityState</code>, <code>getCityStateCode</code>, <code>parse</code>). Bad inputs render empty. <code>$Math</code> / <code>$Datefns</code> / <code>$JSON</code> (<code>stringify</code>, <code>parse</code>) — see <strong>Normal Attribute Definitions</strong>.<br><br><strong>Reuse:</strong> existing values are reused unless this run refreshes the account, the account resets, or a unique value is empty (retry).",
                     "items": [
                         {
                             "key": "maxAttempts",
@@ -639,7 +632,7 @@
                                             "label": "Apache Velocity expression",
                                             "type": "textarea",
                                             "required": true,
-                                            "helpKey": "Velocity template that defines the unique value. Use $counter for a number suffix (e.g. jsmith1) or $UUID for a random unique ID. Managed snapshots expose source attributes plus nested source (id, name), schema (id, name), and IIQDisabled on $account / $accounts. Example: #set($i=$firstname.substring(0, 1))$i$lastname$counter"
+                                            "helpKey": "Velocity template that defines the unique value (required). Use $counter for an automatic number suffix (e.g. jsmith1, jsmith2) — in collision mode $counter renders empty on the first try and as a zero-padded suffix on subsequent attempts (see Minimum counter digits); include $counter explicitly when your expression uses Velocity directives (#if, #set, #end) because the auto-append is skipped in that case. Use $UUID for a fresh v4 random unique ID (include $UUID in the expression for UUID generation). Use $isUnique(value) inside the expression to test whether a candidate value (after this definition's output transforms) is currently free — pick between candidate formats before falling back to $counter. Managed snapshots expose source (id, name) and schema (id, name) on $account / $accounts. Example: #set($i=$firstname.substring(0, 1))$i$lastname$counter"
                                         },
                                         {
                                             "key": "digits",
@@ -737,27 +730,18 @@
                     "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><ul><li><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.</li><li><strong>Thresholds & weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.</li><li><strong>Strictness:</strong> Enforce mandatory rules or optionally assign to the matched identity without manual review when scores are an exact attribute match (every real rule scored 100 with none skipped).</li></ul>",
                     "items": [
                         {
-                            "key": "fusionManualReviewScore",
-                            "label": "Manual review match score [0-100]",
+                            "key": "fusionAverageScore",
+                            "label": "Minimum combined match score [0-100]",
                             "type": "number",
-                            "required": false,
+                            "required": true,
                             "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match. Mandatory rules must still meet their own minimums."
                         },
                         {
-                            "key": "fusionEnableAutoAssignment",
-                            "label": "Enable automatic assignment",
+                            "key": "fusionMergingExactMatch",
+                            "label": "Automatically assign on exact match?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "When enabled, assign the managed account to the matched identity without a review form if the combined score meets or exceeds the automatic assignment match score. Merge and correlation behave like a link-to-existing review, but the fusion account receives the Auto status entitlement only (not Authorized)."
-                        },
-                        {
-                            "key": "fusionAutoAssignmentScore",
-                            "label": "Automatic assignment match score [0-100]",
-                            "parentKey": "fusionEnableAutoAssignment",
-                            "parentValue": "true",
-                            "type": "number",
-                            "required": true,
-                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically assigned. Must be greater than or equal to the manual review score."
+                            "helpKey": "When every configured attribute rule scores 100 and none were skipped (exact attribute match), assign the managed account to that identity without a review form. Merge and correlation behave like a link-to-existing review, but the fusion account receives the Auto status entitlement only (not Authorized). Only enable when you are confident your matching rules produce accurate results."
                         },
                         {
                             "key": "matchingConfigs",
@@ -900,73 +884,6 @@
                             "type": "toggle",
                             "required": false,
                             "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-type breakdown metrics"
-                        },
-                        {
-                            "key": "enableLocalization",
-                            "label": "Enable localized user communications?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Translate emails, reports, and Fusion reviews to the recipient's preferred language. This depends on an identity language attribute."
-                        },
-                        {
-                            "key": "defaultLanguage",
-                            "label": "Default Language",
-                            "type": "select",
-                            "required": false,
-                            "parentKey": "enableLocalization",
-                            "parentValue": "true",
-                            "helpKey": "The default language to use when the recipient's language cannot be determined.",
-                            "options": [
-                                {
-                                    "label": "English",
-                                    "value": "en"
-                                },
-                                {
-                                    "label": "Spanish",
-                                    "value": "es"
-                                },
-                                {
-                                    "label": "French",
-                                    "value": "fr"
-                                },
-                                {
-                                    "label": "German",
-                                    "value": "de"
-                                },
-                                {
-                                    "label": "Chinese",
-                                    "value": "zh"
-                                },
-                                {
-                                    "label": "Japanese",
-                                    "value": "ja"
-                                },
-                                {
-                                    "label": "Portuguese",
-                                    "value": "pt"
-                                },
-                                {
-                                    "label": "Italian",
-                                    "value": "it"
-                                },
-                                {
-                                    "label": "Russian",
-                                    "value": "ru"
-                                },
-                                {
-                                    "label": "Arabic",
-                                    "value": "ar"
-                                }
-                            ]
-                        },
-                        {
-                            "key": "identityLanguageAttribute",
-                            "label": "Identity Language Attribute",
-                            "type": "text",
-                            "required": false,
-                            "parentKey": "enableLocalization",
-                            "parentValue": "true",
-                            "helpKey": "Identity attribute containing the user's preferred language. Recognizes common language formats (e.g. 'en', 'eng', 'english', 'en-US')."
                         }
                     ]
                 }
@@ -979,7 +896,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance.</strong><br><br><ul><li><strong>Reset accounts?:</strong> Rebuild all Fusion accounts from scratch.</li><li><strong>Force attribute refresh on next aggregation?:</strong> Recalculate all Normal-type attributes on the next run.</li><li><strong>Managed accounts batch size:</strong> Optimize memory usage vs throughput during match detection.</li><li><strong>Enable concurrency check?:</strong> Prevent multiple runs overlapping.</li><li><strong>Enable external logging?:</strong> Stream logs to monitoring services.</li></ul>",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance.</strong><br><br><ul><li><strong>Reset & refresh:</strong> Rebuild all Fusion accounts from scratch or force recalculate all Normal-type attributes on every run.</li><li><strong>Batch limits:</strong> Optimize memory usage vs throughput during match detection.</li><li><strong>Misc:</strong> Prevent multiple runs overlapping or stream logs to monitoring services.</li></ul>",
                     "items": [
                         {
                             "key": "reset",
@@ -1057,7 +974,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Advanced Connection Settings",
-                    "sectionHelpMessage": "<strong>Fine-tune API and queue behavior.</strong><br><br><ul><li><strong>Provisioning timeout (seconds):</strong> Max wait for operations (default: 300s).</li><li><strong>Maximum concurrent requests</strong> and <strong>Requests per second:</strong> Enable rate limiting and concurrency control.</li><li><strong>Enable retry?:</strong> Auto-retry failed requests (recommended).</li><li><strong>Processing wait time (seconds):</strong> Keep-alive interval for long operations.</li><li><strong>Batch size:</strong> Group requests for efficiency.</li></ul>",
+                    "sectionHelpMessage": "<strong>Fine-tune API and queue behavior.</strong><br><br><ul><li><strong>Provisioning timeout:</strong> Max wait for operations (default: 300s).</li><li><strong>Queue:</strong> Enable rate limiting and concurrency control.</li><li><strong>Retry:</strong> Auto-retry failed requests (recommended).</li><li><strong>Processing wait time:</strong> Keep-alive interval for long operations.</li><li><strong>Batching:</strong> Group requests for efficiency.</li></ul>",
                     "items": [
                         {
                             "key": "provisioningTimeout",
@@ -1067,12 +984,21 @@
                             "helpKey": "Maximum time (in seconds) to wait for a provisioning operation to complete. Increase this if you experience timeouts with large batches. Default: 300"
                         },
                         {
+                            "key": "enableQueue",
+                            "label": "Enable queue?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "Manage the flow of API requests to avoid overloading the server. Controls how many requests run at once and how fast they are sent"
+                        },
+                        {
                             "key": "maxConcurrentRequests",
                             "label": "Maximum concurrent requests",
                             "type": "number",
                             "required": false,
                             "min": "1",
                             "max": "10",
+                            "parentKey": "enableQueue",
+                            "parentValue": "true",
                             "helpKey": "How many requests can run at the same time. Lower values are safer for rate-limited APIs. Default: 8"
                         },
                         {
@@ -1082,7 +1008,27 @@
                             "required": false,
                             "min": "1",
                             "max": "12",
+                            "parentKey": "enableQueue",
+                            "parentValue": "true",
                             "helpKey": "Maximum number of requests sent per second. Reduce this if you are getting rate-limit errors. Default: 8"
+                        },
+                        {
+                            "key": "enableRetry",
+                            "label": "Enable retry?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "Automatically retry requests that fail due to temporary errors (e.g. timeouts or rate limits). Recommended for production use"
+                        },
+                        {
+                            "key": "maxRetries",
+                            "label": "API request retries",
+                            "type": "number",
+                            "required": false,
+                            "min": "0",
+                            "max": "20",
+                            "parentKey": "enableRetry",
+                            "parentValue": "true",
+                            "helpKey": "How many times to retry a failed request before giving up. Default: 20"
                         },
                         {
                             "key": "processingWait",
@@ -1110,29 +1056,18 @@
                             "helpKey": "Number of requests to group in each batch. Default: 250"
                         },
                         {
-                            "key": "enableRetry",
-                            "label": "Enable retry?",
+                            "key": "enablePriority",
+                            "label": "Enable priority processing?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Automatically retry requests that fail due to temporary errors (e.g. timeouts or rate limits). Recommended for production use"
-                        },
-                        {
-                            "key": "maxRetries",
-                            "label": "API request retries",
-                            "type": "number",
-                            "required": false,
-                            "min": "0",
-                            "max": "20",
-                            "parentKey": "enableRetry",
-                            "parentValue": "true",
-                            "helpKey": "How many times to retry a failed request before giving up. Default: 20"
+                            "helpKey": "Process critical operations (like saving data) before less urgent ones (like logging). Recommended for best performance"
                         }
                     ]
                 },
                 {
                     "type": "section",
                     "sectionTitle": "Proxy Settings",
-                    "sectionHelpMessage": "<strong>Delegate processing to external server.</strong><br><br>Run connector logic on your own infrastructure.<br><ul><li><strong>Enable proxy mode?:</strong> Route all processing through your own server.</li><li><strong>Proxy URL:</strong> External endpoint.</li><li><strong>Proxy password:</strong> Secret for authentication (must match PROXY_PASSWORD env var on proxy).</li></ul>",
+                    "sectionHelpMessage": "<strong>Delegate processing to external server.</strong><br><br>Run connector logic on your own infrastructure.<br><ul><li><strong>Proxy URL:</strong> External endpoint.</li><li><strong>Proxy password:</strong> Secret for authentication (must match PROXY_PASSWORD env var on proxy).</li></ul>",
                     "items": [
                         {
                             "key": "proxyEnabled",
