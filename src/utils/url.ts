@@ -213,3 +213,32 @@ export function createUrlContext(baseUrl: string | undefined): UrlContext {
         form: (id) => buildFormDefinitionUrl(uiOrigin, id),
     }
 }
+
+/**
+ * Validates that a string is a valid HTTP or HTTPS URL.
+ * Safely parses the URL and ensures the protocol is exactly 'http:' or 'https:'.
+ */
+export function isValidHttpUrl(url: string | undefined): boolean {
+    if (!url) return false
+
+    // Reject inputs with leading or trailing whitespace/control characters
+    // since new URL() loosely trims them, which could bypass validation downstream
+    if (url.trim() !== url) return false
+
+    try {
+        const parsed = new URL(url)
+
+        // Node's URL parser is extremely forgiving. 'http:file://' will parse
+        // with protocol 'http:' and host 'file'.
+        // We enforce standard http(s) URL structure by verifying the input string
+        // actually starts with the parsed scheme correctly formatted
+        const schemeAndSlashes = `${parsed.protocol}//`
+        if (!url.toLowerCase().startsWith(schemeAndSlashes)) {
+            return false
+        }
+
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch {
+        return false
+    }
+}

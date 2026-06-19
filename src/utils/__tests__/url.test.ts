@@ -8,6 +8,7 @@ import {
     buildWorkflowUrl,
     buildFormDefinitionUrl,
     isValidUrl,
+    isValidHttpUrl,
     removeTrailingSlash,
     ensureTrailingSlash,
     createUrlContext,
@@ -105,6 +106,32 @@ describe('url', () => {
             expect(isValidUrl('not-a-url')).toBe(false)
             expect(isValidUrl('')).toBe(false)
             expect(isValidUrl(undefined)).toBe(false)
+        })
+    })
+
+    describe('isValidHttpUrl', () => {
+        it('should return true for valid http URL', () => {
+            expect(isValidHttpUrl('http://example.com')).toBe(true)
+        })
+
+        it('should return true for valid https URL', () => {
+            expect(isValidHttpUrl('https://example.com')).toBe(true)
+        })
+
+        it('should return false for invalid prefixes', () => {
+            expect(isValidHttpUrl(' hTtp://evil.com')).toBe(false)
+        })
+
+        it('should return false for non-http schemas', () => {
+            expect(isValidHttpUrl('file://evil.com')).toBe(false)
+        })
+
+        it('should return false for mixed schemas', () => {
+            expect(isValidHttpUrl('http:file://evil.com')).toBe(false)
+        })
+
+        it('should return false for missing URL', () => {
+            expect(isValidHttpUrl(undefined)).toBe(false)
         })
     })
 
