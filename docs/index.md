@@ -173,7 +173,7 @@ Attribute Definition Settings - Per-attribute definition
 
 > **Tip:** Remember that normal attributes are automatically refreshed when new data is found. You don't need to force global or individual attribute refresh unless there's a good reason, like troubleshooting, testing, or if the attribute definition is time-sensitive.
 
-> **Note:** In Velocity context, managed account snapshots (`$accounts` and `$sources`) include each source account’s `**attributes**` plus the nested `**source**` (`id`, `name` — ISC source id and name on managed rows), nested `**schema**` (`id` = native identity, `name` = display name from ISC `name` / `nativeIdentity`), and `**IIQDisabled**` (IdentityIQ-style disabled flag where `true` means disabled). The composite managed key (`sourceId::nativeIdentity`) is also available on each snapshot as `**_id**` for legacy access, and as the top-level `**$originAccount**` for the origin row only. Identity-backed rows (when the origin is Identities) use `**source.name**` = `Identities` (no `source.id`) and the same `**schema**` shape for display name and id. `$accounts` is deterministic: sources follow configured order, accounts keep insertion order within each source, and non-configured sources are appended. `$sources` is a Map keyed by source name — use `$sources.get('SourceName')` to access a source's snapshots. `**$account**` is the origin snapshot (managed shape or identity-backed when the origin is `Identities`); note that `$account` may differ from `$accounts[0]` when the `mainAccount` mapped attribute is set.
+> **Note:** In Velocity context, managed account snapshots (`$accounts` and `$sources`) include each source account’s `**attributes**` plus the nested `**source**` (`id`, `name` — ISC source id and name on managed rows), nested `**schema**` (`id` = native identity, `name` = display name from ISC `name` / `nativeIdentity`), and `**IIQDisabled**` (IdentityIQ-style disabled flag where `true` means disabled). The top-level `**$originAccount**` is the same composite key for the origin row only. Identity-backed rows (when the origin is Identities) use `**source.name**` = `Identities` (no `source.id`) and the same `**schema**` shape for display name and id. `$accounts` is deterministic: sources follow configured order, accounts keep insertion order within each source, and non-configured sources are appended. `$sources` is a Map keyed by source name — use `$sources.get('SourceName')` to access a source's snapshots. `**$account**` is the origin snapshot (managed shape or identity-backed when the origin is `Identities`); note that `$account` may differ from `$accounts[0]` when the `mainAccount` mapped attribute is set.
 
 ### Attribute Matching Settings
 
@@ -392,8 +392,11 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
-### 2.1.7 - 2026-06-18
+### 2.1.7 - 2026-06-19
 
+- Renamed `tenant` mapped attribute reference to `mainAccount` in connector logic and documentation.
+- Removed legacy `_id` fallback from Velocity Context account snapshots.
+- Streamlined identity name assignment in FusionAccount and FusionService.
 - Identity-origin accounts are now orphaned only when their origin identity is outside the configured identity scope.
 - Identity-origin accounts now set the Fusion identity attribute to the source identity id.
 - Consolidated UUID and incremental-counter generation as sub-modes of the Unique attribute type.

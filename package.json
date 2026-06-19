@@ -85,6 +85,7 @@
     },
     "allowScripts": {
         "@fission-ai/openspec": true,
-        "unrs-resolver": false
+        "fsevents": true,
+        "unrs-resolver": true
     }
 }

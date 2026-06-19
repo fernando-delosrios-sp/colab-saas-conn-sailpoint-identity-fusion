@@ -809,10 +809,7 @@ export class AttributeService {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
-        const prioritizedIndex = ordered.findIndex(
-            (account) =>
-                getManagedAccountSnapshotKey(account) === mainAccountId || trimStr(account?._id) === mainAccountId
-        )
+        const prioritizedIndex = ordered.findIndex((account) => getManagedAccountSnapshotKey(account) === mainAccountId)
         if (prioritizedIndex <= 0) return ordered
 
         const prioritizedAccount = ordered[prioritizedIndex]
@@ -838,9 +835,7 @@ export class AttributeService {
         accountId: string
     ): Record<string, any> | undefined {
         for (const accounts of sourceAttributeMap.values()) {
-            const match = accounts.find(
-                (account) => getManagedAccountSnapshotKey(account) === accountId || trimStr(account?._id) === accountId
-            )
+            const match = accounts.find((account) => getManagedAccountSnapshotKey(account) === accountId)
             if (match) return match
         }
 

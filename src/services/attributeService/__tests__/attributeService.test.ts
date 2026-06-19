@@ -157,7 +157,6 @@ describe('AttributeService mainAccount stale cleanup', () => {
                     [
                         {
                             accountKey: 'src-hr::acct-1',
-                            _id: 'src-hr::acct-1',
                             source: { id: 'src-hr', name: 'HR' },
                             schema: { id: 'acct-1', name: 'acct-1' },
                         },
@@ -333,7 +332,6 @@ describe('AttributeService mapping undefined behavior', () => {
                     [
                         {
                             preferredName: 'Neo',
-                            _id: 'src-hr::acct-1',
                             source: { id: 'src-hr', name: 'HR' },
                             schema: { id: 'acct-1', name: 'Neo' },
                         },
@@ -1105,7 +1103,6 @@ describe('AttributeService mainAccount override', () => {
                         {
                             preferredName: 'Neo',
                             employeeId: 'hr-id-001',
-                            _id: 'src-hr::ni-hr',
                             source: { id: 'src-hr', name: 'HR' },
                             schema: { id: 'ni-hr', name: 'Neo' },
                         },
@@ -1117,7 +1114,6 @@ describe('AttributeService mainAccount override', () => {
                         {
                             preferredName: 'Trinity',
                             employeeId: 'erp-id-777',
-                            _id: 'src-erp::ni-erp',
                             source: { id: 'src-erp', name: 'ERP' },
                             schema: { id: 'ni-erp', name: 'Trinity' },
                         },
@@ -1267,7 +1263,6 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
                     [
                         {
                             preferredName: 'Neo',
-                            _id: 'src-hr::ni-hr',
                             source: { id: 'src-hr', name: 'HR' },
                             schema: { id: 'ni-hr', name: 'Neo' },
                         },
@@ -1279,7 +1274,6 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
                         {
                             preferredName: 'Trinity',
                             preferredAccountId: 'src-erp::ni-erp',
-                            _id: 'src-erp::ni-erp',
                             source: { id: 'src-erp', name: 'ERP' },
                             schema: { id: 'ni-erp', name: 'Trinity' },
                         },
@@ -1568,7 +1562,6 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     [
                         {
                             preferredName: 'FromHR',
-                            _id: 'src-hr::native-m1',
                             schema: { name: 'FromHR', id: 'native-m1' },
                             source: { id: 'src-hr', name: 'HR' },
                         },
@@ -1616,7 +1609,6 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     'HR',
                     [
                         {
-                            _id: 'src-h42::managed-42',
                             schema: { name: 'Contoso Smith', id: 'managed-42' },
                             source: { id: 'src-h42', name: 'HR' },
                             IIQDisabled: false,
@@ -1666,7 +1658,6 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     [
                         {
                             employeeNumber: 'E-MANAGED',
-                            _id: 'src-h::same-id',
                             schema: { name: 'managed', id: 'same-id' },
                             source: { id: 'src-h', name: 'HR' },
                         },
@@ -1759,55 +1750,6 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             sources: ['Identities'],
             originSource: 'Identities',
             originAccountId: 'id-only',
-            disabled: false,
-            history: [],
-            importHistory: jest.fn(),
-            attributeBag,
-        }
-        attachAttributesAccessor(fusionAccount, attributeBag)
-        await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBeUndefined()
-    })
-
-    it('does not resolve managed $account by transient account.id fallback', async () => {
-        const { sourceService, log, locks } = velocityDeps()
-        const service = new AttributeService(
-            velocityConfig('$account.employeeNumber', [{ name: 'HR' }]),
-            velocitySchemas,
-            sourceService,
-            log,
-            locks
-        )
-        const attributeBag = {
-            current: {},
-            previous: {},
-            identity: { employeeNumber: 'E-ID' },
-            accounts: [],
-            sources: new Map<string, Record<string, any>[]>([
-                [
-                    'HR',
-                    [
-                        {
-                            employeeNumber: 'E-MANAGED',
-                            _id: 'legacy-row-id',
-                            schema: { name: 'managed', id: 'managed-42' },
-                            source: { id: 'src-h42', name: 'HR' },
-                        },
-                    ],
-                ],
-            ]),
-        }
-        const fusionAccount: any = {
-            type: 'fusion',
-            needsRefresh: true,
-            needsReset: false,
-            name: 'y',
-            sourceName: 'Fusion',
-            fromIdentity: true,
-            isIdentity: true,
-            sources: ['HR', 'Identities'],
-            originSource: 'Identities',
-            originAccountId: 'legacy-row-id',
             disabled: false,
             history: [],
             importHistory: jest.fn(),

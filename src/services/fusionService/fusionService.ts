@@ -848,7 +848,7 @@ export class FusionService {
             await this.attributes.refreshNormalAttributes(fusionAccount)
             this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
 
-            fusionAccount.attributes[fusionDisplayAttribute] = identity.name
+            fusionAccount.attributes[fusionDisplayAttribute] = identity.attributes?.[fusionDisplayAttribute] ?? identity.name
             fusionAccount.attributes[fusionIdentityAttribute] = identityId
 
             // Key generation deferred until getISCAccount
