@@ -848,11 +848,7 @@ export class FusionService {
             await this.attributes.refreshNormalAttributes(fusionAccount)
             this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
 
-            // Keep fusion display aligned with identity label precedence.
-            const identityDisplayName =
-                String((identity.attributes as Record<string, unknown> | undefined)?.displayName ?? '').trim() ||
-                identity.name
-            fusionAccount.attributes[fusionDisplayAttribute] = identityDisplayName
+            fusionAccount.attributes[fusionDisplayAttribute] = identity.name
             fusionAccount.attributes[fusionIdentityAttribute] = identityId
 
             // Key generation deferred until getISCAccount

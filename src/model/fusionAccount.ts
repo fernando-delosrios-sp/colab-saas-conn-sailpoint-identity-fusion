@@ -1105,6 +1105,7 @@ export class FusionAccount {
             this._identityDisplayName = label
         }
         this._attributeBag.identity = identity.attributes ?? {}
+        this._attributeBag.identity.name = identity.name
         this._identityId = identity.id ?? undefined
 
         if (!this._needsRefresh && isNewerThan(identity.modified, this._modified)) {
