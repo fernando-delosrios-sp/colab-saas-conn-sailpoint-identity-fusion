@@ -80,7 +80,8 @@
         "singleQuote": true
     },
     "allowScripts": {
-        "fsevents@2.3.3": true,
-        "unrs-resolver@1.11.1": true
+        "@fission-ai/openspec": true,
+        "fsevents": true,
+        "unrs-resolver": true
     }
 }

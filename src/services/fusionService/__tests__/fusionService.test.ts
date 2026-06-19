@@ -566,7 +566,7 @@ describe('FusionService', () => {
             )
         })
 
-        it('sets fusion display attribute from identity attributes.displayName when present', async () => {
+        it('sets fusion display attribute from identity name', async () => {
             const mockIdentity = {
                 id: 'identity-display-1',
                 name: 'Jane Doe',
@@ -581,7 +581,7 @@ describe('FusionService', () => {
             const result = await fusionService.processIdentity(mockIdentity)
 
             expect(result).toBeDefined()
-            expect(result?.attributes.displayName).toBe('Jane Q. Doe')
+            expect(result?.attributes.displayName).toBe('Jane Doe')
         })
 
         it('should skip existing identities', async () => {
