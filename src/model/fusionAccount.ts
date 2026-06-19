@@ -64,6 +64,7 @@ export class FusionAccount {
     private _originSource?: string
     /** Identity id or managed account key (sourceId::nativeIdentity) that created this fusion account (immutable). */
     private _originAccount?: string
+    private _originIdentityInScope?: boolean
 
     // State flags
     private _uncorrelated = false
@@ -470,6 +471,15 @@ export class FusionAccount {
      */
     public get iscAccountId(): string | undefined {
         return this._iscAccountId
+    }
+
+
+    public get originIdentityInScope(): boolean | undefined {
+        return this._originIdentityInScope
+    }
+
+    public setOriginIdentityInScope(inScope: boolean): void {
+        this._originIdentityInScope = inScope
     }
 
     /** The SDK simple key used for account output. Asserts non-null. */
@@ -1131,6 +1141,7 @@ export class FusionAccount {
         const label = FusionAccount.identityLabelFromIdentity(identity)
         this._identityInfo = FusionAccount.buildIdentityInfo(identity)
         this._attributeBag.identity = identity.attributes ?? {}
+        this._attributeBag.identity.name = identity.name
 
         if (!this._needsRefresh && isNewerThan(identity.modified, this._modified)) {
             this._needsRefresh = true
@@ -1214,10 +1225,20 @@ export class FusionAccount {
         }
 
         // Update orphan status based on final account state
-        // An account is orphaned if it has no managed accounts and is not a baseline identity
-        if (this._accountIds.size === 0 && !this._statuses.has('baseline')) {
-            this._statuses.add('orphan')
-            this._needsRefresh = false
+        // Managed-origin accounts are orphaned when they have no managed accounts.
+        // Identity-origin accounts are orphaned when they have no managed accounts AND
+        // their origin identity is not present in the configured identity scope.
+        if (this._accountIds.size === 0) {
+            if (this.fromIdentity) {
+                const originIdentityId = this.originAccountId ?? this.identityId
+                if (originIdentityId && !this.originIdentityInScope) {
+                    this._statuses.add('orphan')
+                    this._needsRefresh = false
+                }
+            } else {
+                this._statuses.add('orphan')
+                this._needsRefresh = false
+            }
         } else {
             this._statuses.delete('orphan')
         }
@@ -1607,8 +1628,10 @@ export class FusionAccount {
         this._accountIds.delete(id)
 
         if (this._accountIds.size === 0) {
-            this.markAsOrphan()
-            this.addHistory(`Account became orphan after removing source account: ${id}`)
+            if (!this.fromIdentity || (this.fromIdentity && !this.originIdentityInScope)) {
+                this.markAsOrphan()
+                this.addHistory(`Account became orphan after removing source account: ${id}`)
+            }
         }
 
         this.addHistory(`Source account removed: ${id}`)

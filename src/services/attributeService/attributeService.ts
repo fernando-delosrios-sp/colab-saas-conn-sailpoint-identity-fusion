@@ -724,9 +724,23 @@ export class AttributeService {
      */
     private buildVelocityContext(fusionAccount: FusionAccount): Record<string, any> {
         const context: Record<string, any> = { ...fusionAccount.attributeBag.current }
+        
+        // $name falls back to identity name if not mapped
+        if (fusionAccount.identityName && context.name === undefined) {
+            context.name = fusionAccount.identityName
+        }
+
         const orderedAccounts = this.getOrderedAccountsForContext(fusionAccount)
 
+        // $identity.name prioritizes the root identity name over identity.attributes.name
         context.identity = fusionAccount.attributeBag.identity
+        if (fusionAccount.identityName) {
+            context.identity = {
+                ...fusionAccount.attributeBag.identity,
+                name: fusionAccount.identityName,
+            }
+        }
+        
         context.accounts = orderedAccounts
         context.previous = fusionAccount.attributeBag.previous
         context.sources = fusionAccount.attributeBag.sources

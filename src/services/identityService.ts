@@ -42,6 +42,8 @@ function buildIdentityQuery(queryString: string): Search {
  */
 export class IdentityService {
     private identitiesById: Map<string, IdentityDocument> = new Map()
+    /** Identity IDs loaded by the last `fetchIdentities()` call, which respects `includeIdentities` and `identityScopeQuery`. */
+    private identityIdsInScope: Set<string> = new Set()
     private readonly identityScopeQuery?: string
     private readonly includeIdentities: boolean
 
@@ -121,10 +123,14 @@ export class IdentityService {
                     identities.map((identity) => [identity.protected ? '-' : identity.id, identity])
                 )
                 this.identitiesById.delete('-')
+                this.identityIdsInScope = new Set(
+                    identities.filter((identity) => !identity.protected).map((identity) => identity.id)
+                )
             }, `Failed to fetch identities using scope query "${this.identityScopeQuery}"`)
         } else if (this.includeIdentities) {
             this.log.info('No identity scope query defined, skipping global identity fetch.')
             this.identitiesById = new Map()
+            this.identityIdsInScope = new Set()
         }
 
         if (additionalIdentityIds?.length) {
@@ -339,9 +345,23 @@ export class IdentityService {
     }
 
     /**
+     * Checks if an identity is within the scope of the original global fetch.
+     * Identities loaded out-of-band via `hydrateMissingIdentitiesById()` are NOT in scope
+     * and will return false here, even if they can be retrieved via `getIdentityById()`.
+     *
+     * @param id - The identity ID to check
+     * @returns true if the identity is in scope, false otherwise
+     */
+    public hasIdentityInScope(id?: string): boolean {
+        if (!id) return false
+        return this.identityIdsInScope.has(id)
+    }
+
+    /**
      * Clear the identity cache
      */
     public clear(): void {
         this.identitiesById.clear()
+        this.identityIdsInScope.clear()
     }
 }

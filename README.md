@@ -392,6 +392,26 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
+### 2.2.0
+
+- (2026-05-29) Introduced full i18n localization support for email templates and connector communications.
+- (2026-05-29) Added support for complex JSON objects in attribute handling, ensuring schema casting preserves non-string types.
+- (2026-05-29) Overhauled matching configuration in the connector specification, improving auto-assignment logic and adding conditional visibility for thresholds.
+- (2026-05-29) Updated candidate badge reporting in Fusion reports to use 'Auto' and 'Manual' badges based on the configured automatic assignment match score threshold, replacing the legacy 'Exact' badge.
+- (2026-05-28) Refactored the internal client service to support new API adapters and improved queue management.
+- (2026-05-27) Enhanced schema discovery to dynamically include identity schema attributes when identities are in scope.
+- (2026-05-21) Refactored `FusionService`, `FormService`, and `AttributeService` extracting helper functions to `helpers.ts` modules to improve maintainability and separate concerns.
+- (2026-05-21) Refactored `FusionAccount` logic and extracted validation logic.
+- (2026-05-21) Fixed `tsconfig.json` configuration for TypeScript compilation.
+- (2026-05-08) Refactored `execute` method in `src/services/proxyService.ts` to reduce complexity and improve maintainability.
+- (2026-05-08) Refactored `ensureIdentityProfileMapping` in `src/services/sourceService/sourceService.ts` for readability.
+- (2026-05-07) Added missing test cases for `trigramIndex.ts` to improve test coverage.
+- (2026-05-07) Improved performance by batching concurrent API calls in `fetchAccountSchema`.
+- Added test coverage for formService helpers `buildCandidateList` and `getFormOwner`.
+- **Refactor:** Extracted the core aggregation and dry-run execution pipeline phases into a shared helper function `executeSharedPipelinePhases` to prevent duplicate logging/sequence code.
+- (2026-05-07) Bound identity enrichment batch sizes using `promiseAllBatched` to resolve unbounded API concurrency issues.
+- (2026-05-07) Optimize N+1 fetch in `getRecipientEmails` by batch fetching missing identities.
+
 ### 2.1.7 - 2026-06-19
 
 - Renamed `tenant` mapped attribute reference to `mainAccount` in connector logic and documentation.

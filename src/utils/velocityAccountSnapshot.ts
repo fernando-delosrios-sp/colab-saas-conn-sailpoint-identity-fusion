@@ -2,8 +2,7 @@ import { trimStr } from './safeRead'
 
 /**
  * Velocity account snapshots (`$accounts[]`, `$sources`, `$account`) expose nested
- * `source` and `schema` objects. These helpers read the current shape and fall
- * back to legacy flat keys for backwards compatibility.
+ * `source` and `schema` objects.
  */
 export function velocitySnapshotSourceName(account: Record<string, any> | undefined | null): string {
     if (!account) return ''
@@ -11,7 +10,7 @@ export function velocitySnapshotSourceName(account: Record<string, any> | undefi
     if (nested && typeof nested === 'object' && nested !== null && 'name' in nested) {
         return trimStr((nested as { name?: unknown }).name) ?? ''
     }
-    return trimStr(account._source) ?? ''
+    return ''
 }
 
 export function velocitySnapshotSourceId(account: Record<string, any> | undefined | null): string {
@@ -20,7 +19,7 @@ export function velocitySnapshotSourceId(account: Record<string, any> | undefine
     if (nested && typeof nested === 'object' && nested !== null && 'id' in nested) {
         return trimStr((nested as { id?: unknown }).id) ?? ''
     }
-    return trimStr(account._sourceId) ?? ''
+    return ''
 }
 
 export function velocitySnapshotSchemaName(account: Record<string, any> | undefined | null): string {
@@ -29,7 +28,7 @@ export function velocitySnapshotSchemaName(account: Record<string, any> | undefi
     if (nested && typeof nested === 'object' && nested !== null && 'name' in nested) {
         return trimStr((nested as { name?: unknown }).name) ?? ''
     }
-    return trimStr(account._name) ?? ''
+    return ''
 }
 
 export function velocitySnapshotSchemaId(account: Record<string, any> | undefined | null): string {
@@ -38,5 +37,5 @@ export function velocitySnapshotSchemaId(account: Record<string, any> | undefine
     if (nested && typeof nested === 'object' && nested !== null && 'id' in nested) {
         return trimStr((nested as { id?: unknown }).id) ?? ''
     }
-    return trimStr(account._managedKey) ?? ''
+    return ''
 }
