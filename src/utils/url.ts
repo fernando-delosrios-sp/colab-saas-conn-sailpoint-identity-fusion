@@ -160,6 +160,32 @@ export function isValidUrl(url: string | undefined): boolean {
 }
 
 /**
+ * Strictly validates that a string is a safe HTTP/HTTPS URL,
+ * mitigating SSRF bypasses via tab/space injection or malformed parsing.
+ */
+export function isHttpUrl(url: string | undefined): boolean {
+    if (!url) return false
+
+    // Prevent bypass via space/tab prefix injection (e.g., \thttp://)
+    if (url.trim() !== url) return false
+
+    try {
+        const parsed = new URL(url)
+
+        // Strictly enforce expected protocols
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return false
+        }
+
+        // Prevent malformed parsing bypasses (e.g. Node parses http:file:// as http:)
+        // by verifying the original string actually starts with the intended protocol
+        return url.toLowerCase().startsWith(`${parsed.protocol}//`)
+    } catch {
+        return false
+    }
+}
+
+/**
  * Ensures a URL ends without a trailing slash.
  */
 export function removeTrailingSlash(url: string): string {

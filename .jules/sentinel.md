@@ -42,3 +42,11 @@
 **Vulnerability:** The LogService (`src/services/logService/logService.ts`) fetched data directly from a user-configured `externalLoggingUrl` without validating the scheme, making it vulnerable to Server-Side Request Forgery (SSRF) if a user supplied a malicious URL scheme like `file://` or an internal metadata endpoint.
 **Learning:** External or user-provided URLs must always be validated prior to making network requests, especially in Node.js where `fetch` or HTTP clients might attempt to resolve arbitrary schemes or hostnames.
 **Prevention:** Enforce strict URL scheme validation (e.g., checking for `http://` or `https://`) whenever initializing requests with configured URLs.
+## 2026-06-20 - SSRF Vulnerability in HTTP URL Validation
+**Vulnerability:** Weak URL prefix validation () allowed SSRF and malformed URL parsing bypasses (e.g. , ).
+**Learning:** Relying on basic string prefix checks instead of strict URL parsing for scheme validation is error-prone, especially since Node.js's  constructor parses  as  protocol. Space/tab injections can also bypass naive string checks.
+**Prevention:** Use a robust helper function that combines the built-in  constructor parsing, whitespace trimming comparison (), and strict scheme-slash prefix checking () to ensure the input is exactly the intended HTTP URL.
+## 2026-06-20 - SSRF Vulnerability in HTTP URL Validation
+**Vulnerability:** Weak URL prefix validation (`.toLowerCase().startsWith('http://')`) allowed SSRF and malformed URL parsing bypasses (e.g. `\thttp://`, `http:file://`).
+**Learning:** Relying on basic string prefix checks instead of strict URL parsing for scheme validation is error-prone, especially since Node.js's `URL` constructor parses `http:file://` as `http:` protocol. Space/tab injections can also bypass naive string checks.
+**Prevention:** Use a robust helper function that combines the built-in `URL` constructor parsing, whitespace trimming comparison (`url.trim() === url`), and strict scheme-slash prefix checking (`url.toLowerCase().startsWith(`${parsed.protocol}//`)`) to ensure the input is exactly the intended HTTP URL.
