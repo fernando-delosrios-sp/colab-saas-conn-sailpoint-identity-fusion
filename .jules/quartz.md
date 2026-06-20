@@ -16,3 +16,6 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2026-06-20 - Consolidating Sequential If Fallbacks
+**Learning:** When using `trimStr` to extract the first truthy string from multiple potential fields (e.g. `name`, `displayName`, `identityId`), verbose sequential `if (val) return val` checks create unnecessary visual density and make the flow harder to read.
+**Action:** Replaced these verbose `if` fallback chains with a single, concise logical OR (`||`) chain to improve clarity and simplify the code structure.

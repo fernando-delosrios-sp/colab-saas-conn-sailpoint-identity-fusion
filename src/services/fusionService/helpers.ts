@@ -66,17 +66,13 @@ export function fusionReportMatchCandidateAccountFields(
 }
 
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {
-    const rowTitle = trimStr(fusionAccount.name) ?? ''
-    if (rowTitle) return rowTitle
-
-    const idn = trimStr(fusionAccount.identityDisplayName) ?? ''
-    if (idn) return idn
-
-    const legacyDisplayName = trimStr(fusionAccount.displayName) ?? ''
-    if (legacyDisplayName) return legacyDisplayName
-
-    const uid = trimStr(fusionAccount.managedAccountId ?? fusionAccount.identityId) ?? ''
-    return uid || 'Unknown'
+    return (
+        trimStr(fusionAccount.name) ||
+        trimStr(fusionAccount.identityDisplayName) ||
+        trimStr(fusionAccount.displayName) ||
+        trimStr(fusionAccount.managedAccountId ?? fusionAccount.identityId) ||
+        'Unknown'
+    )
 }
 
 /**
