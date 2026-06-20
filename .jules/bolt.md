@@ -61,3 +61,8 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+
+## 2026-06-20 - Prevent Array.from heap allocation on Iterators
+
+**Learning:** Calling `Array.from()` on a Map or Set iterator inside a frequent operation (like checking for managed account context on every attribute build) forces an unnecessary O(N) memory allocation and subsequent garbage collection. Native short-circuiting methods like `.some()` on the resulting array do not mitigate the initial allocation cost.
+**Action:** Iterate directly over the Iterator using a `for...of` loop and manual `break` statements. This allows immediate short-circuiting with O(1) space complexity and eliminates the intermediate array heap allocation entirely.
