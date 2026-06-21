@@ -50,3 +50,7 @@
 ## 2024-05-24 - MkDocs Material Admonition Syntax
 **Learning:** MkDocs Material admonitions (e.g., `!!! warning`, `!!! tip`) require *all* of their inner body text to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the indentation is missing, the admonition will break.
 **Action:** Always add an empty line after the `!!!` line and indent the following text block by 4 spaces.
+## 2026-06-21 - MkDocs bare URL markdown linting
+
+**Learning:** When modifying MkDocs documentation, specifically tables with email addresses or URLs (like `john.smith@company.com`), markdownlint (`pnpm run lint:markdown`) will fail with `MD034/no-bare-urls` errors.
+**Action:** Always wrap example email addresses or URLs in inline code backticks (e.g., `` `user@example.com` ``) to resolve bare URL linting errors without suppressing the rule.
