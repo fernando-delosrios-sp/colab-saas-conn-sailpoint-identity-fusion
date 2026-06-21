@@ -54,7 +54,11 @@ export type DryRunIssueSummary = {
 
 export type DryRunHelpersContext = {
     config?: { baseurl?: string; managedAccountsBatchSize?: number }
-    log: { info: (message: string) => void; metric: (name: string, startedAt: number, data?: Record<string, any>) => void; track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number } }
+    log: {
+        info: (message: string) => void
+        metric: (name: string, startedAt: number, data?: Record<string, any>) => void
+        track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number }
+    }
     res: { send: (payload: unknown) => void }
     reports: {
         ensureReportOutputDirectoryExists: () => Promise<string>
@@ -78,7 +82,9 @@ export type DryRunHelpersContext = {
     }
     fusion: {
         generateReport: (includeNonMatches: boolean, stats?: AggregationStats) => FusionReport
-        forEachISCAccount: (callback: (account: StdAccountListOutput) => void) => Promise<{ sent: number; eligible: number }>
+        forEachISCAccount: (
+            callback: (account: StdAccountListOutput) => void
+        ) => Promise<{ sent: number; eligible: number }>
         getISCAccount: (
             account: FusionAccount,
             includeUncorrelated: boolean
@@ -789,25 +795,21 @@ export const refreshUniqueAttributesForDryRun = async (
 
     // Also refresh analyzed managed accounts that only surface on the uncorrelated-queue path.
     if (analyzedUncorrelatedAccounts.length === 0) return
+
+    const getSortKey = (item: any): string =>
+        String(
+            readUnknown(item, 'originAccountId') ??
+                readPathString(item, ['attributes', 'originAccount']) ??
+                readUnknown(item, 'nativeIdentity') ??
+                readUnknown(item, 'key') ??
+                readUnknown(item, 'name') ??
+                ''
+        )
+
     const stableAnalyzed = [...analyzedUncorrelatedAccounts].sort((a: any, b: any) => {
-        const aKey = String(
-            readUnknown(a, 'originAccountId') ??
-                readPathString(a, ['attributes', 'originAccount']) ??
-                readUnknown(a, 'nativeIdentity') ??
-                readUnknown(a, 'key') ??
-                readUnknown(a, 'name') ??
-                ''
-        )
-        const bKey = String(
-            readUnknown(b, 'originAccountId') ??
-                readPathString(b, ['attributes', 'originAccount']) ??
-                readUnknown(b, 'nativeIdentity') ??
-                readUnknown(b, 'key') ??
-                readUnknown(b, 'name') ??
-                ''
-        )
-        return aKey.localeCompare(bKey)
+        return getSortKey(a).localeCompare(getSortKey(b))
     })
+
     for (let i = 0; i < stableAnalyzed.length; i += batchSize) {
         const batch = stableAnalyzed.slice(i, i + batchSize)
         await Promise.all(batch.map((account) => attributes.refreshUniqueAttributes(account)))
