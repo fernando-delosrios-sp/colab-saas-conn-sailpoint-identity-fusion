@@ -364,4 +364,38 @@ export class IdentityService {
         this.identitiesById.clear()
         this.identityIdsInScope.clear()
     }
+
+    /**
+     * Fetches and converts identity attributes into SchemaAttributes.
+     */
+    public async fetchIdentitySchemaAttributes(): Promise<any[]> {
+        const { identityAttributesApi } = this.client
+        const listCall = async () => {
+            const response = await identityAttributesApi.listIdentityAttributes()
+            return response.data ?? []
+        }
+
+        const identityAttrs = (await this.client.execute(
+            listCall,
+            QueuePriority.HIGH,
+            'IdentityService>fetchIdentitySchemaAttributes'
+        )) ?? []
+
+        const allowedTypes = ['string', 'boolean', 'int', 'long']
+
+        return identityAttrs
+            .filter((attr) => attr && attr.name && attr.name.trim() !== '')
+            .map((attr) => {
+                const rawType = attr.type ? attr.type.toLowerCase() : 'string'
+                const type = allowedTypes.includes(rawType) ? rawType : 'string'
+
+                return {
+                    name: attr.name,
+                    description: attr.displayName || `${attr.name} from Identity`,
+                    type,
+                    multi: attr.multi ?? false,
+                    entitlement: false,
+                }
+            })
+    }
 }

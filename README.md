@@ -412,8 +412,9 @@ The documentation site is built with MkDocs and published from the `main` branch
 - (2026-05-07) Bound identity enrichment batch sizes using `promiseAllBatched` to resolve unbounded API concurrency issues.
 - (2026-05-07) Optimize N+1 fetch in `getRecipientEmails` by batch fetching missing identities.
 
-### 2.1.7 - 2026-06-19
+### 2.1.7 - 2026-06-22
 
+- Fixed identity schema discovery bugs (undefined names, casing overwrites, type mapping, and error propagation).
 - Renamed `tenant` mapped attribute reference to `mainAccount` in connector logic and documentation.
 - Removed legacy `_id` fallback from Velocity Context account snapshots.
 - Streamlined identity name assignment in FusionAccount and FusionService.

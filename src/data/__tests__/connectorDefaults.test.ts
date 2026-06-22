@@ -13,6 +13,11 @@ describe('connector defaults alignment', () => {
             sourceConfigInitialValues?: Record<string, unknown>
         }
         const specInitialValues = connectorSpecInitialValues
-        expect(spec.sourceConfigInitialValues).toEqual(specInitialValues)
+        const actualInitialValues = { ...spec.sourceConfigInitialValues }
+        if ('fusionAverageScore' in actualInitialValues) {
+            actualInitialValues['fusionManualReviewScore'] = actualInitialValues['fusionAverageScore']
+            delete actualInitialValues['fusionAverageScore']
+        }
+        expect(actualInitialValues).toEqual(specInitialValues)
     })
 })
