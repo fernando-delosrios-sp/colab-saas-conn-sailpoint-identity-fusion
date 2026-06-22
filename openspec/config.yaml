@@ -8,7 +8,7 @@ schema: intent-driven
 
 rules:
   proposal:
-    - Must use grill-me skill
+    - Must use grilling skill
   design:
     - Must use c4-diagrams skill
   adr:
