@@ -116,4 +116,51 @@ describe('IdentityService scope tracking', () => {
             expect(mockClient.paginateSearchApi).not.toHaveBeenCalled()
         })
     })
+
+    describe('fetchIdentitySchemaAttributes', () => {
+        it('should fetch, filter, and map identity attributes correctly', async () => {
+            Object.defineProperty(mockClient, 'identityAttributesApi', {
+                get: () => ({
+                    listIdentityAttributes: jest.fn().mockResolvedValue({
+                        data: [
+                            { name: 'empId', displayName: 'Employee ID', type: 'STRING', multi: false },
+                            { name: 'groups', displayName: 'Groups', type: 'STRING', multi: true },
+                            { name: 'unrecognized', displayName: 'Unrecognized Type', type: 'CUSTOM_TYPE', multi: false },
+                            { name: '', displayName: 'Empty Name', type: 'STRING', multi: false },
+                        ],
+                    }),
+                }),
+                configurable: true,
+            })
+            mockClient.execute = jest.fn().mockImplementation((fn) => fn())
+
+            const attrs = await identityService.fetchIdentitySchemaAttributes()
+
+            expect(attrs).toHaveLength(3)
+
+            expect(attrs[0]).toEqual({
+                name: 'empId',
+                description: 'Employee ID',
+                type: 'string',
+                multi: false,
+                entitlement: false,
+            })
+
+            expect(attrs[1]).toEqual({
+                name: 'groups',
+                description: 'Groups',
+                type: 'string',
+                multi: true,
+                entitlement: false,
+            })
+
+            expect(attrs[2]).toEqual({
+                name: 'unrecognized',
+                description: 'Unrecognized Type',
+                type: 'string',
+                multi: false,
+                entitlement: false,
+            })
+        })
+    })
 })
