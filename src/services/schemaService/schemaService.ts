@@ -10,7 +10,7 @@ import {
 } from '../../model/config'
 import { LogService } from '../logService'
 import { SourceService } from '../sourceService'
-import { ClientService, QueuePriority } from '../clientService'
+import { IdentityService } from '../identityService'
 import { assert } from '../../utils/assert'
 import { compact } from '../../utils/safeRead'
 import { fusionAccountSchemaAttributes } from '../../data/schema'
@@ -35,13 +35,13 @@ export class SchemaService {
      * @param config - Fusion configuration containing attribute merge strategy and definitions
      * @param log - Logger instance
      * @param sources - Source service for fetching source schemas
-     * @param client - Client service for API calls
+     * @param identities - Identity service for identity-related API calls and attribute retrieval
      */
     constructor(
         private config: FusionConfig,
         private log: LogService,
         private sources: SourceService,
-        private client: ClientService
+        private identities: IdentityService
     ) {
         this.attributeMerge = config.attributeMerge
         this.normalAttributeDefinitions = config.normalAttributeDefinitions ?? []
@@ -357,25 +357,7 @@ export class SchemaService {
      * Fetches and converts identity attributes into SchemaAttributes.
      */
     private async fetchIdentitySchemaAttributes(): Promise<SchemaAttribute[]> {
-        const { identityAttributesApi } = this.client
-        const listCall = async () => {
-            const response = await identityAttributesApi.listIdentityAttributes()
-            return response.data ?? []
-        }
-
-        const identityAttrs = (await this.client.execute(
-            listCall,
-            QueuePriority.HIGH,
-            'SchemaService>fetchIdentitySchemaAttributes'
-        )) ?? []
-
-        return identityAttrs.map((attr) => ({
-            name: attr.name,
-            description: attr.displayName || `${attr.name} from Identity`,
-            type: attr.type ? attr.type.toLowerCase() : 'string',
-            multi: attr.multi ?? false,
-            entitlement: false,
-        }))
+        return this.identities.fetchIdentitySchemaAttributes()
     }
 
     /**
@@ -431,21 +413,25 @@ export class SchemaService {
         }
 
         const attributeMap = new Map<string, SchemaAttribute>()
-        fusionAttributes.forEach((attribute) => {
-            attributeMap.set(String(attribute.name!).toLowerCase(), attribute)
-        })
-        accountSchemaAttributes.forEach((attribute) => {
-            attributeMap.set(String(attribute.name!).toLowerCase(), attribute)
-        })
-        identitySchemaAttributes.forEach((attribute) => {
-            attributeMap.set(String(attribute.name!).toLowerCase(), attribute)
-        })
-        attributeMappingAttributes.forEach((attribute) => {
-            attributeMap.set(String(attribute.name!).toLowerCase(), attribute)
-        })
-        attributeDefinitionAttributes.forEach((attribute) => {
-            attributeMap.set(String(attribute.name!).toLowerCase(), attribute)
-        })
+        const addAttribute = (attribute: SchemaAttribute) => {
+            if (!attribute.name || attribute.name.trim() === '') return
+            const key = attribute.name.toLowerCase()
+            if (!attributeMap.has(key)) {
+                attributeMap.set(key, attribute)
+            } else {
+                const existing = attributeMap.get(key)!
+                attributeMap.set(key, {
+                    ...attribute,
+                    name: existing.name, // preserve original casing
+                })
+            }
+        }
+
+        fusionAttributes.forEach(addAttribute)
+        accountSchemaAttributes.forEach(addAttribute)
+        identitySchemaAttributes.forEach(addAttribute)
+        attributeMappingAttributes.forEach(addAttribute)
+        attributeDefinitionAttributes.forEach(addAttribute)
 
         // Add reverse correlation attributes from sources configured with correlationMode 'reverse'
         for (const sc of this.sourceConfigs) {
@@ -456,7 +442,7 @@ export class SchemaService {
                     type: 'string',
                     multi: false,
                 }
-                attributeMap.set(sc.correlationAttribute.toLowerCase(), attr)
+                addAttribute(attr)
             }
         }
 

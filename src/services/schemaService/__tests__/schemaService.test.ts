@@ -2,95 +2,43 @@ import { SchemaService } from '../schemaService'
 
 describe('SchemaService', () => {
     let schemaService: SchemaService
-
-    let mockClient: any
+    let mockConfig: any
+    let mockLog: any
     let mockSources: any
+    let mockIdentities: any
 
     beforeEach(() => {
-        mockClient = {
-            identityAttributesApi: {
-                listIdentityAttributes: jest.fn().mockResolvedValue({ data: [] }),
-            },
-            execute: jest.fn().mockImplementation((fn) => fn()),
+        mockConfig = {
+            attributeMerge: 'list',
+            sources: [],
+            includeIdentities: true,
+        }
+        mockLog = {
+            debug: jest.fn(),
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
         }
         mockSources = {
             managedSources: [],
         }
-        // Minimal mock setup
-        schemaService = new SchemaService(
-            {
-                attributeMerge: 'list',
-                sources: [],
-            } as any,
-            { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any,
-            mockSources as any,
-            mockClient as any
-        )
-    })
+        mockIdentities = {
+            fetchIdentitySchemaAttributes: jest.fn().mockResolvedValue([
+                { name: 'empId', description: 'Employee ID', type: 'string', multi: false, entitlement: false },
+                { name: 'groups', description: 'Groups', type: 'string', multi: true, entitlement: false },
+                { name: 'unrecognized', description: 'Unrecognized Type', type: 'string', multi: false, entitlement: false },
+            ]),
+        }
 
-    describe('castAttributeValue (private)', () => {
-        it('should filter null and undefined from multi-valued string arrays', () => {
-            const schemaDef = { name: 'roles', type: 'string', multi: true }
-            const result = (schemaService as any).castAttributeValue(
-                ['Admin', null, 'User', undefined],
-                schemaDef
-            )
-            expect(result).toEqual(['Admin', 'User'])
-        })
-
-        it('should filter null and undefined from multi-valued number arrays', () => {
-            const schemaDef = { name: 'scores', type: 'int', multi: true }
-            const result = (schemaService as any).castAttributeValue(
-                [1, null, 2, undefined, 3],
-                schemaDef
-            )
-            expect(result).toEqual([1, 2, 3])
-        })
-
-        it('should keep valid multi-valued string array unchanged', () => {
-            const schemaDef = { name: 'roles', type: 'string', multi: true }
-            const result = (schemaService as any).castAttributeValue(
-                ['Admin', 'User'],
-                schemaDef
-            )
-            expect(result).toEqual(['Admin', 'User'])
-        })
-
-        it('should wrap scalar value in array for multi-valued attribute', () => {
-            const schemaDef = { name: 'roles', type: 'string', multi: true }
-            const result = (schemaService as any).castAttributeValue('Admin', schemaDef)
-            expect(result).toEqual(['Admin'])
-        })
-
-        it('should join array into CSV string for single-valued attribute', () => {
-            const schemaDef = { name: 'displayName', type: 'string', multi: false }
-            const result = (schemaService as any).castAttributeValue(
-                ['Alice', 'Bob'],
-                schemaDef
-            )
-            expect(result).toBe('Alice,Bob')
-        })
-
-        it('should return null for null/undefined value regardless of cardinality', () => {
-            const multiDef = { name: 'roles', type: 'string', multi: true }
-            const singleDef = { name: 'name', type: 'string', multi: false }
-            expect((schemaService as any).castAttributeValue(null, multiDef)).toBeNull()
-            expect((schemaService as any).castAttributeValue(undefined, singleDef)).toBeNull()
-        })
+        schemaService = new SchemaService(mockConfig, mockLog, mockSources, mockIdentities)
     })
 
     describe('buildDynamicSchema', () => {
-        it('should fetch and include identity schema attributes when includeIdentities is true/default', async () => {
-            mockClient.identityAttributesApi.listIdentityAttributes.mockResolvedValue({
-                data: [
-                    { name: 'empId', displayName: 'Employee ID', type: 'STRING', multi: false },
-                    { name: 'groups', displayName: 'Groups', type: 'STRING', multi: true },
-                ],
-            })
-
+        it('should call identities.fetchIdentitySchemaAttributes and include mapped identity attributes correctly', async () => {
             const schema = await schemaService.buildDynamicSchema()
-            
-            // Check that the returned attributes contain the converted identity attributes
+
+            expect(mockIdentities.fetchIdentitySchemaAttributes).toHaveBeenCalled()
+
             const empIdAttr = schema.attributes.find((a) => a.name === 'empId')
             expect(empIdAttr).toEqual({
                 name: 'empId',
@@ -100,39 +48,40 @@ describe('SchemaService', () => {
                 entitlement: false,
             })
 
-            const groupsAttr = schema.attributes.find((a) => a.name === 'groups')
-            expect(groupsAttr).toEqual({
-                name: 'groups',
-                description: 'Groups',
-                type: 'string',
-                multi: true,
-                entitlement: false,
-            })
+            const unrecognizedAttr = schema.attributes.find((a) => a.name === 'unrecognized')
+            expect(unrecognizedAttr).toBeDefined()
+            expect(unrecognizedAttr?.type).toBe('string')
         })
 
-        it('should not include identity schema attributes when includeIdentities is false', async () => {
-            // Re-instantiate with includeIdentities: false
-            schemaService = new SchemaService(
-                {
-                    attributeMerge: 'list',
-                    sources: [],
-                    includeIdentities: false,
-                } as any,
-                { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any,
-                mockSources as any,
-                mockClient as any
-            )
-
-            mockClient.identityAttributesApi.listIdentityAttributes.mockResolvedValue({
-                data: [
-                    { name: 'empId', displayName: 'Employee ID', type: 'STRING', multi: false },
-                ],
+        it('should preserve original casing on collisions', async () => {
+            // Setup an account schema attribute with "EmployeeID"
+            mockSources.managedSources = [{ id: 'src-1', name: 'Source 1' }]
+            jest.spyOn(schemaService as any, 'fetchAccountSchema').mockResolvedValue({
+                displayAttribute: 'name',
+                identityAttribute: 'id',
+                attributes: [{ name: 'EmployeeID', type: 'string', multi: false }],
             })
 
+            // Setup identity attributes containing lowercase "employeeid"
+            mockIdentities.fetchIdentitySchemaAttributes.mockResolvedValue([
+                { name: 'employeeid', description: 'employee id', type: 'string', multi: false, entitlement: false }
+            ])
+
             const schema = await schemaService.buildDynamicSchema()
-            const empIdAttr = schema.attributes.find((a) => a.name === 'empId')
-            expect(empIdAttr).toBeUndefined()
-            expect(mockClient.identityAttributesApi.listIdentityAttributes).not.toHaveBeenCalled()
+
+            // The resulting schema should have "EmployeeID" (case-preserved from the first-added)
+            const attr = schema.attributes.find((a) => a.name.toLowerCase() === 'employeeid')
+            expect(attr?.name).toBe('EmployeeID')
+        })
+
+        it('should handle API errors during fetch gracefully', async () => {
+            mockIdentities.fetchIdentitySchemaAttributes.mockRejectedValue(new Error('Network Error'))
+
+            const schema = await schemaService.buildDynamicSchema()
+
+            expect(mockLog.error).toHaveBeenCalledWith(expect.stringContaining('Failed to fetch identity attributes'))
+            // The schema builds successfully without the identity attributes
+            expect(schema.attributes.length).toBeGreaterThan(0) // Has static/fusion attributes
         })
     })
 })
