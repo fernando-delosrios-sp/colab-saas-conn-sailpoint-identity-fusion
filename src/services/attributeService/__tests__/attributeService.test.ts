@@ -2454,3 +2454,143 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
         expect(fusionAccount.attributes.name).toBe('fusion-account-slug')
     })
 })
+
+describe('AttributeService maxLength ordering after post-processing transforms', () => {
+    const buildService = (def: any) => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: def.normalAttributeDefinitions ?? [],
+            uniqueAttributeDefinitions: def.uniqueAttributeDefinitions ?? [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+        return new AttributeService(config, schemas, sourceService, log, locks)
+    }
+
+    const buildFusionAccount = (attrs: Record<string, any>) => {
+        const attributeBag = {
+            current: { ...attrs },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+        return fusionAccount
+    }
+
+    it('applies maxLength after trim for a normal definition (final value is exactly maxLength chars)', async () => {
+        const service = buildService({
+            normalAttributeDefinitions: [
+                {
+                    name: 'nickname',
+                    expression: '  hello world  ',
+                    trim: true,
+                    maxLength: 5,
+                    refresh: true,
+                },
+            ],
+        })
+        const fusionAccount = buildFusionAccount({})
+
+        await service.refreshNormalAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.nickname).toBe('hello')
+        expect(fusionAccount.attributes.nickname.length).toBe(5)
+    })
+
+    it('applies maxLength after trim for a unique definition (final value is exactly maxLength chars)', async () => {
+        const service = buildService({
+            uniqueAttributeDefinitions: [
+                {
+                    name: 'id',
+                    expression: '  hello world  ',
+                    useIncrementalCounter: false,
+                    trim: true,
+                    maxLength: 5,
+                },
+            ],
+        })
+        const fusionAccount = buildFusionAccount({})
+
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBe('hello')
+        expect(fusionAccount.attributes.id.length).toBe(5)
+    })
+
+    it('applies maxLength after case for a normal definition', async () => {
+        const service = buildService({
+            normalAttributeDefinitions: [
+                {
+                    name: 'nickname',
+                    expression: 'ABCDEF',
+                    case: 'lower',
+                    maxLength: 5,
+                    refresh: true,
+                },
+            ],
+        })
+        const fusionAccount = buildFusionAccount({})
+
+        await service.refreshNormalAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.nickname).toBe('abcde')
+        expect(fusionAccount.attributes.nickname.length).toBe(5)
+    })
+
+    it('applyUniqueValueOutputTransforms and evaluateTemplate produce the same result for the same definition and raw input', async () => {
+        const service = buildService({})
+        const definition: any = {
+            name: 'login',
+            expression: '$firstName.$lastName$counter',
+            useIncrementalCounter: false,
+            trim: true,
+            case: 'lower',
+            spaces: true,
+            normalize: false,
+            maxLength: 10,
+        }
+        const context = { firstName: '  John ', lastName: ' Doe ', counter: '01' }
+        const evaluateResult = (service as any).evaluateTemplate(definition, context, 'test')
+        const transformsResult = (service as any).applyUniqueValueOutputTransforms(
+            definition,
+            '  John . Doe 01',
+            definition.expression,
+            context
+        )
+        expect(evaluateResult).toBe(transformsResult)
+    })
+})

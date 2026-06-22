@@ -407,6 +407,8 @@ The documentation site is built with MkDocs and published from the `main` branch
 - Updated dependencies and npm `allowScripts` policy; added OpenSec support.
 - Added AI-powered PR review workflows using Cursor and OpenCode agents.
 - Refactored `getManagedAccountKeyFromAccount` to return `buildManagedAccountKey` directly.
+- Fixed `maxLength` output transform ordering — now applied after trim/case/spaces/normalize, so final value is exactly ≤ `maxLength` instead of shorter due to post-truncation trimming.
+- Added counter-aware `maxLength` truncation for Unique definitions: counter character width is reserved from the budget before prefix truncation, ensuring the assembled value (prefix + counter) does not exceed `maxLength`.
 
 ### 2.1.6 - 2026-04-29
 
