@@ -50,3 +50,8 @@
 ## 2024-05-24 - MkDocs Material Admonition Syntax
 **Learning:** MkDocs Material admonitions (e.g., `!!! warning`, `!!! tip`) require *all* of their inner body text to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the indentation is missing, the admonition will break.
 **Action:** Always add an empty line after the `!!!` line and indent the following text block by 4 spaces.
+
+## 2026-06-22 - Convert Standard Text Callouts to Admonitions
+
+**Learning:** Standard text callouts like `- **Exception:**` or `- **Best Practice:**` in list items do not leverage the visual hierarchy available in the Material theme and can be easily missed in dense text.
+**Action:** Convert these standard text callouts to MkDocs Material admonitions (e.g., `!!! note "Exception"`, `!!! tip "Best Practice"`) with proper 4-space indentation to improve visual clarity.
