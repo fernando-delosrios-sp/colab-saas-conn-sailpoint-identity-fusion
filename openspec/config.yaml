@@ -1,20 +1,61 @@
-schema: intent-driven
+schema: spec-driven
 
-#context: |
-#  Repository purpose: Package reusable OpenSpec schemas.
-#  Quality gate: After every implementation/apply that changes schemas, run
-#  `openspec schema review <schema-name>` for each affected schema before
-#  considering the work complete.
+context: |
+  Repository purpose:
+    Identity Fusion NG is an Identity Security Cloud (ISC) connector written in
+    TypeScript using the SailPoint Connector SDK. It consolidates account data
+    from one or more managed sources, maps attributes into a single Fusion
+    account schema, defines derived / unique values (including Apache Velocity
+    computation), and optionally matches accounts to existing identities to
+    reduce duplicates.
+
+  Core framework:
+    - Map: merge source account attributes into Fusion account attributes.
+    - Define: compute normal attributes and generate persistent unique
+      attributes (UUIDs, counters, disambiguated values) via Velocity.
+    - Match: score Fusion accounts against the identity baseline with
+      similarity algorithms and optional manual review workflows.
+
+  Operation modes:
+    - Authoritative accounts: creates identities for unmatched accounts; Fusion
+      owns correlation decisions.
+    - Records: Map/Define without creating Fusion accounts for unmatched rows.
+    - Orphan accounts: skip unmatched accounts, optionally disable stale ones.
+
+  Tech stack:
+    - TypeScript, Node.js, SailPoint Connector SDK (spcx / @sailpoint/connector-sdk)
+    - Apache Velocity (velocityjs) for attribute definition expressions
+    - ISC APIs: Sources, Identities, Accounts, Workflows/Forms
+    - Build: ncc, eslint, prettier, jest
+    - Docs: MkDocs with Markdown sources under docs/
+
+  Project layout relevant to specs:
+    - src/index.ts: connector entry point and command routing
+    - src/operations/: std:account:*, std:entitlement:list, custom:dryrun
+    - src/services/: attribute mapping/definition, matching, account lifecycle
+    - connector-spec.json: UI configuration, sourceConfig schema, defaults
+    - docs/: user-facing guides for Map, Define, Match, source configuration,
+      operations reference, troubleshooting
+    - openspec/specs/: durable specification documents; keep specs aligned with
+      docs/guides and connector-spec.json help text
+
+  Quality and consistency gates:
+    - Any change to connector-spec.json must be mirrored in docs/ and in the
+      relevant openspec/spec/ file when one exists for that behavior.
+    - Attribute-definition behavior changes must update both the implementation
+      and docs/guides/define.md (and the attribute-definition-documentation spec
+      if it covers the area).
+    - Matching behavior changes must update docs/guides/match.md,
+      docs/guides/matching-algorithms.md, and the relevant spec.
+    - Run `npm run lint` and `npm test` before considering implementation complete.
+    - Run `npm run docs:build` after documentation changes.
+    - Version bumps follow the version-update-procedure spec and must keep
+      package.json and connector-spec.json in sync.
 
 rules:
-  proposal:
-    - Must use grilling skill
-  design:
-    - Must use c4-diagrams skill
-  adr:
-    - Must use architectural-decision-records skill
-  spec:
-    - Must use gherkin-authoring skill
-  tasks:
-    - Add a required verification task: run `openspec schema review <schema-name>` for each affected schema.
-    - Do not mark apply complete until all required schema review commands pass.
+    proposal:
+        - Must use grilling skill
+    design:
+        - Must use c4-diagrams skill
+    spec:
+        - Must use gherkin-authoring skill
