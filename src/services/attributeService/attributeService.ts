@@ -11,7 +11,7 @@ import { FusionAccount } from '../../model/account'
 import { SchemaService } from '../schemaService'
 import { Account } from 'sailpoint-api-client'
 import { CompoundKey, CompoundKeyType, SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
-import { evaluateVelocityTemplate, normalize, padNumber, removeSpaces, switchCase } from './formatting'
+import { evaluateVelocityTemplate, normalize, padNumber, removeSpaces, switchCase, truncateResultToMaxLength } from './formatting'
 import { LockService } from '../lockService'
 type RenderContext = Record<string, any>
 import { v4 as uuidv4 } from 'uuid'
@@ -912,7 +912,7 @@ export class AttributeService {
 
         let value: any
         try {
-            value = evaluateVelocityTemplate(expression, context, definition.maxLength)
+            value = evaluateVelocityTemplate(expression, context)
         } catch (error) {
             this.log.error(
                 `Failed to evaluate velocity template for attribute ${definition.name}: ${error instanceof Error ? error.message : String(error)}`
@@ -940,6 +940,9 @@ export class AttributeService {
         if (definition.case && typeof value === 'string') value = switchCase(value, definition.case)
         if (definition.spaces && typeof value === 'string') value = removeSpaces(value)
         if (definition.normalize && typeof value === 'string') value = normalize(value)
+        if (definition.maxLength && typeof value === 'string' && value.length > definition.maxLength) {
+            value = truncateResultToMaxLength(value, expression, context, definition.maxLength)
+        }
 
         try {
             if (typeof value === 'string') {
@@ -1260,7 +1263,7 @@ export class AttributeService {
         const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
 
         const prevIsUnique = context.isUnique
-        context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value)
+        context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value, context)
         try {
             // Don't regenerate unique values if the account is not being reset
             if (hasValue && !fusionAccount.needsReset) {
@@ -1323,26 +1326,37 @@ export class AttributeService {
      * {@link unregisterUniqueAttributes} removes this account's prior value from the set
      * before evaluation, so the registry reflects other accounts only during generation.
      */
-    private isUniqueTemplateValue(definition: UniqueAttributeDefinition, value: unknown): boolean {
+    private isUniqueTemplateValue(
+        definition: UniqueAttributeDefinition,
+        value: unknown,
+        context: RenderContext
+    ): boolean {
         if (missing(value)) return false
         const raw = String(value)
 
-        const transformed = this.applyUniqueValueOutputTransforms(definition, raw)
+        const transformed = this.applyUniqueValueOutputTransforms(definition, raw, definition.expression, context)
         if (transformed === '') return false
 
         return !this.getUniqueValues(definition.name).has(transformed)
     }
 
     /** Match {@link evaluateTemplate} post-velocity transforms for a unique definition (including maxLength). */
-    private applyUniqueValueOutputTransforms(definition: UniqueAttributeDefinition, raw: string): string {
+    private applyUniqueValueOutputTransforms(
+        definition: UniqueAttributeDefinition,
+        raw: string,
+        expression: string | undefined,
+        context: RenderContext
+    ): string {
         let s = raw
-        if (definition.maxLength && s.length > definition.maxLength) {
-            s = s.substring(0, definition.maxLength)
-        }
         if (definition.trim) s = s.trim()
         if (definition.case) s = switchCase(s, definition.case)
         if (definition.spaces) s = removeSpaces(s)
         if (definition.normalize) s = normalize(s)
+        if (definition.maxLength && s.length > definition.maxLength) {
+            s = expression
+                ? truncateResultToMaxLength(s, expression, context, definition.maxLength)
+                : s.substring(0, definition.maxLength)
+        }
         return s
     }
 
