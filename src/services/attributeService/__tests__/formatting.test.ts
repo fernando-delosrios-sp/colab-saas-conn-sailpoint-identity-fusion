@@ -1,4 +1,4 @@
-import { evaluateVelocityTemplate } from '../formatting'
+import { evaluateVelocityTemplate, truncateResultToMaxLength } from '../formatting'
 
 /**
  * Test suite for evaluateVelocityTemplate with contextHelpers
@@ -582,23 +582,53 @@ $earliestAssignment.start_date
     describe('maxLength - truncation', () => {
         it('should truncate result to maxLength', () => {
             const context = { firstName: 'Christopher', lastName: 'Bartholomew' }
-            const result = evaluateVelocityTemplate('$firstName.$lastName', context, 10)
+            const expression = '$firstName.$lastName'
+            const rendered = evaluateVelocityTemplate(expression, context)
+            const result = truncateResultToMaxLength(rendered!, expression, context, 10)
             expect(result).toBe('Christophe')
-            expect(result?.length).toBe(10)
+            expect(result.length).toBe(10)
         })
 
         it('should not truncate if result is shorter than maxLength', () => {
             const context = { firstName: 'John', lastName: 'Doe' }
-            const result = evaluateVelocityTemplate('$firstName.$lastName', context, 20)
+            const expression = '$firstName.$lastName'
+            const rendered = evaluateVelocityTemplate(expression, context)
+            const result = truncateResultToMaxLength(rendered!, expression, context, 20)
             expect(result).toBe('John.Doe')
         })
 
         it('should preserve counter when truncating', () => {
             const context = { firstName: 'Christopher', counter: '001' }
-            const result = evaluateVelocityTemplate('$firstName$counter', context, 10)
+            const expression = '$firstName$counter'
+            const rendered = evaluateVelocityTemplate(expression, context)
+            const result = truncateResultToMaxLength(rendered!, expression, context, 10)
             expect(result).toBe('Christo001')
-            expect(result?.length).toBe(10)
-            expect(result?.endsWith('001')).toBe(true)
+            expect(result.length).toBe(10)
+            expect(result.endsWith('001')).toBe(true)
+        })
+
+        it('should preserve counter when counter is not at the end', () => {
+            const context = { firstName: 'Christopher', counter: '001' }
+            const expression = '$firstName$counter@domain.com'
+            const rendered = evaluateVelocityTemplate(expression, context)
+            const result = truncateResultToMaxLength(rendered!, expression, context, 20)
+            expect(result).toBe('Christ001@domain.com')
+            expect(result.length).toBe(20)
+        })
+
+        it('should truncate suffix if suffix alone exceeds available length', () => {
+            const context = { firstName: 'Chris', counter: '001' }
+            const expression = '$firstName$counter@verylongdomainname.com'
+            const rendered = evaluateVelocityTemplate(expression, context)
+            const result = truncateResultToMaxLength(rendered!, expression, context, 15)
+            expect(result).toBe('001@verylongdom')
+            expect(result.length).toBe(15)
+        })
+
+        it('should leave the raw Velocity result untouched when no maxLength is provided', () => {
+            const context = { firstName: '  Christopher  ' }
+            const result = evaluateVelocityTemplate('$firstName', context)
+            expect(result).toBe('  Christopher  ')
         })
     })
 

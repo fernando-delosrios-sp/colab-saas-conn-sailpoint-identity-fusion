@@ -93,7 +93,7 @@ export const evaluateVelocityTemplate = (
 /**
  * Truncate result to maxLength, smartly preserving counter anywhere in the string
  */
-const truncateResultToMaxLength = (
+export const truncateResultToMaxLength = (
     result: string,
     expression: string,
     context: RenderContext,
