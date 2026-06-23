@@ -7,6 +7,7 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 import { AggregationStats, FusionReport, FusionReportAccount } from '../../services/fusionService/types'
 import { isExactAttributeMatchScores } from '../../services/scoringService/exactMatch'
 import { FusionAccount } from '../../model/account'
+import { getFirstValidAttribute } from '../../utils/attributes'
 import { readArray, readBoolean, readPathString, readUnknown, trimStr } from '../../utils/safeRead'
 import {
     buildReportAccountIndex,
@@ -54,7 +55,11 @@ export type DryRunIssueSummary = {
 
 export type DryRunHelpersContext = {
     config?: { baseurl?: string; managedAccountsBatchSize?: number }
-    log: { info: (message: string) => void; metric: (name: string, startedAt: number, data?: Record<string, any>) => void; track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number } }
+    log: {
+        info: (message: string) => void
+        metric: (name: string, startedAt: number, data?: Record<string, any>) => void
+        track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number }
+    }
     res: { send: (payload: unknown) => void }
     reports: {
         ensureReportOutputDirectoryExists: () => Promise<string>
@@ -78,7 +83,9 @@ export type DryRunHelpersContext = {
     }
     fusion: {
         generateReport: (includeNonMatches: boolean, stats?: AggregationStats) => FusionReport
-        forEachISCAccount: (callback: (account: StdAccountListOutput) => void) => Promise<{ sent: number; eligible: number }>
+        forEachISCAccount: (
+            callback: (account: StdAccountListOutput) => void
+        ) => Promise<{ sent: number; eligible: number }>
         getISCAccount: (
             account: FusionAccount,
             includeUncorrelated: boolean
@@ -791,19 +798,15 @@ export const refreshUniqueAttributesForDryRun = async (
     if (analyzedUncorrelatedAccounts.length === 0) return
     const stableAnalyzed = [...analyzedUncorrelatedAccounts].sort((a: any, b: any) => {
         const aKey = String(
-            readUnknown(a, 'originAccountId') ??
+            getFirstValidAttribute(a as Record<string, any>, 'originAccountId') ??
                 readPathString(a, ['attributes', 'originAccount']) ??
-                readUnknown(a, 'nativeIdentity') ??
-                readUnknown(a, 'key') ??
-                readUnknown(a, 'name') ??
+                getFirstValidAttribute(a as Record<string, any>, 'nativeIdentity', 'key', 'name') ??
                 ''
         )
         const bKey = String(
-            readUnknown(b, 'originAccountId') ??
+            getFirstValidAttribute(b as Record<string, any>, 'originAccountId') ??
                 readPathString(b, ['attributes', 'originAccount']) ??
-                readUnknown(b, 'nativeIdentity') ??
-                readUnknown(b, 'key') ??
-                readUnknown(b, 'name') ??
+                getFirstValidAttribute(b as Record<string, any>, 'nativeIdentity', 'key', 'name') ??
                 ''
         )
         return aKey.localeCompare(bKey)
