@@ -1108,19 +1108,17 @@ export class ContextHelper {
         this.editForms = forms.filter((x) => x.name?.startsWith(this.getEditFormName()))
 
         // Fetch form instances for each unique form
-        const uniqueFormInstancesPromises = this.uniqueForms.map((form) =>
+        const uniqueFormInstancesArrays = await batch(this.uniqueForms, (form) =>
             form.id ? this.client.listFormInstances(form.id) : Promise.resolve([])
         )
-        const uniqueFormInstancesArrays = await Promise.all(uniqueFormInstancesPromises)
         this.uniqueFormInstances = uniqueFormInstancesArrays
             .flat()
             .sort((a, b) => new Date(a.modified!).valueOf() - new Date(b.modified!).valueOf())
 
         // Fetch form instances for each edit form
-        const editFormInstancesPromises = this.editForms.map((form) =>
+        const editFormInstancesArrays = await batch(this.editForms, (form) =>
             form.id ? this.client.listFormInstances(form.id) : Promise.resolve([])
         )
-        const editFormInstancesArrays = await Promise.all(editFormInstancesPromises)
         this.editFormInstances = editFormInstancesArrays
             .flat()
             .sort((a, b) => new Date(a.modified!).valueOf() - new Date(b.modified!).valueOf())

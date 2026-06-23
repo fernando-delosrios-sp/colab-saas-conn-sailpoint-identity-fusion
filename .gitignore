@@ -27,5 +27,4 @@ input.json
 config.json
 .sentryclirc
 .httpyac.json
-.env
-
+.env*

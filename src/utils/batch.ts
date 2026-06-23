@@ -77,6 +77,12 @@ async function processItemWithRetry<T, R>(
         } catch (error: any) {
             if (attempt === maxRetries) throw error
 
+            const status = error.response?.status
+            // Only retry on network errors (no response), 429 Too Many Requests, or 5xx Server Errors
+            if (status && status !== 429 && (status < 500 || status > 599)) {
+                throw error
+            }
+
             // Wait before retry with exponential backoff
             let delay = 1000 * Math.pow(2, attempt)
 

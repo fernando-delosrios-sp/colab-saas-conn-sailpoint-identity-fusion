@@ -553,11 +553,37 @@ export class SDKClient {
     async createForm(form: CreateFormDefinitionRequestBeta): Promise<FormDefinitionResponseBeta> {
         const api = new CustomFormsBetaApi(this.config)
 
-        const response = await api.createFormDefinition({
-            createFormDefinitionRequestBeta: form,
-        })
+        try {
+            const response = await api.createFormDefinition({
+                createFormDefinitionRequestBeta: form,
+            })
+            return response.data
+        } catch (error: any) {
+            if (error.response?.status === 400) {
+                const data = error.response.data
+                const isAlreadyExists = data?.messages?.some((m: any) => m.text?.includes('already exists'))
+                const isInternal429 = data?.messages?.some((m: any) => m.text?.includes('429: Too Many Requests'))
 
-        return response.data
+                if (isAlreadyExists) {
+                    logger.warn(`Form ${form.name} already exists but wasn't found in cache. This is likely due to eventual consistency. Fetching from API...`)
+                    // Wait for it to be indexed and fetch it
+                    let retries = 5;
+                    while (retries > 0) {
+                        await new Promise(r => setTimeout(r, 2000));
+                        const response = await api.searchFormDefinitionsByTenant()
+                        const existingForm = response.data.results?.find((x: any) => x.name === form.name)
+                        if (existingForm) {
+                            return existingForm
+                        }
+                        retries--;
+                    }
+                } else if (isInternal429) {
+                    logger.warn(`Form creation failed with internal 429 error. Overriding status to 429 for retry logic.`)
+                    error.response.status = 429
+                }
+            }
+            throw error
+        }
     }
 
     async createFormInstance(
