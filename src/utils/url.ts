@@ -8,6 +8,26 @@
 // ============================================================================
 
 /**
+ * Validates that a string is a safe HTTP/HTTPS URL, mitigating SSRF risks.
+ */
+export function isSafeHttpUrl(url: string | undefined): boolean {
+    if (!url) return false
+    if (url.trim() !== url) return false
+    try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+        if (!url.toLowerCase().startsWith(`${parsed.protocol}//`)) return false
+        return true
+    } catch {
+        return false
+    }
+}
+
+// ============================================================================
+// UI Origin Helpers
+// ============================================================================
+
+/**
  * Extracts the UI origin from an API base URL.
  * ISC API URLs typically use 'api.' subdomain which needs to be removed for UI URLs.
  *
