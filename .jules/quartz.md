@@ -16,3 +16,6 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2026-06-24 - Logical OR Fallback Chains
+**Learning:** Verbose sequential if-statement fallback chains checking for string presence can be hard to scan.
+**Action:** Replace verbose sequential `if` statement fallback chains checking for string presence (e.g., `const a = trim(); if (a) return a;`) with a single concise logical OR (`||`) chain.
