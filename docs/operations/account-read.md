@@ -10,7 +10,11 @@ The Account Read operation retrieves the current state of a specific fusion acco
     - Verifies that the `identity` (ID) is provided.
     - Loads all sources and the fusion account schema.
 
-2.  **Fusion Account Rebuild**:
+2.  **Cascade Aggregation** (Conditional):
+    - If `cascadeAggregationEnabled` is true, triggers an aggregation on the underlying managed sources to ensure the most up-to-date account data is fetched from ISC before processing the fusion account.
+    - Errors during cascade aggregation are logged but do not stop the main read operation.
+
+3.  **Fusion Account Rebuild**:
     - Calls the `rebuildFusionAccount` helper.
     - **Fetch**: Loads the stored fusion account definition, the authoritative identity, and all linked managed accounts (from source systems).
     - **Process**: Re-runs the fusion logic to map attributes, apply transforms, and generate values.
