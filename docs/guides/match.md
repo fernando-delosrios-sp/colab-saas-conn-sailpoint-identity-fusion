@@ -248,6 +248,13 @@ Configure **Attribute Matching Settings → Review Settings** for the manual rev
 
     The maximum number of candidate identities shown on a single review form is controlled by **Max match candidates per review form** in **Advanced Settings → Developer Settings** (default for new sources comes from `fusionMaxCandidatesForForm` in `connector-spec.json` → `sourceConfigInitialValues`; max 15). Only the highest-scoring potential matches are included if the limit is exceeded.
 
+### Localization (i18n)
+
+The connector supports fully localized user communications. When **Enable localized user communications?** is toggled on:
+- All emails, reports, and Fusion review forms are translated to the recipient's preferred language.
+- Provide the **Identity Language Attribute** to instruct the connector on which identity attribute contains the user's language (e.g., `en`, `fr`).
+- You can specify a **Default Language** to be used when the recipient's language cannot be determined or the attribute is missing.
+
 ### What the aggregation report includes
 
 When **Send report to owner on aggregation?** is enabled, reports include:
