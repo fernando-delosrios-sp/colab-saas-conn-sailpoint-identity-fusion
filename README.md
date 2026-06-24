@@ -187,7 +187,7 @@ Attribute Matching Settings - Matching
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Manual review match score [0-100]** | Minimum weighted combined similarity (0-100) required for a potential match | Yes      | Matches meeting this threshold (and their mandatory rules) are flagged for review. Typical range: 70-90. |
 | **Enable automatic assignment** | Automatically assign to the matched identity if the score meets the auto assignment threshold | No       | When enabled, manual review is bypassed if the best match's score is >= the Automatic assignment match score. |
-| **Automatic assignment match score [0-100]** | Combined score threshold for automatic assignment | No       | Must be >= the manual review match score. |
+| **Automatic assignment match score [0-100]** | Combined score threshold for automatic assignment | Yes (when enabled) | Must be strictly greater than the manual review match score. If this condition is not met, the connector will fail to initialize with a configuration error. |
 | **Fusion attribute matches**             | List of identity attributes to compare for match detection                                          | Yes      | At least one attribute match required; each match specifies an attribute and algorithm                                                                                                                  |
 
 **Per-attribute match configuration:**
