@@ -12,6 +12,7 @@ describe('matchingSettings readSettings', () => {
     it('normalizes string "true" to boolean true for fusionEnableAutoAssignment', () => {
         const raw = {
             fusionEnableAutoAssignment: 'true' as unknown as boolean,
+            fusionAutoAssignmentScore: 100,
             matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }],
         } 
 

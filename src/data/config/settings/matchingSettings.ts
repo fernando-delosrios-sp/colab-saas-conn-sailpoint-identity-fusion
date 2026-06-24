@@ -39,12 +39,13 @@ export function readSettings(raw: Record<string, unknown>): MatchingSettingsSect
     }
 
     if (fusionEnableAutoAssignment) {
-        if (fusionAutoAssignmentScore === undefined) {
-            fusionAutoAssignmentScore = 100
-        }
         assert(
-            fusionAutoAssignmentScore >= fusionManualReviewScore,
-            'Automatic assignment match score (fusionAutoAssignmentScore) must be greater than or equal to the minimum score for manual review (fusionManualReviewScore)'
+            fusionAutoAssignmentScore !== undefined,
+            'Automatic assignment match score (fusionAutoAssignmentScore) is required when automatic assignment is enabled'
+        )
+        assert(
+            fusionAutoAssignmentScore! > fusionManualReviewScore,
+            'Automatic assignment match score (fusionAutoAssignmentScore) must be strictly greater than the minimum score for manual review (fusionManualReviewScore)'
         )
     }
 

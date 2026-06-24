@@ -755,10 +755,10 @@
                             "key": "fusionAutoAssignmentScore",
                             "label": "Automatic assignment match score [0-100]",
                             "type": "number",
-                            "required": false,
+                            "required": true,
                             "parentKey": "fusionEnableAutoAssignment",
                             "parentValue": "true",
-                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically assigned. Must be greater than or equal to the manual review score."
+                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically assigned. Must be greater than the manual review score. If this condition is not met, the connector will fail to initialize with a configuration error."
                         },
                         {
                             "key": "matchingConfigs",
