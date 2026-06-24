@@ -126,11 +126,10 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                   <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">{{i18n "account"}}</td>
                   <td style="padding:3px 0; font-size:12px; color:#0f172a;">
                     {{#if accountUrl}}
-                    <a href="{{accountUrl}}" style="color:#0b5cab; text-decoration:underline;">{{accountName}}</a>
+                    <a href="{{accountUrl}}" style="color:#0b5cab; text-decoration:underline;">{{accountName}} [{{accountSource}}]</a>
                     {{else}}
-                    {{accountName}}
+                    {{accountName}} [{{accountSource}}]
                     {{/if}}
-                    [{{accountSource}}]
                   </td>
                 </tr>
                 {{#if selectedIdentityId}}
@@ -231,22 +230,16 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                                 {{else}}
                                 {{identityName}}
                                 {{/if}}
+                                {{#if auto}}
+                                <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#dcfce7; color:#166534; border:1px solid #86efac; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "auto"}}</span>
+                                {{/if}}
+                                {{#if manual}}
+                                <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "manual"}}</span>
+                                {{/if}}
+                                {{#if ../deferred}}
+                                <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "deferred"}}</span>
+                                {{/if}}
                               </div>
-                              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-                                <tr>
-                                  <td style="padding-top:5px;">
-                                    {{#if auto}}
-                                    <span style="display:inline-block; vertical-align:middle; margin-right:6px; padding:2px 8px; border-radius:6px; background:#dcfce7; color:#166534; border:1px solid #86efac; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "auto"}}</span>
-                                    {{/if}}
-                                    {{#if manual}}
-                                    <span style="display:inline-block; vertical-align:middle; margin-right:6px; padding:2px 8px; border-radius:6px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "manual"}}</span>
-                                    {{/if}}
-                                    {{#if ../deferred}}
-                                    <span style="display:inline-block; vertical-align:middle; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "deferred"}}</span>
-                                    {{/if}}
-                                  </td>
-                                </tr>
-                              </table>
                             </div>
                           </div>
                           <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table; width:auto; border-collapse:collapse; table-layout:auto; vertical-align:top;">
@@ -474,14 +467,14 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                                                 {{else}}
                                                                                 {{identityName}}
                                                                                 {{/if}}
-                                                                              {{#if auto}}
-                                                                              <span style="display:inline-block; vertical-align:middle; margin:4px 0 0 6px; padding:2px 8px; border-radius:6px; background:#dcfce7; color:#166534; border:1px solid #86efac; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "auto"}}</span>
-                                                                              {{/if}}
-                                                                              {{#if manual}}
-                                                                              <span style="display:inline-block; vertical-align:middle; margin:4px 0 0 6px; padding:2px 8px; border-radius:6px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "manual"}}</span>
-                                                                              {{/if}}
+                                                                                {{#if auto}}
+                                                                                <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#dcfce7; color:#166534; border:1px solid #86efac; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "auto"}}</span>
+                                                                                {{/if}}
+                                                                                {{#if manual}}
+                                                                                <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "manual"}}</span>
+                                                                                {{/if}}
                                                                                 {{#if ../deferred}}
-                                                                                <span style="display:inline-block; vertical-align:middle; margin:6px 0 0 6px; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "deferred"}}</span>
+                                                                                <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "deferred"}}</span>
                                                                                 {{/if}}
                                                                             </div>
                                                                         </div>

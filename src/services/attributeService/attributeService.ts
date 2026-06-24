@@ -8,6 +8,7 @@ import {
 } from '../../model/config'
 import { LogService } from '../logService'
 import { FusionAccount } from '../../model/account'
+import { FusionAccountKind } from '../../model/fusionAccountTypes'
 import { SchemaService } from '../schemaService'
 import { Account } from 'sailpoint-api-client'
 import { CompoundKey, CompoundKeyType, SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
@@ -210,7 +211,7 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to map attributes for
      */
     public mapAttributes(fusionAccount: FusionAccount): void {
-        if (fusionAccount.type === 'identity') return
+        if (fusionAccount.type === FusionAccountKind.Identity) return
 
         const { attributeBag, needsRefresh } = fusionAccount
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
@@ -301,10 +302,11 @@ export class AttributeService {
         const { current } = fusionAccount.attributeBag
         const hasExistingValue = isValidAttributeValue(current[attribute])
         const canResetDisplay = fusionAccount.needsReset && attribute === fusionDisplayAttribute
-        const shouldKeepIdentityImmutable = this.isExistingFusionAccount(fusionAccount) && fusionAccount.isIdentity
+        const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
         const isImmutableIdentityAttribute =
-            attribute === fusionIdentityAttribute && hasExistingValue && shouldKeepIdentityImmutable
-        const isImmutableDisplayAttribute = attribute === fusionDisplayAttribute && hasExistingValue && !canResetDisplay
+            attribute === fusionIdentityAttribute && hasExistingValue && isExistingFusionAccount
+        const isImmutableDisplayAttribute =
+            attribute === fusionDisplayAttribute && hasExistingValue && !canResetDisplay && isExistingFusionAccount
 
         if (isImmutableIdentityAttribute || isImmutableDisplayAttribute) return true
         if (this.uniqueAttributeNames.has(attribute) && current[attribute] !== undefined) return true
@@ -440,6 +442,9 @@ export class AttributeService {
     ): boolean {
         const { fusionDisplayAttribute } = this.schemas
         if (attributeName !== fusionDisplayAttribute) return false
+        // Identity decisions are treated as uncorrelated managed accounts; they must not
+        // pick up the display-attribute override from the selected identity name.
+        if (fusionAccount.type === FusionAccountKind.Decision) return false
         if (!fusionAccount.fromIdentity && !fusionAccount.isIdentity) return false
 
         const label = fusionAccount.identityName
@@ -1125,9 +1130,10 @@ export class AttributeService {
         fusionDisplayAttribute: string
     ): string | undefined {
         if (attributeName === fusionIdentityAttribute) {
-            const fromTop = trimStr(fusionAccount.originAccountId)
-            if (fromTop !== undefined) return fromTop
-            return trimStr(fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE])
+            if (this.skipAccountsWithMissingId) {
+                return undefined
+            }
+            return uuidv4()
         }
         if (attributeName === fusionDisplayAttribute) {
             return trimStr(fusionAccount.name)
@@ -1179,21 +1185,21 @@ export class AttributeService {
         const needsRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || refresh
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
         const canResetDisplay = fusionAccount.needsReset && name === fusionDisplayAttribute
-        const shouldKeepIdentityImmutable = this.isExistingFusionAccount(fusionAccount) && fusionAccount.isIdentity
+        const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
 
         if (hasValue && !needsRefresh) return
 
-        // IMMUTABILITY GUARD: Keep nativeIdentity immutable for existing identity-linked accounts
-        if (hasValue && name === fusionIdentityAttribute && shouldKeepIdentityImmutable) {
+        // IMMUTABILITY GUARD: Keep nativeIdentity immutable for existing Fusion accounts once set
+        if (hasValue && name === fusionIdentityAttribute && isExistingFusionAccount) {
             return
         }
 
-        // IMMUTABILITY GUARD: Keep display name immutable for existing accounts unless explicit reset is requested
-        if (hasValue && name === fusionDisplayAttribute && !canResetDisplay) {
+        // IMMUTABILITY GUARD: Keep display name immutable for existing Fusion accounts unless explicit reset is requested
+        if (hasValue && name === fusionDisplayAttribute && !canResetDisplay && isExistingFusionAccount) {
             return
         }
 
-        if (shouldKeepIdentityImmutable && name === fusionIdentityAttribute) {
+        if (isExistingFusionAccount && name === fusionIdentityAttribute) {
             this.log.warn(`Skipping change of nativeIdentity for account: ${fusionAccount.name}`)
             return
         }

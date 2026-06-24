@@ -211,14 +211,74 @@ describe('FusionAccount', () => {
             acc.setKey({ simple: { id: 'id-1' } })
             acc.addStatus('baseline')
             acc.syncCollectionAttributesToBag()
-            
+
             const iscAccount = acc.toISCAccount()
             iscAccount.nativeIdentity = 'id-1'
             iscAccount.id = 'isc-1'
-            
+
             const restored = FusionAccount.fromFusionAccount(iscAccount)
             expect(restored.statuses).toContain('baseline')
             expect(restored.nativeIdentity).toBe('id-1')
+        })
+
+        it('round trips the persisted identityId through attributes', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-1', attributes: { email: 'a@b.com' } } as any)
+            acc.setKey({ simple: { id: 'id-1' } })
+            acc.addStatus('baseline')
+            acc.syncCollectionAttributesToBag()
+
+            const iscAccount = acc.toISCAccount()
+            iscAccount.nativeIdentity = 'id-1'
+            iscAccount.id = 'isc-1'
+            // Simulate ISC echo: only attributes + nativeIdentity + id are persisted, no top-level identityId
+            iscAccount.attributes = { ...iscAccount.attributes }
+
+            const restored = FusionAccount.fromFusionAccount(iscAccount)
+            expect(restored.identityId).toBe('id-1')
+            expect(restored.identityIdAttribute).toBe('id-1')
+        })
+
+        it('routes via identityIdAttribute fallback when SDK does not expose identityId', () => {
+            const persisted = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-attr-1',
+                name: 'Persisted Identity',
+                sourceName: 'Identity Fusion NG',
+                attributes: { identityId: 'identity-1' },
+            } as any)
+            // _identityInfo is created from the persisted attribute (not from the SDK Account)
+            expect(persisted.identityId).toBe('identity-1')
+            expect(persisted.identityIdAttribute).toBe('identity-1')
+        })
+
+        it('ignores empty or whitespace-only persisted identityId', () => {
+            const persisted = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-empty',
+                name: 'Empty ID',
+                sourceName: 'Identity Fusion NG',
+                attributes: { identityId: '   ' },
+            } as any)
+            // No identity info was reconstructed; hasValue('') is false so routing is uncorrelated
+            expect(persisted.identityId).toBeUndefined()
+            expect(persisted.identityIdAttribute).toBeUndefined()
+        })
+
+        it('setIdentityIdAttribute trims and stores the id on _identityInfo', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
+            acc.setIdentityIdAttribute('  identity-42  ')
+            expect(acc.identityIdAttribute).toBe('identity-42')
+            expect((acc as any)._identityInfo?.id).toBe('identity-42')
+            // Empty values are stored as empty string; hasValue returns false
+            acc.setIdentityIdAttribute('')
+            expect(acc.identityIdAttribute).toBe('')
+            expect((acc as any)._identityInfo?.id).toBe('')
+        })
+
+        it('preserves name/displayName when setIdentityIdAttribute updates an existing _identityInfo', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-1', name: 'Jane Doe' } as any)
+            expect((acc as any)._identityInfo?.name).toBeTruthy()
+            acc.setIdentityIdAttribute('identity-99')
+            expect(acc.identityId).toBe('identity-99')
+            expect((acc as any)._identityInfo?.name).toBeTruthy()
         })
     })
 

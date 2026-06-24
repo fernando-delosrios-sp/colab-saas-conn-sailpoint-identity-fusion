@@ -1,4 +1,5 @@
 module.exports = {
+    maxWorkers: '50%',
     preset: 'ts-jest',
     testTimeout: 180000,
     testEnvironment: 'node',

@@ -1,6 +1,6 @@
 import { SourceType } from '../model/config'
 import { FusionDecision } from '../model/form'
-import { readNumber, readString } from '../utils/safeRead'
+import { readNumber, readString, trimStr } from '../utils/safeRead'
 import { createUrlContext } from '../utils/url'
 import { PhaseTimer } from './logService'
 import { mkdir, writeFile } from 'fs/promises'
@@ -36,7 +36,8 @@ const toReportDecision = (
     resolveSourceType?: (sourceName?: string) => SourceType | undefined,
     resolveReviewerName?: (reviewerId?: string) => string | undefined,
     resolveReviewerUrl?: (reviewerId?: string) => string | undefined,
-    resolveAccountUrl?: (accountId?: string) => string | undefined,
+    resolveAccountName?: (accountId?: string) => string | undefined,
+    resolveAccountUrl?: (accountId?: string, identityId?: string) => string | undefined,
     resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string }
 ): FusionReportDecision => {
     const sourceType =
@@ -58,10 +59,16 @@ const toReportDecision = (
     const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
     const reviewerName =
         decision.submitter.name || resolveReviewerName?.(decision.submitter.id) || decision.submitter.id
-    const selectedIdentityName =
-        decision.identityName || selectedIdentityContext.selectedIdentityName || decision.identityId
+    const selectedIdentityName = decision.identityName || selectedIdentityContext.selectedIdentityName
     const correlatedIdentityContext = resolveIdentityContext?.(readString(decision, 'correlatedIdentityId')) ?? {}
     const correlatedAccountName = correlatedIdentityContext.selectedIdentityName
+    const resolvedManagedAccountName = resolveAccountName?.(decision.account.id)
+    const accountNameFromDecision = trimStr(decision.account.name)
+    const accountName = correlatedAccountName
+        || (accountNameFromDecision && accountNameFromDecision !== decision.account.id ? accountNameFromDecision : undefined)
+        || resolvedManagedAccountName
+        || decision.account.name
+        || decision.account.id
 
     const reviewerId = decision.submitter.id
     const reviewerUrl = reviewerId && reviewerId !== 'system' ? resolveReviewerUrl?.(reviewerId) : undefined
@@ -72,8 +79,8 @@ const toReportDecision = (
         reviewerUrl,
         reviewerEmail: decision.submitter.email || undefined,
         accountId: decision.account.id,
-        accountName: correlatedAccountName || decision.account.name || decision.account.id,
-        accountUrl: resolveAccountUrl?.(decision.account.id),
+        accountName,
+        accountUrl: resolveAccountUrl?.(decision.account.id, decision.identityId),
         accountSource: decision.account.sourceName || '',
         sourceType,
         decision: decisionType,
@@ -162,10 +169,45 @@ export class ReportService {
         }
         const resolveReviewerUrl = (reviewerId?: string): string | undefined =>
             reviewerId ? urlContext.identity(reviewerId) : undefined
-        const resolveAccountUrl = (accountId?: string): string | undefined => {
+        const resolveAccountName = (accountId?: string): string | undefined => {
+            if (!accountId) return undefined
+            const managedAccount = this.sources.managedAccountsAllById.get(accountId)
+            const name = trimStr(managedAccount?.name)
+            return name && name !== accountId ? name : undefined
+        }
+        const resolveAccountUrl = (accountId?: string, identityId?: string): string | undefined => {
             if (!accountId) return undefined
             const reportAccountId = this.sources.resolveIscAccountIdForManagedKey(accountId)
-            return reportAccountId ? urlContext.humanAccount(reportAccountId) : undefined
+            if (reportAccountId) return urlContext.humanAccount(reportAccountId)
+            const managedAccount = this.sources.managedAccountsAllById.get(accountId)
+            const directIscId = trimStr(managedAccount?.id)
+            if (directIscId && directIscId !== accountId) {
+                return urlContext.humanAccount(directIscId)
+            }
+            // New fusion reviews use fusionAccount.iscAccountId (the managed account's ISC
+            // id), which is set when the managed account layer is absorbed. Try the same
+            // source for review decisions. The FusionAccount may live in fusionAccountMap
+            // (keyed by composite managed key) or in fusionIdentityMap (keyed by identityId),
+            // so check both maps by the account key/identityId, and scan identity accounts
+            // by nativeIdentity as a last resort.
+            const fusionAccountByKey = this.fusion.getFusionAccountByNativeIdentity(accountId)
+            const fusionAccountByIdentity = identityId ? this.fusion.getFusionIdentity(identityId) : undefined
+            let iscId = fusionAccountByKey?.iscAccountId ?? fusionAccountByIdentity?.iscAccountId
+            if (!iscId) {
+                const identities = this.fusion.fusionIdentities
+                if (identities) {
+                    for (const fa of identities) {
+                        if (fa.nativeIdentity === accountId && fa.iscAccountId) {
+                            iscId = fa.iscAccountId
+                            break
+                        }
+                    }
+                }
+            }
+            if (iscId && iscId !== accountId) {
+                return urlContext.humanAccount(iscId)
+            }
+            return urlContext.humanAccount(accountId)
         }
         const resolveIdentityContext = (
             identityId?: string
@@ -176,7 +218,7 @@ export class ReportService {
                 (identity as any)?.displayName ||
                 (identity as any)?.attributes?.displayName ||
                 (identity as any)?.name ||
-                identityId
+                undefined
             return {
                 selectedIdentityName,
                 selectedIdentityUrl: urlContext.identity(identityId),
@@ -188,6 +230,7 @@ export class ReportService {
                 resolveSourceType,
                 resolveReviewerName,
                 resolveReviewerUrl,
+                resolveAccountName,
                 resolveAccountUrl,
                 resolveIdentityContext
             )

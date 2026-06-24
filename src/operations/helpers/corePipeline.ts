@@ -359,13 +359,6 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     log.info('Batch cumulative count saved')
     saveStateOp.done()
 
-    if (process.env.RECORD_MODE !== 'true') {
-        sources.clearFusionAccounts()
-    } else {
-        log.info('Fusion accounts cache retained for recording')
-    }
-    log.info('Account caches cleared from memory')
-
     const scheduleAggregationOp = log.track('outputPhase.scheduleDelayedAggregations')
     await scheduleDelayedAggregations(sources, messaging)
     scheduleAggregationOp.done()
@@ -463,6 +456,15 @@ export class PipelineRunner {
                 await reportPhase(serviceRegistry, fetchResult, timer, pipelineOptions)
             }
             timer.phase('PHASE 7: Report (fusion report)', 'info', 'Report')
+
+            // Fusion accounts are released after the report is built so the report's
+            // `fusionAccountsFound` metric can still read `sources.fusionAccountCount`.
+            if (process.env.RECORD_MODE !== 'true') {
+                sources.clearFusionAccounts()
+            } else {
+                log.info('Fusion accounts cache retained for recording')
+            }
+            log.info('Account caches cleared from memory')
 
             return { shouldContinue: true, fetchResult, outputCount, timer }
         } catch (error) {

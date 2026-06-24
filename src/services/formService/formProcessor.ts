@@ -5,7 +5,7 @@ import { FusionDecision } from '../../model/form'
 import { isCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { IdentityService } from '../identityService'
 import { assert } from '../../utils/assert'
-import { readString } from '../../utils/safeRead'
+import { readString, trimStr } from '../../utils/safeRead'
 
 // ============================================================================
 // Internal Helpers
@@ -127,7 +127,7 @@ export const extractAccountInfoFromFormInput = (
 
     return {
         id: accountId,
-        name: accountName || accountId,
+        name: trimStr(accountName) || '',
         sourceName: accountSource || '',
     }
 }

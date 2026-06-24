@@ -492,12 +492,15 @@ export class FusionService {
         // managed-account correlation work, not "ignore the identity" — skipping the layer left
         // stale account.name (e.g. managed native id) as the hosting label and broke identity-
         // backed display attributes when originSource/baseline implied identity origin.
-        if (account.identityId) {
-            const identityId = account.identityId
+        if (fusionAccount.identityId) {
+            const identityId = fusionAccount.identityId
             const identity = this.identities.getIdentityById(identityId)
             if (identity) {
                 fusionAccount.addIdentityLayer(identity)
             }
+            // Identity ID is already on _identityInfo: fromFusionAccount populated it from
+            // buildIdentityInfo when account.identityId is set, or from the persisted
+            // attributes.identityId attribute otherwise. No re-registration is needed here.
 
             authorizedLinkDecision = this.forms.getFusionAssignmentDecision(identityId)
             if (authorizedLinkDecision) {
@@ -731,7 +734,6 @@ export class FusionService {
      * @returns The fusion account produced, or undefined if identity was skipped or already had one
      */
     public async processIdentity(identity: IdentityDocument): Promise<FusionAccount | undefined> {
-        const { fusionDisplayAttribute } = this.schemas
         const identityId = identity.id
 
         if (!this.fusionIdentityMap.has(identityId)) {
@@ -761,6 +763,7 @@ export class FusionService {
                 }
                 // Update identity reference; refresh mapping/normal defs but preserve unique attrs
                 existingAccount.addIdentityLayer(identity)
+                existingAccount.setIdentityIdAttribute(identityId)
                 existingAccount.setNeedsRefresh(true)
                 // Register under the new identity ID so callers (e.g. getFusionIdentity) can find it
                 this.fusionIdentityMap.set(identityId, existingAccount)
@@ -773,6 +776,7 @@ export class FusionService {
             const fusionAccount = FusionAccount.fromIdentity(identity)
             this.log.debug(`Processing new identity: ${identity.name} (${identityId})`)
             fusionAccount.addIdentityLayer(identity)
+            // Identity ID is already on _identityInfo via fromIdentity's setIdentityIdAttribute(identity.id).
             // New fusion accounts should regenerate unique attributes even when
             // mapping pre-populates those fields, so uniqueness is enforced.
             fusionAccount.setNeedsReset(true)
@@ -789,8 +793,6 @@ export class FusionService {
             )
 
             await this.applyAttributeProcessing(fusionAccount)
-
-            fusionAccount.attributes[fusionDisplayAttribute] = identity.name
 
             // Key generation deferred until getISCAccount
             this.setFusionAccount(fusionAccount)
@@ -2185,6 +2187,10 @@ export class FusionService {
         this.currentRunUnmatchedFusionNativeIdentitiesBySource.clear()
         this.autoAssignedIdentityIds.clear()
         this.currentRunMatchScoringMs = 0
+
+        for (const fusionAccount of this.fusionAccountMap.values()) {
+            this.registerCurrentRunUnmatchedCandidate(fusionAccount)
+        }
 
         this.validateManagedSourceReviewers()
 

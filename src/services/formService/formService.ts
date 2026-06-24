@@ -1162,7 +1162,7 @@ export class FormService {
 
         return {
             id: accountId,
-            name: account.name || accountId,
+            name: trimStr(account.name) || '',
             sourceName: account.sourceName || '',
             sourceId: readString(account, 'sourceId'),
             nativeIdentity: account.nativeIdentity ?? undefined,

@@ -379,5 +379,35 @@ describe('PipelineRunner.run', () => {
         expect(mockTimer.phase).not.toHaveBeenCalled()
         expect(mockServiceRegistry.sources.releaseProcessLock).toHaveBeenCalled()
     })
+
+    it('keeps fusion accounts alive until the report phase has read fusionAccountCount', async () => {
+        const callOrder: string[] = []
+        const seenCounts: number[] = []
+        const fusionMap = new Map<string, unknown>([['a', {}], ['b', {}], ['c', {}]])
+        Object.defineProperty(mockServiceRegistry.sources, 'fusionAccountsByNativeIdentity', {
+            configurable: true,
+            get: () => fusionMap,
+        })
+        mockServiceRegistry.sources.fusionAccountCount = fusionMap.size
+        mockServiceRegistry.sources.clearFusionAccounts = jest.fn(() => {
+            callOrder.push('clearFusionAccounts')
+            fusionMap.clear()
+        })
+        mockServiceRegistry.fusion.fusionReportOnAggregation = true
+        mockServiceRegistry.reports = {
+            generateAndSendFusionReport: jest.fn(async () => {
+                callOrder.push('reportPhase')
+                seenCounts.push(mockServiceRegistry.sources.fusionAccountCount)
+            }),
+        }
+
+        await PipelineRunner.run(mockServiceRegistry, {
+            mode: { kind: 'aggregation' },
+        })
+
+        expect(seenCounts).toEqual([3])
+        expect(callOrder).toEqual(['reportPhase', 'clearFusionAccounts'])
+        expect(mockServiceRegistry.sources.clearFusionAccounts).toHaveBeenCalledTimes(1)
+    })
 })
 

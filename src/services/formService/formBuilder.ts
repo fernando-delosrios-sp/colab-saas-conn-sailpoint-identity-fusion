@@ -141,14 +141,14 @@ export const buildFormInput = (
     // For identities SELECT, we use displayName as the label and id as the value.
     //
     // Priority for the human-friendly account label used in reports and decision history:
-    // 1. identityDisplayName — the correlated identity's full name (most authoritative when attached)
+    // 1. identityName — the correlated identity's alias/login (IdentityInfo.name chain)
     // 2. name / displayName — fusion row title (ISC Account.name; displayName aliases name)
     // 3. managedAccountIdentifier — managed account key when labels are unavailable
     const preferredAccountLabel =
-        fusionAccount.identityDisplayName || fusionAccount.name || fusionAccount.displayName || managedAccountIdentifier
-    if (!fusionAccount.identityDisplayName && !fusionAccount.name && !fusionAccount.displayName) {
+        fusionAccount.identityName || fusionAccount.name || fusionAccount.displayName || managedAccountIdentifier
+    if (!fusionAccount.identityName && !fusionAccount.name && !fusionAccount.displayName) {
         logger.error(
-            `[formBuilder] Missing identityDisplayName/name for fusion account. Using managed account key fallback: ${managedAccountIdentifier}`
+            `[formBuilder] Missing identityName/name for fusion account. Using managed account key fallback: ${managedAccountIdentifier}`
         )
     }
 
@@ -530,9 +530,9 @@ export const buildFormInputs = (
 
     // Account info
     // IMPORTANT: Use the same label priority as buildFormInput so form definition and instance are consistent.
-    if (!fusionAccount.identityDisplayName && !fusionAccount.name && !fusionAccount.displayName) {
+    if (!fusionAccount.identityName && !fusionAccount.name && !fusionAccount.displayName) {
         logger.error(
-            `[formBuilder] Missing identityDisplayName/name for fusion account in form inputs. Using managed account key fallback: ${managedAccountIdentifier}`
+            `[formBuilder] Missing identityName/name for fusion account in form inputs. Using managed account key fallback: ${managedAccountIdentifier}`
         )
     }
 
@@ -542,7 +542,7 @@ export const buildFormInputs = (
             type: 'STRING',
             label: 'name',
             description:
-                fusionAccount.identityDisplayName ||
+                fusionAccount.identityName ||
                 fusionAccount.name ||
                 fusionAccount.displayName ||
                 managedAccountIdentifier,
