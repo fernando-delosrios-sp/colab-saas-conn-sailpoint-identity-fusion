@@ -61,3 +61,6 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+## 2024-06-24 - Avoid spreading Sets and Maps in hot loops
+**Learning:** Using the spread operator (`...`) to create temporary arrays from Sets or Maps inside high-frequency loops (like O(N*M) scoring iterations) causes significant memory allocation and garbage collection overhead.
+**Action:** Instead of spreading, use direct `for...of` iterations or targeted lookup functions like `hasEquivalentManagedAccountId` which allow early exits and avoid intermediate allocations.

@@ -1888,10 +1888,12 @@ export class FusionService {
             if (index) {
                 if (index.has(key)) return true
             } else {
-                const isLinked = [...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()].some(
-                    (fa) => fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)
-                )
-                if (isLinked) return true
+                for (const fa of this.fusionAccountMap.values()) {
+                    if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) return true
+                }
+                for (const fa of this.fusionIdentityMap.values()) {
+                    if (fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)) return true
+                }
             }
         }
         const identityId = account.identityId
