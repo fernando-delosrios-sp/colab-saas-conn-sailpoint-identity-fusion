@@ -370,6 +370,14 @@
                             "type": "toggle",
                             "required": false,
                             "helpKey": "Skip accounts that are missing a unique identity value. These accounts will be logged so you can review them later"
+                        },
+                        {
+                            "key": "cascadeAggregationEnabled",
+                            "label": "Enable cascade aggregation for single account read",
+                            "type": "toggle",
+                            "value": "false",
+                            "required": false,
+                            "helpKey": "When enabled, triggers aggregation of managed sources before fetching managed accounts during single account operations (e.g., accountRead). This ensures the most up-to-date account data is fetched before processing the fusion account. Errors during cascade aggregation are logged but do not stop the main process."
                         }
                     ]
                 }
@@ -893,6 +901,73 @@
                             "type": "toggle",
                             "required": false,
                             "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-type breakdown metrics"
+                        },
+                        {
+                            "key": "enableLocalization",
+                            "label": "Enable localized user communications?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "Translate emails, reports, and Fusion reviews to the recipient's preferred language. This depends on an identity language attribute."
+                        },
+                        {
+                            "key": "defaultLanguage",
+                            "label": "Default Language",
+                            "type": "select",
+                            "required": false,
+                            "parentKey": "enableLocalization",
+                            "parentValue": "true",
+                            "helpKey": "The default language to use when the recipient's language cannot be determined.",
+                            "options": [
+                                {
+                                    "label": "English",
+                                    "value": "en"
+                                },
+                                {
+                                    "label": "Spanish",
+                                    "value": "es"
+                                },
+                                {
+                                    "label": "French",
+                                    "value": "fr"
+                                },
+                                {
+                                    "label": "German",
+                                    "value": "de"
+                                },
+                                {
+                                    "label": "Chinese",
+                                    "value": "zh"
+                                },
+                                {
+                                    "label": "Japanese",
+                                    "value": "ja"
+                                },
+                                {
+                                    "label": "Portuguese",
+                                    "value": "pt"
+                                },
+                                {
+                                    "label": "Italian",
+                                    "value": "it"
+                                },
+                                {
+                                    "label": "Russian",
+                                    "value": "ru"
+                                },
+                                {
+                                    "label": "Arabic",
+                                    "value": "ar"
+                                }
+                            ]
+                        },
+                        {
+                            "key": "identityLanguageAttribute",
+                            "label": "Identity Language Attribute",
+                            "type": "text",
+                            "required": false,
+                            "parentKey": "enableLocalization",
+                            "parentValue": "true",
+                            "helpKey": "Identity attribute containing the user's preferred language. Recognizes common language formats (e.g. 'en', 'eng', 'english', 'en-US')."
                         }
                     ]
                 }
@@ -905,7 +980,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance.</strong><br><br><ul><li><strong>Reset & refresh:</strong> Rebuild all Fusion accounts from scratch or force recalculate all Normal-type attributes on the next run.</li><li><strong>Batch limits:</strong> Optimize memory usage vs throughput during match detection.</li><li><strong>Misc:</strong> Prevent multiple runs overlapping or stream logs to monitoring services.</li></ul>",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation), manage memory consumption during match detection by adjusting batch sizes, and configure external logging for centralized monitoring.",
                     "items": [
                         {
                             "key": "reset",
@@ -926,14 +1001,14 @@
                             "label": "Enable concurrency check?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Prevent multiple aggregations from running at the same time, which could cause conflicts. Recommended to keep enabled"
+                            "helpKey": "Safeguard against data conflicts if multiple aggregations overlap. Recommended to keep enabled"
                         },
                         {
                             "key": "externalLoggingEnabled",
                             "label": "Enable external logging?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Send connector logs to an external service (e.g. Splunk) for centralized monitoring and troubleshooting"
+                            "helpKey": "Stream connector execution logs directly to external monitoring services like Splunk or Datadog for centralized troubleshooting"
                         },
                         {
                             "key": "externalLoggingUrl",
@@ -983,7 +1058,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Advanced Connection Settings",
-                    "sectionHelpMessage": "<strong>Fine-tune API and queue behavior.</strong><br><br><ul><li><strong>Provisioning timeout:</strong> Max wait for operations.</li><li><strong>Queue:</strong> Enable rate limiting and concurrency control.</li><li><strong>Retry:</strong> Auto-retry failed requests (recommended).</li><li><strong>Processing wait time:</strong> Keep-alive interval for long operations.</li><li><strong>Batching:</strong> Group requests for efficiency.</li></ul>",
+                    "sectionHelpMessage": "<strong>Fine-tune API limits and execution resilience.</strong><br><br>Adjust these parameters to prevent the connector from being rate-limited by Identity Security Cloud, ensure long-running operations complete without timing out, and optimize the throughput by adjusting request concurrency and batching sizes.",
                     "items": [
                         {
                             "key": "provisioningTimeout",
@@ -1026,7 +1101,7 @@
                             "label": "Enable retry?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Automatically retry requests that fail due to temporary errors (e.g. timeouts or rate limits). Recommended for production use"
+                            "helpKey": "Protect against temporary API failures, network timeouts, or rate limits. Recommended for production use"
                         },
                         {
                             "key": "maxRetries",
@@ -1078,14 +1153,14 @@
                 {
                     "type": "section",
                     "sectionTitle": "Proxy Settings",
-                    "sectionHelpMessage": "<strong>Delegate processing to external server.</strong><br><br>Run connector logic on your own infrastructure.<br><ul><li><strong>Proxy URL:</strong> External endpoint.</li><li><strong>Proxy password:</strong> Secret for authentication (must match PROXY_PASSWORD env var on proxy).</li></ul>",
+                    "sectionHelpMessage": "<strong>Delegate processing to your own infrastructure.</strong><br><br>Configure the connector to route all processing through a self-hosted proxy server, which allows you to execute operations outside of the cloud environment while maintaining secure authentication.",
                     "items": [
                         {
                             "key": "proxyEnabled",
                             "label": "Enable proxy mode?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Route all processing through your own server instead of running it in the cloud. Use this if you need to run the connector on your own infrastructure"
+                            "helpKey": "Offload processing workload to your own infrastructure by routing operations through a dedicated server, which is useful for highly restricted or specialized environments"
                         },
                         {
                             "key": "proxyUrl",
