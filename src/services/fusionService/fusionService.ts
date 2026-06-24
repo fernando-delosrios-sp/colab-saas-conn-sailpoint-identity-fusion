@@ -86,7 +86,7 @@ export class FusionService {
     private readonly operationContext?: string
     private readonly currentRunUnmatchedFusionNativeIdentitiesBySource: Map<string, Set<string>> = new Map()
     /**
-     * Identity IDs that were auto-assigned via exact match in the current `processManagedAccounts` run.
+     * Identity IDs that were auto-assigned via automatic assignment threshold in the current `processManagedAccounts` run.
      * Used to skip already-claimed identities during subsequent managed account scoring when
      * `fusionEnableAutoAssignment` is enabled, preventing duplicate assignments or spurious form creation.
      */
@@ -1372,7 +1372,7 @@ export class FusionService {
     ): Promise<FusionAccount | undefined> {
         this.removeMatchAccount(fusionAccount.managedAccountId)
         this.log.debug(
-            `Account ${account.name} [${fusionAccount.sourceName}] has all scores 100, automatic assignment to identity ${identityId}`
+            `Account ${account.name} [${fusionAccount.sourceName}] meets the automatic assignment threshold, auto-assigning to identity ${identityId}`
         )
         // Prevent subsequent managed accounts from scoring against this identity
         this.autoAssignedIdentityIds.add(identityId)

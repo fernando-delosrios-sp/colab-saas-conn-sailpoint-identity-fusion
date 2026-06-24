@@ -261,7 +261,7 @@
                                             "value": "10",
                                             "parentKey": "aggregationMode",
                                             "parentValue": "before",
-                                            "helpKey": "Maximum time to wait for this source's aggregation to finish when using Aggregate before processing. The connector checks task status every 30 seconds until completion or this timeout. Increase for very large sources. Default: 10 minutes"
+                                            "helpKey": "Maximum time to wait for this source's aggregation to finish when using Aggregate before processing. The connector checks task status every 30 seconds until completion or this timeout. Increase for very large sources."
                                         },
                                         {
                                             "key": "aggregationDelay",
@@ -355,7 +355,7 @@
                             "type": "number",
                             "required": false,
                             "min": "1",
-                            "helpKey": "Number of processing history entries to keep per account. Older entries are removed automatically. Default: 10"
+                            "helpKey": "Number of processing history entries to keep per account. Older entries are removed automatically."
                         },
                         {
                             "key": "deleteEmpty",
@@ -601,7 +601,7 @@
                             "type": "number",
                             "required": false,
                             "min": "1",
-                            "helpKey": "Maximum number of tries to find a value that is not already taken. Increase if you have a very large number of existing accounts. Default: 20"
+                            "helpKey": "Maximum number of tries to find a value that is not already taken. Increase if you have a very large number of existing accounts."
                         },
                         {
                             "key": "uniqueAttributeDefinitions",
@@ -727,21 +727,28 @@
                 {
                     "type": "section",
                     "sectionTitle": "Matching Settings",
-                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><ul><li><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.</li><li><strong>Thresholds & weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.</li><li><strong>Strictness:</strong> Enforce mandatory rules or optionally assign to the matched identity without manual review when scores are an exact attribute match (every real rule scored 100 with none skipped).</li></ul>",
+                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><ul><li><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.</li><li><strong>Thresholds & weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.</li><li><strong>Auto-assignment:</strong> Optionally bypass manual review and automatically assign the managed account to a matched identity if the combined score meets or exceeds your defined automatic assignment threshold.</li></ul>",
                     "items": [
                         {
-                            "key": "fusionAverageScore",
-                            "label": "Minimum combined match score [0-100]",
+                            "key": "fusionManualReviewScore",
+                            "label": "Manual review match score [0-100]",
                             "type": "number",
                             "required": true,
                             "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match. Mandatory rules must still meet their own minimums."
                         },
                         {
-                            "key": "fusionMergingExactMatch",
-                            "label": "Automatically assign on exact match?",
+                            "key": "fusionEnableAutoAssignment",
+                            "label": "Enable automatic assignment",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "When every configured attribute rule scores 100 and none were skipped (exact attribute match), assign the managed account to that identity without a review form. Merge and correlation behave like a link-to-existing review, but the fusion account receives the Auto status entitlement only (not Authorized). Only enable when you are confident your matching rules produce accurate results."
+                            "helpKey": "When enabled, assign the managed account to the matched identity without a review form if the combined score meets or exceeds the automatic assignment match score. Merge and correlation behave like a link-to-existing review, but the fusion account receives the Auto status entitlement only (not Authorized)."
+                        },
+                        {
+                            "key": "fusionAutoAssignmentScore",
+                            "label": "Automatic assignment match score [0-100]",
+                            "type": "number",
+                            "required": false,
+                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically assigned. Must be greater than or equal to the manual review score."
                         },
                         {
                             "key": "matchingConfigs",
@@ -862,14 +869,16 @@
                             "label": "Maximum candidates per review form",
                             "type": "number",
                             "required": false,
-                            "helpKey": "Maximum number of potential identity matches shown on each manual review form. If more identities qualify, only the highest-scoring candidates are included (combined match score, then stable tie-break). Valid range: 1–15. Default: 3"
+                            "min": "1",
+                            "max": "15",
+                            "helpKey": "Maximum number of potential identity matches shown on each manual review form. If more identities qualify, only the highest-scoring candidates are included (combined match score, then stable tie-break). Valid range: 1–15."
                         },
                         {
                             "key": "fusionFormExpirationDays",
                             "label": "Manual review expiration days",
                             "type": "number",
                             "required": true,
-                            "helpKey": "Number of days a reviewer has to respond before the review form expires. Default: 7"
+                            "helpKey": "Number of days a reviewer has to respond before the review form expires."
                         },
                         {
                             "key": "fusionOwnerIsGlobalReviewer",
@@ -896,7 +905,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance.</strong><br><br><ul><li><strong>Reset & refresh:</strong> Rebuild all Fusion accounts from scratch or force recalculate all Normal-type attributes on every run.</li><li><strong>Batch limits:</strong> Optimize memory usage vs throughput during match detection.</li><li><strong>Misc:</strong> Prevent multiple runs overlapping or stream logs to monitoring services.</li></ul>",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance.</strong><br><br><ul><li><strong>Reset & refresh:</strong> Rebuild all Fusion accounts from scratch or force recalculate all Normal-type attributes on the next run.</li><li><strong>Batch limits:</strong> Optimize memory usage vs throughput during match detection.</li><li><strong>Misc:</strong> Prevent multiple runs overlapping or stream logs to monitoring services.</li></ul>",
                     "items": [
                         {
                             "key": "reset",
@@ -967,21 +976,21 @@
                             "label": "Managed accounts batch size",
                             "type": "number",
                             "required": false,
-                            "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100. Default: 50"
+                            "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100."
                         }
                     ]
                 },
                 {
                     "type": "section",
                     "sectionTitle": "Advanced Connection Settings",
-                    "sectionHelpMessage": "<strong>Fine-tune API and queue behavior.</strong><br><br><ul><li><strong>Provisioning timeout:</strong> Max wait for operations (default: 300s).</li><li><strong>Queue:</strong> Enable rate limiting and concurrency control.</li><li><strong>Retry:</strong> Auto-retry failed requests (recommended).</li><li><strong>Processing wait time:</strong> Keep-alive interval for long operations.</li><li><strong>Batching:</strong> Group requests for efficiency.</li></ul>",
+                    "sectionHelpMessage": "<strong>Fine-tune API and queue behavior.</strong><br><br><ul><li><strong>Provisioning timeout:</strong> Max wait for operations.</li><li><strong>Queue:</strong> Enable rate limiting and concurrency control.</li><li><strong>Retry:</strong> Auto-retry failed requests (recommended).</li><li><strong>Processing wait time:</strong> Keep-alive interval for long operations.</li><li><strong>Batching:</strong> Group requests for efficiency.</li></ul>",
                     "items": [
                         {
                             "key": "provisioningTimeout",
                             "label": "Provisioning timeout (seconds)",
                             "type": "number",
                             "required": true,
-                            "helpKey": "Maximum time (in seconds) to wait for a provisioning operation to complete. Increase this if you experience timeouts with large batches. Default: 300"
+                            "helpKey": "Maximum time (in seconds) to wait for a provisioning operation to complete. Increase this if you experience timeouts with large batches."
                         },
                         {
                             "key": "enableQueue",
@@ -999,7 +1008,7 @@
                             "max": "10",
                             "parentKey": "enableQueue",
                             "parentValue": "true",
-                            "helpKey": "How many requests can run at the same time. Lower values are safer for rate-limited APIs. Default: 8"
+                            "helpKey": "How many requests can run at the same time. Lower values are safer for rate-limited APIs."
                         },
                         {
                             "key": "requestsPerSecond",
@@ -1010,7 +1019,7 @@
                             "max": "12",
                             "parentKey": "enableQueue",
                             "parentValue": "true",
-                            "helpKey": "Maximum number of requests sent per second. Reduce this if you are getting rate-limit errors. Default: 8"
+                            "helpKey": "Maximum number of requests sent per second. Reduce this if you are getting rate-limit errors."
                         },
                         {
                             "key": "enableRetry",
@@ -1028,15 +1037,15 @@
                             "max": "20",
                             "parentKey": "enableRetry",
                             "parentValue": "true",
-                            "helpKey": "How many times to retry a failed request before giving up. Default: 20"
+                            "helpKey": "How many times to retry a failed request before giving up."
                         },
                         {
                             "key": "processingWait",
                             "label": "Processing wait time (seconds)",
                             "type": "number",
-                            "required": true,
-                            "min": "0",
-                            "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts. Default: 60"
+                            "required": false,
+                            "min": "10",
+                            "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts."
                         },
                         {
                             "key": "retryDelay",
@@ -1044,7 +1053,9 @@
                             "type": "number",
                             "required": true,
                             "min": "0",
-                            "helpKey": "Time to wait (in milliseconds) before retrying a failed request. The server may override this with its own recommended wait time. Default: 1000"
+                            "parentKey": "enableRetry",
+                            "parentValue": "true",
+                            "helpKey": "Time to wait (in milliseconds) before retrying a failed request. The server may override this with its own recommended wait time."
                         },
                         {
                             "key": "batchSize",
@@ -1053,7 +1064,7 @@
                             "required": true,
                             "min": "1",
                             "max": "250",
-                            "helpKey": "Number of requests to group in each batch. Default: 250"
+                            "helpKey": "Number of requests to group in each batch."
                         },
                         {
                             "key": "enablePriority",
