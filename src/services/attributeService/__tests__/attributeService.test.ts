@@ -605,7 +605,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
         expect(fusionAccount.attributes.computed).toBeUndefined()
     })
 
-    it('returns undefined for unique definition with unresolved vars when $counter is auto-appended', async () => {
+    it('returns UUID fallback for unique definition with unresolved vars when $counter is auto-appended', async () => {
         const config = {
             attributeMaps: [],
             attributeMerge: 'first',
@@ -671,7 +671,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
 
         await service.refreshUniqueAttributes(fusionAccount)
 
-        expect(fusionAccount.attributes.id).toBeUndefined()
+        expect(fusionAccount.attributes.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
     })
 
     it('does not auto-append $counter when unique expression includes $UUID', async () => {
@@ -1888,7 +1888,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
         } as any,
     })
 
-    it('normal definition on fusion identity falls back to originAccountId', async () => {
+    it('normal definition on fusion identity falls back to a generated UUID when originAccountId is absent', async () => {
         const { sourceService, log, locks } = baseDeps()
         const config = {
             attributeMaps: [],
@@ -1933,10 +1933,10 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.id).toBe('src-hr::native-1')
+        expect(fusionAccount.attributes.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
     })
 
-    it('normal definition on fusion identity falls back to attributes.originAccount when originAccountId missing', async () => {
+    it('normal definition on fusion identity falls back to a generated UUID when only attributes.originAccount is set', async () => {
         const { sourceService, log, locks } = baseDeps()
         const config = {
             attributeMaps: [],
@@ -1980,7 +1980,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.id).toBe('from-attrs-only')
+        expect(fusionAccount.attributes.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
     })
 
     it('normal definition on fusion display falls back to fusion account name', async () => {
@@ -2083,7 +2083,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshUniqueAttributes(fusionAccount)
-        expect(fusionAccount.attributes.id).toBe('src-hr::uniq-origin')
+        expect(fusionAccount.attributes.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
         expect(fusionAccount.attributes.name).toBe('unique-fallback-display')
     })
 

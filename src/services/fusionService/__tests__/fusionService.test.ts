@@ -437,11 +437,12 @@ describe('FusionService', () => {
     })
 
     describe('FusionAccount identity reference hydration', () => {
-        it('hydrates identity name from prior fusion account identity reference when Identity document is unavailable', () => {
+        it('hydrates identity alias from prior fusion account identity reference when Identity document is unavailable', () => {
             const prior = {
                 nativeIdentity: 'fusion-identity-1',
                 sourceId: 'mock-source',
                 name: '',
+                identityId: 'identity-1',
                 attributes: {
                     id: 'fusion-identity-1',
                     // Simulate legacy/persisted state where attributes.name may be blank or not the true identity name
@@ -454,13 +455,15 @@ describe('FusionService', () => {
 
             const fusionAccount = FusionAccount.fromFusionAccount(prior)
 
-            expect(fusionAccount.name).toBe('Jane Identity (from ref)')
-            expect(fusionAccount.displayName).toBe('Jane Identity (from ref)')
+            // name is the source title (account.name) and is empty here; alias chain picks up the identity ref name
+            expect(fusionAccount.name).toBeUndefined()
+            expect(fusionAccount.displayName).toBeUndefined()
+            expect(fusionAccount.identityName).toBe('Jane Identity (from ref)')
             expect(fusionAccount.identityDisplayName).toBe('Jane Identity (from ref)')
             expect((fusionAccount.attributeBag.identity as any)?.name).toBeUndefined()
         })
 
-        it('does not derive identity display label from account.name when identity reference is absent', () => {
+        it('does not consider a name-only reference an identity linkage', () => {
             const prior = {
                 nativeIdentity: 'fusion-identity-no-ref',
                 sourceId: 'mock-source',
@@ -468,10 +471,16 @@ describe('FusionService', () => {
                 attributes: {
                     id: 'fusion-identity-no-ref',
                 },
+                identity: {
+                    name: 'Name Only Ref',
+                },
             } as unknown as Account
 
             const fusionAccount = FusionAccount.fromFusionAccount(prior)
 
+            // No identityId was supplied, so IdentityInfo cannot be built: name-only references
+            // are not treated as identity linkages.
+            expect(fusionAccount.isIdentity).toBe(false)
             expect(fusionAccount.displayName).toBe('Managed Account Name')
             expect(fusionAccount.identityDisplayName).toBeUndefined()
         })
@@ -502,7 +511,9 @@ describe('FusionService', () => {
 
             fusionAccount.addIdentityLayer(identityDoc)
 
-            expect(fusionAccount.name).toBe('Stale Name (from ref)')
+            // name is the source title (still empty); displayName comes from identity.attributes.displayName
+            expect(fusionAccount.name).toBeUndefined()
+            expect(fusionAccount.identityName).toBe('Authoritative Identity Name')
             expect(fusionAccount.identityDisplayName).toBe('Authoritative Display Name')
         })
     })
@@ -566,7 +577,7 @@ describe('FusionService', () => {
             )
         })
 
-        it('sets fusion display attribute from identity name', async () => {
+        it('sets fusion display attribute from identity name at output time', async () => {
             const mockIdentity = {
                 id: 'identity-display-1',
                 name: 'Jane Doe',
@@ -577,10 +588,14 @@ describe('FusionService', () => {
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
+            mockAttributes.applyDisplayAttributeOverride.mockImplementation((account) => {
+                account.attributes.displayName = account.identityName ?? null
+            })
 
             const result = await fusionService.processIdentity(mockIdentity)
 
             expect(result).toBeDefined()
+            mockAttributes.applyDisplayAttributeOverride(result!)
             expect(result?.attributes.displayName).toBe('Jane Doe')
         })
 
@@ -2132,6 +2147,71 @@ describe('FusionService', () => {
             expect(analyzed[1].fusionMatches.some((match) => match.candidateType === 'new-unmatched')).toBe(true)
             expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
         })
+
+        it('makes previously-persisted non-match accounts visible as deferred candidates', async () => {
+            const persistedNonMatch = FusionAccount.fromManagedAccount({
+                id: 'acct-persisted-nonmatch',
+                nativeIdentity: 'native-persisted-nonmatch',
+                name: 'Previously Persisted Non-Match',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+            } as any)
+            persistedNonMatch.setNonMatched()
+            ;(fusionService as any).fusionAccountMap.set(
+                'source-a-id::native-persisted-nonmatch',
+                persistedNonMatch
+            )
+
+            ;(fusionService as any).sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: { deferredMatching: true },
+            })
+
+            mockAttributes.mapAttributes.mockImplementation((account) => account)
+            mockAttributes.refreshNormalAttributes.mockResolvedValue()
+
+            const workQueue = new Map() as Map<string, Account>
+            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+
+            await fusionService.initializeManagedAccountProcessing()
+
+            const newAccount = {
+                id: 'acct-new-revisit',
+                nativeIdentity: 'native-new-revisit',
+                name: 'Previously Persisted Non-Match',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+
+            let deferredCandidatesFound = 0
+            mockScoring.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
+                const n = Array.from(candidates).length
+                if (candidateType === 'new-unmatched') {
+                    deferredCandidatesFound = n
+                    if (n > 0) {
+                        _account.addFusionMatch({
+                            identityId: '',
+                            identityName: 'Previously Persisted Non-Match',
+                            candidateType: 'new-unmatched',
+                            scores: [
+                                { attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any,
+                            ],
+                        } as any)
+                    }
+                }
+                return n
+            })
+
+            await fusionService.analyzeManagedAccount(newAccount)
+
+            expect(deferredCandidatesFound).toBe(1)
+        })
     })
 
     describe('setFusionAccount routing', () => {
@@ -2171,6 +2251,22 @@ describe('FusionService', () => {
 
             const inAccountMap = fusionService.getFusionAccountByNativeIdentity('fusion-noident-1')
             expect(inAccountMap).toBe(account)
+        })
+
+        it('routes a persisted fusion account into fusionIdentityMap via the attributes.identityId fallback', () => {
+            // Realistic SDK payload: no top-level identityId, only the persisted attribute.
+            // This is the data shape produced by the connector's own getISCAccount output.
+            const account = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-attr-1',
+                name: 'Persisted Identity',
+                sourceName: 'Identity Fusion NG',
+                attributes: { identityId: 'identity-1' },
+            } as unknown as Account)
+
+            fusionService.setFusionAccount(account)
+
+            expect(fusionService.getFusionIdentity('identity-1')).toBe(account)
+            expect(fusionService.getFusionAccountByNativeIdentity('fusion-attr-1')).toBeUndefined()
         })
 
         it('prefers managed composite key over legacy nativeIdentity for unmatched persisted accounts', () => {

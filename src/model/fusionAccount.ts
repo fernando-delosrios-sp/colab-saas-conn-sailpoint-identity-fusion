@@ -133,6 +133,12 @@ export class FusionAccount {
 
     /**
      * Builds a unified IdentityInfo runtime object from an IdentityDocument or standard parameter bag.
+     *
+     * Rules:
+     * - `id` is mandatory and non-empty. Without it, no IdentityInfo is returned.
+     * - `name` is the alias/login chain: identity.name || account.identity?.name || decision.identityName.
+     * - `displayName` is the human-readable chain:
+     *   identity.attributes.displayName || identity.name || account.identity?.name || account.name.
      */
     public static buildIdentityInfo(
         source: IdentityDocument | Account | FusionDecision | { id?: string | null; name?: string | null; displayName?: string | null }
@@ -143,55 +149,56 @@ export class FusionAccount {
 
         // FusionDecision
         if ('account' in source && ('identityName' in source || 'identityId' in source)) {
-            id = trimStr((source as FusionDecision).identityId)
-            name = trimStr((source as FusionDecision).identityName)
-            displayName = name
+            const decision = source as FusionDecision
+            id = trimStr(decision.identityId)
+            name = trimStr(decision.identityName)
+            displayName = name ?? trimStr(decision.account.name) ?? trimStr(decision.account.id)
         }
         // Account
         else if ('sourceId' in source || 'nativeIdentity' in source || 'accountId' in source || 'identityId' in source || 'identity' in source) {
-            id = trimStr((source as Account).identityId)
-            name = trimStr((source as { identity?: { name?: string } }).identity?.name)
-            displayName = trimStr(FusionAccount.labelsFromAccount(source as Account).identityDisplayName)
+            const account = source as Account
+            id = trimStr(account.identityId)
+            name = trimStr((account as { identity?: { name?: string } }).identity?.name)
+            displayName = FusionAccount.identityDisplayNameFromAccount(account)
         }
         // IdentityDocument
         else if ('attributes' in source && source.attributes) {
-            id = trimStr(source.id)
-            name = trimStr(source.name)
-            displayName = trimStr(FusionAccount.identityLabelFromIdentity(source as IdentityDocument))
+            const identity = source as IdentityDocument
+            id = trimStr(identity.id)
+            name = trimStr(identity.name)
+            displayName = FusionAccount.identityDisplayNameFromIdentity(identity)
         }
         // Fallback standard bag
         else {
             id = trimStr((source as any).id)
             name = trimStr((source as any).name)
-            displayName = trimStr((source as any).displayName)
+            displayName = trimStr((source as any).displayName) ?? name
         }
 
-        if (!id && !name && !displayName) {
+        // id is mandatory for an identity linkage
+        if (!id) {
             return undefined
         }
 
         return {
-            id: id ?? '',
-            name: name ?? displayName ?? '',
+            id,
+            name: name ?? '',
             displayName: displayName ?? name ?? '',
         }
     }
 
-    /** Identity-side label: attributes.displayName || displayName || name || id. */
-    private static identityLabelFromIdentity(identity: IdentityDocument): string | undefined {
+    /** Identity-side display label: identity.attributes.displayName || identity.name. */
+    private static identityDisplayNameFromIdentity(identity: IdentityDocument): string | undefined {
         const fromAttrs = (identity.attributes as Record<string, unknown> | undefined)?.displayName as
             | string
             | undefined
-        const top = (identity as { displayName?: string }).displayName
-        return fromAttrs || top || identity.name || identity.id || undefined
+        return trimStr(fromAttrs) ?? trimStr(identity.name) ?? undefined
     }
 
-    /** From an ISC account: identity display label comes from account.identity.name only. */
-    private static labelsFromAccount(account: Account): { identityDisplayName?: string; accountName?: string } {
+    /** Account-side display label: account.identity?.name || account.name. */
+    private static identityDisplayNameFromAccount(account: Account): string | undefined {
         const identityRefName = (account as { identity?: { name?: string } }).identity?.name
-        const identityDisplayName = identityRefName || undefined
-        const accountName = account.name || undefined
-        return { identityDisplayName, accountName }
+        return trimStr(identityRefName) ?? trimStr(account.name) ?? undefined
     }
 
     /**
@@ -279,8 +286,6 @@ export class FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourceSet = new Set<string>()
         const statuses = attributeToSet(account.attributes, 'statuses')
-        const { identityDisplayName, accountName } = FusionAccount.labelsFromAccount(account)
-        const accountDisplayName = accountName || identityDisplayName || undefined
         const resolvedCompositeManagedKey = FusionAccount.resolveCompositeKeyFromFusionRecord(account)
         if (statuses.has('baseline')) sourceSet.add('Identities')
 
@@ -289,7 +294,7 @@ export class FusionAccount {
         fusionAccount.initializeBasicProperties({
             type: FusionAccountKind.Fusion,
             nativeIdentity: resolvedCompositeManagedKey ?? (account.nativeIdentity as string),
-            name: accountDisplayName,
+            name: trimStr(account.name),
             sourceName: account.sourceName,
             disabled: account.disabled,
             sources: sourceSet,
@@ -306,6 +311,15 @@ export class FusionAccount {
             const normalizedOriginAccount = normalizeCompositeManagedAccountKey(account.attributes.originAccount)
             const trimmedOriginAccount = account.attributes.originAccount.trim()
             fusionAccount._originAccount = normalizedOriginAccount ?? (trimmedOriginAccount || undefined)
+        }
+        // Restore the persisted identity ID so identity-backed accounts route to fusionIdentityMap
+        // even when the SDK Account does not expose `identityId` directly. We fold the value into
+        // `_identityInfo` so the `identityId` getter has a single authoritative source.
+        if (!fusionAccount._identityInfo?.id && typeof account.attributes?.identityId === 'string') {
+            const trimmedIdentityId = account.attributes.identityId.trim()
+            if (trimmedIdentityId.length > 0) {
+                fusionAccount.setIdentityIdAttribute(trimmedIdentityId)
+            }
         }
         // Capture the previously stored account IDs so we can later rebuild
         // the current and missing account sets based on which managed accounts
@@ -330,10 +344,10 @@ export class FusionAccount {
      */
     public static fromIdentity(identity: IdentityDocument): FusionAccount {
         const fusionAccount = new FusionAccount()
-        const identityDisplayName = FusionAccount.identityLabelFromIdentity(identity)
         fusionAccount.initializeBasicProperties({
             type: FusionAccountKind.Identity,
             nativeIdentity: identity.id,
+            name: trimStr(identity.name),
             sourceName: 'Identities',
             disabled: identity.disabled,
             needsRefresh: true,
@@ -343,6 +357,7 @@ export class FusionAccount {
         })
         fusionAccount._originSource = 'Identities'
         fusionAccount._originAccount = identity.id ?? undefined
+        fusionAccount.setIdentityIdAttribute(identity.id)
         fusionAccount.setBaseline()
         return fusionAccount
     }
@@ -359,8 +374,6 @@ export class FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourcesAttr = account.attributes?.sources
         const sourceSet = sourcesAttr ? new Set(attrSplit(String(sourcesAttr))) : new Set<string>()
-        const { identityDisplayName, accountName } = FusionAccount.labelsFromAccount(account)
-        const accountDisplayName = accountName || identityDisplayName || undefined
 
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
         if (!managedAccountKey) {
@@ -374,7 +387,7 @@ export class FusionAccount {
         fusionAccount.initializeBasicProperties({
             type: FusionAccountKind.Managed,
             nativeIdentity: managedAccountKey,
-            name: accountDisplayName,
+            name: trimStr(account.name),
             sourceName: account.sourceName,
             disabled: account.disabled,
             needsRefresh: true,
@@ -403,8 +416,7 @@ export class FusionAccount {
     public static fromFusionDecision(decision: FusionDecision): FusionAccount {
         const fusionAccount = new FusionAccount()
         const { account } = decision
-        const identityDisplayName = decision.identityName || undefined
-        const accountName = account.name || account.id || identityDisplayName || undefined
+        const accountName = trimStr(account.name) ?? trimStr(account.id) ?? undefined
         const managedAccountKey = buildManagedAccountKey({
             sourceId: readString(account, 'sourceId'),
             nativeIdentity: readString(account, 'nativeIdentity'),
@@ -441,9 +453,38 @@ export class FusionAccount {
         return this._type
     }
 
-    /** The correlated ISC identity ID, if known. */
+    /**
+     * The correlated ISC identity ID, if known.
+     * Authoritative source is `_identityInfo.id`; when the SDK Account exposes the identity
+     * directly, `buildIdentityInfo` populates `_identityInfo`. When the identity is restored
+     * from the persisted `attributes.identityId` (the connector's own round-trip), this
+     * getter returns that same value via `_identityInfo`.
+     */
     public get identityId(): string | undefined {
         return this._identityInfo?.id
+    }
+
+    /**
+     * Persisted identity ID (mirrors `attributes.identityId` in the bag).
+     * Same value as the `identityId` getter — kept as a distinct accessor so callers can
+     * document intent when reading the persisted attribute specifically.
+     */
+    public get identityIdAttribute(): string | undefined {
+        return this._identityInfo?.id
+    }
+
+    /**
+     * Sets the identity ID on `_identityInfo`, creating the bag if absent. Idempotent.
+     * Non-string/empty values are stored as empty string (consistent with `buildIdentityInfo`),
+     * so `hasValue(identityId)` returns false and the account is correctly treated as uncorrelated.
+     */
+    public setIdentityIdAttribute(value: string | undefined): void {
+        const trimmed = trimStr(value) ?? ''
+        if (!this._identityInfo) {
+            this._identityInfo = { id: trimmed, name: '', displayName: '' }
+            return
+        }
+        this._identityInfo.id = trimmed
     }
 
     /** The native identity (unique key) for this fusion account. Asserts non-null. */
@@ -496,14 +537,14 @@ export class FusionAccount {
         return this._email
     }
 
-    /** Account name (typically the identity display name). */
+    /** Account source title (ISC Account.name). */
     public get name(): string | undefined {
-        return this._name ?? this._identityInfo?.displayName ?? this._identityInfo?.name
+        return this._name
     }
 
     /** Alias for {@link name} (fusion account title / ISC Account.name). */
     public get displayName(): string | undefined {
-        return this.name
+        return this._name
     }
 
     /** Display label for the correlated identity behind this fusion account. */
@@ -550,9 +591,9 @@ export class FusionAccount {
         return this._type === FusionAccountKind.Managed
     }
 
-    /** Whether this fusion account is associated to an ISC identity. */
+    /** Whether this fusion account is associated to an ISC identity. Requires a non-empty identity id. */
     public get isIdentity(): boolean {
-        return this._identityInfo !== undefined
+        return !!this._identityInfo?.id
     }
 
     /**
@@ -958,6 +999,7 @@ export class FusionAccount {
         bag['history'] = [...this._history]
         if (this._originSource !== undefined) bag['originSource'] = this._originSource
         if (this._originAccount !== undefined) bag['originAccount'] = this._originAccount
+        if (this._identityInfo?.id) bag['identityId'] = this._identityInfo.id
     }
 
     /** Queues a review URL for deferred addition (resolved during getISCAccount). */
@@ -1138,7 +1180,6 @@ export class FusionAccount {
      */
     public addIdentityLayer(identity: IdentityDocument): void {
         this._email = identity.attributes?.email as string
-        const label = FusionAccount.identityLabelFromIdentity(identity)
         this._identityInfo = FusionAccount.buildIdentityInfo(identity)
         this._attributeBag.identity = identity.attributes ?? {}
         this._attributeBag.identity.name = identity.name
@@ -1456,7 +1497,6 @@ export class FusionAccount {
             this._attributeBag.accounts.push(contextAttributes)
             // Invalidate cached sourceAttributeMap since sources changed
             this.sourceAttributeMapCache = undefined
-            this._type = FusionAccountKind.Managed
         }
     }
     /** Sets whether this account's attributes need refreshing. */
