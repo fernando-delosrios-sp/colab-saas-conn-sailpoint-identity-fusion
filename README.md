@@ -412,6 +412,22 @@ The documentation site is built with MkDocs and published from the `main` branch
 - **Refactor:** Extracted the core aggregation and dry-run execution pipeline phases into a shared helper function `executeSharedPipelinePhases` to prevent duplicate logging/sequence code.
 - (2026-05-07) Bound identity enrichment batch sizes using `promiseAllBatched` to resolve unbounded API concurrency issues.
 - (2026-05-07) Optimize N+1 fetch in `getRecipientEmails` by batch fetching missing identities.
+- (2026-06-12) Fixed infinite loops in uniqueness counter generation.
+- (2026-06-12) Synced `connector-spec.json` with default values.
+- (2026-06-18) Added OpenSpec support for change-managed specifications.
+- (2026-06-19) Extended orphan detection to identity-origin Fusion accounts and formalized architectural specifications.
+- (2026-06-19) Unified identity-name precedence and removed legacy flat-key fallbacks in Velocity snapshots.
+- (2026-06-21) Initialized Repomix configuration and ignore patterns.
+- (2026-06-22) Updated project dependencies and internal modules within `.opencode`.
+- (2026-06-22) Renamed `fusionAverageScore` to `fusionManualReviewScore` and implemented identity attribute schema discovery.
+- (2026-06-23) Fixed `maxLength` ordering so it is applied as the final output transform after trim, case, spaces, and normalization.
+- (2026-06-23) Implemented a version update procedure for the Identity Fusion NG connector.
+- (2026-06-24) Replaced exact-match auto-assignment with configurable threshold-based automatic assignment settings.
+- (2026-06-24) Added cascade aggregation and localization settings to the connector specification.
+- (2026-06-24) Added a localization guide and documented the cascade aggregation process.
+- (2026-06-24) Added parent key and value constraints to the automatic assignment match score field.
+- (2026-06-24) Made `fusionAutoAssignmentScore` mandatory and enforced strict threshold validation against the manual review score.
+- (2026-06-24) Consolidated Fusion account identity-name resolution: `IdentityInfo` now exposes distinct `id`, alias `name`, and human-readable `displayName` chains; `FusionAccount.name` resolves to the source title only; `fusionDisplayAttribute` and `fusionIdentityAttribute` are now immutable once set (with a UUID fallback for missing identity attributes); identity decisions use mapping/definition config for display resolution. The Fusion Review Decisions card now renders human-readable account names and links the "Created new identity" entry to the ISC account page.
 
 ### 2.1.7 - 2026-06-22
 
