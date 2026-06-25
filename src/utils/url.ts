@@ -160,6 +160,27 @@ export function isValidUrl(url: string | undefined): boolean {
 }
 
 /**
+ * Validates that a string is a secure HTTP/HTTPS URL, rejecting malformed
+ * SSRF bypass payloads (e.g. leading whitespace, invalid schemes).
+ */
+export function isSecureHttpUrl(url: string | undefined): boolean {
+    if (!url) return false
+    if (url.trim() !== url) return false
+    try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return false
+        }
+        if (!url.toLowerCase().startsWith(`${parsed.protocol}//`)) {
+            return false
+        }
+        return true
+    } catch {
+        return false
+    }
+}
+
+/**
  * Ensures a URL ends without a trailing slash.
  */
 export function removeTrailingSlash(url: string): string {
