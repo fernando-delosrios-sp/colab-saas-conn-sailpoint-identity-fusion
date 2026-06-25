@@ -1,4 +1,4 @@
-import { FormInstanceResponseV2025, FormDefinitionInputV2025 } from 'sailpoint-api-client'
+import { FormInstanceResponseV2025 } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import { SourceType } from '../../model/config'
 import { FusionDecision } from '../../model/form'
@@ -29,6 +29,14 @@ function normalizeScalar(value: unknown): string {
 }
 
 /**
+ * Find an input object by its ID from a dictionary-shaped formInput structure.
+ */
+function findDictionaryInput(formInput: any, id: string): any | undefined {
+    if (!formInput || typeof formInput !== 'object') return undefined
+    return Object.values(formInput).find((x: any) => x && x.id === id)
+}
+
+/**
  * Reads the correlated identity ID from either a flat or dictionary form input structure.
  */
 function readCorrelatedIdentityId(formInput: any): string | undefined {
@@ -38,10 +46,7 @@ function readCorrelatedIdentityId(formInput: any): string | undefined {
 
     // Fall back to dictionary structure
     try {
-        const dict = formInput as Record<string, any>
-        const inputObj = Object.values(dict ?? {}).find(
-            (x: any) => x?.id === 'identityId' && (x.value || x.description)
-        )
+        const inputObj = findDictionaryInput(formInput, 'identityId')
         const value = inputObj?.value || inputObj?.description
         return typeof value === 'string' && value.length > 0 ? value : undefined
     } catch {
@@ -108,15 +113,12 @@ export const extractAccountInfoFromFormInput = (
         accountSource = formInput.account.sourceName || formInput.source
     } else {
         // Try dictionary structure (formInput is an object with input objects)
-        const formInputs = formInput as FormDefinitionInputV2025 | undefined
-        const accountInput = Object.values(formInputs ?? {}).find(
-            (x) => x && x.id === 'account' && (x.value?.length ?? 0) > 0
-        )
-        if (accountInput?.value) {
+        const accountInput = findDictionaryInput(formInput, 'account')
+        if (accountInput?.value && accountInput.value.length > 0) {
             accountId = accountInput.value
-            const nameInput = Object.values(formInputs ?? {}).find((x) => x && x.id === 'name')
+            const nameInput = findDictionaryInput(formInput, 'name')
             accountName = nameInput?.value || nameInput?.description
-            const sourceInput = Object.values(formInputs ?? {}).find((x) => x && x.id === 'source')
+            const sourceInput = findDictionaryInput(formInput, 'source')
             accountSource = sourceInput?.value || sourceInput?.description
         }
     }
@@ -143,10 +145,7 @@ export const extractCandidateIdsFromFormInput = (formInput: any): string[] => {
     if (typeof formInput.candidates === 'string') {
         candidatesStr = formInput.candidates
     } else {
-        const formInputs = formInput as Record<string, any>
-        const candidatesInput = Object.values(formInputs).find(
-            (x: any) => x?.id === 'candidates' && (x.value || x.description)
-        )
+        const candidatesInput = findDictionaryInput(formInput, 'candidates')
         candidatesStr = candidatesInput?.value || candidatesInput?.description
     }
 
