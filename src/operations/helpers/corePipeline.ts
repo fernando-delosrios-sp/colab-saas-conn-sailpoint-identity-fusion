@@ -146,7 +146,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
         identities.fetchIdentities(ownerIds),
         sources.fetchManagedAccounts(),
         sources.fetchFusionAccounts(),
-        forms.fetchFormInstancesData(isPersistent),
+        forms.fetchFormInstances(isPersistent),
     ]
 
     if (isPersistent) {

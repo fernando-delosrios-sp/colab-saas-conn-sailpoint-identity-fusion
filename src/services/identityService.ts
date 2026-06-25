@@ -312,12 +312,7 @@ export class IdentityService {
             requestBody: [{ op: 'replace', path: '/identityId', value: identityId }],
         }
 
-        return this.client
-            .execute(
-                () => this.client.accountsApi.updateAccount(requestParameters),
-                QueuePriority.LOW,
-                `IdentityService>correlateAccounts ${accountId}`
-            )
+        return this.executeUpdateAccount(requestParameters, `IdentityService>correlateAccounts ${accountId}`)
             .then(() => {
                 this.log.debug(
                     `Successfully correlated managed key ${accountId} (ISC id ${iscAccountId}) to identity ${identityId}`
@@ -365,19 +360,33 @@ export class IdentityService {
         this.identityIdsInScope.clear()
     }
 
+    public async executeUpdateAccount(requestParameters: AccountsApiUpdateAccountRequest, context: string) {
+        return await this.client.execute(
+            async () => {
+                const response = await this.client.accountsApi.updateAccount(requestParameters)
+                return response.data
+            },
+            QueuePriority.LOW,
+            context
+        )
+    }
+
+    public async executeListIdentityAttributes(context: string) {
+        return await this.client.execute(
+            async () => {
+                const response = await this.client.identityAttributesApi.listIdentityAttributes()
+                return response.data ?? []
+            },
+            QueuePriority.HIGH,
+            context
+        )
+    }
+
     /**
      * Fetches and converts identity attributes into SchemaAttributes.
      */
     public async fetchIdentitySchemaAttributes(): Promise<any[]> {
-        const { identityAttributesApi } = this.client
-        const listCall = async () => {
-            const response = await identityAttributesApi.listIdentityAttributes()
-            return response.data ?? []
-        }
-
-        const identityAttrs = (await this.client.execute(
-            listCall,
-            QueuePriority.HIGH,
+        const identityAttrs = (await this.executeListIdentityAttributes(
             'IdentityService>fetchIdentitySchemaAttributes'
         )) ?? []
 

@@ -11,7 +11,9 @@ import {
     SourcesV2025ApiPutSourceSchemaRequest,
     SourcesV2025ApiGetCorrelationConfigRequest,
     SourcesV2025ApiPutCorrelationConfigRequest,
+    SourcesV2025ApiUpdateSourceRequest,
     IdentityProfilesV2025ApiListIdentityProfilesRequest,
+    IdentityProfilesV2025ApiUpdateIdentityProfileRequest,
     OwnerDto,
     SourcesV2025ApiListSourcesRequest,
     JsonPatchOperationV2025OpV2025,
@@ -243,8 +245,55 @@ export class SourceService {
         return Array.from(this.fusionAccountsByNativeIdentity.values())
     }
 
+    public async executeFetchMembers(workgroupId: string) {
+        const response = await this.client.governanceGroupsApi.listWorkgroupMembers({ workgroupId, limit: 250 })
+        return response.data
+    }
+
+    public async executeListAccounts(params: AccountsApiListAccountsRequest) {
+        return await this.client.accountsApi.listAccounts(params)
+    }
+
+    public async executeUpdateSource(requestParameters: SourcesV2025ApiUpdateSourceRequest, context: string) {
+        return await this.client.execute(
+            async () => {
+                const response = await this.client.sourcesApi.updateSource(requestParameters)
+                return response.data
+            },
+            QueuePriority.HIGH,
+            context
+        )
+    }
+
+    public async executeUpdateIdentityProfile(
+        requestParameters: IdentityProfilesV2025ApiUpdateIdentityProfileRequest,
+        context: string
+    ) {
+        return await this.client.execute(
+            async () => {
+                const response = await this.client.identityProfilesApi.updateIdentityProfile(requestParameters)
+                return response.data
+            },
+            QueuePriority.HIGH,
+            context,
+            undefined,
+            true
+        )
+    }
+
+    public async executeGetSource(requestParameters: any, context: string) {
+        return await this.client.execute(
+            async () => {
+                const response = await this.client.sourcesApi.getSource(requestParameters)
+                return response.data
+            },
+            QueuePriority.HIGH,
+            context
+        )
+    }
+
     /**
-     * Get the number of fusion accounts without creating an array.
+     * How many fusion accounts are loaded for this run.
      */
     public get fusionAccountCount(): number {
         return this.fusionAccountsByNativeIdentity?.size ?? 0
@@ -268,19 +317,24 @@ export class SourceService {
     // Public Source Fetch Methods
     // ------------------------------------------------------------------------
 
+    public async executeListSources(requestParameters?: SourcesV2025ApiListSourcesRequest) {
+        return await this.client.sourcesApi.listSources(requestParameters)
+    }
+
     /**
      * Fetch all sources (managed and fusion) and cache them
      */
     public async fetchAllSources(requireFusionSource = true): Promise<void> {
         this.log.debug('Fetching all sources')
-        const { sourcesApi } = this.client
 
-        const listSources = async (requestParameters?: SourcesV2025ApiListSourcesRequest) => {
-            return await sourcesApi.listSources(requestParameters)
-        }
         const apiSources = await wrapConnectorError(
             () =>
-                this.client.paginate(listSources, {}, QueuePriority.HIGH, 'SourceService>fetchAllSources listSources'),
+                this.client.paginate(
+                    (params) => this.executeListSources(params),
+                    {},
+                    QueuePriority.HIGH,
+                    'SourceService>fetchAllSources executeListSources'
+                ),
             'Failed to fetch sources from ISC. Please verify your connector configuration and API credentials'
         )
         assert(
@@ -406,13 +460,8 @@ export class SourceService {
         const workgroupId = this._fusionSourceManagementWorkgroupId
         if (workgroupId) {
             if (this._fusionSourceWorkgroupMemberIds === undefined) {
-                const { governanceGroupsApi } = this.client
-                const fetchMembers = async () => {
-                    const response = await governanceGroupsApi.listWorkgroupMembers({ workgroupId, limit: 250 })
-                    return response.data
-                }
                 const members = await this.client.execute(
-                    fetchMembers,
+                    () => this.executeFetchMembers(workgroupId),
                     QueuePriority.HIGH,
                     'SourceService>fetchGlobalOwnerIdentityIds'
                 )
@@ -537,7 +586,6 @@ export class SourceService {
      * Fetch all accounts for a given source ID, applying SourceConfig.accountFilter if present (for managed sources).
      */
     public async fetchAccountsBySourceId(sourceId: string, limit?: number): Promise<Account[]> {
-        const { accountsApi } = this.client
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
@@ -552,11 +600,13 @@ export class SourceService {
             sorters,
         }
 
-        const listAccounts = async (params: AccountsApiListAccountsRequest) => {
-            return await accountsApi.listAccounts(params)
-        }
         const ctx = `SourceService>fetchAccountsBySourceId ${sourceInfo.name}`
-        const accounts = await this.client.paginate(listAccounts, requestParameters, QueuePriority.HIGH, ctx)
+        const accounts = await this.client.paginate(
+            (params) => this.executeListAccounts(params),
+            requestParameters,
+            QueuePriority.HIGH,
+            ctx
+        )
         if (!sourceInfo.isManaged) {
             return accounts
         }
@@ -578,7 +628,6 @@ export class SourceService {
         abortSignal?: AbortSignal,
         limit?: number
     ): AsyncGenerator<Account[], void, unknown> {
-        const { accountsApi } = this.client
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
@@ -592,12 +641,9 @@ export class SourceService {
             sorters,
         }
 
-        const listAccounts = async (params: AccountsApiListAccountsRequest) => {
-            return await accountsApi.listAccounts(params)
-        }
         const ctx = `SourceService>fetchAccountsBySourceIdGenerator ${sourceInfo.name}`
         yield* this.client.paginateParallel(
-            listAccounts,
+            (params) => this.executeListAccounts(params),
             requestParameters,
             QueuePriority.HIGH,
             ctx,
@@ -734,7 +780,7 @@ export class SourceService {
 
     /**
      * Fetch and cache a single managed account by source id and native identity.
-     * Uses one filtered `listAccounts` call (ISC accountFilter + sourceId + nativeIdentity), then
+     * Uses one filtered `executeListAccounts` call (ISC accountFilter + sourceId + nativeIdentity), then
      * Accounts JMESPath filter and machine-account guard — same rules as bulk fetch.
      */
     public async fetchManagedAccount(sourceId: string, nativeIdentity: string): Promise<void> {
@@ -788,7 +834,6 @@ export class SourceService {
         sourceId: string,
         nativeIdentity: string
     ): Promise<Account | undefined> {
-        const { accountsApi } = this.client
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
@@ -796,15 +841,11 @@ export class SourceService {
 
         const requestParameters: AccountsApiListAccountsRequest = {
             filters,
-        }
-
-        const listAccounts = async () => {
-            const response = await accountsApi.listAccounts(requestParameters)
-            return response.data ?? []
+            limit: 1,
         }
 
         const accounts = await this.client.execute(
-            listAccounts,
+            () => this.executeListAccounts(requestParameters).then((r) => r.data ?? []),
             QueuePriority.HIGH,
             'SourceService>fetchSourceAccountByNativeIdentity'
         )
@@ -903,6 +944,17 @@ export class SourceService {
         }
     }
 
+    public async executeSearchPost(requestParameters: SearchApiSearchPostRequest, context: string) {
+        return await this.client.execute(
+            async () => {
+                const response = await this.client.searchApi.searchPost(requestParameters)
+                return response.data ?? []
+            },
+            QueuePriority.HIGH,
+            context
+        )
+    }
+
     /**
      * Get latest aggregation date for a source (only for managed sources)
      */
@@ -917,7 +969,6 @@ export class SourceService {
             assert(source, 'Source not found')
             const sourceName = source.name
 
-            const { searchApi } = this.client
             const search: Search = {
                 indices: ['events'],
                 query: {
@@ -927,13 +978,8 @@ export class SourceService {
             }
 
             const requestParameters: SearchApiSearchPostRequest = { search, limit: 1 }
-            const searchPost = async () => {
-                const response = await searchApi.searchPost(requestParameters)
-                return response.data ?? []
-            }
-            const aggregations = await this.client.execute(
-                searchPost,
-                QueuePriority.HIGH,
+            const aggregations = await this.executeSearchPost(
+                requestParameters,
                 'SourceService>getLatestAggregationDate'
             )
 
@@ -952,6 +998,17 @@ export class SourceService {
     // Public Schema Methods
     // ------------------------------------------------------------------------
 
+    public async executeGetSourceSchemas(requestParameters: SourcesV2025ApiGetSourceSchemasRequest, context: string) {
+        return await this.client.execute(
+            async () => {
+                const response = await this.client.sourcesApi.getSourceSchemas(requestParameters)
+                return response.data ?? []
+            },
+            QueuePriority.HIGH,
+            context
+        )
+    }
+
     /**
      * List schemas for a source
      */
@@ -961,17 +1018,11 @@ export class SourceService {
             return cachedSchemas
         }
 
-        const { sourcesApi } = this.client
         const requestParameters: SourcesV2025ApiGetSourceSchemasRequest = {
             sourceId,
         }
-        const getSourceSchemas = async () => {
-            const response = await sourcesApi.getSourceSchemas(requestParameters)
-            return response.data ?? []
-        }
-        const schemas = await this.client.execute(
-            getSourceSchemas,
-            QueuePriority.HIGH,
+        const schemas = await this.executeGetSourceSchemas(
+            requestParameters,
             'SourceService>listSourceSchemas'
         )
         if (!schemas) {
@@ -989,6 +1040,9 @@ export class SourceService {
     // Public Configuration Methods
     // ------------------------------------------------------------------------
 
+    // Public Configuration Methods
+    // ------------------------------------------------------------------------
+
     /**
      * Update source configuration
      * @param context - Optional hint for error logs (e.g. "SourceService>saveBatchCumulativeCount")
@@ -1000,16 +1054,14 @@ export class SourceService {
         context?: string
     ): Promise<Source | undefined> {
         const requestParameters = buildSourceConfigPatch(sourceId, path, value)
-        const { sourcesApi } = this.client
-        const updateSource = async () => {
-            const response = await sourcesApi.updateSource(requestParameters)
-            return response.data
-        }
         const ctx = context ?? 'SourceService>patchSourceConfig'
-        return await this.client.execute(updateSource, QueuePriority.HIGH, ctx)
+        return await this.executeUpdateSource(requestParameters, ctx)
     }
 
     // ------------------------------------------------------------------------
+    // Public Process Lock Methods
+    // ------------------------------------------------------------------------
+
     // Public Process Lock Methods
     // ------------------------------------------------------------------------
 
@@ -1037,15 +1089,13 @@ export class SourceService {
 
         const fusionSourceId = this.fusionSourceId
 
-        const { sourcesApi } = this.client
-        const getSource = async () => {
-            const response = await sourcesApi.getSource({ id: fusionSourceId })
-            return response.data
-        }
-        const source = await this.client.execute(getSource, QueuePriority.HIGH, 'SourceService>setProcessLock')
-        assert(source, 'Failed to fetch fusion source to check processing lock. The API call returned no data.')
+        const currentSource = await this.executeGetSource(
+            { id: fusionSourceId },
+            'SourceService>setProcessLock executeGetSource'
+        )
+        assert(currentSource, 'Failed to fetch fusion source to check processing lock. The API call returned no data.')
 
-        const processing = (source!.connectorAttributes as any)?.processing
+        const processing = (currentSource!.connectorAttributes as any)?.processing
         if (processing === 'true' || processing === true) {
             this.log.warn('Processing flag is active. Aborting this run.')
             // Reset the flag so the next attempt can proceed
@@ -1683,18 +1733,12 @@ export class SourceService {
 
         let updatedProfile: any
         try {
-            updatedProfile = await this.client.execute(
-                () =>
-                    identityProfilesApi
-                        .updateIdentityProfile({
-                            identityProfileId: profile.id!,
-                            jsonPatchOperationV2025,
-                        })
-                        .then((r) => r.data),
-                QueuePriority.HIGH,
-                `SourceService>ensureIdentityProfileMapping upsert ${attributeName} profile=${profile.id}`,
-                undefined,
-                true
+            updatedProfile = await this.executeUpdateIdentityProfile(
+                {
+                    identityProfileId: profile.id!,
+                    jsonPatchOperationV2025,
+                },
+                `SourceService>ensureIdentityProfileMapping upsert ${attributeName} profile=${profile.id}`
             )
         } catch (error: any) {
             throw new ConnectorError(
@@ -2025,6 +2069,28 @@ export class SourceService {
         return fusionLatestAggregationDate > latestSourceDate
     }
 
+    public async executeGetTaskStatus(requestParameters: TaskManagementV2025ApiGetTaskStatusRequest, context: string) {
+        return await this.client.execute(
+            async () => {
+                const response = await this.client.taskManagementApi.getTaskStatus(requestParameters)
+                return response.data
+            },
+            QueuePriority.HIGH,
+            context
+        )
+    }
+
+    public async executeImportAccounts(requestParameters: SourcesV2025ApiImportAccountsRequest, context: string) {
+        return await this.client.execute(
+            async () => {
+                const response = await this.client.sourcesApi.importAccounts(requestParameters)
+                return response.data
+            },
+            QueuePriority.HIGH,
+            context
+        )
+    }
+
     /**
      * Aggregate managed source
      */
@@ -2036,19 +2102,13 @@ export class SourceService {
         let completed = false
         const sourceInfo = this.sourcesById.get(id)
         const sourceName = sourceInfo?.name ?? id
-        const { sourcesApi, taskManagementApi } = this.client
         const requestParameters: SourcesV2025ApiImportAccountsRequest = {
             id,
             disableOptimization: disableOptimization ? 'true' : undefined,
         }
-        const importAccounts = async () => {
-            const response = await sourcesApi.importAccounts(requestParameters)
-            return response.data
-        }
-        const loadAccountsTask = await this.client.execute(
-            importAccounts,
-            QueuePriority.HIGH,
-            'SourceService>aggregateManagedSource importAccounts'
+        const loadAccountsTask = await this.executeImportAccounts(
+            requestParameters,
+            'SourceService>aggregateManagedSource executeImportAccounts'
         )
         if (!loadAccountsTask) {
             this.log.warn(
@@ -2077,19 +2137,15 @@ export class SourceService {
         }
 
         let firstPoll = true
+        const { taskManagementApi } = this.client
         while (!completed && taskId && (firstPoll || Date.now() < deadlineMs)) {
             firstPoll = false
             const requestParameters: TaskManagementV2025ApiGetTaskStatusRequest = {
                 id: taskId,
             }
-            const getTaskStatus = async () => {
-                const response = await taskManagementApi.getTaskStatus(requestParameters)
-                return response.data
-            }
-            const taskStatus = await this.client.execute(
-                getTaskStatus,
-                QueuePriority.HIGH,
-                'SourceService>aggregateManagedSource getTaskStatus'
+            const taskStatus = await this.executeGetTaskStatus(
+                requestParameters,
+                'SourceService>aggregateManagedSource executeGetTaskStatus'
             )
             pollsExecuted++
             lastTaskStatus = taskStatus
