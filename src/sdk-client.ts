@@ -3,15 +3,15 @@ import axiosRetry from 'axios-retry'
 import { logger } from '@sailpoint/connector-sdk'
 import {
     Configuration,
-    CreateFormDefinitionRequestBeta,
-    CreateFormInstanceRequestBeta,
-    CustomFormsBetaApi,
-    CustomFormsBetaApiFactory,
-    FormDefinitionResponseBeta,
-    FormInstanceCreatedByBeta,
-    FormInstanceRecipientBeta,
-    FormInstanceResponseBeta,
-    FormInstanceResponseBetaStateBeta,
+    CreateFormDefinitionRequestV2025,
+    CreateFormInstanceRequestV2025,
+    CustomFormsV2025Api,
+    CustomFormsV2025ApiFactory,
+    FormDefinitionResponseV2025,
+    FormInstanceCreatedByV2025,
+    FormInstanceRecipientV2025,
+    FormInstanceResponseV2025,
+    FormInstanceResponseV2025StateV2025,
     Paginator,
     Search,
     SearchApi,
@@ -451,22 +451,41 @@ export class SDKClient {
         return response.data
     }
 
-    async listForms(): Promise<FormDefinitionResponseBeta[]> {
-        const api = new CustomFormsBetaApi(this.config)
+    async listForms(): Promise<FormDefinitionResponseV2025[]> {
+        const api = new CustomFormsV2025Api(this.config)
 
-        const response = await api.searchFormDefinitionsByTenant()
+        let offset = 0
+        const limit = 250
+        let hasMore = true
+        const forms: FormDefinitionResponseV2025[] = []
 
-        return response.data.results ? response.data.results : []
+        while (hasMore) {
+            const response = await api.searchFormDefinitionsByTenant({ offset, limit })
+            const results = response.data.results ? response.data.results : []
+            forms.push(...results)
+
+            if (results.length === 0 || (results.length < limit && limit <= 50)) {
+                hasMore = false
+            } else if (results.length < limit) {
+                // The API returned fewer results than limit, but maybe it enforces a lower max (like 50).
+                // We'll advance offset by results.length to get the next page properly.
+                offset += results.length
+            } else {
+                offset += limit
+            }
+        }
+
+        return forms
     }
 
     async deleteForm(formDefinitionID: string): Promise<void> {
-        const api = new CustomFormsBetaApi(this.config)
+        const api = new CustomFormsV2025Api(this.config)
 
         const response = await api.deleteFormDefinition({ formDefinitionID })
     }
 
-    async listFormInstances(formDefinitionId?: string): Promise<FormInstanceResponseBeta[]> {
-        const api = new CustomFormsBetaApi(this.config)
+    async listFormInstances(formDefinitionId?: string): Promise<FormInstanceResponseV2025[]> {
+        const api = new CustomFormsV2025Api(this.config)
 
         const axiosOptions = formDefinitionId
             ? { params: { filters: `formDefinitionId eq "${formDefinitionId}"` } }
@@ -474,7 +493,7 @@ export class SDKClient {
 
         const response = await api.searchFormInstancesByTenant(axiosOptions)
 
-        return response.data ? (response.data as FormInstanceResponseBeta[]) : []
+        return response.data ? (response.data as FormInstanceResponseV2025[]) : []
     }
 
     async createTransform(transform: Transform): Promise<Transform> {
@@ -545,17 +564,17 @@ export class SDKClient {
         return response.data
     }
 
-    async batchCreateForms(uniqueForms: CreateFormDefinitionRequestBeta[]): Promise<FormDefinitionResponseBeta[]> {
-        const forms = await batchRetry(uniqueForms, (form: CreateFormDefinitionRequestBeta) => this.createForm(form))
+    async batchCreateForms(uniqueForms: CreateFormDefinitionRequestV2025[]): Promise<FormDefinitionResponseV2025[]> {
+        const forms = await batchRetry(uniqueForms, (form: CreateFormDefinitionRequestV2025) => this.createForm(form))
         return forms
     }
 
-    async createForm(form: CreateFormDefinitionRequestBeta): Promise<FormDefinitionResponseBeta> {
-        const api = new CustomFormsBetaApi(this.config)
+    async createForm(form: CreateFormDefinitionRequestV2025): Promise<FormDefinitionResponseV2025> {
+        const api = new CustomFormsV2025Api(this.config)
 
         try {
             const response = await api.createFormDefinition({
-                createFormDefinitionRequestBeta: form,
+                body: form,
             })
             return response.data
         } catch (error: any) {
@@ -570,7 +589,9 @@ export class SDKClient {
                     let retries = 5;
                     while (retries > 0) {
                         await new Promise(r => setTimeout(r, 2000));
-                        const response = await api.searchFormDefinitionsByTenant()
+                        const response = await api.searchFormDefinitionsByTenant({
+                            filters: `name eq "${form.name}"`
+                        })
                         const existingForm = response.data.results?.find((x: any) => x.name === form.name)
                         if (existingForm) {
                             return existingForm
@@ -592,15 +613,15 @@ export class SDKClient {
         recipientList: string[],
         sourceId: string,
         expire: string
-    ): Promise<FormInstanceResponseBeta> {
-        const api = CustomFormsBetaApiFactory(this.config)
+    ): Promise<FormInstanceResponseV2025> {
+        const api = CustomFormsV2025ApiFactory(this.config)
 
-        const recipients: FormInstanceRecipientBeta[] = recipientList.map((x) => ({ id: x, type: 'IDENTITY' }))
-        const createdBy: FormInstanceCreatedByBeta = {
+        const recipients: FormInstanceRecipientV2025[] = recipientList.map((x) => ({ id: x, type: 'IDENTITY' }))
+        const createdBy: FormInstanceCreatedByV2025 = {
             id: sourceId,
             type: 'SOURCE',
         }
-        const body: CreateFormInstanceRequestBeta = {
+        const body: CreateFormInstanceRequestV2025 = {
             formDefinitionId,
             recipients,
             createdBy,
@@ -615,9 +636,9 @@ export class SDKClient {
 
     async setFormInstanceState(
         formInstanceId: string,
-        state: FormInstanceResponseBetaStateBeta
-    ): Promise<FormInstanceResponseBeta> {
-        const api = CustomFormsBetaApiFactory(this.config)
+        state: FormInstanceResponseV2025StateV2025
+    ): Promise<FormInstanceResponseV2025> {
+        const api = CustomFormsV2025ApiFactory(this.config)
 
         const body: { [key: string]: any }[] = [
             {
