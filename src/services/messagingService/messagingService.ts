@@ -630,7 +630,8 @@ export class MessagingService {
             'MessagingService>refreshEmailWorkflowDefinitionBytes'
         )
         if (full !== undefined && full !== null) {
-            this.emailSenderWorkflowDefinitionBytes = Buffer.byteLength(JSON.stringify(full), 'utf8')
+            const workflowData = (full as any).data || full
+            this.emailSenderWorkflowDefinitionBytes = Buffer.byteLength(JSON.stringify(workflowData), 'utf8')
             this.log.debug(
                 `Email workflow definition JSON ~${this.emailSenderWorkflowDefinitionBytes} bytes; max test input ~${this.getMaxTestWorkflowInputBytes()} bytes`
             )
