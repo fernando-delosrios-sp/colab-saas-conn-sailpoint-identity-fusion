@@ -442,6 +442,15 @@ export class AttributeService {
     ): boolean {
         const { fusionDisplayAttribute } = this.schemas
         if (attributeName !== fusionDisplayAttribute) return false
+
+        const hasExistingValue = isValidAttributeValue(fusionAccount.attributes[attributeName])
+        const canResetDisplay = fusionAccount.needsReset
+        const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
+
+        if (hasExistingValue && !canResetDisplay && isExistingFusionAccount) {
+            return true
+        }
+
         // Identity decisions are treated as uncorrelated managed accounts; they must not
         // pick up the display-attribute override from the selected identity name.
         if (fusionAccount.type === FusionAccountKind.Decision) return false
