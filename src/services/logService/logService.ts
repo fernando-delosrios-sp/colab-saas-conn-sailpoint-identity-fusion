@@ -342,7 +342,7 @@ export class LogService {
             return `${prefix}${originPart}${message} ${JSON.stringify(data)}`
         } catch (e) {
             // If data is not serializable
-            return `${prefix}${originPart}${message} [Unserializable data: ${JSON.stringify(data)}] ${e}`
+            return `${prefix}${originPart}${message} [Unserializable data: ${String(data)}] ${e}`
         }
     }
 
