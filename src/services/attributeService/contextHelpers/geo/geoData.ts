@@ -49,4 +49,15 @@ export const State = {
         }
         return undefined
     },
+    getStateByNameAndCountry: (stateName: string, countryCode: string) => {
+        if (countryCode === 'US') {
+            const state = US.getStateByName(stateName)
+            return state ? { name: state.name, isoCode: state.isoCode } : undefined
+        }
+        if (countryCode === 'GB' || countryCode === 'UK') {
+            const region = UK.getUKRegionByName(stateName)
+            return region ? { name: region.name, isoCode: region.isoCode } : undefined
+        }
+        return undefined
+    },
 }

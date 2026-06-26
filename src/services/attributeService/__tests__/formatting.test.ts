@@ -289,6 +289,59 @@ describe('evaluateVelocityTemplate', () => {
             expect(result).toContain('Los Angeles')
             expect(result).toContain('CA')
         })
+
+        it('preserves existing default US behavior when country is omitted', () => {
+            const context = { address: 'Los Angeles, CA 90001' }
+            const result = evaluateVelocityTemplate('$Normalize.address($address)', context)
+            expect(result).toContain('Los Angeles')
+            expect(result).toContain('CA')
+            expect(result).toContain('90001')
+        })
+
+        it('normalizes a full US state name to its code', () => {
+            const context = { address: 'Los Angeles, California 90001' }
+            const result = evaluateVelocityTemplate('$Normalize.address($address, "US")', context)
+            expect(result).toBe('Los Angeles, CA 90001')
+        })
+
+        it('normalizes a full US state name with explicit US parameter', () => {
+            const context = { address: 'Seattle, Washington 98101' }
+            const result = evaluateVelocityTemplate('$Normalize.address($address, "US")', context)
+            expect(result).toBe('Seattle, WA 98101')
+        })
+
+        it('normalizes a UK region name to its code', () => {
+            const context = { address: 'London, Greater London SW1A 2AA' }
+            const result = evaluateVelocityTemplate('$Normalize.address($address, "GB")', context)
+            expect(result).toContain('London')
+            expect(result).toContain('LND')
+        })
+
+        it('accepts UK alias for GB country code', () => {
+            const context = { address: 'London, Greater London SW1A 2AA' }
+            const result = evaluateVelocityTemplate('$Normalize.address($address, "UK")', context)
+            expect(result).toContain('London')
+            expect(result).toContain('LND')
+        })
+
+        it('normalizes a UK region code to itself', () => {
+            const context = { address: 'London, LND SW1A 2AA' }
+            const result = evaluateVelocityTemplate('$Normalize.address($address, "GB")', context)
+            expect(result).toContain('London')
+            expect(result).toContain('LND')
+        })
+
+        it('falls back to trimmed original for unsupported country codes', () => {
+            const context = { address: 'Toronto, Ontario M5H 2N2' }
+            const result = evaluateVelocityTemplate('$Normalize.address($address, "CA")', context)
+            expect(result).toBe('Toronto, Ontario M5H 2N2')
+        })
+
+        it('returns undefined for empty input', () => {
+            const context = { address: '' }
+            const result = evaluateVelocityTemplate('$Normalize.address($address, "US")', context)
+            expect(result).toBeUndefined()
+        })
     })
 
     // ========================================================================
@@ -330,6 +383,80 @@ describe('evaluateVelocityTemplate', () => {
             const context = { city: 'SEATTLE' }
             const result = evaluateVelocityTemplate('$AddressParse.getCityState($city)', context)
             expect(result).toBe('Washington')
+        })
+    })
+
+    describe('AddressParse.getStateName - code to full name', () => {
+        it('returns the US full name for a US code', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateName("NY", "US")', {})
+            expect(result).toBe('New York')
+        })
+
+        it('returns the UK full name for a GB code', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateName("LND", "GB")', {})
+            expect(result).toBe('Greater London')
+        })
+
+        it('accepts the UK alias for GB', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateName("LND", "UK")', {})
+            expect(result).toBe('Greater London')
+        })
+
+        it('returns empty string for unknown code', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateName("ZZ", "US")', {})
+            // evaluateVelocityTemplate returns undefined for empty-string outputs
+            expect(result).toBeUndefined()
+        })
+
+        it('returns empty string for unsupported country', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateName("NY", "CA")', {})
+            // evaluateVelocityTemplate returns undefined for empty-string outputs
+            expect(result).toBeUndefined()
+        })
+    })
+
+    describe('AddressParse.getStateCode - name to code', () => {
+        it('returns the US code for a US state name', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateCode("New York", "US")', {})
+            expect(result).toBe('NY')
+        })
+
+        it('returns the UK code for a GB region name', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateCode("Greater London", "GB")', {})
+            expect(result).toBe('LND')
+        })
+
+        it('accepts the UK alias for GB', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateCode("Greater London", "UK")', {})
+            expect(result).toBe('LND')
+        })
+
+        it('matches US names case-insensitively', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateCode("new york", "US")', {})
+            expect(result).toBe('NY')
+        })
+
+        it('matches UK names case-insensitively', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateCode("greater london", "GB")', {})
+            expect(result).toBe('LND')
+        })
+
+        it('returns empty string for unknown name', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateCode("Atlantis", "US")', {})
+            // evaluateVelocityTemplate returns undefined for empty-string outputs
+            expect(result).toBeUndefined()
+        })
+
+        it('returns empty string for unsupported country', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateCode("Ontario", "CA")', {})
+            // evaluateVelocityTemplate returns undefined for empty-string outputs
+            expect(result).toBeUndefined()
+        })
+
+        it('does not resolve ambiguous city names to a state', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getStateCode("Springfield", "US")', {})
+            // evaluateVelocityTemplate returns undefined for empty-string outputs
+            expect(result).toBeUndefined()
         })
     })
 

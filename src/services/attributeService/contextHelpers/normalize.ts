@@ -298,35 +298,70 @@ const normalizeSSN = (ssn: string): string | undefined => {
 /**
  * Normalize address using full parser, with fallback to regex
  * @param address - Full address string
- * @returns Normalized address or original if parsing fails
+ * @param countryCode - ISO country code (e.g. "US", "GB", "UK"). Defaults to "US" for backward compatibility.
+ * @returns Normalized address or original if parsing fails or country is unsupported
  */
-const normalizeAddress = (address: string): string | undefined => {
+const normalizeAddress = (address: string, countryCode: string = 'US'): string | undefined => {
     if (!address) return undefined
 
-    // Try full address parser first
-    const parsed = parseAddressSync(address)
-    if (parsed) {
-        const parts: string[] = []
-        if (parsed.street_address1) parts.push(parsed.street_address1)
-        if (parsed.street_address2) parts.push(parsed.street_address2)
-        if (parsed.city) parts.push(parsed.city)
-        if (parsed.state) parts.push(parsed.state)
-        if (parsed.postal_code) parts.push(parsed.postal_code)
+    const normalizedCountry = countryCode?.toUpperCase() ?? 'US'
+    const isUS = normalizedCountry === 'US'
+    const isUK = normalizedCountry === 'GB' || normalizedCountry === 'UK'
 
-        if (parts.length > 0) {
-            return parts.join(', ')
-        }
+    if (!isUS && !isUK) {
+        return address.trim()
     }
 
-    // Fallback to regex pattern matching
-    const cityStateMatch = address.match(/([A-Za-z\s]+),\s*([A-Z]{2})\s*(\d{5})?/i)
-    if (cityStateMatch) {
-        const [, city, stateInput, zip] = cityStateMatch
-        // Try to get state by code or name
-        const state = State.getStateByCodeAndCountry(stateInput.trim().toUpperCase(), 'US')
-        const stateCode = state?.isoCode
-        if (stateCode) {
-            return zip ? `${city.trim()}, ${stateCode} ${zip.trim()}` : `${city.trim()}, ${stateCode}`
+    // Try full address parser first (US only - the parser is US-centric)
+    if (isUS) {
+        const parsed = parseAddressSync(address)
+        if (parsed) {
+            const parts: string[] = []
+            if (parsed.street_address1) parts.push(parsed.street_address1)
+            if (parsed.street_address2) parts.push(parsed.street_address2)
+            if (parsed.city) parts.push(parsed.city)
+            if (parsed.state) parts.push(parsed.state)
+            if (parsed.postal_code) parts.push(parsed.postal_code)
+
+            if (parts.length > 0) {
+                return parts.join(', ')
+            }
+        }
+
+        // Fallback to regex pattern matching for US addresses.
+        // Match either a 2-letter state code OR a multi-word state name before the zip/postal code.
+        const cityStateMatch = address.match(/([A-Za-z][A-Za-z\s]*?),\s*([A-Z]{2}|[A-Za-z][A-Za-z\s]+?)\s*(\d{5}(?:-\d{4})?)?\s*$/)
+        if (cityStateMatch) {
+            const [, city, stateInput, zip] = cityStateMatch
+            const stateInputTrimmed = stateInput.trim()
+            // Try 2-letter code first
+            const byCode = State.getStateByCodeAndCountry(stateInputTrimmed.toUpperCase(), 'US')
+            let state = byCode
+            // If that fails, try by full name (case-insensitive in the underlying data)
+            if (!state) {
+                state = State.getStateByNameAndCountry(stateInputTrimmed, 'US')
+            }
+            const stateCode = state?.isoCode
+            if (stateCode) {
+                return zip ? `${city.trim()}, ${stateCode} ${zip.trim()}` : `${city.trim()}, ${stateCode}`
+            }
+        }
+    } else {
+        // UK fallback: match "City, Region <postcode>" or "City, <region code> <postcode>".
+        // UK postcodes are complex; we accept a permissive alphanumeric tail and look up the region.
+        const ukMatch = address.match(/([A-Za-z][A-Za-z\s]*?),\s*([A-Z]{2,4}|[A-Za-z][A-Za-z\s]+?)\s*([A-Z]{1,2}\d[\dA-Z]?(?:\s*\d[A-Z]{2})?)?\s*$/i)
+        if (ukMatch) {
+            const [, city, regionInput, postcode] = ukMatch
+            const regionInputTrimmed = regionInput.trim()
+            // Try by code first (UK region codes are 3 letters typically)
+            let region = State.getStateByCodeAndCountry(regionInputTrimmed.toUpperCase(), 'GB')
+            if (!region) {
+                region = State.getStateByNameAndCountry(regionInputTrimmed, 'GB')
+            }
+            const regionCode = region?.isoCode
+            if (regionCode) {
+                return postcode ? `${city.trim()}, ${regionCode} ${postcode.trim()}` : `${city.trim()}, ${regionCode}`
+            }
         }
     }
 
