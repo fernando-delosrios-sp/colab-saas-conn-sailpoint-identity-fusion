@@ -35,6 +35,7 @@ Matching algorithms calculate **similarity scores** (0–100) between attribute 
 | **Dice**                  | Longer text (addresses, job titles, descriptions) | Robust for substring matching; handles reordering well                 | Can miss phonetic variations; requires adequate text length      | Medium             |
 | **Double Metaphone**      | Names with spelling variations, phonetic matching | Catches "Catherine"/"Katherine", "John"/"Jon", "Smith"/"Smyth"         | May generate false positives for short names; language-dependent | Low                |
 | **LIG3**                  | Compound identifiers, names with missing parts    | Excellent with international accents and compound gap handling         | Heavily punishes transpositions (e.g. inverted dates/names)      | High               |
+| **Binary (Exact Match)**  | Stable identifiers (employee ID, email, UUID)      | Trivial threshold configuration (any value below 100 is a non-match) | Case- and whitespace-sensitive; no tolerance for variation        | Lowest             |
 | **Custom**                | Domain-specific requirements                      | Your own logic via SaaS customizer                                     | Requires development and testing                                 | Variable           |
 
 ### Decision tree: Which algorithm to use?
@@ -51,6 +52,7 @@ What type of attribute are you comparing?
 │  └─ Typo tolerance → Jaro-Winkler
 │
 ├─ Username / employee ID / short code
+│  ├─ Strict equality required → Binary (Exact Match)
 │  └─ High precision needed → Jaro-Winkler (high threshold: 95–100)
 │
 ├─ Address / job title / longer text
@@ -241,6 +243,42 @@ What type of attribute are you comparing?
 - Very short strings (<4 characters) → less reliable
 - Non-English names (algorithm is English-centric)
 
+### Binary (Exact Match)
+
+**Purpose:** Strict exact-match scoring for stable identifiers where any deviation (case, spacing, characters) must be treated as a non-match. Returns a score of 100 when the two values are identical strings and 0 otherwise.
+
+**How it works:**
+
+- Compares the two values with strict string equality.
+- Case-sensitive and whitespace-sensitive: `"abc123"`, `"ABC123"`, and `" abc123 "` all score 0 against each other.
+- Missing values (empty after trim) score 0 and follow the existing **Skip match if missing** configuration.
+
+**Recommended thresholds:**
+
+| Use case                  | Threshold | Rationale                                                  |
+|---------------------------|-----------|------------------------------------------------------------|
+| Employee ID / UUID / email | 100       | Anything less than an exact match should be a non-match    |
+| Identifier after Define-level normalization | 100 | Pre-normalize in **Define**, then require exact equality  |
+
+**Examples:**
+
+| String 1     | String 2     | Score | Match? (threshold 100) |
+|--------------|--------------|-------|------------------------|
+| EMP-2024-001 | EMP-2024-001 | 100   | Yes                    |
+| EMP-2024-001 | emp-2024-001 | 0     | No                     |
+| EMP-2024-001 | EMP-2024-002 | 0     | No                     |
+| EMP-2024-001 | (empty)      | 0     | No                     |
+
+**When to use:**
+
+- Stable identifiers where the source-of-truth values are already canonical (employee IDs, UUIDs, pre-normalized emails).
+- You want to eliminate any tolerance to formatting differences and avoid threshold tuning.
+
+**When NOT to use:**
+
+- Human-entered data that may contain formatting variations (use **Jaro-Winkler** or **Enhanced Name Matcher** instead).
+- You need forgiving matching — normalize values in **Define** (e.g. lowercase, trim) before applying `Binary`.
+
 ### LIG3
 
 **Purpose:** Advanced hybrid algorithm combining token handling with Levenshtein-style penalties.
@@ -311,7 +349,7 @@ For each **Fusion attribute match**, configure:
 | Field                          | Purpose                                   | Options / Notes                                                                                      |
 | ------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | **Attribute**                  | Identity attribute name to compare        | Must exist on identities in scope; examples: `name`, `email`, `firstname`, `lastname`, `displayName` |
-| **Matching algorithm**         | Algorithm to calculate similarity         | Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Custom                                  |
+| **Matching algorithm**         | Algorithm to calculate similarity         | Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Binary (Exact Match), Custom            |
 | **Minimum similarity [0-100]** | Threshold and blend weight for this rule  | Higher values are stricter and count more in the **combined match score**                            |
 | **Mandatory match?**           | Must pass this rule for a potential match | Passing mandatories contribute to the weighted combined score like other rules                       |
 
@@ -573,6 +611,15 @@ The rows below are **fictional** composites. **Source A** and **Source B** stand
 **Why it is ambiguous:** With **Skip match if missing** = Yes (default), rules on email/phone are **skipped** when Source A is empty, so the **combined score** rests on fewer signals—higher false positive or false negative risk depending on thresholds.
 
 **What to do:** Keep strong non-skipped rules (name + DOB) where populated; document reviewer expectations; consider **Skip match if missing** = No only for attributes you intentionally want to penalize when absent, understanding side effects on combined score and automatic assignment.
+
+### Weak signal on a non-critical attribute
+
+- **Source A:** Daniel Carter, `daniel.carter@example.com`, Senior Engineer
+- **Source B:** Daniel Carter, `daniel.carter@example.com`, Sr. Eng.
+
+**Why it is ambiguous:** Name and email match strongly, but the job title is shortened in Source B. The job-title rule scores below its own minimum, so it is recorded as a **non-match** even though the other two rules are convincing.
+
+**What to do:** Enable **Skip match if threshold not met** on the job-title rule. Because the rule is non-mandatory and below threshold, it is then excluded from the weighted combined score instead of dragging it down with a low similarity. The combined score rests on the strong name and email signals, reducing false negatives caused by the abbreviation. **Mandatory** rules are not affected by this toggle and should be used for attributes that must always meet their minimum.
 
 ### Typographical error
 

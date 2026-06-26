@@ -148,7 +148,7 @@ function createRegistry() {
         },
         forms: {
             fetchFormData: jest.fn().mockResolvedValue(undefined),
-            fetchFormInstancesData: jest.fn().mockResolvedValue(undefined),
+            fetchFormInstances: jest.fn().mockResolvedValue(undefined),
             processFetchedFormData: jest.fn().mockResolvedValue(undefined),
             pendingReviewContextByAccountId: new Map<string, any>(),
             cleanUpForms: jest.fn(),
@@ -629,7 +629,7 @@ describe('dryRun', () => {
 
         await dryRun(registry, { schema: { attributes: [] }, includeMatched: true, includeDeferred: true } as any)
 
-        expect(registry.forms.fetchFormInstancesData).toHaveBeenCalled()
+        expect(registry.forms.fetchFormInstances).toHaveBeenCalled()
         expect(registry.forms.processFetchedFormData).toHaveBeenCalled()
         expect(registry.fusion.refreshUniqueAttributes).toHaveBeenCalled()
         expect(registry.forms.cleanUpForms).not.toHaveBeenCalled()

@@ -374,7 +374,7 @@ export const finalizeDryRun = async (
     context: Pick<DryRunHelpersContext, 'fusion' | 'res' | 'sources'>,
     finalizationInput: DryRunFinalizationInput
 ) => {
-    const { res, fusion, sources } = context
+    const { res, fusion: _fusion, sources } = context
     const {
         sentRows,
         optionEmitCounter,

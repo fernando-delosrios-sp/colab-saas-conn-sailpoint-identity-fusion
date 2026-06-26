@@ -788,7 +788,7 @@
                                             "label": "Matching algorithm",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Algorithm used to compare values. 'Enhanced Name Matcher' excels at strict formatting and accents. 'Jaro-Winkler' is highly tolerant of typographical errors. 'LIG3' balances gaps, missing fragments, and character variations. 'Dice' is forgiving of total word reordering. 'Double Metaphone' captures English phonetic similarity. 'Custom Algorithm (Velocity)' runs your Velocity template once per comparison; it must output a numeric score from 0 to 100",
+                                            "helpKey": "Algorithm used to compare values. 'Enhanced Name Matcher' excels at strict formatting and accents. 'Jaro-Winkler' is highly tolerant of typographical errors. 'LIG3' balances gaps, missing fragments, and character variations. 'Dice' is forgiving of total word reordering. 'Double Metaphone' captures English phonetic similarity. 'Binary (Exact Match)' returns 100 for identical strings and 0 for any difference (case- and whitespace-sensitive). 'Custom Algorithm (Velocity)' runs your Velocity template once per comparison; it must output a numeric score from 0 to 100",
                                             "options": [
                                                 {
                                                     "label": "Enhanced Name Matcher",
@@ -819,6 +819,10 @@
                                                     "value": "double-metaphone",
                                                     "docLink": "https://en.wikipedia.org/wiki/Metaphone",
                                                     "docLinkLabel": "Evaluates strings based on their English pronunciation"
+                                                },
+                                                {
+                                                    "label": "Binary (Exact Match)",
+                                                    "value": "binary"
                                                 },
                                                 {
                                                     "label": "Custom Algorithm (Velocity)",
@@ -855,6 +859,13 @@
                                             "type": "toggle",
                                             "required": false,
                                             "helpKey": "When enabled (default), this rule is skipped if either value is missing (null, undefined, or empty after trimming). When disabled, missing values are still compared and count toward the result."
+                                        },
+                                        {
+                                            "key": "skipMatchIfThresholdNotMet",
+                                            "label": "Skip match if threshold not met",
+                                            "type": "toggle",
+                                            "required": false,
+                                            "helpKey": "When enabled, this rule is excluded from the weighted combined match score if its computed similarity is below its minimum similarity (Similarity threshold & weight). Skipped rules contribute zero weight and zero raw score, so the combined score is calculated from the remaining rules. Mandatory rules are always evaluated regardless of this toggle; a below-threshold mandatory rule still fails the candidate. Default: disabled."
                                         }
                                     ]
                                 }

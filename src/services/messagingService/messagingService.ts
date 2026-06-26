@@ -463,7 +463,7 @@ export class MessagingService {
         // Group recipients by locale
         const recipientsByLocale = new Map<string | undefined, string[]>()
         
-        for (const email of args.recipients) {
+        for (const _email of args.recipients) {
             // we must find the identity id for the email to get the locale
             // deliverReportToRecipients is only used by sendReport (owners) and test workflow (explicit email).
             // For simplicity, we just use the first owner's locale if possible, or fallback to default.

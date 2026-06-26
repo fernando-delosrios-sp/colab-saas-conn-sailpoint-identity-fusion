@@ -281,8 +281,8 @@ describe('ApiQueue', () => {
     it('10. clear() — Enqueue items, call clear(), verify all pending items reject.', async () => {
         queue = new ApiQueue(createConfig({ maxConcurrentRequests: 1 }));
         
-        let blockerResolve: () => void;
-        const blocker = new Promise<void>(resolve => { blockerResolve = resolve });
+        let _blockerResolve: () => void;
+        const blocker = new Promise<void>(resolve => { _blockerResolve = resolve });
         const p1 = queue.enqueue(() => blocker); // Block the queue (active item)
         
         const p2 = queue.enqueue(async () => 'queued'); // Pending item

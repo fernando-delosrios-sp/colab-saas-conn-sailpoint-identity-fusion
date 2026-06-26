@@ -1,5 +1,5 @@
 import { COMBINED_SCORE_ROW_ATTRIBUTE, ScoringService, WEIGHTED_MEAN_ALGORITHM } from '../scoringService'
-import { effectiveSkipMatchIfMissing } from '../../../model/config'
+import { effectiveSkipMatchIfMissing, effectiveSkipMatchIfThresholdNotMet } from '../../../model/config'
 import { FusionAccount } from '../../../model/account'
 import { MatchCandidateType } from '../types'
 import * as scoringHelpers from '../helpers'
@@ -601,6 +601,27 @@ describe('effectiveSkipMatchIfMissing', () => {
     })
 })
 
+describe('effectiveSkipMatchIfThresholdNotMet', () => {
+    it('does not skip by default (toggle omitted or false)', () => {
+        expect(effectiveSkipMatchIfThresholdNotMet({})).toBe(false)
+        expect(effectiveSkipMatchIfThresholdNotMet({ skipMatchIfThresholdNotMet: false })).toBe(false)
+    })
+
+    it('skips when toggle is true and rule is not mandatory', () => {
+        expect(effectiveSkipMatchIfThresholdNotMet({ skipMatchIfThresholdNotMet: true })).toBe(true)
+        expect(
+            effectiveSkipMatchIfThresholdNotMet({ mandatory: false, skipMatchIfThresholdNotMet: true })
+        ).toBe(true)
+    })
+
+    it('never skips mandatory rules regardless of toggle', () => {
+        expect(effectiveSkipMatchIfThresholdNotMet({ mandatory: true })).toBe(false)
+        expect(
+            effectiveSkipMatchIfThresholdNotMet({ mandatory: true, skipMatchIfThresholdNotMet: true })
+        ).toBe(false)
+    })
+})
+
 describe('ScoringService.blendWeight', () => {
     it('uses 1 when fusionScore is 0 or lower', () => {
         expect(ScoringService.blendWeight(0)).toBe(1)
@@ -609,5 +630,251 @@ describe('ScoringService.blendWeight', () => {
 
     it('uses fusionScore when positive', () => {
         expect(ScoringService.blendWeight(80)).toBe(80)
+    })
+})
+
+describe('ScoringService skipMatchIfThresholdNotMet behavior', () => {
+    const log = { crash: jest.fn() } as any
+
+    it('skips non-mandatory below-threshold rule when toggle is enabled', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'email',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 90,
+                        skipMatchIfThresholdNotMet: true,
+                    },
+                    {
+                        attribute: 'department',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 80,
+                        skipMatchIfThresholdNotMet: true,
+                    },
+                ],
+                fusionManualReviewScore: 50,
+            } as any,
+            log
+        )
+
+        const fusionAccount = {
+            attributes: { email: 'same@example.com', department: 'engineering' },
+            addFusionMatch: jest.fn(),
+        } as any
+        const fusionIdentity = {
+            attributes: { email: 'same@example.com', department: 'finance and accounting' },
+            identityId: 'identity-1',
+            displayName: 'Identity One',
+        } as any
+
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+
+        expect(fusionAccount.addFusionMatch).toHaveBeenCalledTimes(1)
+        const fusionMatch = fusionAccount.addFusionMatch.mock.calls[0][0]
+        const deptRule = fusionMatch.scores.find((s: any) => s.attribute === 'department')
+        const emailRule = fusionMatch.scores.find((s: any) => s.attribute === 'email')
+        expect(deptRule.skipped).toBe(true)
+        expect(deptRule.comment).toBe('Rule skipped (score below threshold)')
+        expect(emailRule.skipped).toBeUndefined()
+        expect(emailRule.isMatch).toBe(true)
+    })
+
+    it('still contributes non-mandatory below-threshold rule when toggle is disabled', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'name',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 95,
+                        skipMatchIfThresholdNotMet: false,
+                    },
+                ],
+                fusionManualReviewScore: 50,
+            } as any,
+            log
+        )
+
+        const fusionAccount = {
+            attributes: { name: 'John Smith' },
+            addFusionMatch: jest.fn(),
+        } as any
+        const fusionIdentity = {
+            attributes: { name: 'Jonathan Smyth' },
+            identityId: 'identity-1',
+            displayName: 'Identity One',
+        } as any
+
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+
+        expect(fusionAccount.addFusionMatch).toHaveBeenCalledTimes(1)
+        const fusionMatch = fusionAccount.addFusionMatch.mock.calls[0][0]
+        const rule = fusionMatch.scores.find((s: any) => s.attribute === 'name')
+        expect(rule.skipped).toBeUndefined()
+        expect(rule.isMatch).toBe(false)
+    })
+
+    it('fails candidate when mandatory below-threshold rule is below threshold even with toggle enabled', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'email',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 99,
+                        mandatory: true,
+                        skipMatchIfThresholdNotMet: true,
+                    },
+                ],
+                fusionManualReviewScore: 0,
+            } as any,
+            log
+        )
+
+        const fusionAccount = {
+            attributes: { email: 'a@example.com' },
+            addFusionMatch: jest.fn(),
+        } as any
+        const fusionIdentity = {
+            attributes: { email: 'b@example.com' },
+            identityId: 'identity-1',
+            displayName: 'Identity One',
+        } as any
+
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+
+        expect(fusionAccount.addFusionMatch).not.toHaveBeenCalled()
+    })
+
+    it('recalculates combined score excluding threshold-skipped rules', async () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'firstname',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 80,
+                        skipMatchIfThresholdNotMet: false,
+                    },
+                    {
+                        attribute: 'lastname',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 95,
+                        skipMatchIfThresholdNotMet: true,
+                    },
+                ],
+                fusionManualReviewScore: 50,
+            } as any,
+            log
+        )
+
+        const fusionAccount = {
+            attributes: { firstname: 'John', lastname: 'Smith' },
+            addFusionMatch: jest.fn(),
+        } as any
+        const fusionIdentity = {
+            attributes: { firstname: 'John', lastname: 'Montgomery Fitzgerald' },
+            identityId: 'identity-1',
+            displayName: 'Identity One',
+        } as any
+
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+
+        expect(fusionAccount.addFusionMatch).toHaveBeenCalledTimes(1)
+        const fusionMatch = fusionAccount.addFusionMatch.mock.calls[0][0]
+        const lastNameRule = fusionMatch.scores.find((s: any) => s.attribute === 'lastname')
+        const firstNameRule = fusionMatch.scores.find((s: any) => s.attribute === 'firstname')
+        expect(lastNameRule.skipped).toBe(true)
+        expect(lastNameRule.comment).toBe('Rule skipped (score below threshold)')
+        expect(firstNameRule.skipped).toBeUndefined()
+        const combined = fusionMatch.scores.find((s: any) => s.algorithm === WEIGHTED_MEAN_ALGORITHM)
+        // firstname "John" vs "John" → 100; combined must equal 100, not a weighted blend with lastname.
+        expect(combined.score).toBe(100)
+    })
+
+    it('exact-match check ignores threshold-skipped rules', async () => {
+        // exactMatch.ts requires non-skipped rules to all be exact (score 100). With one rule
+        // skipped by threshold, the remaining rule being exact should still produce a non-skip
+        // report whose score array yields isExactAttributeMatchScores true.
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    {
+                        attribute: 'firstname',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 100,
+                        mandatory: true,
+                    },
+                    {
+                        attribute: 'lastname',
+                        algorithm: 'jaro-winkler',
+                        fusionScore: 99,
+                        skipMatchIfThresholdNotMet: true,
+                    },
+                ],
+                fusionManualReviewScore: 50,
+            } as any,
+            log
+        )
+
+        const fusionAccount = {
+            attributes: { firstname: 'John', lastname: 'Smith' },
+            addFusionMatch: jest.fn(),
+        } as any
+        const fusionIdentity = {
+            attributes: { firstname: 'John', lastname: 'Smyth' },
+            identityId: 'identity-1',
+            displayName: 'Identity One',
+        } as any
+
+        await service.scoreFusionAccount(fusionAccount, [fusionIdentity])
+
+        expect(fusionAccount.addFusionMatch).toHaveBeenCalledTimes(1)
+        const fusionMatch = fusionAccount.addFusionMatch.mock.calls[0][0]
+        const firstNameRule = fusionMatch.scores.find((s: any) => s.attribute === 'firstname')
+        const lastNameRule = fusionMatch.scores.find((s: any) => s.attribute === 'lastname')
+        expect(firstNameRule.skipped).toBeUndefined()
+        expect(firstNameRule.isMatch).toBe(true)
+        expect(lastNameRule.skipped).toBe(true)
+    })
+})
+
+describe('ScoringService binary algorithm dispatch', () => {
+    it('dispatches binary algorithm through scoreAttribute and returns a ScoreReport', () => {
+        const service = new ScoringService(
+            {
+                matchingConfigs: [
+                    { attribute: 'employeeId', algorithm: 'binary', fusionScore: 100, mandatory: true },
+                ],
+                fusionManualReviewScore: 50,
+            } as any,
+            { crash: jest.fn() } as any
+        )
+
+        const scoreBinarySpy = jest.spyOn(scoringHelpers, 'scoreBinary').mockReturnValue({
+            attribute: 'employeeId',
+            algorithm: 'binary',
+            fusionScore: 100,
+            mandatory: true,
+            skipMatchIfMissing: true,
+            skipMatchIfThresholdNotMet: false,
+            score: 100,
+            isMatch: true,
+        })
+
+        const result = (service as any).scoreAttribute('ABC-001', 'ABC-001', {
+            attribute: 'employeeId',
+            algorithm: 'binary',
+            fusionScore: 100,
+            mandatory: true,
+        } as any)
+
+        expect(scoreBinarySpy).toHaveBeenCalledWith('ABC-001', 'ABC-001', expect.objectContaining({ algorithm: 'binary' }))
+        expect(result.algorithm).toBe('binary')
+        expect(result.score).toBe(100)
+        expect(result.isMatch).toBe(true)
+
+        scoreBinarySpy.mockRestore()
     })
 })

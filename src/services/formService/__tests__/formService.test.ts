@@ -84,7 +84,7 @@ describe('FormService stale-form cleanup queue', () => {
             {} as any
         )
 
-        await service.fetchFormInstancesData(true)
+        await service.fetchFormInstances(true)
         await service.cleanUpForms()
         await service.awaitPendingDeleteOperations()
 

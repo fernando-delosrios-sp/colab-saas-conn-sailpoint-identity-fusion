@@ -52,7 +52,7 @@ export function createRegistry() {
         },
         forms: {
             fetchFormData: jest.fn().mockResolvedValue(undefined),
-            fetchFormInstancesData: jest.fn().mockResolvedValue(undefined),
+            fetchFormInstances: jest.fn().mockResolvedValue(undefined),
             processFetchedFormData: jest.fn().mockResolvedValue(undefined),
             cleanUpForms: jest.fn().mockResolvedValue(undefined),
             awaitPendingDeleteOperations: jest.fn().mockResolvedValue(undefined),

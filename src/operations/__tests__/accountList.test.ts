@@ -209,7 +209,7 @@ describe('accountList two-pass aggregation lifecycle', () => {
         setPass('pass1')
         await accountList(registry, input)
 
-        expect(forms.fetchFormInstancesData).toHaveBeenCalledTimes(1)
+        expect(forms.fetchFormInstances).toHaveBeenCalledTimes(1)
         expect(forms.processFetchedFormData).toHaveBeenCalledTimes(1)
         expect(fusion.processFusionIdentityDecisions).toHaveBeenCalledTimes(1)
         expect(sources.releaseProcessLock).toHaveBeenCalledTimes(1)
@@ -218,7 +218,7 @@ describe('accountList two-pass aggregation lifecycle', () => {
         setPass('pass2')
         await accountList(registry, input)
 
-        expect(forms.fetchFormInstancesData).toHaveBeenCalledTimes(2)
+        expect(forms.fetchFormInstances).toHaveBeenCalledTimes(2)
         expect(forms.processFetchedFormData).toHaveBeenCalledTimes(2)
         expect(fusion.processFusionIdentityDecisions).toHaveBeenCalledTimes(2)
         expect(sources.releaseProcessLock).toHaveBeenCalledTimes(2)

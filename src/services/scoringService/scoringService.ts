@@ -1,12 +1,13 @@
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { assert } from '../../utils/assert'
-import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing } from '../../model/config'
+import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing, effectiveSkipMatchIfThresholdNotMet } from '../../model/config'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { countIdentityBackedFusionMatches } from '../formService/helpers'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
 import {
     normalizeLIG3,
+    scoreBinary,
     scoreCustomVelocity,
     scoreDice,
     scoreDoubleMetaphone,
@@ -31,6 +32,7 @@ function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreRepo
         fusionScore: matching.fusionScore,
         mandatory: matching.mandatory,
         skipMatchIfMissing: matching.skipMatchIfMissing,
+        skipMatchIfThresholdNotMet: matching.skipMatchIfThresholdNotMet,
         score: 0,
         isMatch: false,
         skipped: true,
@@ -463,6 +465,13 @@ export class ScoringService {
                     matching
                 )
             }
+            if (
+                !scoreReport.skipped &&
+                effectiveSkipMatchIfThresholdNotMet(matching) &&
+                !scoreReport.isMatch
+            ) {
+                scoreReport = makeSkippedReport(matching, 'Rule skipped (score below threshold)')
+            }
             scores.push(scoreReport)
             if (!scoreReport.skipped) {
                 const w = ScoringService.blendWeight(scoreReport.fusionScore)
@@ -557,7 +566,7 @@ export class ScoringService {
     /**
      * Scores a single attribute pair using the algorithm specified in the matching config.
      *
-     * Supported algorithms: name-matcher, jaro-winkler, dice, double-metaphone, lig3.
+     * Supported algorithms: name-matcher, jaro-winkler, dice, double-metaphone, lig3, binary.
      *
      * @param accountAttribute - The attribute value from the candidate account
      * @param identityAttribute - The attribute value from the existing identity
@@ -580,6 +589,8 @@ export class ScoringService {
                 return scoreDoubleMetaphone(accountAttribute, identityAttribute, matchingConfig)
             case 'lig3':
                 return scoreLIG3(accountAttribute, identityAttribute, matchingConfig)
+            case 'binary':
+                return scoreBinary(accountAttribute, identityAttribute, matchingConfig)
             case 'custom':
                 return scoreCustomVelocity(accountAttribute, identityAttribute, matchingConfig)
         }

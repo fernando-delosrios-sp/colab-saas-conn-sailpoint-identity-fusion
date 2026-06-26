@@ -408,7 +408,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     // Mock form fetch methods to populate from recorded state
     const forms = state.getForms()
     if (forms.length > 0) {
-        registry.forms.fetchFormInstancesData = jest.fn().mockResolvedValue(undefined)
+        registry.forms.fetchFormInstances = jest.fn().mockResolvedValue(undefined)
         registry.forms.processFetchedFormData = jest.fn().mockImplementation(async () => {
             registry.forms.fusionIdentityDecisions = forms
         })
