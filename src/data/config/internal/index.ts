@@ -14,7 +14,6 @@ export const internalConfig = {
     formService: internalConfigFormService,
 } as const
 
-export type InternalConfigByService = typeof internalConfig
 
 /** Flattened for `readConfig` merge — matches `InternalConfig` on `FusionConfig`. */
 export function getInternalConfigFlat(): {

@@ -2015,7 +2015,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account)
 
-            await (fusionService as any).correlatePerSource(fusionAccount)
+            await (fusionService as any).correlationManager.correlatePerSource(fusionAccount)
 
             expect(fusionAccount.attributes.reverseNativeIdentity).toBe('existing-value')
         })
@@ -2053,7 +2053,7 @@ describe('FusionService', () => {
             fusionAccount.addFusionDecisionLayer(linkDecision)
             expect(fusionAccount.getManagedAccountInfo('source-a-id::native-no-meta')).toBeUndefined()
 
-            await (fusionService as any).correlatePerSource(fusionAccount, linkDecision)
+            await (fusionService as any).correlationManager.correlatePerSource(fusionAccount, linkDecision)
 
             expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(fusionAccount, [
                 'source-a-id::native-no-meta',
