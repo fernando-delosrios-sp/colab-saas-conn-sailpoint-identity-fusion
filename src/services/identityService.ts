@@ -135,6 +135,13 @@ export class IdentityService {
 
         if (additionalIdentityIds?.length) {
             await this.hydrateMissingIdentitiesById(additionalIdentityIds)
+            for (const id of additionalIdentityIds) {
+                if (!id) continue
+                const identity = this.identitiesById.get(id)
+                if (identity && !identity.protected) {
+                    this.identityIdsInScope.add(id)
+                }
+            }
         }
     }
 
@@ -340,9 +347,17 @@ export class IdentityService {
     }
 
     /**
-     * Checks if an identity is within the scope of the original global fetch.
-     * Identities loaded out-of-band via `hydrateMissingIdentitiesById()` are NOT in scope
-     * and will return false here, even if they can be retrieved via `getIdentityById()`.
+     * Checks if an identity is part of this aggregation's effective identity list.
+     *
+     * An identity is considered in-scope when either:
+     * - It was returned by the configured `identityScopeQuery` global fetch, or
+     * - It was explicitly requested by the connector via `additionalIdentityIds`
+     *   to {@link fetchIdentities} (currently used to load the global reviewer /
+     *   source-owner identity) and was successfully hydrated into the cache.
+     *
+     * Identities present in the cache for other reasons (e.g. hydrated by reporting
+     * code via `hydrateMissingIdentitiesById` without going through `fetchIdentities`)
+     * are NOT in scope.
      *
      * @param id - The identity ID to check
      * @returns true if the identity is in scope, false otherwise
