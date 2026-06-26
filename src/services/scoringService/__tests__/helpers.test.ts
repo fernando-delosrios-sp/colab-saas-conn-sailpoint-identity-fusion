@@ -1,4 +1,5 @@
 import {
+    scoreBinary,
     scoreCustomVelocity,
     scoreDice,
     scoreDoubleMetaphone,
@@ -78,6 +79,57 @@ describe('scoringService helpers', () => {
         it('should handle name order differences', () => {
             const result = scoreNameMatcher('John Smith', 'Smith John', baseMatching)
             expect(result.score).toBeGreaterThan(80)
+        })
+    })
+
+    describe('scoreBinary', () => {
+        const binaryMatching = { ...baseMatching, algorithm: 'binary' as const }
+
+        it('should return 100 for identical strings', () => {
+            const result = scoreBinary('abc123', 'abc123', { ...binaryMatching, fusionScore: 100 })
+            expect(result.score).toBe(100)
+            expect(result.isMatch).toBe(true)
+        })
+
+        it('should return 0 for different strings', () => {
+            const result = scoreBinary('abc123', 'xyz789', { ...binaryMatching, fusionScore: 100 })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+        })
+
+        it('should be case-sensitive', () => {
+            const result = scoreBinary('ABC123', 'abc123', { ...binaryMatching, fusionScore: 100 })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+        })
+
+        it('should be whitespace-sensitive', () => {
+            const result = scoreBinary('abc123', ' abc123 ', { ...binaryMatching, fusionScore: 100 })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+        })
+
+        it('should return 0 for missing account value', () => {
+            const result = scoreBinary('', 'abc123', { ...binaryMatching, fusionScore: 100 })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+        })
+
+        it('should return 0 for missing identity value', () => {
+            const result = scoreBinary('abc123', '', { ...binaryMatching, fusionScore: 100 })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+        })
+
+        it('should return 0 for both values missing', () => {
+            const result = scoreBinary('', '', { ...binaryMatching, fusionScore: 100 })
+            expect(result.score).toBe(0)
+            expect(result.isMatch).toBe(false)
+        })
+
+        it('should respect fusionScore threshold', () => {
+            const result = scoreBinary('abc', 'abc', { ...binaryMatching, fusionScore: 80 })
+            expect(result.isMatch).toBe(true)
         })
     })
 

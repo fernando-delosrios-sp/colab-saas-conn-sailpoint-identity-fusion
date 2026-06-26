@@ -126,6 +126,7 @@ export interface MatchingConfig {
         | 'double-metaphone'
         | 'average'
         | 'weighted-mean'
+        | 'binary'
         | 'custom'
     /**
      * When `algorithm` is `custom`, Apache Velocity template evaluated per pair.
@@ -139,6 +140,12 @@ export interface MatchingConfig {
     mandatory?: boolean
     /** If true (default), skip this rule when either side is missing (null/undefined/empty after trim). */
     skipMatchIfMissing?: boolean
+    /**
+     * If true, skip this rule (exclude from the weighted combined score) when its
+     * computed similarity is strictly below `fusionScore`. Mandatory rules ignore this
+     * toggle and are always evaluated against their minimum similarity.
+     */
+    skipMatchIfThresholdNotMet?: boolean
 }
 
 /**
@@ -150,6 +157,17 @@ export function effectiveSkipMatchIfMissing(
     matching: Pick<MatchingConfig, 'skipMatchIfMissing' | 'mandatory'>
 ): boolean {
     return !matching.mandatory && matching.skipMatchIfMissing !== false
+}
+
+/**
+ * Whether a rule should be skipped when its computed similarity is below its
+ * configured minimum similarity (`fusionScore`). Mandatory rules are always
+ * evaluated so a failed mandatory rule can invalidate the candidate.
+ */
+export function effectiveSkipMatchIfThresholdNotMet(
+    matching: Pick<MatchingConfig, 'skipMatchIfThresholdNotMet' | 'mandatory'>
+): boolean {
+    return !matching.mandatory && matching.skipMatchIfThresholdNotMet === true
 }
 
 // ============================================================================

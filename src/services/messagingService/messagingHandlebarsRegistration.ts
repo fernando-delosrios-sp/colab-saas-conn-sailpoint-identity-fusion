@@ -19,6 +19,7 @@ export const registerHandlebarsHelpers = (): void => {
         lig3: 'LIG3',
         dice: 'Dice',
         'double-metaphone': 'Double Metaphone',
+        binary: 'Binary (Exact Match)',
         custom: 'Custom',
         average: 'Combined match score (legacy)',
         'weighted-mean': 'Combined score',

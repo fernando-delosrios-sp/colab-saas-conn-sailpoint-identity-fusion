@@ -159,11 +159,10 @@ describe('corePipeline outputPhase', () => {
         const serviceRegistry = { ...registry, forms, identities, sources, fusion, messaging, log }
 
         await fetchPhase(serviceRegistry, { mode: { kind: 'aggregation' } })
-        expect(forms.fetchFormInstancesData).toHaveBeenCalledWith(true)
-
-        forms.fetchFormInstancesData.mockClear()
+        expect(forms.fetchFormInstances).toHaveBeenCalledWith(true)
+        forms.fetchFormInstances.mockClear()
         await fetchPhase(serviceRegistry, { mode: { kind: 'dry-run' } })
-        expect(forms.fetchFormInstancesData).toHaveBeenCalledWith(false)
+        expect(forms.fetchFormInstances).toHaveBeenCalledWith(false)
     })
 })
 

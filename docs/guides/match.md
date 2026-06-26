@@ -152,6 +152,7 @@ For each attribute you want to use in match detection, add a **Fusion attribute 
 | **Minimum similarity [0-100]** | Threshold for this rule; also its weight in the combined score | 75–85 (name); 90–100 (email). Higher values are stricter and count more in the blend.                                                           |
 | **Mandatory match?**           | Must meet this rule’s minimum for a potential match            | Yes for critical identifiers; passing mandatories still contribute weighted score like other rules.                                             |
 | **Skip match if missing**      | Skip when either value is missing                              | Default: Yes. Skipped rules do not affect the combined score. |
+| **Skip match if threshold not met** | Skip the rule when its computed similarity is below its minimum | Default: No (off). When enabled, below-threshold non-mandatory rules are excluded from the combined score; mandatory rules are always evaluated. |
 
 !!! tip "Example edge cases"
 
@@ -201,6 +202,13 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 - With **Skip match if missing = Yes** (default), a missing-value rule is skipped: it does not enter the combined score.
 - With **Skip match if missing = No**, that rule is always evaluated and contributes to the combined score.
 - **Mandatory** rules that are evaluated must pass their minimum or the candidate is rejected.
+
+**Interaction with `Skip match if threshold not met`:**
+
+- With **Skip match if threshold not met = No** (default), every evaluated rule contributes its weight and raw similarity to the combined score, even when the score is below the rule's own minimum. The rule simply fails to "pass" but still dilutes the blend.
+- With **Skip match if threshold not met = Yes**, a non-mandatory rule whose similarity is below its `fusionScore` is excluded from the combined score (zero weight, zero raw score). The combined score is then computed only from the rules that passed their thresholds, which can raise the combined score compared with keeping weak rules in the blend.
+- **Mandatory** rules always ignore this toggle: a below-threshold mandatory rule fails the candidate just as it would with the toggle disabled.
+- Enabling this option can change the combined score and the manual review / automatic assignment outcome. Test with `custom:dryrun` before promoting to production.
 
 **Example:**
 

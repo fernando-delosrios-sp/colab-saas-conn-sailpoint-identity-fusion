@@ -3,7 +3,6 @@
  * No `sourceConfigInitialValues` keys; connection fields are required from the platform.
  */
 import { assert } from '../../../utils/assert'
-import type { ConnectionSettingsSection } from '../../../model/config'
 
 export const connectorSpecInitialValues = {} as const
 export const runtimeDefaults = {} as const

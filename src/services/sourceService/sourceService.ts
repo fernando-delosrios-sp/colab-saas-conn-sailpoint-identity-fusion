@@ -1680,7 +1680,6 @@ export class SourceService {
         fusionSourceId: string,
         fusionSourceName: string
     ): Promise<void> {
-        const { identityProfilesApi } = this.client
         const newTransform = {
             identityAttributeName: attributeName,
             transformDefinition: {
@@ -2137,7 +2136,6 @@ export class SourceService {
         }
 
         let firstPoll = true
-        const { taskManagementApi } = this.client
         while (!completed && taskId && (firstPoll || Date.now() < deadlineMs)) {
             firstPoll = false
             const requestParameters: TaskManagementV2025ApiGetTaskStatusRequest = {

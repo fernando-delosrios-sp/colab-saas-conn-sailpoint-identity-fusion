@@ -164,7 +164,7 @@ export class FormService {
     }
 
     /**
-     * Process form instances that were fetched by fetchFormInstancesData.
+     * Process form instances that were fetched by fetchFormInstances.
      */
     public async processFetchedFormData(): Promise<void> {
         const formInstancesResults = this._fetchedFormInstances

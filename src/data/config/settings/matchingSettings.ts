@@ -1,7 +1,7 @@
 /**
  * connector-spec.json -> Attribute Matching Settings -> Matching Settings
  */
-import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
+import { logger } from '@sailpoint/connector-sdk'
 import { assert, softAssert } from '../../../utils/assert'
 import { extractBoolean } from '../../../utils/attributes'
 import { migrateConfigKey } from '../migration'
@@ -24,7 +24,7 @@ export function readSettings(raw: Record<string, unknown>): MatchingSettingsSect
     const matchingConfigs = (raw.matchingConfigs as MatchingConfig[]) ?? []
     const fusionEnableAutoAssignment = extractBoolean(raw, 'fusionEnableAutoAssignment') ?? runtimeDefaults.fusionEnableAutoAssignment
     const fusionManualReviewScore = (raw.fusionManualReviewScore as number | undefined) ?? connectorSpecInitialValues.fusionManualReviewScore
-    let fusionAutoAssignmentScore = raw.fusionAutoAssignmentScore as number | undefined
+    const fusionAutoAssignmentScore = raw.fusionAutoAssignmentScore as number | undefined
 
     assert(
         fusionManualReviewScore >= 0 && fusionManualReviewScore <= 100,

@@ -215,7 +215,7 @@ describe('Identity Fusion NG - Recorded Chain Replay', () => {
                 const _output = stepResult.output as Record<string, unknown>
                 const step = steps[i]
                 if (step?.expectedOutput) {
-                    const { match, drift } = compareOutputs(
+                    const { match: _match, drift } = compareOutputs(
                         (_output?.outputs as unknown[]) ?? [],
                         step.expectedOutput,
                         `${stepResult.stepId} (index ${i})`

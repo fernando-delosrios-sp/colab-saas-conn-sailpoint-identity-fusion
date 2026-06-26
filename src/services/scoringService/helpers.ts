@@ -36,6 +36,7 @@ function makeScoreReport(
         fusionScore: matching.fusionScore,
         mandatory: matching.mandatory,
         skipMatchIfMissing: matching.skipMatchIfMissing,
+        skipMatchIfThresholdNotMet: matching.skipMatchIfThresholdNotMet,
         score,
         isMatch,
     }
@@ -141,6 +142,25 @@ export const scoreNameMatcher = (
     // nameMatch returns a normalized score (0-1), convert to 0-100
     const score = Math.round(similarity * 100)
 
+    const threshold = matching.fusionScore ?? 0
+    const isMatch = score >= threshold
+
+    return makeScoreReport(matching, score, isMatch)
+}
+
+/**
+ * Strict exact-match scoring. Returns 100 when the two values are identical
+ * non-empty strings, 0 otherwise. Comparison is case- and whitespace-sensitive —
+ * normalization should be performed in **Define** if forgiving comparison
+ * is required. Missing values (empty after trim) score 0 and follow the existing
+ * skip-on-missing behavior in the scoring pipeline.
+ */
+export const scoreBinary = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => {
+    const score = accountAttribute !== '' && accountAttribute === identityAttribute ? 100 : 0
     const threshold = matching.fusionScore ?? 0
     const isMatch = score >= threshold
 
