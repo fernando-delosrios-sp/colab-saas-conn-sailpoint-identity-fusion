@@ -280,9 +280,9 @@ export class IdentityService {
             `Triggering correlation for ${targetIds.length} account(s) for fusion account ${fusionAccount.name}`
         )
 
-        for (const accountId of targetIds) {
-            await this.correlateSingleAccount(fusionAccount, accountId, identityId)
-        }
+        await Promise.all(
+            targetIds.map((accountId) => this.correlateSingleAccount(fusionAccount, accountId, identityId))
+        )
 
         return true
     }

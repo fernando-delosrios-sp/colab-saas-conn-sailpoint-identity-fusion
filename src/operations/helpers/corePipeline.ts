@@ -140,10 +140,10 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
 
     log.info('Fetching identities, managed accounts, and dependencies')
 
-    const ownerIds = ownerIncluded ? await sources.fetchGlobalOwnerIdentityIds() : []
+    const ownerIdsPromise = ownerIncluded ? sources.fetchGlobalOwnerIdentityIds() : Promise.resolve([])
 
     const fetchTasks: Array<Promise<void>> = [
-        identities.fetchIdentities(ownerIds),
+        ownerIdsPromise.then(ownerIds => identities.fetchIdentities(ownerIds)),
         sources.fetchManagedAccounts(),
         sources.fetchFusionAccounts(),
         forms.fetchFormInstances(isPersistent),
