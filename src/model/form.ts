@@ -1,15 +1,5 @@
-import { Attributes } from '@sailpoint/connector-sdk'
 import { SourceType } from './config'
 
-/** Account representation used in fusion review forms, including optional match score. */
-type Account = {
-    id: string
-    name: string
-    sourceName: string
-    attributes: Attributes
-    /** Similarity scores if this account was matched against an identity */
-    score?: Score
-}
 
 /**
  * Minimal account type for FusionDecision - only includes fields actually used.
@@ -31,15 +21,6 @@ type User = {
     name: string
 }
 
-/** Aggregated similarity score with per-attribute breakdown, used in review forms. */
-type Score = {
-    /** Per-attribute score details */
-    attributes: { attribute: string; score: number; threshold: number }[]
-    /** Overall combined score */
-    score: number
-    /** Overall threshold that must be met */
-    threshold: number
-}
 
 /**
  * A reviewer's decision on a fusion (Match) form.
@@ -80,11 +61,4 @@ export type FusionDecision = {
     formUrl?: string
     /** Source type of the managed source this decision pertains to. */
     sourceType?: SourceType
-}
-/** Data payload for creating a new fusion review form instance. */
-export type FusionRequest = {
-    title: string
-    recipient: User
-    account: Account
-    candidates: Account[]
 }
