@@ -7,26 +7,37 @@ The Account Update operation applies changes to a fusion account. Currently, it 
 ## Process Flow
 
 1.  **Input Validation**:
-    - Verifies that the `identity` (ID) and `changes` list are provided.
-    - Loads sources and schema.
+    - Verifies that the `identity` (ID) and `changes` list are provided and that `changes` is non-empty.
+    - Computes the list of reverse-correlation attributes from sources configured with `correlationMode: 'reverse'` and a `correlationAttribute`. An empty reverse-correlation snapshot is created.
 
-2.  **Fusion Account Rebuild**:
+2.  **Setup**:
+    - Loads all managed sources (`sources.fetchAllSources()`).
+    - If any reverse-correlation attributes are configured, the target fusion account is fetched pre-emptively and its existing attribute values for those keys are captured in the snapshot.
+    - Sets the fusion account schema from the input.
+
+3.  **Fusion Account Rebuild**:
     - Fetches the current fusion account, identity, and linked source accounts without recomputing any attribute values.
     - **Attribute operations** (`ATTR_OPS_NONE`):
         - `refreshMapping`: False — preserves existing mapped attribute values.
         - `refreshDefinition`: False — preserves existing Velocity-defined attribute values.
         - `resetDefinition`: False — unique values are not touched.
 
-3.  **Change Processing**:
+4.  **Change Processing**:
     - Iterates through the list of requested changes.
-    - Checks if the change is for the `actions` attribute.
-    - **Action Execution**:
-        - **Report**: Generates a fusion report.
-        - **Fusion**: Adds or removes the fusion tag.
-        - **Correlated**: Manually triggers correlation logic.
-    - Unsupported attributes or actions result in an error.
+    - For each change, asserts the `attribute` field is present.
+    - If the change targets the `actions` attribute, the change is dispatched to `executeActions()` in `operations/actions/index.ts`. Each action token (the substring before `:`) is routed to a handler:
+        - **Report** — Generates a fusion report.
+        - **Fusion** — Adds or removes the fusion tag.
+        - **Correlate / Correlated** — Manually triggers correlation logic. Both tokens map to the same handler.
+        - **Reviewer** — Assigns the source-specific reviewer entitlement.
+    - The dispatcher also detects `Remove` of `correlate`/`correlated` and skips the correlation-status recomputation in step 6.
+    - For any other `attribute`, the operation crashes the connector log (`log.crash("Unsupported entitlement change: …")`).
 
-4.  **Output Generation**:
+5.  **Reverse-Correlation Snapshot Restore** (conditional):
+    - If the operation captured a reverse-correlation attribute snapshot during setup (sources configured with `correlationMode: 'reverse'`), the rebuilt fusion account's reverse-correlation attributes are restored to their pre-rebuild values to prevent the rebuild from overwriting them with derived values.
+
+6.  **Output Generation**:
+    - Converts the rebuilt fusion account into an ISC account object via `fusion.getISCAccount(fusionAccount, includeUncorrelated=true, shouldRecomputeCorrelationStatus)`.
     - Returns the updated ISC account state.
 
 ## Behavior Notes

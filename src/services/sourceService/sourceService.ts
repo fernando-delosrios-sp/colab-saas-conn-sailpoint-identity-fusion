@@ -516,6 +516,20 @@ export class SourceService {
     }
 
     /**
+     * Sources configured for delayed aggregation mode.
+     */
+    public get delayedAggregationSources(): SourceConfig[] {
+        return this.sources.filter((sc) => sc.aggregationMode === 'delayed')
+    }
+
+    /**
+     * Sources configured for reverse correlation mode.
+     */
+    public get reverseCorrelationSources(): SourceConfig[] {
+        return this.sources.filter((sc) => sc.correlationMode === 'reverse')
+    }
+
+    /**
      * Compile/validate configured Accounts JMESPath filters for managed sources.
      * Throws ConnectorError when any expression is invalid.
      */

@@ -1,5 +1,6 @@
 import { FusionService } from '../fusionService'
 import { AggregationTracker } from '../aggregationTracker'
+import { OperationContext } from '../types'
 import { LogService } from '../../logService'
 import { IdentityService } from '../../identityService'
 import { SourceService } from '../../sourceService'
@@ -707,7 +708,7 @@ describe('FusionService', () => {
         })
 
         it('uses newly unmatched current-run accounts as deferred candidates for subsequent managed accounts', async () => {
-            ;(fusionService as any).managedAccountsBatchSize = 1
+            fusionService.config.managedAccountsBatchSize = 1
             const firstAccount = {
                 id: 'acct-seq-1',
                 nativeIdentity: 'native-seq-1',
@@ -759,7 +760,7 @@ describe('FusionService', () => {
         })
 
         it('keeps deferred candidate visibility within a managed-account batch', async () => {
-            ;(fusionService as any).managedAccountsBatchSize = 2
+            fusionService.config.managedAccountsBatchSize = 2
             const firstAccount = {
                 id: 'acct-batch-def-1',
                 nativeIdentity: 'native-batch-def-1',
@@ -814,7 +815,7 @@ describe('FusionService', () => {
         })
 
         it('runs deferred source identity phase in parallel while deferred candidate scoring stays sequential', async () => {
-            ;(fusionService as any).managedAccountsBatchSize = 2
+            fusionService.config.managedAccountsBatchSize = 2
             const accountA1 = {
                 id: 'acct-par-a-1',
                 nativeIdentity: 'native-par-a-1',
@@ -969,7 +970,7 @@ describe('FusionService', () => {
         })
 
         it('resolves all correlated accounts in pre-pass before uncorrelated batch processing', async () => {
-            ;(fusionService as any).managedAccountsBatchSize = 2
+            fusionService.config.managedAccountsBatchSize = 2
             const correlatedA = {
                 id: 'acct-corr-a',
                 nativeIdentity: 'native-corr-a',
@@ -1254,7 +1255,7 @@ describe('FusionService', () => {
                 mockScoring,
                 mockSchemas,
                 StandardCommand.StdAccountList,
-                'custom:dryrun'
+                OperationContext.CustomDryRun
             )
             customReportFusion.setTracker(new AggregationTracker())
 
@@ -1428,7 +1429,7 @@ describe('FusionService', () => {
                 mockScoring,
                 mockSchemas,
                 undefined,
-                'accountList'
+                OperationContext.AccountList
             )
             accountListFusion.setTracker(new AggregationTracker())
             const account = {

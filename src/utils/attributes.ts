@@ -1,3 +1,4 @@
+import { Account } from 'sailpoint-api-client'
 import { hasValue, isDefined, missing, readUnknown, trimStr } from './safeRead'
 
 /**
@@ -348,4 +349,40 @@ export function buildAccountIdentifier(
  */
 function trimOrUndefined(value: string | null | undefined): string | undefined {
     return trimStr(value)
+}
+
+// SDK Account attribute helpers
+
+/** Normalized attributes type: SDK `Account.attributes` coerced from `{[k:string]: any} | null` to a non-null Record. */
+export type AccountAttributes = Record<string, unknown>
+
+/**
+ * Safely reads an SDK Account's attributes, returning an empty record when null/undefined.
+ * Use this to avoid repeated `account.attributes ?? {}` handling and to treat attributes as `Record<string, unknown>`.
+ */
+export function getAccountAttributes(account: Account): AccountAttributes {
+    return (account.attributes ?? {}) as AccountAttributes
+}
+
+/**
+ * Reads a single attribute from an SDK Account, returning `undefined` when the attribute
+ * is missing, null, or the account has no attributes.
+ */
+export function getAccountAttribute(account: Account, name: string): unknown {
+    return getAccountAttributes(account)[name]
+}
+
+/**
+ * Reads a string attribute from an SDK Account, returning `undefined` for non-string values.
+ */
+export function getAccountStringAttribute(account: Account, name: string): string | undefined {
+    const value = getAccountAttribute(account, name)
+    return typeof value === 'string' ? value : undefined
+}
+
+/**
+ * Returns true when the SDK Account has a non-null/non-undefined attribute with the given name.
+ */
+export function hasAccountAttribute(account: Account, name: string): boolean {
+    return getAccountAttribute(account, name) !== undefined
 }

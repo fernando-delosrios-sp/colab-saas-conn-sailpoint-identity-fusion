@@ -1,6 +1,6 @@
 import { Account, IdentityDocument } from 'sailpoint-api-client'
 import { isNewerThan } from '../utils/date'
-import { toSetFromAttribute as attributeToSet } from '../utils/attributes'
+import { toSetFromAttribute as attributeToSet, getAccountStringAttribute, getAccountAttribute } from '../utils/attributes'
 import { FusionDecision } from './form'
 import { FusionConfig, SourceType } from './config'
 import { Attributes, ConnectorError, ConnectorErrorType, SimpleKeyType } from '@sailpoint/connector-sdk'
@@ -18,7 +18,7 @@ import {
 import { missing, readString, trimStr } from '../utils/safeRead'
 import {
     buildIdentityInfo,
-    resolveCompositeKeyFromFusionRecord
+    resolveCompositeManagedKeyFromFusionRecord
 } from './fusionAccountUtils'
 import {
     preserveMissingAccountContext,
@@ -216,7 +216,7 @@ export class FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourceSet = new Set<string>()
         const statuses = attributeToSet(account.attributes, 'statuses')
-        const resolvedCompositeManagedKey = resolveCompositeKeyFromFusionRecord(account)
+        const resolvedCompositeManagedKey = resolveCompositeManagedKeyFromFusionRecord(account)
         if (statuses.has('baseline')) sourceSet.add('Identities')
 
         const identityInfo = buildIdentityInfo(account)
@@ -234,21 +234,23 @@ export class FusionAccount {
             iscAccountId: account.id,
         })
         // Restore persisted origin metadata from existing fusion account attributes.
-        if (typeof account.attributes?.originSource === 'string') {
-            fusionAccount._originSource = account.attributes.originSource
+        const originSource = getAccountStringAttribute(account, 'originSource')
+        if (originSource) {
+            fusionAccount._originSource = originSource
         }
-        if (typeof account.attributes?.originAccount === 'string') {
-            const normalizedOriginAccount = normalizeCompositeManagedAccountKey(account.attributes.originAccount)
-            const trimmedOriginAccount = account.attributes.originAccount.trim()
+        const originAccount = getAccountStringAttribute(account, 'originAccount')
+        if (originAccount) {
+            const normalizedOriginAccount = normalizeCompositeManagedAccountKey(originAccount)
+            const trimmedOriginAccount = originAccount.trim()
             fusionAccount._originAccount = normalizedOriginAccount ?? (trimmedOriginAccount || undefined)
         }
         // Restore the persisted identity ID so identity-backed accounts route to fusionIdentityMap
         // even when the SDK Account does not expose `identityId` directly. We fold the value into
         // `_identityInfo` so the `identityId` getter has a single authoritative source.
-        if (!fusionAccount._identityInfo?.id && typeof account.attributes?.identityId === 'string') {
-            const trimmedIdentityId = account.attributes.identityId.trim()
-            if (trimmedIdentityId.length > 0) {
-                fusionAccount.setIdentityIdAttribute(trimmedIdentityId)
+        if (!fusionAccount._identityInfo?.id) {
+            const identityId = getAccountStringAttribute(account, 'identityId')
+            if (identityId && identityId.trim().length > 0) {
+                fusionAccount.setIdentityIdAttribute(identityId.trim())
             }
         }
         // Capture the previously stored account IDs so we can later rebuild
@@ -256,7 +258,7 @@ export class FusionAccount {
         // still exist in configured sources.
         fusionAccount.previousAccountIds = attributeToSet(account.attributes, 'accounts')
         // Load history from platform so accountUpdate/accountRead don't send back empty history.
-        const historyAttr = account.attributes?.history
+        const historyAttr = getAccountAttribute(account, 'history')
         if (Array.isArray(historyAttr) && historyAttr.length > 0) {
             fusionAccount.importHistory(historyAttr)
         }
@@ -302,7 +304,7 @@ export class FusionAccount {
      */
     public static fromManagedAccount(account: Account): FusionAccount {
         const fusionAccount = new FusionAccount()
-        const sourcesAttr = account.attributes?.sources
+        const sourcesAttr = getAccountAttribute(account, 'sources')
         const sourceSet = sourcesAttr ? new Set(attrSplit(String(sourcesAttr))) : new Set<string>()
 
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
@@ -644,6 +646,32 @@ export class FusionAccount {
 
     public get attributes(): Attributes {
         return this._attributeBag.current
+    }
+
+    /**
+     * Reads a value from the current attribute bag.
+     * Returns `undefined` when the attribute is missing or explicitly `undefined`
+     * (distinguishes from `null`, which is a valid ISC attribute value).
+     */
+    public getAttribute(name: string): Attributes[string] | undefined {
+        return this._attributeBag.current[name]
+    }
+
+    /**
+     * Reads a string attribute from the current attribute bag.
+     * Returns `undefined` when the value is not a string.
+     */
+    public getStringAttribute(name: string): string | undefined {
+        const value = this.getAttribute(name)
+        return typeof value === 'string' ? value : undefined
+    }
+
+    /**
+     * Returns true when the current attribute bag contains the given name,
+     * regardless of whether the value is `null` (a valid ISC attribute value).
+     */
+    public hasAttribute(name: string): boolean {
+        return name in this._attributeBag.current
     }
 
     public get attributeBag(): FusionAttributeBag {
@@ -1027,7 +1055,7 @@ export class FusionAccount {
      */
     public clearFusionIdentityReferences(): void {
         for (const match of this._fusionMatches) {
-            ;(match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
+            ; (match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
         }
     }
 

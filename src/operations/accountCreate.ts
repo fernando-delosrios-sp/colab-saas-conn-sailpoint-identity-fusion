@@ -2,6 +2,7 @@ import { AttributeChangeOp, ConnectorError, StdAccountCreateInput } from '@sailp
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { assert } from '../utils/assert'
 import { normalizeActionTokens } from '../utils/attributes'
+import { resolveIdentityNameFromCreateInput } from '../utils/identityName'
 import { executeActions } from './actions'
 
 /**
@@ -25,7 +26,7 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
     ServiceRegistry.setCurrent(serviceRegistry)
     const { log, identities, sources, schemas, fusion, attributes, res } = serviceRegistry
 
-    let identityName = input.attributes.name ?? input.identity
+    let identityName: string | undefined
     try {
         assert(input.schema, 'Account schema is required')
 
@@ -34,7 +35,7 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
         const { fusionDisplayAttribute } = schemas
         assert(fusionDisplayAttribute, 'Fusion display attribute not found in schema')
 
-        identityName = input.attributes[fusionDisplayAttribute] ?? identityName
+        identityName = resolveIdentityNameFromCreateInput(input, fusionDisplayAttribute)
         assert(identityName, 'Identity name is required for account creation')
 
         log.info(`Creating account for identity: ${identityName}`)

@@ -51,6 +51,12 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         clearFusionAccounts: jest.fn(),
         getSourceByName: jest.fn(),
         getSourceByNameSafe: jest.fn(),
+        get delayedAggregationSources() {
+            return sourceConfigs.filter((sc) => sc.aggregationMode === 'delayed')
+        },
+        get reverseCorrelationSources() {
+            return sourceConfigs.filter((sc) => sc.correlationMode === 'reverse')
+        },
         managedSources: [],
         managedAccountsById: new Map(),
         managedAccountsAllById: new Map(),
