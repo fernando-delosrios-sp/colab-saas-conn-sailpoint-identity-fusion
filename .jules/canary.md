@@ -50,3 +50,11 @@
 ## 2024-05-24 - MkDocs Material Admonition Syntax
 **Learning:** MkDocs Material admonitions (e.g., `!!! warning`, `!!! tip`) require *all* of their inner body text to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the indentation is missing, the admonition will break.
 **Action:** Always add an empty line after the `!!!` line and indent the following text block by 4 spaces.
+
+## 2026-06-26 - Markdownlint MD034 and Text Callout Admonition Conversions
+**Learning:** Bare URLs or email addresses in Markdown tables cause `MD034` linting errors. Additionally, standard text callouts like `- **Why it matters:**` or `- **Best Practice:**` are better represented as MkDocs Material admonitions (, ).
+**Action:** Always wrap URLs/emails in backticks inside documentation to avoid `MD034` and use Material admonitions for callouts for better readability.
+
+## 2026-06-26 - Markdownlint MD034 and Text Callout Admonition Conversions
+**Learning:** Bare URLs or email addresses in Markdown tables cause `MD034` linting errors. Additionally, standard text callouts like `- **Why it matters:**` or `- **Best Practice:**` are better represented as MkDocs Material admonitions (e.g., info, tip).
+**Action:** Always wrap URLs/emails in backticks inside documentation to avoid `MD034` and use Material admonitions for callouts for better readability.
