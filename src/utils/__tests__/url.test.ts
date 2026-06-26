@@ -8,6 +8,7 @@ import {
     buildWorkflowUrl,
     buildFormDefinitionUrl,
     isValidUrl,
+    isSafeHttpUrl,
     removeTrailingSlash,
     ensureTrailingSlash,
     createUrlContext,
@@ -105,6 +106,30 @@ describe('url', () => {
             expect(isValidUrl('not-a-url')).toBe(false)
             expect(isValidUrl('')).toBe(false)
             expect(isValidUrl(undefined)).toBe(false)
+        })
+    })
+
+    describe('isSafeHttpUrl', () => {
+        it('should validate standard http/https urls', () => {
+            expect(isSafeHttpUrl('http://example.com')).toBe(true)
+            expect(isSafeHttpUrl('https://example.com')).toBe(true)
+        })
+
+        it('should reject non-http schemes', () => {
+            expect(isSafeHttpUrl('http:file:///etc/passwd')).toBe(false)
+            expect(isSafeHttpUrl('javascript:alert(1)')).toBe(false)
+        })
+
+        it('should reject payloads attempting SSRF bypasses via prefix whitespace', () => {
+            expect(isSafeHttpUrl('\thttp://example.com')).toBe(false)
+            expect(isSafeHttpUrl(' http://example.com')).toBe(false)
+            expect(isSafeHttpUrl('http://example.com ')).toBe(false)
+        })
+
+        it('should return false for undefined or invalid strings', () => {
+            expect(isSafeHttpUrl(undefined)).toBe(false)
+            expect(isSafeHttpUrl('')).toBe(false)
+            expect(isSafeHttpUrl('not-a-url')).toBe(false)
         })
     })
 

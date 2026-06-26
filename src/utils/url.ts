@@ -173,6 +173,21 @@ export function ensureTrailingSlash(url: string): string {
     return url.endsWith('/') ? url : `${url}/`
 }
 
+/**
+ * Validates that a string is a safe HTTP or HTTPS URL, preventing SSRF bypasses
+ * (e.g., whitespace prefixes like \thttp:// or scheme smuggling).
+ */
+export function isSafeHttpUrl(url: string | undefined): boolean {
+    if (!url || url.trim() !== url) return false
+    try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+        return url.toLowerCase().startsWith(`${parsed.protocol}//`)
+    } catch {
+        return false
+    }
+}
+
 // ============================================================================
 // URL Context Builder
 // ============================================================================
