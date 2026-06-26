@@ -16,3 +16,6 @@
 
 **Learning:** When trying to extract an attribute from an object that might be stored under various potential keys (e.g. `email` vs `mail` vs `emailAddress`), chaining `readUnknown` calls with nullish coalescing operators makes the code harder to scan.
 **Action:** Replace `readUnknown(attrs, 'email') ?? readUnknown(...)` fallback chains with the repository's dedicated `getFirstValidAttribute(attrs, 'email', ...)` helper function to encapsulate the extraction logic and significantly improve readability.
+## 2026-06-26 - Simplify verbose string fallback chains
+**Learning:** Sequential 'if' statements checking for string presence (e.g., `const a = trim(); if (a) return a;`) add unnecessary visual noise and nesting.
+**Action:** Replace these patterns with a single concise logical OR (`||`) chain to improve scanability and clarity.
