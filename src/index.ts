@@ -20,6 +20,8 @@ import { entitlementList } from './operations/entitlementList'
 import { accountDiscoverSchema } from './operations/accountDiscoverSchema'
 import { dryRun } from './operations/dryRun'
 
+import { resolveIdentityNameFromCreateInput } from './utils/identityName'
+
 /**
  * Identity Fusion NG connector factory. Loads configuration and returns a configured
  * connector instance with all standard operations (test connection, account list/read/create/update,
@@ -49,7 +51,7 @@ export const connector = async () => {
         )
         .stdAccountCreate(
             createOperationHandler('accountCreate', accountCreate, config, {
-                errorMessage: (input) => `Failed to create account ${input.attributes.name ?? input.identity}`,
+                errorMessage: (input) => `Failed to create account ${resolveIdentityNameFromCreateInput(input) ?? input.identity}`,
             })
         )
         .stdAccountUpdate(

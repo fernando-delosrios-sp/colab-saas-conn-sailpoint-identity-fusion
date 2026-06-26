@@ -12,8 +12,8 @@ The Account Enable operation re-enables a previously disabled fusion account. Th
 
 2.  **Global Pre-processing**:
     - **Crucial Step**: Fetches **ALL** fusion accounts.
-    - Bulk-registers unique attribute values directly from raw account data to build the collision registry.
-    - Pre-processes fusion accounts to populate the identity map.
+    - Bulk-registers unique attribute values directly from raw account data (`attributes.registerUniqueValuesFromRawAccounts`) to build the collision registry used by the post-rebuild refresh in step 3. This is a lightweight path that does not hydrate full `FusionAccount` instances.
+    - Pre-processes fusion accounts via `fusion.preProcessFusionAccounts()` to populate the fusion-identity map used for duplicate-account detection.
     - _Why?_ To ensure that when we re-enable this account, we don't assign it a unique value (e.g., `john.doe@example.com`) that has been taken by another account while this one was disabled.
 
 3.  **Fusion Account Rebuild and Unique Attribute Refresh**:

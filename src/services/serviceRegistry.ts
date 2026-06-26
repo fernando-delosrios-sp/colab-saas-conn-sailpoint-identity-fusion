@@ -1,5 +1,6 @@
 import { Context, ConnectorError, ConnectorErrorType, Response, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
+import { OperationContext } from './fusionService/types'
 import { LogService } from './logService'
 import { InMemoryLockService, LockService } from './lockService'
 import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
@@ -111,7 +112,7 @@ export class ServiceRegistry {
                 this.scoring,
                 this.schemas,
                 commandType,
-                operationContext
+                operationContext as OperationContext | undefined
             )
 
         this.reports = new ReportService(

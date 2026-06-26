@@ -28,11 +28,12 @@ The Account Create operation creates a new fusion account for a specific identit
     - Explicitly refreshes unique attributes (`refreshUniqueAttributes`) to generate collision-free values against the registered pool.
 
 5.  **Action Execution**:
-    - Checks for any actions specified in `input.attributes.actions`.
-    - Executes supported actions sequentially:
-        - **Report**: Generates a fusion report (if configured).
-        - **Fusion**: Marks the account as a fusion account (adds the 'fusion' tag/attribute).
-        - **Correlate**: Triggers correlation logic to link missing source accounts to this identity.
+    - Checks for any actions specified in `input.attributes.actions` (normalized via `normalizeActionTokens`).
+    - For each action token, the dispatcher in `operations/actions/index.ts` routes to the matching handler:
+        - **Report** — Generates a fusion report (if configured).
+        - **Fusion** — Marks the account as a fusion account (adds the 'fusion' tag/attribute).
+        - **Correlate / Correlated** — Triggers correlation logic to link missing source accounts to this identity. Both tokens map to the same handler.
+        - **Reviewer** — Assigns the source-specific reviewer entitlement. (See `account-update.md` for the full action handler table.)
 
 6.  **Response Generation**:
     - Converts the internal fusion identity into an ISC account object.

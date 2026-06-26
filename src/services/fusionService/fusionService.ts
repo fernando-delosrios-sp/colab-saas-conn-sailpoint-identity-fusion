@@ -3,7 +3,7 @@ import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceType } from '../../model/config'
 import { LogService, PhaseTimer } from '../logService'
 import { FormService } from '../formService'
-import { defaultFusionMaxCandidatesForForm, defaults } from '../../data/config'
+import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { IdentityService } from '../identityService'
 import { SourceInfo, SourceService } from '../sourceService'
 import { FusionAccount } from '../../model/account'
@@ -13,18 +13,22 @@ import { createUrlContext, UrlContext } from '../../utils/url'
 import {
     mapValuesToArray,
     forEachBatched,
-    promiseAllBatched,
     compact,
-    yieldToEventLoop,
-    createBatchProgressLogger,
 } from './collections'
 import { FusionDecision } from '../../model/form'
 import { ScoringService } from '../scoringService'
 import { SchemaService } from '../schemaService'
-import { FusionMatch } from '../scoringService/types'
+import { FusionMatch, MatchCandidateType } from '../scoringService/types'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import { COMBINED_SCORE_ROW_ATTRIBUTE, WEIGHTED_MEAN_ALGORITHM } from '../scoringService/scoringService'
-import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats } from './types'
+import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats, OperationContext } from './types'
+import {
+    batchProcess as batchProcessWithConfig,
+    getManagedAccountsBatchSize,
+    getManagedAccountEventLoopYieldEvery,
+    getFusionParallelBatchSize,
+    yieldToEventLoop,
+} from './batching'
 import { buildFusionReport } from './fusionReportBuilder'
 import { AggregationTracker } from './aggregationTracker'
 import {
@@ -85,10 +89,9 @@ export class FusionService {
     public readonly configSourceNames: Set<string>
     public readonly fusionOwnerIsGlobalReviewer: boolean
     public readonly fusionReportOnAggregation: boolean
-    private readonly managedAccountsBatchSize: number
     public readonly commandType?: StandardCommand
-    /** Connector operation name (e.g. `custom:dryrun`) — used when SDK commandType alone is ambiguous. */
-    private readonly operationContext?: string
+    /** Connector operation name (e.g. {@link OperationContext.AccountList}) — used when SDK commandType alone is ambiguous. */
+    private readonly operationContext?: OperationContext
     /** Accumulates Match scoring duration within a single managed-account analysis pass. */
     private currentRunMatchScoringMs = 0
 
@@ -106,7 +109,7 @@ export class FusionService {
      * @param scoring - Scoring service for Match similarity scoring
      * @param schemas - Schema service for attribute schema lookups
      * @param commandType - The current SDK command type (e.g. StdAccountList)
-     * @param operationContext - Handler operation name from the connector (e.g. `custom:dryrun`)
+     * @param operationContext - Handler operation name from the connector (e.g. {@link OperationContext.CustomDryRun})
      */
     constructor(
         public config: FusionConfig,
@@ -118,7 +121,7 @@ export class FusionService {
         public scoring: ScoringService,
         public schemas: SchemaService,
         commandType?: StandardCommand,
-        operationContext?: string
+        operationContext?: OperationContext
     ) {
         this._repository = new FusionAccountRepository(log)
         this.identityProcessor = new IdentityProcessor(this)
@@ -135,21 +138,12 @@ export class FusionService {
         this.commandType = commandType
         this.operationContext = operationContext
         this.deleteEmpty = config.deleteEmpty
-        this.managedAccountsBatchSize = config.managedAccountsBatchSize ?? defaults.managedAccountsBatchSize
     }
 
     /**
-     * Fusion/identity phases use Promise.all batches; each task runs a large synchronous preamble
-     * before its first await. Capping concurrency avoids stacking tens of accounts on one turn.
-     */
-    private fusionParallelBatchSize(): number {
-        return Math.max(1, Math.min(this.managedAccountsBatchSize, 12))
-    }
-
-    /**
-     * Wraps promiseAllBatched with the service's configured batch size and an
-     * automatically created progress logger. Removes the repetitive boilerplate
-     * of calculating batchSize / total and wiring up createBatchProgressLogger.
+     * Runs the provided function over items in bounded concurrent batches, logging progress.
+     * Kept on FusionService so external callers (e.g. DecisionProcessor) do not need to
+     * import batching utilities directly.
      */
     public async batchProcess<T, R>(
         items: T[],
@@ -157,18 +151,7 @@ export class FusionService {
         fn: (item: T) => Promise<R>,
         batchSize?: number
     ): Promise<R[]> {
-        const size = batchSize ?? this.fusionParallelBatchSize()
-        return promiseAllBatched(items, fn, size, createBatchProgressLogger(this.log, label, items.length, size))
-    }
-
-    /**
-     * Yield at most this often while draining the managed-account queue (in addition to per-phase yields).
-     * ScoringService already yields every 100 identity comparisons, so the outer loop does not need to
-     * yield as frequently. 25 accounts per outer yield reduces setImmediate overhead without sacrificing
-     * event-loop responsiveness for the SDK keep-alive and logger flush paths.
-     */
-    private managedAccountEventLoopYieldEvery(): number {
-        return Math.max(1, Math.min(this.managedAccountsBatchSize, 25))
+        return batchProcessWithConfig(items, label, fn, this.config, this.log, batchSize)
     }
 
     /**
@@ -176,7 +159,7 @@ export class FusionService {
      * Treat the standard account-list operation context as aggregation mode.
      */
     public isAggregationAccountListMode(): boolean {
-        return this.commandType === StandardCommand.StdAccountList || this.operationContext === 'accountList'
+        return this.commandType === StandardCommand.StdAccountList || this.operationContext === OperationContext.AccountList
     }
 
     /**
@@ -187,7 +170,7 @@ export class FusionService {
         return (
             this.fusionReportOnAggregation ||
             !this.isAggregationAccountListMode() ||
-            this.operationContext === 'custom:dryrun'
+            this.operationContext === OperationContext.CustomDryRun
         )
     }
 
@@ -381,7 +364,7 @@ export class FusionService {
             allAccounts,
             'Unique-attribute generation',
             (account) => this.attributes.refreshUniqueAttributes(account),
-            this.managedAccountsBatchSize
+            getManagedAccountsBatchSize(this.config)
         )
         return allAccounts.length
     }
@@ -425,7 +408,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${account.nativeIdentity}), ` +
-                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
@@ -443,7 +426,7 @@ export class FusionService {
         // stale account.name (e.g. managed native id) as the hosting label and broke identity-
         // backed display attributes when originSource/baseline implied identity origin.
         if (fusionAccount.identityId) {
-            const identityId = fusionAccount.identityId
+            const { identityId } = fusionAccount
             const identity = this.identities.getIdentityById(identityId)
             if (identity) {
                 fusionAccount.addIdentityLayer(identity)
@@ -480,8 +463,8 @@ export class FusionService {
                 originIdentityId && originIdentityInScope !== undefined
                     ? originIdentityInScope
                     : originIdentityId
-                      ? this.identities.hasIdentityInScope(originIdentityId)
-                      : false
+                        ? this.identities.hasIdentityInScope(originIdentityId)
+                        : false
             fusionAccount.setOriginIdentityInScope(inScope)
         }
 
@@ -497,7 +480,7 @@ export class FusionService {
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
-                `${fusionAccount.accountIdsSet.size} account(s), ${fusionAccount.missingAccountIdsSet.size} missing`
+            `${fusionAccount.accountIdsSet.size} account(s), ${fusionAccount.missingAccountIdsSet.size} missing`
         )
 
         await yieldToEventLoop()
@@ -524,7 +507,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.setFusionAccount(fusionAccount)
@@ -645,7 +628,7 @@ export class FusionService {
                 this._sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                        `Managed accounts from this source will be treated as NonMatched.`
+                    `Managed accounts from this source will be treated as NonMatched.`
                 )
             }
         }
@@ -698,7 +681,7 @@ export class FusionService {
         managedAccountProcessingStartedAt: number
     ): Promise<number> {
         const initialQueueSize = queuedAccounts.length
-        const logProgressEvery = Math.max(1, Math.min(this.managedAccountsBatchSize, initialQueueSize))
+        const logProgressEvery = Math.max(1, Math.min(getManagedAccountsBatchSize(this.config), initialQueueSize))
         let processed = 0
 
         const parallelAccounts: Account[] = []
@@ -1021,7 +1004,7 @@ export class FusionService {
         this.currentRunMatchScoringMs = 0
         const results: FusionAccount[] = []
         let processed = 0
-        const yieldEveryManaged = this.managedAccountEventLoopYieldEvery()
+        const yieldEveryManaged = getManagedAccountEventLoopYieldEvery(this.config)
         for (const account of map.values()) {
             const fusionAccount = await this.analyzeManagedAccount(account)
             if (
@@ -1029,7 +1012,7 @@ export class FusionService {
                 !checkHasIdentityBackedMatches(fusionAccount) &&
                 checkHasNewUnmatchedPeerMatches(fusionAccount)
             ) {
-                const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'new-unmatched')
+                const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === MatchCandidateType.NewUnmatched)
                 const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
                 this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}`)
             }
@@ -1100,7 +1083,7 @@ export class FusionService {
         if (fusionAccount.isMatch) {
             if (hasIdentityBackedMatches) {
                 const identityMatches = fusionAccount.fusionMatches.filter(
-                    (m) => (m.candidateType ?? 'identity') === 'identity'
+                    (m) => (m.candidateType ?? MatchCandidateType.Identity) === MatchCandidateType.Identity
                 )
                 const { headline, summary } = formatFusionMatchDiscoveryLog(identityMatches, false)
                 this.log.info(`${headline}: ${name} [${sourceName}] - ${summary}`)
@@ -1112,7 +1095,7 @@ export class FusionService {
                 return
             }
             const deferredMatches = fusionAccount.fusionMatches
-                .filter((match) => match.candidateType === 'new-unmatched')
+                .filter((match) => match.candidateType === MatchCandidateType.NewUnmatched)
                 .map((match) => {
                     const fields = fusionReportMatchCandidateAccountFields(match)
                     const fi = match.fusionIdentity
@@ -1131,7 +1114,7 @@ export class FusionService {
                         identityId: peerIdentityId,
                         identityUrl,
                         isMatch: true,
-                        candidateType: 'new-unmatched' as const,
+                        candidateType: MatchCandidateType.NewUnmatched,
                         exact: isExactAttributeMatchScores(match.scores),
                         scores: mapScoreReportsForFusionReport(match.scores),
                     }
@@ -1282,7 +1265,7 @@ export class FusionService {
     public async forEachISCAccount(
         send: (account: StdAccountListOutput) => void
     ): Promise<{ sent: number; eligible: number }> {
-        const batchSize = this.fusionParallelBatchSize()
+        const batchSize = getFusionParallelBatchSize(this.config)
         let count = 0
 
         const allAccounts = [...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()]
@@ -1681,7 +1664,7 @@ export class FusionService {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
 
-        this._managedAccountProcessingBatchSize = Math.max(1, this.managedAccountsBatchSize)
+        this._managedAccountProcessingBatchSize = Math.max(1, getManagedAccountsBatchSize(this.config))
         this._managedAccountProcessingStartedAt = Date.now()
 
         this.tracker.newManagedAccountsCount = map.size

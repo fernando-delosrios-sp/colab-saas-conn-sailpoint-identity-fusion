@@ -78,7 +78,7 @@ export function buildIdentityInfo(
  * Resolve composite managed account key candidates from persisted fusion-account attributes.
  * Keeps legacy nativeIdentity as fallback when no composite can be recovered.
  */
-export function resolveCompositeKeyFromFusionRecord(account: Account): string | undefined {
+export function resolveCompositeManagedKeyFromFusionRecord(account: Account): string | undefined {
     const attributes = (account.attributes ?? {}) as Record<string, unknown>
     const candidates = [
         readString(attributes, 'originAccount'),
