@@ -201,7 +201,7 @@ export const registerHandlebarsHelpers = (): void => {
         pushCard('managed_accounts_processed', stats.managedAccountsProcessed)
         pushCard('fusion_reviews_found', stats.fusionReviewsFound)
         pushCard('fusion_review_instances_found', stats.fusionReviewInstancesFound)
-        pushCard('fusion_automatic_matches', stats.fusionAutomaticMatches)
+        pushCard('fusion_accounts_returned', stats.totalFusionAccounts)
 
         return cards
     })

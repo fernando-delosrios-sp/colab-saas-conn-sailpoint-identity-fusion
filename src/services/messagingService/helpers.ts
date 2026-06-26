@@ -233,9 +233,6 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                                 {{#if auto}}
                                 <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#dcfce7; color:#166534; border:1px solid #86efac; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "auto"}}</span>
                                 {{/if}}
-                                {{#if manual}}
-                                <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "manual"}}</span>
-                                {{/if}}
                                 {{#if ../deferred}}
                                 <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "deferred"}}</span>
                                 {{/if}}
@@ -467,13 +464,10 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                                                 {{else}}
                                                                                 {{identityName}}
                                                                                 {{/if}}
-                                                                                {{#if auto}}
-                                                                                <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#dcfce7; color:#166534; border:1px solid #86efac; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "auto"}}</span>
-                                                                                {{/if}}
-                                                                                {{#if manual}}
-                                                                                <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "manual"}}</span>
-                                                                                {{/if}}
-                                                                                {{#if ../deferred}}
+                                                                                 {{#if auto}}
+                                                                                 <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#dcfce7; color:#166534; border:1px solid #86efac; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "auto"}}</span>
+                                                                                 {{/if}}
+                                                                                 {{#if ../deferred}}
                                                                                 <span style="display:inline-block; vertical-align:middle; margin-left:6px; padding:2px 8px; border-radius:6px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:700; text-transform:uppercase; white-space:nowrap;">{{i18n "deferred"}}</span>
                                                                                 {{/if}}
                                                                             </div>
@@ -638,7 +632,6 @@ export type FusionReportEmailData = {
         fusionReviewAssignments?: number
         fusionReviewsFound?: number
         fusionReviewInstancesFound?: number
-        fusionAutomaticMatches?: number
         fusionReviewsProcessed?: number
         fusionReviewNewIdentities?: number
         fusionReviewNonMatches?: number

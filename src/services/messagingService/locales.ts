@@ -44,7 +44,7 @@ export const locales: Record<string, TranslationDictionary> = {
         fusion_reviews_processed: 'Fusion Reviews Processed',
         fusion_reviews_found: 'Fusion Reviews Found',
         fusion_review_instances_found: 'Fusion Review Instances Found',
-        fusion_automatic_matches: 'Fusion Automatic Matches',
+        fusion_accounts_returned: 'Fusion Accounts Returned',
         // Source types
         authoritative: 'Authoritative',
         record: 'Record',
@@ -92,7 +92,7 @@ export const locales: Record<string, TranslationDictionary> = {
         fusion_reviews_processed: 'Revisiones Fusion procesadas',
         fusion_reviews_found: 'Revisiones Fusion encontradas',
         fusion_review_instances_found: 'Instancias de revisión Fusion encontradas',
-        fusion_automatic_matches: 'Coincidencias automáticas Fusion',
+        fusion_accounts_returned: 'Cuentas Fusion devueltas',
         authoritative: 'Autoritativa',
         record: 'Registro',
         orphan: 'Huérfana'
@@ -139,7 +139,7 @@ export const locales: Record<string, TranslationDictionary> = {
         fusion_reviews_processed: 'Révisions Fusion traitées',
         fusion_reviews_found: 'Révisions Fusion trouvées',
         fusion_review_instances_found: 'Instances de révision Fusion trouvées',
-        fusion_automatic_matches: 'Correspondances automatiques Fusion',
+        fusion_accounts_returned: 'Comptes Fusion retournés',
         authoritative: 'Faisant autorité',
         record: 'Enregistrement',
         orphan: 'Orphelin'
@@ -186,7 +186,7 @@ export const locales: Record<string, TranslationDictionary> = {
         fusion_reviews_processed: 'Fusion-Überprüfungen verarbeitet',
         fusion_reviews_found: 'Fusion-Überprüfungen gefunden',
         fusion_review_instances_found: 'Fusion-Überprüfungsinstanzen gefunden',
-        fusion_automatic_matches: 'Automatische Fusion-Übereinstimmungen',
+        fusion_accounts_returned: 'Zurückgegebene Fusion-Konten',
         authoritative: 'Autoritativ',
         record: 'Eintrag',
         orphan: 'Verwaist'
@@ -233,7 +233,7 @@ export const locales: Record<string, TranslationDictionary> = {
         fusion_reviews_processed: '处理的 Fusion 审核',
         fusion_reviews_found: '找到的 Fusion 审核',
         fusion_review_instances_found: '找到的 Fusion 审核实例',
-        fusion_automatic_matches: 'Fusion 自动匹配项',
+        fusion_accounts_returned: '返回的 Fusion 账户',
         authoritative: '权威',
         record: '记录',
         orphan: '孤立'
@@ -280,7 +280,7 @@ export const locales: Record<string, TranslationDictionary> = {
         fusion_reviews_processed: '処理された Fusion レビュー',
         fusion_reviews_found: '見つかった Fusion レビュー',
         fusion_review_instances_found: '見つかった Fusion レビューインスタンス',
-        fusion_automatic_matches: 'Fusion 自動一致',
+        fusion_accounts_returned: '返された Fusion アカウント',
         authoritative: '権威',
         record: 'レコード',
         orphan: '孤立'
@@ -327,7 +327,7 @@ export const locales: Record<string, TranslationDictionary> = {
         fusion_reviews_processed: 'Revisões do Fusion processadas',
         fusion_reviews_found: 'Revisões do Fusion encontradas',
         fusion_review_instances_found: 'Instâncias de revisão do Fusion encontradas',
-        fusion_automatic_matches: 'Correspondências automáticas do Fusion',
+        fusion_accounts_returned: 'Contas do Fusion retornadas',
         authoritative: 'Autoritativa',
         record: 'Registro',
         orphan: 'Órfã'
@@ -374,7 +374,7 @@ export const locales: Record<string, TranslationDictionary> = {
         fusion_reviews_processed: 'Revisioni Fusion elaborate',
         fusion_reviews_found: 'Revisioni Fusion trovate',
         fusion_review_instances_found: 'Istanze di revisione Fusion trovate',
-        fusion_automatic_matches: 'Corrispondenze automatiche Fusion',
+        fusion_accounts_returned: 'Account Fusion restituiti',
         authoritative: 'Autorevole',
         record: 'Record',
         orphan: 'Orfano'
@@ -421,7 +421,7 @@ export const locales: Record<string, TranslationDictionary> = {
         fusion_reviews_processed: 'Обработано проверок Fusion',
         fusion_reviews_found: 'Найдены проверки Fusion',
         fusion_review_instances_found: 'Найдены экземпляры проверок Fusion',
-        fusion_automatic_matches: 'Автоматические совпадения Fusion',
+        fusion_accounts_returned: 'Возвращенные учетные записи Fusion',
         authoritative: 'Авторитетный',
         record: 'Запись',
         orphan: 'Осиротевший'
@@ -468,7 +468,7 @@ export const locales: Record<string, TranslationDictionary> = {
         fusion_reviews_processed: 'مراجعات فيوجن التي تمت معالجتها',
         fusion_reviews_found: 'مراجعات فيوجن التي تم العثور عليها',
         fusion_review_instances_found: 'مثيلات مراجعة فيوجن التي تم العثور عليها',
-        fusion_automatic_matches: 'مطابقات فيوجن التلقائية',
+        fusion_accounts_returned: 'حسابات فيوجن التي تم إرجاعها',
         authoritative: 'موثوق',
         record: 'سجل',
         orphan: 'يتيم'

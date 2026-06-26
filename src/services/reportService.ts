@@ -251,7 +251,6 @@ export class ReportService {
         let authoritativeNewIdentities = 0
         let recordNoMatches = 0
         let orphanNoMatches = 0
-        let automaticMatches = 0
         for (const d of finishedDecisions) {
             const sourceType = decisionSourceType(d)
             if (sourceType === SourceType.Record) {
@@ -264,7 +263,6 @@ export class ReportService {
                 decisionCountByType.authoritative += 1
                 if (d.newIdentity) authoritativeNewIdentities += 1
             }
-            if (d.automaticAssignment === true) automaticMatches += 1
         }
         const memoryUsage = process.memoryUsage()
         return {
@@ -274,7 +272,6 @@ export class ReportService {
             fusionReviewAssignments: this.forms.formInstancesCreated,
             fusionReviewsFound: this.forms.formsFound,
             fusionReviewInstancesFound: this.forms.formInstancesFound,
-            fusionAutomaticMatches: automaticMatches,
             fusionReviewsProcessed: this.forms.answeredFormInstancesProcessed,
             fusionReviewNewIdentities: authoritativeNewIdentities,
             fusionReviewNonMatches: recordNoMatches + orphanNoMatches,

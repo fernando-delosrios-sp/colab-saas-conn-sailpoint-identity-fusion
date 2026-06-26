@@ -388,7 +388,6 @@ describe('ReportService', () => {
         expect(stats.fusionReviewDecisionsRecord).toBe(1)
         expect(stats.fusionReviewDecisionsOrphan).toBe(1)
         expect(stats.fusionReviewNoMatchesRecord).toBe(1)
-        expect(stats.fusionAutomaticMatches).toBe(1)
         expect(stats.identitiesFound).toBe(21)
         expect(stats.managedAccountsFound).toBe(34)
     })

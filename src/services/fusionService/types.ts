@@ -159,8 +159,6 @@ export type FusionReportStats = {
     fusionReviewsFound?: number
     /** Number of fusion review form instances found during fetch */
     fusionReviewInstancesFound?: number
-    /** Accounts assigned by exact-match automatic assignment (no manual review) */
-    fusionAutomaticMatches?: number
     /** Number of answered fusion review instances processed */
     fusionReviewsProcessed?: number
     /** Number of "new identity" decisions from reviews */
