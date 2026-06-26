@@ -209,6 +209,26 @@ Advanced date formatting and manipulation (`$Datefns.format(date, format)`, `$Da
 
 Parse and normalize US addresses (`$AddressParse.getCityState(city)`, `$AddressParse.parse(address)`).
 
+Additional geo lookup helpers:
+
+- `$AddressParse.getStateName(code, country)` — looks up the full state or region name for a code. Returns the empty string for unknown codes or unsupported countries. Supported country codes: `"US"`, `"GB"`, `"UK"` (alias for GB).
+- `$AddressParse.getStateCode(name, country)` — looks up the ISO code for a state or region name (case-insensitive). Returns the empty string for unknown names or unsupported countries. Supported country codes: `"US"`, `"GB"`, `"UK"`.
+
+```velocity
+## Code to full name
+$AddressParse.getStateName("NY", "US")        ## "New York"
+$AddressParse.getStateName("LND", "GB")       ## "Greater London"
+$AddressParse.getStateName("LND", "UK")       ## "Greater London" (UK alias)
+
+## Name to ISO code
+$AddressParse.getStateCode("New York", "US")          ## "NY"
+$AddressParse.getStateCode("new york", "US")          ## "NY" (case-insensitive)
+$AddressParse.getStateCode("Greater London", "GB")    ## "LND"
+$AddressParse.getStateCode("Atlantis", "US")          ## "" (unknown)
+```
+
+> **Note:** `$AddressParse.getCityState` and `$AddressParse.getCityStateCode` are deprecated because city names alone can collide across states (for example, there are Springfields in many US states). Prefer the explicit state/region lookups above for unambiguous results.
+
 #### $Normalize (data normalization)
 
 Standardize common data formats (`$Normalize.phone(number)`, `$Normalize.date(date)`, `$Normalize.name(name)`).
@@ -216,6 +236,29 @@ Standardize common data formats (`$Normalize.phone(number)`, `$Normalize.date(da
 For ambiguous numeric dates, `Normalize.date` accepts an optional priority argument:
 `$Normalize.date($birthDate, "dd-MM-yyyy,MM-dd-yyyy")` (default) or
 `$Normalize.date($birthDate, "MM-dd-yyyy,dd-MM-yyyy")`.
+
+`Normalize.address(address, country?)` parses and reformats an address. The optional `country` parameter defaults to `"US"`. Supported country codes are `"US"`, `"GB"`, and `"UK"` (alias for GB). For US addresses, the fallback normalizes a full state name to its 2-letter code (for example `"California"` → `"CA"`). For UK addresses, the fallback normalizes a full region name or 3-letter region code (for example `"Greater London"` → `"LND"`). Unsupported country codes return the trimmed original address.
+
+```velocity
+## US: full state name is normalized to ISO code
+$Normalize.address("Los Angeles, California 90001", "US")
+## "Los Angeles, CA 90001"
+
+## US: 2-letter code is preserved
+$Normalize.address("Seattle, WA 98101", "US")
+## "Seattle, WA 98101"
+
+## UK: full region name is normalized to region code
+$Normalize.address("London, Greater London SW1A 2AA", "GB")
+## "London, LND SW1A 2AA"
+
+## UK alias works the same as GB
+$Normalize.address("London, Greater London SW1A 2AA", "UK")
+
+## Unsupported country: returns trimmed original
+$Normalize.address("Toronto, Ontario M5H 2N2", "CA")
+## "Toronto, Ontario M5H 2N2"
+```
 
 ---
 

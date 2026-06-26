@@ -94,8 +94,34 @@ export const parseAddressSync = (addressString: string): ParsedAddress | null =>
     return error ? null : result
 }
 
+/**
+ * Get the full state or region name for a code.
+ * @param code State or region code (e.g. "NY", "LND")
+ * @param country Country code: "US", "GB", or "UK"
+ * @returns Full name (e.g. "New York", "Greater London") or empty string if unknown
+ */
+const getStateName = (code: string, country: string): string => {
+    if (!code || !country) return ''
+    const state = State.getStateByCodeAndCountry(code.trim(), country)
+    return state?.name ?? ''
+}
+
+/**
+ * Get the ISO code for a state or region name (case-insensitive).
+ * @param name Full state or region name (e.g. "New York", "Greater London")
+ * @param country Country code: "US", "GB", or "UK"
+ * @returns ISO code (e.g. "NY", "LND") or empty string if unknown
+ */
+const getStateCode = (name: string, country: string): string => {
+    if (!name || !country) return ''
+    const state = State.getStateByNameAndCountry(name.trim(), country)
+    return state?.isoCode ?? ''
+}
+
 export const AddressParse = {
     getCityState,
     getCityStateCode,
     parse: parseAddressSync,
+    getStateName,
+    getStateCode,
 }

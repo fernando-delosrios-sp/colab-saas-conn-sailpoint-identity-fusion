@@ -13,9 +13,20 @@ import {
     getManagedAccountKeyFromAccount,
     isCompositeManagedAccountKey,
     normalizeCompositeManagedAccountKey,
-    parseManagedAccountKey,
+    parseManagedAccountKey
 } from './managedAccountKey'
 import { missing, readString, trimStr } from '../utils/safeRead'
+import {
+    buildIdentityInfo,
+    resolveCompositeKeyFromFusionRecord
+} from './fusionAccountUtils'
+import {
+    preserveMissingAccountContext,
+    processIdentityMatchedAccounts,
+    processPreviousRunMatchedAccounts,
+    pruneDeletedManagedAccounts,
+    type MatchContext,
+} from './fusionAccountMatcher'
 
 /**
  * Core domain model representing a fusion account in the Identity Fusion connector.
@@ -45,8 +56,20 @@ export class FusionAccount {
     public static configure(config: FusionConfig): void {
         FusionAccount.config = config
     }
-    // ============================================================================
+
+    /**
+     * Builds a unified IdentityInfo runtime object from an identity, account, or decision.
+     * Exported as a static helper so callers outside the model can construct identity
+     * references without importing the utility directly.
+     */
+    public static buildIdentityInfo(
+        source: Parameters<typeof buildIdentityInfo>[0]
+    ): ReturnType<typeof buildIdentityInfo> {
+        return buildIdentityInfo(source)
+    }
+
     // Private Fields - All state is encapsulated
+
     // ============================================================================
 
     // Core identity fields
@@ -129,99 +152,6 @@ export class FusionAccount {
     // Factory Methods - Must be first to ensure proper initialization order
     // ============================================================================
 
-    // ============================================================================
-
-    /**
-     * Builds a unified IdentityInfo runtime object from an IdentityDocument or standard parameter bag.
-     *
-     * Rules:
-     * - `id` is mandatory and non-empty. Without it, no IdentityInfo is returned.
-     * - `name` is the alias/login chain: identity.name || account.identity?.name || decision.identityName.
-     * - `displayName` is the human-readable chain:
-     *   identity.attributes.displayName || identity.name || account.identity?.name || account.name.
-     */
-    public static buildIdentityInfo(
-        source: IdentityDocument | Account | FusionDecision | { id?: string | null; name?: string | null; displayName?: string | null }
-    ): IdentityInfo | undefined {
-        let id: string | undefined
-        let name: string | undefined
-        let displayName: string | undefined
-
-        // FusionDecision
-        if ('account' in source && ('identityName' in source || 'identityId' in source)) {
-            const decision = source as FusionDecision
-            id = trimStr(decision.identityId)
-            name = trimStr(decision.identityName)
-            displayName = name ?? trimStr(decision.account.name) ?? trimStr(decision.account.id)
-        }
-        // Account
-        else if ('sourceId' in source || 'nativeIdentity' in source || 'accountId' in source || 'identityId' in source || 'identity' in source) {
-            const account = source as Account
-            id = trimStr(account.identityId)
-            name = trimStr((account as { identity?: { name?: string } }).identity?.name)
-            displayName = FusionAccount.identityDisplayNameFromAccount(account)
-        }
-        // IdentityDocument
-        else if ('attributes' in source && source.attributes) {
-            const identity = source as IdentityDocument
-            id = trimStr(identity.id)
-            name = trimStr(identity.name)
-            displayName = FusionAccount.identityDisplayNameFromIdentity(identity)
-        }
-        // Fallback standard bag
-        else {
-            id = trimStr((source as any).id)
-            name = trimStr((source as any).name)
-            displayName = trimStr((source as any).displayName) ?? name
-        }
-
-        // id is mandatory for an identity linkage
-        if (!id) {
-            return undefined
-        }
-
-        return {
-            id,
-            name: name ?? '',
-            displayName: displayName ?? name ?? '',
-        }
-    }
-
-    /** Identity-side display label: identity.attributes.displayName || identity.name. */
-    private static identityDisplayNameFromIdentity(identity: IdentityDocument): string | undefined {
-        const fromAttrs = (identity.attributes as Record<string, unknown> | undefined)?.displayName as
-            | string
-            | undefined
-        return trimStr(fromAttrs) ?? trimStr(identity.name) ?? undefined
-    }
-
-    /** Account-side display label: account.identity?.name || account.name. */
-    private static identityDisplayNameFromAccount(account: Account): string | undefined {
-        const identityRefName = (account as { identity?: { name?: string } }).identity?.name
-        return trimStr(identityRefName) ?? trimStr(account.name) ?? undefined
-    }
-
-    /**
-     * Resolve composite managed account key candidates from persisted fusion-account attributes.
-     * Keeps legacy nativeIdentity as fallback when no composite can be recovered.
-     */
-    private static resolveCompositeKeyFromFusionRecord(account: Account): string | undefined {
-        const attributes = (account.attributes ?? {}) as Record<string, unknown>
-        const candidates = [
-            readString(attributes, 'originAccount'),
-            readString(attributes, 'mainAccount'),
-            attributes.accounts,
-            attributes['missing-accounts'],
-        ].flat()
-
-        for (const candidate of candidates) {
-            if (candidate == null) continue
-            const normalized = normalizeCompositeManagedAccountKey(String(candidate))
-            if (normalized) return normalized
-        }
-        return undefined
-    }
-
     /**
      * Common initialization logic for factory methods.
      * Handles default values internally to avoid repetitive null coalescing in callers.
@@ -286,10 +216,10 @@ export class FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourceSet = new Set<string>()
         const statuses = attributeToSet(account.attributes, 'statuses')
-        const resolvedCompositeManagedKey = FusionAccount.resolveCompositeKeyFromFusionRecord(account)
+        const resolvedCompositeManagedKey = resolveCompositeKeyFromFusionRecord(account)
         if (statuses.has('baseline')) sourceSet.add('Identities')
 
-        const identityInfo = FusionAccount.buildIdentityInfo(account)
+        const identityInfo = buildIdentityInfo(account)
 
         fusionAccount.initializeBasicProperties({
             type: FusionAccountKind.Fusion,
@@ -353,7 +283,7 @@ export class FusionAccount {
             needsRefresh: true,
             sources: ['Identities'],
             attributes: identity.attributes ?? undefined,
-            identityInfo: FusionAccount.buildIdentityInfo(identity),
+            identityInfo: buildIdentityInfo(identity),
         })
         fusionAccount._originSource = 'Identities'
         fusionAccount._originAccount = identity.id ?? undefined
@@ -382,7 +312,7 @@ export class FusionAccount {
                 ConnectorErrorType.Generic
             )
         }
-        const identityInfo = FusionAccount.buildIdentityInfo(account)
+        const identityInfo = buildIdentityInfo(account)
 
         fusionAccount.initializeBasicProperties({
             type: FusionAccountKind.Managed,
@@ -434,7 +364,7 @@ export class FusionAccount {
             sourceName: account.sourceName,
             needsRefresh: true,
             identityInfo: decision.identityId
-                ? FusionAccount.buildIdentityInfo(decision)
+                ? buildIdentityInfo(decision)
                 : undefined,
         })
         fusionAccount._originSource = account.sourceName ?? undefined
@@ -1180,7 +1110,7 @@ export class FusionAccount {
      */
     public addIdentityLayer(identity: IdentityDocument): void {
         this._email = identity.attributes?.email as string
-        this._identityInfo = FusionAccount.buildIdentityInfo(identity)
+        this._identityInfo = buildIdentityInfo(identity)
         this._attributeBag.identity = identity.attributes ?? {}
         this._attributeBag.identity.name = identity.name
 
@@ -1223,7 +1153,7 @@ export class FusionAccount {
         accountsById: Map<string, Account>,
         accountsByIdentityId: Map<string, Set<string>>,
         allAccountsById?: Map<string, Account>,
-        pruneDeletedManagedAccounts = false,
+        pruneDeletedManagedAccountsFlag = false,
         addAssociationHistory = true,
         skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
     ): void {
@@ -1243,13 +1173,34 @@ export class FusionAccount {
         this._missingAccountIds = normalizeManagedAccountKeySet(this._missingAccountIds)
         this._accountIds = normalizeManagedAccountKeySet(this._accountIds)
 
-        this.processIdentityMatchedAccounts(
+        const ctx: MatchContext = {
+            identityId: this.identityId,
+            previousAccountIds: this.previousAccountIds,
+            missingAccountIdsSet: this._missingAccountIds,
+            accountIdsSet: this._accountIds,
+            setCorrelatedAccount: (id: string) => this.setCorrelatedAccount(id),
+            setUncorrelatedAccount: (id: string) => this.setUncorrelatedAccount(id),
+            setManagedAccount: (account: Account, addHistory: boolean, skipKeys?: ReadonlySet<string>) =>
+                this.setManagedAccount(account, addHistory, skipKeys),
+            hasManagedAccountInfo: (accountId: string) => this.managedAccountInfo.has(accountId),
+            setManagedAccountInfo: (accountId: string, sourceName: string, nativeIdentity: string) =>
+                this.setManagedAccountInfo(accountId, sourceName, nativeIdentity),
+            deleteManagedAccountInfo: (accountId: string) => this.managedAccountInfo.delete(accountId),
+            addHistory: (message: string) => this.addHistory(message),
+            setNeedsRefresh: (refresh: boolean) => this.setNeedsRefresh(refresh),
+            deleteAccountId: (id: string) => this._accountIds.delete(id),
+            deleteMissingAccountId: (id: string) => this._missingAccountIds.delete(id),
+        }
+
+        processIdentityMatchedAccounts(
+            ctx,
             accountsById,
             accountsByIdentityId,
             addAssociationHistory,
             skipAssociationHistoryForManagedKeys
         )
-        this.processPreviousRunMatchedAccounts(
+        processPreviousRunMatchedAccounts(
+            ctx,
             accountsById,
             accountsByIdentityId,
             addAssociationHistory,
@@ -1257,12 +1208,12 @@ export class FusionAccount {
         )
 
         // Prune account references that no longer exist in the managed-account inventory.
-        if (pruneDeletedManagedAccounts && allAccountsById) {
-            this.pruneDeletedManagedAccounts(allAccountsById)
+        if (pruneDeletedManagedAccountsFlag && allAccountsById) {
+            pruneDeletedManagedAccounts(ctx, allAccountsById)
         }
 
         if (allAccountsById) {
-            this.preserveMissingAccountContext(allAccountsById)
+            preserveMissingAccountContext(ctx, allAccountsById)
         }
 
         // Update orphan status based on final account state
@@ -1282,107 +1233,6 @@ export class FusionAccount {
             }
         } else {
             this._statuses.delete('orphan')
-        }
-    }
-
-    /**
-     * Phase 1: Identity-based matching via index (O(1) lookup)
-     */
-    private processIdentityMatchedAccounts(
-        accountsById: Map<string, Account>,
-        accountsByIdentityId: Map<string, Set<string>>,
-        addAssociationHistory: boolean,
-        skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
-    ): void {
-        const identityId = this.identityId
-        if (identityId === undefined) return
-
-        const matchedIds = accountsByIdentityId.get(identityId)
-        if (!matchedIds) return
-
-        for (const id of matchedIds) {
-            const account = accountsById.get(id)
-            if (account) {
-                this.setCorrelatedAccount(id)
-                this.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
-                accountsById.delete(id)
-            }
-        }
-        // Clean up the index entry since all accounts for this identity have been claimed
-        accountsByIdentityId.delete(identityId)
-    }
-
-    /**
-     * Phase 2: Previous-run matching (scan remaining accounts)
-     */
-    private processPreviousRunMatchedAccounts(
-        accountsById: Map<string, Account>,
-        accountsByIdentityId: Map<string, Set<string>>,
-        addAssociationHistory: boolean,
-        skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
-    ): void {
-        if (this.previousAccountIds.size === 0 && this._missingAccountIds.size === 0) return
-
-        for (const [id, account] of accountsById) {
-            if (!this.previousAccountIds.has(id) && !this._missingAccountIds.has(id)) continue
-
-            this.setUncorrelatedAccount(id)
-            this.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
-            accountsById.delete(id)
-
-            if (!account.identityId) continue
-
-            const idSet = accountsByIdentityId.get(account.identityId)
-            if (!idSet) continue
-
-            idSet.delete(id)
-            if (idSet.size === 0) accountsByIdentityId.delete(account.identityId)
-        }
-    }
-
-    /**
-     * Preserve source/nativeIdentity context for missing accounts even if they were
-     * not claimed from the current work queue (e.g. still missing from previous runs).
-     */
-    private preserveMissingAccountContext(allAccountsById: Map<string, Account>): void {
-        for (const accountId of this._missingAccountIds) {
-            if (this.managedAccountInfo.has(accountId)) continue
-            const account = allAccountsById.get(accountId)
-            if (!account?.sourceName) continue
-            const parsed = parseManagedAccountKey(accountId)
-            const nativeId = trimStr(account.nativeIdentity ?? parsed?.nativeIdentity) || accountId
-            this.setManagedAccountInfo(accountId, account.sourceName, nativeId)
-        }
-    }
-
-    /**
-     * Remove stale managed-account references when the account no longer exists.
-     * This keeps accounts/missing-accounts accurate across runs and records cleanup in history.
-     */
-    private pruneDeletedManagedAccounts(allAccountsById: Map<string, Account>): void {
-        const trackedIds = new Set<string>([
-            ...this._accountIds,
-            ...this._missingAccountIds,
-            ...this.previousAccountIds,
-        ])
-        let removedAnyReference = false
-
-        for (const accountId of trackedIds) {
-            if (allAccountsById.has(accountId)) continue
-
-            const removedFromAccounts = this._accountIds.delete(accountId)
-            const removedFromMissing = this._missingAccountIds.delete(accountId)
-            if (removedFromAccounts || removedFromMissing) {
-                removedAnyReference = true
-                this.addHistory(`Removed managed account missing reference: ${accountId}`)
-            }
-            this.previousAccountIds.delete(accountId)
-            this.managedAccountInfo.delete(accountId)
-        }
-        if (removedAnyReference) {
-            // Deleting managed-account references changes mapping/definition context.
-            // Force a refresh so dependent attributes are recomputed in the same run.
-            this.setNeedsRefresh(true)
         }
     }
 
