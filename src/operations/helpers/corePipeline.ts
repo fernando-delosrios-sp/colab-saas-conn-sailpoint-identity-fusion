@@ -325,8 +325,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
         )
     }
 
-    sources.clearFusionAccounts()
-    log.info('Account caches cleared from memory')
+
 
     if (isPersistent) {
         await sources.aggregateDelayedSources(async ({ sourceId, delayMinutes, disableOptimization }) => {
