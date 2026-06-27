@@ -8,6 +8,7 @@ import {
     buildWorkflowUrl,
     buildFormDefinitionUrl,
     isValidUrl,
+    isValidHttpUrl,
     removeTrailingSlash,
     ensureTrailingSlash,
     createUrlContext,
@@ -92,6 +93,33 @@ describe('url', () => {
         it('should build form definition URL', () => {
             const url = buildFormDefinitionUrl(uiOrigin, 'form-1')
             expect(url).toBe(`${uiOrigin}/ui/a/admin/forms/form-1`)
+        })
+    })
+
+    describe('isValidHttpUrl', () => {
+        it('should return true for valid HTTP/HTTPS URLs', () => {
+            expect(isValidHttpUrl('https://example.com')).toBe(true)
+            expect(isValidHttpUrl('http://localhost:3000')).toBe(true)
+        })
+
+        it('should return false for non-HTTP/HTTPS URLs', () => {
+            expect(isValidHttpUrl('ftp://example.com')).toBe(false)
+            expect(isValidHttpUrl('file:///etc/passwd')).toBe(false)
+            expect(isValidHttpUrl('ws://example.com')).toBe(false)
+        })
+
+        it('should return false for malformed URLs that bypass basic string checks', () => {
+            expect(isValidHttpUrl('javascript:alert(1)')).toBe(false)
+            expect(isValidHttpUrl(' http://example.com')).toBe(false) // leading whitespace
+            expect(isValidHttpUrl('https://example.com ')).toBe(false) // trailing whitespace
+            // Node.js URL parser is forgiving, so we also check prefix matching explicitly
+            expect(isValidHttpUrl('\thttp://example.com')).toBe(false)
+        })
+
+        it('should return false for invalid URLs or empty inputs', () => {
+            expect(isValidHttpUrl('not-a-url')).toBe(false)
+            expect(isValidHttpUrl('')).toBe(false)
+            expect(isValidHttpUrl(undefined)).toBe(false)
         })
     })
 
