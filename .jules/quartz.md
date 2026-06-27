@@ -12,3 +12,7 @@
 
 **Learning:** When multiple functions iterate over mixed-type arrays (e.g., parsing varying SDK shapes like strings or objects) to extract normalized string values, the loop and type-checking logic is often duplicated (e.g. in `toSetFromAttribute` and `normalizeActionTokens`).
 **Action:** Encapsulate the loop and type-checking logic into a shared helper function (like `normalizeArrayItems`) to eliminate duplicate code blocks, clarify intent, and ensure consistency when handling these mixed-type arrays.
+
+## 2026-06-27 - Consolidating Fallback Chains
+**Learning:** Sequential `if` statement fallback chains checking for string presence (e.g., `const a = trim(); if (a) return a;`) are verbose and hard to scan.
+**Action:** Replace these with a single concise logical OR (`||`) chain to clarify intent, remove intermediate variables, and keep the code DRY.

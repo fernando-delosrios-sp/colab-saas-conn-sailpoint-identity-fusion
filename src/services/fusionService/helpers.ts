@@ -66,17 +66,13 @@ export function fusionReportMatchCandidateAccountFields(
 }
 
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {
-    const displayLabel = trimStr(fusionAccount.identityDisplayName) ?? ''
-    if (displayLabel) return displayLabel
-
-    const aliasLabel = trimStr(fusionAccount.identityName) ?? ''
-    if (aliasLabel) return aliasLabel
-
-    const sourceTitle = trimStr(fusionAccount.name) ?? ''
-    if (sourceTitle) return sourceTitle
-
-    const uid = trimStr(fusionAccount.managedAccountId ?? fusionAccount.identityId) ?? ''
-    return uid || 'Unknown'
+    return (
+        trimStr(fusionAccount.identityDisplayName) ||
+        trimStr(fusionAccount.identityName) ||
+        trimStr(fusionAccount.name) ||
+        trimStr(fusionAccount.managedAccountId ?? fusionAccount.identityId) ||
+        'Unknown'
+    )
 }
 
 /**
@@ -91,9 +87,8 @@ export function buildMinimalFusionReportAccount(
     accountIdOverride?: string
 ): FusionReportAccount {
     const reportAccountId = accountIdOverride ?? fusionAccount.managedAccountId
-    const accountUrlId = accountIdOverride && !isCompositeManagedAccountKey(accountIdOverride)
-        ? accountIdOverride
-        : undefined
+    const accountUrlId =
+        accountIdOverride && !isCompositeManagedAccountKey(accountIdOverride) ? accountIdOverride : undefined
     const row: FusionReportAccount = {
         accountName: getFusionReportAccountLabel(fusionAccount),
         accountUrl: urlContext.humanAccount(accountUrlId),
