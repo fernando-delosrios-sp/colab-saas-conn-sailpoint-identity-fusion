@@ -160,6 +160,22 @@ export function isValidUrl(url: string | undefined): boolean {
 }
 
 /**
+ * Validates that a string is a valid HTTP or HTTPS URL, mitigating SSRF bypasses.
+ */
+export function isValidHttpUrl(url: string | undefined): boolean {
+    if (!url || url.trim() !== url) return false
+    try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return false
+        }
+        return url.toLowerCase().startsWith(`${parsed.protocol}//`)
+    } catch {
+        return false
+    }
+}
+
+/**
  * Ensures a URL ends without a trailing slash.
  */
 export function removeTrailingSlash(url: string): string {
