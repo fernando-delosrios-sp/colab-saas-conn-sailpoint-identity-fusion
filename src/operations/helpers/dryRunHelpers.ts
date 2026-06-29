@@ -11,7 +11,6 @@ import { FusionAccount } from '../../model/account'
 import { readArray, readBoolean, readPathString, readUnknown, trimStr } from '../../utils/safeRead'
 import {
     buildReportAccountIndex,
-    buildDryRunSummary,
     createDryRunOptionEmitCounter,
     DryRunInputOptions,
     DryRunOptionEmitCounter,
@@ -46,12 +45,6 @@ function buildOrphanDeferredStubOutput(accountId: string): StdAccountListOutput 
 }
 
 export type DryRunRuntimeOptions = DryRunInputOptions
-type DryRunIssueSummary = {
-    warningCount: number
-    errorCount: number
-    warningSamples: string[]
-    errorSamples: string[]
-}
 
 export type DryRunHelpersContext = {
     config?: { baseurl?: string; managedAccountsBatchSize?: number }
@@ -131,17 +124,6 @@ export type PreparedDryRunOutputData = {
 export type DryRunExecutionState = {
     runtimeOptions: ReturnType<typeof buildDryRunRuntimeOptions>
     rowEmitter: Awaited<ReturnType<typeof createDryRunRowEmitter>>
-}
-
-type DryRunFinalizationInput = {
-    sentRows: number
-    optionEmitCounter: ReturnType<typeof createDryRunOptionEmitCounter>
-    runtimeOptions: DryRunRuntimeOptions
-    rowEmitter: DryRunRowEmitter
-    report: FusionReport
-    issueSummary: DryRunIssueSummary
-    canonicalTotalProcessingTime: string
-    reportHtmlOutputPath?: string
 }
 
 /** Short host segment for filenames: first DNS label of the baseurl host, or full IP literal (sanitized). */
@@ -368,54 +350,6 @@ export const initializeDryRunExecution = async (
     reports.setDryRunRuntimeOptions(runtimeOptions)
     const rowEmitter = await createDryRunRowEmitter(serviceRegistry, runtimeOptions)
     return { runtimeOptions, rowEmitter }
-}
-
-const finalizeDryRun = async (
-    context: Pick<DryRunHelpersContext, 'fusion' | 'res' | 'sources'>,
-    finalizationInput: DryRunFinalizationInput
-) => {
-    const { res, fusion: _fusion, sources } = context
-    const {
-        sentRows,
-        optionEmitCounter,
-        runtimeOptions,
-        rowEmitter,
-        report,
-        issueSummary,
-        canonicalTotalProcessingTime,
-        reportHtmlOutputPath,
-    } = finalizationInput
-
-    const summary = buildDryRunSummary({
-        sentRows,
-        optionEmitCounter,
-        reportOptions: runtimeOptions,
-        reportAccounts: report.accounts,
-        issueSummary,
-        totalProcessingTime: canonicalTotalProcessingTime,
-        stats: report.stats,
-        fusionReviewDecisionsCount: (report.fusionReviewDecisions ?? []).length,
-        writeToDisk: runtimeOptions.writeToDisk,
-        reportOutputPath: rowEmitter.diskOutputPath,
-        reportHtmlOutputPath,
-    })
-
-    if (runtimeOptions.writeToDisk) {
-        try {
-            await rowEmitter.close(summary)
-        } catch {
-            /* ignore close errors after a failed run */
-        }
-    }
-
-    res.send(summary)
-    sources.clearManagedAccounts()
-    sources.clearFusionAccounts()
-
-    return {
-        sentRows,
-        summary,
-    }
 }
 
 const streamEnrichedOutputRows = async (

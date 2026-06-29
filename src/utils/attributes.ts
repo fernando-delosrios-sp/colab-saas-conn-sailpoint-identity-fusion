@@ -7,16 +7,6 @@ import { hasValue, isDefined, missing, readUnknown, trimStr } from './safeRead'
  */
 
 // ============================================================================
-// Types
-// ============================================================================
-
-type AttributeValue = string | number | boolean | null | undefined | object | any[]
-
-interface AttributeBag {
-    [key: string]: AttributeValue
-}
-
-// ============================================================================
 // Attribute Picking
 // ============================================================================
 
@@ -378,11 +368,4 @@ export function getAccountAttribute(account: Account, name: string): unknown {
 export function getAccountStringAttribute(account: Account, name: string): string | undefined {
     const value = getAccountAttribute(account, name)
     return typeof value === 'string' ? value : undefined
-}
-
-/**
- * Returns true when the SDK Account has a non-null/non-undefined attribute with the given name.
- */
-function hasAccountAttribute(account: Account, name: string): boolean {
-    return getAccountAttribute(account, name) !== undefined
 }

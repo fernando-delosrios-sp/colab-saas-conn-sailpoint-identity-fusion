@@ -5,7 +5,7 @@ import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector
  * Returns undefined if not yet initialized (e.g. during config loading).
  * Lazy-imported to avoid circular dependency with ServiceRegistry -> LogService -> assert.
  */
-function tryGetServiceRegistry(): any {
+function tryGetServiceRegistry(): unknown {
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports -- break cycle: ServiceRegistry -> LogService -> assert
         const { ServiceRegistry } = require('../services/serviceRegistry')
@@ -34,8 +34,8 @@ export function assert<T>(
 
     if (isNullish || isFalse) {
         const registry = tryGetServiceRegistry()
-        if (registry?.log) {
-            registry.log.crash(message)
+        if (registry && typeof registry === 'object' && 'log' in registry) {
+            (registry as { log: { crash: (msg: string) => void } }).log.crash(message)
         } else {
             logger.error(message)
             throw new ConnectorError(message, ConnectorErrorType.Generic)
@@ -58,11 +58,12 @@ export function softAssert<T>(
 
     if (isNullish || isFalse) {
         const registry = tryGetServiceRegistry()
-        if (registry?.log) {
+        if (registry && typeof registry === 'object' && 'log' in registry) {
+            const log = (registry as { log: { error: (msg: string) => void; warn: (msg: string) => void } }).log
             if (level === 'error') {
-                registry.log.error(message)
+                log.error(message)
             } else {
-                registry.log.warn(message)
+                log.warn(message)
             }
         } else {
             if (level === 'error') {

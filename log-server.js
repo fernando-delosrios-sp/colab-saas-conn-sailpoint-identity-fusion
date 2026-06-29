@@ -34,11 +34,12 @@ const sanitizeLog = (message) => {
     if (typeof message !== 'string') {
         try {
             message = JSON.stringify(message)
-        } catch (e) {
+        } catch {
             message = String(message)
         }
     }
     // Remove all ASCII control characters (except tab \x09), DEL, and Unicode line/paragraph separators
+    // eslint-disable-next-line no-control-regex
     return message.replace(/[\x00-\x08\x0A-\x1F\x7F\u0085\u2028\u2029]+/g, ' ')
 }
 

@@ -12,10 +12,6 @@ export const connectorSpecInitialValues = {
     useIncrementalCounter: false,
 } as const
 
-const runtimeDefaults = {
-    trim: false,
-} as const
-
 export function readSettings(raw: Record<string, unknown>): UniqueAttributeDefinitionSettingsSection {
     return {
         uniqueAttributeDefinitions: (raw.uniqueAttributeDefinitions as UniqueAttributeDefinition[]) ?? [],

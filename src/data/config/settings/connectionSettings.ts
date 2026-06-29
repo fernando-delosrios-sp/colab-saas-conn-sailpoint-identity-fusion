@@ -5,7 +5,6 @@
 import { assert } from '../../../utils/assert'
 
 export const connectorSpecInitialValues = {} as const
-const runtimeDefaults = {} as const
 
 export function readSettings(raw: Record<string, unknown>): Record<string, never> {
     const baseurl = raw.baseurl as string | undefined

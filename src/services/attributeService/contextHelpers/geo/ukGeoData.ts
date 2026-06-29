@@ -198,24 +198,10 @@ export function getUKRegionByName(name: string): UKRegion | undefined {
 }
 
 /**
- * Get UK cities by name
- */
-function getUKCitiesByName(name: string): UKCity[] {
-    return ukCitiesByName.get(name.toLowerCase()) || []
-}
-
-/**
  * Get all UK cities (returns the cached array)
  */
 function getAllUKCities(): UKCity[] {
     return UK_CITIES
-}
-
-/**
- * Get all UK regions
- */
-function getAllUKRegions(): UKRegion[] {
-    return UK_REGIONS
 }
 
 /**

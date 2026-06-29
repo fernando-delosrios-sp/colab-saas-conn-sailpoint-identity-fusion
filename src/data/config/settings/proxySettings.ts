@@ -9,8 +9,6 @@ export const connectorSpecInitialValues = {
     proxyPassword: '',
 } as const
 
-const runtimeDefaults = {} as const
-
 export function readSettings(raw: Record<string, unknown>): ProxySettingsSection {
     return {
         proxyEnabled: (raw.proxyEnabled as boolean | undefined) ?? connectorSpecInitialValues.proxyEnabled,
