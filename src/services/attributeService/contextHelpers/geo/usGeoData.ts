@@ -13,7 +13,7 @@ export interface USState {
     isoCode: string
 }
 
-export interface USCity {
+interface USCity {
     name: string
     stateCode: string
 }
@@ -21,7 +21,7 @@ export interface USCity {
 /**
  * US States (all 50 states + DC)
  */
-export const US_STATES: USState[] = [
+const US_STATES: USState[] = [
     { name: 'Alabama', isoCode: 'AL' },
     { name: 'Alaska', isoCode: 'AK' },
     { name: 'Arizona', isoCode: 'AZ' },
@@ -79,7 +79,7 @@ export const US_STATES: USState[] = [
  * Top 500+ US cities by population (covers ~80% of US population)
  * Includes major cities and metro areas
  */
-export const US_CITIES: USCity[] = [
+const US_CITIES: USCity[] = [
     // California (most populous state)
     { name: 'Los Angeles', stateCode: 'CA' },
     { name: 'San Diego', stateCode: 'CA' },
@@ -407,7 +407,7 @@ for (const city of US_CITIES) {
 /**
  * Get state by ISO code
  */
-export function getStateByCode(code: string): USState | undefined {
+function getStateByCode(code: string): USState | undefined {
     return stateByCode.get(code.toUpperCase())
 }
 
@@ -421,28 +421,28 @@ export function getStateByName(name: string): USState | undefined {
 /**
  * Get cities by name
  */
-export function getCitiesByName(name: string): USCity[] {
+function getCitiesByName(name: string): USCity[] {
     return citiesByName.get(name.toLowerCase()) || []
 }
 
 /**
  * Get all US cities (returns the cached array)
  */
-export function getAllCities(): USCity[] {
+function getAllCities(): USCity[] {
     return US_CITIES
 }
 
 /**
  * Get all US states
  */
-export function getAllStates(): USState[] {
+function getAllStates(): USState[] {
     return US_STATES
 }
 
 /**
  * Compatibility layer with country-state-city API for US
  */
-export const USCity = {
+const USCity = {
     getCitiesOfCountry: (countryCode: string) => {
         if (countryCode !== 'US') return undefined
         return getAllCities().map((city) => ({

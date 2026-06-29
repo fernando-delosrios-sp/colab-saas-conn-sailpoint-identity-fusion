@@ -24,7 +24,7 @@ export interface UKCity {
 /**
  * UK Regions/Counties (major regions across England, Scotland, Wales, Northern Ireland)
  */
-export const UK_REGIONS: UKRegion[] = [
+const UK_REGIONS: UKRegion[] = [
     // England - Major Counties
     { name: 'Greater London', isoCode: 'LND', country: 'England' },
     { name: 'Greater Manchester', isoCode: 'MAN', country: 'England' },
@@ -86,7 +86,7 @@ export const UK_REGIONS: UKRegion[] = [
 /**
  * Major UK cities (top 70+ cities covering major population centers)
  */
-export const UK_CITIES: UKCity[] = [
+const UK_CITIES: UKCity[] = [
     // England - London
     { name: 'London', regionCode: 'LND', country: 'England' },
 
@@ -186,7 +186,7 @@ for (const city of UK_CITIES) {
 /**
  * Get UK region by ISO code
  */
-export function getUKRegionByCode(code: string): UKRegion | undefined {
+function getUKRegionByCode(code: string): UKRegion | undefined {
     return ukRegionByCode.get(code.toUpperCase())
 }
 
@@ -200,21 +200,21 @@ export function getUKRegionByName(name: string): UKRegion | undefined {
 /**
  * Get UK cities by name
  */
-export function getUKCitiesByName(name: string): UKCity[] {
+function getUKCitiesByName(name: string): UKCity[] {
     return ukCitiesByName.get(name.toLowerCase()) || []
 }
 
 /**
  * Get all UK cities (returns the cached array)
  */
-export function getAllUKCities(): UKCity[] {
+function getAllUKCities(): UKCity[] {
     return UK_CITIES
 }
 
 /**
  * Get all UK regions
  */
-export function getAllUKRegions(): UKRegion[] {
+function getAllUKRegions(): UKRegion[] {
     return UK_REGIONS
 }
 

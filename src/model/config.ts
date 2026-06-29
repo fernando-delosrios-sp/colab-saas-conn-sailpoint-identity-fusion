@@ -175,13 +175,13 @@ export function effectiveSkipMatchIfThresholdNotMet(
 // ============================================================================
 
 /** ISC API connection credentials. */
-export interface ConnectionSettingsSection {
+interface ConnectionSettingsSection {
     baseurl: string
     clientId: string
     clientSecret: string
 }
 
-export type ConnectionSettingsMenu = ConnectionSettingsSection
+type ConnectionSettingsMenu = ConnectionSettingsSection
 
 // ============================================================================
 // Source Settings Menu
@@ -199,7 +199,7 @@ export enum SourceType {
     Orphan = 'orphan',
 }
 
-export type CorrelationMode = 'correlate' | 'reverse' | 'none'
+type CorrelationMode = 'correlate' | 'reverse' | 'none'
 
 /** Configuration for a single managed source that feeds into fusion. */
 export interface SourceConfig {
@@ -253,7 +253,7 @@ export interface ProcessingControlSection {
 }
 
 /** Combined source settings: scope, sources, and processing controls. */
-export interface SourceSettingsMenu extends ScopeSection, SourcesSection, ProcessingControlSection {}
+interface SourceSettingsMenu extends ScopeSection, SourcesSection, ProcessingControlSection {}
 
 // ============================================================================
 // Attribute Mapping Settings Menu
@@ -265,7 +265,7 @@ export interface AttributeMappingDefinitionsSection {
     attributeMaps?: AttributeMap[]
 }
 
-export type AttributeMappingSettingsMenu = AttributeMappingDefinitionsSection
+type AttributeMappingSettingsMenu = AttributeMappingDefinitionsSection
 
 // ============================================================================
 // Normal Attribute Definition Settings Menu
@@ -276,7 +276,7 @@ export interface NormalAttributeDefinitionSettingsSection {
     normalAttributeDefinitions: NormalAttributeDefinition[]
 }
 
-export type NormalAttributeDefinitionSettingsMenu = NormalAttributeDefinitionSettingsSection
+type NormalAttributeDefinitionSettingsMenu = NormalAttributeDefinitionSettingsSection
 
 // ============================================================================
 // Unique Attribute Definition Settings Menu
@@ -292,7 +292,7 @@ export interface UniqueAttributeDefinitionSettingsSection {
     maxAttempts?: number
 }
 
-export type UniqueAttributeDefinitionSettingsMenu = UniqueAttributeDefinitionSettingsSection
+type UniqueAttributeDefinitionSettingsMenu = UniqueAttributeDefinitionSettingsSection
 
 // ============================================================================
 // Attribute Matching Settings Menu
@@ -321,7 +321,7 @@ export interface ReviewSettingsSection {
 }
 
 /** Combined Attribute Matching Settings: matching rules and review workflow. */
-export interface AttributeMatchingSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection {}
+interface AttributeMatchingSettingsMenu extends MatchingSettingsSection, ReviewSettingsSection {}
 
 // ============================================================================
 // Advanced Settings Menu
@@ -453,7 +453,7 @@ export interface ProxySettingsSection {
 }
 
 /** Combined advanced settings: developer, connection tuning, and proxy. */
-export interface AdvancedSettingsMenu
+interface AdvancedSettingsMenu
     extends DeveloperSettingsSection, AdvancedConnectionSettingsSection, ProxySettingsSection {}
 
 // ============================================================================
@@ -461,7 +461,7 @@ export interface AdvancedSettingsMenu
 // ============================================================================
 
 /** Internal constants and computed values not exposed through the UI configuration. */
-export interface InternalConfig {
+interface InternalConfig {
     readonly fusionScoreMap?: Map<string, number>
     readonly requestsPerSecondConstant: number
     readonly tokenUrlPath: string

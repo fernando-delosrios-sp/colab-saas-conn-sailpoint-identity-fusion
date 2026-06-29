@@ -8,7 +8,7 @@ export const connectorSpecInitialValues = {
     fusionMaxCandidatesForForm: 3,
 } as const
 
-export const runtimeDefaults = {} as const
+const runtimeDefaults = {} as const
 
 export function defaultFusionMaxCandidatesForForm(): number {
     return connectorSpecInitialValues.fusionMaxCandidatesForForm

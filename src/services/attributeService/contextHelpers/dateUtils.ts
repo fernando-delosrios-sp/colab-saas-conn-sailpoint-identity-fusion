@@ -5,30 +5,7 @@
  * Provides common date functions for use in Velocity templates
  */
 
-// Compile RegExp patterns once at module level for better performance
-const _TOKEN_PATTERNS: Record<string, RegExp> = {
-    yyyy: /yyyy/g,
-    yy: /yy/g,
-    MM: /MM/g,
-    M: /M/g,
-    dd: /dd/g,
-    d: /d/g,
-    HH: /HH/g,
-    H: /H/g,
-    mm: /mm/g,
-    m: /m/g,
-    ss: /ss/g,
-    s: /s/g,
-    XXX: /XXX/g,
-    XX: /XX/g,
-    X: /X/g,
-    xxx: /xxx/g,
-    xx: /xx/g,
-    x: /x/g,
-    ZZZ: /ZZZ/g,
-    ZZ: /ZZ/g,
-    Z: /Z/g,
-}
+
 
 const FORMAT_TOKEN_REGEX = /yyyy|yy|MM|M|dd|d|HH|H|mm|m|ss|s|XXX|ZZZ|xxx|XX|ZZ|xx|X|Z|x/g
 
@@ -282,7 +259,7 @@ export function parse(dateStr: string | Date | number, formatStr?: string): Date
  * Parse an ISO-8601 date string.
  * Kept for compatibility with date-fns style usage in Velocity templates.
  */
-export function parseISO(dateStr: string | Date | number): Date {
+function parseISO(dateStr: string | Date | number): Date {
     return parse(dateStr)
 }
 
@@ -290,7 +267,7 @@ export function parseISO(dateStr: string | Date | number): Date {
  * Get year from date.
  * Uses UTC to avoid timezone shifts for midnight Z values.
  */
-export function getYear(date: Date | string | number): number {
+function getYear(date: Date | string | number): number {
     const d = new Date(date)
     if (isNaN(d.getTime())) {
         throw new Error('Invalid date')
