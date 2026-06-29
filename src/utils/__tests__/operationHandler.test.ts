@@ -5,15 +5,20 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 // Mock the ServiceRegistry class
 jest.mock('../../services/serviceRegistry', () => {
     return {
-        ServiceRegistry: jest.fn().mockImplementation((_config, _context, _res, _operationName) => {
-            return {
-                proxy: {
-                    isProxyService: jest.fn().mockReturnValue(false),
-                    isProxyMode: jest.fn().mockReturnValue(false),
-                    execute: jest.fn().mockResolvedValue(undefined),
-                },
+        ServiceRegistry: Object.assign(
+            jest.fn().mockImplementation((_config, _context, _res, _operationName) => {
+                return {
+                    proxy: {
+                        isProxyService: jest.fn().mockReturnValue(false),
+                        isProxyMode: jest.fn().mockReturnValue(false),
+                        execute: jest.fn().mockResolvedValue(undefined),
+                    },
+                }
+            }),
+            {
+                run: jest.fn((_reg, callback) => callback()),
             }
-        }),
+        ),
     }
 })
 
@@ -49,9 +54,6 @@ describe('createOperationHandler', () => {
         context = {}
         input = { data: 'testInput' }
         res = { keepAlive: jest.fn() }
-
-        // Add static clear method mock
-        ;(ServiceRegistry as any).clear = jest.fn()
     })
 
     afterEach(() => {
@@ -258,20 +260,17 @@ describe('createOperationHandler', () => {
     })
 
     describe('Cleanup', () => {
-        it('should clear ServiceRegistry and interval on success', async () => {
+        it('should clear interval on success', async () => {
             const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
             await handler(context, input, res)
-
-            expect((ServiceRegistry as any).clear).toHaveBeenCalledTimes(1)
         })
 
-        it('should clear ServiceRegistry and interval on error', async () => {
+        it('should clear interval on error', async () => {
             defaultFn.mockRejectedValue(new Error('Test error'))
 
             const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
 
             await expect(handler(context, input, res)).rejects.toThrow()
-            expect((ServiceRegistry as any).clear).toHaveBeenCalledTimes(1)
         })
     })
 })

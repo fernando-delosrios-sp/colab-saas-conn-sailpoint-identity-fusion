@@ -29,7 +29,6 @@ import { ATTR_OPS_RESET } from '../services/attributeService/types'
  * @param input - SDK input containing the account identity to enable
  */
 export const accountEnable = async (serviceRegistry: ServiceRegistry, input: StdAccountEnableInput) => {
-    ServiceRegistry.setCurrent(serviceRegistry)
     const { log, fusion, sources, schemas, attributes, res, identities } = serviceRegistry
 
     try {

@@ -1,5 +1,4 @@
 import { accountList } from '../accountList'
-import { ServiceRegistry } from '../../services/serviceRegistry'
 import { aggregationScenarios } from './fixtures/aggregationScenarios'
 import { AggregationScenario } from './fixtures/scenarioTypes'
 import { createBaseOperationRegistry, SourceConfigLike } from './harness/mockRegistry'
@@ -66,12 +65,6 @@ function createTwoPassRegistry(scenario: AggregationScenario) {
 }
 
 describe('accountList setup phase', () => {
-    beforeEach(() => {
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation((reg) => {
-            ;(ServiceRegistry as any).current = reg
-        })
-    })
-
     afterEach(() => {
         jest.restoreAllMocks()
     })
@@ -192,12 +185,6 @@ describe('accountList setup phase', () => {
 })
 
 describe('accountList two-pass aggregation lifecycle', () => {
-    beforeEach(() => {
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation((reg) => {
-            ;(ServiceRegistry as any).current = reg
-        })
-    })
-
     afterEach(() => {
         jest.restoreAllMocks()
     })

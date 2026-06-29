@@ -1,5 +1,4 @@
 import { accountUpdate } from '../accountUpdate'
-import { ServiceRegistry } from '../../services/serviceRegistry'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 import { executeActions } from '../actions'
 
@@ -20,10 +19,6 @@ function createRegistry() {
 }
 
 describe('accountUpdate', () => {
-    beforeEach(() => {
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation(() => undefined)
-    })
-
     afterEach(() => {
         jest.restoreAllMocks()
         jest.clearAllMocks()

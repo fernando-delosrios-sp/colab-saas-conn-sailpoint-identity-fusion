@@ -95,8 +95,8 @@ export function createOperationHandler(
 ): any {
     return async (context: any, input: any, res: any) => {
         let interval: ReturnType<typeof setInterval> | undefined
+        const serviceRegistry = new ServiceRegistry(config, context, res, operationName)
         try {
-            const serviceRegistry = new ServiceRegistry(config, context, res, operationName)
             const { runMode, isProxyServer } = resolveRunMode(context, serviceRegistry.proxy, operationName)
             interval = scheduleKeepAlive(options, config, runMode, isProxyServer, res)
 
@@ -109,7 +109,9 @@ export function createOperationHandler(
                 serviceRegistry.identities,
                 serviceRegistry.forms
             )
-            await runOperation(runMode, operationName, context, serviceRegistry, input, defaultFn)
+            await ServiceRegistry.run(serviceRegistry, () =>
+                runOperation(runMode, operationName, context, serviceRegistry, input, defaultFn)
+            )
             serviceRegistry.recording?.endOperation(
                 serviceRegistry.sources,
                 serviceRegistry.identities,
@@ -122,7 +124,6 @@ export function createOperationHandler(
             const msg = typeof options.errorMessage === 'function' ? options.errorMessage(input) : options.errorMessage
             throw new ConnectorError(`${msg}: ${detail}`, ConnectorErrorType.Generic)
         } finally {
-            ServiceRegistry.clear()
             if (interval) clearInterval(interval)
         }
     }

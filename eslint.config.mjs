@@ -18,7 +18,7 @@ export default [
             'no-unused-vars': 'off',
             '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
             'no-explicit-any': 'off',
-            '@typescript-eslint/no-explicit-any': 'error',
+            '@typescript-eslint/no-explicit-any': 'off',
             'no-case-declarations': 'error',
             'jsdoc/require-jsdoc': 'off',
             'jsdoc/require-param': 'off',

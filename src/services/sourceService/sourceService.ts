@@ -1,26 +1,4 @@
-import {
-    Search,
-    Account,
-    AccountsApiListAccountsRequest,
-    SearchApiSearchPostRequest,
-    SourcesV2025ApiImportAccountsRequest,
-    TaskManagementV2025ApiGetTaskStatusRequest,
-    Source,
-    SchemaV2025,
-    SourcesV2025ApiGetSourceSchemasRequest,
-    SourcesV2025ApiPutSourceSchemaRequest,
-    SourcesV2025ApiGetCorrelationConfigRequest,
-    SourcesV2025ApiPutCorrelationConfigRequest,
-    SourcesV2025ApiUpdateSourceRequest,
-    IdentityProfilesV2025ApiListIdentityProfilesRequest,
-    IdentityProfilesV2025ApiUpdateIdentityProfileRequest,
-    OwnerDto,
-    SourcesV2025ApiListSourcesRequest,
-    JsonPatchOperationV2025OpV2025,
-    CorrelationConfigV2025,
-    AttributeDefinitionV2025,
-    AttributeDefinitionTypeV2025,
-} from 'sailpoint-api-client'
+import { Search, AccountV2025 as Account, AccountsApiListAccountsRequest, SearchApiSearchPostRequest, SourcesV2025ApiImportAccountsRequest, TaskManagementV2025ApiGetTaskStatusRequest, Source, SchemaV2025, SourcesV2025ApiGetSourceSchemasRequest, SourcesV2025ApiPutSourceSchemaRequest, SourcesV2025ApiGetCorrelationConfigRequest, SourcesV2025ApiPutCorrelationConfigRequest, SourcesV2025ApiUpdateSourceRequest, IdentityProfilesV2025ApiListIdentityProfilesRequest, IdentityProfilesV2025ApiUpdateIdentityProfileRequest, OwnerDto, SourcesV2025ApiListSourcesRequest, JsonPatchOperationV2025OpV2025, CorrelationConfigV2025, AttributeDefinitionV2025, AttributeDefinitionTypeV2025 } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { BaseConfig, FusionConfig, SourceConfig, SourceType } from '../../model/config'
 import { ClientService, QueuePriority } from '../clientService'

@@ -22,7 +22,6 @@ import { ATTR_OPS_NONE } from '../services/attributeService/types'
  * @param input - SDK input containing the account identity and list of attribute changes
  */
 export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: StdAccountUpdateInput) => {
-    ServiceRegistry.setCurrent(serviceRegistry)
     const { log, sources, schemas, fusion, res, config, identities } = serviceRegistry
 
     try {

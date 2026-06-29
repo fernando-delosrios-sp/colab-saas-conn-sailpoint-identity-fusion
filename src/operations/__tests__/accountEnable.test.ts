@@ -1,6 +1,5 @@
 import { ConnectorError } from '@sailpoint/connector-sdk'
 import { accountEnable } from '../accountEnable'
-import { ServiceRegistry } from '../../services/serviceRegistry'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 
 jest.mock('../helpers/rebuildFusionAccount', () => ({
@@ -10,10 +9,6 @@ jest.mock('../helpers/rebuildFusionAccount', () => ({
 import { createRegistry } from './harness/registryMocking'
 
 describe('accountEnable', () => {
-    beforeEach(() => {
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation(() => undefined)
-    })
-
     afterEach(() => {
         jest.restoreAllMocks()
         jest.clearAllMocks()

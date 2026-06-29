@@ -11,7 +11,6 @@ import { ServiceRegistry } from '../services/serviceRegistry'
  * @param _input - Unused input parameter (required by SDK interface)
  */
 export const testConnection = async (serviceRegistry: ServiceRegistry, _input: any) => {
-    ServiceRegistry.setCurrent(serviceRegistry)
     const { log, sources, schemas, messaging, res } = serviceRegistry
 
     try {

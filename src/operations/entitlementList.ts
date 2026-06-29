@@ -12,7 +12,6 @@ import { ServiceRegistry } from '../services/serviceRegistry'
  * @param input - SDK input containing the entitlement type to list
  */
 export const entitlementList = async (serviceRegistry: ServiceRegistry, input: StdEntitlementListInput) => {
-    ServiceRegistry.setCurrent(serviceRegistry)
     const { log, sources, entitlements, res } = serviceRegistry
 
     try {

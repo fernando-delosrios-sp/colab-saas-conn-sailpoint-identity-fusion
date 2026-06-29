@@ -1,5 +1,4 @@
 import { accountDisable } from '../accountDisable'
-import { ServiceRegistry } from '../../services/serviceRegistry'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 
 jest.mock('../helpers/rebuildFusionAccount', () => ({
@@ -9,10 +8,6 @@ jest.mock('../helpers/rebuildFusionAccount', () => ({
 import { createRegistry } from './harness/registryMocking'
 
 describe('accountDisable', () => {
-    beforeEach(() => {
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation(() => undefined)
-    })
-
     afterEach(() => {
         jest.restoreAllMocks()
         jest.clearAllMocks()

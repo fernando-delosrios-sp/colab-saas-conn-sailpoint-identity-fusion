@@ -1,6 +1,6 @@
 import { FusionAccount } from '../fusionAccount'
 import { FusionConfig, SourceType } from '../config'
-import { Account, IdentityDocument } from 'sailpoint-api-client'
+import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionDecision } from '../form'
 import { FusionAccountKind } from '../fusionAccountTypes'
 

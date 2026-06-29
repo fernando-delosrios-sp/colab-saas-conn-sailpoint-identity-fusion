@@ -12,11 +12,6 @@ describe('assert', () => {
 
     beforeEach(() => {
         jest.clearAllMocks()
-        ServiceRegistry.clear()
-    })
-
-    afterEach(() => {
-        ServiceRegistry.clear()
     })
 
     describe('assert - success cases', () => {
@@ -32,29 +27,33 @@ describe('assert', () => {
     })
 
     describe('assert - failure cases', () => {
-        it('should throw when value is null and registry has no log', () => {
-            ;(ServiceRegistry as any).current = { log: null }
-            expect(() => assert(null, 'expected error')).toThrow(ConnectorError)
-            expect(() => assert(null, 'expected error')).toThrow(/expected error/)
+        it('should throw when value is null and registry has no log', async () => {
+            await ServiceRegistry.run({} as any, async () => {
+                expect(() => assert(null, 'expected error')).toThrow(ConnectorError)
+                expect(() => assert(null, 'expected error')).toThrow(/expected error/)
+            })
         })
 
-        it('should throw when value is undefined', () => {
-            ;(ServiceRegistry as any).current = { log: null }
-            expect(() => assert(undefined, 'msg')).toThrow()
+        it('should throw when value is undefined', async () => {
+            await ServiceRegistry.run({} as any, async () => {
+                expect(() => assert(undefined, 'msg')).toThrow()
+            })
         })
 
-        it('should throw when condition is false', () => {
-            ;(ServiceRegistry as any).current = { log: null }
-            expect(() => assert(false, 'condition failed')).toThrow(/condition failed/)
+        it('should throw when condition is false', async () => {
+            await ServiceRegistry.run({} as any, async () => {
+                expect(() => assert(false, 'condition failed')).toThrow(/condition failed/)
+            })
         })
 
-        it('should call log.crash when registry has log', () => {
+        it('should call log.crash when registry has log', async () => {
             mockLog.crash.mockImplementation(() => {
                 throw new ConnectorError('crash message', 'generic' as any)
             })
-            ;(ServiceRegistry as any).current = { log: mockLog }
-            expect(() => assert(null, 'crash message')).toThrow(ConnectorError)
-            expect(mockLog.crash).toHaveBeenCalledWith('crash message')
+            await ServiceRegistry.run({ log: mockLog } as any, async () => {
+                expect(() => assert(null, 'crash message')).toThrow(ConnectorError)
+                expect(mockLog.crash).toHaveBeenCalledWith('crash message')
+            })
         })
     })
 
@@ -64,16 +63,18 @@ describe('assert', () => {
             expect(softAssert(1, 'msg')).toBe(true)
         })
 
-        it('should return false when value is null', () => {
-            ;(ServiceRegistry as any).current = { log: mockLog }
-            expect(softAssert(null, 'msg')).toBe(false)
-            expect(mockLog.warn).toHaveBeenCalledWith('msg')
+        it('should return false when value is null', async () => {
+            await ServiceRegistry.run({ log: mockLog } as any, async () => {
+                expect(softAssert(null, 'msg')).toBe(false)
+                expect(mockLog.warn).toHaveBeenCalledWith('msg')
+            })
         })
 
-        it('should use error level when specified', () => {
-            ;(ServiceRegistry as any).current = { log: mockLog }
-            softAssert(null, 'error msg', 'error')
-            expect(mockLog.error).toHaveBeenCalledWith('error msg')
+        it('should use error level when specified', async () => {
+            await ServiceRegistry.run({ log: mockLog } as any, async () => {
+                softAssert(null, 'error msg', 'error')
+                expect(mockLog.error).toHaveBeenCalledWith('error msg')
+            })
         })
     })
 })

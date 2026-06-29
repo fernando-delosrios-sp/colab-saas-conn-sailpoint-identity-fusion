@@ -1,4 +1,4 @@
-import { Account, IdentityDocument } from 'sailpoint-api-client'
+import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionDecision } from './form'
 import type { IdentityInfo } from './fusionAccountTypes'
 import { normalizeCompositeManagedAccountKey } from './managedAccountKey'

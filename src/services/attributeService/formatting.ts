@@ -1,8 +1,6 @@
-// Must run before `velocityjs` is loaded (ESM `import` is hoisted ahead of this file's body).
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-require('./velocityPrototypeGuard.cjs')
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const velocityjs = require('velocityjs') as typeof import('velocityjs').default
+import { SafeCompile } from '../../utils/safeVelocityCompile'
 import { transliterate } from 'transliteration'
 import { v4 as uuidv4 } from 'uuid'
 type RenderContext = Record<string, any>
@@ -68,7 +66,7 @@ export const evaluateVelocityTemplate = (
     if (!velocity) {
         // Parse and compile template, then cache it
         const template = velocityjs.parse(expression)
-        velocity = new velocityjs.Compile(template)
+        velocity = new SafeCompile(template)
         templateCache.set(expression, velocity)
         logger.debug(`Compiled and cached new velocity template: ${expression}`)
     }

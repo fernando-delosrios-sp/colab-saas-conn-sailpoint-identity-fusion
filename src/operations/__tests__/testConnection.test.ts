@@ -1,5 +1,4 @@
 import { testConnection } from '../testConnection'
-import { ServiceRegistry } from '../../services/serviceRegistry'
 import { createBaseOperationRegistry, SourceConfigLike } from './harness/mockRegistry'
 
 function createMockRegistry(sourceConfigs: SourceConfigLike[]) {
@@ -8,10 +7,6 @@ function createMockRegistry(sourceConfigs: SourceConfigLike[]) {
 }
 
 describe('testConnection', () => {
-    beforeEach(() => {
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation(() => undefined)
-    })
-
     afterEach(() => {
         jest.restoreAllMocks()
     })

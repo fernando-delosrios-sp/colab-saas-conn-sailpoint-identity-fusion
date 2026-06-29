@@ -1,4 +1,4 @@
-import { Account } from 'sailpoint-api-client'
+import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import jmespath from 'jmespath'
 import { SourceInfo } from './types'

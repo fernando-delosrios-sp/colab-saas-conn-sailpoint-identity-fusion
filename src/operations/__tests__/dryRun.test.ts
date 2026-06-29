@@ -1,5 +1,4 @@
 import { dryRun } from '../dryRun'
-import { ServiceRegistry } from '../../services/serviceRegistry'
 import { LogService } from '../../services/logService'
 import type { FusionReport } from '../../services/fusionService/types'
 import { AggregationTracker } from '../../services/fusionService/aggregationTracker'
@@ -264,10 +263,6 @@ function createRegistry() {
 }
 
 describe('dryRun', () => {
-    beforeEach(() => {
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation(() => undefined)
-    })
-
     afterEach(() => {
         jest.restoreAllMocks()
     })

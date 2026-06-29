@@ -1,4 +1,4 @@
-import { Account } from 'sailpoint-api-client'
+import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { readString, trimStr } from '../utils/safeRead'
 
 const MANAGED_ACCOUNT_KEY_SEPARATOR = '::'

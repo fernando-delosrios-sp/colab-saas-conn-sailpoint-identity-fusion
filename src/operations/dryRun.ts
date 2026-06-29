@@ -17,7 +17,6 @@ import { PipelineRunner } from './helpers/corePipeline'
  * persistence and external API side-effects.
  */
 export const dryRun = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
-    ServiceRegistry.setCurrent(serviceRegistry)
     const { log, reports } = serviceRegistry
     const tracker = new AggregationTracker()
 
