@@ -41,7 +41,7 @@
         "jmespath": "^0.16.0",
         "libphonenumber-js": "^1.12.42",
         "parse-address-string": "^0.0.3",
-        "sailpoint-api-client": "2.0.3",
+        "sailpoint-api-client": "1.8.69",
         "transliteration": "^2.6.1",
         "uuid": "^14.0.0",
         "velocityjs": "^2.1.6"
@@ -79,9 +79,15 @@
         "singleQuote": true
     },
     "knip": {
-        "entry": ["scripts/**/*.{cjs,js}"],
-        "project": ["src/**/*.ts"],
-        "ignoreBinaries": ["python3"]
+        "entry": [
+            "scripts/**/*.{cjs,js}"
+        ],
+        "project": [
+            "src/**/*.ts"
+        ],
+        "ignoreBinaries": [
+            "python3"
+        ]
     },
     "allowScripts": {
         "@fission-ai/openspec": true,
