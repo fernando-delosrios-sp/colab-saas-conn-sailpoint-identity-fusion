@@ -104,10 +104,12 @@ export const connector = async () => {
                     const instances = ctx.listUniqueFormInstancesByForm(currentForm)
                     formInstances: for (const currentFormInstance of instances) {
                         logger.debug(`Processing form instance ${currentForm.name} (${currentFormInstance.id}).`)
-                        const formName = currentForm.name
                         let uniqueAccount: Account | undefined
+                        const formName = currentForm.name
+                        const uncorrelatedAccount: Account | undefined = (await ctx.getAccount(accountID)) as Account
+                        const state = uncorrelatedAccount ? currentFormInstance.state : 'CANCELLED'
 
-                        switch (currentFormInstance.state) {
+                        switch (state) {
                             case 'COMPLETED':
                                 const { decision, account, message } =
                                     await ctx.processUniqueFormInstance(currentFormInstance)
@@ -117,7 +119,6 @@ export const connector = async () => {
 
                                 if (identityMatch) {
                                     logger.debug(`Updating existing account for ${decision}.`)
-                                    const uncorrelatedAccount = (await ctx.getAccount(accountID)) as Account
                                     const currentAccount = ctx.getFusionAccountByIdentity(identityMatch)
                                     if (currentAccount) {
                                         const msg = datedMessage(message, uncorrelatedAccount)
