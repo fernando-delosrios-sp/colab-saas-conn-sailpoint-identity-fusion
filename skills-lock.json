@@ -67,6 +67,12 @@
       "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
       "computedHash": "409b0c0f9d1429fed7315beab3c346865d2e836ce76fe8a4189899ce2873490d"
     },
+    "open-code-review": {
+      "source": "alibaba/open-code-review",
+      "sourceType": "github",
+      "skillPath": "skills/open-code-review/SKILL.md",
+      "computedHash": "5ebd7726ff89b3f5906b6dc4f3a16dfa9684e30181f619d95a3fb7bc00ad3f3a"
+    },
     "writing-great-skills": {
       "source": "fernando-delosrios-sp/skills",
       "sourceType": "github",
