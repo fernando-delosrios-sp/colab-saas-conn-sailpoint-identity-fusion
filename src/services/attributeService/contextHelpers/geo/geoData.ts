@@ -13,11 +13,11 @@ import * as US from './usGeoData'
 import * as UK from './ukGeoData'
 
 // Re-export US and UK modules for direct access
-export { US, UK }
+
 
 // Re-export types
-export type { USState, USCity } from './usGeoData'
-export type { UKRegion, UKCity } from './ukGeoData'
+
+
 
 /**
  * Unified City API compatible with country-state-city library

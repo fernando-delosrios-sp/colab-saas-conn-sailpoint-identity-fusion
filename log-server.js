@@ -83,11 +83,7 @@ app.use(express.json({ limit: '10mb', type: 'application/json' }))
 app.use(express.text({ limit: '10mb', type: 'text/plain' }))
 app.use(express.text({ limit: '10mb', type: '*/*' })) // Catch-all for other text types
 
-// Helper to get short timestamp (HH:MM:SS)
-const getShortTimestamp = () => {
-    const now = new Date()
-    return now.toTimeString().split(' ')[0] // HH:MM:SS
-}
+
 
 // Health check endpoint - only for GET requests
 app.get('/', (req, res) => {

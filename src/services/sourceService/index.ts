@@ -5,4 +5,4 @@ export { SourceService } from './sourceService'
 export type { SourceInfo } from './types'
 
 // Re-export helpers
-export { buildSourceConfigPatch } from './helpers'
+

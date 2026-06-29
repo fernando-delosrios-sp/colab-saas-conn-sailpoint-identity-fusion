@@ -40,7 +40,7 @@ import {
 } from './formProcessor'
 import { FusionMatch } from '../scoringService/types'
 
-export type { PendingReviewFormContext, PendingReviewReviewerContext, PendingReviewAccountContext } from './types'
+export type { PendingReviewFormContext,  PendingReviewAccountContext } from './types'
 
 // ============================================================================
 // FormService Class

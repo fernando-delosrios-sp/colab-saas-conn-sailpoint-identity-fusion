@@ -3,7 +3,7 @@ import { ApiQueue } from '../clientService/queue'
 import { QueuePriority } from '../clientService/types'
 import { getCallerInfo } from './helpers'
 
-export { getCallerInfo } from './helpers'
+
 
 type Logger = typeof logger
 

@@ -59,7 +59,7 @@ export function normalizeEmailValue(value: unknown): string[] {
  * @param attributes - The identity attributes object
  * @returns Array of unique email addresses
  */
-export function extractEmailsFromAttributes(attributes: Record<string, any> | undefined): string[] {
+function extractEmailsFromAttributes(attributes: Record<string, any> | undefined): string[] {
     if (!attributes) return []
 
     const emails = new Set<string>()
@@ -84,7 +84,7 @@ export function extractEmailsFromAttributes(attributes: Record<string, any> | un
  * Basic email format validation using a simple regex.
  * This is not a comprehensive validation but catches obvious issues.
  */
-export function isValidEmailFormat(email: string | undefined): boolean {
+function isValidEmailFormat(email: string | undefined): boolean {
     if (!email) return false
 
     // Basic email regex - checks for presence of @ and proper structure
@@ -95,7 +95,7 @@ export function isValidEmailFormat(email: string | undefined): boolean {
 /**
  * Filters an array of strings to only include valid email addresses.
  */
-export function filterValidEmails(emails: string[]): string[] {
+function filterValidEmails(emails: string[]): string[] {
     return emails.filter(isValidEmailFormat)
 }
 
@@ -139,7 +139,7 @@ export function sanitizeRecipients(recipients: (string | undefined | null)[]): s
  * Merges multiple email sources into a single array of unique values.
  * Useful when gathering recipients from multiple sources.
  */
-export function mergeEmailSources(...sources: (string | string[] | undefined | null)[]): string[] {
+function mergeEmailSources(...sources: (string | string[] | undefined | null)[]): string[] {
     const emails = new Set<string>()
 
     for (const source of sources) {

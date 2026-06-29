@@ -8,7 +8,7 @@ export const connectorSpecInitialValues = {
     identityScopeQuery: '*',
 } as const
 
-export const runtimeDefaults = {} as const
+const runtimeDefaults = {} as const
 
 export function readSettings(raw: Record<string, unknown>): ScopeSection {
     return {

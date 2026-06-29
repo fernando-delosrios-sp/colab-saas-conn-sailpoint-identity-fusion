@@ -24,7 +24,7 @@ import { defaults } from '../../data/config'
 import { sanitizeRecipients } from '../../services/messagingService/email'
 
 /** Record managed source account ids present on a streamed fusion ISC row (drives report join coverage). */
-export const addCoveredManagedAccountIds = (account: StdAccountListOutput, into: Set<string>): void => {
+const addCoveredManagedAccountIds = (account: StdAccountListOutput, into: Set<string>): void => {
     const raw = account.attributes?.accounts
     if (Array.isArray(raw)) {
         for (const x of raw) into.add(String(x))
@@ -46,7 +46,7 @@ function buildOrphanDeferredStubOutput(accountId: string): StdAccountListOutput 
 }
 
 export type DryRunRuntimeOptions = DryRunInputOptions
-export type DryRunIssueSummary = {
+type DryRunIssueSummary = {
     warningCount: number
     errorCount: number
     warningSamples: string[]
@@ -90,7 +90,7 @@ export type DryRunHelpersContext = {
     attributes: { refreshUniqueAttributes: (account: FusionAccount) => Promise<void> }
 }
 
-export const buildDryRunRuntimeOptions = (input: StdAccountListInput): DryRunRuntimeOptions => {
+const buildDryRunRuntimeOptions = (input: StdAccountListInput): DryRunRuntimeOptions => {
     return {
         includeExisting: readBoolean(input, 'includeExisting', false),
         includeNonMatched: readBoolean(input, 'includeNonMatched', false),
@@ -202,7 +202,7 @@ async function writePrettyJsonArrayElement(stream: WriteStream, obj: unknown, is
  * Routes detail rows either through `res.send` (streaming) or to a pretty-printed JSON file under `./reports`
  * shaped as `{ "summary": {...}, "rows": [...] }` (summary first so consumers can read metadata without scanning rows).
  */
-export const createDryRunRowEmitter = async (
+const createDryRunRowEmitter = async (
     context: Pick<DryRunHelpersContext, 'config' | 'log' | 'reports' | 'res'>,
     runtimeOptions: DryRunRuntimeOptions
 ): Promise<DryRunRowEmitter> => {
@@ -370,7 +370,7 @@ export const initializeDryRunExecution = async (
     return { runtimeOptions, rowEmitter }
 }
 
-export const finalizeDryRun = async (
+const finalizeDryRun = async (
     context: Pick<DryRunHelpersContext, 'fusion' | 'res' | 'sources'>,
     finalizationInput: DryRunFinalizationInput
 ) => {
@@ -418,7 +418,7 @@ export const finalizeDryRun = async (
     }
 }
 
-export const streamEnrichedOutputRows = async (
+const streamEnrichedOutputRows = async (
     context: Pick<DryRunHelpersContext, 'config' | 'fusion' | 'schemas' | 'sources'>,
     reportIndex: ReturnType<typeof buildReportAccountIndex>,
     pendingReviewByAccountId: PendingReviewContextByAccountId,
@@ -516,7 +516,7 @@ export const streamUncorrelatedAnalyzedRows = async (
  * account id never appears on any `forEachISCAccount` row. Emit synthetic ISC-shaped stubs so
  * `enrichISCAccountWithMatching` can attach the deferred FusionReportAccount slice.
  */
-export const streamOrphanDeferredReportRows = async (
+const streamOrphanDeferredReportRows = async (
     context: Pick<DryRunHelpersContext, 'config' | 'schemas' | 'sources'>,
     reportAccounts: FusionReportAccount[],
     reportIndex: ReturnType<typeof buildReportAccountIndex>,
@@ -759,7 +759,7 @@ const getEmissionKey = (account: any): string => {
     return JSON.stringify(readUnknown(readUnknown(account, 'attributes'), 'accounts') ?? [])
 }
 
-export const refreshUniqueAttributesForDryRun = async (
+const refreshUniqueAttributesForDryRun = async (
     context: Pick<DryRunHelpersContext, 'attributes' | 'config' | 'fusion' | 'log'>,
     analyzedUncorrelatedAccounts: FusionAccount[],
     runtimeOptions: DryRunRuntimeOptions

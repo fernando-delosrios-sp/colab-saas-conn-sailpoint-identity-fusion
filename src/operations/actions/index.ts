@@ -7,7 +7,7 @@ import { correlateAction } from './correlateAction'
 import { reviewerAction } from './reviewerAction'
 import { ActionChange } from './types'
 
-export { reportAction, fusionAction, correlateAction }
+
 
 const ACTION_HANDLERS: Record<
     string,

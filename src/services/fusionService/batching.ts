@@ -59,4 +59,4 @@ export { yieldToEventLoop }
 /**
  * Fire-and-forget batched iteration with the configured batch size.
  */
-export { forEachBatched }
+

@@ -12,7 +12,7 @@ export const connectorSpecInitialValues = {
     useIncrementalCounter: false,
 } as const
 
-export const runtimeDefaults = {
+const runtimeDefaults = {
     trim: false,
 } as const
 

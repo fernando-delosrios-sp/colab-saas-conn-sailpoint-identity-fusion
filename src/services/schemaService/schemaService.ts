@@ -126,11 +126,12 @@ export class SchemaService {
                 if (typeof value === 'string') return value.toLowerCase() === 'true'
                 return value !== 0
             case 'int':
-            case 'long':
+            case 'long': {
                 if (typeof value === 'number') return value
                 if (typeof value === 'boolean') return value ? 1 : 0
                 const num = Number(value)
                 return isNaN(num) ? 0 : num
+            }
             case 'string':
             default:
                 return String(value)

@@ -5,7 +5,7 @@ import { normalizeCompositeManagedAccountKey } from './managedAccountKey'
 import { readString, trimStr } from '../utils/safeRead'
 
 /** Identity-side display label: identity.attributes.displayName || identity.name. */
-export function identityDisplayNameFromIdentity(identity: IdentityDocument): string | undefined {
+function identityDisplayNameFromIdentity(identity: IdentityDocument): string | undefined {
     const fromAttrs = (identity.attributes as Record<string, unknown> | undefined)?.displayName as
         | string
         | undefined
@@ -13,7 +13,7 @@ export function identityDisplayNameFromIdentity(identity: IdentityDocument): str
 }
 
 /** Account-side display label: account.identity?.name || account.name. */
-export function identityDisplayNameFromAccount(account: Account): string | undefined {
+function identityDisplayNameFromAccount(account: Account): string | undefined {
     const identityRefName = (account as { identity?: { name?: string } }).identity?.name
     return trimStr(identityRefName) ?? trimStr(account.name) ?? undefined
 }

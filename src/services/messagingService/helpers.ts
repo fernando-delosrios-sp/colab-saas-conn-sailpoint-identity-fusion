@@ -565,7 +565,7 @@ export type FusionReviewEmailData = {
     locale?: string
 }
 
-export type EditRequestEmailData = {
+type EditRequestEmailData = {
     accountName: string
     accountSource: string
     accountAttributes: Record<string, any>
@@ -681,7 +681,7 @@ export const renderFusionReviewEmail = (
 /**
  * Render edit request email template
  */
-export const renderEditRequestEmail = (
+const renderEditRequestEmail = (
     templates: Map<string, HandlebarsTemplateDelegate>,
     data: EditRequestEmailData
 ): string => {

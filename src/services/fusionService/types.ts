@@ -131,7 +131,7 @@ export type FusionReportDecision = {
  * Passed to generateReport so it can build the full FusionReportStats.
  */
 /** Per-phase elapsed durations from pipeline orchestration (optional for backward compatibility). */
-export type PhaseTimingBreakdownEntry = {
+type PhaseTimingBreakdownEntry = {
     phase: string
     elapsed: string
 }

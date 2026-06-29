@@ -4,7 +4,7 @@ import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
 import { AggregationTracker } from '../../services/fusionService'
 
-export type PipelineMode =
+type PipelineMode =
     | { kind: 'aggregation' } // full persistent run — accountList (includes optional aggregation report)
     | { kind: 'dry-run' } // non-persistent analysis — customReport, reportAction's mini-pipeline
 
@@ -262,7 +262,7 @@ export async function outputPreparationPhase(
 }
 
 /** Phase 7: Generate fusion report (conditional). */
-export async function reportPhase(
+async function reportPhase(
     serviceRegistry: ServiceRegistry,
     fetchResult: FetchResult,
     timer: ReturnType<ServiceRegistry['log']['timer']>,
@@ -369,7 +369,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     return sent
 }
 
-export type PipelinePhase =
+type PipelinePhase =
     | 'setup'
     | 'fetch'
     | 'refresh'

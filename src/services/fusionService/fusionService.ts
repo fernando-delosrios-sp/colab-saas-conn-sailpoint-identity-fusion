@@ -1166,14 +1166,6 @@ export class FusionService {
         return this.managedAccountAnalyzer.isDeferredMatchingEnabledForSource(sourceName)
     }
 
-    /**
-     * Record sources: Match scoring (identity + optional deferred peers). Default true.
-     * When false, record accounts skip scoring but still participate in Map & Define and
-     * unique-attribute registration.
-     */
-    private isRecordMatchingEnabledForSource(sourceName: string | undefined): boolean {
-        return this.managedAccountAnalyzer.isRecordMatchingEnabledForSource(sourceName)
-    }
 
     /**
      * Records a failed matching for inclusion in the fusion report.

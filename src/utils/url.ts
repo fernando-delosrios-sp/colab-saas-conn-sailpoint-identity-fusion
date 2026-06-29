@@ -104,7 +104,7 @@ export function buildAccountUrl(uiOrigin: string | undefined, accountId: string 
 /**
  * Builds a URL to a human account in Accounts Management in the ISC UI.
  */
-export function buildHumanAccountManagementUrl(
+function buildHumanAccountManagementUrl(
     uiOrigin: string | undefined,
     accountId: string | undefined
 ): string | undefined {

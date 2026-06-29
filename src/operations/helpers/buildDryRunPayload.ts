@@ -15,7 +15,7 @@ import { readPathString } from '../../utils/safeRead'
  */
 export type MatchingStatus = 'matched' | 'deferred' | 'non-matched' | 'review-error' | 'not-analyzed'
 
-export type DryRunRowCounter = Record<MatchingStatus, number>
+type DryRunRowCounter = Record<MatchingStatus, number>
 
 /** Mirrors the boolean flags passed in the `custom:dryrun` command input. */
 export type DryRunInputOptions = {
@@ -175,7 +175,7 @@ const toStringArray = (value: unknown): string[] => {
 
 const EMPTY_REVIEW_PAYLOAD: ReviewPayload = { pending: false, forms: [], reviewers: [], candidates: [] }
 
-export const createDryRunRowCounter = (): DryRunRowCounter => ({
+const createDryRunRowCounter = (): DryRunRowCounter => ({
     matched: 0,
     deferred: 0,
     'non-matched': 0,
