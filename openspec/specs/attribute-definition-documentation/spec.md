@@ -95,6 +95,12 @@ Rule: The connector auto-appends $counter to unique-attribute expressions that d
 - **THEN** it explains that when `$counter` is active, its character length is reserved from the `maxLength` budget so the final value (prefix + counter + suffix) does not exceed `maxLength`
 - **AND** it notes that this means the non-counter portion of the value may be shorter than `maxLength` to accommodate the counter
 
+#### Scenario: UUID expressions skip auto-append and resolve collisions by recalculation
+- **GIVEN** any documentation surface describes the auto-append behavior
+- **WHEN** a user reads it
+- **THEN** it explains that expressions containing `$UUID` do NOT have `$counter` auto-appended
+- **AND** it notes that when collisions occur for such expressions, a new UUID is generated instead of relying on a counter
+
 ### Requirement: maxAttempts default is 20
 
 The default value for `maxAttempts` in the connector is 20, set in `src/data/config/settings/uniqueAttributeDefinitionsSettings.ts:7`. All documentation surfaces that quote a default for `maxAttempts` MUST state `20`, not `100` or any other value.
