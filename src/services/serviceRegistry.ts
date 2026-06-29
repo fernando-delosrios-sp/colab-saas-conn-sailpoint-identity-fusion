@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { Context, ConnectorError, ConnectorErrorType, Response, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { OperationContext } from './fusionService/types'
@@ -21,12 +22,13 @@ import { RecordingService } from './recordingService'
  * Central dependency injection container for all connector services.
  *
  * Instantiates and wires together all services in dependency order during construction.
- * Each service can be overridden via the SDK context (useful for testing). A static
- * singleton reference tracks the "current" registry for the active operation so that
- * deeply-nested code can access services without prop-drilling.
+ * Each service can be overridden via the SDK context (useful for testing). The active
+ * registry for an in-flight operation is tracked via {@link AsyncLocalStorage} so that
+ * deeply-nested code can access services without prop-drilling while still being
+ * isolated per concurrent operation.
  */
 export class ServiceRegistry {
-    private static current?: ServiceRegistry
+    private static readonly storage = new AsyncLocalStorage<ServiceRegistry>()
     public log: LogService
     public locks: LockService
     public client: ClientService
@@ -135,33 +137,46 @@ export class ServiceRegistry {
     }
 
     /**
-     * Sets the active registry singleton for the current operation.
-     * Called at the start of every operation handler.
+     * Runs a callback with `reg` bound as the active registry for the duration of the
+     * async call tree. Nested service accessors (e.g. via {@link getCurrent}) read
+     * the registry from the current `AsyncLocalStorage` context, so concurrent
+     * operations each see their own registry without cross-contamination.
      *
-     * @param reg - The registry instance to make globally accessible
+     * The callback is invoked with no arguments and is expected to perform async
+     * work; any value (including `undefined`) it resolves to is returned to the
+     * caller.
+     *
+     * @param reg - The registry instance to make active
+     * @param callback - Async work that may read the active registry
+     * @returns The result of `callback`
      */
-    static setCurrent(reg: ServiceRegistry) {
-        this.current = reg
+    static run<T>(reg: ServiceRegistry, callback: () => Promise<T>): Promise<T> {
+        return this.storage.run(reg, callback)
     }
 
     /**
-     * Retrieves the active registry singleton.
+     * Retrieves the active registry singleton from the current `AsyncLocalStorage`
+     * context. Replaces the previous process-global `static current` to make the
+     * registry request-scoped.
      *
      * @returns The current ServiceRegistry instance
-     * @throws {ConnectorError} If no registry has been set via {@link setCurrent}
+     * @throws {ConnectorError} If no registry is bound in the current context
      */
     static getCurrent(): ServiceRegistry {
-        if (!this.current) {
+        const reg = this.storage.getStore()
+        if (!reg) {
             throw new ConnectorError('ServiceRegistry not found', ConnectorErrorType.Generic)
         }
-        return this.current!
+        return reg
     }
 
     /**
-     * Flushes pending logs and clears the active registry singleton, releasing all service references.
+     * Flushes pending logs for the active registry, if any. Retained for backward
+     * compatibility with callers that previously invoked `clear()` to drop the
+     * process-global reference. With `AsyncLocalStorage`, context cleanup is handled
+     * by the call tree boundary established via {@link run}.
      */
     static clear() {
-        void this.current?.log?.flush()
-        this.current = undefined
+        void this.storage.getStore()?.log?.flush()
     }
 }

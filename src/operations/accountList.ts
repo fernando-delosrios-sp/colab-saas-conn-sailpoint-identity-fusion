@@ -16,7 +16,6 @@ import { PipelineRunner } from './helpers/corePipeline'
  * 7. REPORT — Generate fusion report (conditional)
  */
 export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
-    ServiceRegistry.setCurrent(serviceRegistry)
     const { log } = serviceRegistry
     const tracker = new AggregationTracker()
 

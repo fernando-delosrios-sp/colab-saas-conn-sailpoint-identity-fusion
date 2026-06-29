@@ -1,4 +1,4 @@
-import { Account, IdentityDocument } from 'sailpoint-api-client'
+import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { isNewerThan } from '../utils/date'
 import { toSetFromAttribute as attributeToSet, getAccountStringAttribute, getAccountAttribute } from '../utils/attributes'
 import { FusionDecision } from './form'

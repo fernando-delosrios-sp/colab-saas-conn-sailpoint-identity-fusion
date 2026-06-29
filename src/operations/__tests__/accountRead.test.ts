@@ -1,5 +1,4 @@
 import { accountRead } from '../accountRead'
-import { ServiceRegistry } from '../../services/serviceRegistry'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 
@@ -16,11 +15,6 @@ function createRegistry() {
 }
 
 describe('accountRead', () => {
-    beforeEach(() => {
-        ServiceRegistry.clear()
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation(() => undefined)
-    })
-
     afterEach(() => {
         jest.restoreAllMocks()
         jest.clearAllMocks()

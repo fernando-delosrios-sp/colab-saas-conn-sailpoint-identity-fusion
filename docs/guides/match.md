@@ -38,11 +38,11 @@ Use Identity Fusion for Match when you face these challenges:
 
 ### Optional but useful
 
-| Option                                  | Configuration                                                          | Use case                                                                      |
-| --------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Access profiles for reviewers**       | Create access profile per source with reviewer entitlement             | Assign reviewers per source for targeted notifications                        |
-| **Fusion report access profile**        | Access profile with "Fusion report" entitlement                        | Allow specific users to view potential match reports                          |
-| **Automatic assignment**                  | **Attribute Matching Settings → Enable automatic assignment**          | Assign without manual review when the combined score meets the automatic assignment match score |
+| Option                            | Configuration                                                 | Use case                                                                                        |
+| --------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Access profiles for reviewers** | Create access profile per source with reviewer entitlement    | Assign reviewers per source for targeted notifications                                          |
+| **Fusion report access profile**  | Access profile with "Fusion report" entitlement               | Allow specific users to view potential match reports                                            |
+| **Automatic assignment**          | **Attribute Matching Settings → Enable automatic assignment** | Assign without manual review when the combined score meets the automatic assignment match score |
 
 **Screenshot placeholder:** High-level Match flow diagram.
 
@@ -129,11 +129,11 @@ Attribute Matching Settings control how potential matches are detected and revie
 
 Configure **Attribute Matching Settings → Matching Settings** to define match detection rules:
 
-| Field                                    | Purpose                                                  | Recommended value                                  |
-| ---------------------------------------- | -------------------------------------------------------- | -------------------------------------------------- |
-| **Manual review match score [0-100]** | Global floor for the weighted combined match score       | 80 (start); tune with false positive/negative rate |
-| **Enable automatic assignment** | Skip review when the combined score meets the automatic assignment match score | No initially; enable after tuning                  |
-| **Fusion attribute matches**             | List of identity attributes to compare                   | At least 2 attributes (e.g. name + email)          |
+| Field                                 | Purpose                                                                        | Recommended value                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------- |
+| **Manual review match score [0-100]** | Global floor for the weighted combined match score                             | 80 (start); tune with false positive/negative rate |
+| **Enable automatic assignment**       | Skip review when the combined score meets the automatic assignment match score | No initially; enable after tuning                  |
+| **Fusion attribute matches**          | List of identity attributes to compare                                         | At least 2 attributes (e.g. name + email)          |
 
 **Screenshot placeholder:** Attribute Matching Settings - Matching section.
 
@@ -145,13 +145,13 @@ Configure **Attribute Matching Settings → Matching Settings** to define match 
 
 For each attribute you want to use in match detection, add a **Fusion attribute match**:
 
-| Field                          | Purpose                                                        | Options / Example                                                                                                                               |
-| ------------------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Attribute**                  | Identity attribute name                                        | `name`, `email`, `displayName`, `firstname`, `lastname`                                                                                         |
-| **Matching algorithm**         | Similarity calculation method                                  | See [Matching algorithms](matching-algorithms.md) for details                                                                                   |
-| **Minimum similarity [0-100]** | Threshold for this rule; also its weight in the combined score | 75–85 (name); 90–100 (email). Higher values are stricter and count more in the blend.                                                           |
-| **Mandatory match?**           | Must meet this rule’s minimum for a potential match            | Yes for critical identifiers; passing mandatories still contribute weighted score like other rules.                                             |
-| **Skip match if missing**      | Skip when either value is missing                              | Default: Yes. Skipped rules do not affect the combined score. |
+| Field                               | Purpose                                                         | Options / Example                                                                                                                                |
+| ----------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Attribute**                       | Identity attribute name                                         | `name`, `email`, `displayName`, `firstname`, `lastname`                                                                                          |
+| **Matching algorithm**              | Similarity calculation method                                   | See [Matching algorithms](matching-algorithms.md) for details                                                                                    |
+| **Minimum similarity [0-100]**      | Threshold for this rule; also its weight in the combined score  | 75–85 (name); 90–100 (email). Higher values are stricter and count more in the blend.                                                            |
+| **Mandatory match?**                | Must meet this rule’s minimum for a potential match             | Yes for critical identifiers; passing mandatories still contribute weighted score like other rules.                                              |
+| **Skip match if missing**           | Skip when either value is missing                               | Default: Yes. Skipped rules do not affect the combined score.                                                                                    |
 | **Skip match if threshold not met** | Skip the rule when its computed similarity is below its minimum | Default: No (off). When enabled, below-threshold non-mandatory rules are excluded from the combined score; mandatory rules are always evaluated. |
 
 !!! tip "Example edge cases"
@@ -222,9 +222,9 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 
 ### Automatic assignment (thresholds)
 
-| Field                                    | Value | Effect                                                                     |
-| ---------------------------------------- | ----- | -------------------------------------------------------------------------- |
-| **Enable automatic assignment** | No    | All potential matches go to manual review                                  |
+| Field                           | Value | Effect                                                                         |
+| ------------------------------- | ----- | ------------------------------------------------------------------------------ |
+| **Enable automatic assignment** | No    | All potential matches go to manual review                                      |
 | **Enable automatic assignment** | Yes   | Threshold matches are assigned without review; borderline cases still reviewed |
 
 **When to enable automatic assignment:**
@@ -259,6 +259,7 @@ Configure **Attribute Matching Settings → Review Settings** for the manual rev
 ### Localization (i18n)
 
 The connector supports fully localized user communications. When **Enable localized user communications?** is toggled on:
+
 - All emails, reports, and Fusion review forms are translated to the recipient's preferred language.
 - Provide the **Identity Language Attribute** to instruct the connector on which identity attribute contains the user's language (e.g., `en`, `fr`).
 - You can specify a **Default Language** to be used when the recipient's language cannot be determined or the attribute is missing.
@@ -427,10 +428,10 @@ For each Fusion account (new or updated):
 
 For each potential match:
 
-| Condition                                                                                                                                             | Action                                                              |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Condition                                                                                            | Action                                                              |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | **Enable automatic assignment** = Yes, and **combined score** ≥ **Automatic assignment match score** | Skip review form; assign and apply (same as an authorized decision) |
-| Else                                                                                                                                                  | Create review form; notify reviewers                                |
+| Else                                                                                                 | Create review form; notify reviewers                                |
 
 **Step 5–6: Manual review**
 
@@ -467,13 +468,13 @@ On next aggregation:
 
 ### Initial tuning workflow
 
-| Phase                              | Action                                                                        | Goal                                           |
-| ---------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------- |
-| **1. Baseline**                    | Set conservative thresholds (e.g. name: 90, email: 95)                        | Low false positive rate; may miss some matches |
-| **2. Test run**                    | Run aggregation with small **Aggregation batch size** (e.g. 100–500 accounts) | Evaluate match quality                         |
-| **3. Review results**              | Check review forms: Are matches obvious? Many false positives?                | Calibrate                                      |
-| **4. Adjust**                      | Lower thresholds if missing matches; raise if too many false positives        | Fine-tune                                      |
-| **5. Full rollout**                | Remove **Aggregation batch size** limit; run on all accounts                  | Production                                     |
+| Phase                              | Action                                                                                           | Goal                                           |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| **1. Baseline**                    | Set conservative thresholds (e.g. name: 90, email: 95)                                           | Low false positive rate; may miss some matches |
+| **2. Test run**                    | Run aggregation with small **Aggregation batch size** (e.g. 100–500 accounts)                    | Evaluate match quality                         |
+| **3. Review results**              | Check review forms: Are matches obvious? Many false positives?                                   | Calibrate                                      |
+| **4. Adjust**                      | Lower thresholds if missing matches; raise if too many false positives                           | Fine-tune                                      |
+| **5. Full rollout**                | Remove **Aggregation batch size** limit; run on all accounts                                     | Production                                     |
 | **6. Enable automatic assignment** | Once confident, set an automatic assignment threshold and toggle **Enable automatic assignment** | Reduce manual burden                           |
 
 ### Monitoring and metrics

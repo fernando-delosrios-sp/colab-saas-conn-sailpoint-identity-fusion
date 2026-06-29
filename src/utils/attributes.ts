@@ -1,4 +1,4 @@
-import { Account } from 'sailpoint-api-client'
+import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { hasValue, isDefined, missing, readUnknown, trimStr } from './safeRead'
 
 /**
@@ -109,18 +109,13 @@ export function toLowerFirstChar(str: string | null | undefined): string {
 }
 
 /**
- * Converts the first character of a string to uppercase.
+ * Capitalizes the first letter of a string.
  * Returns the original string if empty or null.
  */
-export function toUpperFirstChar(str: string | null | undefined): string {
+export function capitalizeFirst(str: string | null | undefined): string {
     if (!str) return str ?? ''
     return str.charAt(0).toUpperCase() + str.slice(1)
 }
-
-/**
- * Alias for toUpperFirstChar - capitalizes the first letter of a string
- */
-export const capitalizeFirst = toUpperFirstChar
 
 // ============================================================================
 // Attribute Merging

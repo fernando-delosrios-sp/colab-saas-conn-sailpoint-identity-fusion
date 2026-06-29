@@ -1,5 +1,4 @@
 import { accountCreate } from '../accountCreate'
-import { ServiceRegistry } from '../../services/serviceRegistry'
 import { executeActions } from '../actions'
 
 jest.mock('../actions', () => ({
@@ -9,10 +8,6 @@ jest.mock('../actions', () => ({
 import { createRegistry } from './harness/registryMocking'
 
 describe('accountCreate', () => {
-    beforeEach(() => {
-        jest.spyOn(ServiceRegistry, 'setCurrent').mockImplementation(() => undefined)
-    })
-
     afterEach(() => {
         jest.restoreAllMocks()
         jest.clearAllMocks()

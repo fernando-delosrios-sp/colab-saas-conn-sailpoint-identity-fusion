@@ -11,7 +11,7 @@ import { SchemaService } from '../../schemaService'
 import { ServiceRegistry } from '../../serviceRegistry'
 import { FusionConfig } from '../../../model/config'
 import { StandardCommand } from '@sailpoint/connector-sdk'
-import { Account, IdentityDocument } from 'sailpoint-api-client'
+import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount } from '../../../model/account'
 import { hasValue, trimStr } from '../../../utils/safeRead'
 

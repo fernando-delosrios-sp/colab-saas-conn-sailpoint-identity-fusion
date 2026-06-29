@@ -4,7 +4,7 @@
     "main": "dist/index.js",
     "scripts": {
         "clean": "shx rm -rf ./dist",
-        "prebuild": "npm run clean && node scripts/sync-connector-spec-initial-values.cjs && shx mkdir -p dist/services/attributeService && shx cp src/services/attributeService/velocityPrototypeGuard.cjs dist/services/attributeService/velocityPrototypeGuard.cjs",
+        "prebuild": "npm run clean && node scripts/sync-connector-spec-initial-values.cjs",
         "build": "npx ncc build ./src/index.ts -o ./dist -m -C",
         "docs:install": "node scripts/docs-venv.cjs install",
         "docs:prepare": "node scripts/prepare-docs.cjs",
@@ -12,7 +12,6 @@
         "docs:build": "npm run docs:prepare && node scripts/docs-venv.cjs build",
         "docs:serve": "npm run docs:prepare && node scripts/docs-venv.cjs serve",
         "start": "spcx run dist/index.js $PORT",
-        "predebug": "shx mkdir -p dist/services/attributeService && shx cp src/services/attributeService/velocityPrototypeGuard.cjs dist/services/attributeService/velocityPrototypeGuard.cjs",
         "debug": "spcx run dist/index.js",
         "proxy": "concurrently \"cross-env spcx run dist/index.js\" \"wait-on tcp:3000 && npx tmole 3000\"",
         "log-server": "mkdir -p logs && LOG_FILE=logs/remote-logs-$(date +%Y%m%d).log node log-server.js 2>&1 | grep -v '\\[200 OK\\]\\|\\[201\\|\\[204\\|\\[404\\|\\[500'",
@@ -37,6 +36,7 @@
         "axios": "^1.15.2",
         "axios-retry": "^4.5.0",
         "double-metaphone": "^2.0.1",
+        "form-data": "^4.0.0",
         "handlebars": "^4.7.9",
         "jmespath": "^0.16.0",
         "libphonenumber-js": "^1.12.42",
@@ -79,14 +79,9 @@
         "singleQuote": true
     },
     "knip": {
-        "entry": [
-            "src/index.ts",
-            "scripts/**/*.{cjs,js}",
-            "log-server.js"
-        ],
-        "project": [
-            "src/**/*.ts"
-        ]
+        "entry": ["scripts/**/*.{cjs,js}"],
+        "project": ["src/**/*.ts"],
+        "ignoreBinaries": ["python3"]
     },
     "allowScripts": {
         "@fission-ai/openspec": true,

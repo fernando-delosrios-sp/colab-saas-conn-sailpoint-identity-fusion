@@ -1,9 +1,4 @@
-import {
-    CreateWorkflowRequestV2025,
-    WorkflowBodyOwnerV2025,
-    WorkflowDefinitionV2025,
-    WorkflowTriggerV2025,
-} from 'sailpoint-api-client'
+import { CreateWorkflowRequestV2025, WorkflowBodyOwnerV2025, WorkflowDefinitionV2025, WorkflowTriggerV2025 } from 'sailpoint-api-client'
 
 export class EmailWorkflow implements CreateWorkflowRequestV2025 {
     name: string

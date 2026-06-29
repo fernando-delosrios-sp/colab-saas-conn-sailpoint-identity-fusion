@@ -4,7 +4,6 @@ import {
     setAttributeValue,
     isValidAttributeValue,
     toLowerFirstChar,
-    toUpperFirstChar,
     capitalizeFirst,
     mergeAttributes,
     copyAttributes,
@@ -117,13 +116,13 @@ describe('attributes', () => {
         })
     })
 
-    describe('toUpperFirstChar / capitalizeFirst', () => {
+    describe('capitalizeFirst', () => {
         it('should uppercase first character', () => {
-            expect(toUpperFirstChar('hello')).toBe('Hello')
+            expect(capitalizeFirst('hello')).toBe('Hello')
         })
 
         it('should handle empty and null', () => {
-            expect(toUpperFirstChar('')).toBe('')
+            expect(capitalizeFirst('')).toBe('')
             expect(capitalizeFirst('test')).toBe('Test')
         })
     })

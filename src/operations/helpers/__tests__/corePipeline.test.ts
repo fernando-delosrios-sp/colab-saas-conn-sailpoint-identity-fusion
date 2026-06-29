@@ -186,7 +186,6 @@ describe('corePipeline setupPhase', () => {
         registry.sources.managedSources = []
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
-        registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
         registry.fusion.isReset = jest.fn().mockReturnValue(true)
         registry.forms.deleteExistingForms = jest.fn().mockResolvedValue(undefined)
         registry.fusion.disableReset = jest.fn().mockResolvedValue(undefined)
@@ -196,7 +195,7 @@ describe('corePipeline setupPhase', () => {
         const result = await setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })
 
         expect(result).toBe(false)
-        expect(registry.sources.setProcessLock).toHaveBeenCalled()
+        // setupPhase no longer acquires the process lock — that is hoisted to PipelineRunner.run
         expect(registry.forms.deleteExistingForms).toHaveBeenCalled()
         expect(registry.fusion.disableReset).toHaveBeenCalled()
         expect(registry.fusion.resetState).toHaveBeenCalled()
@@ -226,7 +225,6 @@ describe('corePipeline setupPhase', () => {
         registry.sources.managedSources = []
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
-        registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
         registry.fusion.isReset = jest.fn().mockReturnValue(false)
         registry.config = { forceAttributeRefresh: true, sources: [] }
         registry.fusion.disableForceAttributeRefresh = jest.fn().mockResolvedValue(undefined)
@@ -267,7 +265,6 @@ describe('corePipeline setupPhase', () => {
         registry.sources.managedSources = []
         registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
-        registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
         registry.fusion.isReset = jest.fn().mockReturnValue(false)
 
         const reverseSource = { name: 'reverseSrc', correlationMode: 'reverse', correlationAttribute: 'uid' }

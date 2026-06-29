@@ -831,7 +831,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
 
         // The second attempt should generate the second UUID without appending a counter
         expect(fusionAccount.attributes.id).toBe('prefix-22222222-2222-4222-a222-222222222222')
-        uuidSpy.mockRestore()
+        uuidSpy.mockImplementation(jest.requireActual('uuid').v4)
     })
 
     it('recalculates a new UUID on collision for unique expression with $UUID when useIncrementalCounter is true', async () => {
@@ -912,7 +912,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
 
         // The second attempt should generate the second UUID AND increment the counter
         expect(fusionAccount.attributes.id).toBe('prefix-22222222-2222-4222-a222-222222222222-2')
-        uuidSpy.mockRestore()
+        uuidSpy.mockImplementation(jest.requireActual('uuid').v4)
     })
 })
 

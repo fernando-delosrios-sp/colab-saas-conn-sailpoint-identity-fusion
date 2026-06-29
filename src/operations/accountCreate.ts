@@ -23,7 +23,6 @@ import { executeActions } from './actions'
  * @param input - SDK input containing the identity name and requested actions
  */
 export const accountCreate = async (serviceRegistry: ServiceRegistry, input: StdAccountCreateInput) => {
-    ServiceRegistry.setCurrent(serviceRegistry)
     const { log, identities, sources, schemas, fusion, attributes, res } = serviceRegistry
 
     let identityName: string | undefined

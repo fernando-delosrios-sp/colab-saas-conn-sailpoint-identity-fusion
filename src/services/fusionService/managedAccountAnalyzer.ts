@@ -1,4 +1,4 @@
-import { Account } from 'sailpoint-api-client'
+import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { SourceType } from '../../model/config'
 import { SourceInfo } from '../sourceService'
 import { coerceBoolean } from '../../utils/safeRead'

@@ -438,7 +438,7 @@ const USCity = {
     },
 }
 
-export const USState = {
+const usStateApi = {
     getStateByCodeAndCountry: (stateCode: string, countryCode: string) => {
         if (countryCode !== 'US') return undefined
         const state = getStateByCode(stateCode)
@@ -446,6 +446,6 @@ export const USState = {
     },
 }
 
-// Legacy exports for backwards compatibility
+// Legacy export for backwards compatibility
 export const City = USCity
-export const State = USState
+export const State = usStateApi

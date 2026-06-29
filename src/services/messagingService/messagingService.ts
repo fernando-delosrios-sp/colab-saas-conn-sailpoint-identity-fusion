@@ -1,10 +1,4 @@
-import {
-    FormInstanceResponseV2025,
-    WorkflowV2025,
-    TestWorkflowRequestV2025,
-    WorkflowsV2025ApiTestWorkflowRequest,
-    CreateWorkflowRequestV2025,
-} from 'sailpoint-api-client'
+import { FormInstanceResponseV2025, WorkflowV2025, TestWorkflowRequestV2025, WorkflowsV2025ApiTestWorkflowRequest, CreateWorkflowRequestV2025 } from 'sailpoint-api-client'
 import type { TemplateDelegate as HandlebarsTemplateDelegate } from 'handlebars'
 import { FusionConfig, SourceType } from '../../model/config'
 import { ClientService } from '../clientService'

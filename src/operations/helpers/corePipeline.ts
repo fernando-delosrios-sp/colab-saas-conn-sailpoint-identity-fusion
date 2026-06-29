@@ -55,10 +55,6 @@ export async function setupPhase(
         )
     }
 
-    if (isPersistent) {
-        await sources.setProcessLock()
-    }
-
     if (isReset) {
         log.info('Reset flag detected, disabling reset and exiting')
         if (isPersistent) {
@@ -415,11 +411,16 @@ export class PipelineRunner {
         }
 
         try {
-            // Phase 1: Setup
-            shouldContinue = await setupPhase(serviceRegistry, options.schema, pipelineOptions)
+            // Acquire the process lock at the orchestration layer so the finally block
+            // can release it deterministically even if setup throws. setupPhase must not
+            // acquire the lock itself; doing so fragments the lock lifecycle.
             if (isPersistent) {
+                await sources.setProcessLock()
                 processLockAcquired = true
             }
+
+            // Phase 1: Setup
+            shouldContinue = await setupPhase(serviceRegistry, options.schema, pipelineOptions)
             if (!shouldContinue) {
                 return { shouldContinue: false, timer }
             }

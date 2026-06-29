@@ -1,4 +1,4 @@
-import { Account } from 'sailpoint-api-client'
+import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { parseManagedAccountKey } from './managedAccountKey'
 import { trimStr } from '../utils/safeRead'
 

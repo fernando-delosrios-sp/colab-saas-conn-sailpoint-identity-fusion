@@ -22,7 +22,6 @@ import { ATTR_OPS_REFRESH } from '../services/attributeService/types'
  * @param input - SDK input containing the account identity to disable
  */
 export const accountDisable = async (serviceRegistry: ServiceRegistry, input: StdAccountDisableInput) => {
-    ServiceRegistry.setCurrent(serviceRegistry)
     const { log, fusion, sources, schemas, res, identities } = serviceRegistry
 
     try {
