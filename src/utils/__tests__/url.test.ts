@@ -11,6 +11,7 @@ import {
     removeTrailingSlash,
     ensureTrailingSlash,
     createUrlContext,
+    isHttpUrl,
 } from '../url'
 
 describe('url', () => {
@@ -136,5 +137,38 @@ describe('url', () => {
             expect(ctx.source('src1')).toBe(`${uiOrigin}/ui/a/admin/connections/sources/src1`)
             expect(ctx.account('acc1')).toBe(`${uiOrigin}/ui/a/admin/accounts/acc1`)
         })
+    })
+})
+
+describe('isHttpUrl', () => {
+    it('returns true for valid HTTP URLs', () => {
+        expect(isHttpUrl('http://example.com')).toBe(true)
+        expect(isHttpUrl('https://example.com')).toBe(true)
+        expect(isHttpUrl('http://127.0.0.1:8080')).toBe(true)
+    })
+
+    it('returns false for invalid schemas', () => {
+        expect(isHttpUrl('ftp://example.com')).toBe(false)
+        expect(isHttpUrl('file:///etc/passwd')).toBe(false)
+        expect(isHttpUrl('javascript:alert(1)')).toBe(false)
+        expect(isHttpUrl('data:text/html,<html>')).toBe(false)
+    })
+
+    it('returns false for empty or undefined', () => {
+        expect(isHttpUrl(undefined)).toBe(false)
+        expect(isHttpUrl('')).toBe(false)
+        expect(isHttpUrl('   ')).toBe(false)
+    })
+
+    it('returns false for URLs with whitespace prefixes or suffixes to prevent parser confusion', () => {
+        expect(isHttpUrl(' http://example.com')).toBe(false)
+        expect(isHttpUrl('\thttp://example.com')).toBe(false)
+        expect(isHttpUrl('http://example.com ')).toBe(false)
+    })
+
+    it('returns false for SSRF bypasses via Node URL parser edge cases', () => {
+        // Node URL allows file:// inside http: protocol but it's dangerous
+        expect(isHttpUrl('http:file:///etc/passwd')).toBe(false)
+        expect(isHttpUrl('https:javascript:alert(1)')).toBe(false)
     })
 })
