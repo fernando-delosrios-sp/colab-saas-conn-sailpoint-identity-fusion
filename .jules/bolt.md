@@ -61,3 +61,7 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+
+## 2026-06-29 - Avoid Array.from(set).find() for early exit iteration
+**Learning:** Using `Array.from(iterable).find()` inside getter methods like `getFusionSource` eagerly allocates an entire array before starting the search. This prevents early exits, negating the primary benefit of the find operation, and causes unnecessary heap allocations.
+**Action:** Replace `Array.from(iterable).find(fn)` with a direct `for...of` loop over the iterable, allowing it to short-circuit as soon as the condition is met and avoiding the memory allocation overhead.
