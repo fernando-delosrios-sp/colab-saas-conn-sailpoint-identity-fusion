@@ -1,5 +1,13 @@
 import { AttributeService } from '../attributeService'
+import * as uuid from 'uuid'
 
+jest.mock('uuid', () => {
+    const originalModule = jest.requireActual('uuid')
+    return {
+        ...originalModule,
+        v4: jest.fn().mockImplementation(originalModule.v4),
+    }
+})
 describe('AttributeService mapping targets for definition context', () => {
     const createService = () => {
         const config = {
@@ -742,6 +750,169 @@ describe('AttributeService template evaluation fallback behavior', () => {
         expect(uniqueDefinition.expression).toBe('$UUID')
         expect(typeof fusionAccount.attributes.id).toBe('string')
         expect(fusionAccount.attributes.id).toHaveLength(36)
+    })
+
+    it('recalculates a new UUID on collision for unique expression with $UUID', async () => {
+        const uniqueDefinition = {
+            name: 'id',
+            expression: 'prefix-$UUID',
+            useIncrementalCounter: false,
+            normalize: false,
+            spaces: false,
+            trim: true,
+        }
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [uniqueDefinition],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        // Force a collision by making the first generated UUID match an already registered one
+        const uuidSpy = jest.spyOn(uuid, 'v4')
+        let callCount1 = 0
+        uuidSpy.mockImplementation(((() => {
+            callCount1++
+            if (callCount1 === 1) return '11111111-1111-4111-a111-111111111111'
+            return '22222222-2222-4222-a222-222222222222'
+        }) as any))
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+        // Pre-register the first value to force a collision
+        service['getUniqueValues']('id').add('prefix-11111111-1111-4111-a111-111111111111')
+
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        // The second attempt should generate the second UUID without appending a counter
+        expect(fusionAccount.attributes.id).toBe('prefix-22222222-2222-4222-a222-222222222222')
+        uuidSpy.mockRestore()
+    })
+
+    it('recalculates a new UUID on collision for unique expression with $UUID when useIncrementalCounter is true', async () => {
+        const uniqueDefinition = {
+            name: 'id',
+            expression: 'prefix-${UUID}-${counter}',
+            useIncrementalCounter: true,
+            normalize: false,
+            spaces: false,
+            trim: true,
+        }
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [uniqueDefinition],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        const uuidSpy = jest.spyOn(uuid, 'v4')
+        let callCount2 = 0
+        uuidSpy.mockImplementation(((() => {
+            callCount2++
+            const val = callCount2 === 1 ? '11111111-1111-4111-a111-111111111111' : '22222222-2222-4222-a222-222222222222'
+            return val
+        }) as any))
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+        service['getUniqueValues']('id').add('prefix-11111111-1111-4111-a111-111111111111-1')
+
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        await service.initializeCounters()
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        // The second attempt should generate the second UUID AND increment the counter
+        expect(fusionAccount.attributes.id).toBe('prefix-22222222-2222-4222-a222-222222222222-2')
+        uuidSpy.mockRestore()
     })
 })
 
