@@ -419,24 +419,10 @@ export function getStateByName(name: string): USState | undefined {
 }
 
 /**
- * Get cities by name
- */
-function getCitiesByName(name: string): USCity[] {
-    return citiesByName.get(name.toLowerCase()) || []
-}
-
-/**
  * Get all US cities (returns the cached array)
  */
 function getAllCities(): USCity[] {
     return US_CITIES
-}
-
-/**
- * Get all US states
- */
-function getAllStates(): USState[] {
-    return US_STATES
 }
 
 /**

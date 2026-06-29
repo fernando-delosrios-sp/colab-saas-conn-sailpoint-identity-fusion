@@ -8,8 +8,6 @@ export const connectorSpecInitialValues = {
     identityScopeQuery: '*',
 } as const
 
-const runtimeDefaults = {} as const
-
 export function readSettings(raw: Record<string, unknown>): ScopeSection {
     return {
         includeIdentities: (raw.includeIdentities as boolean | undefined) ?? connectorSpecInitialValues.includeIdentities,

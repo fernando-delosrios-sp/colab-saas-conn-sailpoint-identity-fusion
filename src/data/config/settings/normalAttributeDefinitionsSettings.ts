@@ -9,8 +9,6 @@ export const connectorSpecInitialValues = {
     force: false,
 } as const
 
-const runtimeDefaults = {} as const
-
 export function readSettings(raw: Record<string, unknown>): NormalAttributeDefinitionSettingsSection {
     return {
         normalAttributeDefinitions: (raw.normalAttributeDefinitions as NormalAttributeDefinition[]) ?? [],

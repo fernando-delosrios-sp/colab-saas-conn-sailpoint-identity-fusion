@@ -1,7 +1,7 @@
 import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
 import { defaults } from '../../data/config'
-import { createBatchProgressLogger, forEachBatched, promiseAllBatched, yieldToEventLoop } from './collections'
+import { createBatchProgressLogger, promiseAllBatched, yieldToEventLoop } from './collections'
 
 /**
  * Batching policy and execution helpers for fusion processing.

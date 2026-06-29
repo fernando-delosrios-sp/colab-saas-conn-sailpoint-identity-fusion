@@ -565,13 +565,6 @@ export type FusionReviewEmailData = {
     locale?: string
 }
 
-type EditRequestEmailData = {
-    accountName: string
-    accountSource: string
-    accountAttributes: Record<string, any>
-    formInstanceId?: string
-}
-
 export type FusionReportEmailData = {
     reportTitle: string
     /** Tenant host and fusion source, e.g. "acme.identitynow.com - My Fusion Source" */
@@ -672,23 +665,6 @@ export const renderFusionReviewEmail = (
     if (!template) {
         throw new ConnectorError(
             'Fusion review email template not found. Email templates may not have been compiled correctly.',
-            ConnectorErrorType.Generic
-        )
-    }
-    return template(data)
-}
-
-/**
- * Render edit request email template
- */
-const renderEditRequestEmail = (
-    templates: Map<string, HandlebarsTemplateDelegate>,
-    data: EditRequestEmailData
-): string => {
-    const template = templates.get('edit-request')
-    if (!template) {
-        throw new ConnectorError(
-            'Edit request email template not found. Email templates may not have been compiled correctly.',
             ConnectorErrorType.Generic
         )
     }

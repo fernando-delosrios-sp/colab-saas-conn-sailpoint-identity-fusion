@@ -5,7 +5,7 @@ import jsdoc from 'eslint-plugin-jsdoc'
 
 export default [
     {
-        ignores: ['dist/', 'site/', 'scripts/', 'log-server.js', 'babel.config.cjs', 'jest.config.js'],
+        ignores: ['dist/', 'site/', 'babel.config.cjs', 'jest.config.js'],
     },
     { files: ['**/*.{js,mjs,cjs,ts}'] },
     { languageOptions: { globals: globals.node } },
@@ -16,9 +16,9 @@ export default [
         rules: {
             'no-unused-labels': 'off',
             'no-unused-vars': 'off',
-            '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+            '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
             'no-explicit-any': 'off',
-            '@typescript-eslint/no-explicit-any': 'warn',
+            '@typescript-eslint/no-explicit-any': 'error',
             'no-case-declarations': 'error',
             'jsdoc/require-jsdoc': 'off',
             'jsdoc/require-param': 'off',
@@ -35,7 +35,7 @@ export default [
     },
     // CommonJS entrypoints and test utilities use require(); keep TypeScript sources on ESM/import style.
     {
-        files: ['**/*.cjs', 'test-data/**/*.js'],
+        files: ['**/*.cjs', 'test-data/**/*.js', 'log-server.js', 'scripts/**/*.js'],
         rules: {
             '@typescript-eslint/no-require-imports': 'off',
         },

@@ -52,53 +52,6 @@ export function normalizeEmailValue(value: unknown): string[] {
     return []
 }
 
-/**
- * Extracts email addresses from an identity's attributes.
- * Checks common email attribute names: email, mail, emailAddress.
- *
- * @param attributes - The identity attributes object
- * @returns Array of unique email addresses
- */
-function extractEmailsFromAttributes(attributes: Record<string, any> | undefined): string[] {
-    if (!attributes) return []
-
-    const emails = new Set<string>()
-
-    // Check common email attribute names
-    const emailKeys = ['email', 'mail', 'emailAddress', 'Email', 'Mail', 'EmailAddress']
-    for (const key of emailKeys) {
-        if (key in attributes) {
-            const normalized = normalizeEmailValue(attributes[key])
-            normalized.forEach((email) => emails.add(email))
-        }
-    }
-
-    return Array.from(emails)
-}
-
-// ============================================================================
-// Email Validation
-// ============================================================================
-
-/**
- * Basic email format validation using a simple regex.
- * This is not a comprehensive validation but catches obvious issues.
- */
-function isValidEmailFormat(email: string | undefined): boolean {
-    if (!email) return false
-
-    // Basic email regex - checks for presence of @ and proper structure
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email.trim())
-}
-
-/**
- * Filters an array of strings to only include valid email addresses.
- */
-function filterValidEmails(emails: string[]): string[] {
-    return emails.filter(isValidEmailFormat)
-}
-
 // ============================================================================
 // Email Recipients
 // ============================================================================
@@ -133,34 +86,4 @@ export function sanitizeRecipients(recipients: (string | undefined | null)[]): s
     }
 
     return result
-}
-
-/**
- * Merges multiple email sources into a single array of unique values.
- * Useful when gathering recipients from multiple sources.
- */
-function mergeEmailSources(...sources: (string | string[] | undefined | null)[]): string[] {
-    const emails = new Set<string>()
-
-    for (const source of sources) {
-        if (!source) continue
-
-        if (typeof source === 'string') {
-            const trimmed = source.trim()
-            if (trimmed.length > 0) {
-                emails.add(trimmed)
-            }
-        } else if (Array.isArray(source)) {
-            for (const email of source) {
-                if (typeof email === 'string') {
-                    const trimmed = email.trim()
-                    if (trimmed.length > 0) {
-                        emails.add(trimmed)
-                    }
-                }
-            }
-        }
-    }
-
-    return Array.from(emails)
 }
