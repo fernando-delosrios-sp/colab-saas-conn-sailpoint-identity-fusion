@@ -18,49 +18,8 @@ import {
 export function createRetriesConfig(retries?: number): IAxiosRetryConfig {
     return {
         retries: retries ?? DEFAULT_RETRIES,
-        retryDelay: (retryCount, error) => {
-            // Handle 429 rate limiting with retry-after header
-            if (error?.response?.status === 429) {
-                const retryAfter = error.response.headers?.['retry-after']
-                if (retryAfter) {
-                    const delay = parseInt(retryAfter, 10)
-                    if (!isNaN(delay)) {
-                        return delay * 1000 // Convert to milliseconds
-                    }
-                }
-            }
-
-            // Exponential backoff with jitter for other retryable errors
-            const exponentialDelay = BASE_RETRY_DELAY_MS * Math.pow(2, retryCount)
-            const jitter = Math.random() * RETRY_JITTER_FACTOR * exponentialDelay
-            return Math.min(exponentialDelay + jitter, MAX_RETRY_DELAY_MS)
-        },
-        retryCondition: (error) => {
-            if (!error) return false
-
-            // Network errors
-            if (axiosRetry.isNetworkError(error) || axiosRetry.isRetryableError(error)) {
-                return true
-            }
-
-            // Rate limiting (429)
-            if (error.response?.status === 429) {
-                return true
-            }
-
-            // Server errors (5xx)
-            const status = error.response?.status
-            if (status && status >= 500 && status < 600) {
-                return true
-            }
-
-            // Timeout errors
-            if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-                return true
-            }
-
-            return false
-        },
+        retryDelay: calculateRetryDelay,
+        retryCondition: shouldRetry,
         onRetry: (retryCount, error, requestConfig) => {
             const url = requestConfig.url || 'unknown'
             const status = error?.response?.status || error?.code || 'unknown'
@@ -116,6 +75,33 @@ export function shouldRetry(error: unknown): boolean {
     return false
 }
 
+const IMF_FIXDATE_REGEX = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/
+
+/**
+ * Parse a Retry-After header value into milliseconds.
+ * Accepts integer seconds or an IMF-fixdate HTTP-date.
+ * Returns undefined for invalid or unsupported values.
+ */
+function parseRetryAfter(value: string, nowMs: number): number | undefined {
+    const trimmed = value.trim()
+    if (trimmed === '') return undefined
+
+    // Non-negative integer seconds
+    if (/^\d+$/.test(trimmed)) {
+        return parseInt(trimmed, 10) * 1000
+    }
+
+    // Strict IMF-fixdate: Day, DD Mon YYYY HH:MM:SS GMT
+    if (IMF_FIXDATE_REGEX.test(trimmed)) {
+        const dateMs = Date.parse(trimmed)
+        if (!isNaN(dateMs)) {
+            return Math.max(0, dateMs - nowMs)
+        }
+    }
+
+    return undefined
+}
+
 /**
  * Calculate retry delay with exponential backoff and respect for retry-after headers.
  * For 429 responses, uses the retry-after header with jitter.
@@ -127,12 +113,10 @@ export function calculateRetryDelay(retryCount: number, error: unknown): number 
     if (err.response?.status === 429) {
         const retryAfter = err.response.headers?.['retry-after']
         if (retryAfter) {
-            const delay = parseInt(retryAfter, 10)
-            if (!isNaN(delay)) {
-                const baseDelay = delay * 1000 // Convert to milliseconds
-                // Add jitter to prevent thundering herd
-                const jitter = Math.random() * RATE_LIMIT_JITTER_FACTOR * baseDelay
-                return baseDelay + jitter
+            const delay = parseRetryAfter(retryAfter, Date.now())
+            if (delay !== undefined) {
+                const jitter = Math.random() * RATE_LIMIT_JITTER_FACTOR * delay
+                return delay + jitter
             }
         }
     }

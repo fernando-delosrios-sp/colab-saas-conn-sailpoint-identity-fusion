@@ -150,12 +150,12 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 
 ### Configuration overview
 
-| Category                  | Fields                                                     | Purpose                               |
-| ------------------------- | ---------------------------------------------------------- | ------------------------------------- |
-| **Provisioning & timing** | Provisioning timeout, Processing wait time                 | Max wait times for operations         |
-| **Queue**                 | Max concurrent requests, Requests per second | Rate limiting and concurrency control |
-| **Retry**                 | Enable retry, API request retries, Retry delay             | Automatic retry for failed requests   |
-| **Batch sizing**          | Batch size                                                 | Tune page size and throughput balance |
+| Category                  | Fields                                         | Purpose                               |
+| ------------------------- | ---------------------------------------------- | ------------------------------------- |
+| **Provisioning & timing** | Provisioning timeout, Processing wait time     | Max wait times for operations         |
+| **Queue**                 | Max concurrent requests, Requests per second   | Rate limiting and concurrency control |
+| **Retry**                 | API request retries                            | Automatic retry for failed requests   |
+| **Batch sizing**          | Batch size                                     | Tune page size and throughput balance |
 
 **Screenshot placeholder:** Advanced Connection Settings interface.
 
@@ -187,22 +187,22 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 
 ### Queue (rate limiting and concurrency)
 
-Queue management provides rate limiting and concurrency control.
+Queue management is always enabled and provides rate limiting and concurrency control.
 
 | Field                           | Default | Range   | Purpose                    |
 | ------------------------------- | ------- | ------- | -------------------------- |
 | **Maximum concurrent requests** | 10      | 1–10    | Max simultaneous API calls |
 | **Requests per second**         | 10      | 1–12    | Rate limit (throttle)      |
 
-**When to enable queue:**
+**When to adjust queue settings:**
 
-| Scenario                        | Enable?  | Configuration                        |
-| ------------------------------- | -------- | ------------------------------------ |
-| Production (>500 accounts)      | Yes      | Max concurrent: 10; RPS: 10          |
-| Large dataset (>5,000 accounts) | Yes      | Start at max concurrent: 10; RPS: 10 |
-| ISC API rate limits             | Yes      | RPS ≤ ISC limit; enable retry        |
-| HTTP 429 errors                 | Yes      | Lower RPS; enable retry              |
-| Testing/development             | Optional | Default settings usually fine        |
+| Scenario                        | Configuration                        |
+| ------------------------------- | ------------------------------------ |
+| Production (>500 accounts)      | Max concurrent: 10; RPS: 10          |
+| Large dataset (>5,000 accounts) | Start at max concurrent: 10; RPS: 10 |
+| ISC API rate limits             | RPS ≤ ISC limit                      |
+| HTTP 429 errors                 | Lower RPS                            |
+| Testing/development             | Default settings usually fine        |
 
 **Tuning guidelines:**
 
@@ -222,7 +222,6 @@ The **Requests per second** field also appears in **Connection Settings**. They 
 **Queue behavior:**
 
 ```
-Queue enabled:
 1. API request added to queue
 2. Queue checks:
    - Current concurrent requests < max?
@@ -234,54 +233,52 @@ Queue enabled:
 
 ### Retry
 
-**Enable retry?** = Yes activates automatic retry logic for failed API requests.
+Automatic retry is always enabled for failed API requests.
 
-| Field                          | Default           | Range     | Purpose                        |
-| ------------------------------ | ----------------- | --------- | ------------------------------ |
-| **Enable retry?**              | Yes (recommended) | Boolean   | Activates retry logic          |
-| **API request retries**        | 20                | 0–20      | Max retry attempts per request |
-| **Retry delay (milliseconds)** | 1000              | 100–10000 | Base delay between retries     |
+| Field                   | Default | Range | Purpose                        |
+| ----------------------- | ------- | ----- | ------------------------------ |
+| **API request retries** | 20      | 0–20  | Max retry attempts per request |
 
-**When to enable retry:**
+**When retry helps:**
 
-| Scenario                  | Enable?  | Configuration                              |
-| ------------------------- | -------- | ------------------------------------------ |
-| Production                | **Yes**  | Retries: 20; Delay: 1000                   |
-| Transient network issues  | **Yes**  | Handles temporary failures                 |
-| ISC API rate limits (429) | **Yes**  | Automatic backoff; uses Retry-After header |
-| Testing/development       | Optional | Helps during setup                         |
+| Scenario                  | Configuration                              |
+| ------------------------- | ------------------------------------------ |
+| Production                | Retries: 20                                |
+| Transient network issues  | Handles temporary failures                 |
+| ISC API rate limits (429) | Automatic backoff; uses Retry-After header |
+| Testing/development       | Default settings usually fine              |
 
 **Retry behavior:**
 
 ```
 Standard retry:
 1. Request fails (network error, 5xx, etc.)
-2. Wait: Retry delay (base)
+2. Wait: base delay with exponential backoff
 3. Retry #1
-4. If fails: wait (retry delay)
+4. If fails: wait (longer backoff)
 5. Retry #2
 6. ...continue up to max retries
 
 HTTP 429 retry (rate limit):
 1. Request fails with HTTP 429
 2. Check Retry-After header
-3. Wait: max(Retry-After, retry delay)
+3. Wait: Retry-After (with jitter)
 4. Retry
 5. Continue up to max retries
 ```
 
 **Tuning guidelines:**
 
-| Symptom                     | Adjustment                           |
-| --------------------------- | ------------------------------------ |
-| Transient failures          | Enable retry; 10–20 retries          |
-| Frequent HTTP 429           | Enable retry; 20+ retries; lower RPS |
-| Long-duration failures      | Increase retry delay (2000–5000ms)   |
-| Quick failures (auth, etc.) | Lower retry count (5–10)             |
+| Symptom                     | Adjustment                  |
+| --------------------------- | --------------------------- |
+| Transient failures          | 10–20 retries               |
+| Frequent HTTP 429           | 20+ retries; lower RPS      |
+| Long-duration failures      | Increase retry count        |
+| Quick failures (auth, etc.) | Lower retry count (5–10)    |
 
 !!! note
 
-    Retry delay is the **base** delay. For HTTP 429, the connector uses the `Retry-After` header from the API response, which may be longer.
+    The retry delay uses exponential backoff with a 1000 ms base. For HTTP 429, the connector uses the `Retry-After` header from the API response, which may be longer.
 
 ### Batch size
 
@@ -317,10 +314,8 @@ Developer Settings:
 Advanced Connection Settings:
 - Provisioning timeout: 600 seconds
 - Max concurrent requests: 15
-- Enable retry: Yes
 - API request retries: 20
 - Requests per second: 10
-- Retry delay: 1000ms
 - Batch size: 250
 ```
 
@@ -339,10 +334,8 @@ Advanced Connection Settings:
 Advanced Connection Settings:
 - Provisioning timeout: 1800 seconds (30 min)
 - Max concurrent requests: 10
-- Enable retry: Yes
 - API request retries: 20
 - Requests per second: 10
-- Retry delay: 2000ms
 - Batch size: 250
 ```
 
@@ -360,10 +353,8 @@ Advanced Connection Settings:
 ```
 Advanced Connection Settings:
 - Max concurrent requests: 5
-- Enable retry: Yes
 - API request retries: 20
 - Requests per second: 5
-- Retry delay: 3000ms
 - Batch size: 100
 ```
 
@@ -384,9 +375,7 @@ Developer Settings:
 
 Advanced Connection Settings:
 - Provisioning timeout: 300
-- Enable retry: Yes
 - API request retries: 10
-- Retry delay: 1000ms
 - Batch size: 100
 ```
 
@@ -444,7 +433,7 @@ Advanced Connection Settings:
 
 | Issue                           | Possible cause                         | Solution                                                     |
 | ------------------------------- | -------------------------------------- | ------------------------------------------------------------ |
-| **HTTP 429 (rate limit)**       | RPS too high                           | Lower RPS; ensure retry enabled                              |
+| **HTTP 429 (rate limit)**       | RPS too high                           | Lower RPS; retry is automatic                                |
 | **Aggregation timeout**         | Provisioning timeout too low; slow API | Increase timeout; check ISC performance                      |
 | **Slow aggregation**            | Low concurrency; suboptimal page size  | Increase max concurrent requests; tune batch size            |
 | **Accounts stuck processing**   | Timeout; unfinished run                | Increase timeout; retry aggregation (auto-resets stuck flag) |
@@ -475,14 +464,14 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 | ------------------------- | ------------------------------------- | --------------------------------------- |
 | **Developer Settings**    | Reset accounts, External logging      | Testing, troubleshooting, monitoring    |
 | **Provisioning & timing** | Provisioning timeout, Processing wait | Operation timeouts                      |
-| **Queue**                 | Max concurrent, RPS     | Rate limiting, concurrency control      |
-| **Retry**                 | Enable retry, Retries, Delay          | Resilience, handling transient failures |
+| **Queue**                 | Max concurrent, RPS                   | Rate limiting, concurrency control      |
+| **Retry**                 | API request retries                   | Resilience, handling transient failures |
 | **Batch sizing**          | Batch size                            | Throughput and payload-size tuning      |
 
 **Best practices:**
 
-1. **Production:** Enable retry, tune batch size, configure external logging
-2. **Rate limits:** Lower RPS and concurrency; enable retry with longer delay
+1. **Production:** Tune retries and batch size, configure external logging
+2. **Rate limits:** Lower RPS and concurrency; retries are automatic
 3. **Performance:** Increase concurrency and batch size (within rate limits)
 4. **Testing:** Use Debug logging; enable reset once then disable
 5. **Monitoring:** Track metrics; adjust based on observed behavior

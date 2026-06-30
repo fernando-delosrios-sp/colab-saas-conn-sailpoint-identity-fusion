@@ -32,18 +32,11 @@ export class SdkApiAdapter implements IscApiAdapter {
     ) {
         const tokenUrl = new URL(fusionConfig.baseurl).origin + fusionConfig.tokenUrlPath
 
-        // Determine if queue and retry are enabled
-        const enableQueue = fusionConfig.enableQueue ?? false
-        const enableRetry = fusionConfig.enableRetry ?? false
-
-        // Only enable retry in axios config if enableRetry is true
-        const maxRetries = enableRetry ? (fusionConfig.maxRetries ?? fusionConfig.retriesConstant) : 0
-        // When the queue is enabled it acts as the sole retry authority (exponential backoff + jitter
-        // via calculateRetryDelay). Enabling axios-retry at the same time would cause a single failed
-        // request to be retried by axios first and then retried again by the queue after axios
-        // exhausts its own budget — multiplying the effective retry count unexpectedly.
-        const axiosRetries = enableQueue && enableRetry ? 0 : maxRetries
-        const retriesConfig = createRetriesConfig(axiosRetries)
+        // The API queue is always enabled and acts as the sole retry authority (exponential backoff
+        // + jitter via calculateRetryDelay). Enabling axios-retry at the same time would cause a
+        // single failed request to be retried by axios first and then retried again by the queue
+        // after axios exhausts its own budget — multiplying the effective retry count unexpectedly.
+        const retriesConfig = createRetriesConfig(0)
 
         // Inject https agent with keepAlive: true to reuse TCP connections
         const agent = new https.Agent({ keepAlive: true })

@@ -369,24 +369,14 @@ export interface AdvancedConnectionSettingsSection {
     provisioningTimeout?: number
 
     /**
-     * Enable queue management for API requests.
-     */
-    enableQueue: boolean
-
-    /**
-     * Enable retry logic for failed API requests.
-     */
-    enableRetry: boolean
-
-    /**
      * The number of times to retry a failed API request.
-     * Only used when retry is enabled. Configured in Advanced Connection Settings.
+     * Configured in Advanced Connection Settings.
      */
     maxRetries?: number
 
     /**
      * Maximum number of requests to send per second (throttling).
-     * Only used when queue is enabled. Configured in Advanced Connection Settings.
+     * Configured in Advanced Connection Settings.
      */
     requestsPerSecond?: number
 
@@ -405,26 +395,19 @@ export interface AdvancedConnectionSettingsSection {
     processingWait?: number
 
     /**
-     * Base delay (in milliseconds) between retry attempts for failed requests.
-     * For HTTP 429 responses, the retry delay is automatically calculated from the retry-after header.
-     */
-    retryDelay?: number
-
-    /**
      * Number of requests to include in a single processing batch.
      */
     batchSize?: number
 
     /**
      * Enable priority processing in the queue, allowing more important requests to be handled first.
-     * Enabled by default when queue is enabled.
      */
     enablePriority?: boolean
 
     /**
      * Number of pages to fetch concurrently inside paginateParallel.
-     * Defaults to 8 when unset. When the queue is enabled the effective value is
-     * capped at maxConcurrentRequests so it never exceeds the queue's concurrency budget.
+     * Defaults to 8 when unset. The effective value is capped at maxConcurrentRequests
+     * so it never exceeds the queue's concurrency budget.
      */
     parallelBatchSize?: number
 }
