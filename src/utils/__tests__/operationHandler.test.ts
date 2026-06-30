@@ -6,12 +6,16 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 jest.mock('../../services/serviceRegistry', () => {
     return {
         ServiceRegistry: Object.assign(
-            jest.fn().mockImplementation((_config, _context, _res, _operationName) => {
+            jest.fn().mockImplementation((_config, _context, res, _operationName) => {
                 return {
+                    res,
                     proxy: {
                         isProxyService: jest.fn().mockReturnValue(false),
                         isProxyMode: jest.fn().mockReturnValue(false),
-                        execute: jest.fn().mockResolvedValue(undefined),
+                        execute: jest.fn().mockImplementation(() => {
+                            res.send()
+                            return Promise.resolve(undefined)
+                        }),
                     },
                 }
             }),
@@ -50,10 +54,13 @@ describe('createOperationHandler', () => {
         jest.clearAllMocks()
         jest.useFakeTimers()
 
-        defaultFn = jest.fn().mockResolvedValue(undefined)
+        defaultFn = jest.fn().mockImplementation((serviceRegistry: any) => {
+            serviceRegistry.res.send()
+            return Promise.resolve(undefined)
+        })
         context = {}
         input = { data: 'testInput' }
-        res = { keepAlive: jest.fn() }
+        res = { keepAlive: jest.fn(), send: jest.fn(), error: jest.fn() }
     })
 
     afterEach(() => {
@@ -72,7 +79,10 @@ describe('createOperationHandler', () => {
         })
 
         it('should run in Custom mode when custom operation exists in context', async () => {
-            context[operationName] = jest.fn().mockResolvedValue(undefined)
+            context[operationName] = jest.fn().mockImplementation((serviceRegistry: any) => {
+                serviceRegistry.res.send()
+                return Promise.resolve(undefined)
+            })
             const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
             await handler(context, input, res)
 
@@ -82,11 +92,15 @@ describe('createOperationHandler', () => {
         })
 
         it('should run in Proxy mode when proxy client', async () => {
-            ;(ServiceRegistry as any).mockImplementationOnce(() => ({
+            ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
+                res,
                 proxy: {
                     isProxyService: jest.fn().mockReturnValue(false),
                     isProxyMode: jest.fn().mockReturnValue(true),
-                    execute: jest.fn().mockResolvedValue(undefined),
+                    execute: jest.fn().mockImplementation(() => {
+                        res.send()
+                        return Promise.resolve(undefined)
+                    }),
                 },
             }))
 
@@ -110,9 +124,13 @@ describe('createOperationHandler', () => {
         })
 
         it('should start simple keepAlive interval', async () => {
+            let resolveRegistry: any
             let resolveFn: () => void
             const longPromise = new Promise<void>((resolve) => {
-                resolveFn = resolve
+                resolveFn = () => {
+                    resolveRegistry.res.send()
+                    resolve()
+                }
             })
             defaultFn.mockReturnValue(longPromise)
 
@@ -120,6 +138,7 @@ describe('createOperationHandler', () => {
             const handler = createOperationHandler(operationName, defaultFn, mockConfig, options)
 
             const promise = handler(context, input, res)
+            resolveRegistry = (ServiceRegistry as any).mock.results[(ServiceRegistry as any).mock.results.length - 1].value
 
             // Wait for interval to be set up
             await Promise.resolve()
@@ -140,9 +159,13 @@ describe('createOperationHandler', () => {
         })
 
         it('should start memory keepAlive interval', async () => {
+            let resolveRegistry: any
             let resolveFn: () => void
             const longPromise = new Promise<void>((resolve) => {
-                resolveFn = resolve
+                resolveFn = () => {
+                    resolveRegistry.res.send()
+                    resolve()
+                }
             })
             defaultFn.mockReturnValue(longPromise)
 
@@ -150,6 +173,7 @@ describe('createOperationHandler', () => {
             const handler = createOperationHandler(operationName, defaultFn, mockConfig, options)
 
             const promise = handler(context, input, res)
+            resolveRegistry = (ServiceRegistry as any).mock.results[(ServiceRegistry as any).mock.results.length - 1].value
 
             await Promise.resolve()
 
@@ -161,12 +185,14 @@ describe('createOperationHandler', () => {
         })
 
         it('should not start simple keepAlive if run mode is Proxy', async () => {
-            ;(ServiceRegistry as any).mockImplementationOnce(() => ({
+            ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
+                res,
                 proxy: {
                     isProxyService: jest.fn().mockReturnValue(false),
                     isProxyMode: jest.fn().mockReturnValue(true),
                     execute: jest.fn().mockImplementation(async () => {
                         jest.advanceTimersByTime(1500)
+                        res.send()
                     }),
                 },
             }))
@@ -183,16 +209,21 @@ describe('createOperationHandler', () => {
         })
 
         it('should not start memory keepAlive if proxy server', async () => {
-            ;(ServiceRegistry as any).mockImplementationOnce(() => ({
+            ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
+                res,
                 proxy: {
                     isProxyService: jest.fn().mockReturnValue(true),
                     isProxyMode: jest.fn().mockReturnValue(false),
-                    execute: jest.fn().mockResolvedValue(undefined),
+                    execute: jest.fn().mockImplementation(() => {
+                        res.send()
+                        return Promise.resolve(undefined)
+                    }),
                 },
             }))
 
-            defaultFn.mockImplementation(async () => {
+            defaultFn.mockImplementation(async (serviceRegistry: any) => {
                 jest.advanceTimersByTime(1500)
+                serviceRegistry.res.send()
             })
 
             const options: OperationHandlerOptions = { ...defaultOptions, keepAlive: 'memory' }
@@ -271,6 +302,49 @@ describe('createOperationHandler', () => {
             const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
 
             await expect(handler(context, input, res)).rejects.toThrow()
+        })
+    })
+
+    describe('Response Guarantee', () => {
+        it('should throw ConnectorError when default operation forgets to respond', async () => {
+            defaultFn.mockResolvedValue(undefined)
+
+            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+
+            await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
+            await expect(handler(context, input, res)).rejects.toHaveProperty(
+                'message',
+                'Operation finished without calling res.send() or res.error()'
+            )
+        })
+
+        it('should throw ConnectorError when custom operation forgets to respond', async () => {
+            context[operationName] = jest.fn().mockResolvedValue(undefined)
+
+            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+
+            await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
+            await expect(handler(context, input, res)).rejects.toHaveProperty(
+                'message',
+                'Operation finished without calling res.send() or res.error()'
+            )
+        })
+
+        it('should complete normally when operation calls res.send()', async () => {
+            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+
+            await expect(handler(context, input, res)).resolves.toBeUndefined()
+            expect(res.send).toHaveBeenCalledTimes(1)
+        })
+
+        it('should not mask an original ConnectorError thrown before responding', async () => {
+            const connectorError = new ConnectorError('Original error', ConnectorErrorType.NotFound)
+            defaultFn.mockRejectedValue(connectorError)
+
+            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+
+            await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
+            await expect(handler(context, input, res)).rejects.toHaveProperty('message', 'Original error')
         })
     })
 })
