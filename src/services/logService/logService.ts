@@ -2,6 +2,7 @@ import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector
 import { ApiQueue } from '../clientService/queue'
 import { QueuePriority } from '../clientService/types'
 import { getCallerInfo } from './helpers'
+import { isValidHttpUrl } from '../../utils/url'
 
 export { getCallerInfo } from './helpers'
 
@@ -287,7 +288,7 @@ export class LogService {
         }
 
         const url = this.externalLoggingUrl
-        if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
+        if (!isValidHttpUrl(url)) {
             return
         }
         const doFetch = () =>
@@ -299,7 +300,15 @@ export class LogService {
             }).then(() => {})
 
         const pending: Promise<void> = (
-            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW, label: 'LogService>sendExternalLog', noRetry: true }).then(() => {}) : doFetch()
+            this.apiQueue
+                ? this.apiQueue
+                      .enqueue(doFetch, {
+                          priority: QueuePriority.LOW,
+                          label: 'LogService>sendExternalLog',
+                          noRetry: true,
+                      })
+                      .then(() => {})
+                : doFetch()
         )
             .catch(() => {})
             .finally(() => {
@@ -518,7 +527,12 @@ export class LogService {
      */
     metric(name: string, startedAt: number, data?: Record<string, any>): void {
         const durationMs = Date.now() - startedAt
-        const dataStr = data ? ' ' + Object.entries(data).map(([k, v]) => `${k}=${v}`).join(' ') : ''
+        const dataStr = data
+            ? ' ' +
+              Object.entries(data)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(' ')
+            : ''
         this.info(`Performance metric: ${name} durationMs=${durationMs}${dataStr}`)
     }
 
