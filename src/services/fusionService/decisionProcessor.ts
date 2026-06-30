@@ -3,6 +3,7 @@ import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
 import { SourceType } from '../../model/config'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
+import { StatusEntitlement } from '../../model/statusEntitlement'
 import { trimStr } from '../../utils/safeRead'
 import { compact } from './collections'
 import { FusionService } from './fusionService'
@@ -31,23 +32,23 @@ export class DecisionProcessor {
 
         // Clear stale transient state, re-apply candidate statuses, and sync attributes.
         for (const account of this.fusionService.fusionAccountMap.values()) {
-            account.removeStatus('candidate')
+            account.removeStatus(StatusEntitlement.Candidate)
             account.clearFusionReviews()
 
             const iid = account.identityId
             if (iid && candidateIdsNeedingStatus.has(iid)) {
-                account.addStatus('candidate')
+                account.addStatus(StatusEntitlement.Candidate)
             }
 
             account.syncCollectionAttributesToBag()
         }
 
         for (const [identityId, identity] of this.fusionService.fusionIdentityMap.entries()) {
-            identity.removeStatus('candidate')
+            identity.removeStatus(StatusEntitlement.Candidate)
             identity.clearFusionReviews()
 
             if (candidateIdsNeedingStatus.has(identityId)) {
-                identity.addStatus('candidate')
+                identity.addStatus(StatusEntitlement.Candidate)
             }
 
             const urls = pendingReviewUrlsByReviewerId.get(identityId)

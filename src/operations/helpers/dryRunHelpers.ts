@@ -8,6 +8,7 @@ import { AggregationStats, FusionReport, FusionReportAccount, FusionReportStats 
 import { AggregationTracker } from '../../services/fusionService/aggregationTracker'
 import { isExactAttributeMatchScores } from '../../services/scoringService/exactMatch'
 import { FusionAccount } from '../../model/account'
+import { StatusEntitlement } from '../../model/statusEntitlement'
 import { readArray, readBoolean, readPathString, readUnknown, trimStr } from '../../utils/safeRead'
 import {
     buildReportAccountIndex,
@@ -536,7 +537,7 @@ const categorizeRow = (
     const statuses = new Set<string>(readArray<string>(attributes, 'statuses', []))
     const relatedAccounts = readArray<string>(attributes, 'accounts', [])
 
-    if (statuses.has('baseline')) {
+    if (statuses.has(StatusEntitlement.Baseline)) {
         categories.push('baseline')
     } else if (fusionIdentityAttributeValue(attributes, fusionIdentityAttribute)) {
         // Correlated fusion accounts usually do not retain the "baseline" entitlement unless they were
@@ -544,7 +545,7 @@ const categorizeRow = (
         categories.push('identity-linked')
     }
     // NonMatched should include analysis-level non-matches plus explicit NonMatched status tags.
-    if (statuses.has('nonMatched') || status === 'non-matched') categories.push('nonMatched')
+    if (statuses.has(StatusEntitlement.NonMatched) || status === 'non-matched') categories.push('nonMatched')
     if (status === 'matched') {
         categories.push('matched')
         const matches = Array.isArray(enrichedAccount?.attributes?.matching?.matches)

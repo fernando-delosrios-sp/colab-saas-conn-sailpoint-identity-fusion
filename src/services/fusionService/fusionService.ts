@@ -45,6 +45,7 @@ import {
     getManagedAccountKeyFromAccount,
     normalizeCompositeManagedAccountKey,
 } from '../../model/managedAccountKey'
+import { StatusEntitlement } from '../../model/statusEntitlement'
 import { hasValue, trimStr } from '../../utils/safeRead'
 import { FusionAccountRepository } from './fusionAccountRepository'
 import { IdentityProcessor } from './identityProcessor'
@@ -1381,7 +1382,7 @@ export class FusionService {
         const pendingCandidates = this.forms.pendingCandidateIdentityIds ?? new Set<string>()
         const needsCandidate = pendingCandidates.has(identityId)
         if (needsCandidate) {
-            fusionAccount.addStatus('candidate')
+            fusionAccount.addStatus(StatusEntitlement.Candidate)
         }
 
         if (fusionAccount.listReviewerSources().length > 0) {

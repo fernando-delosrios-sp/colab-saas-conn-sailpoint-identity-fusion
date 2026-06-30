@@ -13,6 +13,7 @@ import { FusionConfig } from '../../../model/config'
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount } from '../../../model/account'
+import { StatusEntitlement } from '../../../model/statusEntitlement'
 import { hasValue, trimStr } from '../../../utils/safeRead'
 
 // Mock dependencies
@@ -2809,8 +2810,8 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account)
 
-            fusionAccount.addStatus('candidate', 'Set candidate status')
-            fusionAccount.addStatus('candidate', 'Set candidate status')
+            fusionAccount.addStatus(StatusEntitlement.Candidate, 'Set candidate status')
+            fusionAccount.addStatus(StatusEntitlement.Candidate, 'Set candidate status')
 
             const duplicateMessages = fusionAccount.history.filter((h) => h.includes('Set candidate status'))
             expect(duplicateMessages).toHaveLength(1)
