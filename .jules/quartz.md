@@ -12,3 +12,6 @@
 
 **Learning:** When multiple functions iterate over mixed-type arrays (e.g., parsing varying SDK shapes like strings or objects) to extract normalized string values, the loop and type-checking logic is often duplicated (e.g. in `toSetFromAttribute` and `normalizeActionTokens`).
 **Action:** Encapsulate the loop and type-checking logic into a shared helper function (like `normalizeArrayItems`) to eliminate duplicate code blocks, clarify intent, and ensure consistency when handling these mixed-type arrays.
+## 2026-05-23 - Simplifying Attribute Merge Logic
+**Learning:** Verbose `if/else` blocks that assign static boolean values based on a single condition (like `attributeMerge === AttributeMergeMode.List`) reduce scanability and create unnecessary boilerplate.
+**Action:** Replaced nested conditionals with direct boolean assignment using a ternary operator for fallback logic, following the Quartz Readability Pattern for concise logical chains.

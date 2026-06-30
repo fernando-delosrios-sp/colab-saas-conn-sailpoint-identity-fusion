@@ -75,10 +75,7 @@ export class SchemaService {
      * - For multi-valued attributes (`multi` is true): scalar values are wrapped in an array.
      * - Values are cast to the target type (`string`, `boolean`, `int`/`long`).
      */
-    private castAttributeValue(
-        value: any,
-        schemaDef: SchemaAttribute
-    ): any {
+    private castAttributeValue(value: any, schemaDef: SchemaAttribute): any {
         if (value === null || value === undefined) return null
 
         const isMulti = schemaDef.multi === true
@@ -97,7 +94,7 @@ export class SchemaService {
             if (type === 'string') {
                 if (typeof value === 'object' && value !== null) {
                     if (Array.isArray(value)) {
-                        const isObjectArray = value.some(v => typeof v === 'object' && v !== null)
+                        const isObjectArray = value.some((v) => typeof v === 'object' && v !== null)
                         if (isObjectArray) {
                             return JSON.stringify(value)
                         } else {
@@ -237,19 +234,8 @@ export class SchemaService {
         const attributes: SchemaAttribute[] = []
         for (const attribute of schema.attributes) {
             const attributeMap = this.attributeMap.get(attribute.name!)
-            if (attributeMap) {
-                if (attributeMap.attributeMerge === AttributeMergeMode.List) {
-                    attribute.multi = true
-                } else {
-                    attribute.multi = false
-                }
-            } else {
-                if (this.attributeMerge === AttributeMergeMode.List) {
-                    attribute.multi = true
-                } else {
-                    attribute.multi = false
-                }
-            }
+            attribute.multi =
+                (attributeMap ? attributeMap.attributeMerge : this.attributeMerge) === AttributeMergeMode.List
             attribute.description = attribute.description || `${attribute.name} from ${sourceName}`
             attributes.push(attribute)
         }
