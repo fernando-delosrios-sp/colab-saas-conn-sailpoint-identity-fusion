@@ -648,7 +648,10 @@ The rows below are **fictional** composites. **Source A** and **Source B** stand
 Before relying entirely on matching algorithms, consider enabling the **Normalize special characters?** transformation during the _Define_ phase. Normalization transliterates international accents and strips erratic punctuation (like apostrophes in "O'Conner" or hyphens).
 
 - **Why it matters:** Algorithms like `Jaro-Winkler` and `Dice` are strictly mechanically based on characters. "Renée" vs "Renee" scores poorly under Dice (50%) but scores 100% when normalized. `LIG3` penalizes punctuation as unmapped insertions (dropping scores to ~64%), which the normalizer effortlessly resolves.
-- **Exception**: The `Enhanced Name Matcher` natively handles accents and unicode transliteration, so it is less reliant on upstream normalization.
+
+!!! note "Exception"
+
+    The `Enhanced Name Matcher` natively handles accents and unicode transliteration, so it is less reliant on upstream normalization.
 
 ### Dates
 
