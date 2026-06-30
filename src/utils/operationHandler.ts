@@ -95,16 +95,28 @@ export function createOperationHandler(
 ): any {
     return async (context: any, input: any, res: any) => {
         let interval: ReturnType<typeof setInterval> | undefined
-        const serviceRegistry = new ServiceRegistry(config, context, res, operationName)
+        let responseSent = false
+        const safeRes = {
+            ...res,
+            send: (...args: any[]) => {
+                responseSent = true
+                return res.send(...args)
+            },
+            error: (...args: any[]) => {
+                responseSent = true
+                return res.error(...args)
+            },
+        }
+        const serviceRegistry = new ServiceRegistry(config, context, safeRes, operationName)
         try {
             const { runMode, isProxyServer } = resolveRunMode(context, serviceRegistry.proxy, operationName)
-            interval = scheduleKeepAlive(options, config, runMode, isProxyServer, res)
+            interval = scheduleKeepAlive(options, config, runMode, isProxyServer, safeRes)
 
             logger.info(`Running ${operationName} in ${runMode} mode`)
             serviceRegistry.recording?.startOperation(
                 operationName,
                 input,
-                res,
+                safeRes,
                 serviceRegistry.sources,
                 serviceRegistry.identities,
                 serviceRegistry.forms
@@ -112,6 +124,12 @@ export function createOperationHandler(
             await ServiceRegistry.run(serviceRegistry, () =>
                 runOperation(runMode, operationName, context, serviceRegistry, input, defaultFn)
             )
+            if (!responseSent) {
+                throw new ConnectorError(
+                    'Operation finished without calling res.send() or res.error()',
+                    ConnectorErrorType.Generic
+                )
+            }
             serviceRegistry.recording?.endOperation(
                 serviceRegistry.sources,
                 serviceRegistry.identities,
