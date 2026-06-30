@@ -26,13 +26,10 @@
         "identityScopeQuery": "*",
         "maxHistoryMessages": 10,
         "attributeMerge": "first",
-        "enableQueue": true,
-        "enableRetry": true,
         "maxRetries": 20,
         "requestsPerSecond": 10,
         "maxConcurrentRequests": 10,
         "processingWait": 60,
-        "retryDelay": 1000,
         "batchSize": 250,
         "externalLoggingLevel": "info",
         "proxyEnabled": false,
@@ -1081,21 +1078,12 @@
                             "helpKey": "Maximum time (in seconds) to wait for a provisioning operation to complete. Increase this if you experience timeouts with large batches."
                         },
                         {
-                            "key": "enableQueue",
-                            "label": "Enable queue?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Manage the flow of API requests to avoid overloading the server. Controls how many requests run at once and how fast they are sent"
-                        },
-                        {
                             "key": "maxConcurrentRequests",
                             "label": "Maximum concurrent requests",
                             "type": "number",
                             "required": false,
                             "min": "1",
                             "max": "10",
-                            "parentKey": "enableQueue",
-                            "parentValue": "true",
                             "helpKey": "How many requests can run at the same time. Lower values are safer for rate-limited APIs."
                         },
                         {
@@ -1105,16 +1093,7 @@
                             "required": false,
                             "min": "1",
                             "max": "12",
-                            "parentKey": "enableQueue",
-                            "parentValue": "true",
                             "helpKey": "Maximum number of requests sent per second. Reduce this if you are getting rate-limit errors."
-                        },
-                        {
-                            "key": "enableRetry",
-                            "label": "Enable retry?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Protect against temporary API failures, network timeouts, or rate limits. Recommended for production use"
                         },
                         {
                             "key": "maxRetries",
@@ -1123,8 +1102,6 @@
                             "required": false,
                             "min": "0",
                             "max": "20",
-                            "parentKey": "enableRetry",
-                            "parentValue": "true",
                             "helpKey": "How many times to retry a failed request before giving up."
                         },
                         {
@@ -1134,16 +1111,6 @@
                             "required": false,
                             "min": "10",
                             "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts."
-                        },
-                        {
-                            "key": "retryDelay",
-                            "label": "Retry delay (milliseconds)",
-                            "type": "number",
-                            "required": true,
-                            "min": "0",
-                            "parentKey": "enableRetry",
-                            "parentValue": "true",
-                            "helpKey": "Time to wait (in milliseconds) before retrying a failed request. The server may override this with its own recommended wait time."
                         },
                         {
                             "key": "batchSize",

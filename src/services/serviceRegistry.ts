@@ -70,13 +70,13 @@ export class ServiceRegistry {
             this.log.setQueue(this.client.getQueue())
         } else {
             const adapter = new SdkApiAdapter(this.config, this.log)
-            const queueConfig = this.config.enableQueue ? {
+            const queueConfig = {
                 requestsPerSecond: this.config.requestsPerSecond ?? this.config.requestsPerSecondConstant,
                 maxConcurrentRequests: this.config.maxConcurrentRequests ?? Math.max(10, (this.config.requestsPerSecond ?? this.config.requestsPerSecondConstant) * 2),
-                maxRetries: this.config.enableRetry ? (this.config.maxRetries ?? this.config.retriesConstant) : 0,
+                maxRetries: this.config.maxRetries ?? this.config.retriesConstant,
                 enablePriority: this.config.enablePriority ?? true,
-            } : null
-            const queue = queueConfig ? new ApiQueue(queueConfig) : null
+            }
+            const queue = new ApiQueue(queueConfig)
             this.client = new ClientService(adapter, queue, this.config, this.log)
             this.log.setQueue(queue)
         }

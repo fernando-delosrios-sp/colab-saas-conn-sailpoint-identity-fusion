@@ -56,7 +56,6 @@ describe('ClientService', () => {
         } as unknown as jest.Mocked<LogService>
 
         mockConfig = {
-            enableQueue: true,
             requestsPerSecond: 10,
             pageSize: 250,
             sailPointListMax: 250,

@@ -115,7 +115,7 @@ curl -X GET https://[tenant].api.identitynow.com/v3/sources \
 | -------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | **Provisioning timeout too low** | Check timeout vs actual runtime                                      | Increase **Provisioning timeout** in Advanced Settings (e.g., 600–1800 seconds) |
 | **Force aggregation enabled**    | Check if **Force aggregation before processing?** is Yes for sources | Disable force aggregation; or increase timeout                                  |
-| **API rate limits (429)**        | Check logs for HTTP 429 errors                                       | Enable retry; lower RPS in Advanced Settings                                    |
+| **API rate limits (429)**        | Check logs for HTTP 429 errors                                       | Lower RPS in Advanced Settings; retry is automatic                              |
 | **Large dataset**                | Number of accounts                                                   | Increase timeout; enable batching                                               |
 | **Slow source API**              | Test source API response time                                        | Optimize source; increase timeout                                               |
 
@@ -519,11 +519,9 @@ curl -X POST https://your-proxy.com/fusion \
    - Record current aggregation time
    - Note: accounts, errors, retries
 
-2. Enable queue optimizations:
-   - Enable queue: Yes
+2. Tune queue settings:
    - Max concurrent: 15–20
    - RPS: 15–20 (within ISC limits)
-   - Enable batching: Yes
    - Batch size: 250
 
 3. Test:

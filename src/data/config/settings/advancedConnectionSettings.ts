@@ -9,13 +9,10 @@ import type { AdvancedConnectionSettingsSection } from '../../../model/config'
 export const connectorSpecInitialValues = {
     provisioningTimeout: 300,
     managedAccountsBatchSize: 100,
-    enableQueue: true,
-    enableRetry: true,
     maxRetries: 20,
     requestsPerSecond: 10,
     maxConcurrentRequests: 10,
     processingWait: 60,
-    retryDelay: 1000,
     batchSize: 250,
 } as const
 
@@ -30,12 +27,9 @@ export function readSettings(raw: Record<string, unknown>): AdvancedConnectionSe
             : internalConfig.clientService.processingWaitConstant / 1000
 
     return {
-        enableQueue: extractBoolean(raw, 'enableQueue') ?? connectorSpecInitialValues.enableQueue,
-        enableRetry: extractBoolean(raw, 'enableRetry') ?? connectorSpecInitialValues.enableRetry,
         maxRetries: (raw.maxRetries as number | undefined) ?? internalConfig.clientService.retriesConstant,
         requestsPerSecond: (raw.requestsPerSecond as number | undefined) ?? connectorSpecInitialValues.requestsPerSecond,
         maxConcurrentRequests: (raw.maxConcurrentRequests as number | undefined) ?? connectorSpecInitialValues.maxConcurrentRequests,
-        retryDelay: (raw.retryDelay as number | undefined) ?? connectorSpecInitialValues.retryDelay,
         parallelBatchSize: (raw.parallelBatchSize as number | undefined) ?? runtimeDefaults.parallelBatchSize,
         batchSize: (raw.batchSize as number | undefined) ?? internalConfig.clientService.pageSize,
         enablePriority: extractBoolean(raw, 'enablePriority') ?? matchingInitialValues.enablePriority,
