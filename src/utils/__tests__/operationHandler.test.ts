@@ -124,6 +124,7 @@ describe('createOperationHandler', () => {
         })
 
         it('should start simple keepAlive interval', async () => {
+            // eslint-disable-next-line prefer-const
             let resolveRegistry: any
             let resolveFn: () => void
             const longPromise = new Promise<void>((resolve) => {
@@ -159,6 +160,7 @@ describe('createOperationHandler', () => {
         })
 
         it('should start memory keepAlive interval', async () => {
+            // eslint-disable-next-line prefer-const
             let resolveRegistry: any
             let resolveFn: () => void
             const longPromise = new Promise<void>((resolve) => {

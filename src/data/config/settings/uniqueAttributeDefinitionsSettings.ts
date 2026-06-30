@@ -12,9 +12,13 @@ export const connectorSpecInitialValues = {
     useIncrementalCounter: false,
 } as const
 
+export const runtimeDefaults = {
+    maxAttempts: connectorSpecInitialValues.maxAttempts,
+} as const
+
 export function readSettings(raw: Record<string, unknown>): UniqueAttributeDefinitionSettingsSection {
     return {
         uniqueAttributeDefinitions: (raw.uniqueAttributeDefinitions as UniqueAttributeDefinition[]) ?? [],
-        maxAttempts: (raw.maxAttempts as number | undefined) ?? connectorSpecInitialValues.maxAttempts,
+        maxAttempts: (raw.maxAttempts as number | undefined) ?? runtimeDefaults.maxAttempts,
     }
 }

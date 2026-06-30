@@ -8,9 +8,14 @@ export const connectorSpecInitialValues = {
     identityScopeQuery: '*',
 } as const
 
+export const runtimeDefaults = {
+    includeIdentities: connectorSpecInitialValues.includeIdentities,
+    identityScopeQuery: connectorSpecInitialValues.identityScopeQuery,
+} as const
+
 export function readSettings(raw: Record<string, unknown>): ScopeSection {
     return {
-        includeIdentities: (raw.includeIdentities as boolean | undefined) ?? connectorSpecInitialValues.includeIdentities,
-        identityScopeQuery: (raw.identityScopeQuery as string | undefined) ?? connectorSpecInitialValues.identityScopeQuery,
+        includeIdentities: (raw.includeIdentities as boolean | undefined) ?? runtimeDefaults.includeIdentities,
+        identityScopeQuery: (raw.identityScopeQuery as string | undefined) ?? runtimeDefaults.identityScopeQuery,
     }
 }

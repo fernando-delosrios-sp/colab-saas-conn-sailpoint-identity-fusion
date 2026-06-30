@@ -1,4 +1,4 @@
-import { defaults, internalConfig } from '../../data/config'
+import { runtimeDefaults, internalConfig } from '../../data/config'
 
 /**
  * Default number of retry attempts for API requests (aligned with connector defaults)
@@ -8,7 +8,7 @@ export const DEFAULT_RETRIES = internalConfig.clientService.retriesConstant
 /**
  * Default requests per second for throttling (aligned with connector defaults)
  */
-export const DEFAULT_REQUESTS_PER_SECOND = defaults.requestsPerSecond
+export const DEFAULT_REQUESTS_PER_SECOND = runtimeDefaults.requestsPerSecond
 
 /**
  * Base delay for exponential backoff (in milliseconds)

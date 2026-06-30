@@ -1,6 +1,6 @@
 export {
     safeReadConfig,
-    defaults,
+    runtimeDefaults,
     internalConfig,
     connectorSpecInitialValues,
     defaultFusionMaxCandidatesForForm,

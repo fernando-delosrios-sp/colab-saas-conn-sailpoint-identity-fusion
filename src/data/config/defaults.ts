@@ -1,6 +1,9 @@
 /**
- * Merged `defaults` and `connectorSpecInitialValues` built from per-setting modules
- * (same key order as `connector-spec.json` -> `sourceConfigInitialValues`).
+ * Per-setting modules export two aggregates:
+ * - `connectorSpecInitialValues`: UI-exposed defaults, mirrors
+ *   `connector-spec.json` -> `sourceConfigInitialValues` (same key order).
+ * - `runtimeDefaults`: universal execution fallback, extends the UI defaults with
+ *   non-UI config bridged from `internalConfig` (e.g. time units converted to ms).
  */
 import * as advancedConnectionSettings from './settings/advancedConnectionSettings'
 import * as attributeMappingDefinitionsSettings from './settings/attributeMappingDefinitionsSettings'
@@ -39,11 +42,16 @@ export const connectorSpecInitialValues = {
     ...sourcesSettings.connectorSpecInitialValues,
 } as const
 
-export const defaults = {
+export const runtimeDefaults = {
     ...connectorSpecInitialValues,
     source: sourcesSettings.runtimeDefaults.source,
     ...processingControlSettings.runtimeDefaults,
     ...matchingSettings.runtimeDefaults,
     ...developerSettings.runtimeDefaults,
     ...advancedConnectionSettings.runtimeDefaults,
+    ...scopeSettings.runtimeDefaults,
+    ...proxySettings.runtimeDefaults,
+    ...reviewSettings.runtimeDefaults,
+    ...attributeMappingDefinitionsSettings.runtimeDefaults,
+    ...uniqueAttributeDefinitionsSettings.runtimeDefaults,
 } as const

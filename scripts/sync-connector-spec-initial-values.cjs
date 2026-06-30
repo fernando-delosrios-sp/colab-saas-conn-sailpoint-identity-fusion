@@ -204,7 +204,7 @@ const sources = loadInitialValues('sourcesSettings.ts')
 const merged = {
     ...connection,
     fusionFormExpirationDays: review.fusionFormExpirationDays,
-    fusionAverageScore: matching.fusionManualReviewScore,
+    fusionManualReviewScore: matching.fusionManualReviewScore,
     provisioningTimeout: advancedConnection.provisioningTimeout,
     managedAccountsBatchSize: advancedConnection.managedAccountsBatchSize,
     fusionMaxCandidatesForForm: review.fusionMaxCandidatesForForm,

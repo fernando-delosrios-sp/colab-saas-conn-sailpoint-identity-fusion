@@ -19,7 +19,7 @@ import {
     MatchingStatus,
     PendingReviewContextByAccountId,
 } from './buildDryRunPayload'
-import { defaults } from '../../data/config'
+import { runtimeDefaults } from '../../data/config'
 import { sanitizeRecipients } from '../../services/messagingService/email'
 
 /** Record managed source account ids present on a streamed fusion ISC row (drives report join coverage). */
@@ -706,7 +706,7 @@ const refreshUniqueAttributesForDryRun = async (
     //
     // Note: some unit-test mocks provide fusion.refreshUniqueAttributes() but not fusionAccounts/fusionIdentities getters.
     // Fall back to the legacy call in that case to keep tests and mocks stable.
-    const batchSize = context.config?.managedAccountsBatchSize ?? defaults.managedAccountsBatchSize
+    const batchSize = context.config?.managedAccountsBatchSize ?? runtimeDefaults.managedAccountsBatchSize
     const fusionAccounts = readUnknown(fusion, 'fusionAccounts') as FusionAccount[] | undefined
     const fusionIdentities = readUnknown(fusion, 'fusionIdentities') as Iterable<FusionAccount> | undefined
     if (Array.isArray(fusionAccounts) && fusionIdentities && Symbol.iterator in Object(fusionIdentities)) {

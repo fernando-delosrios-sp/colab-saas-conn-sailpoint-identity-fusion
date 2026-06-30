@@ -17,23 +17,30 @@ export const connectorSpecInitialValues = {
 } as const
 
 export const runtimeDefaults = {
+    maxRetries: internalConfig.clientService.retriesConstant,
+    requestsPerSecond: connectorSpecInitialValues.requestsPerSecond,
+    maxConcurrentRequests: connectorSpecInitialValues.maxConcurrentRequests,
     parallelBatchSize: 8,
+    batchSize: internalConfig.clientService.pageSize,
+    enablePriority: matchingInitialValues.enablePriority,
+    processingWait: internalConfig.clientService.processingWaitConstant,
+    provisioningTimeout: connectorSpecInitialValues.provisioningTimeout,
 } as const
 
 export function readSettings(raw: Record<string, unknown>): AdvancedConnectionSettingsSection {
-    const processingWaitSeconds =
+    const processingWaitMs =
         raw.processingWait !== undefined
-            ? (raw.processingWait as number)
-            : internalConfig.clientService.processingWaitConstant / 1000
+            ? (raw.processingWait as number) * 1000
+            : runtimeDefaults.processingWait
 
     return {
-        maxRetries: (raw.maxRetries as number | undefined) ?? internalConfig.clientService.retriesConstant,
-        requestsPerSecond: (raw.requestsPerSecond as number | undefined) ?? connectorSpecInitialValues.requestsPerSecond,
-        maxConcurrentRequests: (raw.maxConcurrentRequests as number | undefined) ?? connectorSpecInitialValues.maxConcurrentRequests,
+        maxRetries: (raw.maxRetries as number | undefined) ?? runtimeDefaults.maxRetries,
+        requestsPerSecond: (raw.requestsPerSecond as number | undefined) ?? runtimeDefaults.requestsPerSecond,
+        maxConcurrentRequests: (raw.maxConcurrentRequests as number | undefined) ?? runtimeDefaults.maxConcurrentRequests,
         parallelBatchSize: (raw.parallelBatchSize as number | undefined) ?? runtimeDefaults.parallelBatchSize,
-        batchSize: (raw.batchSize as number | undefined) ?? internalConfig.clientService.pageSize,
-        enablePriority: extractBoolean(raw, 'enablePriority') ?? matchingInitialValues.enablePriority,
-        processingWait: processingWaitSeconds * 1000,
-        provisioningTimeout: (raw.provisioningTimeout as number | undefined) ?? connectorSpecInitialValues.provisioningTimeout,
+        batchSize: (raw.batchSize as number | undefined) ?? runtimeDefaults.batchSize,
+        enablePriority: extractBoolean(raw, 'enablePriority') ?? runtimeDefaults.enablePriority,
+        processingWait: processingWaitMs,
+        provisioningTimeout: (raw.provisioningTimeout as number | undefined) ?? runtimeDefaults.provisioningTimeout,
     }
 }

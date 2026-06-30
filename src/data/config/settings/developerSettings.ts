@@ -14,16 +14,21 @@ export const connectorSpecInitialValues = {
 } as const
 
 export const runtimeDefaults = {
-    forceAttributeRefresh: false,
+    externalLoggingLevel: connectorSpecInitialValues.externalLoggingLevel,
+    managedAccountsBatchSize: advancedInitialValues.managedAccountsBatchSize,
+    fusionMaxCandidatesForForm: defaultFusionMaxCandidatesForForm(),
+    fusionMaxCandidatesForFormMin: internalConfig.formService.fusionMaxCandidatesForFormMin,
+    fusionMaxCandidatesForFormMax: internalConfig.formService.fusionMaxCandidatesForFormMax,
     reset: false,
     externalLoggingEnabled: false,
     concurrencyCheckEnabled: true,
+    forceAttributeRefresh: false,
 } as const
 
 export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSection {
     const externalLoggingEnabled = extractBoolean(raw, 'externalLoggingEnabled') ?? runtimeDefaults.externalLoggingEnabled
     const externalLoggingUrl = raw.externalLoggingUrl as string | undefined
-    const externalLoggingLevel = (raw.externalLoggingLevel as 'error' | 'warn' | 'info' | 'debug' | undefined) ?? connectorSpecInitialValues.externalLoggingLevel
+    const externalLoggingLevel = (raw.externalLoggingLevel as 'error' | 'warn' | 'info' | 'debug' | undefined) ?? runtimeDefaults.externalLoggingLevel
 
     if (externalLoggingEnabled) {
         assert(externalLoggingUrl, 'External logging URL is required when external logging is enabled')
@@ -41,19 +46,19 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
     const rawMaxCandidates =
         raw.fusionMaxCandidatesForForm !== undefined
             ? Number(raw.fusionMaxCandidatesForForm)
-            : defaultFusionMaxCandidatesForForm()
+            : runtimeDefaults.fusionMaxCandidatesForForm
     assert(
         Number.isFinite(rawMaxCandidates) &&
-            rawMaxCandidates >= internalConfig.formService.fusionMaxCandidatesForFormMin &&
-            rawMaxCandidates <= internalConfig.formService.fusionMaxCandidatesForFormMax,
-        `fusionMaxCandidatesForForm must be between ${internalConfig.formService.fusionMaxCandidatesForFormMin} and ${internalConfig.formService.fusionMaxCandidatesForFormMax}`
+            rawMaxCandidates >= runtimeDefaults.fusionMaxCandidatesForFormMin &&
+            rawMaxCandidates <= runtimeDefaults.fusionMaxCandidatesForFormMax,
+        `fusionMaxCandidatesForForm must be between ${runtimeDefaults.fusionMaxCandidatesForFormMin} and ${runtimeDefaults.fusionMaxCandidatesForFormMax}`
     )
 
     logger.info('Configuration validation completed successfully')
 
     return {
         reset: extractBoolean(raw, 'reset') ?? runtimeDefaults.reset,
-        managedAccountsBatchSize: (raw.managedAccountsBatchSize as number | undefined) ?? advancedInitialValues.managedAccountsBatchSize,
+        managedAccountsBatchSize: (raw.managedAccountsBatchSize as number | undefined) ?? runtimeDefaults.managedAccountsBatchSize,
         fusionMaxCandidatesForForm: Math.trunc(rawMaxCandidates),
         concurrencyCheckEnabled: extractBoolean(raw, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled,
         forceAttributeRefresh: extractBoolean(raw, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh,
