@@ -238,6 +238,14 @@ export class FusionAccount {
         if (originSource) {
             fusionAccount._originSource = originSource
         }
+        // Identity-origin accounts carry a permanent 'baseline' status marker.
+        // Re-assert it defensively so legacy or migrated records that lost it from
+        // the persisted statuses array are still classified correctly on restore,
+        // and the 'Identities' virtual source mirrors the baseline origin signal.
+        if (fusionAccount.fromIdentity && !fusionAccount._statuses.has('baseline')) {
+            fusionAccount._statuses.add('baseline')
+            fusionAccount._sources.add('Identities')
+        }
         const originAccount = getAccountStringAttribute(account, 'originAccount')
         if (originAccount) {
             const normalizedOriginAccount = normalizeCompositeManagedAccountKey(originAccount)

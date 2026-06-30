@@ -325,4 +325,76 @@ describe('FusionAccount', () => {
             expect(acc.attributes['revAttr']).toBeUndefined()
         })
     })
+
+    describe('15. Identity-origin baseline re-assertion on fromFusionAccount', () => {
+        const buildPersistedAccount = (overrides: Record<string, unknown> = {}): Account =>
+            ({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Identity',
+                sourceName: 'Identity Fusion NG',
+                identityId: 'id-1',
+                disabled: false,
+                attributes: {
+                    originSource: 'Identities',
+                    originAccount: 'id-1',
+                    accounts: [],
+                    statuses: ['baseline'],
+                    ...overrides,
+                },
+            }) as unknown as Account
+
+        it('preserves baseline and Identities for a record that already has baseline', () => {
+            const acc = FusionAccount.fromFusionAccount(buildPersistedAccount())
+            expect(acc.fromIdentity).toBe(true)
+            expect(acc.statuses).toContain('baseline')
+            expect(acc.sources).toContain('Identities')
+        })
+
+        it('re-asserts baseline when the persisted statuses array is empty (identity-origin)', () => {
+            const acc = FusionAccount.fromFusionAccount(
+                buildPersistedAccount({ statuses: [] })
+            )
+            expect(acc.fromIdentity).toBe(true)
+            expect(acc.statuses).toContain('baseline')
+            expect(acc.sources).toContain('Identities')
+        })
+
+        it('re-asserts baseline when the persisted statuses key is missing (identity-origin)', () => {
+            const acc = FusionAccount.fromFusionAccount(
+                buildPersistedAccount({ statuses: undefined })
+            )
+            expect(acc.fromIdentity).toBe(true)
+            expect(acc.statuses).toContain('baseline')
+            expect(acc.sources).toContain('Identities')
+        })
+
+        it('coexists with orphan when persisted statuses only carries orphan (identity-origin)', () => {
+            const acc = FusionAccount.fromFusionAccount(
+                buildPersistedAccount({ statuses: ['orphan'] })
+            )
+            expect(acc.fromIdentity).toBe(true)
+            expect(acc.statuses).toContain('baseline')
+            expect(acc.statuses).toContain('orphan')
+            expect(acc.sources).toContain('Identities')
+        })
+
+        it('does not add baseline to a non-identity-origin record', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-2',
+                id: 'isc-2',
+                name: 'Persisted Managed',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    originSource: 'Source A',
+                    originAccount: 'src-a::native-1',
+                    accounts: [],
+                    statuses: [],
+                },
+            } as unknown as Account)
+            expect(acc.fromIdentity).toBe(false)
+            expect(acc.statuses).not.toContain('baseline')
+            expect(acc.sources).not.toContain('Identities')
+        })
+    })
 })
