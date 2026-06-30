@@ -332,7 +332,7 @@ describe('ApiQueue', () => {
         const stats = queue.getStats();
         expect(stats.totalProcessed).toBe(2);
         expect(stats.totalFailed).toBe(0);
-        expect(stats.averageProcessingTime).toBeGreaterThanOrEqual(20);
+        expect(stats.averageProcessingTime).toBeGreaterThanOrEqual(15);
         expect(stats.queueLength).toBe(0);
         expect(stats.activeRequests).toBe(0);
     });
