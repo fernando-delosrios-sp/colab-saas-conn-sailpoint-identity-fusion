@@ -6,7 +6,6 @@ import type { NormalAttributeDefinitionSettingsSection, NormalAttributeDefinitio
 export const connectorSpecInitialValues = {
     refresh: false,
     trim: false,
-    force: false,
 } as const
 
 export function readSettings(raw: Record<string, unknown>): NormalAttributeDefinitionSettingsSection {

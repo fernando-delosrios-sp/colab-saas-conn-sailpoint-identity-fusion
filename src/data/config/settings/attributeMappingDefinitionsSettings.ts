@@ -7,9 +7,13 @@ export const connectorSpecInitialValues = {
     attributeMerge: AttributeMergeMode.First,
 } as const
 
+export const runtimeDefaults = {
+    attributeMerge: connectorSpecInitialValues.attributeMerge,
+} as const
+
 export function readSettings(raw: Record<string, unknown>): AttributeMappingDefinitionsSection {
     return {
-        attributeMerge: (raw.attributeMerge as DefaultAttributeMergeMode) ?? connectorSpecInitialValues.attributeMerge,
+        attributeMerge: (raw.attributeMerge as DefaultAttributeMergeMode) ?? runtimeDefaults.attributeMerge,
         attributeMaps: (raw.attributeMaps as AttributeMap[]) ?? [],
     }
 }

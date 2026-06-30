@@ -9,11 +9,17 @@ export const connectorSpecInitialValues = {
     proxyPassword: '',
 } as const
 
+export const runtimeDefaults = {
+    proxyEnabled: connectorSpecInitialValues.proxyEnabled,
+    proxyUrl: connectorSpecInitialValues.proxyUrl,
+    proxyPassword: connectorSpecInitialValues.proxyPassword,
+} as const
+
 export function readSettings(raw: Record<string, unknown>): ProxySettingsSection {
     return {
-        proxyEnabled: (raw.proxyEnabled as boolean | undefined) ?? connectorSpecInitialValues.proxyEnabled,
-        proxyUrl: (raw.proxyUrl as string | undefined) ?? connectorSpecInitialValues.proxyUrl,
-        proxyPassword: (raw.proxyPassword as string | undefined) ?? connectorSpecInitialValues.proxyPassword,
+        proxyEnabled: (raw.proxyEnabled as boolean | undefined) ?? runtimeDefaults.proxyEnabled,
+        proxyUrl: (raw.proxyUrl as string | undefined) ?? runtimeDefaults.proxyUrl,
+        proxyPassword: (raw.proxyPassword as string | undefined) ?? runtimeDefaults.proxyPassword,
         proxyRequestTimeoutMs: raw.proxyRequestTimeoutMs as number | undefined,
     }
 }

@@ -15,6 +15,7 @@ export const connectorSpecInitialValues = {
 
 export const runtimeDefaults = {
     fusionEnableAutoAssignment: false,
+    fusionManualReviewScore: connectorSpecInitialValues.fusionManualReviewScore,
 } as const
 
 export function readSettings(raw: Record<string, unknown>): MatchingSettingsSection & { fusionScoreMap: Map<string, number> } {
@@ -23,7 +24,7 @@ export function readSettings(raw: Record<string, unknown>): MatchingSettingsSect
 
     const matchingConfigs = (raw.matchingConfigs as MatchingConfig[]) ?? []
     const fusionEnableAutoAssignment = extractBoolean(raw, 'fusionEnableAutoAssignment') ?? runtimeDefaults.fusionEnableAutoAssignment
-    const fusionManualReviewScore = (raw.fusionManualReviewScore as number | undefined) ?? connectorSpecInitialValues.fusionManualReviewScore
+    const fusionManualReviewScore = (raw.fusionManualReviewScore as number | undefined) ?? runtimeDefaults.fusionManualReviewScore
     const fusionAutoAssignmentScore = raw.fusionAutoAssignmentScore as number | undefined
 
     assert(

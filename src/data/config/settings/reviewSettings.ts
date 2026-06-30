@@ -8,6 +8,11 @@ export const connectorSpecInitialValues = {
     fusionMaxCandidatesForForm: 3,
 } as const
 
+export const runtimeDefaults = {
+    fusionFormExpirationDays: connectorSpecInitialValues.fusionFormExpirationDays,
+    fusionMaxCandidatesForForm: connectorSpecInitialValues.fusionMaxCandidatesForForm,
+} as const
+
 export function defaultFusionMaxCandidatesForForm(): number {
     return connectorSpecInitialValues.fusionMaxCandidatesForForm
 }
@@ -15,7 +20,7 @@ export function defaultFusionMaxCandidatesForForm(): number {
 export function readSettings(raw: Record<string, unknown>): ReviewSettingsSection {
     return {
         fusionFormAttributes: (raw.fusionFormAttributes as string[] | undefined) ?? [],
-        fusionFormExpirationDays: (raw.fusionFormExpirationDays as number | undefined) ?? connectorSpecInitialValues.fusionFormExpirationDays,
+        fusionFormExpirationDays: (raw.fusionFormExpirationDays as number | undefined) ?? runtimeDefaults.fusionFormExpirationDays,
         fusionOwnerIsGlobalReviewer: raw.fusionOwnerIsGlobalReviewer as boolean | undefined,
         fusionReportOnAggregation: raw.fusionReportOnAggregation as boolean | undefined,
     }

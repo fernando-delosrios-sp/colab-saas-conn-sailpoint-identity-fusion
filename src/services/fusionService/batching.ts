@@ -1,6 +1,6 @@
 import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
-import { defaults } from '../../data/config'
+import { runtimeDefaults } from '../../data/config'
 import { createBatchProgressLogger, promiseAllBatched, yieldToEventLoop } from './collections'
 
 /**
@@ -13,7 +13,7 @@ import { createBatchProgressLogger, promiseAllBatched, yieldToEventLoop } from '
 
 /** Configured batch size for managed-account processing. */
 export function getManagedAccountsBatchSize(config: FusionConfig): number {
-    return config.managedAccountsBatchSize ?? defaults.managedAccountsBatchSize
+    return config.managedAccountsBatchSize ?? runtimeDefaults.managedAccountsBatchSize
 }
 
 /**
