@@ -16,6 +16,7 @@ import {
     parseManagedAccountKey
 } from './managedAccountKey'
 import { missing, readString, trimStr } from '../utils/safeRead'
+import { StatusEntitlement } from './statusEntitlement'
 import {
     buildIdentityInfo,
     resolveCompositeManagedKeyFromFusionRecord
@@ -217,7 +218,7 @@ export class FusionAccount {
         const sourceSet = new Set<string>()
         const statuses = attributeToSet(account.attributes, 'statuses')
         const resolvedCompositeManagedKey = resolveCompositeManagedKeyFromFusionRecord(account)
-        if (statuses.has('baseline')) sourceSet.add('Identities')
+        if (statuses.has(StatusEntitlement.Baseline)) sourceSet.add('Identities')
 
         const identityInfo = buildIdentityInfo(account)
 
@@ -242,8 +243,8 @@ export class FusionAccount {
         // Re-assert it defensively so legacy or migrated records that lost it from
         // the persisted statuses array are still classified correctly on restore,
         // and the 'Identities' virtual source mirrors the baseline origin signal.
-        if (fusionAccount.fromIdentity && !fusionAccount._statuses.has('baseline')) {
-            fusionAccount._statuses.add('baseline')
+        if (fusionAccount.fromIdentity && !fusionAccount._statuses.has(StatusEntitlement.Baseline)) {
+            fusionAccount._statuses.add(StatusEntitlement.Baseline)
             fusionAccount._sources.add('Identities')
         }
         const originAccount = getAccountStringAttribute(account, 'originAccount')
@@ -877,14 +878,14 @@ export class FusionAccount {
     /** Marks this fusion account's identity as a reviewer for the given source. */
     public setSourceReviewer(sourceId: string): void {
         this._actions.add(`reviewer:${sourceId}`)
-        this.addStatus('reviewer')
+        this.addStatus(StatusEntitlement.Reviewer)
     }
 
     /** Removes reviewer assignment for the given source and updates reviewer status when needed. */
     public removeSourceReviewer(sourceId: string): void {
         this._actions.delete(`reviewer:${sourceId}`)
         if (!this._actionsHasReviewerScope()) {
-            this._statuses.delete('reviewer')
+            this._statuses.delete(StatusEntitlement.Reviewer)
         }
     }
 
@@ -930,14 +931,14 @@ export class FusionAccount {
     /** Adds a fusion review URL and sets the "activeReviews" status. */
     public addFusionReview(reviewUrl: string): void {
         this._reviews.add(reviewUrl)
-        this._statuses.add('activeReviews')
+        this._statuses.add(StatusEntitlement.ActiveReviews)
     }
 
     /** Removes a fusion review URL. Clears "activeReviews" status if no reviews remain. */
     public removeFusionReview(reviewUrl: string): void {
         this._reviews.delete(reviewUrl)
         if (this._reviews.size === 0) {
-            this._statuses.delete('activeReviews')
+            this._statuses.delete(StatusEntitlement.ActiveReviews)
         }
     }
 
@@ -947,7 +948,7 @@ export class FusionAccount {
      */
     public clearFusionReviews(): void {
         this._reviews.clear()
-        this._statuses.delete('activeReviews')
+        this._statuses.delete(StatusEntitlement.ActiveReviews)
     }
 
     /**
@@ -1260,15 +1261,15 @@ export class FusionAccount {
             if (this.fromIdentity) {
                 const originIdentityId = this.originAccountId ?? this.identityId
                 if (originIdentityId && !this.originIdentityInScope) {
-                    this._statuses.add('orphan')
+                    this._statuses.add(StatusEntitlement.Orphan)
                     this._needsRefresh = false
                 }
             } else {
-                this._statuses.add('orphan')
+                this._statuses.add(StatusEntitlement.Orphan)
                 this._needsRefresh = false
             }
         } else {
-            this._statuses.delete('orphan')
+            this._statuses.delete(StatusEntitlement.Orphan)
         }
     }
 
@@ -1404,7 +1405,7 @@ export class FusionAccount {
      */
     private setUncorrelatedStatus(): void {
         this._uncorrelated = true
-        this._statuses.add('uncorrelated')
+        this._statuses.add(StatusEntitlement.Uncorrelated)
         this._actions.delete('correlated')
     }
 
@@ -1419,13 +1420,13 @@ export class FusionAccount {
 
     /** Marks this account with "baseline" status (created from an identity in authoritative mode). */
     private setBaseline(): void {
-        this._statuses.add('baseline')
+        this._statuses.add(StatusEntitlement.Baseline)
         this.addHistory(`Set ${this.formatHistoryAccountInfo(this.name, this._sourceName)} as baseline`)
     }
 
     /** Marks this account as NonMatched (no Match found, pending review). */
     public setNonMatched(): void {
-        this._statuses.add('nonMatched')
+        this._statuses.add(StatusEntitlement.NonMatched)
         this.addHistory(`Set ${this.formatHistoryAccountInfo(this.name, this._sourceName)} as NonMatched`)
     }
 
@@ -1466,8 +1467,8 @@ export class FusionAccount {
 
     /** Marks this account as "manual" (reviewer decided to create a new identity or confirmed no match). */
     private setManual(decision: FusionDecision): void {
-        this._statuses.delete('nonMatched')
-        this._statuses.add('manual')
+        this._statuses.delete(StatusEntitlement.NonMatched)
+        this._statuses.add(StatusEntitlement.Manual)
         const message = this.createDecisionHistoryMessage(decision, 'manual')
         this.addHistory(message)
     }
@@ -1477,11 +1478,11 @@ export class FusionAccount {
      * exact-match automatic assignment adds `auto` only (not `authorized`).
      */
     private setAuthorized(decision: FusionDecision): void {
-        this._statuses.delete('nonMatched')
+        this._statuses.delete(StatusEntitlement.NonMatched)
         if (decision.automaticAssignment === true) {
-            this._statuses.add('auto')
+            this._statuses.add(StatusEntitlement.Auto)
         } else {
-            this._statuses.add('authorized')
+            this._statuses.add(StatusEntitlement.Authorized)
         }
         const message = this.createDecisionHistoryMessage(decision, 'authorized')
         this.addHistory(message)
@@ -1499,11 +1500,11 @@ export class FusionAccount {
         const hasAllAccountsCorrelated = this._missingAccountIds.size === 0
 
         if (hasAllAccountsCorrelated) {
-            this._statuses.delete('uncorrelated')
+            this._statuses.delete(StatusEntitlement.Uncorrelated)
             this._actions.add('correlated')
             this._uncorrelated = false
         } else {
-            this._statuses.add('uncorrelated')
+            this._statuses.add(StatusEntitlement.Uncorrelated)
             this._actions.delete('correlated')
             this._uncorrelated = true
         }
@@ -1539,7 +1540,7 @@ export class FusionAccount {
 
     /** Whether this account has lost all its managed source accounts. */
     public isOrphan(): boolean {
-        return this._statuses.has('orphan')
+        return this._statuses.has(StatusEntitlement.Orphan)
     }
 
     /** Adds a fusion decision action entitlement with a history entry. */
@@ -1574,6 +1575,6 @@ export class FusionAccount {
     }
 
     private markAsOrphan(): void {
-        this._statuses.add('orphan')
+        this._statuses.add(StatusEntitlement.Orphan)
     }
 }

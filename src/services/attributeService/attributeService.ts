@@ -11,7 +11,7 @@ import { FusionAccount } from '../../model/account'
 import { FusionAccountKind } from '../../model/fusionAccountTypes'
 import { SchemaService } from '../schemaService'
 import { AccountV2025 as Account } from 'sailpoint-api-client'
-import { CompoundKey, CompoundKeyType, SimpleKey, SimpleKeyType, StandardCommand } from '@sailpoint/connector-sdk'
+import { CompoundKey, CompoundKeyType, SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
 import {
     evaluateVelocityTemplate,
     normalize,
@@ -173,9 +173,7 @@ export class AttributeService {
      */
     public async initializeCounters(): Promise<void> {
         const stateWrapper = this.getStateWrapper()
-        const counterDefinitions = this.uniqueDefinitions.filter(
-            (definition) => definition.useIncrementalCounter
-        )
+        const counterDefinitions = this.uniqueDefinitions.filter((definition) => definition.useIncrementalCounter)
         if (counterDefinitions.length === 0) return
 
         this.log.debug(`Initializing ${counterDefinitions.length} incremental counter attributes`)
@@ -448,10 +446,7 @@ export class AttributeService {
      * override the value with the identity name and return true to signal that
      * further template evaluation for this attribute should be skipped.
      */
-    private applyDisplayAttributeOverrideIfApplicable(
-        fusionAccount: FusionAccount,
-        attributeName: string
-    ): boolean {
+    private applyDisplayAttributeOverrideIfApplicable(fusionAccount: FusionAccount, attributeName: string): boolean {
         const { fusionDisplayAttribute } = this.schemas
         if (attributeName !== fusionDisplayAttribute) return false
 
@@ -470,9 +465,7 @@ export class AttributeService {
 
         const label = fusionAccount.identityName
         if (label) {
-            this.log.info(
-                `Setting identity name for attribute: ${attributeName} for account: ${fusionAccount.name}`
-            )
+            this.log.info(`Setting identity name for attribute: ${attributeName} for account: ${fusionAccount.name}`)
             fusionAccount.attributes[attributeName] = label
         }
         return true
@@ -750,7 +743,7 @@ export class AttributeService {
      */
     private buildVelocityContext(fusionAccount: FusionAccount): Record<string, any> {
         const context: Record<string, any> = { ...fusionAccount.attributeBag.current }
-        
+
         // $name falls back to identity name if not mapped
         if (fusionAccount.identityName && context.name === undefined) {
             context.name = fusionAccount.identityName
@@ -766,7 +759,7 @@ export class AttributeService {
                 name: fusionAccount.identityName,
             }
         }
-        
+
         context.accounts = orderedAccounts
         context.previous = fusionAccount.attributeBag.previous
         context.sources = fusionAccount.attributeBag.sources
@@ -841,7 +834,6 @@ export class AttributeService {
         return trimStr(fusionAccount.identityDisplayName) ?? trimStr(identityBag?.name) ?? trimStr(fusionAccount.name)
     }
 
-
     /**
      * Build a deterministic accounts array for attribute-definition context.
      *
@@ -879,10 +871,7 @@ export class AttributeService {
         return ordered
     }
 
-    private prioritizeMainAccount(
-        ordered: Record<string, any>[],
-        fusionAccount: FusionAccount
-    ): Record<string, any>[] {
+    private prioritizeMainAccount(ordered: Record<string, any>[], fusionAccount: FusionAccount): Record<string, any>[] {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
@@ -987,7 +976,9 @@ export class AttributeService {
             // Keep as string if parsing fails
         }
 
-        this.log.debug(`[${accountName}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`)
+        this.log.debug(
+            `[${accountName}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
+        )
 
         return value
     }

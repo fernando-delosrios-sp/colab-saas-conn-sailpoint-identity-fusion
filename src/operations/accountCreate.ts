@@ -1,5 +1,6 @@
 import { AttributeChangeOp, ConnectorError, StdAccountCreateInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
+import { StatusEntitlement } from '../model/statusEntitlement'
 import { assert } from '../utils/assert'
 import { normalizeActionTokens } from '../utils/attributes'
 import { resolveIdentityNameFromCreateInput } from '../utils/identityName'
@@ -63,7 +64,7 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
         const fusionIdentity = fusion.getFusionIdentity(identity.id)
         assert(fusionIdentity, `Fusion identity not found for identity ID: ${identity.id}`)
         log.debug(`Found fusion identity: ${fusionIdentity.nativeIdentity}`)
-        fusionIdentity.addStatus('requested', 'Status set by accountCreate operation')
+        fusionIdentity.addStatus(StatusEntitlement.Requested, 'Status set by accountCreate operation')
 
         await attributes.refreshUniqueAttributes(fusionIdentity)
         timer.phase('Step 3: Processing identity')

@@ -3,6 +3,7 @@ import { FusionConfig, SourceType } from '../config'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionDecision } from '../form'
 import { FusionAccountKind } from '../fusionAccountTypes'
+import { StatusEntitlement } from '../statusEntitlement'
 
 describe('FusionAccount', () => {
     const minimalConfig = {
@@ -209,7 +210,7 @@ describe('FusionAccount', () => {
         it('round trips toISCAccount and fromFusionAccount', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1', attributes: { email: 'a@b.com' } } as any)
             acc.setKey({ simple: { id: 'id-1' } })
-            acc.addStatus('baseline')
+            acc.addStatus(StatusEntitlement.Baseline)
             acc.syncCollectionAttributesToBag()
 
             const iscAccount = acc.toISCAccount()
@@ -224,7 +225,7 @@ describe('FusionAccount', () => {
         it('round trips the persisted identityId through attributes', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1', attributes: { email: 'a@b.com' } } as any)
             acc.setKey({ simple: { id: 'id-1' } })
-            acc.addStatus('baseline')
+            acc.addStatus(StatusEntitlement.Baseline)
             acc.syncCollectionAttributesToBag()
 
             const iscAccount = acc.toISCAccount()

@@ -1,5 +1,6 @@
 import { accountCreate } from '../accountCreate'
 import { executeActions } from '../actions'
+import { StatusEntitlement } from '../../model/statusEntitlement'
 
 jest.mock('../actions', () => ({
     executeActions: jest.fn(),
@@ -34,7 +35,7 @@ describe('accountCreate', () => {
         expect(registry.fusion.preProcessFusionAccounts).toHaveBeenCalledTimes(1)
         expect(registry.fusion.processIdentity).toHaveBeenCalledWith({ id: 'id-1', name: 'Alice Doe' })
         expect(registry.fusion.getFusionIdentity().addStatus).toHaveBeenCalledWith(
-            'requested',
+            StatusEntitlement.Requested,
             'Status set by accountCreate operation'
         )
         expect(executeActions).toHaveBeenCalledTimes(2)
