@@ -61,3 +61,8 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+
+## 2026-05-27 - Prevent Set to Array transformation overhead in fusion service iterators
+
+**Learning:** When checking values in an indexed dictionary (like iterating over map values), converting Sets to Arrays via `[...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()].some(...)` forces unnecessary intermediate heap allocations. This overhead is magnified heavily in hot loops like `isCorrelatedManagedAccountLinkedInFusion`.
+**Action:** Replace `...` spread conversions with direct `for...of` loops iterating over values to maintain the early-exit behavior of `.some` while eliminating the memory overhead associated with intermediate arrays.
