@@ -254,11 +254,17 @@ export class FusionAccount {
     public static fromFusionAccount(account: Account): FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourceSet = new Set<string>()
-        const statuses = attributeToSet(account.attributes, 'statuses')
         const { identityDisplayName, accountName } = FusionAccount.labelsFromAccount(account)
         const accountDisplayName = accountName || identityDisplayName || undefined
         const resolvedCompositeManagedKey = FusionAccount.resolveCompositeKeyFromFusionRecord(account)
-        if (statuses.has('baseline')) sourceSet.add('Identities')
+
+        // Resolve the persisted origin source up front so the 'Identities' virtual
+        // source can be added to sourceSet BEFORE initializeBasicProperties snapshots it.
+        const persistedOriginSource =
+            typeof account.attributes?.originSource === 'string' ? account.attributes.originSource : undefined
+        if (persistedOriginSource === 'Identities') {
+            sourceSet.add('Identities')
+        }
 
         fusionAccount.initializeBasicProperties({
             type: FusionAccountKind.Fusion,
@@ -273,8 +279,14 @@ export class FusionAccount {
             modified: account.modified ?? '',
         })
         // Restore persisted origin metadata from existing fusion account attributes.
-        if (typeof account.attributes?.originSource === 'string') {
-            fusionAccount._originSource = account.attributes.originSource
+        if (persistedOriginSource !== undefined) {
+            fusionAccount._originSource = persistedOriginSource
+        }
+        // Identity-origin accounts carry a permanent 'baseline' status marker.
+        // Re-assert it defensively so legacy or migrated records that lost it from
+        // the persisted statuses array are still classified correctly on restore.
+        if (fusionAccount.fromIdentity && !fusionAccount._statuses.has('baseline')) {
+            fusionAccount._statuses.add('baseline')
         }
         if (typeof account.attributes?.originAccount === 'string') {
             const normalizedOriginAccount = normalizeCompositeManagedAccountKey(account.attributes.originAccount)
