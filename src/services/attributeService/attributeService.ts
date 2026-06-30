@@ -11,9 +11,16 @@ import { FusionAccount } from '../../model/account'
 import { SchemaService } from '../schemaService'
 import { Account } from 'sailpoint-api-client'
 import { CompoundKey, CompoundKeyType, SimpleKey, SimpleKeyType, StandardCommand } from '@sailpoint/connector-sdk'
-import { evaluateVelocityTemplate, normalize, padNumber, removeSpaces, switchCase, truncateResultToMaxLength } from './formatting'
+import {
+    evaluateVelocityTemplate,
+    normalize,
+    padNumber,
+    removeSpaces,
+    switchCase,
+    truncateResultToMaxLength,
+} from './formatting'
 import { LockService } from '../lockService'
-export type RenderContext = Record<string, any>;
+export type RenderContext = Record<string, any>
 import { v4 as uuidv4 } from 'uuid'
 import { assert } from '../../utils/assert'
 import { SourceService } from '../sourceService'
@@ -109,7 +116,9 @@ export class AttributeService {
         this.uniqueAttributeNames = new Set(this.uniqueDefinitions.map((d) => d.name))
 
         this.setStateWrapper(config.fusionState)
-        this.reverseSources = this.sourceConfigs.filter((sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute)
+        this.reverseSources = this.sourceConfigs.filter(
+            (sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute
+        )
     }
 
     // ------------------------------------------------------------------------
@@ -228,6 +237,10 @@ export class AttributeService {
             )
             const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sc) => sc.name)
+            if (fusionAccount.originSource === 'Identities') {
+                sourceOrder.push('Identities')
+                sourceAttributeMap.set('Identities', [attributeBag.identity])
+            }
             let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
             const mappingTargets = this.getAttributeMappingTargetNames()
             for (const attribute of mappingTargets) {
@@ -405,7 +418,7 @@ export class AttributeService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -763,16 +776,10 @@ export class AttributeService {
         const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
         if (fusionAccount.fromIdentity) {
             return (
-                trimStr(fusionAccount.name) ??
-                trimStr(identityBag?.name) ??
-                trimStr(fusionAccount.identityDisplayName)
+                trimStr(fusionAccount.name) ?? trimStr(identityBag?.name) ?? trimStr(fusionAccount.identityDisplayName)
             )
         }
-        return (
-            trimStr(fusionAccount.identityDisplayName) ??
-            trimStr(identityBag?.name) ??
-            trimStr(fusionAccount.name)
-        )
+        return trimStr(fusionAccount.identityDisplayName) ?? trimStr(identityBag?.name) ?? trimStr(fusionAccount.name)
     }
 
     private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
