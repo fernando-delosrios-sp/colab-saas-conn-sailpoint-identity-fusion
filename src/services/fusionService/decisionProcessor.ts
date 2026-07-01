@@ -154,7 +154,8 @@ export class DecisionProcessor {
             this.fusionService.sources.managedAccountsAllById,
             this.fusionService.shouldPruneDeletedManagedAccounts(),
             true,
-            skipBlendHistoryForManagedKeys
+            skipBlendHistoryForManagedKeys,
+            (account) => this.fusionService.registerFusionBlend(fusionAccount, account)
         )
         await this.fusionService.applyAttributeProcessing(fusionAccount)
 

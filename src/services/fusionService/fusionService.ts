@@ -489,19 +489,7 @@ export class FusionService {
             this.shouldPruneDeletedManagedAccounts(),
             true,
             skipBlendHistoryForManagedKeys,
-            (account) => {
-                if (this._tracker) {
-                    const sourceName = account.sourceName ?? ''
-                    const nativeIdentity = trimStr(account.nativeIdentity) ?? ''
-                    const blendedAccountName = trimStr(account.name) || nativeIdentity || account.id || ''
-                    this._tracker.fusionBlends.push({
-                        accountName: fusionAccount.name ?? fusionAccount.identityId ?? 'Unknown',
-                        accountUrl: fusionAccount.identityId ? this.urlContext.identity(fusionAccount.identityId) : undefined,
-                        blendedAccountName,
-                        blendedSource: sourceName
-                    })
-                }
-            }
+            (account) => this.registerFusionBlend(fusionAccount, account)
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
@@ -1737,6 +1725,20 @@ export class FusionService {
      */
     public setFusionAccount(fusionAccount: FusionAccount): void {
         this._repository.setFusionAccount(fusionAccount, this._tracker)
+    }
+
+    public registerFusionBlend(fusionAccount: FusionAccount, account: Account): void {
+        if (this._tracker) {
+            const sourceName = account.sourceName ?? ''
+            const nativeIdentity = trimStr(account.nativeIdentity) ?? ''
+            const blendedAccountName = trimStr(account.name) || nativeIdentity || account.id || ''
+            this._tracker.fusionBlends.push({
+                accountName: fusionAccount.name ?? fusionAccount.identityId ?? 'Unknown',
+                accountUrl: fusionAccount.identityId ? this.urlContext.identity(fusionAccount.identityId) : undefined,
+                blendedAccountName,
+                blendedSource: sourceName
+            })
+        }
     }
 
     /**
