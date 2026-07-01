@@ -157,25 +157,33 @@ export class RecordingService {
         )
         if (process.env.VERBOSE_RECORDING === 'true') {
             const passInfo = this.currentStep.pass ? ` (pass ${this.currentStep.pass})` : ''
-            console.log(`[Recording] ← ${this.currentStep.operation}${passInfo} completed — ${this.currentStep.duration}ms, ${this.currentStep.output.length} outputs`)
+            console.log(
+                `[Recording] ← ${this.currentStep.operation}${passInfo} completed — ${this.currentStep.duration}ms, ${this.currentStep.output.length} outputs`
+            )
         }
         this.currentStep = null
     }
 
     private snapshotState(sources: SourceService, identities: IdentityService, forms: FormService): StateSnapshot {
-        let managedAccounts: unknown[] = []
+        const managedAccounts: unknown[] = []
         if (sources?.managedAccountsAllById) {
-            managedAccounts = Array.from(sources.managedAccountsAllById.values()).map((a) => sanitizeForJson(a))
+            for (const a of sources.managedAccountsAllById.values()) {
+                managedAccounts.push(sanitizeForJson(a))
+            }
         }
 
-        let fusionAccounts: unknown[] = []
+        const fusionAccounts: unknown[] = []
         if (sources?.fusionAccountsByNativeIdentity) {
-            fusionAccounts = Array.from(sources.fusionAccountsByNativeIdentity.values()).map((a) => sanitizeForJson(a))
+            for (const a of sources.fusionAccountsByNativeIdentity.values()) {
+                fusionAccounts.push(sanitizeForJson(a))
+            }
         }
 
-        let identityList: unknown[] = []
+        const identityList: unknown[] = []
         try {
-            identityList = Array.from(identities.identityValues()).map((i) => sanitizeForJson(i))
+            for (const i of identities.identityValues()) {
+                identityList.push(sanitizeForJson(i))
+            }
         } catch {
             /* identityValues may not be accessible in all contexts */
         }
