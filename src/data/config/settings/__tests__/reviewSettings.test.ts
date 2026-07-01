@@ -6,6 +6,7 @@ describe('reviewSettings readSettings', () => {
         const result = readSettings(raw)
         expect(result.fusionFormAttributes).toEqual([])
         expect(result.fusionFormExpirationDays).toBe(connectorSpecInitialValues.fusionFormExpirationDays)
+        expect(result.fusionMaxCandidatesForForm).toBe(connectorSpecInitialValues.fusionMaxCandidatesForForm)
         expect(result.fusionOwnerIsGlobalReviewer).toBeUndefined()
         expect(result.fusionReportOnAggregation).toBeUndefined()
     })
@@ -14,12 +15,14 @@ describe('reviewSettings readSettings', () => {
         const raw = {
             fusionFormAttributes: ['email', 'department'],
             fusionFormExpirationDays: 14,
+            fusionMaxCandidatesForForm: 5,
             fusionOwnerIsGlobalReviewer: true,
             fusionReportOnAggregation: false,
         }
         const result = readSettings(raw)
         expect(result.fusionFormAttributes).toEqual(['email', 'department'])
         expect(result.fusionFormExpirationDays).toBe(14)
+        expect(result.fusionMaxCandidatesForForm).toBe(5)
         expect(result.fusionOwnerIsGlobalReviewer).toBe(true)
         expect(result.fusionReportOnAggregation).toBe(false)
     })

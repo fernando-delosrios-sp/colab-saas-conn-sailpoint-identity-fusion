@@ -2,6 +2,8 @@
 
 Identity Fusion NG processes accounts in a fixed **logical order**: **Map**, then **Define**, then **Match**. You can use only the stages you need, but the connector always evaluates configured steps in this sequence.
 
+For definitions of the terms used here and across the documentation, see the [glossary](glossary.md).
+
 ## Map (consolidation)
 
 **Map** aligns managed account attributes with your Fusion account schema. When several sources contribute to the same attribute, the connector merges values using your chosen strategy (for example first found, distinct list, concatenate, or a preferred source).

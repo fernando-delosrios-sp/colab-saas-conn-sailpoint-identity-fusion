@@ -21,7 +21,7 @@ These guides explain how to configure Identity Fusion NG in ISC. If you are new 
 
 | Guide                                                           | Description                                                          |
 | --------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [Advanced connection settings](advanced-connection-settings.md) | Queue, retry, batch sizing, timeouts, and external logging.          |
+| [Advanced connection settings](advanced-connection-settings.md) | Queue, retry, timeouts, concurrency, and external logging.          |
 | [Proxy mode](proxy-mode.md)                                     | Run connector logic on an external server and connect ISC via proxy. |
 
 ## Change management

@@ -4,21 +4,16 @@
 import { logger } from '@sailpoint/connector-sdk'
 import { assert } from '../../../utils/assert'
 import { extractBoolean } from '../../../utils/attributes'
-import { internalConfig } from '../internal'
-import { connectorSpecInitialValues as advancedInitialValues } from './advancedConnectionSettings'
-import { defaultFusionMaxCandidatesForForm } from './reviewSettings'
 import type { DeveloperSettingsSection } from '../../../model/config'
 
 export const connectorSpecInitialValues = {
     externalLoggingLevel: 'info' as const,
+    managedAccountsBatchSize: 100,
 } as const
 
 export const runtimeDefaults = {
     externalLoggingLevel: connectorSpecInitialValues.externalLoggingLevel,
-    managedAccountsBatchSize: advancedInitialValues.managedAccountsBatchSize,
-    fusionMaxCandidatesForForm: defaultFusionMaxCandidatesForForm(),
-    fusionMaxCandidatesForFormMin: internalConfig.formService.fusionMaxCandidatesForFormMin,
-    fusionMaxCandidatesForFormMax: internalConfig.formService.fusionMaxCandidatesForFormMax,
+    managedAccountsBatchSize: connectorSpecInitialValues.managedAccountsBatchSize,
     reset: false,
     externalLoggingEnabled: false,
     concurrencyCheckEnabled: true,
@@ -43,23 +38,11 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
         )
     }
 
-    const rawMaxCandidates =
-        raw.fusionMaxCandidatesForForm !== undefined
-            ? Number(raw.fusionMaxCandidatesForForm)
-            : runtimeDefaults.fusionMaxCandidatesForForm
-    assert(
-        Number.isFinite(rawMaxCandidates) &&
-            rawMaxCandidates >= runtimeDefaults.fusionMaxCandidatesForFormMin &&
-            rawMaxCandidates <= runtimeDefaults.fusionMaxCandidatesForFormMax,
-        `fusionMaxCandidatesForForm must be between ${runtimeDefaults.fusionMaxCandidatesForFormMin} and ${runtimeDefaults.fusionMaxCandidatesForFormMax}`
-    )
-
     logger.info('Configuration validation completed successfully')
 
     return {
         reset: extractBoolean(raw, 'reset') ?? runtimeDefaults.reset,
         managedAccountsBatchSize: (raw.managedAccountsBatchSize as number | undefined) ?? runtimeDefaults.managedAccountsBatchSize,
-        fusionMaxCandidatesForForm: Math.trunc(rawMaxCandidates),
         concurrencyCheckEnabled: extractBoolean(raw, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled,
         forceAttributeRefresh: extractBoolean(raw, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh,
         externalLoggingEnabled,

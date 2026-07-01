@@ -102,7 +102,7 @@ export type DryRunSummary = {
     writeToDisk?: boolean
 }
 
-/** Dry-run wire: fusion candidate only (`identity` vs same-aggregation `deferred`). */
+/** Dry-run wire: fusion candidate only (`identity` vs deferred-matching `deferred`). */
 type MatchingCandidate = {
     identityName: string
     identityId?: string

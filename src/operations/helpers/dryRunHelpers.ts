@@ -450,7 +450,7 @@ export const streamUncorrelatedAnalyzedRows = async (
 }
 
 /**
- * Deferred same-aggregation matches do not create a fusion account in the run, so the managed
+ * Deferred-matching matches do not create a fusion account in the run, so the managed
  * account id never appears on any `forEachISCAccount` row. Emit synthetic ISC-shaped stubs so
  * `enrichISCAccountWithMatching` can attach the deferred FusionReportAccount slice.
  */

@@ -19,6 +19,6 @@ Identity Fusion NG Framework
 | [Match](guides/match.md)                                                            | Detect and resolve potential matching identities using one or more sources.                                  |
 | [Source configuration](guides/source-configuration.md)                              | In-depth guide on source settings, scope, aggregation timing, and correlation modes.                         |
 | [Migration from previous Identity Fusion](guides/migration-from-previous-fusion.md) | Migrate from an earlier Identity Fusion version: add the old source as managed, align schemas, then migrate. |
-| [Advanced connection settings](guides/advanced-connection-settings.md)              | Queue, retry, batch sizing, timeouts, and external logging.                                                  |
+| [Advanced connection settings](guides/advanced-connection-settings.md)              | Queue, retry, timeouts, concurrency, and external logging.                                                   |
 | [Proxy mode](guides/proxy-mode.md)                                                  | Run connector logic on an external server and connect ISC via proxy.                                         |
 | [Troubleshooting](guides/troubleshooting.md)                                        | Common issues, checks, and recovery steps.                                                                   |

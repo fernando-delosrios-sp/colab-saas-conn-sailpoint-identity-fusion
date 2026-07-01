@@ -11,7 +11,7 @@ Advanced Settings are organized into three sections:
 | Section                          | Purpose                                                         | When to configure                                                  |
 | -------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------ |
 | **Developer Settings**           | Reset accounts, external logging                                | Testing, troubleshooting, centralized monitoring                   |
-| **Advanced Connection Settings** | API behavior: queue, retry, batch sizing, timeouts, concurrency | Production tuning, rate limit management, performance optimization |
+| **Advanced Connection Settings** | API behavior: queue, retry, timeouts, concurrency | Production tuning, rate limit management, performance optimization |
 | **Proxy Settings**               | Delegate processing to external server                          | Custom deployment requirements (see [Proxy mode](proxy-mode.md))   |
 
 **Screenshot placeholder:** Advanced Settings menu interface.
@@ -31,8 +31,7 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 | Field                                            | Type     | Purpose                                                                                        | Default                                                | Risk level                                    |
 | ------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------- |
 | **Reset accounts?**                              | Boolean  | Force rebuild of all Fusion accounts from scratch                                              | No                                                     | ⚠️ **HIGH** — Deletes all Fusion account data |
-| **Managed accounts batch size**                  | Number   | Number of uncorrelated managed accounts per batch                                              | 50                                                     | Low                                           |
-| **Max match candidates per review form**         | Number   | Limit of potential matches shown on review form                                                | From `connector-spec.json` `sourceConfigInitialValues` | Low                                           |
+| **Managed accounts batch size**                  | Number   | Number of uncorrelated managed accounts per batch                                              | 100                                                    | Low                                           |
 | **Force attribute refresh on next aggregation?** | Boolean  | Recalculate Normal-type attributes on the next aggregation only (auto-disabled after that run) | No                                                     | Medium                                        |
 | **Enable concurrency check?**                    | Boolean  | Prevent concurrent aggregations                                                                | Yes                                                    | Low                                           |
 | **Enable external logging?**                     | Boolean  | Send connector logs to external endpoint                                                       | No                                                     | Low                                           |
@@ -155,7 +154,6 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 | **Provisioning & timing** | Provisioning timeout, Processing wait time     | Max wait times for operations         |
 | **Queue**                 | Max concurrent requests, Requests per second   | Rate limiting and concurrency control |
 | **Retry**                 | API request retries                            | Automatic retry for failed requests   |
-| **Batch sizing**          | Batch size                                     | Tune page size and throughput balance |
 
 **Screenshot placeholder:** Advanced Connection Settings interface.
 
@@ -280,24 +278,6 @@ HTTP 429 retry (rate limit):
 
     The retry delay uses exponential backoff with a 1000 ms base. For HTTP 429, the connector uses the `Retry-After` header from the API response, which may be longer.
 
-### Batch size
-
-`Batch size` controls the account pagination size used for list retrieval and throughput tuning.
-
-| Field          | Default | Range | Purpose                                              |
-| -------------- | ------- | ----- | ---------------------------------------------------- |
-| **Batch size** | 250     | 1–250 | Number of records fetched per page/request iteration |
-
-**Tuning guidance:**
-
-| Scenario                                   | Batch size |
-| ------------------------------------------ | ---------- |
-| Large datasets with stable API performance | 250        |
-| Rate-limited or unstable tenants           | 100–200    |
-| Troubleshooting memory spikes/timeouts     | 50–100     |
-
-**Trade-off:** Larger batch sizes reduce round trips but can increase payload size and per-call latency.
-
 ## Part 3: Configuration patterns
 
 ### Pattern 1: Production with many accounts (recommended)
@@ -316,13 +296,11 @@ Advanced Connection Settings:
 - Max concurrent requests: 15
 - API request retries: 20
 - Requests per second: 10
-- Batch size: 250
 ```
 
 **Rationale:**
 
 - Queue + retry handle rate limits and transient failures
-- Batch size 250 balances throughput and payload size
 - External logging provides visibility
 - Moderate concurrency balances speed and API load
 
@@ -336,14 +314,12 @@ Advanced Connection Settings:
 - Max concurrent requests: 10
 - API request retries: 20
 - Requests per second: 10
-- Batch size: 250
 ```
 
 **Rationale:**
 
 - Extended timeout for bulk operations
 - Concurrency and RPS tuned to connector-spec ranges
-- Larger page size can improve throughput when API is stable
 - More retries for resilience
 
 ### Pattern 3: Rate limit sensitive
@@ -355,7 +331,6 @@ Advanced Connection Settings:
 - Max concurrent requests: 5
 - API request retries: 20
 - Requests per second: 5
-- Batch size: 100
 ```
 
 **Rationale:**
@@ -376,14 +351,13 @@ Developer Settings:
 Advanced Connection Settings:
 - Provisioning timeout: 300
 - API request retries: 10
-- Batch size: 100
 ```
 
 **Rationale:**
 
 - Reset accounts for clean slate
 - Debug logging for troubleshooting
-- Simpler settings and smaller page size for easier debugging
+- Simpler settings for easier debugging
 
 ### Pattern 5: Troubleshooting performance
 
@@ -423,7 +397,7 @@ Advanced Connection Settings:
 | ---------------------- | ----------------------------------------------------------------------------------- | ------------------- |
 | 1. Baseline            | Run aggregation with default settings; record metrics                               | Establish baseline  |
 | 2. Identify bottleneck | Check: HTTP 429? Slow API? High queue wait?                                         | Find constraint     |
-| 3. Adjust              | Lower RPS if 429; increase concurrency if slow; tune batch size for payload profile | Relieve bottleneck  |
+| 3. Adjust              | Lower RPS if 429; increase concurrency if slow                                          | Relieve bottleneck  |
 | 4. Test                | Run aggregation with new settings; compare metrics                                  | Measure improvement |
 | 5. Iterate             | Repeat steps 2–4 until satisfactory                                                 | Optimize            |
 
@@ -435,7 +409,7 @@ Advanced Connection Settings:
 | ------------------------------- | -------------------------------------- | ------------------------------------------------------------ |
 | **HTTP 429 (rate limit)**       | RPS too high                           | Lower RPS; retry is automatic                                |
 | **Aggregation timeout**         | Provisioning timeout too low; slow API | Increase timeout; check ISC performance                      |
-| **Slow aggregation**            | Low concurrency; suboptimal page size  | Increase max concurrent requests; tune batch size            |
+| **Slow aggregation**            | Low concurrency                        | Increase max concurrent requests; tune RPS                   |
 | **Accounts stuck processing**   | Timeout; unfinished run                | Increase timeout; retry aggregation (auto-resets stuck flag) |
 | **External logs not appearing** | Wrong URL; endpoint down               | Verify URL; check endpoint availability                      |
 | **Reset not working**           | Didn't disable after reset             | Reset works once; must disable to prevent repeat             |
@@ -466,13 +440,12 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 | **Provisioning & timing** | Provisioning timeout, Processing wait | Operation timeouts                      |
 | **Queue**                 | Max concurrent, RPS                   | Rate limiting, concurrency control      |
 | **Retry**                 | API request retries                   | Resilience, handling transient failures |
-| **Batch sizing**          | Batch size                            | Throughput and payload-size tuning      |
 
 **Best practices:**
 
-1. **Production:** Tune retries and batch size, configure external logging
+1. **Production:** Tune retries, concurrency, and RPS; configure external logging
 2. **Rate limits:** Lower RPS and concurrency; retries are automatic
-3. **Performance:** Increase concurrency and batch size (within rate limits)
+3. **Performance:** Increase concurrency and RPS only within tenant rate limits
 4. **Testing:** Use Debug logging; enable reset once then disable
 5. **Monitoring:** Track metrics; adjust based on observed behavior
 

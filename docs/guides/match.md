@@ -88,15 +88,16 @@ Configure **Source Settings → Sources** to specify which sources contribute ac
 | Configuration           | Typical setup                                                           | Example                                   |
 | ----------------------- | ----------------------------------------------------------------------- | ----------------------------------------- |
 | **Multiple sources**    | 2–5 authoritative sources                                               | Workday (HR), Active Directory, Okta, SAP |
-| **Per-source settings** | Source name (exact match), force aggregation (optional), account filter | See table below                           |
+| **Per-source settings** | Source name (exact match), aggregation mode, account filter | See table below                           |
 
 **Per-source configuration:**
 
 | Field                                    | Value                               | When to use                 | Notes                                                    |
 | ---------------------------------------- | ----------------------------------- | --------------------------- | -------------------------------------------------------- |
 | **Source name**                          | Exact ISC source name               | Always (required)           | Case-sensitive; verify in Admin → Connections → Sources  |
-| **Force aggregation before processing?** | No                                  | Default; faster             | Ensures current data but significantly increases runtime |
-| **Force aggregation before processing?** | Yes                                 | Real-time accuracy critical | Each Fusion run triggers fresh source aggregation        |
+| **Account aggregation mode**             | **Do not aggregate**                | Default; faster             | Uses existing account data                               |
+| **Account aggregation mode**             | **Aggregate before processing**     | Real-time accuracy critical | Each Fusion run triggers fresh source aggregation first  |
+| **Account aggregation mode**             | **Delayed aggregation**             | Non-blocking refresh        | Refreshes source accounts after Fusion returns results   |
 | **Account filter**                       | Empty                               | Default; all accounts       | Leave empty initially                                    |
 | **Account filter**                       | `attributes.accountType:"employee"` | Subset of accounts          | Filter by account attribute                              |
 | **Aggregation batch size**               | Empty                               | Process all accounts        | Default for production                                   |
@@ -112,12 +113,12 @@ Configure **Source Settings → Processing Control** for account lifecycle:
 | ----------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Maximum history messages**                          | 10 (default)          | Balance between audit trail and storage                                                                                                                                                                                                                                                       |
 | **Delete accounts with no managed accounts left?**    | Yes                   | Auto-cleanup when person leaves organization and all source accounts are removed                                                                                                                                                                                                              |
-| **Correlate missing source accounts on aggregation?** | Yes                   | Automatically correlate new or previously missing source accounts. When this is **disabled**, a new managed account will **not** be correlated to an existing identity during aggregation unless you also configure an enforced correlation role (see below).                                 |
+| **Correlation mode**                                  | **Correlate missing accounts on aggregation** | Automatically correlate new or previously missing source accounts during aggregation. Other options are **Reverse correlation from managed source** (sets a Fusion attribute for ISC native correlation) and **Do not correlate**.                                                         |
 | **Force attribute refresh on next aggregation?**      | No                    | Located at **Advanced Settings → Developer Settings**. Applies only to Normal-type attributes; Unique attributes are only computed on account creation or activation. One-time refresh: the option is automatically turned off after the next run. Expensive if attributes change frequently. |
 
 !!! warning "Important"
 
-    When merging a new managed account with an existing identity, managed account correlation will only occur if **Correlate missing source accounts on aggregation?** is enabled **or** you have configured an **enforced correlation role** that drives that correlation. Otherwise, the connector will not correlate the new managed account automatically.
+    When merging a new managed account with an existing identity, managed account correlation will only occur if **Correlation mode** is set to **Correlate missing accounts on aggregation** **or** you have configured an **enforced correlation role** that drives that correlation. Otherwise, the connector will not correlate the new managed account automatically.
 
 ---
 
@@ -245,16 +246,17 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 
 Configure **Attribute Matching Settings → Review Settings** for the manual review workflow:
 
-| Field                                              | Purpose                                     | Recommended value                                             |
-| -------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------- |
-| **List of identity attributes to include in form** | Attributes shown to reviewer                | `name`, `email`, `department`, `manager`, `hireDate`, `phone` |
-| **Manual review expiration days**                  | Form expiration                             | 7 (default); adjust based on SLA                              |
-| **Owner is global reviewer?**                      | Add Fusion source owner to all review forms | Yes (ensures at least one reviewer)                           |
-| **Send report to owner on aggregation?**           | Email report after each aggregation         | Yes (useful for monitoring)                                   |
+| Field                                                    | Purpose                                     | Recommended value                                             |
+| -------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------- |
+| **List of Fusion account attributes to include in form** | Attributes shown to reviewer                | `name`, `email`, `department`, `manager`, `hireDate`, `phone` |
+| **Manual review expiration days**                        | Form expiration                             | 7 (default); adjust based on SLA                              |
+| **Maximum candidates per review form**                   | Limit of potential matches shown on form    | 3 (default); valid range 1–15                                 |
+| **Owners are global reviewers?**                         | Add Fusion source owner to all review forms | Yes (ensures at least one reviewer)                           |
+| **Send report to owner on aggregation?**                 | Email report after each aggregation         | Yes (useful for monitoring)                                   |
 
 !!! note
 
-    The maximum number of candidate identities shown on a single review form is controlled by **Max match candidates per review form** in **Advanced Settings → Developer Settings** (default for new sources comes from `fusionMaxCandidatesForForm` in `connector-spec.json` → `sourceConfigInitialValues`; max 15). Only the highest-scoring potential matches are included if the limit is exceeded.
+    The **Maximum candidates per review form** setting lives in **Attribute Matching Settings → Review Settings**. Only the highest-scoring potential matches are included if the limit is exceeded.
 
 ### Localization (i18n)
 
@@ -324,7 +326,7 @@ Include attributes that help reviewers decide if identities are matches:
 
 For each source, create an access profile that grants reviewer permissions. The connector automatically creates a dedicated reviewer entitlement for each managed source that can be assigned to your users.
 
-While the connector supports establishing the current source owner as a **global reviewer** for all managed sources (via "Owner is global reviewer?"), it is recommended to use the dedicated per-source reviewer entitlements for granular control.
+While the connector supports establishing the current source owner as a **global reviewer** for all managed sources (via "Owners are global reviewers?"), it is recommended to use the dedicated per-source reviewer entitlements for granular control.
 
 | Access profile                 | Entitlement                                        | Assignment                         |
 | ------------------------------ | -------------------------------------------------- | ---------------------------------- |
@@ -368,7 +370,7 @@ An **enforced correlation role** is an automatically assigned ISC role that oper
         - Uncorrelated accounts get the correlated action entitlement so that they are brought into correlation.
         - Already correlated accounts keep the correlated action entitlement so their state remains consistent.
 - **How this relates to aggregation correlation**
-    - If **Correlate missing source accounts on aggregation?** is disabled, configuring an enforced correlation role is the supported way to still ensure that new managed accounts are correlated to their Fusion identities during or after aggregation.
+    - If **Correlation mode** is set to **Do not correlate**, configuring an enforced correlation role is the supported way to still ensure that new managed accounts are correlated to their Fusion identities during or after aggregation.
 
 ---
 
@@ -397,7 +399,7 @@ An **enforced correlation role** is an automatically assigned ISC role that oper
 
 When account aggregation runs on the Fusion source:
 
-1. If **Force aggregation before processing?** is enabled for any source, trigger aggregation on those sources first
+1. If **Account aggregation mode** is set to **Aggregate before processing** for any source, trigger aggregation on those sources first
 2. Wait for source aggregations to complete (poll task status every 30 seconds, up to the per-source **Aggregation wait timeout (minutes)**)
 3. Fetch accounts from each configured source (apply **Account filter** if set)
 4. For each person/identity in scope:
@@ -440,10 +442,10 @@ If review form created:
 1. ISC creates form instance with:
     - Proxy account attributes
     - List of potential matching identities with similarity scores
-    - Attributes configured in **List of identity attributes to include in form**
+    - Attributes configured in **List of Fusion account attributes to include in form**
 2. ISC sends email to:
     - Reviewers assigned via `<Source Name> reviewer` access profiles
-    - Global reviewer (if **Owner is global reviewer?** = Yes)
+    - Global reviewer (if **Owners are global reviewers?** = Yes)
 3. First reviewer to complete form makes decision:
     - **Link to existing identity**: Select an identity from the list
     - **Create new identity**: Choose "Create new" option
@@ -509,10 +511,10 @@ Track these metrics to assess Match effectiveness:
 | Component                                  | Purpose                                      | Key configuration                                                  |
 | ------------------------------------------ | -------------------------------------------- | ------------------------------------------------------------------ |
 | **Source Settings (Scope)**                | Define identity baseline                     | Include identities = Yes; Identity Scope Query                     |
-| **Source Settings (Sources)**              | Sources contributing account data            | Source names (2+); Force aggregation (optional)                    |
+| **Source Settings (Sources)**              | Sources contributing account data            | Source names (2+); account aggregation mode (optional)             |
 | **Attribute Mapping**                      | Merge source attributes into Fusion accounts | Merge strategies (first/list/concatenate)                          |
 | **Attribute Matching Settings (Matching)** | Duplicate detection rules                    | Fusion attribute matches; algorithms; scores; automatic assignment |
-| **Attribute Matching Settings (Review)**   | Manual review workflow                       | Form attributes; expiration days; global reviewer                  |
+| **Attribute Matching Settings (Review)**   | Manual review workflow                       | Form attributes; expiration days; max candidates; global reviewer  |
 | **Access Profiles**                        | Reviewer permissions                         | Per-source reviewer access profiles; Fusion report                 |
 
 **Match requires:**
