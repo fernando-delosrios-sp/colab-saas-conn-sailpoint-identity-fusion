@@ -139,7 +139,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
     const ownerIdsPromise = ownerIncluded ? sources.fetchGlobalOwnerIdentityIds() : Promise.resolve([])
 
     const fetchTasks: Array<Promise<void>> = [
-        ownerIdsPromise.then(ownerIds => identities.fetchIdentities(ownerIds)),
+        ownerIdsPromise.then((ownerIds) => identities.fetchIdentities(ownerIds)),
         sources.fetchManagedAccounts(),
         sources.fetchFusionAccounts(),
         forms.fetchFormInstances(isPersistent),
@@ -365,14 +365,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     return sent
 }
 
-type PipelinePhase =
-    | 'setup'
-    | 'fetch'
-    | 'refresh'
-    | 'process'
-    | 'uniqueAttributes'
-    | 'output'
-    | 'report'
+type PipelinePhase = 'setup' | 'fetch' | 'refresh' | 'process' | 'uniqueAttributes' | 'output' | 'report'
 
 export interface PipelineRunOptions {
     mode: PipelineMode
@@ -389,25 +382,22 @@ export interface PipelineRunResult {
 }
 
 export class PipelineRunner {
-    static async run(
-        serviceRegistry: ServiceRegistry,
-        options: PipelineRunOptions
-    ): Promise<PipelineRunResult> {
+    static async run(serviceRegistry: ServiceRegistry, options: PipelineRunOptions): Promise<PipelineRunResult> {
         const { log, sources } = serviceRegistry
         const mode = options.mode
         const isPersistent = mode.kind === 'aggregation'
         const timer = log.timer()
 
-        let shouldContinue: boolean;
-        let fetchResult: FetchResult | undefined;
-        let outputCount: number;
+        let shouldContinue: boolean
+        let fetchResult: FetchResult | undefined
+        let outputCount: number
 
         let processLockAcquired = false
 
         const targetPhase = options.targetPhase ?? (isPersistent ? 'report' : 'process')
         const pipelineOptions: CorePipelineOptions = {
             mode,
-            tracker: options.tracker
+            tracker: options.tracker,
         }
 
         try {
@@ -482,5 +472,3 @@ export class PipelineRunner {
         }
     }
 }
-
-
