@@ -102,7 +102,10 @@ export class IdentityProcessor {
                 this.fusionService.sources.managedAccountsById,
                 this.fusionService.sources.managedAccountsByIdentityId,
                 this.fusionService.sources.managedAccountsAllById,
-                this.fusionService.shouldPruneDeletedManagedAccounts()
+                this.fusionService.shouldPruneDeletedManagedAccounts(),
+                true,
+                undefined,
+                (account) => this.fusionService.registerFusionBlend(fusionAccount, account)
             )
 
             await this.fusionService.applyAttributeProcessing(fusionAccount)
