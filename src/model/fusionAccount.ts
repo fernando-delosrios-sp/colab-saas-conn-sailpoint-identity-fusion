@@ -1463,6 +1463,7 @@ export class FusionAccount {
 
             const contextAttributes = {
                 ...(account.attributes ?? {}),
+                name: trimStr(account.name ?? account.nativeIdentity) || accountId,
                 source: {
                     id: trimStr(readString(account, 'sourceId', '')) ?? '',
                     name: account.sourceName ?? '',
