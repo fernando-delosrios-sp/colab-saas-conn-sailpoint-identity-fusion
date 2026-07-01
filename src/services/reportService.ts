@@ -238,30 +238,6 @@ export class ReportService {
         )
     }
 
-    /** Build normalized association blend entries from form decisions for the report. */
-    public buildAssociationBlends(): FusionReportBlend[] {
-        const finishedDecisions = this.forms.finishedFusionDecisions ?? []
-        const urlContext = createUrlContext(this.baseurl)
-        const blends: FusionReportBlend[] = []
-
-        for (const decision of finishedDecisions) {
-            if (!decision.newIdentity && !decision.automaticAssignment) {
-                const identityName = decision.identityName ?? decision.identityId ?? 'Unknown'
-                const identityUrl = decision.identityId ? urlContext.identity(decision.identityId) : undefined
-                const blendedAccountName = trimStr(decision.account.name) || trimStr(decision.account.id) || ''
-                const blendedSource = decision.account.sourceName ?? ''
-
-                blends.push({
-                    accountName: identityName,
-                    accountUrl: identityUrl,
-                    blendedAccountName,
-                    blendedSource,
-                })
-            }
-        }
-        return blends
-    }
-
 
     /**
      * Merge aggregation metrics with fusion-review counters and system diagnostics.
@@ -553,10 +529,6 @@ export class ReportService {
             const tracker = this.fusion.tracker
             const report = this.fusion.generateReport(tracker, includeNonMatches, stats)
             report.fusionReviewDecisions = this.buildFusionReviewDecisions()
-            const formBlends = this.buildAssociationBlends()
-            if (formBlends.length > 0) {
-                report.fusionBlends = [...(report.fusionBlends ?? []), ...formBlends]
-            }
             reportPhaseTimer.phase('PHASE 7: Report (fusion report)', 'info', 'Report')
             const priorPhases = aggregationStats.phaseTiming ?? []
             stats.phaseTiming = [...priorPhases, ...reportPhaseTimer.getPhaseBreakdown()]
@@ -568,10 +540,6 @@ export class ReportService {
         const tracker = this.fusion.tracker
         const report = this.fusion.generateReport(tracker, includeNonMatches, undefined)
         report.fusionReviewDecisions = this.buildFusionReviewDecisions()
-        const formBlends = this.buildAssociationBlends()
-        if (formBlends.length > 0) {
-            report.fusionBlends = [...(report.fusionBlends ?? []), ...formBlends]
-        }
         await this.messaging.sendReport(report, 'fusion')
         this.identities.clear()
     }
