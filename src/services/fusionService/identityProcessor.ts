@@ -103,7 +103,7 @@ export class IdentityProcessor {
                 this.fusionService.sources.managedAccountsByIdentityId,
                 this.fusionService.sources.managedAccountsAllById,
                 this.fusionService.shouldPruneDeletedManagedAccounts(),
-                true,
+                false,
                 undefined,
                 (account) => this.fusionService.registerFusionBlend(fusionAccount, account)
             )
