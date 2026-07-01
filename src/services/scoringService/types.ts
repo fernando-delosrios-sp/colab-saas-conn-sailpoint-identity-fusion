@@ -14,7 +14,9 @@ export enum MatchCandidateType {
  * Result of scoring a single attribute comparison. Extends the matching config
  * with the calculated score and match result.
  */
-export type ScoreReport = MatchingConfig & {
+export type ScoreReport = Omit<MatchingConfig, 'algorithm'> & {
+    /** The similarity algorithm to use for comparison, or 'weighted-mean' for the combined score */
+    algorithm?: MatchingConfig['algorithm'] | 'weighted-mean'
     /** Raw algorithm similarity (0-100) */
     score: number
     /** Weighted partial toward the combined score: (blendWeight/Σw)×raw; sums to combined for evaluated rules */
