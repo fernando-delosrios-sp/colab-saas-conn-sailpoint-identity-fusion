@@ -9,6 +9,8 @@ export const locales: Record<string, TranslationDictionary> = {
         aggregation_errors: 'Aggregation Errors',
         fusion_review_decisions: 'Fusion Review Decisions',
         fusion_blends: 'Fusion Blends',
+        blended: 'Blended',
+        blended_account: 'Blended Account',
         auto: 'AUTO',
         manual: 'MANUAL',
         reviewer: 'Reviewer',

@@ -162,7 +162,13 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
             <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">{{i18n "fusion_blends"}}</div>
             {{#each fusionBlends}}
             <div style="margin-bottom: 10px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 12px; background: #fbfcff;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+              <div style="font-size:14px; font-weight:900; color:#0f172a; line-height:1.3;">
+                {{i18n "blended"}}
+                {{#if isAutoAssignment}}
+                <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:11px; font-weight:700; text-transform:uppercase; vertical-align:middle;">{{i18n "auto"}}</span>
+                {{/if}}
+              </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px; border-collapse:collapse;">
                 <tr>
                   <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700; width:140px;">{{i18n "account"}}</td>
                   <td style="padding:3px 0; font-size:12px; color:#0f172a;">
@@ -174,12 +180,8 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">{{i18n "source"}}</td>
-                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{blendedSource}}</td>
-                </tr>
-                <tr>
-                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">{{i18n "value"}}</td>
-                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{blendedAccountName}}</td>
+                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">{{i18n "blended_account"}}</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{blendedAccountName}} [{{blendedSource}}]</td>
                 </tr>
               </table>
             </div>
@@ -189,7 +191,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
         {{/if}}
 
         {{#if accounts}}
-          <div style="margin-top: 18px; font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: -6px;">{{i18n "new_fusion_reviews"}}</div>
+          <div style="margin-top: 18px; font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">{{i18n "new_fusion_reviews"}}</div>
                   </td>
                 </tr>
                 <tr>
