@@ -26,7 +26,7 @@ describe('accountUpdate', () => {
 
     it('executes action entitlement changes and returns updated account', async () => {
         const registry = createRegistry()
-        const fusionAccount = { nativeIdentity: 'fusion-1', name: 'Fusion User' }
+        const fusionAccount = { managedKey: 'fusion-1', name: 'Fusion User' }
         ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
 
         const input = {
@@ -55,7 +55,7 @@ describe('accountUpdate', () => {
 
     it('skips correlation status recompute when removing correlated action', async () => {
         const registry = createRegistry()
-        const fusionAccount = { nativeIdentity: 'fusion-1', name: 'Fusion User' }
+        const fusionAccount = { managedKey: 'fusion-1', name: 'Fusion User' }
         ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
 
         await accountUpdate(registry, {
@@ -69,7 +69,7 @@ describe('accountUpdate', () => {
 
     it('logs crash for unsupported entitlement change attribute', async () => {
         const registry = createRegistry()
-        ;(rebuildFusionAccount as jest.Mock).mockResolvedValue({ nativeIdentity: 'fusion-1' })
+        ;(rebuildFusionAccount as jest.Mock).mockResolvedValue({ managedKey: 'fusion-1' })
 
         await accountUpdate(registry, {
             identity: 'fusion-1',
@@ -92,7 +92,7 @@ describe('accountUpdate', () => {
             },
         })
         const fusionAccount = {
-            nativeIdentity: 'fusion-1',
+            managedKey: 'fusion-1',
             attributes: {
                 reverseNativeIdentity: 'native-after-rebuild',
             } as Record<string, string>,

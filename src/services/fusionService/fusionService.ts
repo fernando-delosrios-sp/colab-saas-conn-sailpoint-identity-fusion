@@ -73,7 +73,7 @@ export class FusionService {
     public get fusionAccountMap(): Map<string, FusionAccount> { return this._repository.fusionAccountMap }
     public get _reviewersBySourceId(): Map<string, Set<FusionAccount>> { return this._repository.reviewersBySourceId }
     public get _sourcesWithoutReviewers(): Set<string> { return this._repository.sourcesWithoutReviewers }
-    public get currentRunUnmatchedFusionNativeIdentitiesBySource(): Map<string, Set<string>> { return this._repository.currentRunUnmatchedFusionNativeIdentitiesBySource }
+    public get currentRunUnmatchedFusionManagedKeysBySource(): Map<string, Set<string>> { return this._repository.currentRunUnmatchedFusionManagedKeysBySource }
     public get autoAssignedIdentityIds(): Set<string> { return this._repository.autoAssignedIdentityIds }
     public get _linkedAccountKeyIndex(): Set<string> | undefined { return this._repository.linkedAccountKeyIndex }
     public set _linkedAccountKeyIndex(value: Set<string> | undefined) { this._repository.linkedAccountKeyIndex = value }
@@ -292,7 +292,7 @@ export class FusionService {
         )
         const results: FusionAccount[] = []
         await forEachBatched(fusionAccounts, async (x: Account) => {
-            const fusionAccount = FusionAccount.fromFusionAccount(x)
+            const fusionAccount = FusionAccount.fromFusionAccount(x, this.sources.fusionSourceId)
             this.setFusionAccount(fusionAccount)
             results.push(fusionAccount)
         })
@@ -417,10 +417,10 @@ export class FusionService {
         originIdentityInScope?: boolean
     ): Promise<FusionAccount> {
         const { refreshMapping, refreshDefinition, resetDefinition } = attributeOperations
-        const fusionAccount = FusionAccount.fromFusionAccount(account)
+        const fusionAccount = FusionAccount.fromFusionAccount(account, this.sources.fusionSourceId)
         this.log.debug(
-            `Pre-processing fusion account: ${fusionAccount.name} (${account.nativeIdentity}), ` +
-            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+            `Pre-processing fusion account: ${fusionAccount.name} (${fusionAccount.managedKey}), ` +
+                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
@@ -1310,12 +1310,9 @@ export class FusionService {
      * Resolves all pending operations (correlations, reviews) before building the output,
      * then syncs collection attributes and applies the schema subset filter.
      *
-     * Key / nativeIdentity handling:
-     * - For existing accounts that already have a key (set during creation), the key is
-     *   reused as-is. The nativeIdentity is never changed after creation to prevent
-     *   disconnection between the existing Fusion account and the platform.
-     * - For interim accounts (from processIdentity or processFusionIdentityDecision),
-     *   the key is generated here via {@link AttributeService.getSimpleKey}.
+     * Key / managedKey handling:
+     * - The output key is always `key.simple.id = fusionAccount.managedKey`.
+     * - The managedKey is set by the factory method and never changed afterwards.
      * - When `skipAccountsWithMissingId` is enabled and the identity attribute is empty,
      *   getSimpleKey returns undefined and the account is omitted from the output. This
      *   enables a deliberate pattern: generate an empty identity attribute to prevent
@@ -1486,13 +1483,13 @@ export class FusionService {
     }
 
     private registerCurrentRunUnmatchedCandidate(fusionAccount: FusionAccount): void {
-        const { nativeIdentity } = fusionAccount
-        if (!nativeIdentity || !this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) return
+        const { managedKey } = fusionAccount
+        if (!managedKey || !this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) return
         const sourceKey = this.deferredMatchingSourceKey(fusionAccount.sourceName)
         if (!sourceKey) return
-        const setForSource = this.currentRunUnmatchedFusionNativeIdentitiesBySource.get(sourceKey) ?? new Set<string>()
-        setForSource.add(nativeIdentity)
-        this.currentRunUnmatchedFusionNativeIdentitiesBySource.set(sourceKey, setForSource)
+        const setForSource = this.currentRunUnmatchedFusionManagedKeysBySource.get(sourceKey) ?? new Set<string>()
+        setForSource.add(managedKey)
+        this.currentRunUnmatchedFusionManagedKeysBySource.set(sourceKey, setForSource)
     }
 
     private deferredMatchingSourceKey(sourceName: string | null | undefined): string {
@@ -1625,16 +1622,16 @@ export class FusionService {
 
     /** Generator that yields unmatched candidates without allocating intermediate arrays. */
     private *_currentRunUnmatchedCandidatesIterableForSource(sourceKey: string): Iterable<FusionAccount> {
-        const sourceCandidates = this.currentRunUnmatchedFusionNativeIdentitiesBySource.get(sourceKey)
+        const sourceCandidates = this.currentRunUnmatchedFusionManagedKeysBySource.get(sourceKey)
         if (!sourceCandidates) return
-        for (const nativeIdentity of sourceCandidates) {
-            const account = this.fusionAccountMap.get(nativeIdentity)
+        for (const managedKey of sourceCandidates) {
+            const account = this.fusionAccountMap.get(managedKey)
             if (account) yield account
         }
     }
 
     /**
-     * Get all fusion accounts keyed by native identity as an array.
+     * Get all fusion accounts keyed by managedKey as an array.
      * Note: Creates a new array on each access.
      */
     public get fusionAccounts(): FusionAccount[] {
@@ -1673,7 +1670,7 @@ export class FusionService {
         this._managedAccountProcessingStartedAt = Date.now()
 
         this.tracker.newManagedAccountsCount = map.size
-        this.currentRunUnmatchedFusionNativeIdentitiesBySource.clear()
+        this.currentRunUnmatchedFusionManagedKeysBySource.clear()
         this.autoAssignedIdentityIds.clear()
         this.currentRunMatchScoringMs = 0
 
@@ -1730,13 +1727,13 @@ export class FusionService {
     }
 
     /**
-     * Retrieves a fusion account by its native identity (unique key).
+     * Retrieves a fusion account by its managedKey (unique key).
      *
-     * @param nativeIdentity - The native identity string to look up
+     * @param managedKey - The managedKey string to look up
      * @returns The fusion account, or undefined if not found
      */
-    public getFusionAccountByNativeIdentity(nativeIdentity: string): FusionAccount | undefined {
-        return this.fusionAccountMap.get(nativeIdentity)
+    public getFusionAccountByManagedKey(managedKey: string): FusionAccount | undefined {
+        return this.fusionAccountMap.get(managedKey)
     }
 
     /**

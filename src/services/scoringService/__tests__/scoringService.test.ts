@@ -486,7 +486,7 @@ describe('ScoringService deferred candidate matching', () => {
         const managedCandidate = {
             attributes: { email: 'self@example.com' },
             managedAccountId: 'source-id::self@example.com',
-            nativeIdentityOrUndefined: 'source-id::self@example.com',
+            managedKeyOrUndefined: 'source-id::self@example.com',
             addFusionMatch: jest.fn(),
         } as any
 
@@ -519,7 +519,7 @@ describe('ScoringService deferred candidate matching', () => {
         const analyzedManagedCandidate = {
             attributes: { email: 'self@example.com' },
             managedAccountId: managedKey,
-            nativeIdentityOrUndefined: managedKey,
+            managedKeyOrUndefined: managedKey,
             addFusionMatch: jest.fn(),
         } as any
 
@@ -528,7 +528,7 @@ describe('ScoringService deferred candidate matching', () => {
         const persistedUnmatchedCandidate = {
             attributes: { email: 'self@example.com' },
             managedAccountId: undefined,
-            nativeIdentityOrUndefined: 'fusion-simple-key',
+            managedKeyOrUndefined: 'fusion-simple-key',
             originAccountId: managedKey,
             accountIdsSet: new Set<string>(),
             missingAccountIdsSet: new Set<string>([managedKey]),
@@ -563,14 +563,14 @@ describe('ScoringService deferred candidate matching', () => {
         const analyzedManagedCandidate = {
             attributes: { email: 'self@example.com' },
             managedAccountId: managedKey,
-            nativeIdentityOrUndefined: managedKey,
+            managedKeyOrUndefined: managedKey,
             addFusionMatch: jest.fn(),
         } as any
 
         const persistedUnmatchedCandidate = {
             attributes: { email: 'self@example.com' },
             managedAccountId: undefined,
-            nativeIdentityOrUndefined: 'fusion-simple-key',
+            managedKeyOrUndefined: 'fusion-simple-key',
             originAccountId: ' source-id :: self@example.com ',
             accountIdsSet: new Set<string>(),
             missingAccountIdsSet: new Set<string>(),

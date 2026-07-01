@@ -116,7 +116,7 @@ export const buildFormName = (fusionAccount: FusionAccount, fusionFormNamePatter
     const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
     const source = `[${fusionAccount.sourceName}]`
     const accountIdentifier =
-        trimStr(fusionAccount.nativeIdentity) || trimStr(fusionAccount.managedAccountId) || 'unknown'
+        trimStr(fusionAccount.managedKey) || trimStr(fusionAccount.managedAccountId) || 'unknown'
     return `${fusionFormNamePattern} - ${accountName} ${source} (${accountIdentifier})`
 }
 

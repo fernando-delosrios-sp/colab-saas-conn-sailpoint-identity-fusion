@@ -65,12 +65,12 @@ export class IdentityProcessor {
             const existingAccount = this.findFusionAccountByIdentityManagedAccounts(identity)
             if (existingAccount) {
                 this.fusionService.log.debug(
-                    `Reusing existing Fusion account ${existingAccount.nativeIdentity} for identity ` +
+                    `Reusing existing Fusion account ${existingAccount.managedKey} for identity ` +
                         `${identity.name} (${identityId}) - prevents duplicate baseline creation`
                 )
                 // Remove from whichever map currently holds it
-                if (this.fusionService.fusionAccountMap.get(existingAccount.nativeIdentity) === existingAccount) {
-                    this.fusionService.fusionAccountMap.delete(existingAccount.nativeIdentity)
+                if (this.fusionService.fusionAccountMap.get(existingAccount.managedKey) === existingAccount) {
+                    this.fusionService.fusionAccountMap.delete(existingAccount.managedKey)
                 } else {
                     for (const [staleId, fa] of this.fusionService.fusionIdentityMap.entries()) {
                         if (fa === existingAccount) {

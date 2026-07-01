@@ -89,7 +89,7 @@ function ensureFusionAccountsPopulated(step: StepDefinition, context: ChainConte
 
     const initialFusionAccounts = scenario.initialState?.fusionAccounts ?? []
     for (const fa of initialFusionAccounts) {
-        const nid = fa.nativeIdentity || fa.key?.simple?.id || fa.attributes?.id
+        const nid = fa.managedKey || fa.key?.simple?.id || fa.attributes?.id
         if (nid) {
             fusionMap.set(nid, { ...fa })
         }
@@ -109,7 +109,7 @@ function ensureFusionAccountsPopulated(step: StepDefinition, context: ChainConte
                     const existing = fusionMap.get(nid) ?? {}
                     fusionMap.set(nid, {
                         ...existing,
-                        nativeIdentity: nid,
+                        managedKey: nid,
                         identityId: identityId ?? existing.identityId,
                         disabled: out.disabled !== undefined ? out.disabled : existing.disabled,
                         attributes: {
@@ -126,7 +126,7 @@ function ensureFusionAccountsPopulated(step: StepDefinition, context: ChainConte
             const deltaFusionAccounts = delta.fusionAccounts as any[] | undefined
             if (deltaFusionAccounts && deltaFusionAccounts.length > 0) {
                 for (const fa of deltaFusionAccounts) {
-                    const nid = fa.nativeIdentity || fa.key?.simple?.id || fa.attributes?.id
+                    const nid = fa.managedKey || fa.key?.simple?.id || fa.attributes?.id
                     if (nid) {
                         const existing = fusionMap.get(nid) ?? {}
                         fusionMap.set(nid, {
@@ -140,7 +140,7 @@ function ensureFusionAccountsPopulated(step: StepDefinition, context: ChainConte
             const deltaFusionAccountsAdd = delta.fusionAccountsAdd as any[] | undefined
             if (deltaFusionAccountsAdd) {
                 for (const fa of deltaFusionAccountsAdd) {
-                    const nid = fa.nativeIdentity || fa.key?.simple?.id || fa.attributes?.id
+                    const nid = fa.managedKey || fa.key?.simple?.id || fa.attributes?.id
                     if (nid) {
                         const existing = fusionMap.get(nid) ?? {}
                         fusionMap.set(nid, {
@@ -380,7 +380,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     })
 
     const fusionAccounts = state.getFusionAccounts()
-    const getNativeIdentity = (a: any) => a.nativeIdentity || a.key?.simple?.id || a.attributes?.id
+    const getNativeIdentity = (a: any) => a.managedKey || a.key?.simple?.id || a.attributes?.id
     const fusionMap = new Map<string, any>()
     for (const a of fusionAccounts) {
         const nid = getNativeIdentity(a)
@@ -500,10 +500,10 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         console.log('processFusionAccounts mock: got raw accounts count:', faList.length)
         for (const rawAccount of faList) {
             const processedFa = await registry.fusion.processFusionAccount(rawAccount)
-            const nativeId = rawAccount.nativeIdentity // Use rawAccount's nativeIdentity to match what's in state
-            const existingInState = state.getFusionAccount(nativeId)
+            const managedKey = rawAccount.managedKey // Use rawAccount's managedKey to match what's in state
+            const existingInState = state.getFusionAccount(managedKey)
             console.log(
-                `processFusionAccounts mock: processed account nativeId=${nativeId}, existingInState=${!!existingInState}`
+                `processFusionAccounts mock: processed account managedKey=${managedKey}, existingInState=${!!existingInState}`
             )
             if (existingInState) {
                 processedFa.syncCollectionAttributesToBag()
@@ -547,17 +547,17 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         activeFusionIdentities.set(identity.id, fusionAccount)
 
         // Also add to state so that getISCAccount and output see it!
-        const nativeId = fusionAccount.nativeIdentity
-        if (nativeId) {
+        const managedKey = fusionAccount.managedKey
+        if (managedKey) {
             const rawAccount = {
-                key: { simple: { id: nativeId } },
-                nativeIdentity: nativeId,
+                key: { simple: { id: managedKey } },
+                managedKey,
                 identityId: identity.id,
                 attributes: { ...fusionAccount.attributes },
                 disabled: fusionAccount.disabled,
             }
             state.addFusionAccount(rawAccount)
-            console.log('processIdentity mock: added raw fusion account to state:', nativeId)
+            console.log('processIdentity mock: added raw fusion account to state:', managedKey)
         }
 
         return fusionAccount
@@ -589,7 +589,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             fusionAccount.syncCollectionAttributesToBag()
         }
 
-        const finalId = fusionAccount.attributes?.id || fusionAccount.nativeIdentity
+        const finalId = fusionAccount.attributes?.id || fusionAccount.managedKey
         if (finalId && !fusionAccount.key) {
             if (typeof fusionAccount.setKey === 'function') {
                 fusionAccount.setKey({ simple: { id: finalId } })
@@ -598,8 +598,8 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             }
         }
 
-        const nativeId = fusionAccount.nativeIdentity
-        const rawAccount = state.getFusionAccount(nativeId)
+        const managedKey = fusionAccount.managedKey
+        const rawAccount = state.getFusionAccount(managedKey)
         if (rawAccount) {
             rawAccount.attributes = { ...fusionAccount.attributes }
             rawAccount.disabled = fusionAccount.disabled
@@ -607,16 +607,17 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             const newRaw: any = {
                 key: fusionAccount.key || {
                     simple: {
-                        id: nativeId,
+                        id: managedKey,
                     },
                 },
+                managedKey,
                 attributes: { ...fusionAccount.attributes },
                 disabled: fusionAccount.disabled,
                 identityId: fusionAccount.identityId,
             }
             state.addFusionAccount(newRaw)
             fusionAccounts.push(newRaw)
-            fusionMap.set(nativeId, newRaw)
+            fusionMap.set(managedKey, newRaw)
         }
 
         const attributes = registry.schemas.getFusionAttributeSubset(fusionAccount.attributes)
@@ -648,7 +649,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         for (const account of faList) {
             const iscAccount = await registry.fusion.getISCAccount(account)
             console.log(
-                `forEachISCAccount mock: getISCAccount for nativeId=${account.nativeIdentity} produced iscAccount=${!!iscAccount}`
+                `forEachISCAccount mock: getISCAccount for managedKey=${account.managedKey} produced iscAccount=${!!iscAccount}`
             )
             if (iscAccount) {
                 send(iscAccount)

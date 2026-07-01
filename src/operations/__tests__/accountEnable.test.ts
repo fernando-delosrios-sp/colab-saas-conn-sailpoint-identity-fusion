@@ -17,7 +17,7 @@ describe('accountEnable', () => {
     it('pre-processes unique attributes and enables account', async () => {
         const registry = createRegistry()
         registry.fusion.getISCAccount.mockResolvedValue({ id: 'isc-enabled' })
-        const fusionAccount = { nativeIdentity: 'fusion-1', enable: jest.fn() }
+        const fusionAccount = { managedKey: 'fusion-1', enable: jest.fn() }
         ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
 
         await accountEnable(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)

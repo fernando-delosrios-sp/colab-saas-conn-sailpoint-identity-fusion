@@ -730,7 +730,7 @@ const refreshUniqueAttributesForDryRun = async (
         const aKey = String(
             readUnknown(a, 'originAccountId') ??
                 readPathString(a, ['attributes', FusionAttribute.OriginAccount]) ??
-                readUnknown(a, 'nativeIdentity') ??
+                readUnknown(a, 'managedKey') ??
                 readUnknown(a, 'key') ??
                 readUnknown(a, 'name') ??
                 ''
@@ -738,7 +738,7 @@ const refreshUniqueAttributesForDryRun = async (
         const bKey = String(
             readUnknown(b, 'originAccountId') ??
                 readPathString(b, ['attributes', FusionAttribute.OriginAccount]) ??
-                readUnknown(b, 'nativeIdentity') ??
+                readUnknown(b, 'managedKey') ??
                 readUnknown(b, 'key') ??
                 readUnknown(b, 'name') ??
                 ''

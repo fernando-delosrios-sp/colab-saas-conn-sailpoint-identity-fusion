@@ -10,7 +10,7 @@ export function createRegistry() {
     }
 
     const fusionIdentity = {
-        nativeIdentity: 'fusion-id-1',
+        managedKey: 'fusion-id-1',
         addStatus: jest.fn(),
     }
 

@@ -22,7 +22,7 @@ describe('accountRead', () => {
 
     it('rebuilds and returns a single ISC account', async () => {
         const registry = createRegistry()
-        const fusionAccount = { nativeIdentity: 'fusion-1', name: 'Fusion User' }
+        const fusionAccount = { managedKey: 'fusion-1', name: 'Fusion User' }
         ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
 
         await accountRead(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)

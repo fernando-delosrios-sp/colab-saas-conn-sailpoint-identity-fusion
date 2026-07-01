@@ -37,13 +37,13 @@ export function mapScoreReportsForFusionReport(scoreReports: ScoreReport[]): Fus
 }
 
 /**
- * Stable key for identity conflict tracking when nativeIdentity may be missing.
+ * Stable key for identity conflict tracking when managedKey may be missing.
  */
 export function getFusionIdentityConflictTrackingKey(fusionAccount: FusionAccount): string {
-    const nativeIdentity = fusionAccount.nativeIdentityOrUndefined
-    const trimmedNative = trimStr(nativeIdentity)
-    if (trimmedNative) {
-        return trimmedNative
+    const managedKey = fusionAccount.managedKeyOrUndefined
+    const trimmedManagedKey = trimStr(managedKey)
+    if (trimmedManagedKey) {
+        return trimmedManagedKey
     }
     const name = fusionAccount.name || fusionAccount.displayName || 'unknown'
     return `name:${name}`
@@ -55,7 +55,7 @@ export function fusionReportMatchCandidateAccountFields(
 ): Pick<FusionReportMatch, 'accountId' | 'accountName'> {
     const fi = match.fusionIdentity
     if (fi) {
-        const accountId = trimStr(fi.identityId ?? fi.nativeIdentityOrUndefined)
+        const accountId = trimStr(fi.identityId ?? fi.managedKeyOrUndefined)
         return { accountId, accountName: getFusionReportAccountLabel(fi) }
     }
     const id = trimStr(match.identityId) ?? ''
@@ -125,13 +125,13 @@ export function buildIdentityConflictWarningsFromMap(
 
     const occurrences: FusionReportIdentityConflictOccurrence[] = []
     for (const [identityId, accounts] of conflictingFusionIdentityAccounts.entries()) {
-        const nativeIdentities = Array.from(accounts.keys()).sort((a, b) => a.localeCompare(b))
+        const managedKeys = Array.from(accounts.keys()).sort((a, b) => a.localeCompare(b))
         const accountNames = Array.from(new Set(accounts.values())).sort((a, b) => a.localeCompare(b))
         occurrences.push({
             identityId,
-            accountCount: nativeIdentities.length,
+            accountCount: managedKeys.length,
             accountNames,
-            nativeIdentities,
+            managedKeys,
         })
     }
     occurrences.sort((a, b) => a.identityId.localeCompare(b.identityId))

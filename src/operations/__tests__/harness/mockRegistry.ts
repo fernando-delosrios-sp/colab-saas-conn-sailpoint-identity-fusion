@@ -100,7 +100,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         processIdentities: jest.fn().mockResolvedValue([]),
         processIdentity: jest.fn().mockResolvedValue(undefined),
         getFusionIdentity: jest.fn().mockImplementation((id) => ({
-            nativeIdentity: id,
+            managedKey: id,
             addStatus: jest.fn(),
             enable: jest.fn(),
             disable: jest.fn(),

@@ -15,7 +15,7 @@ export class FusionAccountRepository {
     public readonly fusionAccountMap: Map<string, FusionAccount> = new Map()
     public readonly reviewersBySourceId: Map<string, Set<FusionAccount>> = new Map()
     public readonly sourcesWithoutReviewers: Set<string> = new Set()
-    public readonly currentRunUnmatchedFusionNativeIdentitiesBySource: Map<string, Set<string>> = new Map()
+    public readonly currentRunUnmatchedFusionManagedKeysBySource: Map<string, Set<string>> = new Map()
     public readonly autoAssignedIdentityIds: Set<string> = new Set()
     public linkedAccountKeyIndex: Set<string> | undefined
 
@@ -45,8 +45,8 @@ export class FusionAccountRepository {
         return this.fusionIdentityMap.get(identityId)
     }
 
-    public getFusionAccountByNativeIdentity(nativeIdentity: string): FusionAccount | undefined {
-        return this.fusionAccountMap.get(nativeIdentity)
+    public getFusionAccountByManagedKey(managedKey: string): FusionAccount | undefined {
+        return this.fusionAccountMap.get(managedKey)
     }
 
     public setFusionAccount(fusionAccount: FusionAccount, tracker?: AggregationTracker): void {
@@ -65,10 +65,10 @@ export class FusionAccountRepository {
             this.fusionIdentityMap.set(identityId!, fusionAccount)
         } else {
             assert(
-                fusionAccount.nativeIdentity,
-                'Fusion account must have a nativeIdentity to be added to fusion account map'
+                fusionAccount.managedKey,
+                'Fusion account must have a managedKey to be added to fusion account map'
             )
-            this.fusionAccountMap.set(fusionAccount.nativeIdentity, fusionAccount)
+            this.fusionAccountMap.set(fusionAccount.managedKey, fusionAccount)
         }
     }
 
@@ -92,7 +92,7 @@ export class FusionAccountRepository {
         accounts.set(newKey, newAccount.name || newAccount.displayName || newKey)
 
         const accountLabels = Array.from(accounts.entries()).map(
-            ([nativeIdentity, name]) => `${name} (${nativeIdentity})`
+            ([managedKey, name]) => `${name} (${managedKey})`
         )
         this.log.warn(
             `More than one Fusion account was found for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
@@ -101,7 +101,7 @@ export class FusionAccountRepository {
     }
 
     public clearCurrentRunState(): void {
-        this.currentRunUnmatchedFusionNativeIdentitiesBySource.clear()
+        this.currentRunUnmatchedFusionManagedKeysBySource.clear()
         this.autoAssignedIdentityIds.clear()
     }
 }

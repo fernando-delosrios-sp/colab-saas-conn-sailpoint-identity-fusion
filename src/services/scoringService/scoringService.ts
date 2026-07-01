@@ -344,7 +344,7 @@ export class ScoringService {
 
         const managedAccountId = fusionAccount.managedAccountId
         if (!managedAccountId) {
-            return fusionAccount.nativeIdentityOrUndefined === fusionIdentity.nativeIdentityOrUndefined
+            return fusionAccount.managedKeyOrUndefined === fusionIdentity.managedKeyOrUndefined
         }
 
         return this.identityMatchesManagedAccountKey(fusionIdentity, managedAccountId)
@@ -352,12 +352,12 @@ export class ScoringService {
 
     /**
      * Check whether a fusion identity matches a managed account key by comparing against
-     * all known identity key variants (managedAccountId, nativeIdentity, originAccountId, accountIdsSet, missingAccountIdsSet).
+     * all known identity key variants (managedAccountId, managedKey, originAccountId, accountIdsSet, missingAccountIdsSet).
      */
     private identityMatchesManagedAccountKey(fusionIdentity: FusionAccount, managedAccountId: string): boolean {
         const candidates = [
             fusionIdentity.managedAccountId,
-            fusionIdentity.nativeIdentityOrUndefined,
+            fusionIdentity.managedKeyOrUndefined,
             fusionIdentity.originAccountId,
             ...(fusionIdentity.accountIdsSet ?? []),
             ...(fusionIdentity.missingAccountIdsSet ?? []),
@@ -559,7 +559,7 @@ export class ScoringService {
         const identityId = trimStr(fusionIdentity.identityId) ?? ''
         if (identityId) return identityId
 
-        const fallback = trimStr(fusionIdentity.nativeIdentityOrUndefined) ?? ''
+        const fallback = trimStr(fusionIdentity.managedKeyOrUndefined) ?? ''
         return fallback || 'Unknown'
     }
 

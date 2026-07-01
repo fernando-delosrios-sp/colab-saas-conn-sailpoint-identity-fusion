@@ -58,17 +58,17 @@ describe('fusionReportHelpers', () => {
     })
 
     describe('getFusionIdentityConflictTrackingKey', () => {
-        it('should return trimmed nativeIdentity if present', () => {
-            const acc = { nativeIdentityOrUndefined: '  user123  ' } as any
+        it('should return trimmed managedKey if present', () => {
+            const acc = { managedKeyOrUndefined: '  user123  ' } as any
             expect(getFusionIdentityConflictTrackingKey(acc)).toBe('user123')
         })
 
-        it('should fall back to name if nativeIdentity is missing', () => {
+        it('should fall back to name if managedKey is missing', () => {
             const acc = { name: 'John Doe' } as any
             expect(getFusionIdentityConflictTrackingKey(acc)).toBe('name:John Doe')
         })
 
-        it('should fall back to displayName if nativeIdentity and name are missing', () => {
+        it('should fall back to displayName if managedKey and name are missing', () => {
             const acc = { displayName: 'John D' } as any
             expect(getFusionIdentityConflictTrackingKey(acc)).toBe('name:John D')
         })
@@ -94,10 +94,10 @@ describe('fusionReportHelpers', () => {
             })
         })
 
-        it('should use nativeIdentityOrUndefined from fusionIdentity if identityId is missing', () => {
+        it('should use managedKeyOrUndefined from fusionIdentity if identityId is missing', () => {
             const match = {
                 fusionIdentity: {
-                    nativeIdentityOrUndefined: ' nat1 ',
+                    managedKeyOrUndefined: ' nat1 ',
                     name: 'Account 1',
                 },
             } as any
@@ -257,12 +257,12 @@ describe('fusionReportHelpers', () => {
 
             // Should sort identities by ID
             expect(result?.identityConflicts?.occurrences[0].identityId).toBe('idA')
-            expect(result?.identityConflicts?.occurrences[0].nativeIdentities).toEqual(['nat1', 'nat2'])
+            expect(result?.identityConflicts?.occurrences[0].managedKeys).toEqual(['nat1', 'nat2'])
             expect(result?.identityConflicts?.occurrences[0].accountNames).toEqual(['Account A', 'Account B'])
             expect(result?.identityConflicts?.occurrences[0].accountCount).toBe(2)
 
             expect(result?.identityConflicts?.occurrences[1].identityId).toBe('idB')
-            expect(result?.identityConflicts?.occurrences[1].nativeIdentities).toEqual(['nat3', 'nat4'])
+            expect(result?.identityConflicts?.occurrences[1].managedKeys).toEqual(['nat3', 'nat4'])
             expect(result?.identityConflicts?.occurrences[1].accountNames).toEqual(['Account Y', 'Account Z'])
         })
     })
