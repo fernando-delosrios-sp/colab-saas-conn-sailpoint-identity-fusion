@@ -1,4 +1,4 @@
-import { readSettings } from '../developerSettings'
+import { readSettings, connectorSpecInitialValues } from '../developerSettings'
 
 describe('developerSettings readSettings', () => {
     it('defaults reset to false when omitted', () => {
@@ -7,6 +7,22 @@ describe('developerSettings readSettings', () => {
         const result = readSettings(raw)
 
         expect(result.reset).toBe(false)
+    })
+
+    it('defaults managedAccountsBatchSize to 100 when omitted', () => {
+        const raw = {}
+
+        const result = readSettings(raw)
+
+        expect(result.managedAccountsBatchSize).toBe(connectorSpecInitialValues.managedAccountsBatchSize)
+    })
+
+    it('returns configured managedAccountsBatchSize when valid', () => {
+        const raw = { managedAccountsBatchSize: 25 }
+
+        const result = readSettings(raw)
+
+        expect(result.managedAccountsBatchSize).toBe(25)
     })
 
     it('normalizes string "true" to boolean true for reset', () => {

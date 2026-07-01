@@ -7,6 +7,10 @@ import { LogService } from '../logService'
 import { AggregationTracker } from './aggregationTracker'
 
 export class FusionAccountRepository {
+    /**
+     * Maps ISC identity id to the Fusion account that became that identity.
+     * A Fusion identity is a Fusion account that has been promoted to an ISC identity.
+     */
     public readonly fusionIdentityMap: Map<string, FusionAccount> = new Map()
     public readonly fusionAccountMap: Map<string, FusionAccount> = new Map()
     public readonly reviewersBySourceId: Map<string, Set<FusionAccount>> = new Map()

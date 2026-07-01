@@ -30,7 +30,6 @@
         "requestsPerSecond": 10,
         "maxConcurrentRequests": 10,
         "processingWait": 60,
-        "batchSize": 250,
         "externalLoggingLevel": "info",
         "proxyEnabled": false,
         "proxyUrl": "",
@@ -182,13 +181,13 @@
                                         },
                                         {
                                             "key": "deferredMatching",
-                                            "label": "Same-aggregation matching",
+                                            "label": "Deferred matching",
                                             "type": "toggle",
                                             "required": false,
                                             "value": "true",
                                             "parentKey": "sourceType",
                                             "parentValue": "authoritative",
-                                            "helpKey": "After identity matching, also compare this account to other new unmatched accounts from the same source in this run. If the only strong match is one of those same-source peers, defer instead of creating another Fusion identity until a later run. Off: skip that check and use normal unmatched handling. Only peers from this source are considered; cross-source checks are never performed."
+                                            "helpKey": "Deferred matching: after identity matching, also compare this account to other new unmatched accounts from the same source in this run. If the only strong match is one of those same-source peers, defer instead of creating another Fusion identity until a later run. Off: skip that check and use normal unmatched handling. Only peers from this source are considered; cross-source checks are never performed."
                                         },
                                         {
                                             "key": "includeRecordAccountsForMatching",
@@ -1110,15 +1109,6 @@
                             "required": false,
                             "min": "10",
                             "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts."
-                        },
-                        {
-                            "key": "batchSize",
-                            "label": "Batch size",
-                            "type": "number",
-                            "required": true,
-                            "min": "1",
-                            "max": "250",
-                            "helpKey": "Number of requests to group in each batch."
                         },
                         {
                             "key": "enablePriority",

@@ -199,10 +199,11 @@ export class FusionService {
     }
 
     /**
-     * Retrieves a fusion identity from the in-memory map by ISC identity ID.
+     * Retrieves a Fusion identity from the in-memory map by ISC identity ID.
+     * A Fusion identity is a Fusion account that became an identity.
      *
      * @param identityId - The ISC identity ID to look up
-     * @returns The fusion account for this identity, or undefined if not found
+     * @returns The Fusion account for this identity, or undefined if not found
      */
     public getFusionIdentity(identityId: string): FusionAccount | undefined {
         return this.fusionIdentityMap.get(identityId)
@@ -280,7 +281,7 @@ export class FusionService {
     /**
      * Pre-process all fusion accounts from sources.
      * Loads fusion accounts from the platform, builds FusionAccount instances, and registers them
-     * in the internal maps (fusionIdentityMap / fusionAccountMap) via setFusionAccount.
+     * in the internal maps (identity-linked Fusion account map / fusionAccountMap) via setFusionAccount.
      *
      * @returns Empty array (registration is done via setFusionAccount; return kept for API consistency)
      */
@@ -511,8 +512,8 @@ export class FusionService {
         await this.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, authorizedLinkDecision)
 
         // Sync _uncorrelated flag with actual _missingAccountIds state so that
-        // setFusionAccount routes the account to the correct map (fusionIdentityMap
-        // vs fusionAccountMap). Without this, optimistic correlations from
+        // setFusionAccount routes the account to the correct map (identity-linked
+        // Fusion account map vs fusionAccountMap). Without this, optimistic correlations from
         // correlatePerSource leave _uncorrelated stale.
         fusionAccount.updateCorrelationStatus()
 
@@ -524,7 +525,7 @@ export class FusionService {
         this.setFusionAccount(fusionAccount)
 
         // Explicitly deplete the identity work queue so processIdentities skips
-        // this identity without relying solely on the fusionIdentityMap.has() guard.
+        // this identity without relying solely on the identity-linked Fusion account map guard.
         // Mirrors how addManagedAccountLayer removes from managedAccountsById.
         const claimedIdentityId = fusionAccount.identityId
         if (claimedIdentityId) {
@@ -567,7 +568,8 @@ export class FusionService {
     }
 
     /**
-     * Process all fusion identity decisions (new identity).
+     * Process all Fusion identity decisions (new identity).
+     * A Fusion identity is a Fusion account that became an identity.
      * Candidate status is handled by processFusionAccounts, since pending form
      * candidates are always existing fusion accounts.
      *
@@ -578,9 +580,9 @@ export class FusionService {
     }
 
     /**
-     * Processes a single fusion identity decision (reviewer form response).
-     * Creates a new fusion identity for "new identity" decisions, or merges
-     * into an existing one for "authorized" decisions.
+     * Processes a single Fusion identity decision (reviewer form response).
+     * Creates a new Fusion identity (a Fusion account that became an identity) for
+     * "new identity" decisions, or merges into an existing one for "authorized" decisions.
      *
      * For record/orphan source types, "new identity" (toggle true) means "no match":
      * - record: registers unique attributes but does not output as ISC account
@@ -617,12 +619,12 @@ export class FusionService {
      *
      * Memory Efficiency:
      * - Uses per-phase snapshots to avoid iterator invalidation while work-queue entries are removed
-     * - Configurable batch size (managedAccountsBatchSize, default 50) limits concurrent in-flight objects
+     * - Configurable batch size (managedAccountsBatchSize, default 100) limits concurrent in-flight objects
      * - Non-matches store minimal report data; full FusionAccount only for matches
      * - Tracker state cleared by generateReport() after use
      * - Processes bounded batches to improve throughput while preserving shared-state updates.
      *
-     * @returns Empty array (side effects register accounts in fusionAccountMap/fusionIdentityMap)
+     * @returns Empty array (side effects register accounts in fusionAccountMap / identity-linked Fusion account map)
      */
     public async processManagedAccounts(): Promise<void> {
         await this.initializeManagedAccountProcessing()
@@ -648,7 +650,7 @@ export class FusionService {
     private buildLinkedAccountKeyIndex(): void {
         // Build a one-shot flat index of every account key already linked in a loaded Fusion row.
         // isCorrelatedManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
-        // of scanning fusionAccountMap + fusionIdentityMap (O(A+I)) for every correlated account.
+        // of scanning fusionAccountMap + identity-linked Fusion account map (O(A+I)) for every correlated account.
         this._linkedAccountKeyIndex = new Set<string>()
         for (const fa of this.fusionAccountMap.values()) {
             for (const key of fa.accountIdsSet) this._linkedAccountKeyIndex.add(key)
@@ -663,7 +665,7 @@ export class FusionService {
     private async runCorrelatedManagedAccountPrePass(map: Map<string, Account>): Promise<void> {
         // Pre-pass: resolve all correlated managed accounts before uncorrelated scoring begins.
         // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion row)
-        // are registered as non-matches in fusionIdentityMap here, so they are immediately visible
+        // are registered as non-matches in the identity-linked Fusion account map here, so they are immediately visible
         // as deferred-match candidates when uncorrelated accounts are scored in the main pass.
         const correlatedAccounts = [...map.values()].filter((a) => a.uncorrelated === false)
         if (correlatedAccounts.length === 0) {
@@ -755,7 +757,7 @@ export class FusionService {
                         await yieldToEventLoop()
                     }
 
-                    // Phase B: preserve same-aggregation visibility for this source only.
+                    // Phase B: preserve deferred-matching visibility for this source only.
                     for (const analysis of deferredPhaseSequentialQueue) {
                         await this.managedAccountAnalyzer.analyzeDeferredPhase(analysis)
                         await this.completeManagedAccountFromAnalysis(analysis, true)
@@ -767,7 +769,7 @@ export class FusionService {
 
                     if (sequentiallyProcessed > 0) {
                         this.log.debug(
-                            `Deferred same-aggregation pass for source "${sourceKey}" analyzed ${sequentiallyProcessed} account(s) (phaseA parallel, phaseB sequential)`
+                            `Deferred matching pass for source "${sourceKey}" analyzed ${sequentiallyProcessed} account(s) (phaseA parallel, phaseB sequential)`
                         )
                     }
                 })
@@ -809,7 +811,7 @@ export class FusionService {
      *
      * @param account - The ISC account from a managed source (typically uncorrelated on the work queue)
      * @returns The fusion account produced or updated, or undefined if skipped or sent for manual review.
-     *          Same-aggregation deferred matches (peer is another new unmatched account) are removed from
+     *          Deferred-matching matches (peer is another new unmatched account from the same source) are removed from
      *          the managed-account work queue for this run; they are expected to be re-fetched next aggregation.
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
@@ -1168,7 +1170,7 @@ export class FusionService {
     }
 
     /**
-     * Same-aggregation (deferred) matching.
+     * Deferred matching.
      *
      * Default is enabled to preserve existing behavior unless explicitly disabled
      * per-source via config.
@@ -1434,7 +1436,7 @@ export class FusionService {
      * a loaded identity-backed Fusion account.
      *
      * Uses _linkedAccountKeyIndex (O(1)) when available (set by processManagedAccounts pre-pass),
-     * falling back to a linear scan of fusionAccountMap + fusionIdentityMap for standalone calls.
+     * falling back to a linear scan of fusionAccountMap + identity-linked Fusion account map for standalone calls.
      */
     private isCorrelatedManagedAccountLinkedInFusion(account: Account): boolean {
         const key = getManagedAccountKeyFromAccount(account)
@@ -1653,7 +1655,7 @@ export class FusionService {
     private _managedAccountProcessingStartedAt = 0
     private _managedAccountProcessingBatchSize = 0
 
-    private ensureManagedAccountProcessingInitialized(): void {
+    private _ensureManagedAccountProcessingInitialized(): void {
         if (this._managedAccountProcessingState !== 'initialized') {
             throw new Error('initializeManagedAccountProcessing must be called before managed account processing')
         }
@@ -1693,7 +1695,7 @@ export class FusionService {
 
     /** Correlated pre-pass: resolve linked/correlated managed accounts before uncorrelated scoring. */
     public async processCorrelatedManagedAccounts(): Promise<void> {
-        this.ensureManagedAccountProcessingInitialized()
+        this._ensureManagedAccountProcessingInitialized()
         const map = this.sources.managedAccountsById
         await this.runCorrelatedManagedAccountPrePass(map)
         this._linkedAccountKeyIndex = undefined
@@ -1704,7 +1706,7 @@ export class FusionService {
      * @returns Processed count and match scoring duration for metric emission.
      */
     public async processUncorrelatedManagedAccounts(): Promise<{ processed: number; matchScoringMs: number }> {
-        this.ensureManagedAccountProcessingInitialized()
+        this._ensureManagedAccountProcessingInitialized()
         const map = this.sources.managedAccountsById
         const queuedAccounts = [...map.values()]
         const initialQueueSize = queuedAccounts.length

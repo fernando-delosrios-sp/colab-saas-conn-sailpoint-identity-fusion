@@ -118,16 +118,7 @@ export interface MatchingConfig {
     /** The attribute name to compare between accounts */
     attribute: string
     /** The similarity algorithm to use for comparison */
-    algorithm?:
-        | 'name-matcher'
-        | 'jaro-winkler'
-        | 'lig3'
-        | 'dice'
-        | 'double-metaphone'
-        | 'average'
-        | 'weighted-mean'
-        | 'binary'
-        | 'custom'
+    algorithm?: 'name-matcher' | 'jaro-winkler' | 'lig3' | 'dice' | 'double-metaphone' | 'binary' | 'custom'
     /**
      * When `algorithm` is `custom`, Apache Velocity template evaluated per pair.
      * Context includes `$accountValue`, `$candidateValue`, and `$attribute` (rule attribute name).
@@ -223,11 +214,11 @@ export interface SourceConfig {
     correlationAttribute?: string
     correlationDisplayName?: string
     /**
-     * Same-aggregation matching: after identity matching, also compare to other new
-     * unmatched accounts from this run. If the only strong match is such a peer, defer
-     * instead of creating another Fusion identity until a later run. When false, skip
-     * that check (normal unmatched handling). Default true; disable when one person may
-     * appear as multiple accounts in a single aggregation.
+     * Deferred matching: after identity matching, also compare to other new
+     * unmatched accounts from the same source in this run. If the only strong match is
+     * such a peer, defer instead of creating another Fusion identity until a later run.
+     * When false, skip that check (normal unmatched handling). Default true; disable
+     * when one person may appear as multiple accounts in a single aggregation.
      */
     deferredMatching?: boolean
     /**
@@ -313,6 +304,12 @@ export interface MatchingSettingsSection {
 export interface ReviewSettingsSection {
     fusionFormAttributes?: string[]
     fusionFormExpirationDays: number
+    /**
+     * Maximum number of potential identity matches included on each fusion review form.
+     * When there are more candidates than this cap, the highest-scoring matches are kept (see form builder).
+     * Valid range: 1–15. Default for new sources: `sourceConfigInitialValues.fusionMaxCandidatesForForm` in connector-spec.json.
+     */
+    fusionMaxCandidatesForForm?: number
     fusionOwnerIsGlobalReviewer?: boolean
     fusionReportOnAggregation?: boolean
     enableLocalization?: boolean
@@ -333,7 +330,7 @@ export interface DeveloperSettingsSection {
     /**
      * Batch size for processing uncorrelated managed accounts during Match.
      * Lower values reduce peak memory usage; higher values may improve throughput.
-     * Default: 50.
+     * Default: 100.
      */
     managedAccountsBatchSize?: number
     /**
@@ -350,12 +347,6 @@ export interface DeveloperSettingsSection {
      * Enabled by default.
      */
     concurrencyCheckEnabled: boolean
-    /**
-     * Maximum number of potential identity matches included on each fusion review form.
-     * When there are more candidates than this cap, the highest-scoring matches are kept (see form builder).
-     * Valid range: 1–15. Default for new sources: `sourceConfigInitialValues.fusionMaxCandidatesForForm` in connector-spec.json.
-     */
-    fusionMaxCandidatesForForm?: number
     externalLoggingEnabled: boolean
     externalLoggingUrl?: string
     externalLoggingLevel?: 'error' | 'warn' | 'info' | 'debug'
@@ -393,11 +384,6 @@ export interface AdvancedConnectionSettingsSection {
      * reduce timeout risk; higher values reduce keep-alive traffic.
      */
     processingWait?: number
-
-    /**
-     * Number of requests to include in a single processing batch.
-     */
-    batchSize?: number
 
     /**
      * Enable priority processing in the queue, allowing more important requests to be handled first.
