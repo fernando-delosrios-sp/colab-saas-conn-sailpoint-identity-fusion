@@ -1,6 +1,10 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { isNewerThan } from '../utils/date'
-import { toSetFromAttribute as attributeToSet, getAccountStringAttribute, getAccountAttribute } from '../utils/attributes'
+import {
+    toSetFromAttribute as attributeToSet,
+    getAccountStringAttribute,
+    getAccountAttribute,
+} from '../utils/attributes'
 import { FusionDecision } from './form'
 import { FusionConfig, SourceType } from './config'
 import { FusionAttribute } from '../data/schema'
@@ -14,7 +18,7 @@ import {
     getManagedAccountKeyFromAccount,
     isCompositeManagedAccountKey,
     normalizeCompositeManagedAccountKey,
-    parseManagedAccountKey
+    parseManagedAccountKey,
 } from './managedAccountKey'
 import { missing, readString, trimStr } from '../utils/safeRead'
 import { StatusEntitlement } from './statusEntitlement'
@@ -127,7 +131,7 @@ export class FusionAccount {
     }
 
     // Timestamps
-    private _modified: string = ''
+    private _modified?: string
 
     // Read-only configuration (set in constructor)
     /** Cached Set of configured source names for O(1) `.has()` lookups. */
@@ -174,7 +178,8 @@ export class FusionAccount {
     }): void {
         this._type = config.type
         this._managedKey = config.managedKey
-        if (config.name) this._name = config.name
+        const trimmedName = trimStr(config.name)
+        if (trimmedName) this._name = trimmedName
         if (config.sourceName) this._sourceName = config.sourceName
         if (config.disabled !== undefined) this._disabled = config.disabled
         if (config.needsRefresh !== undefined) this._needsRefresh = config.needsRefresh
@@ -357,11 +362,11 @@ export class FusionAccount {
         fusionAccount.initializeCoreState({
             type: FusionAccountKind.Fusion,
             managedKey,
-            name: trimStr(account.name),
+            name: account.name,
             sourceName: account.sourceName,
             disabled: account.disabled,
             identityInfo,
-            modified: account.modified ?? '',
+            modified: account.modified,
             iscAccountId: account.id,
         })
         fusionAccount.initializeSources(FusionAccount.deriveBaselineSourceSet(account.attributes))
@@ -391,7 +396,7 @@ export class FusionAccount {
         fusionAccount.initializeCoreState({
             type: FusionAccountKind.Identity,
             managedKey,
-            name: trimStr(identity.name),
+            name: identity.name,
             sourceName: IDENTITIES_SOURCE_NAME,
             disabled: identity.disabled,
             needsRefresh: true,
@@ -429,7 +434,7 @@ export class FusionAccount {
         fusionAccount.initializeCoreState({
             type: FusionAccountKind.Managed,
             managedKey: managedAccountKey,
-            name: trimStr(account.name),
+            name: account.name,
             sourceName: account.sourceName,
             disabled: account.disabled,
             needsRefresh: true,
@@ -456,7 +461,6 @@ export class FusionAccount {
     public static fromFusionDecision(decision: FusionDecision): FusionAccount {
         const fusionAccount = new FusionAccount()
         const { account } = decision
-        const accountName = trimStr(account.name) ?? trimStr(account.id) ?? undefined
         const managedAccountKey = buildManagedAccountKey({
             sourceId: readString(account, 'sourceId'),
             nativeIdentity: readString(account, 'nativeIdentity'),
@@ -470,12 +474,10 @@ export class FusionAccount {
         fusionAccount.initializeCoreState({
             type: FusionAccountKind.Decision,
             managedKey: managedAccountKey,
-            name: accountName,
+            name: account.name,
             sourceName: account.sourceName,
             needsRefresh: true,
-            identityInfo: decision.identityId
-                ? buildIdentityInfo(decision)
-                : undefined,
+            identityInfo: decision.identityId ? buildIdentityInfo(decision) : undefined,
         })
         fusionAccount.setOrigin(account.sourceName, managedAccountKey)
         fusionAccount.setUncorrelatedAccount(managedAccountKey)
@@ -551,7 +553,6 @@ export class FusionAccount {
     public get iscAccountId(): string | undefined {
         return this._iscAccountId
     }
-
 
     public get originIdentityInScope(): boolean | undefined {
         return this._originIdentityInScope
@@ -811,7 +812,7 @@ export class FusionAccount {
     // Accessors - Internal State (for service layer use)
     // ============================================================================
 
-    public get modified(): string {
+    public get modified(): string | undefined {
         return this._modified
     }
 
@@ -1160,7 +1161,7 @@ export class FusionAccount {
      */
     public clearFusionIdentityReferences(): void {
         for (const match of this._fusionMatches) {
-            ; (match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
+            ;(match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
         }
     }
 
