@@ -40,7 +40,7 @@ export const accountDisable = async (serviceRegistry: ServiceRegistry, input: St
             log,
         })
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
-        log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
+        log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.managedKey}`)
         timer.phase('Step 2: Rebuilding fusion account with fresh attributes')
 
         fusionAccount.disable()

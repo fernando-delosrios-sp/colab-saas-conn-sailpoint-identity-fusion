@@ -134,7 +134,7 @@ describe('streamUncorrelatedAnalyzedRows', () => {
     })
 
     it('processes accounts and emits them', async () => {
-        mockAnalyzedAccounts = [{ nativeIdentity: 'user1' } as any, { nativeIdentity: 'user2' } as any]
+        mockAnalyzedAccounts = [{ managedKey: 'user1' } as any, { managedKey: 'user2' } as any]
 
         const iscOutput1 = { attributes: { id: 'user1' } }
         const iscOutput2 = { attributes: { id: 'user2' } }
@@ -173,7 +173,7 @@ describe('streamUncorrelatedAnalyzedRows', () => {
     })
 
     it('skips account if getISCAccount returns falsy', async () => {
-        mockAnalyzedAccounts = [{ nativeIdentity: 'user1' } as any]
+        mockAnalyzedAccounts = [{ managedKey: 'user1' } as any]
         mockContext.fusion.getISCAccount.mockResolvedValueOnce(null)
 
         const result = await streamUncorrelatedAnalyzedRows(

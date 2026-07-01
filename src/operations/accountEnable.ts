@@ -57,7 +57,7 @@ export const accountEnable = async (serviceRegistry: ServiceRegistry, input: Std
             log,
         })
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
-        log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
+        log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.managedKey}`)
 
         await attributes.refreshUniqueAttributes(fusionAccount)
         timer.phase('Step 3: Rebuilding target fusion account with fresh attributes')

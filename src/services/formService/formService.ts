@@ -862,7 +862,7 @@ export class FormService {
         const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
         const source = `[${fusionAccount.sourceName}]`
         const accountIdentifier =
-            trimStr(fusionAccount.nativeIdentity) || trimStr(fusionAccount.managedAccountId) || 'unknown'
+            trimStr(fusionAccount.managedKey) || trimStr(fusionAccount.managedAccountId) || 'unknown'
         return `${this.fusionFormNamePattern} - ${accountName} ${source} (${accountIdentifier})`
     }
 

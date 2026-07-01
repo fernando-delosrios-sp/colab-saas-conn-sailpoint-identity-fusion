@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-07-01
+goal: Eliminate inconsistent nativeIdentity handling and unify FusionAccount
+  internal/external identifiers.

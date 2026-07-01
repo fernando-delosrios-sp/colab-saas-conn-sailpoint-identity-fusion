@@ -217,8 +217,8 @@ export type FusionReportIdentityConflictOccurrence = {
     accountCount: number
     /** Unique account names involved in the conflicting mapping */
     accountNames: string[]
-    /** Unique native identities involved in the conflicting mapping */
-    nativeIdentities: string[]
+    /** Unique managed keys involved in the conflicting mapping */
+    managedKeys: string[]
 }
 
 /** Report warnings section payload. */

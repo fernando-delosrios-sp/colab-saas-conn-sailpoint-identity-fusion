@@ -530,7 +530,7 @@ export class AttributeService {
      * @param fusionAccount - The fusion account whose unique values to register
      */
     public async registerUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
-        this.log.debug(`Registering unique attributes for account: ${fusionAccount.nativeIdentity}`)
+        this.log.debug(`Registering unique attributes for account: ${fusionAccount.managedKey}`)
 
         for (const definition of this.uniqueDefinitions) {
             const value = fusionAccount.attributes[definition.name]
@@ -556,7 +556,7 @@ export class AttributeService {
      */
     public async unregisterUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
         const { fusionIdentityAttribute } = this.schemas
-        this.log.debug(`Unregistering unique attributes for account: ${fusionAccount.nativeIdentity}`)
+        this.log.debug(`Unregistering unique attributes for account: ${fusionAccount.managedKey}`)
 
         for (const definition of this.uniqueDefinitions) {
             if (definition.name === fusionIdentityAttribute) continue
@@ -605,10 +605,10 @@ export class AttributeService {
             return undefined
         }
 
-        const finalId = uniqueId ?? fusionAccount.nativeIdentity
-        assert(finalId, `Unique ID is required for simple key`)
+        const managedKey = fusionAccount.managedKey
+        assert(managedKey, `Managed key is required for simple key`)
 
-        return SimpleKey(finalId)
+        return SimpleKey(managedKey)
     }
 
     /**

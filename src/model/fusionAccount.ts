@@ -18,10 +18,7 @@ import {
 } from './managedAccountKey'
 import { missing, readString, trimStr } from '../utils/safeRead'
 import { StatusEntitlement } from './statusEntitlement'
-import {
-    buildIdentityInfo,
-    resolveCompositeManagedKeyFromFusionRecord
-} from './fusionAccountUtils'
+import { buildIdentityInfo } from './fusionAccountUtils'
 import {
     preserveMissingAccountContext,
     processIdentityMatchedAccounts,
@@ -82,7 +79,7 @@ export class FusionAccount {
     // Core identity fields
     private _type: FusionAccountKind = FusionAccountKind.Fusion
     private _identityInfo?: IdentityInfo
-    private managedKey?: string
+    private _managedKey?: string
     private _iscAccountId?: string
     private _key?: SimpleKeyType
 
@@ -161,12 +158,12 @@ export class FusionAccount {
 
     /**
      * Initializes scalar core fields from the factory input.
-     * `type` and `nativeIdentity` are required; everything else is optional.
+     * `type` and `managedKey` are required; everything else is optional.
      * Booleans use explicit undefined checks so `false` values are preserved.
      */
     private initializeCoreState(config: {
         type: FusionAccountKind
-        nativeIdentity: string
+        managedKey: string
         name: string | null | undefined
         sourceName: string | null | undefined
         disabled?: boolean
@@ -176,7 +173,7 @@ export class FusionAccount {
         modified?: string
     }): void {
         this._type = config.type
-        this.managedKey = config.nativeIdentity
+        this._managedKey = config.managedKey
         if (config.name) this._name = config.name
         if (config.sourceName) this._sourceName = config.sourceName
         if (config.disabled !== undefined) this._disabled = config.disabled
@@ -203,11 +200,11 @@ export class FusionAccount {
     private initializeAttributeState(
         attributes: Attributes | null | undefined,
         kind: FusionAccountKind,
-        nativeIdentity?: string
+        managedKey?: string
     ): void {
         if (!attributes) return
         this._attributeBag.current = { ...attributes }
-        if (kind === FusionAccountKind.Fusion && nativeIdentity) {
+        if (kind === FusionAccountKind.Fusion && managedKey) {
             this._attributeBag.previous = { ...attributes }
         }
         this.initializeMissingAccountIds(attributes)
@@ -341,7 +338,7 @@ export class FusionAccount {
      * Restores all persisted state including attributes, collections, history, and origin source.
      *
      * Construction sequence:
-     * 1. `initializeCoreState` — scalar fields (type, nativeIdentity, name, sourceName, disabled, identityInfo, modified, iscAccountId).
+     * 1. `initializeCoreState` — scalar fields (type, managedKey, name, sourceName, disabled, identityInfo, modified, iscAccountId).
      * 2. `initializeSources` — virtual IDENTITIES_SOURCE_NAME source if persisted statuses include baseline.
      * 3. `initializeAttributeState` — current/previous attribute bags and collection sets (missing-accounts, reviews, statuses, actions).
      * 4. `restoreOriginMetadata` — persisted originSource/originAccount; re-asserts baseline for identity-origin records.
@@ -349,16 +346,17 @@ export class FusionAccount {
      * 6. `restorePersistedCollections` — previous account IDs and history import.
      *
      * @param account - The ISC Account object from the fusion source
+     * @param fusionSourceId - The id of the Fusion source itself
      * @returns A fully initialized FusionAccount with restored state
      */
-    public static fromFusionAccount(account: Account): FusionAccount {
+    public static fromFusionAccount(account: Account, fusionSourceId: string): FusionAccount {
         const fusionAccount = new FusionAccount()
         const identityInfo = buildIdentityInfo(account)
-        const resolvedCompositeManagedKey = resolveCompositeManagedKeyFromFusionRecord(account)
+        const managedKey = `${fusionSourceId}::${account.nativeIdentity as string}`
 
         fusionAccount.initializeCoreState({
             type: FusionAccountKind.Fusion,
-            nativeIdentity: resolvedCompositeManagedKey ?? (account.nativeIdentity as string),
+            managedKey,
             name: trimStr(account.name),
             sourceName: account.sourceName,
             disabled: account.disabled,
@@ -370,7 +368,7 @@ export class FusionAccount {
         fusionAccount.initializeAttributeState(
             account.attributes,
             FusionAccountKind.Fusion,
-            fusionAccount.nativeIdentityOrUndefined
+            fusionAccount.managedKeyOrUndefined
         )
         fusionAccount.restoreOriginMetadata(account)
         fusionAccount.restoreIdentityLinkage(account)
@@ -389,9 +387,10 @@ export class FusionAccount {
      */
     public static fromIdentity(identity: IdentityDocument): FusionAccount {
         const fusionAccount = new FusionAccount()
+        const managedKey = `${IDENTITIES_SOURCE_NAME}::${identity.id}`
         fusionAccount.initializeCoreState({
             type: FusionAccountKind.Identity,
-            nativeIdentity: identity.id,
+            managedKey,
             name: trimStr(identity.name),
             sourceName: IDENTITIES_SOURCE_NAME,
             disabled: identity.disabled,
@@ -399,7 +398,7 @@ export class FusionAccount {
             identityInfo: buildIdentityInfo(identity),
         })
         fusionAccount.initializeSources([IDENTITIES_SOURCE_NAME])
-        fusionAccount.initializeAttributeState(identity.attributes, FusionAccountKind.Identity, identity.id)
+        fusionAccount.initializeAttributeState(identity.attributes, FusionAccountKind.Identity, managedKey)
         fusionAccount.markIdentityOrigin(identity.id)
         fusionAccount.setIdentityIdAttribute(identity.id)
         return fusionAccount
@@ -429,7 +428,7 @@ export class FusionAccount {
 
         fusionAccount.initializeCoreState({
             type: FusionAccountKind.Managed,
-            nativeIdentity: managedAccountKey,
+            managedKey: managedAccountKey,
             name: trimStr(account.name),
             sourceName: account.sourceName,
             disabled: account.disabled,
@@ -470,7 +469,7 @@ export class FusionAccount {
         }
         fusionAccount.initializeCoreState({
             type: FusionAccountKind.Decision,
-            nativeIdentity: managedAccountKey,
+            managedKey: managedAccountKey,
             name: accountName,
             sourceName: account.sourceName,
             needsRefresh: true,
@@ -526,23 +525,23 @@ export class FusionAccount {
         this._identityInfo.id = trimmed
     }
 
-    /** The native identity (unique key) for this fusion account. Asserts non-null. */
-    public get nativeIdentity(): string {
-        return this.managedKey!
+    /** The managed key (unique internal identifier) for this fusion account. Asserts non-null. */
+    public get managedKey(): string {
+        return this._managedKey!
     }
 
     /**
-     * Safe nativeIdentity accessor (may be undefined until key is set)
+     * Safe managedKey accessor (may be undefined until key is set)
      */
-    public get nativeIdentityOrUndefined(): string | undefined {
-        return this.managedKey
+    public get managedKeyOrUndefined(): string | undefined {
+        return this._managedKey
     }
 
     /**
      * Managed account key (sourceId::nativeIdentity) when this fusion account represents an uncorrelated managed account.
      */
     public get managedAccountId(): string | undefined {
-        return this._type === FusionAccountKind.Managed ? this.managedKey : undefined
+        return this._type === FusionAccountKind.Managed ? this._managedKey : undefined
     }
 
     /**
@@ -828,10 +827,9 @@ export class FusionAccount {
     // Setters - Core Properties
     // ============================================================================
 
-    /** Sets the SDK key and updates the native identity to match. */
+    /** Sets the SDK output key. The managedKey is set by the factory and must not change. */
     public setKey(key: SimpleKeyType): void {
         this._key = key
-        this.managedKey = key.simple.id
     }
 
     // ============================================================================

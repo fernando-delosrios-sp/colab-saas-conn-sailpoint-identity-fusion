@@ -36,7 +36,7 @@ describe('ReportService', () => {
             newManagedAccountsCount: 13,
             identitiesProcessedCount: 17,
             getFusionIdentity: jest.fn(() => undefined),
-            getFusionAccountByNativeIdentity: jest.fn(() => undefined),
+            getFusionAccountByManagedKey: jest.fn(() => undefined),
             fusionIdentities: [],
         }
         const messaging = {
@@ -220,7 +220,7 @@ describe('ReportService', () => {
                 resolveIscAccountIdForManagedKey: jest.fn(() => undefined),
             },
             fusion: {
-                getFusionAccountByNativeIdentity: jest.fn((key: string) =>
+                getFusionAccountByManagedKey: jest.fn((key: string) =>
                     key === 'source-1::native-1' ? { iscAccountId: 'isc-from-fusion-map' } : undefined
                 ),
             },
@@ -252,13 +252,13 @@ describe('ReportService', () => {
         // FusionAccount stored in fusionIdentityMap (if identityId was set during
         // processing) even though the decision object itself has no identityId.
         // The code must scan identity accounts by nativeIdentity to find iscAccountId.
-        const identityAccounts = [{ nativeIdentity: 'source-1::native-1', iscAccountId: 'isc-from-identity-scan' }]
+        const identityAccounts = [{ managedKey: 'source-1::native-1', iscAccountId: 'isc-from-identity-scan' }]
         const { service } = createService({
             sources: {
                 resolveIscAccountIdForManagedKey: jest.fn(() => undefined),
             },
             fusion: {
-                getFusionAccountByNativeIdentity: jest.fn(() => undefined),
+                getFusionAccountByManagedKey: jest.fn(() => undefined),
                 get fusionIdentities() {
                     return identityAccounts
                 },

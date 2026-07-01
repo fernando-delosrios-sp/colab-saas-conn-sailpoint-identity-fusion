@@ -26,7 +26,7 @@ export interface ChainManagedAccount {
 }
 
 export interface ChainFusionAccount {
-    nativeIdentity: string
+    managedKey: string
     identityId?: string
     name?: string
     displayName?: string
@@ -127,12 +127,12 @@ export class ChainState {
         return this.state.fusionAccounts
     }
 
-    getFusionAccount(nativeIdentity: string): ChainFusionAccount | undefined {
-        return this.state.fusionAccounts.find((a) => a.nativeIdentity === nativeIdentity)
+    getFusionAccount(managedKey: string): ChainFusionAccount | undefined {
+        return this.state.fusionAccounts.find((a) => a.managedKey === managedKey)
     }
 
     addFusionAccount(account: ChainFusionAccount): void {
-        const existing = this.state.fusionAccounts.find((a) => a.nativeIdentity === account.nativeIdentity)
+        const existing = this.state.fusionAccounts.find((a) => a.managedKey === account.managedKey)
         if (existing) {
             Object.assign(existing, account)
         } else {
@@ -140,8 +140,8 @@ export class ChainState {
         }
     }
 
-    updateFusionAccount(nativeIdentity: string, updates: Partial<ChainFusionAccount>): void {
-        const account = this.state.fusionAccounts.find((a) => a.nativeIdentity === nativeIdentity)
+    updateFusionAccount(managedKey: string, updates: Partial<ChainFusionAccount>): void {
+        const account = this.state.fusionAccounts.find((a) => a.managedKey === managedKey)
         if (account) {
             Object.assign(account, updates)
         }

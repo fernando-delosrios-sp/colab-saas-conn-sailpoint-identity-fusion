@@ -188,17 +188,17 @@ export class ReportService {
             // New fusion reviews use fusionAccount.iscAccountId (the managed account's ISC
             // id), which is set when the managed account layer is absorbed. Try the same
             // source for review decisions. The FusionAccount may live in fusionAccountMap
-            // (keyed by composite managed key) or in fusionIdentityMap (keyed by identityId),
+            // (keyed by managedKey) or in fusionIdentityMap (keyed by identityId),
             // so check both maps by the account key/identityId, and scan identity accounts
-            // by nativeIdentity as a last resort.
-            const fusionAccountByKey = this.fusion.getFusionAccountByNativeIdentity(managedAccountKey)
+            // by managedKey as a last resort.
+            const fusionAccountByKey = this.fusion.getFusionAccountByManagedKey(managedAccountKey)
             const fusionAccountByIdentity = identityId ? this.fusion.getFusionIdentity(identityId) : undefined
             let iscId = fusionAccountByKey?.iscAccountId ?? fusionAccountByIdentity?.iscAccountId
             if (!iscId) {
                 const identities = this.fusion.fusionIdentities
                 if (identities) {
                     for (const fa of identities) {
-                        if (fa.nativeIdentity === managedAccountKey && fa.iscAccountId) {
+                        if (fa.managedKey === managedAccountKey && fa.iscAccountId) {
                             iscId = fa.iscAccountId
                             break
                         }

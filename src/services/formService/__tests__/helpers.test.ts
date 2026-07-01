@@ -63,7 +63,7 @@ describe('formService helpers', () => {
             const fusionAccount = {
                 name: 'John Doe',
                 displayName: 'John Doe',
-                nativeIdentity: 'acc-123',
+                managedKey: 'acc-123',
                 sourceName: 'HR Source',
             } as any
             const result = buildFormName(fusionAccount, 'Fusion Review')
@@ -73,7 +73,7 @@ describe('formService helpers', () => {
         it('should use displayName when name is missing', () => {
             const fusionAccount = {
                 displayName: 'Jane Smith',
-                nativeIdentity: 'acc-999',
+                managedKey: 'acc-999',
                 sourceName: 'IT',
             } as any
             const result = buildFormName(fusionAccount, 'Review')
@@ -92,10 +92,10 @@ describe('formService helpers', () => {
             expect(result).toBe('F - Unknown [S] (unknown)')
         })
 
-        it('should append native identity to the title', () => {
+        it('should append managed key to the title', () => {
             const fusionAccount = {
                 name: 'fcooper',
-                nativeIdentity: 'aa7459e540f94cbdbaa859019ef5c4f1',
+                managedKey: 'aa7459e540f94cbdbaa859019ef5c4f1',
                 sourceName: 'Active Directory',
             } as any
             const result = buildFormName(fusionAccount, 'Fusion Review')

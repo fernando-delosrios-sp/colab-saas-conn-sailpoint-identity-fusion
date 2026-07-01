@@ -53,7 +53,7 @@ function getManagedAccountIdentifier(fusionAccount: FusionAccount): string {
         return managedKey
     }
     throw new ConnectorError(
-        `Cannot build review form without managed account key for fusion account ${fusionAccount.name || fusionAccount.nativeIdentity}.`,
+        `Cannot build review form without managed account key for fusion account ${fusionAccount.name || fusionAccount.managedKey}.`,
         ConnectorErrorType.Generic
     )
 }

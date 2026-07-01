@@ -64,7 +64,7 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
 
         const fusionIdentity = fusion.getFusionIdentity(identity.id)
         assert(fusionIdentity, `Fusion identity not found for identity ID: ${identity.id}`)
-        log.debug(`Found fusion identity: ${fusionIdentity.nativeIdentity}`)
+        log.debug(`Found fusion identity: ${fusionIdentity.managedKey}`)
         fusionIdentity.addStatus(StatusEntitlement.Requested, 'Status set by accountCreate operation')
 
         await attributes.refreshUniqueAttributes(fusionIdentity)
