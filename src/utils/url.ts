@@ -149,6 +149,22 @@ export function buildFormDefinitionUrl(uiOrigin: string | undefined, formId: str
 /**
  * Validates that a string is a valid URL.
  */
+
+/**
+ * Validates that a string is a valid HTTP or HTTPS URL, strictly checking to prevent SSRF bypasses.
+ */
+export function isValidHttpUrl(url: string | undefined): boolean {
+    if (!url) return false
+    if (url.trim() !== url) return false
+    try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+        return url.toLowerCase().startsWith(`${parsed.protocol}//`)
+    } catch {
+        return false
+    }
+}
+
 export function isValidUrl(url: string | undefined): boolean {
     if (!url) return false
     try {

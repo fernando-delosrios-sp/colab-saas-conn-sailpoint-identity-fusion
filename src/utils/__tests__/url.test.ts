@@ -7,6 +7,7 @@ import {
     buildAccountUrl,
     buildWorkflowUrl,
     buildFormDefinitionUrl,
+    isValidHttpUrl,
     isValidUrl,
     removeTrailingSlash,
     ensureTrailingSlash,
@@ -135,6 +136,25 @@ describe('url', () => {
             expect(ctx.identity('id1')).toBe(`${uiOrigin}/ui/a/admin/identities/id1/details/attributes`)
             expect(ctx.source('src1')).toBe(`${uiOrigin}/ui/a/admin/connections/sources/src1`)
             expect(ctx.account('acc1')).toBe(`${uiOrigin}/ui/a/admin/accounts/acc1`)
+        })
+    })
+
+    describe('isValidHttpUrl', () => {
+        it('should return true for valid HTTP/HTTPS URLs', () => {
+            expect(isValidHttpUrl('http://foo.com')).toBe(true)
+            expect(isValidHttpUrl('https://foo.com')).toBe(true)
+        })
+
+        it('should return false for invalid URLs or empty values', () => {
+            expect(isValidHttpUrl('not-a-url')).toBe(false)
+            expect(isValidHttpUrl('')).toBe(false)
+            expect(isValidHttpUrl(undefined)).toBe(false)
+        })
+
+        it('should return false for SSRF bypass payloads', () => {
+            expect(isValidHttpUrl('\thttp://foo.com')).toBe(false)
+            expect(isValidHttpUrl('http://foo.com\n')).toBe(false)
+            expect(isValidHttpUrl('http:file://foo.com')).toBe(false)
         })
     })
 })
