@@ -35,17 +35,13 @@ import { buildManagedAccountKey } from '../../model/managedAccountKey'
 import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
 import { hasValue, missing, readString, trimStr } from '../../utils/safeRead'
 import { runtimeDefaults } from '../../data/config'
+import { FusionAttribute } from '../../data/schema'
 
 type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
-const MAIN_ACCOUNT_ATTRIBUTE = 'mainAccount'
 
 // Module-level regex constants — compiled once (hot attribute-evaluation path)
 const COUNTER_SUFFIX_RE = /\$counter$|\$\{counter\}$/
 const VELOCITY_VAR_RE = /(^|[^\\])\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)/
-/** System-managed provenance id; not mapped or defined via Velocity. */
-const ORIGIN_ACCOUNT_ATTRIBUTE = 'originAccount'
-/** System-managed provenance source; not mapped or defined via Velocity. */
-const ORIGIN_SOURCE_ATTRIBUTE = 'originSource'
 
 /**
  * Managed account key for matching `mainAccount` / `$originAccount` — composite `sourceId::nativeIdentity`
@@ -270,7 +266,7 @@ export class AttributeService {
                     }
                     // mainAccount is used as an override context selector; when no supporting
                     // source value exists anymore, clear stale values so account mapping can update.
-                    if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {
+                    if (attribute === FusionAttribute.MainAccount) {
                         delete attributes[attribute]
                         prioritizedAccount = undefined
                     }
@@ -278,13 +274,13 @@ export class AttributeService {
                 }
 
                 attributes[attribute] = processedValue
-                if (attribute === MAIN_ACCOUNT_ATTRIBUTE) {
+                if (attribute === FusionAttribute.MainAccount) {
                     const mainAccountId = trimStr(processedValue)
                     prioritizedAccount = mainAccountId
                         ? this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId)
                         : undefined
                 }
-                if (attribute === 'history') {
+                if (attribute === FusionAttribute.History) {
                     this.applyHistoryMapping(processedValue, fusionAccount)
                 }
             }
@@ -293,7 +289,7 @@ export class AttributeService {
         // Ensure fusion account history is never lost: for accounts that have their own audit log
         // (e.g. type 'managed' with setNonMatched), keep it in the bag so output is correct.
         if (fusionAccount.history.length > 0) {
-            attributes['history'] = [...fusionAccount.history]
+            attributes[FusionAttribute.History] = [...fusionAccount.history]
         }
 
         attributeBag.current = attributes
@@ -472,7 +468,7 @@ export class AttributeService {
     }
 
     private isSystemProvenanceAttribute(name: string): boolean {
-        return name === ORIGIN_ACCOUNT_ATTRIBUTE || name === ORIGIN_SOURCE_ATTRIBUTE
+        return name === FusionAttribute.OriginAccount || name === FusionAttribute.OriginSource
     }
 
     /**
@@ -783,7 +779,7 @@ export class AttributeService {
         fusionAccount: FusionAccount,
         orderedAccounts: Record<string, any>[]
     ): Record<string, any> | undefined {
-        const originIdRaw = fusionAccount.originAccountId ?? fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE]
+        const originIdRaw = fusionAccount.originAccountId ?? fusionAccount.attributes[FusionAttribute.OriginAccount]
         const originId = trimStr(originIdRaw)
         if (!originId) return undefined
 
@@ -888,7 +884,7 @@ export class AttributeService {
     }
 
     private getMainAccountOverrideId(fusionAccount: FusionAccount): string | undefined {
-        return trimStr(fusionAccount.attributeBag.current[MAIN_ACCOUNT_ATTRIBUTE])
+        return trimStr(fusionAccount.attributeBag.current[FusionAttribute.MainAccount])
     }
 
     private getMainAccountContextAccount(

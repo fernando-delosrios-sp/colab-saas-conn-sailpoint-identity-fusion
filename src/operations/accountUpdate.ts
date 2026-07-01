@@ -1,6 +1,7 @@
 import { AttributeChangeOp, ConnectorError, StdAccountUpdateInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
+import { FusionAttribute } from '../data/schema'
 import { assert } from '../utils/assert'
 import { executeActions } from './actions'
 import { ATTR_OPS_NONE } from '../services/attributeService/types'
@@ -65,7 +66,7 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
         for (const change of input.changes) {
             assert(change.attribute, 'Change attribute is required')
 
-            if (change.attribute === 'actions') {
+            if (change.attribute === FusionAttribute.Actions) {
                 const actionValues = [change.value].flat().map((value) => String(value).split(':')[0])
                 if (
                     change.op === AttributeChangeOp.Remove &&
@@ -81,12 +82,11 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
         timer.phase(`Step 3: Processing ${input.changes.length} change(s)`)
 
         if (reverseCorrelationSnapshot.size > 0) {
-            const fusionAttributes = fusionAccount.attributes as Record<string, unknown>
             for (const [attributeName, snapshot] of reverseCorrelationSnapshot.entries()) {
                 if (snapshot.exists) {
-                    fusionAttributes[attributeName] = snapshot.value
+                    fusionAccount.setReverseCorrelationAttribute(attributeName, snapshot.value as string)
                 } else {
-                    delete fusionAttributes[attributeName]
+                    fusionAccount.clearReverseCorrelationAttribute(attributeName)
                 }
             }
         }

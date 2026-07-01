@@ -3,6 +3,7 @@ import { isNewerThan } from '../utils/date'
 import { toSetFromAttribute as attributeToSet, getAccountStringAttribute, getAccountAttribute } from '../utils/attributes'
 import { FusionDecision } from './form'
 import { FusionConfig, SourceType } from './config'
+import { FusionAttribute } from '../data/schema'
 import { Attributes, ConnectorError, ConnectorErrorType, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { FusionMatch } from '../services/scoringService'
 import { attrConcat, attrSplit } from '../services/attributeService/helpers'
@@ -198,10 +199,10 @@ export class FusionAccount {
         }
         if (config.attributes) {
             const attributes = config.attributes
-            this._missingAccountIds = attributeToSet(attributes, 'accounts')
-            this._reviews = attributeToSet(attributes, 'reviews')
-            this._statuses = attributeToSet(attributes, 'statuses')
-            this._actions = attributeToSet(attributes, 'actions')
+            this._missingAccountIds = attributeToSet(attributes, FusionAttribute.MissingAccounts)
+            this._reviews = attributeToSet(attributes, FusionAttribute.Reviews)
+            this._statuses = attributeToSet(attributes, FusionAttribute.Statuses)
+            this._actions = attributeToSet(attributes, FusionAttribute.Actions)
         }
     }
 
@@ -216,7 +217,7 @@ export class FusionAccount {
     public static fromFusionAccount(account: Account): FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourceSet = new Set<string>()
-        const statuses = attributeToSet(account.attributes, 'statuses')
+        const statuses = attributeToSet(account.attributes, FusionAttribute.Statuses)
         const resolvedCompositeManagedKey = resolveCompositeManagedKeyFromFusionRecord(account)
         if (statuses.has(StatusEntitlement.Baseline)) sourceSet.add('Identities')
 
@@ -235,7 +236,7 @@ export class FusionAccount {
             iscAccountId: account.id,
         })
         // Restore persisted origin metadata from existing fusion account attributes.
-        const originSource = getAccountStringAttribute(account, 'originSource')
+        const originSource = getAccountStringAttribute(account, FusionAttribute.OriginSource)
         if (originSource) {
             fusionAccount._originSource = originSource
         }
@@ -247,7 +248,7 @@ export class FusionAccount {
             fusionAccount._statuses.add(StatusEntitlement.Baseline)
             fusionAccount._sources.add('Identities')
         }
-        const originAccount = getAccountStringAttribute(account, 'originAccount')
+        const originAccount = getAccountStringAttribute(account, FusionAttribute.OriginAccount)
         if (originAccount) {
             const normalizedOriginAccount = normalizeCompositeManagedAccountKey(originAccount)
             const trimmedOriginAccount = originAccount.trim()
@@ -265,9 +266,9 @@ export class FusionAccount {
         // Capture the previously stored account IDs so we can later rebuild
         // the current and missing account sets based on which managed accounts
         // still exist in configured sources.
-        fusionAccount.previousAccountIds = attributeToSet(account.attributes, 'accounts')
+        fusionAccount.previousAccountIds = attributeToSet(account.attributes, FusionAttribute.Accounts)
         // Load history from platform so accountUpdate/accountRead don't send back empty history.
-        const historyAttr = getAccountAttribute(account, 'history')
+        const historyAttr = getAccountAttribute(account, FusionAttribute.History)
         if (Array.isArray(historyAttr) && historyAttr.length > 0) {
             fusionAccount.importHistory(historyAttr)
         }
@@ -313,7 +314,7 @@ export class FusionAccount {
      */
     public static fromManagedAccount(account: Account): FusionAccount {
         const fusionAccount = new FusionAccount()
-        const sourcesAttr = getAccountAttribute(account, 'sources')
+        const sourcesAttr = getAccountAttribute(account, FusionAttribute.Sources)
         const sourceSet = sourcesAttr ? new Set(attrSplit(String(sourcesAttr))) : new Set<string>()
 
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
@@ -957,15 +958,15 @@ export class FusionAccount {
      */
     public syncCollectionAttributesToBag(): void {
         const bag = this._attributeBag.current
-        bag['reviews'] = Array.from(this._reviews)
-        bag['accounts'] = Array.from(this._accountIds)
-        bag['statuses'] = Array.from(this._statuses)
-        bag['actions'] = Array.from(this._actions)
-        bag['missing-accounts'] = Array.from(this._missingAccountIds)
-        bag['sources'] = attrConcat(Array.from(this._sources))
-        bag['history'] = [...this._history]
-        if (this._originSource !== undefined) bag['originSource'] = this._originSource
-        if (this._originAccount !== undefined) bag['originAccount'] = this._originAccount
+        bag[FusionAttribute.Reviews] = Array.from(this._reviews)
+        bag[FusionAttribute.Accounts] = Array.from(this._accountIds)
+        bag[FusionAttribute.Statuses] = Array.from(this._statuses)
+        bag[FusionAttribute.Actions] = Array.from(this._actions)
+        bag[FusionAttribute.MissingAccounts] = Array.from(this._missingAccountIds)
+        bag[FusionAttribute.Sources] = attrConcat(Array.from(this._sources))
+        bag[FusionAttribute.History] = [...this._history]
+        if (this._originSource !== undefined) bag[FusionAttribute.OriginSource] = this._originSource
+        if (this._originAccount !== undefined) bag[FusionAttribute.OriginAccount] = this._originAccount
         if (this._identityInfo?.id) bag['identityId'] = this._identityInfo.id
     }
 

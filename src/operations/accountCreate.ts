@@ -1,6 +1,7 @@
 import { AttributeChangeOp, ConnectorError, StdAccountCreateInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { StatusEntitlement } from '../model/statusEntitlement'
+import { FusionAttribute } from '../data/schema'
 import { assert } from '../utils/assert'
 import { normalizeActionTokens } from '../utils/attributes'
 import { resolveIdentityNameFromCreateInput } from '../utils/identityName'
@@ -75,7 +76,7 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
         for (const action of actions) {
             await executeActions(
                 fusionIdentity,
-                { op: AttributeChangeOp.Add, attribute: 'actions', value: action },
+                { op: AttributeChangeOp.Add, attribute: FusionAttribute.Actions, value: action },
                 serviceRegistry
             )
         }

@@ -1,5 +1,31 @@
 import { SchemaAttribute } from '@sailpoint/connector-sdk'
 
+/**
+ * Canonical string identifiers for the connector's default Fusion schema attributes.
+ *
+ * Every reference to a default attribute name in production code MUST be a member of
+ * this enum. The `name` and `id` keys are intentionally excluded — they are SDK
+ * structural keys (the schema's `identityAttribute` and `displayAttribute` defaults)
+ * as well as schema attribute names, and conflating the two would be misleading.
+ *
+ * The runtime value of each member is the exact string the SDK has historically used
+ * for that attribute, so persisted payloads round-trip unchanged. The contract test
+ * in `src/data/__tests__/schema.test.ts` fails if this enum drifts from
+ * `fusionAccountSchemaAttributes`.
+ */
+export enum FusionAttribute {
+    History = 'history',
+    Statuses = 'statuses',
+    Actions = 'actions',
+    Accounts = 'accounts',
+    MissingAccounts = 'missing-accounts',
+    Reviews = 'reviews',
+    Sources = 'sources',
+    MainAccount = 'mainAccount',
+    OriginSource = 'originSource',
+    OriginAccount = 'originAccount',
+}
+
 export const fusionAccountSchemaAttributes: SchemaAttribute[] = [
     {
         name: 'name',

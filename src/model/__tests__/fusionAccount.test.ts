@@ -398,4 +398,34 @@ describe('FusionAccount', () => {
             expect(acc.sources).not.toContain('Identities')
         })
     })
+
+    describe('16. Missing-accounts restoration from persisted attributes', () => {
+        it('restores missing-accounts into the missing reference set', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    accounts: ['src-a::correlated-1'],
+                    'missing-accounts': ['src-a::missing-1'],
+                },
+            } as unknown as Account)
+            expect(acc.missingAccountIds).toContain('src-a::missing-1')
+            expect(acc.missingAccountIds).not.toContain('src-a::correlated-1')
+        })
+
+        it('does not put correlated accounts into the missing reference set', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    accounts: ['src-a::correlated-1'],
+                },
+            } as unknown as Account)
+            expect(acc.missingAccountIds).toEqual([])
+        })
+    })
 })

@@ -348,9 +348,19 @@ export class FusionService {
     }
 
     /**
-     * Refresh pending form data and reconcile transient candidate/reviewer output state.
+     * Refresh pending form data and reconcile transient candidate/reviewer output state
+     * for the single account being processed.
      *
-     * Used by single-account operations before serializing ISC account output.
+     * Single-account operations (create/read/enable/disable) handle one identity at a time,
+     * but the shared form/decision state can carry transient 'candidate' and reviewer
+     * 'reviews' entries from other accounts processed in the same lifecycle. Before
+     * serializing the ISC account output, this method:
+     * 1. Re-fetches the latest pending form instances via {@link FusionForms.fetchFormData}
+     *    so the current account's pending decisions are reflected.
+     * 2. Calls {@link reconcilePendingFormState} to drop stale 'candidate' / 'reviews'
+     *    entries (which may reference accounts not present in this operation) and
+     *    rebuild them from the currently-known pending (unanswered) form instances,
+     *    so the serialized output only references the account being returned.
      */
     public async normalizePendingFormStateForOutput(): Promise<void> {
         await this.decisionProcessor.normalizePendingFormStateForOutput()

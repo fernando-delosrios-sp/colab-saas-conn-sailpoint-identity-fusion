@@ -72,6 +72,54 @@ describe('rebuildFusionAccount', () => {
         expect(fetchManagedAccount).not.toHaveBeenCalledWith(expect.anything(), 'acct-other')
     })
 
+    it('fetches managed accounts from missing-accounts attribute', async () => {
+        const fetchManagedAccount = jest.fn().mockResolvedValue(undefined)
+        const processFusionAccount = jest.fn().mockResolvedValue({ nativeIdentity: 'fusion-missing' })
+
+        const registry = {
+            sources: {
+                fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
+                fusionAccountsByNativeIdentity: new Map([
+                    [
+                        'fusion-missing',
+                        {
+                            nativeIdentity: 'fusion-missing',
+                            identityId: 'identity-missing',
+                            attributes: {
+                                accounts: ['source-a::correlated-1'],
+                                'missing-accounts': ['source-a::missing-1'],
+                            },
+                        },
+                    ],
+                ]),
+                fetchManagedAccount,
+                getSourceByName: jest.fn().mockReturnValue(undefined),
+                getSourceById: jest.fn().mockReturnValue(undefined),
+                aggregateManagedSource: jest.fn().mockResolvedValue(undefined),
+                config: { cascadeAggregationEnabled: false },
+            },
+            identities: {
+                fetchIdentityById: jest.fn().mockResolvedValue(undefined),
+                getIdentityById: jest.fn().mockReturnValue({ id: 'identity-missing', accounts: [] }),
+            },
+            fusion: {
+                processFusionAccount,
+            },
+            log: { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() },
+        } as any
+
+        await rebuildFusionAccount('fusion-missing', {} as any, {
+            fusion: registry.fusion,
+            identities: registry.identities,
+            sources: registry.sources,
+            log: registry.log,
+        })
+
+        expect(fetchManagedAccount).toHaveBeenCalledTimes(2)
+        expect(fetchManagedAccount).toHaveBeenCalledWith('source-a', 'correlated-1')
+        expect(fetchManagedAccount).toHaveBeenCalledWith('source-a', 'missing-1')
+    })
+
     it('calls fetchManagedAccount once per composite key (no separate fetchSourceAccountByNativeIdentity)', async () => {
         const fetchManagedAccount = jest.fn().mockResolvedValue(undefined)
 

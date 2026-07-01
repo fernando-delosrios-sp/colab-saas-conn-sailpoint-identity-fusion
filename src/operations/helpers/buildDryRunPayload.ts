@@ -1,6 +1,7 @@
 import { StdAccountListOutput } from '@sailpoint/connector-sdk'
 import { FusionReportAccount, FusionReportMatch, FusionReportStats } from '../../services/fusionService/types'
 import { PendingReviewAccountContext } from '../../services/formService/formService'
+import { FusionAttribute } from '../../data/schema'
 import { createUrlContext } from '../../utils/url'
 import { readPathString } from '../../utils/safeRead'
 
@@ -250,9 +251,9 @@ const buildMatchingPayload = (
 
     const status = deriveMatchingStatus(reportAccounts)
 
-    const correlationAccounts = toStringArray(attributes.accounts)
-    const correlationMissing = toStringArray(attributes['missing-accounts'])
-    const correlationStatuses = toStringArray(attributes.statuses)
+    const correlationAccounts = toStringArray(attributes[FusionAttribute.Accounts])
+    const correlationMissing = toStringArray(attributes[FusionAttribute.MissingAccounts])
+    const correlationStatuses = toStringArray(attributes[FusionAttribute.Statuses])
     // Orphan-deferred stubs are synthetic records with no real ISC correlation history.
     // Their accounts[] is already captured in matchingStatus.accountIds — suppress the duplicate.
     const hasCorrelationContext =

@@ -8,6 +8,7 @@ import {
     SourceConfig,
     UniqueAttributeDefinition,
 } from '../../model/config'
+import { FusionAttribute } from '../../data/schema'
 import { LogService } from '../logService'
 import { SourceService } from '../sourceService'
 import { IdentityService } from '../identityService'
@@ -373,7 +374,7 @@ export class SchemaService {
         const schema: AccountSchema = {
             displayAttribute: 'name',
             identityAttribute: 'id',
-            groupAttribute: 'actions',
+            groupAttribute: FusionAttribute.Actions,
             attributes,
         }
 

@@ -2,6 +2,7 @@ import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionDecision } from './form'
 import type { IdentityInfo } from './fusionAccountTypes'
 import { normalizeCompositeManagedAccountKey } from './managedAccountKey'
+import { FusionAttribute } from '../data/schema'
 import { readString, trimStr } from '../utils/safeRead'
 
 /** Identity-side display label: identity.attributes.displayName || identity.name. */
@@ -81,10 +82,10 @@ export function buildIdentityInfo(
 export function resolveCompositeManagedKeyFromFusionRecord(account: Account): string | undefined {
     const attributes = (account.attributes ?? {}) as Record<string, unknown>
     const candidates = [
-        readString(attributes, 'originAccount'),
-        readString(attributes, 'mainAccount'),
-        attributes.accounts,
-        attributes['missing-accounts'],
+        readString(attributes, FusionAttribute.OriginAccount),
+        readString(attributes, FusionAttribute.MainAccount),
+        attributes[FusionAttribute.Accounts],
+        attributes[FusionAttribute.MissingAccounts],
     ].flat()
 
     for (const candidate of candidates) {
