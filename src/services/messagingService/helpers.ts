@@ -604,7 +604,7 @@ export type FusionReportEmailData = {
         reviewerName: string
         reviewerUrl?: string
         reviewerEmail?: string
-        accountId: string
+        managedAccountKey: string
         accountName: string
         accountUrl?: string
         accountSource: string

@@ -99,6 +99,7 @@ describe('ReportService', () => {
         expect(decisions).toHaveLength(1)
         expect(decisions[0].reviewerName).toBe('Name rev-1')
         expect(decisions[0].selectedIdentityName).toBe('Name id-1')
+        expect(decisions[0].managedAccountKey).toBe('acc-1')
         expect(decisions[0].accountUrl).toContain('/human-accounts/')
         expect(decisions[0].decision).toBe('assign-existing-identity')
     })

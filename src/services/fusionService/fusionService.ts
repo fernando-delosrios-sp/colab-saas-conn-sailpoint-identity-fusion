@@ -1653,7 +1653,7 @@ export class FusionService {
     private _managedAccountProcessingStartedAt = 0
     private _managedAccountProcessingBatchSize = 0
 
-    private _ensureManagedAccountProcessingInitialized(): void {
+    private ensureManagedAccountProcessingInitialized(): void {
         if (this._managedAccountProcessingState !== 'initialized') {
             throw new Error('initializeManagedAccountProcessing must be called before managed account processing')
         }
@@ -1693,7 +1693,7 @@ export class FusionService {
 
     /** Correlated pre-pass: resolve linked/correlated managed accounts before uncorrelated scoring. */
     public async processCorrelatedManagedAccounts(): Promise<void> {
-        this._ensureManagedAccountProcessingInitialized()
+        this.ensureManagedAccountProcessingInitialized()
         const map = this.sources.managedAccountsById
         await this.runCorrelatedManagedAccountPrePass(map)
         this._linkedAccountKeyIndex = undefined
@@ -1704,7 +1704,7 @@ export class FusionService {
      * @returns Processed count and match scoring duration for metric emission.
      */
     public async processUncorrelatedManagedAccounts(): Promise<{ processed: number; matchScoringMs: number }> {
-        this._ensureManagedAccountProcessingInitialized()
+        this.ensureManagedAccountProcessingInitialized()
         const map = this.sources.managedAccountsById
         const queuedAccounts = [...map.values()]
         const initialQueueSize = queuedAccounts.length

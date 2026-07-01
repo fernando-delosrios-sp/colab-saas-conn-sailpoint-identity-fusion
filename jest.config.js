@@ -17,7 +17,7 @@ module.exports = {
     // Allow Jest to transform ESM-only packages (e.g. double-metaphone) via Babel
     transformIgnorePatterns: ['node_modules/(?!(double-metaphone|uuid)/)'],
     transform: {
-        '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }],
+        '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: 'tsconfig.test.json', isolatedModules: true }],
         '^.+\\.js$': 'babel-jest',
     },
 }

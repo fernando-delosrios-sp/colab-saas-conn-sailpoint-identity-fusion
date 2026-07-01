@@ -255,7 +255,9 @@ const initializeDryRunStreamingContext = (
     return {
         reportIndex: buildReportAccountIndex(report.accounts),
         pendingReviewByAccountId: forms.pendingReviewContextByAccountId,
-        decisionAccountIds: new Set((report.fusionReviewDecisions ?? []).map((decision) => decision.accountId)),
+        decisionAccountIds: new Set(
+            (report.fusionReviewDecisions ?? []).map((decision) => decision.managedAccountKey)
+        ),
         coveredManagedAccountIds: new Set<string>(),
         emittedRowKeys: new Set<string>(),
         optionEmitCounter: createDryRunOptionEmitCounter(),
