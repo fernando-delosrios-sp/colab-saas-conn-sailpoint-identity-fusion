@@ -14,7 +14,7 @@ export const locales: Record<string, TranslationDictionary> = {
         account: 'Account',
         selected_identity: 'Selected Identity',
         comments: 'Comments',
-        new_fusion_reviews: 'New Fusion Reviews',
+        new_fusion_reviews: 'Fusion Reviews',
         source: 'Source:',
         email: 'Email:',
         matches_vertical: 'M<br>A<br>T<br>C<br>H<br>E<br>S',

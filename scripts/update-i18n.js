@@ -19,7 +19,7 @@ const replacements = [
   ['>Account<', '>{{i18n "account"}}<'],
   ['>Selected Identity<', '>{{i18n "selected_identity"}}<'],
   ['>Comments<', '>{{i18n "comments"}}<'],
-  ['>New Fusion Reviews<', '>{{i18n "new_fusion_reviews"}}<'],
+  ['>Fusion Reviews<', '>{{i18n "new_fusion_reviews"}}<'],
   ['>Source:<', '>{{i18n "source"}}<'],
   ['>Email:<', '>{{i18n "email"}}<'],
   ['>M<br>A<br>T<br>C<br>H<br>E<br>S<', '>{{{i18n "matches_vertical"}}}<'],
