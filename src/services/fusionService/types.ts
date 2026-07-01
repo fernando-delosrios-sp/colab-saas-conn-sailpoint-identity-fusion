@@ -231,6 +231,14 @@ export type FusionReportWarnings = {
     }
 }
 
+/** Details about a managed account blended into a Fusion account. */
+export type FusionReportBlend = {
+    accountName: string
+    accountUrl?: string
+    blendedAccountName: string
+    blendedSource: string
+}
+
 /**
  * Complete fusion report generated during aggregation or on-demand.
  * Contains all analyzed accounts and their matching results.
@@ -248,6 +256,8 @@ export type FusionReport = {
     stats?: FusionReportStats
     /** Finished reviewer decisions processed from fusion reviews */
     fusionReviewDecisions?: FusionReportDecision[]
+    /** Blending events executed during this run */
+    fusionBlends?: FusionReportBlend[]
     /** Global warnings surfaced during report generation */
     warnings?: FusionReportWarnings
 }

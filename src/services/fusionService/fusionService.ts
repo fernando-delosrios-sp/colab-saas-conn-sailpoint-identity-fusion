@@ -455,14 +455,14 @@ export class FusionService {
         }
 
         // Replayed assignments and new identity decisions already record a decision history line;
-        // do not append the generic "Associated managed account …" for that same managed key
+        // do not append the generic "Blended managed account …" for that same managed key
         // (persisted accounts list can lag identity until the next account write).
-        let skipAssociationHistoryForManagedKeys: ReadonlySet<string> | undefined
+        let skipBlendHistoryForManagedKeys: ReadonlySet<string> | undefined
         if (authorizedLinkDecision) {
             const rawKey = trimStr(authorizedLinkDecision.account.id) ?? ''
             const normalized = normalizeCompositeManagedAccountKey(rawKey)
             if (normalized) {
-                skipAssociationHistoryForManagedKeys = new Set([normalized])
+                skipBlendHistoryForManagedKeys = new Set([normalized])
             }
         }
 
@@ -488,7 +488,20 @@ export class FusionService {
             this.sources.managedAccountsAllById,
             this.shouldPruneDeletedManagedAccounts(),
             true,
-            skipAssociationHistoryForManagedKeys
+            skipBlendHistoryForManagedKeys,
+            (account) => {
+                if (this._tracker) {
+                    const sourceName = account.sourceName ?? ''
+                    const nativeIdentity = trimStr(account.nativeIdentity) ?? ''
+                    const blendedAccountName = trimStr(account.name) || nativeIdentity || account.id || ''
+                    this._tracker.fusionBlends.push({
+                        accountName: fusionAccount.name ?? fusionAccount.identityId ?? 'Unknown',
+                        accountUrl: fusionAccount.identityId ? this.urlContext.identity(fusionAccount.identityId) : undefined,
+                        blendedAccountName,
+                        blendedSource: sourceName
+                    })
+                }
+            }
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
@@ -1770,6 +1783,10 @@ export class FusionService {
             includeNonMatches,
             stats
         )
+
+        if (tracker.fusionBlends.length > 0) {
+            report.fusionBlends = [...tracker.fusionBlends]
+        }
 
         tracker.clear()
 

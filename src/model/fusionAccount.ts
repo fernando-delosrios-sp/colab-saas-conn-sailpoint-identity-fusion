@@ -1280,16 +1280,17 @@ export class FusionAccount {
      *
      * @param accountsById - Shared work queue of managed accounts
      * @param accountsByIdentityId - Secondary index: identityId → Set of account IDs
-     * @param skipAssociationHistoryForManagedKeys - Optional managed keys that must not get the generic
-     *   "Associated managed account …" line (e.g. replay of a link-to-existing form decision in processFusionAccount).
+     * @param skipBlendHistoryForManagedKeys - Optional managed keys that must not get the generic
+     *   "Blended managed account …" line (e.g. replay of a link-to-existing form decision in processFusionAccount).
      */
     public addManagedAccountLayer(
         accountsById: Map<string, Account>,
         accountsByIdentityId: Map<string, Set<string>>,
         allAccountsById?: Map<string, Account>,
         pruneDeletedManagedAccountsFlag = false,
-        addAssociationHistory = true,
-        skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
+        addBlendHistory = true,
+        skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
+        onBlend?: (account: Account) => void
     ): void {
         const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> => {
             // ⚡ Bolt: Iterate Set directly to prevent Array.from heap allocation
@@ -1330,15 +1331,17 @@ export class FusionAccount {
             ctx,
             accountsById,
             accountsByIdentityId,
-            addAssociationHistory,
-            skipAssociationHistoryForManagedKeys
+            addBlendHistory,
+            skipBlendHistoryForManagedKeys,
+            onBlend
         )
         processPreviousRunMatchedAccounts(
             ctx,
             accountsById,
             accountsByIdentityId,
-            addAssociationHistory,
-            skipAssociationHistoryForManagedKeys
+            addBlendHistory,
+            skipBlendHistoryForManagedKeys,
+            onBlend
         )
 
         // Prune account references that no longer exist in the managed-account inventory.
@@ -1417,9 +1420,9 @@ export class FusionAccount {
      */
     private setManagedAccount(
         account: Account,
-        addAssociationHistory: boolean = true,
-        skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
-    ): void {
+        addBlendHistory: boolean = true,
+        skipBlendHistoryForManagedKeys?: ReadonlySet<string>
+    ): boolean {
         const accountId = getManagedAccountKeyFromAccount(account)
         if (!accountId) {
             throw new ConnectorError(
@@ -1428,25 +1431,24 @@ export class FusionAccount {
             )
         }
         const normalizedKey = normalizeCompositeManagedAccountKey(accountId) ?? accountId
-        const skipAssociationReplay =
-            Boolean(skipAssociationHistoryForManagedKeys?.has(normalizedKey)) ||
-            Boolean(skipAssociationHistoryForManagedKeys?.has(accountId))
-        const recordAssociationHistory = addAssociationHistory && !skipAssociationReplay
+        const skipBlendReplay =
+            Boolean(skipBlendHistoryForManagedKeys?.has(normalizedKey)) ||
+            Boolean(skipBlendHistoryForManagedKeys?.has(accountId))
+        const recordBlendHistory = addBlendHistory && !skipBlendReplay
         const isNewAccount = !this.previousAccountIds.has(accountId)
 
         if (account.id) this._iscAccountId = account.id
 
         if (isNewAccount) {
             this.setNeedsRefresh(true)
-            if (recordAssociationHistory) {
+            if (recordBlendHistory) {
                 const accountLabel = trimStr(account.name ?? account.nativeIdentity ?? accountId) || accountId
                 const sourceLabel = account.sourceName ?? this._sourceName
                 this.addHistory(
-                    `Associated managed account ${this.formatHistoryAccountInfo(accountLabel, sourceLabel)}`
+                    `Blended managed account ${this.formatHistoryAccountInfo(accountLabel, sourceLabel)}`
                 )
             }
         }
-
         if (!this._needsRefresh) {
             const thresholdMs = this.fusionAccountRefreshThresholdInSeconds * 1000
             if (isNewerThan(account.modified, this._modified, thresholdMs)) {
@@ -1482,6 +1484,7 @@ export class FusionAccount {
             // Invalidate cached sourceAttributeMap since sources changed
             this.sourceAttributeMapCache = undefined
         }
+        return recordBlendHistory && isNewAccount
     }
     /** Sets whether this account's attributes need refreshing. */
     public setNeedsRefresh(refresh: boolean) {

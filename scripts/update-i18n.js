@@ -14,6 +14,7 @@ const replacements = [
   ['>Aggregation Warnings<', '>{{i18n "aggregation_warnings"}}<'],
   ['>Aggregation Errors<', '>{{i18n "aggregation_errors"}}<'],
   ['>Fusion Review Decisions<', '>{{i18n "fusion_review_decisions"}}<'],
+  ['>Fusion Blends<', '>{{i18n "fusion_blends"}}<'],
   ['>AUTO<', '>{{i18n "auto"}}<'],
   ['>Reviewer<', '>{{i18n "reviewer"}}<'],
   ['>Account<', '>{{i18n "account"}}<'],

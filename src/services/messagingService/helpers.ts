@@ -100,7 +100,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
           <div style="margin-top: 18px;">
             <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">{{i18n "fusion_review_decisions"}}</div>
             {{#each fusionReviewDecisions}}
-            <div style="margin-top: 10px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 12px; background: #fbfcff;">
+            <div style="margin-bottom: 10px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 12px; background: #fbfcff;">
               <div style="font-size:14px; font-weight:900; color:#0f172a; line-height:1.3;">
                 {{decisionLabel}}
                 {{#if sourceType}}
@@ -156,16 +156,47 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
           </div>
           {{/if}}
         {{/if}}
+        {{#if fusionBlends}}
+          {{#if (gt fusionBlends.length 0)}}
+          <div style="margin-top: 18px;">
+            <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">{{i18n "fusion_blends"}}</div>
+            {{#each fusionBlends}}
+            <div style="margin-bottom: 10px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 12px; background: #fbfcff;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                <tr>
+                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700; width:140px;">{{i18n "account"}}</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">
+                    {{#if accountUrl}}
+                    <a href="{{accountUrl}}" style="color:#0b5cab; text-decoration:underline;">{{accountName}}</a>
+                    {{else}}
+                    {{accountName}}
+                    {{/if}}
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">{{i18n "source"}}</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{blendedSource}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">{{i18n "value"}}</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{blendedAccountName}}</td>
+                </tr>
+              </table>
+            </div>
+            {{/each}}
+          </div>
+          {{/if}}
+        {{/if}}
 
         {{#if accounts}}
-          <div style="margin-top: 18px; font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">{{i18n "new_fusion_reviews"}}</div>
+          <div style="margin-top: 18px; font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: -6px;">{{i18n "new_fusion_reviews"}}</div>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:0 14px 0 14px; max-width:100%; min-width:0; width:100%; vertical-align:top; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;">
           <div style="display:block; width:auto; min-width:100%; box-sizing:border-box; white-space:nowrap;">
           {{#each accounts}}
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table; vertical-align:top; white-space:normal; margin-top:14px; margin-bottom:14px; border:1px solid #e6ebf5; border-radius:10px; background:#ffffff; border-collapse:separate; border-spacing:0; width:auto; min-width:100%; box-sizing:border-box;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="display:inline-table; vertical-align:top; white-space:normal; margin-bottom:14px; border:1px solid #e6ebf5; border-radius:10px; background:#ffffff; border-collapse:separate; border-spacing:0; width:auto; min-width:100%; box-sizing:border-box;">
             <tr>
               <td style="padding:12px; vertical-align:top;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate; border-spacing:0; width:auto; min-width:100%;">
