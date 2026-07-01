@@ -20,7 +20,7 @@ import { ScoringService } from '../scoringService'
 import { SchemaService } from '../schemaService'
 import { FusionMatch, MatchCandidateType } from '../scoringService/types'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
-import { COMBINED_SCORE_ROW_ATTRIBUTE, WEIGHTED_MEAN_ALGORITHM } from '../scoringService/scoringService'
+import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../scoringService/scoringService'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats, OperationContext } from './types'
 import {
     batchProcess as batchProcessWithConfig,
@@ -879,7 +879,7 @@ export class FusionService {
 
         for (const m of matches) {
             const combinedReport = m.scores.find(
-                (s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE && s.algorithm === WEIGHTED_MEAN_ALGORITHM
+                (s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE
             )
             const score = combinedReport?.score ?? 0
 
