@@ -457,7 +457,7 @@ export class AttributeService {
         // Identity decisions are treated as uncorrelated managed accounts; they must not
         // pick up the display-attribute override from the selected identity name.
         if (fusionAccount.type === FusionAccountKind.Decision) return false
-        if (!fusionAccount.fromIdentity && !fusionAccount.isIdentity) return false
+        if (!fusionAccount.fromIdentity && !fusionAccount.isIdentity && !fusionAccount.isMatch) return false
 
         const label = fusionAccount.identityName
         if (label) {
