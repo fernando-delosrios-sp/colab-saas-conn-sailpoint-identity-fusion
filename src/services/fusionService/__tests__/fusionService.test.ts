@@ -1780,7 +1780,7 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {
-                    accounts: ['source-a-id::native-missing-1'],
+                    'missing-accounts': ['source-a-id::native-missing-1'],
                 },
             } as unknown as Account
 
@@ -1918,7 +1918,8 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {
-                    accounts: ['source-a-id::native-existing-1', 'source-a-id::native-deleted-1'],
+                    accounts: ['source-a-id::native-existing-1'],
+                    'missing-accounts': ['source-a-id::native-deleted-1'],
                     originSource: 'Source A',
                     originAccount: 'source-a-id::native-deleted-1',
                 },

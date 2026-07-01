@@ -9,6 +9,7 @@ import { AggregationTracker } from '../../services/fusionService/aggregationTrac
 import { isExactAttributeMatchScores } from '../../services/scoringService/exactMatch'
 import { FusionAccount } from '../../model/account'
 import { StatusEntitlement } from '../../model/statusEntitlement'
+import { FusionAttribute } from '../../data/schema'
 import { readArray, readBoolean, readPathString, readUnknown, trimStr } from '../../utils/safeRead'
 import {
     buildReportAccountIndex,
@@ -534,8 +535,8 @@ const categorizeRow = (
 ): ReportCategory[] => {
     const categories: ReportCategory[] = []
     const attributes = readUnknown(enrichedAccount, 'attributes')
-    const statuses = new Set<string>(readArray<string>(attributes, 'statuses', []))
-    const relatedAccounts = readArray<string>(attributes, 'accounts', [])
+    const statuses = new Set<string>(readArray<string>(attributes, FusionAttribute.Statuses, []))
+    const relatedAccounts = readArray<string>(attributes, FusionAttribute.Accounts, [])
 
     if (statuses.has(StatusEntitlement.Baseline)) {
         categories.push('baseline')
@@ -612,7 +613,7 @@ const emitGroupedRows = async (
                 correlationContext: correlationStatus,
                 ...matchingStatus
             } = matching ?? {}
-            const relatedRaw = readUnknown(readUnknown(row.account, 'attributes'), 'accounts')
+            const relatedRaw = readUnknown(readUnknown(row.account, 'attributes'), FusionAttribute.Accounts)
             const relatedIds = Array.isArray(relatedRaw) ? relatedRaw.map((x) => String(x)) : []
             const reviewStatus = {
                 pendingReviews: readBoolean(review, 'pending', false),
@@ -689,9 +690,9 @@ const getEmissionKey = (account: any): string => {
     if (key !== undefined && key !== null) return String(key)
     const attributeId = readPathString(account, ['attributes', 'id'])
     if (attributeId) return attributeId
-    const originAccount = readPathString(account, ['attributes', 'originAccount'])
+    const originAccount = readPathString(account, ['attributes', FusionAttribute.OriginAccount])
     if (originAccount) return originAccount
-    return JSON.stringify(readUnknown(readUnknown(account, 'attributes'), 'accounts') ?? [])
+    return JSON.stringify(readUnknown(readUnknown(account, 'attributes'), FusionAttribute.Accounts) ?? [])
 }
 
 const refreshUniqueAttributesForDryRun = async (
@@ -726,7 +727,7 @@ const refreshUniqueAttributesForDryRun = async (
     const stableAnalyzed = [...analyzedUncorrelatedAccounts].sort((a: any, b: any) => {
         const aKey = String(
             readUnknown(a, 'originAccountId') ??
-                readPathString(a, ['attributes', 'originAccount']) ??
+                readPathString(a, ['attributes', FusionAttribute.OriginAccount]) ??
                 readUnknown(a, 'nativeIdentity') ??
                 readUnknown(a, 'key') ??
                 readUnknown(a, 'name') ??
@@ -734,7 +735,7 @@ const refreshUniqueAttributesForDryRun = async (
         )
         const bKey = String(
             readUnknown(b, 'originAccountId') ??
-                readPathString(b, ['attributes', 'originAccount']) ??
+                readPathString(b, ['attributes', FusionAttribute.OriginAccount]) ??
                 readUnknown(b, 'nativeIdentity') ??
                 readUnknown(b, 'key') ??
                 readUnknown(b, 'name') ??

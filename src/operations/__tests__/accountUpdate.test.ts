@@ -95,6 +95,12 @@ describe('accountUpdate', () => {
             nativeIdentity: 'fusion-1',
             attributes: {
                 reverseNativeIdentity: 'native-after-rebuild',
+            } as Record<string, string>,
+            setReverseCorrelationAttribute(attributeName: string, value: string) {
+                this.attributes[attributeName] = value
+            },
+            clearReverseCorrelationAttribute(attributeName: string) {
+                delete this.attributes[attributeName]
             },
         }
         ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
