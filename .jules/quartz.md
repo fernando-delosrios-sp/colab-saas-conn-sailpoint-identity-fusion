@@ -12,3 +12,7 @@
 
 **Learning:** When multiple functions iterate over mixed-type arrays (e.g., parsing varying SDK shapes like strings or objects) to extract normalized string values, the loop and type-checking logic is often duplicated (e.g. in `toSetFromAttribute` and `normalizeActionTokens`).
 **Action:** Encapsulate the loop and type-checking logic into a shared helper function (like `normalizeArrayItems`) to eliminate duplicate code blocks, clarify intent, and ensure consistency when handling these mixed-type arrays.
+## 2026-07-01 - Consolidating Nullish Fallback Chains
+
+**Learning:** Replacing verbose nullish coalescing (`??`) fallback chains with an iterative helper function (like `readFirstUnknown`) improves readability and maintainability when checking many potential property keys. However, such helpers must explicitly skip both `undefined` and `null` (e.g., `value !== undefined && value !== null`) to maintain exact behavioral parity with the `??` operator.
+**Action:** Extract sequential property fallback logic into a `readFirstUnknown` helper, ensuring strict `null`/`undefined` checking to prevent subtle bugs when encountering explicitly nulled fields.
