@@ -6,7 +6,7 @@ import {
     mapScoreReportsForFusionReport,
 } from './helpers'
 import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
-import { COMBINED_SCORE_ROW_ATTRIBUTE, WEIGHTED_MEAN_ALGORITHM } from '../scoringService/scoringService'
+import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../scoringService/scoringService'
 import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
 import { UrlContext } from '../../utils/url'
 import { SourceInfo } from '../sourceService'
@@ -64,7 +64,7 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
 
         const matches = fusionMatches.map((match) => {
             const combinedReport = match.scores.find(
-                (s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE && s.algorithm === WEIGHTED_MEAN_ALGORITHM
+                (s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE
             )
             const score = combinedReport?.score ?? 0
             const auto = state.fusionAutoAssignmentScore !== undefined && score >= state.fusionAutoAssignmentScore
