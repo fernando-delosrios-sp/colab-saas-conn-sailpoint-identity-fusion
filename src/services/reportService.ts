@@ -36,8 +36,8 @@ const toReportDecision = (
     resolveSourceType?: (sourceName?: string) => SourceType | undefined,
     resolveReviewerName?: (reviewerId?: string) => string | undefined,
     resolveReviewerUrl?: (reviewerId?: string) => string | undefined,
-    resolveAccountName?: (accountId?: string) => string | undefined,
-    resolveAccountUrl?: (accountId?: string, identityId?: string) => string | undefined,
+    resolveAccountName?: (managedAccountKey?: string) => string | undefined,
+    resolveAccountUrl?: (managedAccountKey?: string, identityId?: string) => string | undefined,
     resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string }
 ): FusionReportDecision => {
     const sourceType =
@@ -56,19 +56,20 @@ const toReportDecision = (
               ? 'Created new identity'
               : 'Confirmed no match'
 
+    const managedAccountKey = decision.account.id
     const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
     const reviewerName =
         decision.submitter.name || resolveReviewerName?.(decision.submitter.id) || decision.submitter.id
     const selectedIdentityName = decision.identityName || selectedIdentityContext.selectedIdentityName
     const correlatedIdentityContext = resolveIdentityContext?.(readString(decision, 'correlatedIdentityId')) ?? {}
     const correlatedAccountName = correlatedIdentityContext.selectedIdentityName
-    const resolvedManagedAccountName = resolveAccountName?.(decision.account.id)
+    const resolvedManagedAccountName = resolveAccountName?.(managedAccountKey)
     const accountNameFromDecision = trimStr(decision.account.name)
     const accountName = correlatedAccountName
-        || (accountNameFromDecision && accountNameFromDecision !== decision.account.id ? accountNameFromDecision : undefined)
+        || (accountNameFromDecision && accountNameFromDecision !== managedAccountKey ? accountNameFromDecision : undefined)
         || resolvedManagedAccountName
         || decision.account.name
-        || decision.account.id
+        || managedAccountKey
 
     const reviewerId = decision.submitter.id
     const reviewerUrl = reviewerId && reviewerId !== 'system' ? resolveReviewerUrl?.(reviewerId) : undefined
@@ -78,9 +79,9 @@ const toReportDecision = (
         reviewerName,
         reviewerUrl,
         reviewerEmail: decision.submitter.email || undefined,
-        accountId: decision.account.id,
+        managedAccountKey,
         accountName,
-        accountUrl: resolveAccountUrl?.(decision.account.id, decision.identityId),
+        accountUrl: resolveAccountUrl?.(managedAccountKey, decision.identityId),
         accountSource: decision.account.sourceName || '',
         sourceType,
         decision: decisionType,
@@ -169,19 +170,19 @@ export class ReportService {
         }
         const resolveReviewerUrl = (reviewerId?: string): string | undefined =>
             reviewerId ? urlContext.identity(reviewerId) : undefined
-        const resolveAccountName = (accountId?: string): string | undefined => {
-            if (!accountId) return undefined
-            const managedAccount = this.sources.managedAccountsAllById.get(accountId)
+        const resolveAccountName = (managedAccountKey?: string): string | undefined => {
+            if (!managedAccountKey) return undefined
+            const managedAccount = this.sources.managedAccountsAllById.get(managedAccountKey)
             const name = trimStr(managedAccount?.name)
-            return name && name !== accountId ? name : undefined
+            return name && name !== managedAccountKey ? name : undefined
         }
-        const resolveAccountUrl = (accountId?: string, identityId?: string): string | undefined => {
-            if (!accountId) return undefined
-            const reportAccountId = this.sources.resolveIscAccountIdForManagedKey(accountId)
+        const resolveAccountUrl = (managedAccountKey?: string, identityId?: string): string | undefined => {
+            if (!managedAccountKey) return undefined
+            const reportAccountId = this.sources.resolveIscAccountIdForManagedKey(managedAccountKey)
             if (reportAccountId) return urlContext.humanAccount(reportAccountId)
-            const managedAccount = this.sources.managedAccountsAllById.get(accountId)
+            const managedAccount = this.sources.managedAccountsAllById.get(managedAccountKey)
             const directIscId = trimStr(managedAccount?.id)
-            if (directIscId && directIscId !== accountId) {
+            if (directIscId && directIscId !== managedAccountKey) {
                 return urlContext.humanAccount(directIscId)
             }
             // New fusion reviews use fusionAccount.iscAccountId (the managed account's ISC
@@ -190,24 +191,24 @@ export class ReportService {
             // (keyed by composite managed key) or in fusionIdentityMap (keyed by identityId),
             // so check both maps by the account key/identityId, and scan identity accounts
             // by nativeIdentity as a last resort.
-            const fusionAccountByKey = this.fusion.getFusionAccountByNativeIdentity(accountId)
+            const fusionAccountByKey = this.fusion.getFusionAccountByNativeIdentity(managedAccountKey)
             const fusionAccountByIdentity = identityId ? this.fusion.getFusionIdentity(identityId) : undefined
             let iscId = fusionAccountByKey?.iscAccountId ?? fusionAccountByIdentity?.iscAccountId
             if (!iscId) {
                 const identities = this.fusion.fusionIdentities
                 if (identities) {
                     for (const fa of identities) {
-                        if (fa.nativeIdentity === accountId && fa.iscAccountId) {
+                        if (fa.nativeIdentity === managedAccountKey && fa.iscAccountId) {
                             iscId = fa.iscAccountId
                             break
                         }
                     }
                 }
             }
-            if (iscId && iscId !== accountId) {
+            if (iscId && iscId !== managedAccountKey) {
                 return urlContext.humanAccount(iscId)
             }
-            return urlContext.humanAccount(accountId)
+            return urlContext.humanAccount(managedAccountKey)
         }
         const resolveIdentityContext = (
             identityId?: string

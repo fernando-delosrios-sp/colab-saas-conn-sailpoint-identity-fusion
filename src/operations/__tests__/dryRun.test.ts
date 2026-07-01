@@ -94,7 +94,7 @@ function createRegistry() {
                 ],
                 fusionReviewDecisions: [
                     {
-                        accountId: 'acc-2',
+                        managedAccountKey: 'acc-2',
                         accountName: 'Bob IT',
                         accountSource: 'IT',
                         reviewerId: 'rev-1',
@@ -485,7 +485,7 @@ describe('dryRun', () => {
                 ],
                 fusionReviewDecisions: [
                     {
-                        accountId: 'acc-2',
+                        managedAccountKey: 'acc-2',
                         accountName: 'Bob IT',
                         accountSource: 'IT',
                         reviewerId: 'rev-1',

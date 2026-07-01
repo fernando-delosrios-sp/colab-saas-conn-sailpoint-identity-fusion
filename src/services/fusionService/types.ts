@@ -97,8 +97,8 @@ export type FusionReportDecision = {
     reviewerUrl?: string
     /** Reviewer email (if available) */
     reviewerEmail?: string
-    /** Source account ID tied to the review */
-    accountId: string
+    /** Composite managed account key (sourceId::nativeIdentity) for the reviewed account. */
+    managedAccountKey: string
     /** Source account display label */
     accountName: string
     /** Direct URL to human account in ISC UI */

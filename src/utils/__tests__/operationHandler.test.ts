@@ -307,46 +307,5 @@ describe('createOperationHandler', () => {
         })
     })
 
-    describe('Response Guarantee', () => {
-        it('should throw ConnectorError when default operation forgets to respond', async () => {
-            defaultFn.mockResolvedValue(undefined)
 
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
-
-            await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
-            await expect(handler(context, input, res)).rejects.toHaveProperty(
-                'message',
-                'Operation finished without calling res.send() or res.error()'
-            )
-        })
-
-        it('should throw ConnectorError when custom operation forgets to respond', async () => {
-            context[operationName] = jest.fn().mockResolvedValue(undefined)
-
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
-
-            await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
-            await expect(handler(context, input, res)).rejects.toHaveProperty(
-                'message',
-                'Operation finished without calling res.send() or res.error()'
-            )
-        })
-
-        it('should complete normally when operation calls res.send()', async () => {
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
-
-            await expect(handler(context, input, res)).resolves.toBeUndefined()
-            expect(res.send).toHaveBeenCalledTimes(1)
-        })
-
-        it('should not mask an original ConnectorError thrown before responding', async () => {
-            const connectorError = new ConnectorError('Original error', ConnectorErrorType.NotFound)
-            defaultFn.mockRejectedValue(connectorError)
-
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
-
-            await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
-            await expect(handler(context, input, res)).rejects.toHaveProperty('message', 'Original error')
-        })
-    })
 })

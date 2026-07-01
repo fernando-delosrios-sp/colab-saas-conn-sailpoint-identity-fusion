@@ -1,4 +1,4 @@
-import { FusionAccount } from '../fusionAccount'
+import { FusionAccount, IDENTITIES_SOURCE_NAME } from '../fusionAccount'
 import { FusionConfig, SourceType } from '../config'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionDecision } from '../form'
@@ -29,7 +29,7 @@ describe('FusionAccount', () => {
             }
             const acc = FusionAccount.fromIdentity(identity)
             expect(acc.type).toBe(FusionAccountKind.Identity)
-            expect(acc.sourceName).toBe('Identities')
+            expect(acc.sourceName).toBe(IDENTITIES_SOURCE_NAME)
             expect(acc.statuses).toContain('baseline')
             expect(acc.fromIdentity).toBe(true)
         })
@@ -337,7 +337,7 @@ describe('FusionAccount', () => {
                 identityId: 'id-1',
                 disabled: false,
                 attributes: {
-                    originSource: 'Identities',
+                    originSource: IDENTITIES_SOURCE_NAME,
                     originAccount: 'id-1',
                     accounts: [],
                     statuses: ['baseline'],
@@ -349,7 +349,7 @@ describe('FusionAccount', () => {
             const acc = FusionAccount.fromFusionAccount(buildPersistedAccount())
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
-            expect(acc.sources).toContain('Identities')
+            expect(acc.sources).toContain(IDENTITIES_SOURCE_NAME)
         })
 
         it('re-asserts baseline when the persisted statuses array is empty (identity-origin)', () => {
@@ -358,7 +358,7 @@ describe('FusionAccount', () => {
             )
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
-            expect(acc.sources).toContain('Identities')
+            expect(acc.sources).toContain(IDENTITIES_SOURCE_NAME)
         })
 
         it('re-asserts baseline when the persisted statuses key is missing (identity-origin)', () => {
@@ -367,7 +367,7 @@ describe('FusionAccount', () => {
             )
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
-            expect(acc.sources).toContain('Identities')
+            expect(acc.sources).toContain(IDENTITIES_SOURCE_NAME)
         })
 
         it('coexists with orphan when persisted statuses only carries orphan (identity-origin)', () => {
@@ -377,7 +377,7 @@ describe('FusionAccount', () => {
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
             expect(acc.statuses).toContain('orphan')
-            expect(acc.sources).toContain('Identities')
+            expect(acc.sources).toContain(IDENTITIES_SOURCE_NAME)
         })
 
         it('does not add baseline to a non-identity-origin record', () => {
@@ -395,7 +395,7 @@ describe('FusionAccount', () => {
             } as unknown as Account)
             expect(acc.fromIdentity).toBe(false)
             expect(acc.statuses).not.toContain('baseline')
-            expect(acc.sources).not.toContain('Identities')
+            expect(acc.sources).not.toContain(IDENTITIES_SOURCE_NAME)
         })
     })
 
@@ -426,6 +426,37 @@ describe('FusionAccount', () => {
                 },
             } as unknown as Account)
             expect(acc.missingAccountIds).toEqual([])
+        })
+    })
+
+    describe('17. Persisted collection and history restoration', () => {
+        it('restores previous account IDs from persisted accounts', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    accounts: ['src-a::correlated-1', 'src-b::correlated-2'],
+                },
+            } as unknown as Account)
+            expect((acc as any).previousAccountIds).toContain('src-a::correlated-1')
+            expect((acc as any).previousAccountIds).toContain('src-b::correlated-2')
+        })
+
+        it('restores history from persisted attributes', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    accounts: [],
+                    history: ['[2026-01-01] event one', '[2026-01-02] event two'],
+                },
+            } as unknown as Account)
+            expect(acc.history).toContain('[2026-01-01] event one')
+            expect(acc.history).toContain('[2026-01-02] event two')
         })
     })
 })

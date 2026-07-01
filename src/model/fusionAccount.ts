@@ -31,6 +31,11 @@ import {
 } from './fusionAccountMatcher'
 
 /**
+ * The ISC virtual source name that represents an identity-origin fusion account.
+ */
+export const IDENTITIES_SOURCE_NAME = 'Identities'
+
+/**
  * Core domain model representing a fusion account in the Identity Fusion connector.
  *
  * A FusionAccount aggregates data from multiple sources (identity, managed accounts,
@@ -155,30 +160,24 @@ export class FusionAccount {
     // ============================================================================
 
     /**
-     * Common initialization logic for factory methods.
-     * Handles default values internally to avoid repetitive null coalescing in callers.
-     * Use explicit undefined checks for booleans so `disabled: false` / `needsRefresh: false` apply.
-     * When `attributes` are provided, extracts collection sets into the corresponding fields.
+     * Initializes scalar core fields from the factory input.
+     * `type` and `nativeIdentity` are required; everything else is optional.
+     * Booleans use explicit undefined checks so `false` values are preserved.
      */
-    private initializeBasicProperties(config: {
-        type?: FusionAccountKind
-        nativeIdentity?: string
-        name?: string | null
-        sourceName?: string | null
-        /** Maps to `name` when `name` is absent (compat). */
-        displayName?: string | null
+    private initializeCoreState(config: {
+        type: FusionAccountKind
+        nativeIdentity: string
+        name: string | null | undefined
+        sourceName: string | null | undefined
         disabled?: boolean
         needsRefresh?: boolean
-        sources?: string[] | Set<string>
-        attributes?: Attributes | null
         identityInfo?: IdentityInfo
-        modified?: string
         iscAccountId?: string | null
+        modified?: string
     }): void {
-        if (config.type) this._type = config.type
+        this._type = config.type
+        this.managedKey = config.nativeIdentity
         if (config.name) this._name = config.name
-        else if (config.displayName) this._name = config.displayName
-        if (config.nativeIdentity) this.managedKey = config.nativeIdentity
         if (config.sourceName) this._sourceName = config.sourceName
         if (config.disabled !== undefined) this._disabled = config.disabled
         if (config.needsRefresh !== undefined) this._needsRefresh = config.needsRefresh
@@ -187,22 +186,152 @@ export class FusionAccount {
         }
         if (config.iscAccountId != null) this._iscAccountId = config.iscAccountId
         if (config.modified !== undefined) this._modified = config.modified
-        if (config.sources) {
-            this._sources = Array.isArray(config.sources) ? new Set(config.sources) : config.sources
+    }
+
+    /**
+     * Initializes the source name set from an array or existing Set.
+     */
+    private initializeSources(sources: string[] | Set<string> | undefined): void {
+        if (!sources) return
+        this._sources = Array.isArray(sources) ? new Set(sources) : sources
+    }
+
+    /**
+     * Seeds the attribute bag and hydrates collection sets from persisted attributes.
+     * Previous attributes are stored only for existing fusion accounts to save memory.
+     */
+    private initializeAttributeState(
+        attributes: Attributes | null | undefined,
+        kind: FusionAccountKind,
+        nativeIdentity?: string
+    ): void {
+        if (!attributes) return
+        this._attributeBag.current = { ...attributes }
+        if (kind === FusionAccountKind.Fusion && nativeIdentity) {
+            this._attributeBag.previous = { ...attributes }
         }
-        if (config.attributes) {
-            this._attributeBag.current = { ...config.attributes }
-            // Only store previous for existing fusion accounts to save memory
-            if (config.type === FusionAccountKind.Fusion && config.nativeIdentity) {
-                this._attributeBag.previous = { ...config.attributes }
-            }
+        this.initializeMissingAccountIds(attributes)
+        this.initializeReviews(attributes)
+        this.initializeStatuses(attributes)
+        this.initializeActions(attributes)
+    }
+
+    /**
+     * Hydrates the missing-account ID set from persisted attributes.
+     */
+    private initializeMissingAccountIds(attributes: Attributes | null | undefined): void {
+        this._missingAccountIds = attributeToSet(attributes, FusionAttribute.MissingAccounts)
+    }
+
+    /**
+     * Hydrates the review URL set from persisted attributes.
+     */
+    private initializeReviews(attributes: Attributes | null | undefined): void {
+        this._reviews = attributeToSet(attributes, FusionAttribute.Reviews)
+    }
+
+    /**
+     * Hydrates the status entitlement set from persisted attributes.
+     */
+    private initializeStatuses(attributes: Attributes | null | undefined): void {
+        this._statuses = attributeToSet(attributes, FusionAttribute.Statuses)
+    }
+
+    /**
+     * Hydrates the action set from persisted attributes.
+     */
+    private initializeActions(attributes: Attributes | null | undefined): void {
+        this._actions = attributeToSet(attributes, FusionAttribute.Actions)
+    }
+
+    /**
+     * Hydrates the previous account ID set from persisted attributes.
+     */
+    private initializePreviousAccountIds(attributes: Attributes | null | undefined): void {
+        this.previousAccountIds = attributeToSet(attributes, FusionAttribute.Accounts)
+    }
+
+    /**
+     * Derives the initial source set for a persisted fusion account.
+     * Adds the virtual IDENTITIES_SOURCE_NAME source when the persisted statuses include baseline.
+     */
+    private static deriveBaselineSourceSet(attributes: Attributes | null | undefined): Set<string> {
+        const sourceSet = new Set<string>()
+        const statuses = attributeToSet(attributes, FusionAttribute.Statuses)
+        if (statuses.has(StatusEntitlement.Baseline)) {
+            sourceSet.add(IDENTITIES_SOURCE_NAME)
         }
-        if (config.attributes) {
-            const attributes = config.attributes
-            this._missingAccountIds = attributeToSet(attributes, FusionAttribute.MissingAccounts)
-            this._reviews = attributeToSet(attributes, FusionAttribute.Reviews)
-            this._statuses = attributeToSet(attributes, FusionAttribute.Statuses)
-            this._actions = attributeToSet(attributes, FusionAttribute.Actions)
+        return sourceSet
+    }
+
+    /**
+     * Sets the origin source and account for managed-origin creation paths.
+     */
+    private setOrigin(sourceName: string | null | undefined, accountId: string | null | undefined): void {
+        this._originSource = sourceName ?? undefined
+        this._originAccount = accountId ?? undefined
+    }
+
+    /**
+     * Marks this account as identity-origin and applies the baseline status.
+     * Keeps `originSource === IDENTITIES_SOURCE_NAME` and the `baseline` entitlement in sync.
+     */
+    private markIdentityOrigin(accountId: string | null | undefined): void {
+        this._originSource = IDENTITIES_SOURCE_NAME
+        this._originAccount = accountId ?? undefined
+        this.setBaseline()
+    }
+
+    /**
+     * Restores persisted origin metadata from an existing fusion account.
+     * Also re-asserts baseline status when the restored origin is IDENTITIES_SOURCE_NAME.
+     */
+    private restoreOriginMetadata(account: Account): void {
+        const originSource = getAccountStringAttribute(account, FusionAttribute.OriginSource)
+        if (originSource) {
+            this._originSource = originSource
+        }
+
+        const originAccount = getAccountStringAttribute(account, FusionAttribute.OriginAccount)
+        if (originAccount) {
+            const normalizedOriginAccount = normalizeCompositeManagedAccountKey(originAccount)
+            const trimmedOriginAccount = originAccount.trim()
+            this._originAccount = normalizedOriginAccount ?? (trimmedOriginAccount || undefined)
+        }
+
+        this.ensureBaselineForIdentityOrigin()
+    }
+
+    /**
+     * Restores identity linkage from persisted attributes when the SDK Account
+     * does not expose identityId directly.
+     */
+    private restoreIdentityLinkage(account: Account): void {
+        if (this._identityInfo?.id) return
+        const identityId = getAccountStringAttribute(account, 'identityId')
+        if (identityId && identityId.trim().length > 0) {
+            this.setIdentityIdAttribute(identityId.trim())
+        }
+    }
+
+    /**
+     * Restores persisted collection references and history.
+     */
+    private restorePersistedCollections(account: Account): void {
+        this.initializePreviousAccountIds(account.attributes)
+        const historyAttr = getAccountAttribute(account, FusionAttribute.History)
+        if (Array.isArray(historyAttr) && historyAttr.length > 0) {
+            this.importHistory(historyAttr)
+        }
+    }
+
+    /**
+     * Defensively re-asserts baseline status and Identities source for identity-origin records.
+     */
+    private ensureBaselineForIdentityOrigin(): void {
+        if (this.fromIdentity && !this._statuses.has(StatusEntitlement.Baseline)) {
+            this._statuses.add(StatusEntitlement.Baseline)
+            this._sources.add(IDENTITIES_SOURCE_NAME)
         }
     }
 
@@ -211,67 +340,41 @@ export class FusionAccount {
      * Used during aggregation to reconstruct fusion accounts from the previous run.
      * Restores all persisted state including attributes, collections, history, and origin source.
      *
+     * Construction sequence:
+     * 1. `initializeCoreState` — scalar fields (type, nativeIdentity, name, sourceName, disabled, identityInfo, modified, iscAccountId).
+     * 2. `initializeSources` — virtual IDENTITIES_SOURCE_NAME source if persisted statuses include baseline.
+     * 3. `initializeAttributeState` — current/previous attribute bags and collection sets (missing-accounts, reviews, statuses, actions).
+     * 4. `restoreOriginMetadata` — persisted originSource/originAccount; re-asserts baseline for identity-origin records.
+     * 5. `restoreIdentityLinkage` — identityId fallback from persisted attributes when the SDK Account does not expose it.
+     * 6. `restorePersistedCollections` — previous account IDs and history import.
+     *
      * @param account - The ISC Account object from the fusion source
      * @returns A fully initialized FusionAccount with restored state
      */
     public static fromFusionAccount(account: Account): FusionAccount {
         const fusionAccount = new FusionAccount()
-        const sourceSet = new Set<string>()
-        const statuses = attributeToSet(account.attributes, FusionAttribute.Statuses)
-        const resolvedCompositeManagedKey = resolveCompositeManagedKeyFromFusionRecord(account)
-        if (statuses.has(StatusEntitlement.Baseline)) sourceSet.add('Identities')
-
         const identityInfo = buildIdentityInfo(account)
+        const resolvedCompositeManagedKey = resolveCompositeManagedKeyFromFusionRecord(account)
 
-        fusionAccount.initializeBasicProperties({
+        fusionAccount.initializeCoreState({
             type: FusionAccountKind.Fusion,
             nativeIdentity: resolvedCompositeManagedKey ?? (account.nativeIdentity as string),
             name: trimStr(account.name),
             sourceName: account.sourceName,
             disabled: account.disabled,
-            sources: sourceSet,
-            attributes: account.attributes ?? undefined,
             identityInfo,
             modified: account.modified ?? '',
             iscAccountId: account.id,
         })
-        // Restore persisted origin metadata from existing fusion account attributes.
-        const originSource = getAccountStringAttribute(account, FusionAttribute.OriginSource)
-        if (originSource) {
-            fusionAccount._originSource = originSource
-        }
-        // Identity-origin accounts carry a permanent 'baseline' status marker.
-        // Re-assert it defensively so legacy or migrated records that lost it from
-        // the persisted statuses array are still classified correctly on restore,
-        // and the 'Identities' virtual source mirrors the baseline origin signal.
-        if (fusionAccount.fromIdentity && !fusionAccount._statuses.has(StatusEntitlement.Baseline)) {
-            fusionAccount._statuses.add(StatusEntitlement.Baseline)
-            fusionAccount._sources.add('Identities')
-        }
-        const originAccount = getAccountStringAttribute(account, FusionAttribute.OriginAccount)
-        if (originAccount) {
-            const normalizedOriginAccount = normalizeCompositeManagedAccountKey(originAccount)
-            const trimmedOriginAccount = originAccount.trim()
-            fusionAccount._originAccount = normalizedOriginAccount ?? (trimmedOriginAccount || undefined)
-        }
-        // Restore the persisted identity ID so identity-backed accounts route to fusionIdentityMap
-        // even when the SDK Account does not expose `identityId` directly. We fold the value into
-        // `_identityInfo` so the `identityId` getter has a single authoritative source.
-        if (!fusionAccount._identityInfo?.id) {
-            const identityId = getAccountStringAttribute(account, 'identityId')
-            if (identityId && identityId.trim().length > 0) {
-                fusionAccount.setIdentityIdAttribute(identityId.trim())
-            }
-        }
-        // Capture the previously stored account IDs so we can later rebuild
-        // the current and missing account sets based on which managed accounts
-        // still exist in configured sources.
-        fusionAccount.previousAccountIds = attributeToSet(account.attributes, FusionAttribute.Accounts)
-        // Load history from platform so accountUpdate/accountRead don't send back empty history.
-        const historyAttr = getAccountAttribute(account, FusionAttribute.History)
-        if (Array.isArray(historyAttr) && historyAttr.length > 0) {
-            fusionAccount.importHistory(historyAttr)
-        }
+        fusionAccount.initializeSources(FusionAccount.deriveBaselineSourceSet(account.attributes))
+        fusionAccount.initializeAttributeState(
+            account.attributes,
+            FusionAccountKind.Fusion,
+            fusionAccount.nativeIdentityOrUndefined
+        )
+        fusionAccount.restoreOriginMetadata(account)
+        fusionAccount.restoreIdentityLinkage(account)
+        fusionAccount.restorePersistedCollections(account)
 
         return fusionAccount
     }
@@ -286,21 +389,19 @@ export class FusionAccount {
      */
     public static fromIdentity(identity: IdentityDocument): FusionAccount {
         const fusionAccount = new FusionAccount()
-        fusionAccount.initializeBasicProperties({
+        fusionAccount.initializeCoreState({
             type: FusionAccountKind.Identity,
             nativeIdentity: identity.id,
             name: trimStr(identity.name),
-            sourceName: 'Identities',
+            sourceName: IDENTITIES_SOURCE_NAME,
             disabled: identity.disabled,
             needsRefresh: true,
-            sources: ['Identities'],
-            attributes: identity.attributes ?? undefined,
             identityInfo: buildIdentityInfo(identity),
         })
-        fusionAccount._originSource = 'Identities'
-        fusionAccount._originAccount = identity.id ?? undefined
+        fusionAccount.initializeSources([IDENTITIES_SOURCE_NAME])
+        fusionAccount.initializeAttributeState(identity.attributes, FusionAccountKind.Identity, identity.id)
+        fusionAccount.markIdentityOrigin(identity.id)
         fusionAccount.setIdentityIdAttribute(identity.id)
-        fusionAccount.setBaseline()
         return fusionAccount
     }
 
@@ -326,21 +427,19 @@ export class FusionAccount {
         }
         const identityInfo = buildIdentityInfo(account)
 
-        fusionAccount.initializeBasicProperties({
+        fusionAccount.initializeCoreState({
             type: FusionAccountKind.Managed,
             nativeIdentity: managedAccountKey,
             name: trimStr(account.name),
             sourceName: account.sourceName,
             disabled: account.disabled,
             needsRefresh: true,
-            sources: sourceSet,
-            attributes: account.attributes ?? undefined,
             identityInfo,
             iscAccountId: account.id,
         })
-        fusionAccount._originSource = account.sourceName ?? undefined
-        fusionAccount._originAccount = managedAccountKey
-        fusionAccount.setUncorrelatedStatus()
+        fusionAccount.initializeSources(sourceSet)
+        fusionAccount.initializeAttributeState(account.attributes, FusionAccountKind.Managed, managedAccountKey)
+        fusionAccount.setOrigin(account.sourceName, managedAccountKey)
         fusionAccount.setUncorrelatedAccount(managedAccountKey)
         fusionAccount.setManagedAccount(account, false)
         fusionAccount.setNeedsReset(true)
@@ -369,7 +468,7 @@ export class FusionAccount {
                 ConnectorErrorType.Generic
             )
         }
-        fusionAccount.initializeBasicProperties({
+        fusionAccount.initializeCoreState({
             type: FusionAccountKind.Decision,
             nativeIdentity: managedAccountKey,
             name: accountName,
@@ -379,9 +478,7 @@ export class FusionAccount {
                 ? buildIdentityInfo(decision)
                 : undefined,
         })
-        fusionAccount._originSource = account.sourceName ?? undefined
-        fusionAccount._originAccount = managedAccountKey
-        fusionAccount.setUncorrelatedStatus()
+        fusionAccount.setOrigin(account.sourceName, managedAccountKey)
         fusionAccount.setUncorrelatedAccount(managedAccountKey)
         return fusionAccount
     }
@@ -509,7 +606,7 @@ export class FusionAccount {
         return this._sourceName
     }
 
-    /** The original source that created this fusion account (e.g. "Identities" or a managed source name). */
+    /** The original source that created this fusion account (e.g. `IDENTITIES_SOURCE_NAME` or a managed source name). */
     public get originSource(): string | undefined {
         return this._originSource
     }
@@ -548,9 +645,9 @@ export class FusionAccount {
         const originFromAttributes = this._attributeBag.current?.originSource
         const legacyOriginFromAttributes = this._attributeBag.current?.sourceOrigin
         return (
-            this._originSource === 'Identities' ||
-            originFromAttributes === 'Identities' ||
-            legacyOriginFromAttributes === 'Identities'
+            this._originSource === IDENTITIES_SOURCE_NAME ||
+            originFromAttributes === IDENTITIES_SOURCE_NAME ||
+            legacyOriginFromAttributes === IDENTITIES_SOURCE_NAME
         )
     }
 
@@ -1379,7 +1476,7 @@ export class FusionAccount {
 
             const existingSourceAccounts = this._attributeBag.sources.get(account.sourceName) || []
             existingSourceAccounts.push(contextAttributes)
-            this._sources.delete('Identities')
+            this._sources.delete(IDENTITIES_SOURCE_NAME)
             this._sources.add(account.sourceName)
             this._attributeBag.sources.set(account.sourceName, existingSourceAccounts)
             this._attributeBag.accounts.push(contextAttributes)
