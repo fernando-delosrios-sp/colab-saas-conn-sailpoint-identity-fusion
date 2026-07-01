@@ -122,7 +122,7 @@ export const rebuildFusionAccount = async (
     const identity = identities.getIdentityById(account.identityId)
 
     const accountIds = collectManagedAccountKeys(
-        account,
+        account as unknown as Account,
         identity ?? undefined,
         (sourceName) => !!sources.getSourceByName(sourceName)?.isManaged
     )
