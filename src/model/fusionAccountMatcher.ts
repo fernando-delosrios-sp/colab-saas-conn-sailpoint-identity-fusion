@@ -11,9 +11,9 @@ export interface MatchContext {
     setUncorrelatedAccount(id: string): void
     setManagedAccount(
         account: Account,
-        addAssociationHistory: boolean,
-        skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
-    ): void
+        addBlendHistory: boolean,
+        skipBlendHistoryForManagedKeys?: ReadonlySet<string>
+    ): boolean
     hasManagedAccountInfo(accountId: string): boolean
     setManagedAccountInfo(accountId: string, sourceName: string, nativeIdentity: string): void
     deleteManagedAccountInfo(accountId: string): void
@@ -30,8 +30,9 @@ export function processIdentityMatchedAccounts(
     ctx: MatchContext,
     accountsById: Map<string, Account>,
     accountsByIdentityId: Map<string, Set<string>>,
-    addAssociationHistory: boolean,
-    skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
+    addBlendHistory: boolean,
+    skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
+    onBlend?: (account: Account) => void
 ): void {
     const identityId = ctx.identityId
     if (identityId === undefined) return
@@ -43,7 +44,8 @@ export function processIdentityMatchedAccounts(
         const account = accountsById.get(id)
         if (account) {
             ctx.setCorrelatedAccount(id)
-            ctx.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
+            const blended = ctx.setManagedAccount(account, addBlendHistory, skipBlendHistoryForManagedKeys)
+            if (blended && onBlend) onBlend(account)
             accountsById.delete(id)
         }
     }
@@ -58,8 +60,9 @@ export function processPreviousRunMatchedAccounts(
     ctx: MatchContext,
     accountsById: Map<string, Account>,
     accountsByIdentityId: Map<string, Set<string>>,
-    addAssociationHistory: boolean,
-    skipAssociationHistoryForManagedKeys?: ReadonlySet<string>
+    addBlendHistory: boolean,
+    skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
+    onBlend?: (account: Account) => void
 ): void {
     if (ctx.previousAccountIds.size === 0 && ctx.missingAccountIdsSet.size === 0) return
 
@@ -67,7 +70,8 @@ export function processPreviousRunMatchedAccounts(
         if (!ctx.previousAccountIds.has(id) && !ctx.missingAccountIdsSet.has(id)) continue
 
         ctx.setUncorrelatedAccount(id)
-        ctx.setManagedAccount(account, addAssociationHistory, skipAssociationHistoryForManagedKeys)
+        const blended = ctx.setManagedAccount(account, addBlendHistory, skipBlendHistoryForManagedKeys)
+        if (blended && onBlend) onBlend(account)
         accountsById.delete(id)
 
         if (!account.identityId) continue

@@ -1,5 +1,5 @@
 import { FusionAccount } from '../../model/account'
-import { FusionReportAccount } from './types'
+import { FusionReportAccount, FusionReportBlend } from './types'
 
 /**
  * AggregationTracker acts as a stateful container for compiling and tracking
@@ -14,6 +14,7 @@ export class AggregationTracker {
     public conflictingFusionIdentityAccounts: Map<string, Map<string, string>> = new Map()
     public newManagedAccountsCount = 0
     public identitiesProcessedCount = 0
+    public fusionBlends: FusionReportBlend[] = []
     public readonly fusionIdentityComparisonsByAccount = new WeakMap<FusionAccount, number>()
 
     /**
@@ -27,5 +28,6 @@ export class AggregationTracker {
         this.conflictingFusionIdentityAccounts.clear()
         this.newManagedAccountsCount = 0
         this.identitiesProcessedCount = 0
+        this.fusionBlends = []
     }
 }

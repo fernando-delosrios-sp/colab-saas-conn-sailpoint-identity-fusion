@@ -144,7 +144,7 @@ export class DecisionProcessor {
 
         const rawDecisionKey = trimStr(fusionDecision.account.id) ?? ''
         const normalizedDecisionKey = normalizeCompositeManagedAccountKey(rawDecisionKey)
-        const skipAssociationHistoryForManagedKeys = normalizedDecisionKey
+        const skipBlendHistoryForManagedKeys = normalizedDecisionKey
             ? new Set([normalizedDecisionKey])
             : undefined
 
@@ -154,7 +154,7 @@ export class DecisionProcessor {
             this.fusionService.sources.managedAccountsAllById,
             this.fusionService.shouldPruneDeletedManagedAccounts(),
             true,
-            skipAssociationHistoryForManagedKeys
+            skipBlendHistoryForManagedKeys
         )
         await this.fusionService.applyAttributeProcessing(fusionAccount)
 

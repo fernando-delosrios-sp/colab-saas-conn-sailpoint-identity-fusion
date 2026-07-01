@@ -1912,7 +1912,7 @@ describe('FusionService', () => {
             expect(result.accountIds).toContain('source-a-id::native-new-2')
             expect(result.history).toEqual(
                 expect.arrayContaining([
-                    expect.stringContaining('Associated managed account Managed Account New [Source A]'),
+                    expect.stringContaining('Blended managed account Managed Account New [Source A]'),
                 ])
             )
         })

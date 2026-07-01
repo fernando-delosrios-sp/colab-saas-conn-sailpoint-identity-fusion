@@ -10,6 +10,7 @@
 .idea/
 .cline/
 .claude/
+.agent/
 *.iml
 cursor_settings_backup.json
 
