@@ -280,21 +280,6 @@ describe('AttributeService incremental counter seeding', () => {
         return fusionAccount
     }
 
-    it('seeds the persistent counter from existing incremental values to avoid burning through collisions', async () => {
-        const service = createService()
-        await service.initializeCounters()
-
-        const existing = createFusionAccount({ id: 'NG015' })
-        await service.refreshUniqueAttributes(existing)
-
-        expect(await service.getStateObject()).toEqual({ id: 15 })
-
-        const next = createFusionAccount({})
-        await service.refreshUniqueAttributes(next)
-
-        expect(next.attributes.id).toBe('NG016')
-        expect(await service.getStateObject()).toEqual({ id: 16 })
-    })
 })
 
 describe('AttributeService mapping undefined behavior', () => {
@@ -2679,3 +2664,111 @@ describe('AttributeService maxLength ordering after post-processing transforms',
         expect(evaluateResult).toBe(transformsResult)
     })
 })
+
+describe('AttributeService refreshUniqueAttributes early skip rules', () => {
+    const buildService = (def: any) => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: def.normalAttributeDefinitions ?? [],
+            uniqueAttributeDefinitions: def.uniqueAttributeDefinitions ?? [
+                {
+                    name: 'id',
+                    expression: 'generated-id',
+                    useIncrementalCounter: false,
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                }
+            ],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+        return new AttributeService(config, schemas, sourceService, log, locks)
+    }
+
+    const buildFusionAccount = (type: any, isMatch: boolean, needsReset: boolean) => {
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+        const fusionAccount: any = {
+            type,
+            needsRefresh: true,
+            needsReset,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            isMatch,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+        return fusionAccount
+    }
+
+    it('skips unique attributes when it proceeds from an assignment decision', async () => {
+        const service = buildService({})
+        // type = 'decision', isMatch = false, needsReset = false (assignment decision)
+        const fusionAccount = buildFusionAccount('decision', false, false)
+
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBeUndefined()
+    })
+
+    it('does not skip unique attributes when it proceeds from an identity decision', async () => {
+        const service = buildService({})
+        // type = 'decision', isMatch = false, needsReset = true (identity decision)
+        const fusionAccount = buildFusionAccount('decision', false, true)
+
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBe('generated-id')
+    })
+
+    it('skips unique attributes when it yields a Fusion form to be reviewed (isMatch is true)', async () => {
+        const service = buildService({})
+        // type = 'managed', isMatch = true, needsReset = false
+        const fusionAccount = buildFusionAccount('managed', true, false)
+
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBeUndefined()
+    })
+
+    it('does not skip unique attributes for standard uncorrelated managed accounts that are non-matches', async () => {
+        const service = buildService({})
+        // type = 'managed', isMatch = false, needsReset = false
+        const fusionAccount = buildFusionAccount('managed', false, false)
+
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBe('generated-id')
+    })
+})
+

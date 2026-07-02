@@ -99,6 +99,7 @@ export class FusionAccount {
 
     // State flags
     private _uncorrelated = false
+    private _isIdentity = false
     private _disabled = false
     private _needsRefresh = false
     private _needsReset = false
@@ -175,6 +176,7 @@ export class FusionAccount {
         identityInfo?: IdentityInfo
         iscAccountId?: string | null
         modified?: string
+        isIdentity?: boolean
     }): void {
         this._type = config.type
         this._managedKey = config.managedKey
@@ -188,6 +190,7 @@ export class FusionAccount {
         }
         if (config.iscAccountId != null) this._iscAccountId = config.iscAccountId
         if (config.modified !== undefined) this._modified = config.modified
+        if (config.isIdentity !== undefined) this._isIdentity = config.isIdentity
     }
 
     /**
@@ -368,6 +371,7 @@ export class FusionAccount {
             identityInfo,
             modified: account.modified,
             iscAccountId: account.id,
+            isIdentity: account.uncorrelated === false,
         })
         fusionAccount.initializeSources(FusionAccount.deriveBaselineSourceSet(account.attributes))
         fusionAccount.initializeAttributeState(
@@ -401,6 +405,7 @@ export class FusionAccount {
             disabled: identity.disabled,
             needsRefresh: true,
             identityInfo: buildIdentityInfo(identity),
+            isIdentity: true,
         })
         fusionAccount.initializeSources([IDENTITIES_SOURCE_NAME])
         fusionAccount.initializeAttributeState(identity.attributes, FusionAccountKind.Identity, managedKey)
@@ -440,6 +445,7 @@ export class FusionAccount {
             needsRefresh: true,
             identityInfo,
             iscAccountId: account.id,
+            isIdentity: account.uncorrelated === false,
         })
         fusionAccount.initializeSources(sourceSet)
         fusionAccount.initializeAttributeState(account.attributes, FusionAccountKind.Managed, managedAccountKey)
@@ -478,6 +484,7 @@ export class FusionAccount {
             sourceName: account.sourceName,
             needsRefresh: true,
             identityInfo: decision.identityId ? buildIdentityInfo(decision) : undefined,
+            isIdentity: (account as any).uncorrelated === false,
         })
         fusionAccount.setOrigin(account.sourceName, managedAccountKey)
         fusionAccount.setUncorrelatedAccount(managedAccountKey)
@@ -630,9 +637,13 @@ export class FusionAccount {
         return this._type === FusionAccountKind.Managed
     }
 
-    /** Whether this fusion account is associated to an ISC identity. Requires a non-empty identity id. */
+    /** Whether this fusion account is associated to an ISC identity. */
     public get isIdentity(): boolean {
-        return !!this._identityInfo?.id
+        return this._isIdentity
+    }
+
+    public set isIdentity(value: boolean) {
+        this._isIdentity = value
     }
 
     /**

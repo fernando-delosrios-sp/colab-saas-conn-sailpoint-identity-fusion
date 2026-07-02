@@ -417,7 +417,7 @@ export class AttributeService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -444,7 +444,10 @@ export class AttributeService {
      */
     private applyDisplayAttributeOverrideIfApplicable(fusionAccount: FusionAccount, attributeName: string): boolean {
         const { fusionDisplayAttribute } = this.schemas
+        // Not display name
         if (attributeName !== fusionDisplayAttribute) return false
+        // Not an identity
+        if (!fusionAccount.isIdentity) return false
 
         const hasExistingValue = isValidAttributeValue(fusionAccount.attributes[attributeName])
         const canResetDisplay = fusionAccount.needsReset
@@ -453,11 +456,6 @@ export class AttributeService {
         if (hasExistingValue && !canResetDisplay && isExistingFusionAccount) {
             return true
         }
-
-        // Identity decisions are treated as uncorrelated managed accounts; they must not
-        // pick up the display-attribute override from the selected identity name.
-        if (fusionAccount.type === FusionAccountKind.Decision) return false
-        if (!fusionAccount.fromIdentity && !fusionAccount.isIdentity && !fusionAccount.isMatch) return false
 
         const label = fusionAccount.identityName
         if (label) {
@@ -490,6 +488,12 @@ export class AttributeService {
      * @param fusionAccount - The fusion account to refresh unique attributes for
      */
     public async refreshUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
+        // Skip accounts that will not yield a standalone ISCAccount per accountList logic:
+        // 1. Assignment decisions (Decision-type, not new-identity) merge into an existing identity.
+        // 2. Matched managed accounts produce a review form or auto-assignment, not a standalone account.
+        if (fusionAccount.type === FusionAccountKind.Decision && !fusionAccount.needsReset) return
+        if (fusionAccount.isMatch) return
+
         if (this.uniqueDefinitions.length === 0) return
 
         // Also refresh when any unique attribute value is missing or empty, to recover from
@@ -600,7 +604,7 @@ export class AttributeService {
         if (this.skipAccountsWithMissingId && !uniqueId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -720,7 +724,7 @@ export class AttributeService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} raw account(s) ` +
-                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -1292,9 +1296,6 @@ export class AttributeService {
             if (hasValue && !fusionAccount.needsReset) {
                 const valueStr = String(existingValue)
                 this.getUniqueValues(name).add(valueStr)
-                if (definition.useIncrementalCounter) {
-                    await this.seedIncrementalCounterFromExistingValue(definition, valueStr)
-                }
                 return
             }
 
@@ -1381,30 +1382,5 @@ export class AttributeService {
                 : s.substring(0, definition.maxLength)
         }
         return s
-    }
-
-    private async seedIncrementalCounterFromExistingValue(
-        definition: UniqueAttributeDefinition,
-        value: string
-    ): Promise<void> {
-        const match = value.match(/(\d+)\s*$/)
-        if (!match) return
-        const parsed = Number.parseInt(match[1], 10)
-        if (!Number.isFinite(parsed) || parsed <= 0) return
-
-        const stateWrapper = this.getStateWrapper()
-        const key = definition.name
-        const lockKey = `counter:${key}`
-        await this.locks.withLock(lockKey, async () => {
-            const current = stateWrapper.get(key)
-            if (current === undefined) {
-                const start = definition.counterStart ?? 1
-                await stateWrapper.initCounter(key, start)
-            }
-            const nextCurrent = stateWrapper.get(key) ?? 0
-            if (parsed > nextCurrent) {
-                stateWrapper.set(key, parsed)
-            }
-        })
     }
 }
