@@ -50,3 +50,6 @@
 ## 2024-05-24 - MkDocs Material Admonition Syntax
 **Learning:** MkDocs Material admonitions (e.g., `!!! warning`, `!!! tip`) require *all* of their inner body text to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the indentation is missing, the admonition will break.
 **Action:** Always add an empty line after the `!!!` line and indent the following text block by 4 spaces.
+## 2025-07-02 - Ensure docs:install before docs:build
+**Learning:** If `npm run docs:build` (or `pnpm run docs:build`) fails with a `Docs virtual environment not found` error, execute `npm run docs:install` first to correctly initialize the Python virtual environment and install MkDocs dependencies before attempting to build again.
+**Action:** Run `npm run docs:install` before `docs:build` if the environment is fresh.
