@@ -4,11 +4,16 @@ import * as path from 'path'
 import { finished, pipeline } from 'stream/promises'
 import { StdAccountListInput, StdAccountListOutput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
-import { AggregationStats, FusionReport, FusionReportAccount, FusionReportStats } from '../../services/fusionService/types'
+import {
+    AggregationStats,
+    FusionReport,
+    FusionReportAccount,
+    FusionReportStats,
+} from '../../services/fusionService/types'
 import { AggregationTracker } from '../../services/fusionService/aggregationTracker'
 import { isExactAttributeMatchScores } from '../../services/scoringService/exactMatch'
 import { FusionAccount } from '../../model/account'
-import { readArray, readBoolean, readPathString, readUnknown, trimStr } from '../../utils/safeRead'
+import { readArray, readBoolean, readPathString, readUnknown, readFirstUnknown, trimStr } from '../../utils/safeRead'
 import {
     buildReportAccountIndex,
     buildDryRunSummary,
@@ -55,7 +60,11 @@ export type DryRunIssueSummary = {
 
 export type DryRunHelpersContext = {
     config?: { baseurl?: string; managedAccountsBatchSize?: number }
-    log: { info: (message: string) => void; metric: (name: string, startedAt: number, data?: Record<string, any>) => void; track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number } }
+    log: {
+        info: (message: string) => void
+        metric: (name: string, startedAt: number, data?: Record<string, any>) => void
+        track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number }
+    }
     res: { send: (payload: unknown) => void }
     reports: {
         ensureReportOutputDirectoryExists: () => Promise<string>
@@ -78,8 +87,14 @@ export type DryRunHelpersContext = {
         clearFusionAccounts: () => void
     }
     fusion: {
-        generateReport: (tracker: AggregationTracker, includeNonMatches?: boolean, stats?: FusionReportStats) => FusionReport
-        forEachISCAccount: (callback: (account: StdAccountListOutput) => void) => Promise<{ sent: number; eligible: number }>
+        generateReport: (
+            tracker: AggregationTracker,
+            includeNonMatches?: boolean,
+            stats?: FusionReportStats
+        ) => FusionReport
+        forEachISCAccount: (
+            callback: (account: StdAccountListOutput) => void
+        ) => Promise<{ sent: number; eligible: number }>
         getISCAccount: (
             account: FusionAccount,
             includeUncorrelated: boolean
@@ -790,19 +805,15 @@ export const refreshUniqueAttributesForDryRun = async (
     if (analyzedUncorrelatedAccounts.length === 0) return
     const stableAnalyzed = [...analyzedUncorrelatedAccounts].sort((a: any, b: any) => {
         const aKey = String(
-            readUnknown(a, 'originAccountId') ??
+            readFirstUnknown(a, ['originAccountId']) ??
                 readPathString(a, ['attributes', 'originAccount']) ??
-                readUnknown(a, 'nativeIdentity') ??
-                readUnknown(a, 'key') ??
-                readUnknown(a, 'name') ??
+                readFirstUnknown(a, ['nativeIdentity', 'key', 'name']) ??
                 ''
         )
         const bKey = String(
-            readUnknown(b, 'originAccountId') ??
+            readFirstUnknown(b, ['originAccountId']) ??
                 readPathString(b, ['attributes', 'originAccount']) ??
-                readUnknown(b, 'nativeIdentity') ??
-                readUnknown(b, 'key') ??
-                readUnknown(b, 'name') ??
+                readFirstUnknown(b, ['nativeIdentity', 'key', 'name']) ??
                 ''
         )
         return aKey.localeCompare(bKey)

@@ -12,3 +12,7 @@
 
 **Learning:** When multiple functions iterate over mixed-type arrays (e.g., parsing varying SDK shapes like strings or objects) to extract normalized string values, the loop and type-checking logic is often duplicated (e.g. in `toSetFromAttribute` and `normalizeActionTokens`).
 **Action:** Encapsulate the loop and type-checking logic into a shared helper function (like `normalizeArrayItems`) to eliminate duplicate code blocks, clarify intent, and ensure consistency when handling these mixed-type arrays.
+## 2026-07-03 - Replacing Nested readUnknown coalescing
+
+**Learning:** When retrieving fallback values using multiple sequential `readUnknown(x, 'y') ?? readUnknown(x, 'z')` expressions, the chain is hard to read and easily misses `null` edge cases since `??` only evaluates on `null`/`undefined`, but nested paths might be missed or handled inconsistently.
+**Action:** Extract this into a dedicated `readFirstUnknown(source, keys)` utility that loops through the provided keys and returns the first value strictly strictly checking `!== undefined && !== null`. Replace occurrences of coalesced `readUnknown` calls with this utility to improve readability and reliability.
