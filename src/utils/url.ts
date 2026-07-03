@@ -32,6 +32,24 @@ export function getUIOriginFromBaseUrl(baseUrl: string | undefined): string | un
     }
 }
 
+/**
+ * Validates that a string is a secure URL (mitigates SSRF bypasses).
+ *
+ * 🛡️ Sentinel: Enforce strict URL validation to prevent SSRF via malformed payloads
+ * (e.g., '\thttp://' or 'http:file://'). Combines URL parsing, whitespace rejection,
+ * and scheme-slash prefix verification.
+ */
+export function isSecureHttpUrl(url: string | undefined): boolean {
+    if (!url || url.trim() !== url) return false
+    try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+        return url.toLowerCase().startsWith(`${parsed.protocol}//`)
+    } catch {
+        return false
+    }
+}
+
 // ============================================================================
 // Identity URL Builders
 // ============================================================================
