@@ -10,11 +10,7 @@ import { FusionAccount } from '../../model/account'
 import { AttributeService } from '../attributeService'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
-import {
-    mapValuesToArray,
-    forEachBatched,
-    compact,
-} from './collections'
+import { mapValuesToArray, forEachBatched, compact, promiseAllBatched } from './collections'
 import { FusionDecision } from '../../model/form'
 import { ScoringService } from '../scoringService'
 import { SchemaService } from '../schemaService'
@@ -41,10 +37,7 @@ import {
     hasNewUnmatchedPeerMatches as checkHasNewUnmatchedPeerMatches,
 } from './helpers'
 import { AttributeOperations } from '../attributeService/types'
-import {
-    getManagedAccountKeyFromAccount,
-    normalizeCompositeManagedAccountKey,
-} from '../../model/managedAccountKey'
+import { getManagedAccountKeyFromAccount, normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { hasValue, trimStr } from '../../utils/safeRead'
 import { FusionAccountRepository } from './fusionAccountRepository'
 import { IdentityProcessor } from './identityProcessor'
@@ -68,14 +61,30 @@ export class FusionService {
     private decisionProcessor: DecisionProcessor
     private managedAccountAnalyzer: ManagedAccountAnalyzer
 
-    public get fusionIdentityMap(): Map<string, FusionAccount> { return this._repository.fusionIdentityMap }
-    public get fusionAccountMap(): Map<string, FusionAccount> { return this._repository.fusionAccountMap }
-    public get _reviewersBySourceId(): Map<string, Set<FusionAccount>> { return this._repository.reviewersBySourceId }
-    public get _sourcesWithoutReviewers(): Set<string> { return this._repository.sourcesWithoutReviewers }
-    public get currentRunUnmatchedFusionNativeIdentitiesBySource(): Map<string, Set<string>> { return this._repository.currentRunUnmatchedFusionNativeIdentitiesBySource }
-    public get autoAssignedIdentityIds(): Set<string> { return this._repository.autoAssignedIdentityIds }
-    public get _linkedAccountKeyIndex(): Set<string> | undefined { return this._repository.linkedAccountKeyIndex }
-    public set _linkedAccountKeyIndex(value: Set<string> | undefined) { this._repository.linkedAccountKeyIndex = value }
+    public get fusionIdentityMap(): Map<string, FusionAccount> {
+        return this._repository.fusionIdentityMap
+    }
+    public get fusionAccountMap(): Map<string, FusionAccount> {
+        return this._repository.fusionAccountMap
+    }
+    public get _reviewersBySourceId(): Map<string, Set<FusionAccount>> {
+        return this._repository.reviewersBySourceId
+    }
+    public get _sourcesWithoutReviewers(): Set<string> {
+        return this._repository.sourcesWithoutReviewers
+    }
+    public get currentRunUnmatchedFusionNativeIdentitiesBySource(): Map<string, Set<string>> {
+        return this._repository.currentRunUnmatchedFusionNativeIdentitiesBySource
+    }
+    public get autoAssignedIdentityIds(): Set<string> {
+        return this._repository.autoAssignedIdentityIds
+    }
+    public get _linkedAccountKeyIndex(): Set<string> | undefined {
+        return this._repository.linkedAccountKeyIndex
+    }
+    public set _linkedAccountKeyIndex(value: Set<string> | undefined) {
+        this._repository.linkedAccountKeyIndex = value
+    }
 
     private _tracker?: AggregationTracker
 
@@ -159,7 +168,10 @@ export class FusionService {
      * Treat the standard account-list operation context as aggregation mode.
      */
     public isAggregationAccountListMode(): boolean {
-        return this.commandType === StandardCommand.StdAccountList || this.operationContext === OperationContext.AccountList
+        return (
+            this.commandType === StandardCommand.StdAccountList ||
+            this.operationContext === OperationContext.AccountList
+        )
     }
 
     /**
@@ -408,7 +420,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${account.nativeIdentity}), ` +
-            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
@@ -463,8 +475,8 @@ export class FusionService {
                 originIdentityId && originIdentityInScope !== undefined
                     ? originIdentityInScope
                     : originIdentityId
-                        ? this.identities.hasIdentityInScope(originIdentityId)
-                        : false
+                      ? this.identities.hasIdentityInScope(originIdentityId)
+                      : false
             fusionAccount.setOriginIdentityInScope(inScope)
         }
 
@@ -480,7 +492,7 @@ export class FusionService {
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
-            `${fusionAccount.accountIdsSet.size} account(s), ${fusionAccount.missingAccountIdsSet.size} missing`
+                `${fusionAccount.accountIdsSet.size} account(s), ${fusionAccount.missingAccountIdsSet.size} missing`
         )
 
         await yieldToEventLoop()
@@ -507,7 +519,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.setFusionAccount(fusionAccount)
@@ -628,7 +640,7 @@ export class FusionService {
                 this._sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                    `Managed accounts from this source will be treated as NonMatched.`
+                        `Managed accounts from this source will be treated as NonMatched.`
                 )
             }
         }
@@ -719,8 +731,9 @@ export class FusionService {
 
         const runDeferredGroups = async (): Promise<void> => {
             const deferredGroupEntries = Array.from(deferredGroups.entries())
-            await Promise.all(
-                deferredGroupEntries.map(async ([sourceKey, accounts]) => {
+            await promiseAllBatched(
+                deferredGroupEntries,
+                async ([sourceKey, accounts]) => {
                     let sequentiallyProcessed = 0
                     const deferredPhaseSequentialQueue: ManagedAccountAnalysisContext[] = []
 
@@ -759,7 +772,8 @@ export class FusionService {
                             `Deferred same-aggregation pass for source "${sourceKey}" analyzed ${sequentiallyProcessed} account(s) (phaseA parallel, phaseB sequential)`
                         )
                     }
-                })
+                },
+                batchSize
             )
         }
 
@@ -1012,7 +1026,9 @@ export class FusionService {
                 !checkHasIdentityBackedMatches(fusionAccount) &&
                 checkHasNewUnmatchedPeerMatches(fusionAccount)
             ) {
-                const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === MatchCandidateType.NewUnmatched)
+                const deferredMatches = fusionAccount.fusionMatches.filter(
+                    (m) => m.candidateType === MatchCandidateType.NewUnmatched
+                )
                 const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
                 this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}`)
             }
