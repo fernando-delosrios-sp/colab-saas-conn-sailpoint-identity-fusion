@@ -42,3 +42,9 @@
 **Vulnerability:** The LogService (`src/services/logService/logService.ts`) fetched data directly from a user-configured `externalLoggingUrl` without validating the scheme, making it vulnerable to Server-Side Request Forgery (SSRF) if a user supplied a malicious URL scheme like `file://` or an internal metadata endpoint.
 **Learning:** External or user-provided URLs must always be validated prior to making network requests, especially in Node.js where `fetch` or HTTP clients might attempt to resolve arbitrary schemes or hostnames.
 **Prevention:** Enforce strict URL scheme validation (e.g., checking for `http://` or `https://`) whenever initializing requests with configured URLs.
+
+## 2026-07-04 - Fix SSRF Bypass via Whitespace and Forgiving URL Parsers
+
+**Vulnerability:** Across multiple configuration loading and networking services (`proxyService`, `logService`, etc.), URL schemes were validated using naive prefix checks: `url.toLowerCase().startsWith('http://')`. This could easily be bypassed with leading whitespace (e.g., `\thttp://`) which some HTTP clients might trim later, or bypassed entirely depending on how strict the downstream consumer is.
+**Learning:** Checking prefixes is never a substitute for actually parsing a URL according to the URI specification. Additionally, even Node.js's built-in `new URL()` constructor can be unexpectedly forgiving (e.g., it parses `http:file://` as a valid HTTP scheme but with an empty host and `file://` as the pathname).
+**Prevention:** Always validate URLs by attempting to parse them with `new URL()`. Furthermore, to combat forgiving parsers, strictly check that the parsed `protocol` is exactly `http:` or `https:`, reject input that requires trimming (`url.trim() !== url`), and verify that the original string genuinely starts with `${parsed.protocol}//` to prevent unexpected URL mangling downstream.

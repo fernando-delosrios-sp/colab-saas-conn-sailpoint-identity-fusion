@@ -213,3 +213,16 @@ export function createUrlContext(baseUrl: string | undefined): UrlContext {
         form: (id) => buildFormDefinitionUrl(uiOrigin, id),
     }
 }
+
+export function isSafeHttpUrl(url: string | undefined): boolean {
+    if (!url || typeof url !== 'string') return false
+    if (url.trim() !== url) return false
+    try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+        if (!url.toLowerCase().startsWith(`${parsed.protocol}//`)) return false
+        return true
+    } catch {
+        return false
+    }
+}
