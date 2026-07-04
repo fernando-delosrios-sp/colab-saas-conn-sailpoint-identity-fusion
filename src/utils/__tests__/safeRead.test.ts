@@ -14,6 +14,7 @@ import {
     readPathUnknown,
     readString,
     readUnknown,
+    readFirstUnknown,
     trimStr,
 } from '../safeRead'
 
@@ -99,6 +100,16 @@ describe('safeRead', () => {
             expect(coerceBoolean('no')).toBeUndefined()
             expect(coerceBoolean(1)).toBeUndefined()
             expect(coerceBoolean(0)).toBeUndefined()
+        })
+    })
+
+    describe('readFirstUnknown', () => {
+        it('returns the first defined value from a list of keys', () => {
+            const source = { a: null, b: undefined, c: 'first', d: 'second' }
+            expect(readFirstUnknown(source, ['a', 'b', 'c', 'd'])).toBe('first')
+            expect(readFirstUnknown(source, ['a', 'b'])).toBeUndefined()
+            expect(readFirstUnknown(undefined, ['c'])).toBeUndefined()
+            expect(readFirstUnknown(source, ['d', 'c'])).toBe('second')
         })
     })
 })

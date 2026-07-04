@@ -108,3 +108,13 @@ export function readPathNumber(source: unknown, path: string[], fallback?: numbe
     const value = readPathUnknown(source, path)
     return typeof value === 'number' ? value : fallback
 }
+
+export const readFirstUnknown = (source: unknown, keys: string[]): unknown => {
+    const record = asRecord(source)
+    if (!record) return undefined
+    for (const key of keys) {
+        const value = record[key]
+        if (value !== null && value !== undefined) return value
+    }
+    return undefined
+}

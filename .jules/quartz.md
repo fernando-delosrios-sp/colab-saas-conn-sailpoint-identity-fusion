@@ -12,3 +12,6 @@
 
 **Learning:** When multiple functions iterate over mixed-type arrays (e.g., parsing varying SDK shapes like strings or objects) to extract normalized string values, the loop and type-checking logic is often duplicated (e.g. in `toSetFromAttribute` and `normalizeActionTokens`).
 **Action:** Encapsulate the loop and type-checking logic into a shared helper function (like `normalizeArrayItems`) to eliminate duplicate code blocks, clarify intent, and ensure consistency when handling these mixed-type arrays.
+## 2026-07-04 - Consolidating Nullish Coalescing Chains into Iterative Lookups
+**Learning:** Chained nullish coalescing operators (e.g., `a ?? b ?? c`) that read from an object repeatedly reduce scanability and bloat lines, particularly when used within `.map()` or `.filter()`.
+**Action:** Extract sequential property fallbacks into a focused array-based helper like `readFirstUnknown(source, ['key1', 'key2'])` to improve readability by explicitly stating intent.
