@@ -101,7 +101,15 @@ flowchart TD
     - Reviewer identities are updated with their corresponding pending Fusion reviews URL.
 
     !!! warning "Upgrade note: Fusion review form definitions"
-        Candidate identities receive the `candidate` status from data stored on pending form instances. The connector declares a `candidates` field on the form definition so that value round-trips from ISC across aggregations. **Existing** form definitions that were created before that field existed are not updated automatically; they keep their old shape until removed. After upgrading the connector, delete stale fusion review form definitions (or use a reset that clears forms) so new definitions are created with the full input set, or candidate-related entitlements may not persist correctly for in-flight reviews until those forms are replaced.
+
+        Candidate identities receive the `candidate` status from data stored on pending form instances.
+        The connector declares a `candidates` field on the form definition so that value round-trips from ISC across aggregations.
+
+        **Important upgrade considerations:**
+
+        - **Existing forms:** Form definitions created before the `candidates` field existed are not updated automatically; they keep their old shape until removed.
+        - **Required action:** After upgrading the connector, delete stale fusion review form definitions (or use a reset that clears forms).
+        - **Impact of not upgrading forms:** New definitions won't be created with the full input set, meaning candidate-related entitlements may not persist correctly for in-flight reviews until those old forms are replaced.
 
     - Review form names include the account identifier suffix (`<pattern> - <name> [<source>] (<nativeIdentity>)`), so reviewers can disambiguate forms when several Fusion accounts share the same display name and source. Existing forms keep their original names until replaced.
 
