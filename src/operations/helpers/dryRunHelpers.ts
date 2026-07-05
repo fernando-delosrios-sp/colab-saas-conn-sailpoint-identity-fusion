@@ -4,7 +4,12 @@ import * as path from 'path'
 import { finished, pipeline } from 'stream/promises'
 import { StdAccountListInput, StdAccountListOutput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
-import { AggregationStats, FusionReport, FusionReportAccount, FusionReportStats } from '../../services/fusionService/types'
+import {
+    AggregationStats,
+    FusionReport,
+    FusionReportAccount,
+    FusionReportStats,
+} from '../../services/fusionService/types'
 import { AggregationTracker } from '../../services/fusionService/aggregationTracker'
 import { isExactAttributeMatchScores } from '../../services/scoringService/exactMatch'
 import { FusionAccount } from '../../model/account'
@@ -55,7 +60,11 @@ export type DryRunIssueSummary = {
 
 export type DryRunHelpersContext = {
     config?: { baseurl?: string; managedAccountsBatchSize?: number }
-    log: { info: (message: string) => void; metric: (name: string, startedAt: number, data?: Record<string, any>) => void; track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number } }
+    log: {
+        info: (message: string) => void
+        metric: (name: string, startedAt: number, data?: Record<string, any>) => void
+        track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number }
+    }
     res: { send: (payload: unknown) => void }
     reports: {
         ensureReportOutputDirectoryExists: () => Promise<string>
@@ -78,8 +87,14 @@ export type DryRunHelpersContext = {
         clearFusionAccounts: () => void
     }
     fusion: {
-        generateReport: (tracker: AggregationTracker, includeNonMatches?: boolean, stats?: FusionReportStats) => FusionReport
-        forEachISCAccount: (callback: (account: StdAccountListOutput) => void) => Promise<{ sent: number; eligible: number }>
+        generateReport: (
+            tracker: AggregationTracker,
+            includeNonMatches?: boolean,
+            stats?: FusionReportStats
+        ) => FusionReport
+        forEachISCAccount: (
+            callback: (account: StdAccountListOutput) => void
+        ) => Promise<{ sent: number; eligible: number }>
         getISCAccount: (
             account: FusionAccount,
             includeUncorrelated: boolean
@@ -646,12 +661,26 @@ function bumpOptionEmitCountsForRow(
     optionEmitCounter: DryRunOptionEmitCounter
 ): void {
     for (const c of categories) {
-        if (c === 'nonMatched') optionEmitCounter.includeNonMatched += 1
-        else if (c === 'matched') optionEmitCounter.includeMatched += 1
-        else if (c === 'exact') optionEmitCounter.includeExact += 1
-        else if (c === 'deferred') optionEmitCounter.includeDeferred += 1
-        else if (c === 'review') optionEmitCounter.includeReview += 1
-        else if (c === 'decisions') optionEmitCounter.includeDecisions += 1
+        switch (c) {
+            case 'nonMatched':
+                optionEmitCounter.includeNonMatched += 1
+                break
+            case 'matched':
+                optionEmitCounter.includeMatched += 1
+                break
+            case 'exact':
+                optionEmitCounter.includeExact += 1
+                break
+            case 'deferred':
+                optionEmitCounter.includeDeferred += 1
+                break
+            case 'review':
+                optionEmitCounter.includeReview += 1
+                break
+            case 'decisions':
+                optionEmitCounter.includeDecisions += 1
+                break
+        }
     }
     if (status === 'review-error') {
         optionEmitCounter.reviewErrors += 1
