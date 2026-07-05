@@ -1,3 +1,4 @@
+import { isValidHttpUrl } from '../utils/url'
 import { ConnectorError, Response } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
@@ -69,14 +70,8 @@ export class ProxyService {
             const serverPassword = process.env.PROXY_PASSWORD || ''
             const clientPassword = this.config.proxyPassword || ''
 
-            const expectedHash = crypto
-                .createHash('sha256')
-                .update(serverPassword)
-                .digest()
-            const actualHash = crypto
-                .createHash('sha256')
-                .update(clientPassword)
-                .digest()
+            const expectedHash = crypto.createHash('sha256').update(serverPassword).digest()
+            const actualHash = crypto.createHash('sha256').update(clientPassword).digest()
             const isMatch = crypto.timingSafeEqual(expectedHash, actualHash)
             assert(isMatch, 'Proxy password mismatch')
 
@@ -122,7 +117,7 @@ export class ProxyService {
             throw new ConnectorError('Proxy mode is not enabled or proxy URL is missing')
         }
         const { proxyUrl } = this.config
-        if (!proxyUrl.toLowerCase().startsWith('http://') && !proxyUrl.toLowerCase().startsWith('https://')) {
+        if (!isValidHttpUrl(proxyUrl)) {
             throw new ConnectorError('Proxy URL must use http or https protocol')
         }
         const externalConfig = { ...this.config, isProxy: true }

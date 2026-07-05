@@ -213,3 +213,17 @@ export function createUrlContext(baseUrl: string | undefined): UrlContext {
         form: (id) => buildFormDefinitionUrl(uiOrigin, id),
     }
 }
+
+/**
+ * Validates that a string is a valid HTTP or HTTPS URL, robustly mitigating SSRF bypasses.
+ */
+export function isValidHttpUrl(url: string | undefined): boolean {
+    if (!url || typeof url !== 'string' || url.trim() !== url) return false
+    try {
+        const parsed = new URL(url)
+        const isHttp = parsed.protocol === 'http:' || parsed.protocol === 'https:'
+        return isHttp && url.toLowerCase().startsWith(`${parsed.protocol}//`)
+    } catch {
+        return false
+    }
+}

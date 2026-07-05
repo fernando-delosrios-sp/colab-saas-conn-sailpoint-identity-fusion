@@ -8,6 +8,7 @@ import {
     buildWorkflowUrl,
     buildFormDefinitionUrl,
     isValidUrl,
+    isValidHttpUrl,
     removeTrailingSlash,
     ensureTrailingSlash,
     createUrlContext,
@@ -135,6 +136,27 @@ describe('url', () => {
             expect(ctx.identity('id1')).toBe(`${uiOrigin}/ui/a/admin/identities/id1/details/attributes`)
             expect(ctx.source('src1')).toBe(`${uiOrigin}/ui/a/admin/connections/sources/src1`)
             expect(ctx.account('acc1')).toBe(`${uiOrigin}/ui/a/admin/accounts/acc1`)
+        })
+    })
+
+    describe('isValidHttpUrl', () => {
+        it('returns true for valid HTTP/HTTPS URLs', () => {
+            expect(isValidHttpUrl('https://example.com')).toBe(true)
+            expect(isValidHttpUrl('http://localhost:3000')).toBe(true)
+        })
+
+        it('returns false for invalid or missing URLs', () => {
+            expect(isValidHttpUrl(undefined)).toBe(false)
+            expect(isValidHttpUrl('')).toBe(false)
+            expect(isValidHttpUrl('not-a-url')).toBe(false)
+        })
+
+        it('returns false for SSRF bypass payloads', () => {
+            expect(isValidHttpUrl('\thttp://example.com')).toBe(false) // Leading whitespace
+            expect(isValidHttpUrl('http://example.com ')).toBe(false) // Trailing whitespace
+            expect(isValidHttpUrl('http:file://example.com')).toBe(false) // Forgiving URL parser bypass
+            expect(isValidHttpUrl('file://example.com')).toBe(false) // Invalid protocol
+            expect(isValidHttpUrl('ftp://example.com')).toBe(false) // Invalid protocol
         })
     })
 })
