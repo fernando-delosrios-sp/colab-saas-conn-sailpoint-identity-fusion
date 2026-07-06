@@ -4,6 +4,23 @@
  */
 
 // ============================================================================
+
+/**
+ * Validates that a string is a valid HTTP/HTTPS URL and prevents parser bypasses.
+ */
+export function isValidHttpUrl(url: string | undefined): boolean {
+    if (!url) return false
+    if (url.trim() !== url) return false
+    try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+        if (!url.toLowerCase().startsWith(`${parsed.protocol}//`)) return false
+        return true
+    } catch {
+        return false
+    }
+}
+
 // UI Origin Helpers
 // ============================================================================
 

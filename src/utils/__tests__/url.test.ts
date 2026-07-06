@@ -8,6 +8,7 @@ import {
     buildWorkflowUrl,
     buildFormDefinitionUrl,
     isValidUrl,
+    isValidHttpUrl,
     removeTrailingSlash,
     ensureTrailingSlash,
     createUrlContext,
@@ -92,6 +93,22 @@ describe('url', () => {
         it('should build form definition URL', () => {
             const url = buildFormDefinitionUrl(uiOrigin, 'form-1')
             expect(url).toBe(`${uiOrigin}/ui/a/admin/forms/form-1`)
+        })
+    })
+
+    describe('isValidHttpUrl', () => {
+        it('should return true for valid HTTP/HTTPS URLs', () => {
+            expect(isValidHttpUrl('http://example.com')).toBe(true)
+            expect(isValidHttpUrl('https://example.com')).toBe(true)
+        })
+
+        it('should return false for invalid URLs, whitespace bypasses, and parser confusion bypasses', () => {
+            expect(isValidHttpUrl('not-a-url')).toBe(false)
+            expect(isValidHttpUrl('')).toBe(false)
+            expect(isValidHttpUrl(undefined)).toBe(false)
+            expect(isValidHttpUrl(' http://example.com')).toBe(false)
+            expect(isValidHttpUrl('http:file:///etc/passwd')).toBe(false)
+            expect(isValidHttpUrl('ftp://example.com')).toBe(false)
         })
     })
 
