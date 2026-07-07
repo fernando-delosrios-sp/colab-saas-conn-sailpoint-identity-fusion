@@ -122,8 +122,20 @@ export class ProxyService {
             throw new ConnectorError('Proxy mode is not enabled or proxy URL is missing')
         }
         const { proxyUrl } = this.config
-        if (!proxyUrl.toLowerCase().startsWith('http://') && !proxyUrl.toLowerCase().startsWith('https://')) {
-            throw new ConnectorError('Proxy URL must use http or https protocol')
+        let parsed: URL;
+        try {
+            parsed = new URL(proxyUrl);
+        } catch {
+            throw new ConnectorError('Proxy URL must be a valid URL');
+        }
+
+        // 🛡️ Sentinel: Mitigate SSRF by strictly validating the URL protocol and preventing bypasses.
+        if (
+            (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+            proxyUrl.trim() !== proxyUrl ||
+            !proxyUrl.toLowerCase().startsWith(`${parsed.protocol}//`)
+        ) {
+            throw new ConnectorError('Proxy URL must use http or https protocol');
         }
         const externalConfig = { ...this.config, isProxy: true }
         const body = {
