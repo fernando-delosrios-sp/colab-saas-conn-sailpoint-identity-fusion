@@ -424,7 +424,13 @@ export class SourceService {
      * Get fusion source info
      */
     public getFusionSource(): SourceInfo | undefined {
-        return Array.from(this.sourcesById.values()).find((s) => !s.isManaged)
+        // ⚡ Bolt: Iterate Map values directly to prevent Array.from heap allocation and allow early exit
+        for (const s of this.sourcesById.values()) {
+            if (!s.isManaged) {
+                return s
+            }
+        }
+        return undefined
     }
 
     /**
