@@ -7,7 +7,7 @@
 **Documentation**
 
 - Full documentation site: [GitHub Pages](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/)
-- Source docs in this repository: [documentation folder](docs/README.md)
+- Source docs in this repository: [documentation folder](docs/index.md)
 - Start here for the core concepts and architecture: [Identity Fusion NG Framework](docs/collateral/Identity_Fusion_NG_Framework.pdf)
 
 Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consolidates account data from one or more managed sources, lets you **map** attributes into a single Fusion account schema, **define** derived and unique values (including Velocity-based computation), and optionally **match** new or changed accounts to existing identities so you can avoid duplicate identities without brittle exact-match correlation alone.
