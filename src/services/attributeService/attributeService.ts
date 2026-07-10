@@ -226,9 +226,15 @@ export class AttributeService {
         }
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
-            const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some(
-                (accounts) => accounts.length > 0
-            )
+            // ⚡ Bolt: Prevent heap allocations in hot loop by using a direct iterator
+            // instead of Array.from(). This avoids creating an intermediate array.
+            let hasManagedAccountContext = false
+            for (const accounts of sourceAttributeMap.values()) {
+                if (accounts.length > 0) {
+                    hasManagedAccountContext = true
+                    break
+                }
+            }
             const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sourceConfig) => sourceConfig.name)
             let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
