@@ -369,6 +369,16 @@ An **enforced correlation role** is an automatically assigned ISC role that oper
 - **How this relates to aggregation correlation**
     - If **Correlate missing source accounts on aggregation?** is disabled, configuring an enforced correlation role is the supported way to still ensure that new managed accounts are correlated to their Fusion identities during or after aggregation.
 
+**Example criteria configuration (ISC UI):**
+
+```text
+Source: Identity Fusion NG
+Entitlement: actions Equals correlated
+OR
+Source: Identity Fusion NG
+Entitlement: statuses Equals uncorrelated
+```
+
 ---
 
 ## End-to-end Match flow
