@@ -35,32 +35,7 @@ export function createRetriesConfig(retries?: number): IAxiosRetryConfig {
             const jitter = Math.random() * RETRY_JITTER_FACTOR * exponentialDelay
             return Math.min(exponentialDelay + jitter, MAX_RETRY_DELAY_MS)
         },
-        retryCondition: (error) => {
-            if (!error) return false
-
-            // Network errors
-            if (axiosRetry.isNetworkError(error) || axiosRetry.isRetryableError(error)) {
-                return true
-            }
-
-            // Rate limiting (429)
-            if (error.response?.status === 429) {
-                return true
-            }
-
-            // Server errors (5xx)
-            const status = error.response?.status
-            if (status && status >= 500 && status < 600) {
-                return true
-            }
-
-            // Timeout errors
-            if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-                return true
-            }
-
-            return false
-        },
+        retryCondition: shouldRetry,
         onRetry: (retryCount, error, requestConfig) => {
             const url = requestConfig.url || 'unknown'
             const status = error?.response?.status || error?.code || 'unknown'
@@ -97,23 +72,16 @@ export function createThrottleConfig(requestsPerSecond?: number) {
 export function shouldRetry(error: unknown): boolean {
     if (!error) return false
     const err = error as { response?: { status?: number }; code?: string }
-
-    // Network errors
-    if (axiosRetry.isNetworkError(error as any) || axiosRetry.isRetryableError(error as any)) {
-        return true
-    }
-
-    // Rate limiting
-    if (err.response?.status === 429) return true
-
-    // Server errors (5xx)
     const status = err.response?.status
-    if (status !== undefined && status >= 500 && status < 600) return true
 
-    // Timeout errors
-    if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') return true
-
-    return false
+    return (
+        axiosRetry.isNetworkError(error as any) ||
+        axiosRetry.isRetryableError(error as any) ||
+        status === 429 ||
+        (status !== undefined && status >= 500 && status < 600) ||
+        err.code === 'ECONNABORTED' ||
+        err.code === 'ETIMEDOUT'
+    )
 }
 
 /**
