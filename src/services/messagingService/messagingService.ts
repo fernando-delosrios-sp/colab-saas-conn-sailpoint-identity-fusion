@@ -1,3 +1,4 @@
+import { promiseAllBatched } from '../fusionService/collections'
 import {
     FormInstanceResponseV2025,
     WorkflowV2025,
@@ -381,7 +382,7 @@ export class MessagingService {
             reportDate: new Date(),
             formInstanceId: formInstance.id,
             formUrl: formInstance.standAloneFormUrl,
-            locale
+            locale,
         }
 
         assert(this.templates, 'Email templates are required')
@@ -395,10 +396,7 @@ export class MessagingService {
     /**
      * Send report email to all global owners (source owner + governance group members).
      */
-    public async sendReport(
-        report: FusionReport,
-        reportType: 'aggregation' | 'fusion'
-    ): Promise<void> {
+    public async sendReport(report: FusionReport, reportType: 'aggregation' | 'fusion'): Promise<void> {
         const recipientEmails = new Set<string>()
 
         // Add all global owners (source owner + governance group members) as recipients
@@ -436,7 +434,7 @@ export class MessagingService {
             reportDate: report.reportDate || new Date(),
             reportTitle,
             headerSubtitle: this.buildEmailHeaderSubtitle(),
-            locale
+            locale,
         }
         return renderFusionReport(this.templates, emailData)
     }
@@ -459,10 +457,10 @@ export class MessagingService {
         const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
         const reportTitle = args.reportTitle || MessagingService.FUSION_REPORT_EMAIL_TITLE
         const subject = `${reportTitle} - ${matchAccountCount} Match(es) require(s) your attention`
-        
+
         // Group recipients by locale
         const recipientsByLocale = new Map<string | undefined, string[]>()
-        
+
         for (const _email of args.recipients) {
             // we must find the identity id for the email to get the locale
             // deliverReportToRecipients is only used by sendReport (owners) and test workflow (explicit email).
@@ -479,7 +477,7 @@ export class MessagingService {
             const body = this.renderFusionReportHtml(report, args.reportType, reportTitle, locale)
             await this.sendEmail(emails, subject, body)
         }
-        
+
         const sentRecipientCount = sanitizeRecipients(args.recipients).length
         this.log.info(`Sent fusion report email to ${sentRecipientCount} recipient(s)`)
     }
@@ -614,8 +612,6 @@ export class MessagingService {
         return Math.max(1024, limit - margin - this.emailSenderWorkflowDefinitionBytes)
     }
 
-
-
     /**
      * Measure full workflow JSON via getWorkflow (listWorkflows entries are often incomplete).
      */
@@ -707,28 +703,27 @@ export class MessagingService {
 
         await this.identities?.hydrateMissingIdentitiesById(validIds)
 
-        const results = await Promise.all(
-            validIds.map(async (identityId) => {
-                let identity = this.identities?.getIdentityById(identityId)
-                if (!identity) {
-                    try {
-                        identity = await this.identities?.fetchIdentityById(identityId)
-                    } catch (e) {
-                        this.log.warn(`Failed to fetch identity ${identityId}: ${e}`)
-                    }
+        // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
+        const results = await promiseAllBatched(validIds, async (identityId) => {
+            let identity = this.identities?.getIdentityById(identityId)
+            if (!identity) {
+                try {
+                    identity = await this.identities?.fetchIdentityById(identityId)
+                } catch (e) {
+                    this.log.warn(`Failed to fetch identity ${identityId}: ${e}`)
                 }
+            }
 
-                const attrs: any = identity?.attributes ?? {}
-                const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
-                const normalized = normalizeEmailValue(emailValue)
+            const attrs: any = identity?.attributes ?? {}
+            const emailValue = attrs.email ?? attrs.mail ?? attrs.emailAddress
+            const normalized = normalizeEmailValue(emailValue)
 
-                if (normalized.length === 0) {
-                    this.log.warn(`No email found for identity ${identityId}`)
-                }
+            if (normalized.length === 0) {
+                this.log.warn(`No email found for identity ${identityId}`)
+            }
 
-                return normalized
-            })
-        )
+            return normalized
+        })
 
         for (const normalized of results) {
             for (const e of normalized) {
@@ -739,11 +734,7 @@ export class MessagingService {
         return Array.from(emails)
     }
 
-    public async executePatchCall(
-            patchFnAny: any,
-            requestParameters: any,
-            context: string
-    ) {
+    public async executePatchCall(patchFnAny: any, requestParameters: any, context: string) {
         return await this.client.execute(
             async () => {
                 const resp = await patchFnAny.call(this.client.workflowsApi, requestParameters)
