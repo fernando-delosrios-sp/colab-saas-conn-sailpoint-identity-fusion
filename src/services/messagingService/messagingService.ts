@@ -1,3 +1,4 @@
+import { promiseAllBatched } from '../fusionService/collections'
 import {
     FormInstanceResponseV2025,
     WorkflowV2025,
@@ -707,8 +708,11 @@ export class MessagingService {
 
         await this.identities?.hydrateMissingIdentitiesById(validIds)
 
-        const results = await Promise.all(
-            validIds.map(async (identityId) => {
+        // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
+        // to prevent rate-limiting, socket exhaustion, and high memory spikes.
+        const results = await promiseAllBatched(
+            validIds,
+            async (identityId) => {
                 let identity = this.identities?.getIdentityById(identityId)
                 if (!identity) {
                     try {
@@ -727,7 +731,7 @@ export class MessagingService {
                 }
 
                 return normalized
-            })
+            }
         )
 
         for (const normalized of results) {

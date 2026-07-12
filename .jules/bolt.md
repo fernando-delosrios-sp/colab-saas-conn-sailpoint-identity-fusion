@@ -61,3 +61,6 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+## 2023-10-27 - Bounding concurrent Promise.all iterations
+**Learning:** Using `Promise.all(array.map(...))` on unbounded arrays (like iterating over all valid recipient IDs in messagingService) runs the risk of generating huge numbers of concurrent API calls, hitting rate limits, and spiking memory footprint. `promiseAllBatched` is a project utility that solves this gracefully.
+**Action:** Be proactive in scanning backend logic for unbounded `Promise.all` arrays. Replace them safely using `promiseAllBatched` wherever API or db requests are triggered inside the mapped function.
