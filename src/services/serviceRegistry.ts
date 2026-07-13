@@ -76,7 +76,7 @@ export class ServiceRegistry {
             new FormService(this.config, this.log, this.client, this.sources, this.identities, this.messaging)
 
         // Initialize services that depend on others (in dependency order)
-        this.schemas = context.schemaService ?? new SchemaService(this.config, this.log, this.sources)
+        this.schemas = context.schemaService ?? new SchemaService(this.config, this.log, this.sources, this.identities)
         const commandType = context.commandType as StandardCommand | undefined
         this.attributes =
             context.attributesService ??

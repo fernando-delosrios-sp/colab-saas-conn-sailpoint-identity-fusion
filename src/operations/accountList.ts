@@ -57,6 +57,13 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         await reportPhase(serviceRegistry, fetchResult, timer, options)
         timer.phase('PHASE 7: Report (fusion report)', 'info', 'Report')
 
+        if (process.env.RECORD_MODE !== 'true') {
+            sources.clearFusionAccounts()
+        } else {
+            log.info('Fusion accounts cache retained for recording')
+        }
+        log.info('Account caches cleared from memory')
+
         // Report generation consumes analyzed-account slices; clear them after report/output complete.
         serviceRegistry.fusion.clearAnalyzedAccounts()
         timer.end(`✓ Account list operation completed successfully - ${count} account(s) processed`)

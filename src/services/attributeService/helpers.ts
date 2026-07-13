@@ -65,7 +65,11 @@ export const processAttributeMapping = (
     const { attributeMerge } = config
 
     // Handle single-value merge strategies with early return
-    if (attributeMerge === AttributeMergeMode.First || attributeMerge === AttributeMergeMode.Source) {
+    if (
+        attributeMerge === AttributeMergeMode.First ||
+        attributeMerge === AttributeMergeMode.Source ||
+        attributeMerge === undefined
+    ) {
         return processSingleValueMerge(config, sourceAttributeMap, sourceOrder, prioritizedAccount)
     }
 

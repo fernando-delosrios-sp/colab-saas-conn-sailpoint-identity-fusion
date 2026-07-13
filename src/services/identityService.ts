@@ -41,6 +41,8 @@ function buildIdentityQuery(queryString: string): Search {
  */
 export class IdentityService {
     private identitiesById: Map<string, IdentityDocument> = new Map()
+    /** Identity IDs loaded by the last `fetchIdentities()` call, which respects `includeIdentities` and `identityScopeQuery`. */
+    private identityIdsInScope: Set<string> = new Set()
     private readonly identityScopeQuery?: string
     private readonly includeIdentities: boolean
 
@@ -120,10 +122,14 @@ export class IdentityService {
                     identities.map((identity) => [identity.protected ? '-' : identity.id, identity])
                 )
                 this.identitiesById.delete('-')
+                this.identityIdsInScope = new Set(
+                    identities.filter((identity) => !identity.protected).map((identity) => identity.id)
+                )
             }, `Failed to fetch identities using scope query "${this.identityScopeQuery}"`)
         } else {
             this.log.info('No identity scope query defined, skipping identity fetch.')
             this.identitiesById = new Map()
+            this.identityIdsInScope = new Set()
         }
     }
 
@@ -219,6 +225,45 @@ export class IdentityService {
         if (id) {
             return this.identitiesById.get(id)
         }
+    }
+
+    /**
+     * Returns true when the given identity ID was loaded by `fetchIdentities()`,
+     * meaning it is within the configured identity scope (`includeIdentities` +
+     * `identityScopeQuery`). Does not consider identities fetched individually
+     * via `fetchIdentityById()`.
+     *
+     * @param id - The identity ID to check
+     * @returns true if the identity is in scope, false otherwise
+     */
+    public hasIdentityInScope(id?: string): boolean {
+        if (!id) return false
+        return this.identityIdsInScope.has(id)
+    }
+
+    /**
+     * Checks whether a single identity ID is within the configured identity scope
+     * without requiring the full scope cache. Performs a targeted search combining
+     * `id:"<id>"` with the configured scope query.
+     *
+     * @param id - The identity ID to check
+     * @returns true if the identity matches the configured scope, false otherwise
+     */
+    public async isIdentityInScope(id: string): Promise<boolean> {
+        if (!this.includeIdentities || !this.identityScopeQuery) {
+            return false
+        }
+
+        const query = buildIdentityQuery(`id:"${id}" AND (${this.identityScopeQuery})`)
+
+        return wrapConnectorError(async () => {
+            const identities = await this.client.paginateSearchApi<IdentityDocument>(
+                query,
+                QueuePriority.HIGH,
+                'IdentityService>isIdentityInScope searchPost'
+            )
+            return identities.some((identity) => identity.id === id && !identity.protected)
+        }, `Failed to check identity scope for "${id}"`)
     }
 
     /**
@@ -330,9 +375,44 @@ export class IdentityService {
     }
 
     /**
-     * Clear the identity cache
+     * Clear the identity cache and the scope tracking set.
      */
     public clear(): void {
         this.identitiesById.clear()
+        this.identityIdsInScope.clear()
+    }
+
+    /**
+     * Fetches and converts identity attributes into SchemaAttributes.
+     */
+    public async fetchIdentitySchemaAttributes(): Promise<any[]> {
+        const { identityAttributesApi } = this.client
+        const listCall = async () => {
+            const response = await identityAttributesApi.listIdentityAttributes()
+            return response.data ?? []
+        }
+
+        const identityAttrs = (await this.client.execute(
+            listCall,
+            QueuePriority.HIGH,
+            'IdentityService>fetchIdentitySchemaAttributes'
+        )) ?? []
+
+        const allowedTypes = ['string', 'boolean', 'int', 'long']
+
+        return identityAttrs
+            .filter((attr) => attr && attr.name && attr.name.trim() !== '')
+            .map((attr) => {
+                const rawType = attr.type ? attr.type.toLowerCase() : 'string'
+                const type = allowedTypes.includes(rawType) ? rawType : 'string'
+
+                return {
+                    name: attr.name,
+                    description: attr.displayName || `${attr.name} from Identity`,
+                    type,
+                    multi: attr.multi ?? false,
+                    entitlement: false,
+                }
+            })
     }
 }
