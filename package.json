@@ -32,14 +32,14 @@
     },
     "private": true,
     "dependencies": {
-        "@sailpoint/connector-sdk": "^1.2.1",
+        "@sailpoint/connector-sdk": "1.2.1",
         "axios-retry": "^4.5.0",
         "double-metaphone": "^2.0.1",
         "handlebars": "^4.7.8",
         "jmespath": "^0.16.0",
         "libphonenumber-js": "^1.12.42",
         "parse-address-string": "^0.0.3",
-        "sailpoint-api-client": "^1.8.29",
+        "sailpoint-api-client": "1.8.29",
         "transliteration": "^2.6.1",
         "uuid": "^14.0.0",
         "velocityjs": "^2.0.6"
