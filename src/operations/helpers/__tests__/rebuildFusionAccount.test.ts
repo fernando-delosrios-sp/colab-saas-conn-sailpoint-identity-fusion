@@ -2,14 +2,14 @@ import { rebuildFusionAccount } from '../rebuildFusionAccount'
 
 describe('rebuildFusionAccount', () => {
     it('fetches managed accounts from fusion attributes and identity links for configured managed sources only', async () => {
-        const fetchManagedAccount = jest.fn().mockResolvedValue(undefined)
-        const processFusionAccount = jest.fn().mockResolvedValue({ nativeIdentity: 'fusion-1' })
-        const getSourceByName = jest.fn((sourceName: string) => {
+        const fetchManagedAccount = vi.fn().mockResolvedValue(undefined)
+        const processFusionAccount = vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-1' })
+        const getSourceByName = vi.fn((sourceName: string) => {
             if (sourceName === 'Source A') return { isManaged: true }
             if (sourceName === 'Source B') return { isManaged: false }
             return undefined
         })
-        const getIdentityById = jest.fn().mockReturnValue({
+        const getIdentityById = vi.fn().mockReturnValue({
             id: 'identity-1',
             accounts: [
                 {
@@ -30,7 +30,7 @@ describe('rebuildFusionAccount', () => {
 
         const registry = {
             sources: {
-                fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
+                fetchFusionAccount: vi.fn().mockResolvedValue(undefined),
                 fusionAccountsByNativeIdentity: new Map([
                     [
                         'fusion-1',
@@ -45,18 +45,18 @@ describe('rebuildFusionAccount', () => {
                 ]),
                 fetchManagedAccount,
                 getSourceByName,
-                getSourceById: jest.fn().mockReturnValue(undefined),
-                aggregateManagedSource: jest.fn().mockResolvedValue(undefined),
+                getSourceById: vi.fn().mockReturnValue(undefined),
+                aggregateManagedSource: vi.fn().mockResolvedValue(undefined),
                 config: { cascadeAggregationEnabled: false },
             },
             identities: {
-                fetchIdentityById: jest.fn().mockResolvedValue(undefined),
+                fetchIdentityById: vi.fn().mockResolvedValue(undefined),
                 getIdentityById,
             },
             fusion: {
                 processFusionAccount,
             },
-            log: { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() },
+            log: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
         } as any
 
         await rebuildFusionAccount('fusion-1', {} as any, {
@@ -73,12 +73,12 @@ describe('rebuildFusionAccount', () => {
     })
 
     it('fetches managed accounts from missing-accounts attribute', async () => {
-        const fetchManagedAccount = jest.fn().mockResolvedValue(undefined)
-        const processFusionAccount = jest.fn().mockResolvedValue({ nativeIdentity: 'fusion-missing' })
+        const fetchManagedAccount = vi.fn().mockResolvedValue(undefined)
+        const processFusionAccount = vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-missing' })
 
         const registry = {
             sources: {
-                fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
+                fetchFusionAccount: vi.fn().mockResolvedValue(undefined),
                 fusionAccountsByNativeIdentity: new Map([
                     [
                         'fusion-missing',
@@ -93,19 +93,19 @@ describe('rebuildFusionAccount', () => {
                     ],
                 ]),
                 fetchManagedAccount,
-                getSourceByName: jest.fn().mockReturnValue(undefined),
-                getSourceById: jest.fn().mockReturnValue(undefined),
-                aggregateManagedSource: jest.fn().mockResolvedValue(undefined),
+                getSourceByName: vi.fn().mockReturnValue(undefined),
+                getSourceById: vi.fn().mockReturnValue(undefined),
+                aggregateManagedSource: vi.fn().mockResolvedValue(undefined),
                 config: { cascadeAggregationEnabled: false },
             },
             identities: {
-                fetchIdentityById: jest.fn().mockResolvedValue(undefined),
-                getIdentityById: jest.fn().mockReturnValue({ id: 'identity-missing', accounts: [] }),
+                fetchIdentityById: vi.fn().mockResolvedValue(undefined),
+                getIdentityById: vi.fn().mockReturnValue({ id: 'identity-missing', accounts: [] }),
             },
             fusion: {
                 processFusionAccount,
             },
-            log: { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() },
+            log: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
         } as any
 
         await rebuildFusionAccount('fusion-missing', {} as any, {
@@ -121,11 +121,11 @@ describe('rebuildFusionAccount', () => {
     })
 
     it('calls fetchManagedAccount once per composite key (no separate fetchSourceAccountByNativeIdentity)', async () => {
-        const fetchManagedAccount = jest.fn().mockResolvedValue(undefined)
+        const fetchManagedAccount = vi.fn().mockResolvedValue(undefined)
 
         const registry = {
             sources: {
-                fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
+                fetchFusionAccount: vi.fn().mockResolvedValue(undefined),
                 fusionAccountsByNativeIdentity: new Map([
                     [
                         'fusion-2',
@@ -139,19 +139,19 @@ describe('rebuildFusionAccount', () => {
                     ],
                 ]),
                 fetchManagedAccount,
-                getSourceByName: jest.fn(() => ({ isManaged: true })),
-                getSourceById: jest.fn().mockReturnValue(undefined),
-                aggregateManagedSource: jest.fn().mockResolvedValue(undefined),
+                getSourceByName: vi.fn(() => ({ isManaged: true })),
+                getSourceById: vi.fn().mockReturnValue(undefined),
+                aggregateManagedSource: vi.fn().mockResolvedValue(undefined),
                 config: { cascadeAggregationEnabled: false },
             },
             identities: {
-                fetchIdentityById: jest.fn().mockResolvedValue(undefined),
-                getIdentityById: jest.fn().mockReturnValue({ id: 'identity-2', accounts: [] }),
+                fetchIdentityById: vi.fn().mockResolvedValue(undefined),
+                getIdentityById: vi.fn().mockReturnValue({ id: 'identity-2', accounts: [] }),
             },
             fusion: {
-                processFusionAccount: jest.fn().mockResolvedValue({ nativeIdentity: 'fusion-2' }),
+                processFusionAccount: vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-2' }),
             },
-            log: { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() },
+            log: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
         } as any
 
         await rebuildFusionAccount('fusion-2', {} as any, {
@@ -166,12 +166,12 @@ describe('rebuildFusionAccount', () => {
     })
 
     it('warns and skips legacy non-composite account references', async () => {
-        const fetchManagedAccount = jest.fn().mockResolvedValue(undefined)
-        const log = { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() }
+        const fetchManagedAccount = vi.fn().mockResolvedValue(undefined)
+        const log = { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() }
 
         const registry = {
             sources: {
-                fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
+                fetchFusionAccount: vi.fn().mockResolvedValue(undefined),
                 fusionAccountsByNativeIdentity: new Map([
                     [
                         'fusion-3',
@@ -185,17 +185,17 @@ describe('rebuildFusionAccount', () => {
                     ],
                 ]),
                 fetchManagedAccount,
-                getSourceByName: jest.fn(),
-                getSourceById: jest.fn().mockReturnValue(undefined),
-                aggregateManagedSource: jest.fn().mockResolvedValue(undefined),
+                getSourceByName: vi.fn(),
+                getSourceById: vi.fn().mockReturnValue(undefined),
+                aggregateManagedSource: vi.fn().mockResolvedValue(undefined),
                 config: { cascadeAggregationEnabled: false },
             },
             identities: {
-                fetchIdentityById: jest.fn().mockResolvedValue(undefined),
-                getIdentityById: jest.fn().mockReturnValue({ id: 'identity-3', accounts: [] }),
+                fetchIdentityById: vi.fn().mockResolvedValue(undefined),
+                getIdentityById: vi.fn().mockReturnValue({ id: 'identity-3', accounts: [] }),
             },
             fusion: {
-                processFusionAccount: jest.fn().mockResolvedValue({ nativeIdentity: 'fusion-3' }),
+                processFusionAccount: vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-3' }),
             },
             log,
         } as any

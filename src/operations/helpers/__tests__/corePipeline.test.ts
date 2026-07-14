@@ -10,14 +10,15 @@ import {
 } from '../corePipeline'
 
 import { createRegistry as createMockRegistry } from '../../__tests__/harness/registryMocking'
+import type { Mock } from 'vitest'
 
-function mockTrackedOperation(log: { metric: jest.Mock }): { done: jest.Mock; elapsedMs: jest.Mock } {
+function mockTrackedOperation(log: { metric: Mock }): { done: Mock; elapsedMs: Mock } {
     return {
-        done: jest.fn((data?: Record<string, any>) => {
+        done: vi.fn((data?: Record<string, any>) => {
             log.metric('tracked', 0, data)
             return 0
         }),
-        elapsedMs: jest.fn(() => 0),
+        elapsedMs: vi.fn(() => 0),
     }
 }
 
@@ -25,10 +26,10 @@ function createRegistry() {
     const registry = createMockRegistry()
     registry.sources.managedAccountsById = new Map()
     registry.sources.managedSources = []
-    registry.sources.clearManagedAccounts = jest.fn()
-    registry.sources.saveBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
-    registry.sources.clearFusionAccounts = jest.fn()
-    registry.sources.aggregateDelayedSources = jest.fn().mockResolvedValue(undefined)
+    registry.sources.clearManagedAccounts = vi.fn()
+    registry.sources.saveBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
+    registry.sources.clearFusionAccounts = vi.fn()
+    registry.sources.aggregateDelayedSources = vi.fn().mockResolvedValue(undefined)
     return {
         registry,
         forms: registry.forms,
@@ -41,42 +42,42 @@ describe('corePipeline phase split', () => {
     it('runs refresh before process before unique attributes with correct side-effect order', async () => {
         const callOrder: string[] = []
         const fusion = {
-            processFusionAccounts: jest.fn(async () => {
+            processFusionAccounts: vi.fn(async () => {
                 callOrder.push('processFusionAccounts')
                 return []
             }),
-            processIdentities: jest.fn(async () => {
+            processIdentities: vi.fn(async () => {
                 callOrder.push('processIdentities')
                 return []
             }),
-            processFusionIdentityDecisions: jest.fn(async () => {
+            processFusionIdentityDecisions: vi.fn(async () => {
                 callOrder.push('processFusionIdentityDecisions')
                 return []
             }),
-            initializeManagedAccountProcessing: jest.fn(async () => {
+            initializeManagedAccountProcessing: vi.fn(async () => {
                 callOrder.push('initializeManagedAccountProcessing')
             }),
-            processCorrelatedManagedAccounts: jest.fn(async () => {
+            processCorrelatedManagedAccounts: vi.fn(async () => {
                 callOrder.push('processCorrelatedManagedAccounts')
             }),
-            processUncorrelatedManagedAccounts: jest.fn(async () => {
+            processUncorrelatedManagedAccounts: vi.fn(async () => {
                 callOrder.push('processUncorrelatedManagedAccounts')
                 return { processed: 0, matchScoringMs: 0 }
             }),
-            awaitPendingDisableOperations: jest.fn(async () => {
+            awaitPendingDisableOperations: vi.fn(async () => {
                 callOrder.push('awaitPendingDisableOperations')
             }),
-            reconcilePendingFormState: jest.fn(() => {
+            reconcilePendingFormState: vi.fn(() => {
                 callOrder.push('reconcilePendingFormState')
             }),
-            refreshUniqueAttributes: jest.fn(async () => {
+            refreshUniqueAttributes: vi.fn(async () => {
                 callOrder.push('refreshUniqueAttributes')
                 return 0
             }),
         }
-        const identities = { clear: jest.fn(() => callOrder.push('identities.clear')), identityCount: 0 }
+        const identities = { clear: vi.fn(() => callOrder.push('identities.clear')), identityCount: 0 }
         const sources = { managedAccountsById: new Map() }
-        const log = { info: jest.fn(), metric: jest.fn(), track: jest.fn() }
+        const log = { info: vi.fn(), metric: vi.fn(), track: vi.fn() }
         const trackedOp = mockTrackedOperation(log)
         log.track.mockReturnValue(trackedOp)
         const registry = { fusion, identities, sources, log } as any
@@ -137,25 +138,25 @@ describe('corePipeline outputPhase', () => {
     it('passes stale cleanup flag only for persistent fetch runs', async () => {
         const { registry, forms } = createRegistry()
         const identities = {
-            fetchIdentities: jest.fn().mockResolvedValue(undefined),
+            fetchIdentities: vi.fn().mockResolvedValue(undefined),
             identityCount: 0,
-            getIdentityById: jest.fn(),
+            getIdentityById: vi.fn(),
         }
         const sources = {
-            fetchManagedAccounts: jest.fn().mockResolvedValue(undefined),
-            fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
+            fetchManagedAccounts: vi.fn().mockResolvedValue(undefined),
+            fetchFusionAccounts: vi.fn().mockResolvedValue(undefined),
             managedAccountsById: new Map(),
             managedSources: [],
-            getSourceByNameSafe: jest.fn(),
+            getSourceByNameSafe: vi.fn(),
             fusionAccountCount: 0,
-            fetchGlobalOwnerIdentityIds: jest.fn().mockResolvedValue([]),
+            fetchGlobalOwnerIdentityIds: vi.fn().mockResolvedValue([]),
         }
         const fusion = { fusionReportOnAggregation: false, fusionOwnerIsGlobalReviewer: false }
         const messaging = {
-            fetchSender: jest.fn().mockResolvedValue(undefined),
-            fetchDelayedAggregationSender: jest.fn().mockResolvedValue(undefined),
+            fetchSender: vi.fn().mockResolvedValue(undefined),
+            fetchDelayedAggregationSender: vi.fn().mockResolvedValue(undefined),
         }
-        const log = { info: jest.fn(), metric: jest.fn(), track: jest.fn(() => ({ done: jest.fn(() => 0), elapsedMs: jest.fn(() => 0) })) }
+        const log = { info: vi.fn(), metric: vi.fn(), track: vi.fn(() => ({ done: vi.fn(() => 0), elapsedMs: vi.fn(() => 0) })) }
         const serviceRegistry = { ...registry, forms, identities, sources, fusion, messaging, log }
 
         await fetchPhase(serviceRegistry, { mode: { kind: 'aggregation' } })
@@ -171,9 +172,9 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = false
         registry.sources.managedSources = []
-        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        registry.sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
-        registry.fusion.isReset = jest.fn().mockReturnValue(false)
+        registry.fusion.isReset = vi.fn().mockReturnValue(false)
 
         await expect(setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })).rejects.toThrow(
             'Fusion source not found'
@@ -184,13 +185,13 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
         registry.sources.managedSources = []
-        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        registry.sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
-        registry.fusion.isReset = jest.fn().mockReturnValue(true)
-        registry.forms.deleteExistingForms = jest.fn().mockResolvedValue(undefined)
-        registry.fusion.disableReset = jest.fn().mockResolvedValue(undefined)
-        registry.fusion.resetState = jest.fn().mockResolvedValue(undefined)
-        registry.sources.resetBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
+        registry.fusion.isReset = vi.fn().mockReturnValue(true)
+        registry.forms.deleteExistingForms = vi.fn().mockResolvedValue(undefined)
+        registry.fusion.disableReset = vi.fn().mockResolvedValue(undefined)
+        registry.fusion.resetState = vi.fn().mockResolvedValue(undefined)
+        registry.sources.resetBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
 
         const result = await setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })
 
@@ -206,11 +207,11 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
         registry.sources.managedSources = []
-        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        registry.sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
-        registry.fusion.isReset = jest.fn().mockReturnValue(true)
-        registry.forms.deleteExistingForms = jest.fn().mockResolvedValue(undefined)
-        registry.fusion.disableReset = jest.fn().mockResolvedValue(undefined)
+        registry.fusion.isReset = vi.fn().mockReturnValue(true)
+        registry.forms.deleteExistingForms = vi.fn().mockResolvedValue(undefined)
+        registry.fusion.disableReset = vi.fn().mockResolvedValue(undefined)
 
         const result = await setupPhase(registry as any, undefined, { mode: { kind: 'dry-run' } })
 
@@ -223,15 +224,15 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
         registry.sources.managedSources = []
-        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        registry.sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
-        registry.fusion.isReset = jest.fn().mockReturnValue(false)
+        registry.fusion.isReset = vi.fn().mockReturnValue(false)
         registry.config = { forceAttributeRefresh: true, sources: [] }
-        registry.fusion.disableForceAttributeRefresh = jest.fn().mockResolvedValue(undefined)
-        registry.schemas.loadFusionAccountSchemaFromSource = jest.fn().mockResolvedValue(undefined)
-        registry.sources.aggregateManagedSources = jest.fn().mockResolvedValue(undefined)
-        registry.sources.clearReverseCorrelationReadinessCache = jest.fn()
-        registry.attributes.initializeCounters = jest.fn().mockResolvedValue(undefined)
+        registry.fusion.disableForceAttributeRefresh = vi.fn().mockResolvedValue(undefined)
+        registry.schemas.loadFusionAccountSchemaFromSource = vi.fn().mockResolvedValue(undefined)
+        registry.sources.aggregateManagedSources = vi.fn().mockResolvedValue(undefined)
+        registry.sources.clearReverseCorrelationReadinessCache = vi.fn()
+        registry.attributes.initializeCounters = vi.fn().mockResolvedValue(undefined)
 
         const result = await setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })
 
@@ -243,13 +244,13 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
         registry.sources.managedSources = []
-        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        registry.sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
-        registry.fusion.isReset = jest.fn().mockReturnValue(false)
+        registry.fusion.isReset = vi.fn().mockReturnValue(false)
         registry.config = { forceAttributeRefresh: false, sources: [] }
-        registry.schemas.setFusionAccountSchema = jest.fn().mockResolvedValue(undefined)
-        registry.schemas.loadFusionAccountSchemaFromSource = jest.fn().mockResolvedValue(undefined)
-        registry.attributes.initializeCounters = jest.fn().mockResolvedValue(undefined)
+        registry.schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
+        registry.schemas.loadFusionAccountSchemaFromSource = vi.fn().mockResolvedValue(undefined)
+        registry.attributes.initializeCounters = vi.fn().mockResolvedValue(undefined)
 
         const dummySchema = { attributes: [] }
         const result = await setupPhase(registry as any, dummySchema, { mode: { kind: 'dry-run' } })
@@ -263,20 +264,20 @@ describe('corePipeline setupPhase', () => {
         const { registry } = createRegistry()
         registry.sources.hasFusionSource = true
         registry.sources.managedSources = []
-        registry.sources.fetchAllSources = jest.fn().mockResolvedValue(undefined)
+        registry.sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
         Object.defineProperty(registry.sources, 'managedSources', { get: () => [] })
-        registry.fusion.isReset = jest.fn().mockReturnValue(false)
+        registry.fusion.isReset = vi.fn().mockReturnValue(false)
 
         const reverseSource = { name: 'reverseSrc', correlationMode: 'reverse', correlationAttribute: 'uid' }
         registry.config = { forceAttributeRefresh: false, sources: [reverseSource] }
-        registry.schemas.loadFusionAccountSchemaFromSource = jest.fn().mockResolvedValue(undefined)
-        registry.sources.clearReverseCorrelationReadinessCache = jest.fn()
-        registry.schemas.getManagedSourceSchemaAttributeNames = jest.fn().mockResolvedValue(['uid'])
-        registry.sources.ensureReverseCorrelationSetup = jest.fn().mockResolvedValue(undefined)
-        registry.schemas.setFusionAccountSchema = jest.fn().mockResolvedValue(undefined)
-        registry.sources.setupReverseCorrelationSources = jest.fn().mockResolvedValue(1)
-        registry.sources.aggregateManagedSources = jest.fn().mockResolvedValue(undefined)
-        registry.attributes.initializeCounters = jest.fn().mockResolvedValue(undefined)
+        registry.schemas.loadFusionAccountSchemaFromSource = vi.fn().mockResolvedValue(undefined)
+        registry.sources.clearReverseCorrelationReadinessCache = vi.fn()
+        registry.schemas.getManagedSourceSchemaAttributeNames = vi.fn().mockResolvedValue(['uid'])
+        registry.sources.ensureReverseCorrelationSetup = vi.fn().mockResolvedValue(undefined)
+        registry.schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
+        registry.sources.setupReverseCorrelationSources = vi.fn().mockResolvedValue(1)
+        registry.sources.aggregateManagedSources = vi.fn().mockResolvedValue(undefined)
+        registry.attributes.initializeCounters = vi.fn().mockResolvedValue(undefined)
 
         const result = await setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })
 
@@ -298,49 +299,49 @@ describe('PipelineRunner.run', () => {
         mockServiceRegistry = setup.registry
 
         mockTimer = {
-            phase: jest.fn(),
-            end: jest.fn(),
-            totalElapsed: jest.fn().mockReturnValue(100),
-            getPhaseBreakdown: jest.fn().mockReturnValue({}),
+            phase: vi.fn(),
+            end: vi.fn(),
+            totalElapsed: vi.fn().mockReturnValue(100),
+            getPhaseBreakdown: vi.fn().mockReturnValue({}),
         }
 
         mockServiceRegistry.log = {
-            timer: jest.fn().mockReturnValue(mockTimer),
-            info: jest.fn(),
-            crash: jest.fn(),
-            track: jest.fn(() => ({
-                done: jest.fn(() => 0),
-                elapsedMs: jest.fn(() => 0),
+            timer: vi.fn().mockReturnValue(mockTimer),
+            info: vi.fn(),
+            crash: vi.fn(),
+            track: vi.fn(() => ({
+                done: vi.fn(() => 0),
+                elapsedMs: vi.fn(() => 0),
             })),
-            metric: jest.fn(),
+            metric: vi.fn(),
         } as any
 
-        mockServiceRegistry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
-        mockServiceRegistry.sources.releaseProcessLock = jest.fn().mockResolvedValue(undefined)
-        mockServiceRegistry.sources.resetBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
-        mockServiceRegistry.sources.fetchManagedAccounts = jest.fn().mockResolvedValue(undefined)
-        mockServiceRegistry.sources.fetchGlobalOwnerIdentityIds = jest.fn().mockResolvedValue([])
-        mockServiceRegistry.sources.saveBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.sources.setProcessLock = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.sources.releaseProcessLock = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.sources.resetBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.sources.fetchManagedAccounts = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.sources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([])
+        mockServiceRegistry.sources.saveBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
 
-        mockServiceRegistry.fusion.isReset = jest.fn().mockReturnValue(false)
-        mockServiceRegistry.fusion.disableReset = jest.fn().mockResolvedValue(undefined)
-        mockServiceRegistry.fusion.resetState = jest.fn().mockResolvedValue(undefined)
-        mockServiceRegistry.fusion.disableForceAttributeRefresh = jest.fn().mockResolvedValue(undefined)
-        mockServiceRegistry.fusion.processFusionAccounts = jest.fn().mockResolvedValue([])
-        mockServiceRegistry.fusion.processIdentities = jest.fn().mockResolvedValue([])
-        mockServiceRegistry.fusion.processFusionIdentityDecisions = jest.fn().mockResolvedValue([])
-        mockServiceRegistry.fusion.awaitPendingDisableOperations = jest.fn().mockResolvedValue(undefined)
-        mockServiceRegistry.fusion.reconcilePendingFormState = jest.fn()
+        mockServiceRegistry.fusion.isReset = vi.fn().mockReturnValue(false)
+        mockServiceRegistry.fusion.disableReset = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.fusion.resetState = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.fusion.disableForceAttributeRefresh = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.fusion.processFusionAccounts = vi.fn().mockResolvedValue([])
+        mockServiceRegistry.fusion.processIdentities = vi.fn().mockResolvedValue([])
+        mockServiceRegistry.fusion.processFusionIdentityDecisions = vi.fn().mockResolvedValue([])
+        mockServiceRegistry.fusion.awaitPendingDisableOperations = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.fusion.reconcilePendingFormState = vi.fn()
 
-        mockServiceRegistry.schemas.loadFusionAccountSchemaFromSource = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.schemas.loadFusionAccountSchemaFromSource = vi.fn().mockResolvedValue(undefined)
 
-        mockServiceRegistry.forms.deleteExistingForms = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.forms.deleteExistingForms = vi.fn().mockResolvedValue(undefined)
 
-        mockServiceRegistry.identities.fetchIdentities = jest.fn().mockResolvedValue(undefined)
-        mockServiceRegistry.identities.clear = jest.fn()
+        mockServiceRegistry.identities.fetchIdentities = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.identities.clear = vi.fn()
         mockServiceRegistry.identities.identityCount = 0
 
-        mockServiceRegistry.messaging.fetchDelayedAggregationSender = jest.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.messaging.fetchDelayedAggregationSender = vi.fn().mockResolvedValue(undefined)
     })
 
     it('runs up to the specified targetPhase', async () => {
@@ -385,13 +386,13 @@ describe('PipelineRunner.run', () => {
             get: () => fusionMap,
         })
         mockServiceRegistry.sources.fusionAccountCount = fusionMap.size
-        mockServiceRegistry.sources.clearFusionAccounts = jest.fn(() => {
+        mockServiceRegistry.sources.clearFusionAccounts = vi.fn(() => {
             callOrder.push('clearFusionAccounts')
             fusionMap.clear()
         })
         mockServiceRegistry.fusion.fusionReportOnAggregation = true
         mockServiceRegistry.reports = {
-            generateAndSendFusionReport: jest.fn(async () => {
+            generateAndSendFusionReport: vi.fn(async () => {
                 callOrder.push('reportPhase')
                 seenCounts.push(mockServiceRegistry.sources.fusionAccountCount)
             }),

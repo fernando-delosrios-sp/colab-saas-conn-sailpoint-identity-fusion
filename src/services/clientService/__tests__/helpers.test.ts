@@ -6,16 +6,17 @@ import {
     RETRY_JITTER_FACTOR,
 } from '../constants'
 import axiosRetry from 'axios-retry'
+import type { Mock } from 'vitest'
 
-jest.mock('axios-retry', () => ({
-    isNetworkError: jest.fn((err: any) => err?.isNetworkError === true),
-    isRetryableError: jest.fn((err: any) => err?.isRetryable === true),
+vi.mock('axios-retry', () => ({
+    isNetworkError: vi.fn((err: any) => err?.isNetworkError === true),
+    isRetryableError: vi.fn((err: any) => err?.isRetryable === true),
     default: {},
 }))
 
 describe('clientService helpers', () => {
     beforeEach(() => {
-        jest.clearAllMocks()
+        vi.clearAllMocks()
     })
 
     describe('createRetriesConfig', () => {
@@ -78,7 +79,7 @@ describe('clientService helpers', () => {
         })
 
         it('should return true for network errors', () => {
-            ;(axiosRetry.isNetworkError as jest.Mock).mockReturnValue(true)
+            ;(axiosRetry.isNetworkError as Mock).mockReturnValue(true)
             expect(shouldRetry({ isNetworkError: true })).toBe(true)
         })
 
@@ -88,8 +89,8 @@ describe('clientService helpers', () => {
         })
 
         it('should return false for 4xx (except 429)', () => {
-            ;(axiosRetry.isNetworkError as jest.Mock).mockReturnValue(false)
-            ;(axiosRetry.isRetryableError as jest.Mock).mockReturnValue(false)
+            ;(axiosRetry.isNetworkError as Mock).mockReturnValue(false)
+            ;(axiosRetry.isRetryableError as Mock).mockReturnValue(false)
             expect(shouldRetry({ response: { status: 400 } })).toBe(false)
             expect(shouldRetry({ response: { status: 404 } })).toBe(false)
         })
@@ -131,7 +132,7 @@ describe('clientService helpers', () => {
 
         it('should use retry-after HTTP-date with jitter for 429', () => {
             const now = 1750000000000
-            const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now)
+            const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now)
             try {
                 const future = new Date(now + 5000).toUTCString()
                 const delay = calculateRetryDelay(0, {

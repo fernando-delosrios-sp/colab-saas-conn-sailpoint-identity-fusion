@@ -20,23 +20,23 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         uniqueAttributeDefinitions: [],
     }
     const log: any = {
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
     }
     const client: any = {
         execute: async (fn: () => Promise<any>) => fn(),
-        paginate: jest.fn(),
-        paginateParallel: jest.fn(),
+        paginate: vi.fn(),
+        paginateParallel: vi.fn(),
         accountsApi: {
-            listAccounts: jest.fn(),
+            listAccounts: vi.fn(),
         },
         sourcesApi: {
-            importAccounts: jest.fn(),
+            importAccounts: vi.fn(),
         },
         taskManagementApi: {
-            getTaskStatus: jest.fn(),
+            getTaskStatus: vi.fn(),
         },
     }
 
@@ -61,7 +61,7 @@ describe('SourceService Accounts JMESPath filter', () => {
             accountJmespathFilter: 'accounts[?attributes.department == `Engineering`]',
         })
 
-        jest.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* () {
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* () {
             yield [
                 {
                     id: 'a1',
@@ -100,11 +100,11 @@ describe('SourceService Accounts JMESPath filter', () => {
 
 describe('SourceService per-source aggregation polling', () => {
     afterEach(() => {
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 
     it('on zero-minute timeout performs one status check then warns with timeout fields', async () => {
-        jest.useFakeTimers({ now: 0 })
+        vi.useFakeTimers({ now: 0 })
         const { service, client } = createService({
             aggregationMode: 'before',
             aggregationTimeout: 0,
@@ -128,7 +128,7 @@ describe('SourceService per-source aggregation polling', () => {
     })
 
     it('after one poll interval hits timeout with two polls executed', async () => {
-        jest.useFakeTimers({ now: 0 })
+        vi.useFakeTimers({ now: 0 })
         const { service, client } = createService({
             aggregationMode: 'before',
             aggregationTimeout: 1,
@@ -143,9 +143,9 @@ describe('SourceService per-source aggregation polling', () => {
 
         const promise = (service as any).aggregateManagedSource('managed-source-id', false, true)
         await Promise.resolve()
-        await jest.advanceTimersByTimeAsync(30_000)
+        await vi.advanceTimersByTimeAsync(30_000)
         await Promise.resolve()
-        await jest.advanceTimersByTimeAsync(30_000)
+        await vi.advanceTimersByTimeAsync(30_000)
         await Promise.resolve()
         await promise
 
@@ -156,7 +156,7 @@ describe('SourceService per-source aggregation polling', () => {
     })
 
     it('stops polling when task completes before timeout', async () => {
-        jest.useFakeTimers({ now: 0 })
+        vi.useFakeTimers({ now: 0 })
         const { service, client } = createService({
             aggregationMode: 'before',
             aggregationTimeout: 10,
@@ -175,7 +175,7 @@ describe('SourceService per-source aggregation polling', () => {
 
         const promise = (service as any).aggregateManagedSource('managed-source-id', false, true)
         await Promise.resolve()
-        await jest.advanceTimersByTimeAsync(30_000)
+        await vi.advanceTimersByTimeAsync(30_000)
         await Promise.resolve()
         await promise
 
@@ -329,9 +329,9 @@ describe('SourceService reverse correlation setup hardening', () => {
             },
         })
 
-        jest.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
-        const phasesSpy = jest.spyOn(service as any, 'ensureReverseCorrelationSetupPhases').mockResolvedValue(undefined)
-        const statusSpy = jest.spyOn(service as any, 'getReverseCorrelationSetupStatus')
+        vi.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
+        const phasesSpy = vi.spyOn(service as any, 'ensureReverseCorrelationSetupPhases').mockResolvedValue(undefined)
+        const statusSpy = vi.spyOn(service as any, 'getReverseCorrelationSetupStatus')
         statusSpy
             .mockResolvedValueOnce({
                 isConsistent: false,
@@ -341,7 +341,7 @@ describe('SourceService reverse correlation setup hardening', () => {
                 isConsistent: true,
                 missingArtifacts: [],
             })
-        const repairSpy = jest.spyOn(service as any, 'repairReverseCorrelationSetup').mockResolvedValue(undefined)
+        const repairSpy = vi.spyOn(service as any, 'repairReverseCorrelationSetup').mockResolvedValue(undefined)
 
         await service.ensureReverseCorrelationSetup(
             {
@@ -377,10 +377,10 @@ describe('SourceService reverse correlation setup hardening', () => {
                 correlationDisplayName: 'Reverse Native Identity',
             },
         })
-        jest.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
-        jest.spyOn(service as any, 'ensureReverseCorrelationSetupPhases').mockResolvedValue(undefined)
-        jest.spyOn(service as any, 'repairReverseCorrelationSetup').mockResolvedValue(undefined)
-        jest.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
+        vi.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
+        vi.spyOn(service as any, 'ensureReverseCorrelationSetupPhases').mockResolvedValue(undefined)
+        vi.spyOn(service as any, 'repairReverseCorrelationSetup').mockResolvedValue(undefined)
+        vi.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
             isConsistent: false,
             missingArtifacts: ['identity_profile_mapping'],
         })
@@ -431,12 +431,12 @@ describe('SourceService reverse correlation setup hardening', () => {
                 config: hrConfig,
             })
 
-            jest.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
-            const fusionSpy = jest.spyOn(service as any, 'ensureFusionSchemaAttribute').mockResolvedValue(undefined)
-            const identitySpy = jest.spyOn(service as any, 'ensureIdentityAttribute').mockResolvedValue(undefined)
-            const profileSpy = jest.spyOn(service as any, 'ensureIdentityProfileMapping').mockResolvedValue(undefined)
-            const managedSpy = jest.spyOn(service as any, 'ensureManagedSourceCorrelation').mockResolvedValue(undefined)
-            jest.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
+            vi.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
+            const fusionSpy = vi.spyOn(service as any, 'ensureFusionSchemaAttribute').mockResolvedValue(undefined)
+            const identitySpy = vi.spyOn(service as any, 'ensureIdentityAttribute').mockResolvedValue(undefined)
+            const profileSpy = vi.spyOn(service as any, 'ensureIdentityProfileMapping').mockResolvedValue(undefined)
+            const managedSpy = vi.spyOn(service as any, 'ensureManagedSourceCorrelation').mockResolvedValue(undefined)
+            vi.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
                 isConsistent: true,
                 missingArtifacts: [],
             })
@@ -473,9 +473,9 @@ describe('SourceService authoritative reverse correlation identity profile mappi
         ])
 
         client.identityProfilesApi = {
-            updateIdentityProfile: jest.fn().mockResolvedValue({ data: { id: 'profile-1' } }),
+            updateIdentityProfile: vi.fn().mockResolvedValue({ data: { id: 'profile-1' } }),
         }
-        client.paginate = jest.fn().mockResolvedValue([
+        client.paginate = vi.fn().mockResolvedValue([
             {
                 id: 'profile-1',
                 authoritativeSource: { id: 'fusion-source-id' },
@@ -522,16 +522,16 @@ describe('SourceService authoritative reverse correlation identity profile mappi
         ])
 
         client.identityProfilesApi = {
-            updateIdentityProfile: jest.fn().mockResolvedValue({ data: { id: 'profile-1' } }),
+            updateIdentityProfile: vi.fn().mockResolvedValue({ data: { id: 'profile-1' } }),
         }
-        client.paginate = jest.fn().mockResolvedValue([
+        client.paginate = vi.fn().mockResolvedValue([
             {
                 id: 'profile-1',
                 authoritativeSource: { id: 'fusion-source-id' },
                 identityAttributeConfig: { attributeTransforms: [] },
             },
         ])
-        jest.spyOn(service as any, 'waitForIdentityProfileMapping').mockResolvedValue(true)
+        vi.spyOn(service as any, 'waitForIdentityProfileMapping').mockResolvedValue(true)
 
         await (service as any).ensureIdentityProfileMapping('reverseNativeIdentity', {
             name: 'HR Source',
@@ -549,7 +549,7 @@ describe('SourceService reverse correlation readiness cache', () => {
             correlationAttribute: 'reverseNativeIdentity',
             correlationDisplayName: 'Reverse Native Identity',
         })
-        const statusSpy = jest.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
+        const statusSpy = vi.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
             isConsistent: true,
             missingArtifacts: [],
         })
@@ -574,9 +574,9 @@ describe('SourceService reverse correlation readiness cache', () => {
             correlationAttribute: 'reverseNativeIdentity',
             correlationDisplayName: 'Reverse Native Identity',
         })
-        jest.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
-        jest.spyOn(service as any, 'ensureReverseCorrelationSetupPhases').mockResolvedValue(undefined)
-        const statusSpy = jest.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
+        vi.spyOn(service, 'validateNoAttributeOverlap').mockImplementation(() => {})
+        vi.spyOn(service as any, 'ensureReverseCorrelationSetupPhases').mockResolvedValue(undefined)
+        const statusSpy = vi.spyOn(service as any, 'getReverseCorrelationSetupStatus').mockResolvedValue({
             isConsistent: true,
             missingArtifacts: [],
         })

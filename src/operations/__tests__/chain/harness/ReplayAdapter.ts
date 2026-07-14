@@ -9,6 +9,7 @@ import {
 } from '../../../../services/attributeService/helpers'
 import { AttributeService } from '../../../../services/attributeService/attributeService'
 import { SchemaService } from '../../../../services/schemaService/schemaService'
+import type { Mock } from 'vitest'
 
 const replayOutputs = new Map<string, unknown>()
 
@@ -182,10 +183,10 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     }))
 
     const { registry } = createBaseOperationRegistry(sourceConfigs)
-    registry.log.error = jest.fn().mockImplementation((...args) => {
+    registry.log.error = vi.fn().mockImplementation((...args) => {
         console.error('LOG.ERROR:', ...args)
     })
-    registry.log.warn = jest.fn().mockImplementation((...args) => {
+    registry.log.warn = vi.fn().mockImplementation((...args) => {
         console.warn('LOG.WARN:', ...args)
     })
 
@@ -193,7 +194,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     registry.schemas = schemaService as any
 
     // Mock fetchAllSources to populate managedSources from config
-    registry.sources.fetchAllSources = jest.fn().mockImplementation(async () => {
+    registry.sources.fetchAllSources = vi.fn().mockImplementation(async () => {
         registry.sources.managedSources = scenarioSources.map((s) => ({
             id: (s.id as string) ?? `source-${s.name}`,
             name: s.name as string,
@@ -221,13 +222,13 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     registry.sources.managedAccountsAllById = new Map(map)
     registry.sources.managedAccountsByIdentityId = byIdentity
 
-    registry.sources.fetchManagedAccounts = jest.fn().mockImplementation(async () => {
+    registry.sources.fetchManagedAccounts = vi.fn().mockImplementation(async () => {
         registry.sources.managedAccountsById = map
         registry.sources.managedAccountsAllById = new Map(map)
         registry.sources.managedAccountsByIdentityId = byIdentity
     })
 
-    registry.sources.fetchManagedAccount = jest
+    registry.sources.fetchManagedAccount = vi
         .fn()
         .mockImplementation(async (sourceId: string, nativeIdentity: string) => {
             const account = managedAccounts.find(
@@ -341,10 +342,10 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         return dynamicIdentity
     }
 
-    registry.identities.fetchIdentities = jest.fn().mockImplementation(async () => {
+    registry.identities.fetchIdentities = vi.fn().mockImplementation(async () => {
         registry.identities.identityCount = state.getIdentities().length
     })
-    registry.identities.fetchIdentityByName = jest.fn().mockImplementation(async (name: string) => {
+    registry.identities.fetchIdentityByName = vi.fn().mockImplementation(async (name: string) => {
         const existing = state.getIdentityByName(name)
         if (existing) return existing
 
@@ -370,11 +371,11 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         }
         return null
     })
-    registry.identities.getIdentityById = jest.fn().mockImplementation((id: string) => {
+    registry.identities.getIdentityById = vi.fn().mockImplementation((id: string) => {
         console.log('registry.identities.getIdentityById mock called for id:', id)
         return getOrBuildIdentity(id)
     })
-    registry.identities.fetchIdentityById = jest.fn().mockImplementation(async (id: string) => {
+    registry.identities.fetchIdentityById = vi.fn().mockImplementation(async (id: string) => {
         console.log('registry.identities.fetchIdentityById mock called for id:', id)
         return getOrBuildIdentity(id)
     })
@@ -393,12 +394,12 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     registry.sources.fusionAccounts = fusionAccounts
     registry.sources.fusionAccountCount = fusionAccounts.length
 
-    registry.sources.fetchFusionAccounts = jest.fn().mockImplementation(async () => {
+    registry.sources.fetchFusionAccounts = vi.fn().mockImplementation(async () => {
         registry.sources.fusionAccountsByNativeIdentity = fusionMap
         registry.sources.fusionAccounts = fusionAccounts
     })
 
-    registry.sources.fetchFusionAccount = jest.fn().mockImplementation(async (nativeIdentity: string) => {
+    registry.sources.fetchFusionAccount = vi.fn().mockImplementation(async (nativeIdentity: string) => {
         const account = fusionAccounts.find((a) => getNativeIdentity(a) === nativeIdentity)
         if (account) {
             fusionMap.set(nativeIdentity, account)
@@ -408,13 +409,13 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     // Mock form fetch methods to populate from recorded state
     const forms = state.getForms()
     if (forms.length > 0) {
-        registry.forms.fetchFormInstances = jest.fn().mockResolvedValue(undefined)
-        registry.forms.processFetchedFormData = jest.fn().mockImplementation(async () => {
+        registry.forms.fetchFormInstances = vi.fn().mockResolvedValue(undefined)
+        registry.forms.processFetchedFormData = vi.fn().mockImplementation(async () => {
             registry.forms.fusionIdentityDecisions = forms
         })
     }
 
-    registry.sources.getSourceByName = jest.fn().mockImplementation((name: string) => {
+    registry.sources.getSourceByName = vi.fn().mockImplementation((name: string) => {
         const src = scenarioSources.find((s) => s.name === name)
         if (src) {
             return {
@@ -427,7 +428,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         return undefined
     })
 
-    registry.sources.getSourceById = jest.fn().mockImplementation((sourceId: string) => {
+    registry.sources.getSourceById = vi.fn().mockImplementation((sourceId: string) => {
         const src = scenarioSources.find(
             (s) => s.id === sourceId || s.name === sourceId || `source-${s.name}` === sourceId
         )
@@ -466,7 +467,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         } as any
     )
 
-    registry.fusion.processFusionAccount = jest.fn().mockImplementation(async (account) => {
+    registry.fusion.processFusionAccount = vi.fn().mockImplementation(async (account) => {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         if (account.identityId) {
             const identity = registry.identities.getIdentityById(account.identityId)
@@ -494,7 +495,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         return fusionAccount
     })
 
-    registry.fusion.processFusionAccounts = jest.fn().mockImplementation(async () => {
+    registry.fusion.processFusionAccounts = vi.fn().mockImplementation(async () => {
         const processed = []
         const faList = state.getFusionAccounts()
         console.log('processFusionAccounts mock: got raw accounts count:', faList.length)
@@ -515,7 +516,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         return processed
     })
 
-    registry.fusion.correlateMissingAccountsPerSource = jest.fn().mockImplementation(async (fusionAccount) => {
+    registry.fusion.correlateMissingAccountsPerSource = vi.fn().mockImplementation(async (fusionAccount) => {
         const missingIds = [...fusionAccount.missingAccountIds]
         for (const accountId of missingIds) {
             fusionAccount.setCorrelatedAccount(accountId)
@@ -523,7 +524,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         fusionAccount.updateCorrelationStatus()
     })
 
-    registry.fusion.processIdentity = jest.fn().mockImplementation(async (identity) => {
+    registry.fusion.processIdentity = vi.fn().mockImplementation(async (identity) => {
         console.log('processIdentity mock called for:', identity.id, 'attributes:', JSON.stringify(identity.attributes))
         const fusionAccount = FusionAccount.fromIdentity(identity)
         fusionAccount.addIdentityLayer(identity)
@@ -563,7 +564,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         return fusionAccount
     })
 
-    registry.fusion.processIdentities = jest.fn().mockImplementation(async () => {
+    registry.fusion.processIdentities = vi.fn().mockImplementation(async () => {
         const processed = []
         const ids = state.getIdentities()
         console.log('processIdentities mock: got identities count:', ids.length)
@@ -580,11 +581,11 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         return processed
     })
 
-    registry.fusion.getFusionIdentity = jest.fn().mockImplementation((id: string) => {
+    registry.fusion.getFusionIdentity = vi.fn().mockImplementation((id: string) => {
         return activeFusionIdentities.get(id)
     })
 
-    registry.fusion.getISCAccount = jest.fn().mockImplementation(async (fusionAccount: any) => {
+    registry.fusion.getISCAccount = vi.fn().mockImplementation(async (fusionAccount: any) => {
         if (typeof fusionAccount.syncCollectionAttributesToBag === 'function') {
             fusionAccount.syncCollectionAttributesToBag()
         }
@@ -642,7 +643,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         }
     })
 
-    registry.fusion.forEachISCAccount = jest.fn().mockImplementation(async (send: (account: any) => void) => {
+    registry.fusion.forEachISCAccount = vi.fn().mockImplementation(async (send: (account: any) => void) => {
         let sent = 0
         const faList = state.getFusionAccounts()
         console.log('forEachISCAccount mock: state.getFusionAccounts() count:', faList.length)
@@ -660,7 +661,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         return { sent, eligible: faList.length }
     })
 
-    registry.res.send = jest.fn()
+    registry.res.send = vi.fn()
 
     context.registry = registry as unknown as MockRegistry
 
@@ -670,7 +671,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
 export function collectOutputs(context: ChainContext): unknown[] {
     const sent: unknown[] = []
     if (context.registry.res && 'send' in (context.registry.res ?? {})) {
-        const mock = (context.registry as any).res.send as jest.Mock
+        const mock = (context.registry as any).res.send as Mock
         if (mock?.mock?.calls) {
             for (const call of mock.mock.calls) {
                 sent.push(call[0])

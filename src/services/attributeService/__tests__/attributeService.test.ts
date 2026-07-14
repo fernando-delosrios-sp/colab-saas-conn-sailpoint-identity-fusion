@@ -1,11 +1,11 @@
 import { AttributeService } from '../attributeService'
 import * as uuid from 'uuid'
 
-jest.mock('uuid', () => {
-    const originalModule = jest.requireActual('uuid')
+vi.mock('uuid', async () => {
+    const originalModule = await vi.importActual<typeof import('uuid')>('uuid')
     return {
         ...originalModule,
-        v4: jest.fn().mockImplementation(originalModule.v4),
+        v4: vi.fn().mockImplementation(originalModule.v4),
     }
 })
 describe('AttributeService mapping targets for definition context', () => {
@@ -37,22 +37,22 @@ describe('AttributeService mapping targets for definition context', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
         const log = {
-            debug: jest.fn(),
-            info: jest.fn(),
-            warn: jest.fn(),
-            error: jest.fn(),
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
         } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         return new AttributeService(config, schemas, sourceService, log, locks)
@@ -87,7 +87,7 @@ describe('AttributeService mapping targets for definition context', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -140,17 +140,17 @@ describe('AttributeService mainAccount stale cleanup', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'mainAccount']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'mainAccount' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'mainAccount']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'mainAccount' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         const service = new AttributeService(config, schemas, sourceService, log, locks)
@@ -183,7 +183,7 @@ describe('AttributeService mainAccount stale cleanup', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -224,22 +224,22 @@ describe('AttributeService incremental counter seeding', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
-        const sourceService = { fusionSourceId: 'src-1', patchSourceConfig: jest.fn() } as any
+        const sourceService = { fusionSourceId: 'src-1', patchSourceConfig: vi.fn() } as any
         const log = {
-            debug: jest.fn(),
-            info: jest.fn(),
-            warn: jest.fn(),
-            error: jest.fn(),
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
         } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         const service = new AttributeService(config, schemas, sourceService, log, locks)
@@ -266,7 +266,7 @@ describe('AttributeService incremental counter seeding', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -301,17 +301,17 @@ describe('AttributeService mapping undefined behavior', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'nickname']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         const service = new AttributeService(config, schemas, sourceService, log, locks)
@@ -344,7 +344,7 @@ describe('AttributeService mapping undefined behavior', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -381,17 +381,17 @@ describe('AttributeService mapping undefined behavior', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'nickname']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         const service = new AttributeService(config, schemas, sourceService, log, locks)
@@ -412,7 +412,7 @@ describe('AttributeService mapping undefined behavior', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -451,22 +451,22 @@ describe('AttributeService template evaluation fallback behavior', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
         const log = {
-            debug: jest.fn(),
-            info: jest.fn(),
-            warn: jest.fn(),
-            error: jest.fn(),
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
         } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         return new AttributeService(config, schemas, sourceService, log, locks)
@@ -491,7 +491,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -545,17 +545,17 @@ describe('AttributeService template evaluation fallback behavior', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'computed']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'computed' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'computed']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'computed' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         const service = new AttributeService(config, schemas, sourceService, log, locks)
@@ -579,7 +579,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -619,17 +619,17 @@ describe('AttributeService template evaluation fallback behavior', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         const service = new AttributeService(config, schemas, sourceService, log, locks)
@@ -651,7 +651,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -687,17 +687,17 @@ describe('AttributeService template evaluation fallback behavior', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         const service = new AttributeService(config, schemas, sourceService, log, locks)
@@ -719,7 +719,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -757,21 +757,21 @@ describe('AttributeService template evaluation fallback behavior', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         // Force a collision by making the first generated UUID match an already registered one
-        const uuidSpy = jest.spyOn(uuid, 'v4')
+        const uuidSpy = vi.spyOn(uuid, 'v4')
         let callCount1 = 0
         uuidSpy.mockImplementation(((() => {
             callCount1++
@@ -801,7 +801,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -816,7 +816,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
 
         // The second attempt should generate the second UUID without appending a counter
         expect(fusionAccount.attributes.id).toBe('prefix-22222222-2222-4222-a222-222222222222')
-        uuidSpy.mockImplementation(jest.requireActual('uuid').v4)
+        uuidSpy.mockImplementation((await vi.importActual<typeof import('uuid')>('uuid')).v4)
     })
 
     it('recalculates a new UUID on collision for unique expression with $UUID when useIncrementalCounter is true', async () => {
@@ -839,20 +839,20 @@ describe('AttributeService template evaluation fallback behavior', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
-        const uuidSpy = jest.spyOn(uuid, 'v4')
+        const uuidSpy = vi.spyOn(uuid, 'v4')
         let callCount2 = 0
         uuidSpy.mockImplementation(((() => {
             callCount2++
@@ -881,7 +881,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -897,14 +897,14 @@ describe('AttributeService template evaluation fallback behavior', () => {
 
         // The second attempt should generate the second UUID AND increment the counter
         expect(fusionAccount.attributes.id).toBe('prefix-22222222-2222-4222-a222-222222222222-2')
-        uuidSpy.mockImplementation(jest.requireActual('uuid').v4)
+        uuidSpy.mockImplementation((await vi.importActual<typeof import('uuid')>('uuid')).v4)
     })
 })
 
 describe('AttributeService $isUnique in unique attribute expressions', () => {
     const baseLocks = {
-        withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-        waitForAllPendingOperations: jest.fn(async () => undefined),
+        withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+        waitForAllPendingOperations: vi.fn(async () => undefined),
     } as any
 
     it('picks the else branch when $isUnique is false for a registered value', async () => {
@@ -931,14 +931,14 @@ fallback
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'login']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'login' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'login']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'login' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const service = new AttributeService(config, schemas, sourceService, log, baseLocks)
         service.registerExistingValues('login', ['candidate'])
 
@@ -960,7 +960,7 @@ fallback
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -1000,14 +1000,14 @@ used
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'login']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'login' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'login']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'login' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const service = new AttributeService(config, schemas, sourceService, log, baseLocks)
 
         const attributeBag = {
@@ -1028,7 +1028,7 @@ used
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -1084,8 +1084,8 @@ describe('AttributeService mainAccount override', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname', 'mainAccount']),
-            getSchemaAttributes: jest.fn(() => [
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'nickname', 'mainAccount']),
+            getSchemaAttributes: vi.fn(() => [
                 { name: 'id' },
                 { name: 'name' },
                 { name: 'nickname' },
@@ -1096,10 +1096,10 @@ describe('AttributeService mainAccount override', () => {
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         return new AttributeService(config, schemas, sourceService, log, locks)
@@ -1151,7 +1151,7 @@ describe('AttributeService mainAccount override', () => {
             isIdentity: false,
             sources: ['HR', 'ERP'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -1251,8 +1251,8 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
 
         const schemas = {
             // Keep processing order unchanged: nicknameBefore -> mainAccount -> nicknameAfter
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nicknameBefore', 'mainAccount', 'nicknameAfter']),
-            getSchemaAttributes: jest.fn(() => [
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'nicknameBefore', 'mainAccount', 'nicknameAfter']),
+            getSchemaAttributes: vi.fn(() => [
                 { name: 'id' },
                 { name: 'name' },
                 { name: 'nicknameBefore' },
@@ -1264,10 +1264,10 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         const service = new AttributeService(config, schemas, sourceService, log, locks)
@@ -1313,7 +1313,7 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
             isIdentity: false,
             sources: ['HR', 'ERP'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -1354,17 +1354,17 @@ describe('AttributeService unique identity reset for managed accounts', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         const service = new AttributeService(config, schemas, sourceService, log, locks)
@@ -1387,7 +1387,7 @@ describe('AttributeService unique identity reset for managed accounts', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -1426,17 +1426,17 @@ describe('AttributeService identity immutability by account lifecycle', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         return new AttributeService(config, schemas, sourceService, log, locks)
@@ -1473,7 +1473,7 @@ describe('AttributeService identity immutability by account lifecycle', () => {
             previousAttributes: {},
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -1505,7 +1505,7 @@ describe('AttributeService identity immutability by account lifecycle', () => {
             previousAttributes: attributeBag.previous,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -1518,18 +1518,18 @@ describe('AttributeService identity immutability by account lifecycle', () => {
 
 describe('AttributeService $originAccount and $account Velocity context', () => {
     const velocitySchemas = {
-        listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'derived']),
-        getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'derived' }]),
+        listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'derived']),
+        getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'derived' }]),
         fusionIdentityAttribute: 'id',
         fusionDisplayAttribute: 'name',
     } as any
 
     const velocityDeps = () => ({
         sourceService: {} as any,
-        log: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any,
+        log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
         locks: {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any,
     })
 
@@ -1604,7 +1604,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             originAccountId: 'src-hr::native-m1',
             disabled: false,
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -1653,7 +1653,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             originAccountId: 'src-h42::managed-42',
             disabled: false,
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -1702,7 +1702,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             originAccountId: 'src-h::same-id',
             disabled: false,
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -1739,7 +1739,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             originAccountId: 'id-only',
             disabled: false,
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -1776,7 +1776,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             originAccountId: 'id-only',
             disabled: false,
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -1825,7 +1825,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             originAccountId: 'legacy-row-id',
             disabled: false,
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -1862,7 +1862,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             originAccountId: 'id-only',
             disabled: false,
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -1899,7 +1899,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             originAccountId: 'id-only',
             disabled: false,
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -1936,7 +1936,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             originAccountId: 'acc-99',
             disabled: false,
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -1967,17 +1967,17 @@ describe('AttributeService unique value registration', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         const service = new AttributeService(config, schemas, sourceService, log, locks)
@@ -2000,7 +2000,7 @@ describe('AttributeService unique value registration', () => {
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -2020,8 +2020,8 @@ describe('AttributeService unique value registration', () => {
 
 describe('AttributeService fusion identity/display safe defaults when undefined', () => {
     const fusionSchemas = {
-        listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname']),
-        getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
+        listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'nickname']),
+        getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
         fusionIdentityAttribute: 'id',
         fusionDisplayAttribute: 'name',
     } as any
@@ -2037,10 +2037,10 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
 
     const baseDeps = () => ({
         sourceService: {} as any,
-        log: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any,
+        log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
         locks: {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any,
     })
 
@@ -2084,7 +2084,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             sources: ['HR'],
             originAccountId: 'src-hr::native-1',
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -2131,7 +2131,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -2179,7 +2179,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             sources: ['HR'],
             originAccountId: 'src-hr::x',
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -2234,7 +2234,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             sources: ['HR'],
             originAccountId: 'src-hr::uniq-origin',
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -2282,7 +2282,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -2330,7 +2330,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             identityName: 'Hosting Identity Name',
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -2369,7 +2369,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             identityName: 'Hosting Identity Name Correlated',
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
@@ -2412,22 +2412,22 @@ describe('AttributeService error handling', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
         const log = {
-            debug: jest.fn(),
-            info: jest.fn(),
-            warn: jest.fn(),
-            error: jest.fn(),
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
         } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
 
         return new AttributeService(config, schemas, sourceService, log, locks)
@@ -2474,7 +2474,7 @@ describe('AttributeService error handling', () => {
             sourceName: 'IdentityFusion',
             attributes: { ...attrs },
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
 
@@ -2487,13 +2487,13 @@ describe('AttributeService error handling', () => {
         const service = createService()
         const fusionAccount = createFusionAccount()
 
-        const logErrorSpy = jest.spyOn((service as any).log, 'error')
+        const logErrorSpy = vi.spyOn((service as any).log, 'error')
 
         // Mock processNormalDefinition to throw
-        ;(service as any).processNormalDefinition = jest.fn().mockRejectedValue(new Error('Test normal error'))
+        ;(service as any).processNormalDefinition = vi.fn().mockRejectedValue(new Error('Test normal error'))
 
         // Mock processUniqueDefinition to succeed
-        ;(service as any).processUniqueDefinition = jest.fn().mockResolvedValue(undefined)
+        ;(service as any).processUniqueDefinition = vi.fn().mockResolvedValue(undefined)
 
         // Should not throw
         await expect(service.refreshAllAttributes(fusionAccount)).resolves.not.toThrow()
@@ -2508,13 +2508,13 @@ describe('AttributeService error handling', () => {
         const service = createService()
         const fusionAccount = createFusionAccount()
 
-        const logErrorSpy = jest.spyOn((service as any).log, 'error')
+        const logErrorSpy = vi.spyOn((service as any).log, 'error')
 
         // Mock processNormalDefinition to succeed
-        ;(service as any).processNormalDefinition = jest.fn().mockResolvedValue(undefined)
+        ;(service as any).processNormalDefinition = vi.fn().mockResolvedValue(undefined)
 
         // Mock processUniqueDefinition to throw
-        ;(service as any).processUniqueDefinition = jest.fn().mockRejectedValue(new Error('Test unique error'))
+        ;(service as any).processUniqueDefinition = vi.fn().mockRejectedValue(new Error('Test unique error'))
 
         await expect(service.refreshAllAttributes(fusionAccount)).rejects.toThrow('Test unique error')
 
@@ -2537,16 +2537,16 @@ describe('AttributeService maxLength ordering after post-processing transforms',
             forceAttributeRefresh: false,
         } as any
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'nickname']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
         return new AttributeService(config, schemas, sourceService, log, locks)
     }
@@ -2569,7 +2569,7 @@ describe('AttributeService maxLength ordering after post-processing transforms',
             isIdentity: false,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         Object.defineProperty(fusionAccount, 'attributes', {
@@ -2686,16 +2686,16 @@ describe('AttributeService refreshUniqueAttributes early skip rules', () => {
             forceAttributeRefresh: false,
         } as any
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const locks = {
-            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: jest.fn(async () => undefined),
+            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: vi.fn(async () => undefined),
         } as any
         return new AttributeService(config, schemas, sourceService, log, locks)
     }
@@ -2719,7 +2719,7 @@ describe('AttributeService refreshUniqueAttributes early skip rules', () => {
             isMatch,
             sources: ['HR'],
             history: [],
-            importHistory: jest.fn(),
+            importHistory: vi.fn(),
             attributeBag,
         }
         Object.defineProperty(fusionAccount, 'attributes', {

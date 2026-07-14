@@ -4,6 +4,7 @@ import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
 import { SourceService } from '../sourceService'
 import { IdentityService } from '../identityService'
+import type { Mock } from 'vitest'
 
 type ClientServiceStub = Pick<ClientService, 'paginateSearchApi' | 'paginateSearchApiGenerator' | 'execute'>
 type SourceServiceStub = Pick<SourceService, 'resolveIscAccountIdForManagedKey'>
@@ -20,28 +21,28 @@ function makeIdentity(id: string, overrides: Partial<IdentityDocument> = {}): Id
 
 function makeLog(): LogService {
     return {
-        info: jest.fn(),
-        debug: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        assert: jest.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        assert: vi.fn(),
     } as unknown as LogService
 }
 
 function makeClient(searchResultsByQuery: Record<string, IdentityDocument[]> = {}): ClientServiceStub {
     return {
-        paginateSearchApi: jest.fn(async (search: { query?: { query?: string } }) => {
+        paginateSearchApi: vi.fn(async (search: { query?: { query?: string } }) => {
             const key = search?.query?.query ?? ''
             return searchResultsByQuery[key] ?? []
         }),
-        paginateSearchApiGenerator: jest.fn(),
-        execute: jest.fn(),
+        paginateSearchApiGenerator: vi.fn(),
+        execute: vi.fn(),
     } as unknown as ClientServiceStub
 }
 
 function makeSources(): SourceServiceStub {
     return {
-        resolveIscAccountIdForManagedKey: jest.fn(),
+        resolveIscAccountIdForManagedKey: vi.fn(),
     } as unknown as SourceServiceStub
 }
 
@@ -116,7 +117,7 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
     it('marks hydrated additional ids as in-scope for the current aggregation', async () => {
         const owner = makeIdentity('owner-1')
         const { service, client } = makeService()
-        ;(client.paginateSearchApi as jest.Mock).mockImplementation(
+        ;(client.paginateSearchApi as Mock).mockImplementation(
             async (_search: unknown, _priority: QueuePriority, context: string) => {
                 // fetchIdentityById targets an `id:"<value>"` query.
                 if (context === 'IdentityService>fetchIdentityById searchPost') {
@@ -134,7 +135,7 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
 
     it('does not mark additional ids that fail to hydrate as in-scope', async () => {
         const { service, client } = makeService()
-        ;(client.paginateSearchApi as jest.Mock).mockResolvedValue([])
+        ;(client.paginateSearchApi as Mock).mockResolvedValue([])
 
         await service.fetchIdentities(['owner-missing'])
 
@@ -145,7 +146,7 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
     it('does not mark a protected additional id as in-scope', async () => {
         const protectedOwner = makeIdentity('owner-protected', { protected: true })
         const { service, client } = makeService()
-        ;(client.paginateSearchApi as jest.Mock).mockImplementation(
+        ;(client.paginateSearchApi as Mock).mockImplementation(
             async (_search: unknown, _priority: QueuePriority, context: string) => {
                 if (context === 'IdentityService>fetchIdentityById searchPost') {
                     return [protectedOwner]
@@ -169,7 +170,7 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
                 'source.name:Employees': [scoped],
             },
         })
-        ;(client.paginateSearchApi as jest.Mock).mockImplementation(
+        ;(client.paginateSearchApi as Mock).mockImplementation(
             async (search: { query?: { query?: string } }, _priority: QueuePriority, context: string) => {
                 if (context === 'IdentityService>fetchIdentityById searchPost') {
                     return [owner]
@@ -187,7 +188,7 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
     it('skips empty / falsy additional ids', async () => {
         const owner = makeIdentity('owner-1')
         const { service, client } = makeService()
-        ;(client.paginateSearchApi as jest.Mock).mockImplementation(
+        ;(client.paginateSearchApi as Mock).mockImplementation(
             async (_search: unknown, _priority: QueuePriority, context: string) => {
                 if (context === 'IdentityService>fetchIdentityById searchPost') {
                     return [owner]

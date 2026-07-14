@@ -26,7 +26,7 @@ describe('ScoringService mandatory matching behavior', () => {
                 mandatoryAttr: 'alpha',
                 optionalAttr: 'same-value',
             },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
 
         const fusionIdentity = {
@@ -47,7 +47,7 @@ describe('ScoringService mandatory matching behavior', () => {
                 matchingConfigs: baseMatchingConfigs,
                 fusionManualReviewScore: 50,
             } as any,
-            { crash: jest.fn() } as any
+            { crash: vi.fn() } as any
         )
         const { fusionAccount, fusionIdentity } = createAccounts()
 
@@ -62,14 +62,14 @@ describe('ScoringService mandatory matching behavior', () => {
                 matchingConfigs: baseMatchingConfigs,
                 fusionManualReviewScore: 90,
             } as any,
-            { crash: jest.fn() } as any
+            { crash: vi.fn() } as any
         )
         const fusionAccount = {
             attributes: {
                 mandatoryAttr: 'same-value',
                 optionalAttr: 'same-value',
             },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: {
@@ -109,12 +109,12 @@ describe('ScoringService mandatory matching behavior', () => {
                 ],
                 fusionManualReviewScore: 80,
             } as any,
-            { crash: jest.fn() } as any
+            { crash: vi.fn() } as any
         )
 
         const fusionAccount = {
             attributes: { birthdate: '', last4ssn: '1234' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { birthdate: '', last4ssn: '1234' },
@@ -136,11 +136,11 @@ describe('ScoringService mandatory matching behavior', () => {
                 ],
                 fusionManualReviewScore: 70,
             } as any,
-            { crash: jest.fn() } as any
+            { crash: vi.fn() } as any
         )
         const fusionAccount = {
             attributes: { firstname: 'John', lastname: 'Smith' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { firstname: 'Jon', lastname: 'Smith' },
@@ -177,7 +177,7 @@ describe('ScoringService max identity match candidates', () => {
                 ],
                 fusionManualReviewScore: 80,
             } as any,
-            { crash: jest.fn() } as any
+            { crash: vi.fn() } as any
         )
 
         const fusionAccount = FusionAccount.fromManagedAccount({
@@ -211,7 +211,7 @@ describe('ScoringService max identity match candidates', () => {
 })
 
 describe('ScoringService skipMatchIfMissing behavior', () => {
-    const log = { crash: jest.fn() } as any
+    const log = { crash: vi.fn() } as any
 
     it('pushes skipped row and does not match when only rule is skipped', async () => {
         const service = new ScoringService(
@@ -231,7 +231,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
 
         const fusionAccount = {
             attributes: { email: '   ' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { email: 'person@example.com' },
@@ -263,7 +263,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
 
         const fusionAccount = {
             attributes: { email: undefined },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { email: '' },
@@ -300,7 +300,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
 
         const fusionAccount = {
             attributes: { name: 'John Smith', email: '' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { name: 'John Smith', email: undefined },
@@ -341,7 +341,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
 
         const fusionAccount = {
             attributes: { name: 'John Smith', email: '' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { name: 'John Smith', email: 'person@example.com' },
@@ -377,7 +377,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
 
         const fusionAccount = {
             attributes: { name: 'John Smith', email: 'person@example.com' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { name: 'John Smith', email: 'person@example.com' },
@@ -417,7 +417,7 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
 
         const fusionAccount = {
             attributes: { name: 'John Smith', email: 'person@example.com' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { name: 'John Smith', email: 'person@example.com' },
@@ -432,10 +432,10 @@ describe('ScoringService skipMatchIfMissing behavior', () => {
 })
 
 describe('ScoringService combined-score early exit', () => {
-    const log = { crash: jest.fn() } as any
+    const log = { crash: vi.fn() } as any
 
     it('does not evaluate later rules when perfect future scores cannot reach fusionManualReviewScore', async () => {
-        const scoreDiceSpy = jest.spyOn(scoringHelpers, 'scoreDice')
+        const scoreDiceSpy = vi.spyOn(scoringHelpers, 'scoreDice')
 
         const service = new ScoringService(
             {
@@ -450,7 +450,7 @@ describe('ScoringService combined-score early exit', () => {
 
         const fusionAccount = {
             attributes: { a: 'x', b: 'y' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { a: 'z', b: 'y' },
@@ -480,14 +480,14 @@ describe('ScoringService deferred candidate matching', () => {
                 ],
                 fusionManualReviewScore: 80,
             } as any,
-            { crash: jest.fn() } as any
+            { crash: vi.fn() } as any
         )
 
         const managedCandidate = {
             attributes: { email: 'self@example.com' },
             managedAccountId: 'source-id::self@example.com',
             managedKeyOrUndefined: 'source-id::self@example.com',
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
 
         const compared = await service.scoreFusionAccount(
@@ -512,7 +512,7 @@ describe('ScoringService deferred candidate matching', () => {
                 ],
                 fusionManualReviewScore: 80,
             } as any,
-            { crash: jest.fn() } as any
+            { crash: vi.fn() } as any
         )
 
         const managedKey = 'source-id::self@example.com'
@@ -520,7 +520,7 @@ describe('ScoringService deferred candidate matching', () => {
             attributes: { email: 'self@example.com' },
             managedAccountId: managedKey,
             managedKeyOrUndefined: managedKey,
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
 
         // Simulates a previously persisted unmatched fusion account shape where
@@ -556,7 +556,7 @@ describe('ScoringService deferred candidate matching', () => {
                 ],
                 fusionManualReviewScore: 80,
             } as any,
-            { crash: jest.fn() } as any
+            { crash: vi.fn() } as any
         )
 
         const managedKey = 'source-id::self@example.com'
@@ -564,7 +564,7 @@ describe('ScoringService deferred candidate matching', () => {
             attributes: { email: 'self@example.com' },
             managedAccountId: managedKey,
             managedKeyOrUndefined: managedKey,
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
 
         const persistedUnmatchedCandidate = {
@@ -634,7 +634,7 @@ describe('ScoringService.blendWeight', () => {
 })
 
 describe('ScoringService skipMatchIfThresholdNotMet behavior', () => {
-    const log = { crash: jest.fn() } as any
+    const log = { crash: vi.fn() } as any
 
     it('skips non-mandatory below-threshold rule when toggle is enabled', async () => {
         const service = new ScoringService(
@@ -660,7 +660,7 @@ describe('ScoringService skipMatchIfThresholdNotMet behavior', () => {
 
         const fusionAccount = {
             attributes: { email: 'same@example.com', department: 'engineering' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { email: 'same@example.com', department: 'finance and accounting' },
@@ -698,7 +698,7 @@ describe('ScoringService skipMatchIfThresholdNotMet behavior', () => {
 
         const fusionAccount = {
             attributes: { name: 'John Smith' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { name: 'Jonathan Smyth' },
@@ -734,7 +734,7 @@ describe('ScoringService skipMatchIfThresholdNotMet behavior', () => {
 
         const fusionAccount = {
             attributes: { email: 'a@example.com' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { email: 'b@example.com' },
@@ -771,7 +771,7 @@ describe('ScoringService skipMatchIfThresholdNotMet behavior', () => {
 
         const fusionAccount = {
             attributes: { firstname: 'John', lastname: 'Smith' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { firstname: 'John', lastname: 'Montgomery Fitzgerald' },
@@ -820,7 +820,7 @@ describe('ScoringService skipMatchIfThresholdNotMet behavior', () => {
 
         const fusionAccount = {
             attributes: { firstname: 'John', lastname: 'Smith' },
-            addFusionMatch: jest.fn(),
+            addFusionMatch: vi.fn(),
         } as any
         const fusionIdentity = {
             attributes: { firstname: 'John', lastname: 'Smyth' },
@@ -849,10 +849,10 @@ describe('ScoringService binary algorithm dispatch', () => {
                 ],
                 fusionManualReviewScore: 50,
             } as any,
-            { crash: jest.fn() } as any
+            { crash: vi.fn() } as any
         )
 
-        const scoreBinarySpy = jest.spyOn(scoringHelpers, 'scoreBinary').mockReturnValue({
+        const scoreBinarySpy = vi.spyOn(scoringHelpers, 'scoreBinary').mockReturnValue({
             attribute: 'employeeId',
             algorithm: 'binary',
             fusionScore: 100,

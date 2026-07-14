@@ -39,7 +39,7 @@ describe('collections utilities', () => {
             const originalSetImmediate = global.setImmediate
 
             // Mock setImmediate to track if it's called
-            const setImmediateMock = jest.fn((cb) => {
+            const setImmediateMock = vi.fn((cb) => {
                 originalSetImmediate(cb)
             })
             global.setImmediate = setImmediateMock as any
@@ -54,7 +54,7 @@ describe('collections utilities', () => {
 
     describe('promiseAllBatched', () => {
         it('should process an empty array', async () => {
-            const fn = jest.fn()
+            const fn = vi.fn()
             const result = await promiseAllBatched([], fn)
             expect(result).toEqual([])
             expect(fn).not.toHaveBeenCalled()
@@ -62,8 +62,8 @@ describe('collections utilities', () => {
 
         it('should process items smaller than batch size', async () => {
             const items = [1, 2, 3]
-            const fn = jest.fn(async (item) => item * 2)
-            const onBatchComplete = jest.fn()
+            const fn = vi.fn(async (item) => item * 2)
+            const onBatchComplete = vi.fn()
 
             const result = await promiseAllBatched(items, fn, 5, onBatchComplete)
 
@@ -75,8 +75,8 @@ describe('collections utilities', () => {
 
         it('should process items in multiple batches', async () => {
             const items = [1, 2, 3, 4, 5]
-            const fn = jest.fn(async (item) => item * 2)
-            const onBatchComplete = jest.fn()
+            const fn = vi.fn(async (item) => item * 2)
+            const onBatchComplete = vi.fn()
 
             const result = await promiseAllBatched(items, fn, 2, onBatchComplete)
 
@@ -91,14 +91,14 @@ describe('collections utilities', () => {
 
     describe('forEachBatched', () => {
         it('should process an empty array', async () => {
-            const fn = jest.fn()
+            const fn = vi.fn()
             await forEachBatched([], fn)
             expect(fn).not.toHaveBeenCalled()
         })
 
         it('should process items smaller than batch size', async () => {
             const items = [1, 2, 3]
-            const fn = jest.fn(async () => {})
+            const fn = vi.fn(async () => {})
 
             await forEachBatched(items, fn, 5)
 
@@ -107,7 +107,7 @@ describe('collections utilities', () => {
 
         it('should process items in multiple batches', async () => {
             const items = [1, 2, 3, 4, 5]
-            const fn = jest.fn(async () => {})
+            const fn = vi.fn(async () => {})
 
             await forEachBatched(items, fn, 2)
 

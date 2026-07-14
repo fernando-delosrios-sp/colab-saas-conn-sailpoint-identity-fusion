@@ -2,10 +2,10 @@ import { MessagingService } from '../messagingService'
 
 const createMessagingService = (workflowPayload?: { padding?: string }) => {
     const workflowsApi = {
-        listWorkflows: jest.fn().mockResolvedValue({
+        listWorkflows: vi.fn().mockResolvedValue({
             data: [{ id: 'wf-email-1', name: 'Fusion Email Sender (Test Tenant)', enabled: false }],
         }),
-        getWorkflow: jest.fn().mockResolvedValue({
+        getWorkflow: vi.fn().mockResolvedValue({
             data: {
                 id: 'wf-email-1',
                 name: 'Fusion Email Sender (Test Tenant)',
@@ -13,18 +13,18 @@ const createMessagingService = (workflowPayload?: { padding?: string }) => {
                 ...workflowPayload,
             },
         }),
-        testWorkflow: jest.fn().mockResolvedValue({ status: 200 }),
+        testWorkflow: vi.fn().mockResolvedValue({ status: 200 }),
     }
     const client = {
         config: { accessToken: 'token' },
         workflowsApi,
-        execute: jest.fn(async (fn: () => Promise<any>) => await fn()),
+        execute: vi.fn(async (fn: () => Promise<any>) => await fn()),
     } as any
     const log = {
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
     } as any
     const config = {
         workflowName: 'Fusion Email Sender',
@@ -35,7 +35,7 @@ const createMessagingService = (workflowPayload?: { padding?: string }) => {
     } as any
     const sources = {
         fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
-        getFusionSource: jest.fn(() => ({ name: 'Fusion Source' })),
+        getFusionSource: vi.fn(() => ({ name: 'Fusion Source' })),
     } as any
     const service = new MessagingService(config, log, client, sources)
     return { service, workflowsApi }

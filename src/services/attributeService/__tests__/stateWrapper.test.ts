@@ -1,11 +1,11 @@
 import { StateWrapper } from '../stateWrapper'
 import { logger } from '@sailpoint/connector-sdk'
 
-jest.mock('@sailpoint/connector-sdk', () => ({
+vi.mock('@sailpoint/connector-sdk', () => ({
     logger: {
-        info: jest.fn(),
-        debug: jest.fn(),
-        error: jest.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+        error: vi.fn(),
     },
     ConnectorError: class ConnectorError extends Error {
         type: string
@@ -26,7 +26,7 @@ describe('StateWrapper', () => {
     beforeAll(() => {
         originalStringify = JSON.stringify
         // Mock JSON.stringify to prevent throwing on line 17 before the try-catch block
-        JSON.stringify = jest.fn().mockImplementation((val) => {
+        JSON.stringify = vi.fn().mockImplementation((val) => {
             try {
                 return originalStringify(val)
             } catch {
@@ -40,7 +40,7 @@ describe('StateWrapper', () => {
     })
 
     beforeEach(() => {
-        jest.clearAllMocks()
+        vi.clearAllMocks()
     })
 
     describe('constructor initialization', () => {

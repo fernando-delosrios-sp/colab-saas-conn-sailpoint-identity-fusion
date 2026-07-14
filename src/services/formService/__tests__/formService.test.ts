@@ -2,8 +2,8 @@ import { FormService } from '../formService'
 
 describe('FormService fetchFormInstancesByDefinitionId', () => {
     it('filters out instances with mismatched formDefinitionId', async () => {
-        const warn = jest.fn()
-        const debug = jest.fn()
+        const warn = vi.fn()
+        const debug = vi.fn()
         const fakeInstances = [
             { id: '1', formDefinitionId: 'fd-1' },
             { id: '2', formDefinitionId: 'fd-2' },
@@ -15,7 +15,7 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
             { warn, debug } as any,
             {
                 customFormsApi: {
-                    searchFormInstancesByTenant: jest.fn().mockResolvedValue({ data: fakeInstances }),
+                    searchFormInstancesByTenant: vi.fn().mockResolvedValue({ data: fakeInstances }),
                 },
                 execute: async (fn: () => Promise<any>) => fn(),
             } as any,
@@ -32,7 +32,7 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
     })
 
     it('warns when API returns page-size ceiling of 250', async () => {
-        const warn = jest.fn()
+        const warn = vi.fn()
         const instances = Array.from({ length: 250 }, (_, i) => ({
             id: `i-${i}`,
             formDefinitionId: 'fd-1',
@@ -40,10 +40,10 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
 
         const service = new FormService(
             {} as any,
-            { warn, debug: jest.fn() } as any,
+            { warn, debug: vi.fn() } as any,
             {
                 customFormsApi: {
-                    searchFormInstancesByTenant: jest.fn().mockResolvedValue({ data: instances }),
+                    searchFormInstancesByTenant: vi.fn().mockResolvedValue({ data: instances }),
                 },
                 execute: async (fn: () => Promise<any>) => fn(),
             } as any,
@@ -61,22 +61,22 @@ describe('FormService stale-form cleanup queue', () => {
         const now = Date.now()
         const staleDate = new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString()
         const freshDate = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString()
-        const searchFormInstancesByTenant = jest.fn().mockResolvedValue({ data: [] })
-        const deleteFormDefinition = jest.fn().mockResolvedValue(undefined)
+        const searchFormInstancesByTenant = vi.fn().mockResolvedValue({ data: [] })
+        const deleteFormDefinition = vi.fn().mockResolvedValue(undefined)
 
         const service = new FormService(
             {
                 fusionFormNamePattern: 'Fusion',
                 fusionFormExpirationDays: 7,
             } as any,
-            { warn: jest.fn(), info: jest.fn(), debug: jest.fn() } as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
             {
                 customFormsApi: {
                     searchFormInstancesByTenant,
                     deleteFormDefinition,
                 },
                 execute: async (fn: () => Promise<any>) => fn(),
-                paginate: jest.fn().mockResolvedValue([
+                paginate: vi.fn().mockResolvedValue([
                     { id: 'form-stale', name: 'Fusion stale', created: staleDate },
                     { id: 'form-fresh', name: 'Fusion fresh', created: freshDate },
                 ]),
@@ -98,7 +98,7 @@ describe('FormService stale-form cleanup queue', () => {
 
     it('does not block while queued deletions are still running', async () => {
         let resolveDelete: (() => void) | undefined
-        const deleteFormDefinition = jest.fn().mockImplementation(
+        const deleteFormDefinition = vi.fn().mockImplementation(
             () =>
                 new Promise<void>((resolve) => {
                     resolveDelete = resolve
@@ -110,11 +110,11 @@ describe('FormService stale-form cleanup queue', () => {
                 fusionFormNamePattern: 'Fusion',
                 fusionFormExpirationDays: 7,
             } as any,
-            { warn: jest.fn(), info: jest.fn(), debug: jest.fn() } as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
             {
                 customFormsApi: {
                     deleteFormDefinition,
-                    searchFormInstancesByTenant: jest.fn().mockResolvedValue({ data: [] }),
+                    searchFormInstancesByTenant: vi.fn().mockResolvedValue({ data: [] }),
                 },
                 execute: async (fn: () => Promise<any>) => fn(),
             } as any,
@@ -164,7 +164,7 @@ describe('FormService managed work queue synchronization', () => {
 
         const service = new FormService(
             {} as any,
-            { warn: jest.fn(), info: jest.fn(), debug: jest.fn() } as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
             {} as any,
             sources
         )

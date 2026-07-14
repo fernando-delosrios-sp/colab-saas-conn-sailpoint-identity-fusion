@@ -1,18 +1,19 @@
 import { ChainState } from './ChainState'
+import type { Mock } from 'vitest'
 
 export interface MockRegistry {
     config: Record<string, unknown>
     log: {
-        info: jest.Mock
-        debug: jest.Mock
-        warn: jest.Mock
-        error: jest.Mock
-        crash: jest.Mock
-        timer: jest.Mock
-        flush: jest.Mock
+        info: Mock
+        debug: Mock
+        warn: Mock
+        error: Mock
+        crash: Mock
+        timer: Mock
+        flush: Mock
     }
     res: {
-        send: jest.Mock
+        send: Mock
     }
     schemas: Record<string, unknown>
     sources: Record<string, unknown>

@@ -166,11 +166,11 @@ describe('fusionReportHelpers', () => {
 
     describe('buildMinimalFusionReportAccount', () => {
         const mockUrlContext: UrlContext = {
-            humanAccount: jest.fn((id) => (id ? `http://example.com/human/${id}` : undefined)),
+            humanAccount: vi.fn((id) => (id ? `http://example.com/human/${id}` : undefined)),
         } as any
 
         beforeEach(() => {
-            jest.clearAllMocks()
+            vi.clearAllMocks()
         })
 
         it('should build minimal account without error and accountIdOverride', () => {

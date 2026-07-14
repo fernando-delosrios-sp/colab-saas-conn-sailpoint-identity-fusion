@@ -14,16 +14,16 @@ describe('SchemaService', () => {
             includeIdentities: true,
         }
         mockLog = {
-            debug: jest.fn(),
-            info: jest.fn(),
-            warn: jest.fn(),
-            error: jest.fn(),
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
         }
         mockSources = {
             managedSources: [],
         }
         mockIdentities = {
-            fetchIdentitySchemaAttributes: jest.fn().mockResolvedValue([
+            fetchIdentitySchemaAttributes: vi.fn().mockResolvedValue([
                 { name: 'empId', description: 'Employee ID', type: 'string', multi: false, entitlement: false },
                 { name: 'groups', description: 'Groups', type: 'string', multi: true, entitlement: false },
                 { name: 'unrecognized', description: 'Unrecognized Type', type: 'string', multi: false, entitlement: false },
@@ -56,7 +56,7 @@ describe('SchemaService', () => {
         it('should preserve original casing on collisions', async () => {
             // Setup an account schema attribute with "EmployeeID"
             mockSources.managedSources = [{ id: 'src-1', name: 'Source 1' }]
-            jest.spyOn(schemaService as any, 'fetchAccountSchema').mockResolvedValue({
+            vi.spyOn(schemaService as any, 'fetchAccountSchema').mockResolvedValue({
                 displayAttribute: 'name',
                 identityAttribute: 'id',
                 attributes: [{ name: 'EmployeeID', type: 'string', multi: false }],

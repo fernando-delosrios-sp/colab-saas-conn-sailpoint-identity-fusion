@@ -2,10 +2,11 @@ import { ServiceRegistry } from '../../../services/serviceRegistry'
 import { fetchAndProcessForReport, generateReport } from '../generateReport'
 import * as corePipeline from '../corePipeline'
 import { AggregationStats } from '../../../services/fusionService/types'
+import type { Mock } from 'vitest'
 
-jest.mock('../corePipeline', () => ({
+vi.mock('../corePipeline', () => ({
     PipelineRunner: {
-        run: jest.fn(),
+        run: vi.fn(),
     },
 }))
 
@@ -15,30 +16,30 @@ describe('generateReport helpers', () => {
     let mockReportsService: any
 
     beforeEach(() => {
-        jest.clearAllMocks()
+        vi.clearAllMocks()
 
         mockTimer = {
-            phase: jest.fn(),
-            totalElapsed: jest.fn().mockReturnValue(1234),
-            getPhaseBreakdown: jest.fn().mockReturnValue({ phase1: 100, phase2: 200 }),
+            phase: vi.fn(),
+            totalElapsed: vi.fn().mockReturnValue(1234),
+            getPhaseBreakdown: vi.fn().mockReturnValue({ phase1: 100, phase2: 200 }),
         }
 
         mockReportsService = {
-            generateAndSendFusionReport: jest.fn().mockResolvedValue(undefined),
+            generateAndSendFusionReport: vi.fn().mockResolvedValue(undefined),
         }
 
         mockServiceRegistry = {
             log: {
-                timer: jest.fn().mockReturnValue(mockTimer),
+                timer: vi.fn().mockReturnValue(mockTimer),
             } as any,
             reports: mockReportsService,
         }
 
-        jest.spyOn(ServiceRegistry, 'getCurrent').mockReturnValue(mockServiceRegistry as ServiceRegistry)
+        vi.spyOn(ServiceRegistry, 'getCurrent').mockReturnValue(mockServiceRegistry as ServiceRegistry)
     })
     describe('fetchAndProcessForReport', () => {
         it('should return empty stats if setupPhase returns false', async () => {
-            ;(corePipeline.PipelineRunner.run as jest.Mock).mockResolvedValue({
+            ;(corePipeline.PipelineRunner.run as Mock).mockResolvedValue({
                 shouldContinue: false,
                 timer: mockTimer,
             })
@@ -63,7 +64,7 @@ describe('generateReport helpers', () => {
                 managedAccountsFoundRecord: 15,
                 managedAccountsFoundOrphan: 2,
             }
-            ;(corePipeline.PipelineRunner.run as jest.Mock).mockResolvedValue({
+            ;(corePipeline.PipelineRunner.run as Mock).mockResolvedValue({
                 shouldContinue: true,
                 fetchResult: mockFetchResult,
                 timer: mockTimer,
@@ -95,7 +96,7 @@ describe('generateReport helpers', () => {
         it('should use provided serviceRegistry and call generateAndSendFusionReport with all args', async () => {
             const mockStats = {} as AggregationStats
 
-            jest.spyOn(ServiceRegistry, 'getCurrent').mockClear()
+            vi.spyOn(ServiceRegistry, 'getCurrent').mockClear()
 
             await generateReport(true, mockServiceRegistry as ServiceRegistry, mockStats)
 

@@ -12,42 +12,43 @@ import { accountDisable } from '../operations/accountDisable'
 import { entitlementList } from '../operations/entitlementList'
 import { accountDiscoverSchema } from '../operations/accountDiscoverSchema'
 import { dryRun } from '../operations/dryRun'
+import type { Mock } from 'vitest'
 
-jest.mock('@sailpoint/connector-sdk')
-jest.mock('../data/config')
-jest.mock('../utils/operationHandler')
-jest.mock('../operations/testConnection', () => ({ testConnection: jest.fn() }))
-jest.mock('../operations/accountList', () => ({ accountList: jest.fn() }))
-jest.mock('../operations/accountRead', () => ({ accountRead: jest.fn() }))
-jest.mock('../operations/accountCreate', () => ({ accountCreate: jest.fn() }))
-jest.mock('../operations/accountUpdate', () => ({ accountUpdate: jest.fn() }))
-jest.mock('../operations/accountEnable', () => ({ accountEnable: jest.fn() }))
-jest.mock('../operations/accountDisable', () => ({ accountDisable: jest.fn() }))
-jest.mock('../operations/entitlementList', () => ({ entitlementList: jest.fn() }))
-jest.mock('../operations/accountDiscoverSchema', () => ({ accountDiscoverSchema: jest.fn() }))
-jest.mock('../operations/dryRun', () => ({ dryRun: jest.fn() }))
+vi.mock('@sailpoint/connector-sdk', () => ({ createConnector: vi.fn() }))
+vi.mock('../data/config', () => ({ safeReadConfig: vi.fn() }))
+vi.mock('../utils/operationHandler', () => ({ createOperationHandler: vi.fn() }))
+vi.mock('../operations/testConnection', () => ({ testConnection: vi.fn() }))
+vi.mock('../operations/accountList', () => ({ accountList: vi.fn() }))
+vi.mock('../operations/accountRead', () => ({ accountRead: vi.fn() }))
+vi.mock('../operations/accountCreate', () => ({ accountCreate: vi.fn() }))
+vi.mock('../operations/accountUpdate', () => ({ accountUpdate: vi.fn() }))
+vi.mock('../operations/accountEnable', () => ({ accountEnable: vi.fn() }))
+vi.mock('../operations/accountDisable', () => ({ accountDisable: vi.fn() }))
+vi.mock('../operations/entitlementList', () => ({ entitlementList: vi.fn() }))
+vi.mock('../operations/accountDiscoverSchema', () => ({ accountDiscoverSchema: vi.fn() }))
+vi.mock('../operations/dryRun', () => ({ dryRun: vi.fn() }))
 
 describe('connector factory', () => {
     let mockConnector: any
 
     beforeEach(() => {
-        jest.clearAllMocks()
+        vi.clearAllMocks()
 
         mockConnector = {
-            stdTestConnection: jest.fn().mockReturnThis(),
-            stdAccountList: jest.fn().mockReturnThis(),
-            stdAccountRead: jest.fn().mockReturnThis(),
-            stdAccountCreate: jest.fn().mockReturnThis(),
-            stdAccountUpdate: jest.fn().mockReturnThis(),
-            stdAccountEnable: jest.fn().mockReturnThis(),
-            stdAccountDisable: jest.fn().mockReturnThis(),
-            stdEntitlementList: jest.fn().mockReturnThis(),
-            stdAccountDiscoverSchema: jest.fn().mockReturnThis(),
-            command: jest.fn().mockReturnThis(),
+            stdTestConnection: vi.fn().mockReturnThis(),
+            stdAccountList: vi.fn().mockReturnThis(),
+            stdAccountRead: vi.fn().mockReturnThis(),
+            stdAccountCreate: vi.fn().mockReturnThis(),
+            stdAccountUpdate: vi.fn().mockReturnThis(),
+            stdAccountEnable: vi.fn().mockReturnThis(),
+            stdAccountDisable: vi.fn().mockReturnThis(),
+            stdEntitlementList: vi.fn().mockReturnThis(),
+            stdAccountDiscoverSchema: vi.fn().mockReturnThis(),
+            command: vi.fn().mockReturnThis(),
         }
-        ;(createConnector as jest.Mock).mockReturnValue(mockConnector)
-        ;(safeReadConfig as jest.Mock).mockResolvedValue({ some: 'config' })
-        ;(createOperationHandler as jest.Mock).mockImplementation((name) => `handler_${name}`)
+        ;(createConnector as Mock).mockReturnValue(mockConnector)
+        ;(safeReadConfig as Mock).mockResolvedValue({ some: 'config' })
+        ;(createOperationHandler as Mock).mockImplementation((name) => `handler_${name}`)
     })
 
     it('should configure and return a connector with all standard operations', async () => {
@@ -137,7 +138,7 @@ describe('connector factory', () => {
         await connector()
 
         // Find calls and extract errorMessage functions
-        const calls = (createOperationHandler as jest.Mock).mock.calls
+        const calls = (createOperationHandler as Mock).mock.calls
 
         const accountReadCall = calls.find((c: any) => c[0] === 'accountRead')
 

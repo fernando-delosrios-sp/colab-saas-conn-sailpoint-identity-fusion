@@ -5,13 +5,13 @@ const createMessagingService = (baseurl: string, getFusionSourceReturnValue: any
     const client = {
         config: { accessToken: 'token' },
         workflowsApi,
-        execute: jest.fn(async (fn: () => Promise<any>) => await fn()),
+        execute: vi.fn(async (fn: () => Promise<any>) => await fn()),
     } as any
     const log = {
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
     } as any
     const config = {
         workflowName: 'Fusion Email Sender',
@@ -22,7 +22,7 @@ const createMessagingService = (baseurl: string, getFusionSourceReturnValue: any
     } as any
     const sources = {
         fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
-        getFusionSource: jest.fn(() => getFusionSourceReturnValue),
+        getFusionSource: vi.fn(() => getFusionSourceReturnValue),
     } as any
     const service = new MessagingService(config, log, client, sources)
     return { service }
