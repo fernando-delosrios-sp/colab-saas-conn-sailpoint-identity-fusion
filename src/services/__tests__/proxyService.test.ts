@@ -121,6 +121,20 @@ describe('ProxyService.performFetch', () => {
         expect(global.fetch).toHaveBeenCalledTimes(1)
     })
 
+    it('throws ConnectorError when proxyUrl uses http but is not localhost', async () => {
+        const config = {
+            proxyEnabled: true,
+            proxyUrl: 'http://proxy.example.com',
+        }
+        const mockLog = { error: jest.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        await expect((service as any).performFetch({})).rejects.toMatchObject({
+            message:
+                'Proxy URL must use https protocol to prevent unencrypted transmission of sensitive configuration data',
+        })
+    })
+
     it('throws ConnectorError when fetch throws unknown error', async () => {
         const config = {
             proxyEnabled: true,
