@@ -14,6 +14,8 @@ import {
     readPathUnknown,
     readString,
     readUnknown,
+    readFirstUnknown,
+    readFirstString,
     trimStr,
 } from '../safeRead'
 
@@ -57,6 +59,9 @@ describe('safeRead', () => {
         expect(readNumber(source, 'missing', 3)).toBe(3)
         expect(readBoolean(source, 'b')).toBe(true)
         expect(readBoolean(source, 'missing', false)).toBe(false)
+
+        expect(readFirstString(source, ['missing', 's'])).toBe('ok')
+        expect(readFirstString(source, ['missing', 'notString'], 'fallback')).toBe('fallback')
     })
 
     it('reads arrays and unknown values safely', () => {
@@ -65,6 +70,9 @@ describe('safeRead', () => {
         expect(readUnknown(undefined, 'obj')).toBeUndefined()
         expect(readArray<string>(source, 'ids')).toEqual(['a', 'b'])
         expect(readArray<string>(source, 'none', [])).toEqual([])
+
+        expect(readFirstUnknown(source, ['missing', 'obj'])).toEqual({ x: 1 })
+        expect(readFirstUnknown(source, ['missing1', 'missing2'])).toBeUndefined()
     })
 
     it('reads nested paths safely', () => {

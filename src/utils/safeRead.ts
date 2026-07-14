@@ -38,6 +38,16 @@ export const readUnknown = (source: unknown, key: string): unknown => {
     return record ? record[key] : undefined
 }
 
+export const readFirstUnknown = (source: unknown, keys: string[]): unknown => {
+    for (const key of keys) {
+        const value = readUnknown(source, key)
+        if (value !== undefined && value !== null) {
+            return value
+        }
+    }
+    return undefined
+}
+
 export const readPathUnknown = (source: unknown, path: string[]): unknown => {
     let current: unknown = source
     for (const segment of path) {
@@ -51,6 +61,13 @@ export function readString(source: unknown, key: string): string | undefined
 export function readString(source: unknown, key: string, fallback: string): string
 export function readString(source: unknown, key: string, fallback?: string): string | undefined {
     const value = readUnknown(source, key)
+    return typeof value === 'string' ? value : fallback
+}
+
+export function readFirstString(source: unknown, keys: string[]): string | undefined
+export function readFirstString(source: unknown, keys: string[], fallback: string): string
+export function readFirstString(source: unknown, keys: string[], fallback?: string): string | undefined {
+    const value = readFirstUnknown(source, keys)
     return typeof value === 'string' ? value : fallback
 }
 
