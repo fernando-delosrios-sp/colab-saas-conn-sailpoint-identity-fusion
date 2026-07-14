@@ -1,12 +1,12 @@
 const mockLogger = {
     level: 'info',
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
 }
 
-jest.mock('@sailpoint/connector-sdk', () => {
+vi.mock('@sailpoint/connector-sdk', () => {
     class MockConnectorError extends Error {
         constructor(message: string) {
             super(message)
@@ -101,13 +101,13 @@ describe('PhaseTimer.formatElapsed', () => {
 
 describe('PhaseTimer breakdown', () => {
     it('records ordered phase entries from phase() and recordElapsed()', () => {
-        jest.useFakeTimers()
-        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const timer = log.timer()
-        jest.advanceTimersByTime(1000)
+        vi.advanceTimersByTime(1000)
         timer.phase('Step A', 'info', 'Setup')
-        jest.advanceTimersByTime(2500)
+        vi.advanceTimersByTime(2500)
         timer.phase('Step B', 'info', 'Fetch')
         timer.recordElapsed('Output', 100)
         expect(timer.getPhaseBreakdown()).toEqual([
@@ -115,7 +115,7 @@ describe('PhaseTimer breakdown', () => {
             { phase: 'Fetch', elapsed: '2.5S' },
             { phase: 'Output', elapsed: '100MS' },
         ])
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 })
 
@@ -126,42 +126,42 @@ describe('LogService.metric', () => {
     })
 
     it('logs duration without data', () => {
-        jest.useFakeTimers()
-        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const startedAt = Date.now()
-        jest.advanceTimersByTime(1234)
+        vi.advanceTimersByTime(1234)
         log.metric('test.operation', startedAt)
         expect(mockLogger.info).toHaveBeenCalledWith(
             expect.stringContaining('Performance metric: test.operation durationMs=1234')
         )
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 
     it('logs duration with structured data', () => {
-        jest.useFakeTimers()
-        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const startedAt = Date.now()
-        jest.advanceTimersByTime(567)
+        vi.advanceTimersByTime(567)
         log.metric('outputPhase.sendAccounts', startedAt, { count: 500, batchSize: 100 })
         expect(mockLogger.info).toHaveBeenCalledWith(
             expect.stringContaining('Performance metric: outputPhase.sendAccounts durationMs=567 count=500 batchSize=100')
         )
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 
     it('logs duration with single data field', () => {
-        jest.useFakeTimers()
-        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const startedAt = Date.now()
-        jest.advanceTimersByTime(89)
+        vi.advanceTimersByTime(89)
         log.metric('outputPhase.saveAttributeState', startedAt)
         expect(mockLogger.info).toHaveBeenCalledWith(
             expect.stringContaining('Performance metric: outputPhase.saveAttributeState durationMs=89')
         )
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 })
 
@@ -172,55 +172,55 @@ describe('TrackedOperation via LogService.track', () => {
     })
 
     it('emits metric with duration on done()', () => {
-        jest.useFakeTimers()
-        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const op = log.track('test.operation')
-        jest.advanceTimersByTime(1234)
+        vi.advanceTimersByTime(1234)
         op.done()
         expect(mockLogger.info).toHaveBeenCalledWith(
             expect.stringContaining('Performance metric: test.operation durationMs=1234')
         )
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 
     it('emits metric with structured data on done()', () => {
-        jest.useFakeTimers()
-        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const op = log.track('outputPhase.sendAccounts')
-        jest.advanceTimersByTime(567)
+        vi.advanceTimersByTime(567)
         op.done({ count: 500, batchSize: 100 })
         expect(mockLogger.info).toHaveBeenCalledWith(
             expect.stringContaining('Performance metric: outputPhase.sendAccounts durationMs=567 count=500 batchSize=100')
         )
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 
     it('returns elapsed ms from done()', () => {
-        jest.useFakeTimers()
-        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const op = log.track('test.elapsed')
-        jest.advanceTimersByTime(2500)
+        vi.advanceTimersByTime(2500)
         const elapsed = op.done()
         expect(elapsed).toBe(2500)
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 
     it('reports intermediate progress via elapsedMs() without emitting a metric', () => {
-        jest.useFakeTimers()
-        jest.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const op = log.track('test.progress')
-        jest.advanceTimersByTime(500)
+        vi.advanceTimersByTime(500)
         expect(op.elapsedMs()).toBe(500)
         expect(mockLogger.info).not.toHaveBeenCalled()
-        jest.advanceTimersByTime(300)
+        vi.advanceTimersByTime(300)
         op.done({ count: 3 })
         expect(mockLogger.info).toHaveBeenCalledWith(
             expect.stringContaining('Performance metric: test.progress durationMs=800 count=3')
         )
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 })

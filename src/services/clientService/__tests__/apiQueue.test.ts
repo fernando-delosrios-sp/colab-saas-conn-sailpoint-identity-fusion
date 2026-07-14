@@ -1,17 +1,18 @@
 import { ApiQueue } from '../queue'
 import { QueuePriority, QueueConfig } from '../types'
 import { shouldRetry, calculateRetryDelay } from '../helpers'
+import type { Mock } from 'vitest'
 
-jest.mock('@sailpoint/connector-sdk', () => ({
+vi.mock('@sailpoint/connector-sdk', () => ({
     logger: {
-        debug: jest.fn(),
-        info: jest.fn(),
-        error: jest.fn(),
-        warn: jest.fn()
+        debug: vi.fn(),
+        info: vi.fn(),
+        error: vi.fn(),
+        warn: vi.fn()
     }
 }))
 
-jest.mock('../../../data/config', () => ({
+vi.mock('../../../data/config', () => ({
     internalConfig: {
         clientService: {
             maxStatsSamples: 100,
@@ -21,9 +22,9 @@ jest.mock('../../../data/config', () => ({
 }))
 
 // We need to mock helpers but also retain the ability to change mock implementation
-jest.mock('../helpers', () => ({
-    shouldRetry: jest.fn(),
-    calculateRetryDelay: jest.fn()
+vi.mock('../helpers', () => ({
+    shouldRetry: vi.fn(),
+    calculateRetryDelay: vi.fn()
 }))
 
 describe('ApiQueue', () => {
@@ -34,7 +35,7 @@ describe('ApiQueue', () => {
             queue.stop();
             queue.clear();
         }
-        jest.clearAllMocks();
+        vi.clearAllMocks();
     });
 
     const createConfig = (overrides?: Partial<QueueConfig>): QueueConfig => ({
@@ -194,8 +195,8 @@ describe('ApiQueue', () => {
         let calls = 0;
         const error = new Error('429 Too Many Requests');
         
-        (shouldRetry as jest.Mock).mockImplementation((err) => err.message === '429 Too Many Requests');
-        (calculateRetryDelay as jest.Mock).mockReturnValue(10);
+        (shouldRetry as Mock).mockImplementation((err) => err.message === '429 Too Many Requests');
+        (calculateRetryDelay as Mock).mockReturnValue(10);
         
         const task = async () => {
             calls++;
@@ -218,8 +219,8 @@ describe('ApiQueue', () => {
         let calls = 0;
         const error = new Error('500 Internal Server Error');
         
-        (shouldRetry as jest.Mock).mockImplementation(() => true);
-        (calculateRetryDelay as jest.Mock).mockReturnValue(5);
+        (shouldRetry as Mock).mockImplementation(() => true);
+        (calculateRetryDelay as Mock).mockReturnValue(5);
         
         const task = async () => {
             calls++;
@@ -242,7 +243,7 @@ describe('ApiQueue', () => {
         let calls = 0;
         const error = new Error('500 Internal Server Error');
         
-        (shouldRetry as jest.Mock).mockImplementation(() => true);
+        (shouldRetry as Mock).mockImplementation(() => true);
         
         const task = async () => {
             calls++;

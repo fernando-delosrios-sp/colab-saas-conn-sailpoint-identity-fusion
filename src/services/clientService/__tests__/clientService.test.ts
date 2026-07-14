@@ -1,3 +1,4 @@
+import type { Mocked } from 'vitest'
 import { ClientService } from '../clientService'
 import { IscApiAdapter } from '../iscApiAdapter'
 import { ApiQueue } from '../queue'
@@ -6,9 +7,9 @@ import { LogService } from '../../logService'
 import { QueuePriority } from '../types'
 
 describe('ClientService', () => {
-    let mockAdapter: jest.Mocked<IscApiAdapter>
-    let mockQueue: jest.Mocked<ApiQueue>
-    let mockLog: jest.Mocked<LogService>
+    let mockAdapter: Mocked<IscApiAdapter>
+    let mockQueue: Mocked<ApiQueue>
+    let mockLog: Mocked<LogService>
     let mockConfig: FusionConfig
 
     let activeClients: ClientService[] = []
@@ -32,8 +33,8 @@ describe('ClientService', () => {
         }
 
         mockQueue = {
-            enqueue: jest.fn(),
-            getStats: jest.fn().mockReturnValue({
+            enqueue: vi.fn(),
+            getStats: vi.fn().mockReturnValue({
                 queueLength: 0,
                 activeRequests: 0,
                 totalProcessed: 0,
@@ -42,18 +43,18 @@ describe('ClientService', () => {
                 averageWaitTime: 0,
                 averageProcessingTime: 0,
             }),
-            getPendingItems: jest.fn(),
-            getActiveItems: jest.fn(),
-            clear: jest.fn(),
-            stop: jest.fn(),
-        } as unknown as jest.Mocked<ApiQueue>
+            getPendingItems: vi.fn(),
+            getActiveItems: vi.fn(),
+            clear: vi.fn(),
+            stop: vi.fn(),
+        } as unknown as Mocked<ApiQueue>
 
         mockLog = {
-            info: jest.fn(),
-            error: jest.fn(),
-            warn: jest.fn(),
-            debug: jest.fn(),
-        } as unknown as jest.Mocked<LogService>
+            info: vi.fn(),
+            error: vi.fn(),
+            warn: vi.fn(),
+            debug: vi.fn(),
+        } as unknown as Mocked<LogService>
 
         mockConfig = {
             requestsPerSecond: 10,
@@ -79,7 +80,7 @@ describe('ClientService', () => {
     it('executes directly when queue is null', async () => {
         const client = new ClientService(mockAdapter, null, mockConfig, mockLog)
         activeClients.push(client)
-        const apiFunction = jest.fn().mockResolvedValue('success')
+        const apiFunction = vi.fn().mockResolvedValue('success')
         
         const result = await client.execute(apiFunction, QueuePriority.MEDIUM)
         
@@ -92,7 +93,7 @@ describe('ClientService', () => {
         mockQueue.enqueue.mockResolvedValue('queued-success')
         const client = new ClientService(mockAdapter, mockQueue, mockConfig, mockLog)
         activeClients.push(client)
-        const apiFunction = jest.fn()
+        const apiFunction = vi.fn()
         
         const result = await client.execute(apiFunction, QueuePriority.HIGH)
         
@@ -103,7 +104,7 @@ describe('ClientService', () => {
     it('returns undefined on failure when throwOnError is false', async () => {
         const client = new ClientService(mockAdapter, null, mockConfig, mockLog)
         activeClients.push(client)
-        const apiFunction = jest.fn().mockRejectedValue(new Error('api-error'))
+        const apiFunction = vi.fn().mockRejectedValue(new Error('api-error'))
         
         const result = await client.execute(apiFunction, QueuePriority.MEDIUM, 'test-context', undefined, false)
         
@@ -115,7 +116,7 @@ describe('ClientService', () => {
         const client = new ClientService(mockAdapter, null, mockConfig, mockLog)
         activeClients.push(client)
         const error = new Error('api-error')
-        const apiFunction = jest.fn().mockRejectedValue(error)
+        const apiFunction = vi.fn().mockRejectedValue(error)
         
         await expect(client.execute(apiFunction, QueuePriority.MEDIUM, 'test-context', undefined, true)).rejects.toThrow(error)
     })

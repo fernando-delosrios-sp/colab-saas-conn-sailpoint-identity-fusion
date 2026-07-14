@@ -1,3 +1,4 @@
+import type { Mocked } from 'vitest'
 import { FusionService } from '../fusionService'
 import { AggregationTracker } from '../aggregationTracker'
 import { OperationContext } from '../types'
@@ -17,25 +18,25 @@ import { StatusEntitlement } from '../../../model/statusEntitlement'
 import { hasValue, trimStr } from '../../../utils/safeRead'
 
 // Mock dependencies
-jest.mock('../../logService')
-jest.mock('../../identityService')
-jest.mock('../../sourceService')
-jest.mock('../../formService')
-jest.mock('../../attributeService')
-jest.mock('../../scoringService')
-jest.mock('../../schemaService')
+vi.mock('../../logService')
+vi.mock('../../identityService')
+vi.mock('../../sourceService')
+vi.mock('../../formService')
+vi.mock('../../attributeService')
+vi.mock('../../scoringService')
+vi.mock('../../schemaService')
 
 describe('FusionService', () => {
     const FUSION_SOURCE_ID = 'fusion-src'
 
     let fusionService: FusionService
-    let mockLog: jest.Mocked<LogService>
-    let mockIdentities: jest.Mocked<IdentityService>
-    let mockSources: jest.Mocked<SourceService>
-    let mockForms: jest.Mocked<FormService>
-    let mockAttributes: jest.Mocked<AttributeService>
-    let mockScoring: jest.Mocked<ScoringService>
-    let mockSchemas: jest.Mocked<SchemaService>
+    let mockLog: Mocked<LogService>
+    let mockIdentities: Mocked<IdentityService>
+    let mockSources: Mocked<SourceService>
+    let mockForms: Mocked<FormService>
+    let mockAttributes: Mocked<AttributeService>
+    let mockScoring: Mocked<ScoringService>
+    let mockSchemas: Mocked<SchemaService>
     let mockConfig: FusionConfig
 
     beforeEach(() => {
@@ -53,12 +54,12 @@ describe('FusionService', () => {
         } as unknown as FusionConfig
 
         // Reset mocks
-        mockLog = new LogService({ spConnDebugLoggingEnabled: false }) as jest.Mocked<LogService>
+        mockLog = new LogService({ spConnDebugLoggingEnabled: false }) as Mocked<LogService>
         const mockClient = {} as any
-        mockSources = new SourceService(mockConfig, mockLog, mockClient) as jest.Mocked<SourceService>
+        mockSources = new SourceService(mockConfig, mockLog, mockClient) as Mocked<SourceService>
         ;(mockSources as any)._fusionSourceId = FUSION_SOURCE_ID
         Object.defineProperty(mockSources, 'fusionSourceId', {
-            get: jest.fn(() => FUSION_SOURCE_ID),
+            get: vi.fn(() => FUSION_SOURCE_ID),
             configurable: true,
         })
         mockIdentities = new IdentityService(
@@ -66,56 +67,56 @@ describe('FusionService', () => {
             mockLog,
             mockClient,
             mockSources
-        ) as jest.Mocked<IdentityService>
+        ) as Mocked<IdentityService>
         mockForms = new FormService(
             mockConfig,
             mockLog,
             mockClient,
             mockSources,
             mockIdentities
-        ) as jest.Mocked<FormService>
+        ) as Mocked<FormService>
         const mockLocks = {} as any
-        mockSchemas = new SchemaService(mockConfig, mockLog, mockSources, mockClient) as jest.Mocked<SchemaService>
+        mockSchemas = new SchemaService(mockConfig, mockLog, mockSources, mockClient) as Mocked<SchemaService>
         mockAttributes = new AttributeService(
             mockConfig,
             mockSchemas,
             mockSources,
             mockLog,
             mockLocks
-        ) as jest.Mocked<AttributeService>
-        mockScoring = new ScoringService(mockConfig, mockLog) as jest.Mocked<ScoringService>
+        ) as Mocked<AttributeService>
+        mockScoring = new ScoringService(mockConfig, mockLog) as Mocked<ScoringService>
 
         // Mock specific properties/methods needed for initialization
         Object.defineProperty(mockSources, 'managedAccountsById', {
-            get: jest.fn(() => new Map()),
+            get: vi.fn(() => new Map()),
             configurable: true,
         })
         Object.defineProperty(mockSources, 'managedAccountsByIdentityId', {
-            get: jest.fn(() => new Map()),
+            get: vi.fn(() => new Map()),
             configurable: true,
         })
         Object.defineProperty(mockSources, 'managedAccountsAllById', {
-            get: jest.fn(() => new Map()),
+            get: vi.fn(() => new Map()),
             configurable: true,
         })
         Object.defineProperty(mockSources, 'fusionAccounts', {
-            get: jest.fn(() => []),
+            get: vi.fn(() => []),
             configurable: true,
         })
         Object.defineProperty(mockSources, 'managedSources', {
-            get: jest.fn(() => []),
+            get: vi.fn(() => []),
             configurable: true,
         })
         Object.defineProperty(mockIdentities, 'identities', {
-            get: jest.fn(() => []),
+            get: vi.fn(() => []),
             configurable: true,
         })
         Object.defineProperty(mockSchemas, 'fusionDisplayAttribute', {
-            get: jest.fn(() => 'displayName'),
+            get: vi.fn(() => 'displayName'),
             configurable: true,
         })
 
-        mockSources.resolveIscAccountIdForManagedKey = jest.fn((managedKey: string) => {
+        mockSources.resolveIscAccountIdForManagedKey = vi.fn((managedKey: string) => {
             const work = mockSources.managedAccountsById as unknown as Map<string, Account> | undefined
             const all = mockSources.managedAccountsAllById as unknown as Map<string, Account> | undefined
             const acc =
@@ -142,7 +143,7 @@ describe('FusionService', () => {
         fusionService.setTracker(new AggregationTracker())
 
         // Mock ServiceRegistry
-        jest.spyOn(ServiceRegistry, 'getCurrent').mockReturnValue({
+        vi.spyOn(ServiceRegistry, 'getCurrent').mockReturnValue({
             fusion: fusionService,
             sources: mockSources,
             identities: mockIdentities,
@@ -191,15 +192,15 @@ describe('FusionService', () => {
             mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
             Object.defineProperty(mockForms, 'pendingCandidateIdentityIds', {
-                get: jest.fn(() => new Set([identityId])),
+                get: vi.fn(() => new Set([identityId])),
                 configurable: true,
             })
             Object.defineProperty(mockForms, 'pendingReviewUrlsByCandidateId', {
-                get: jest.fn(() => new Map([[identityId, [reviewUrl]]])),
+                get: vi.fn(() => new Map([[identityId, [reviewUrl]]])),
                 configurable: true,
             })
             Object.defineProperty(mockForms, 'pendingReviewUrlsByReviewerId', {
-                get: jest.fn(() => new Map()),
+                get: vi.fn(() => new Map()),
                 configurable: true,
             })
 
@@ -225,15 +226,15 @@ describe('FusionService', () => {
             mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
             Object.defineProperty(mockForms, 'pendingCandidateIdentityIds', {
-                get: jest.fn(() => new Set()),
+                get: vi.fn(() => new Set()),
                 configurable: true,
             })
             Object.defineProperty(mockForms, 'pendingReviewUrlsByCandidateId', {
-                get: jest.fn(() => new Map()),
+                get: vi.fn(() => new Map()),
                 configurable: true,
             })
             Object.defineProperty(mockForms, 'pendingReviewUrlsByReviewerId', {
-                get: jest.fn(() => new Map([[identityId, [reviewUrl]]])),
+                get: vi.fn(() => new Map([[identityId, [reviewUrl]]])),
                 configurable: true,
             })
 
@@ -255,7 +256,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            jest.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
+            vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
 
             // Mock FusionAccount.fromFusionAccount static method if possible,
             // but since it's a class method we might depend on its implementation or mock the return of processFusionAccount
@@ -284,14 +285,14 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            jest.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
+            vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
             mockIdentities.getIdentityById.mockReturnValue(undefined)
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockAttributes.registerUniqueAttributes.mockResolvedValue()
 
             // deleteIdentity must exist on the mock (it's a new method)
-            mockIdentities.deleteIdentity = jest.fn()
+            mockIdentities.deleteIdentity = vi.fn()
 
             await fusionService.processFusionAccounts()
 
@@ -311,12 +312,12 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            jest.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
+            vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockAttributes.registerUniqueAttributes.mockResolvedValue()
 
-            mockIdentities.deleteIdentity = jest.fn()
+            mockIdentities.deleteIdentity = vi.fn()
 
             await fusionService.processFusionAccounts()
 
@@ -339,20 +340,20 @@ describe('FusionService', () => {
 
             const mockIdentityDoc = { id: identityId, name: 'Dedup Identity' } as IdentityDocument
 
-            jest.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockFusionAccount])
+            vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockFusionAccount])
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockAttributes.registerUniqueAttributes.mockResolvedValue()
 
             // deleteIdentity removes identity from the service cache; simulate this by tracking calls
             const deletedIds = new Set<string>()
-            mockIdentities.deleteIdentity = jest.fn((id: string) => {
+            mockIdentities.deleteIdentity = vi.fn((id: string) => {
                 deletedIds.add(id)
             })
 
             // identities getter returns only those not yet deleted
             const allIdentities = [mockIdentityDoc]
-            jest.spyOn(mockIdentities, 'identities', 'get').mockImplementation(() =>
+            vi.spyOn(mockIdentities, 'identities', 'get').mockImplementation(() =>
                 allIdentities.filter((i) => !deletedIds.has(i.id))
             )
             mockIdentities.getIdentityById.mockReturnValue(undefined)
@@ -380,7 +381,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
                     [
                         managedKey,
@@ -396,10 +397,10 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
                 new Map([['identity-1', new Set([managedKey])]])
             )
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([
                     [
                         managedKey,
@@ -419,7 +420,7 @@ describe('FusionService', () => {
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockAttributes.registerUniqueAttributes.mockResolvedValue()
 
-            jest.spyOn(mockForms, 'getFusionAssignmentDecision').mockReturnValue({
+            vi.spyOn(mockForms, 'getFusionAssignmentDecision').mockReturnValue({
                 submitter: { id: 'reviewer-1', email: 'r@example.com', name: 'fernando.delosrios' },
                 account: {
                     id: managedKey,
@@ -534,7 +535,7 @@ describe('FusionService', () => {
                 name: 'New Identity',
             } as IdentityDocument
 
-            jest.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
+            vi.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
 
             // Mock mapAttributes since it's called in processIdentity
             mockAttributes.mapAttributes.mockImplementation((account) => account)
@@ -613,7 +614,7 @@ describe('FusionService', () => {
                 id: 'identity-1',
                 name: 'New Identity',
             } as IdentityDocument
-            jest.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
+            vi.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
 
             await fusionService.processIdentity(mockIdentity)
             const result = await fusionService.processIdentity(mockIdentity)
@@ -656,12 +657,12 @@ describe('FusionService', () => {
             } as Account
             const key = 'source-a-id::native-linked-1'
             const workQueue = new Map([[key, linkedAccount]])
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
                 new Map([['identity-linked', new Set([key])]])
             )
-            jest.spyOn(fusionService as any, 'isCorrelatedManagedAccountLinkedInFusion').mockReturnValue(true)
-            const analyzeSpy = jest.spyOn(fusionService, 'analyzeManagedAccount')
+            vi.spyOn(fusionService as any, 'isCorrelatedManagedAccountLinkedInFusion').mockReturnValue(true)
+            const analyzeSpy = vi.spyOn(fusionService, 'analyzeManagedAccount')
 
             const result = await fusionService.processManagedAccount(linkedAccount)
 
@@ -687,9 +688,9 @@ describe('FusionService', () => {
             const key = 'source-a-id::native-exact-queue-1'
             const workQueue = new Map([[key, account]])
             const byIdentity = new Map([['identity-exact', new Set([key])]])
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(byIdentity)
-            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(byIdentity)
+            vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
             mockIdentities.getIdentityById.mockReturnValue(undefined)
             mockIdentities.fetchIdentityById.mockResolvedValue({ id: 'identity-exact', name: 'Exact Identity' } as any)
             mockAttributes.mapAttributes.mockImplementation((fusionAccount) => fusionAccount)
@@ -705,8 +706,8 @@ describe('FusionService', () => {
                     { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }
                 ] as any,
             } as any)
-            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
-            jest.spyOn(fusionService as any, 'isCorrelatedManagedAccountLinkedInFusion').mockReturnValue(false)
+            vi.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn(fusionService as any, 'isCorrelatedManagedAccountLinkedInFusion').mockReturnValue(false)
 
             const result = await fusionService.processManagedAccount(account)
 
@@ -740,9 +741,9 @@ describe('FusionService', () => {
                 ['source-a-id::native-seq-1', firstAccount],
                 ['source-a-id::native-seq-2', secondAccount],
             ])
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
@@ -792,9 +793,9 @@ describe('FusionService', () => {
                 ['source-a-id::native-batch-def-1', firstAccount],
                 ['source-a-id::native-batch-def-2', secondAccount],
             ])
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
@@ -866,9 +867,9 @@ describe('FusionService', () => {
                 ['source-b-id::native-seq-b-1', accountB1],
                 ['source-b-id::native-seq-b-2', accountB2],
             ])
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
             ;(fusionService as any).sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
@@ -1014,20 +1015,20 @@ describe('FusionService', () => {
                 ['source-a-id::native-unc-1', uncorrelated],
                 ['source-a-id::native-corr-b', correlatedB],
             ])
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
 
             const callOrder: string[] = []
             const originalProcessManagedAccount = fusionService.processManagedAccount.bind(fusionService)
-            jest.spyOn(fusionService, 'processManagedAccount').mockImplementation(async (account: Account) => {
+            vi.spyOn(fusionService, 'processManagedAccount').mockImplementation(async (account: Account) => {
                 callOrder.push(account.id ?? '')
                 return originalProcessManagedAccount(account)
             })
             const originalCompleteManagedAccountFromAnalysis = (
                 fusionService as any
             ).completeManagedAccountFromAnalysis.bind(fusionService)
-            jest.spyOn(fusionService as any, 'completeManagedAccountFromAnalysis').mockImplementation(
+            vi.spyOn(fusionService as any, 'completeManagedAccountFromAnalysis').mockImplementation(
                 async (...args: any[]) => {
                     const analysis = args[0]
                     const deferredPhaseExecuted = args[1]
@@ -1186,8 +1187,8 @@ describe('FusionService', () => {
             })
 
             const workQueue = new Map([['source-a-id::native-deferred-1', mockManagedAccount]])
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
 
             const result = await fusionService.processManagedAccount(mockManagedAccount)
 
@@ -1343,7 +1344,7 @@ describe('FusionService', () => {
                 config: {},
             })
             const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
-            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
 
             const result = await fusionService.processManagedAccount(mockManagedAccount)
 
@@ -1378,8 +1379,8 @@ describe('FusionService', () => {
             const tracker = new AggregationTracker()
             fusionService.setTracker(tracker)
             tracker.matchAccounts = [analyzed]
-            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
-            jest.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
+            vi.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
 
             await fusionService.processManagedAccount(account)
 
@@ -1409,8 +1410,8 @@ describe('FusionService', () => {
                     { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }
                 ] as any,
             } as any)
-            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
-            jest.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
+            vi.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
 
             await fusionService.processManagedAccount(account)
 
@@ -1459,8 +1460,8 @@ describe('FusionService', () => {
                     { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }
                 ] as any,
             } as any)
-            jest.spyOn(accountListFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
-            const processDecision = jest
+            vi.spyOn(accountListFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            const processDecision = vi
                 .spyOn(accountListFusion, 'processFusionIdentityDecision')
                 .mockResolvedValue(analyzed)
 
@@ -1507,7 +1508,7 @@ describe('FusionService', () => {
                     { attribute: 'email', algorithm: 'jaro-winkler', score: 0, skipped: true } as any,
                 ],
             } as any)
-            jest.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
 
             await fusionService.processManagedAccount(account)
 
@@ -1553,7 +1554,7 @@ describe('FusionService', () => {
                 scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 95, isMatch: true } as any],
             } as any)
             mockForms.createFusionForm.mockResolvedValue({ formDefinitionReady: true, newReviewInstancesQueued: 1 })
-            jest.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
 
             const result = await analysisFusion.processManagedAccount(account)
 
@@ -1600,8 +1601,8 @@ describe('FusionService', () => {
                     { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
                 ],
             } as any)
-            jest.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
-            const processDecision = jest
+            vi.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            const processDecision = vi
                 .spyOn(analysisFusion, 'processFusionIdentityDecision')
                 .mockResolvedValue(analyzed)
 
@@ -1643,8 +1644,8 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
             const analyzed = FusionAccount.fromManagedAccount(account)
-            jest.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
-            jest.spyOn(mockSources, 'fireDisableAccount').mockResolvedValue(undefined)
+            vi.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn(mockSources, 'fireDisableAccount').mockResolvedValue(undefined)
 
             await analysisFusion.processManagedAccount(account)
 
@@ -1665,7 +1666,7 @@ describe('FusionService', () => {
             const managedAccountsMap = new Map<string, Account>()
             managedAccountsMap.set('source-a-id::mgmt-1', mockManagedAccount)
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedAccountsMap)
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedAccountsMap)
 
             // Mock scoring
             mockScoring.scoreFusionAccount.mockImplementation(
@@ -1734,7 +1735,7 @@ describe('FusionService', () => {
             mockAttributes.mapAttributes.mockImplementation((a) => a)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
-            const spyFinalize = jest.spyOn(fusionService as any, 'finalizeAuthoritativeUnmatched')
+            const spyFinalize = vi.spyOn(fusionService as any, 'finalizeAuthoritativeUnmatched')
 
             const result = await fusionService.processManagedAccount(mockManagedAccount)
 
@@ -1771,7 +1772,7 @@ describe('FusionService', () => {
                 config: {},
             })
 
-            const spyFinalize = jest.spyOn(fusionService as any, 'finalizeAuthoritativeUnmatched')
+            const spyFinalize = vi.spyOn(fusionService as any, 'finalizeAuthoritativeUnmatched')
 
             const result = await fusionService.processManagedAccount(mockManagedAccount)
 
@@ -1798,9 +1799,9 @@ describe('FusionService', () => {
                 correlationDisplayName: 'Reverse Native Identity',
             })
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([
                     [
                         'source-a-id::native-missing-1',
@@ -1836,16 +1837,16 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            jest.spyOn(mockIdentities, 'getIdentityById').mockReturnValue({
+            vi.spyOn(mockIdentities, 'getIdentityById').mockReturnValue({
                 id: 'identity-1',
                 name: 'Jane Doe',
                 attributes: { displayName: 'Jane Q. Doe' },
             } as IdentityDocument)
-            jest.spyOn(mockForms, 'getFusionAssignmentDecision').mockReturnValue(undefined)
+            vi.spyOn(mockForms, 'getFusionAssignmentDecision').mockReturnValue(undefined)
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockAttributes.registerUniqueAttributes.mockResolvedValue()
@@ -1868,7 +1869,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
                     [
                         'source-a-id::native-new-2',
@@ -1884,10 +1885,10 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
                 new Map([['identity-1', new Set(['source-a-id::native-new-2'])]])
             )
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([
                     [
                         'source-a-id::native-new-2',
@@ -1932,7 +1933,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
                     [
                         'source-a-id::native-existing-1',
@@ -1946,8 +1947,8 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([
                     [
                         'source-a-id::native-existing-1',
@@ -2032,7 +2033,7 @@ describe('FusionService', () => {
 
         it('direct-correlates link-decision assigned account when managed metadata is absent but source is correlate', async () => {
             mockIdentities.correlateAccounts.mockResolvedValue(true)
-            jest.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
+            vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
                 name: 'Source A',
                 correlationMode: 'correlate',
             } as any)
@@ -2120,7 +2121,7 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
                     ['source-a-id::native-analyze-1', firstAccount],
                     ['source-a-id::native-analyze-2', secondAccount],
@@ -2184,8 +2185,8 @@ describe('FusionService', () => {
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
             const workQueue = new Map() as Map<string, Account>
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
 
             await fusionService.initializeManagedAccountProcessing()
 
@@ -2438,16 +2439,16 @@ describe('FusionService', () => {
             const managedKey = 'src-lh2::lh2-authz-existing'
             const managedMap = new Map<string, Account>([[managedKey, managedAccount]])
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[managedKey, managedAccount]])
             )
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
             mockIdentities.correlateAccounts.mockResolvedValue(true)
-            jest.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
+            vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
                 name: 'LH2',
                 correlationMode: 'correlate',
                 sourceType: 'authoritative',
@@ -2503,16 +2504,16 @@ describe('FusionService', () => {
             const managedKeyAuto = 'src-lh2::lh2-auto'
             const managedMap = new Map<string, Account>([[managedKeyAuto, managedAccount]])
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[managedKeyAuto, managedAccount]])
             )
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
             mockIdentities.correlateAccounts.mockResolvedValue(true)
-            jest.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
+            vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
                 name: 'LH2',
                 correlationMode: 'none',
                 sourceType: 'authoritative',
@@ -2566,16 +2567,16 @@ describe('FusionService', () => {
             const managedKeyAutoCorr = 'src-lh2::lh2-auto-corr'
             const managedMap = new Map<string, Account>([[managedKeyAutoCorr, managedAccount]])
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[managedKeyAutoCorr, managedAccount]])
             )
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
             mockIdentities.correlateAccounts.mockResolvedValue(true)
-            jest.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
+            vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
                 name: 'LH2',
                 correlationMode: 'correlate',
                 sourceType: 'authoritative',
@@ -2616,9 +2617,9 @@ describe('FusionService', () => {
             const managedKeyNoId = 'src-lh2::lh2-authz-noid'
             const managedMap = new Map<string, Account>([[managedKeyNoId, managedAccount]])
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[managedKeyNoId, managedAccount]])
             )
             mockAttributes.mapAttributes.mockImplementation((account) => account)
@@ -2657,9 +2658,9 @@ describe('FusionService', () => {
             const managedKeyAuthz = 'src-auth-src::auth-src-native-1'
             const managedMap = new Map<string, Account>([[managedKeyAuthz, managedAccount]])
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[managedKeyAuthz, managedAccount]])
             )
             mockAttributes.mapAttributes.mockImplementation((account) => account)
@@ -2672,7 +2673,7 @@ describe('FusionService', () => {
                 attributes: {},
             } as unknown as IdentityDocument)
             mockIdentities.correlateAccounts.mockResolvedValue(true)
-            jest.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
+            vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
                 name: 'Authoritative Source',
                 correlationMode: 'correlate',
                 sourceType: 'authoritative',
@@ -2702,9 +2703,9 @@ describe('FusionService', () => {
 
         it('registers unique attributes and skips output for record no-match decisions', async () => {
             const managedMap = new Map<string, Account>()
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockAttributes.registerUniqueAttributes.mockResolvedValue()
@@ -2743,9 +2744,9 @@ describe('FusionService', () => {
             const managedKeyOrphan = 'src-orphan-1::orphan-native-1'
             const managedMap = new Map<string, Account>([[managedKeyOrphan, managedAccount]])
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             ;(fusionService as any).sourcesByName.set('Orphan Source', {
@@ -2755,7 +2756,7 @@ describe('FusionService', () => {
                 config: { disableNonMatchingAccounts: true },
             })
 
-            const queueDisableSpy = jest
+            const queueDisableSpy = vi
                 .spyOn(fusionService as any, 'queueDisableOperation')
                 .mockImplementation(() => {})
             const decision = {
@@ -2781,13 +2782,13 @@ describe('FusionService', () => {
         })
 
         it('registers a new fusion account for authoritative new-identity decisions', async () => {
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
-            const setFusionAccountSpy = jest.spyOn(fusionService, 'setFusionAccount')
+            const setFusionAccountSpy = vi.spyOn(fusionService, 'setFusionAccount')
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
                 account: {
@@ -2856,9 +2857,9 @@ describe('FusionService', () => {
             const histKey = 'src-lh2::hist-fallback'
             const managedMap = new Map<string, Account>([[histKey, managedAccount]])
 
-            jest.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            jest.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            jest.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[histKey, managedAccount]])
             )
             mockAttributes.mapAttributes.mockImplementation((account) => account)
@@ -2908,7 +2909,7 @@ describe('FusionService', () => {
 
             let inFlight = 0
             let maxInFlight = 0
-            jest.spyOn(fusionService as any, 'getISCAccount').mockImplementation(async (...args: any[]) => {
+            vi.spyOn(fusionService as any, 'getISCAccount').mockImplementation(async (...args: any[]) => {
                 const account = args[0] as FusionAccount
                 inFlight += 1
                 maxInFlight = Math.max(maxInFlight, inFlight)

@@ -17,13 +17,13 @@ function createRegistry() {
             baseurl: 'https://tenant.example.api.identitynow.com',
         },
         log: {
-            info: jest.fn(),
-            debug: jest.fn(),
-            crash: jest.fn(),
-            timer: jest.fn().mockImplementation(() => timer),
-            metric: jest.fn(),
-            track: jest.fn(() => ({ done: jest.fn(() => 0), elapsedMs: jest.fn(() => 0) })),
-            getAggregationIssueSummary: jest.fn(() => ({
+            info: vi.fn(),
+            debug: vi.fn(),
+            crash: vi.fn(),
+            timer: vi.fn().mockImplementation(() => timer),
+            metric: vi.fn(),
+            track: vi.fn(() => ({ done: vi.fn(() => 0), elapsedMs: vi.fn(() => 0) })),
+            getAggregationIssueSummary: vi.fn(() => ({
                 warningCount: 1,
                 errorCount: 0,
                 warningSamples: ['warn-sample'],
@@ -34,47 +34,47 @@ function createRegistry() {
             managedSources: [{ id: 'src-1' }],
             hasFusionSource: true,
             fusionSourceOwner: { id: 'fusion-owner-1', type: 'IDENTITY' },
-            fetchGlobalOwnerIdentityIds: jest.fn().mockResolvedValue(['fusion-owner-1']),
+            fetchGlobalOwnerIdentityIds: vi.fn().mockResolvedValue(['fusion-owner-1']),
             managedAccountsById: new Map<string, any>([
                 ['acc-1', { id: 'acc-1', sourceName: 'HR' }],
                 ['acc-2', { id: 'acc-2', sourceName: 'IT' }],
             ]),
             fusionAccountCount: 2,
-            fetchAllSources: jest.fn().mockResolvedValue(undefined),
-            fetchFusionAccounts: jest.fn().mockResolvedValue(undefined),
-            fetchManagedAccounts: jest.fn().mockResolvedValue(undefined),
-            getSourceByName: jest.fn((name: string) =>
+            fetchAllSources: vi.fn().mockResolvedValue(undefined),
+            fetchFusionAccounts: vi.fn().mockResolvedValue(undefined),
+            fetchManagedAccounts: vi.fn().mockResolvedValue(undefined),
+            getSourceByName: vi.fn((name: string) =>
                 name === 'IT' ? { sourceType: 'record' } : { sourceType: 'authoritative' }
             ),
-            getSourceByNameSafe: jest.fn((name?: string | null) =>
+            getSourceByNameSafe: vi.fn((name?: string | null) =>
                 name ? (name === 'IT' ? { sourceType: 'record' } : { sourceType: 'authoritative' }) : undefined
             ),
-            clearManagedAccounts: jest.fn(),
-            clearFusionAccounts: jest.fn(),
+            clearManagedAccounts: vi.fn(),
+            clearFusionAccounts: vi.fn(),
         },
         identities: {
             identityCount: 10,
-            fetchIdentities: jest.fn().mockResolvedValue(undefined),
-            getIdentityById: jest.fn((id?: string) => (id ? { id, name: 'Cached' } : undefined)),
-            fetchIdentityById: jest.fn().mockResolvedValue({ id: 'fusion-owner-1', name: 'Fusion Owner' }),
-            clear: jest.fn(),
+            fetchIdentities: vi.fn().mockResolvedValue(undefined),
+            getIdentityById: vi.fn((id?: string) => (id ? { id, name: 'Cached' } : undefined)),
+            fetchIdentityById: vi.fn().mockResolvedValue({ id: 'fusion-owner-1', name: 'Fusion Owner' }),
+            clear: vi.fn(),
         },
         schemas: {
-            setFusionAccountSchema: jest.fn().mockResolvedValue(undefined),
+            setFusionAccountSchema: vi.fn().mockResolvedValue(undefined),
             fusionIdentityAttribute: 'id',
         },
         fusion: {
-            setTracker: jest.fn().mockImplementation((t) => { activeTracker = t }),
+            setTracker: vi.fn().mockImplementation((t) => { activeTracker = t }),
             get tracker() { return activeTracker || new AggregationTracker() },
-            isReset: jest.fn(() => false),
+            isReset: vi.fn(() => false),
             fusionOwnerIsGlobalReviewer: false,
             fusionReportOnAggregation: false,
-            processFusionAccounts: jest.fn().mockResolvedValue([]),
-            processIdentities: jest.fn().mockResolvedValue([]),
-            processFusionIdentityDecisions: jest.fn().mockResolvedValue([]),
-            analyzeUncorrelatedAccounts: jest.fn().mockResolvedValue([]),
-            refreshUniqueAttributes: jest.fn().mockResolvedValue(0),
-            generateReport: jest.fn((tracker: any, _includeNonMatches?: boolean, stats?: Record<string, unknown>) => ({
+            processFusionAccounts: vi.fn().mockResolvedValue([]),
+            processIdentities: vi.fn().mockResolvedValue([]),
+            processFusionIdentityDecisions: vi.fn().mockResolvedValue([]),
+            analyzeUncorrelatedAccounts: vi.fn().mockResolvedValue([]),
+            refreshUniqueAttributes: vi.fn().mockResolvedValue(0),
+            generateReport: vi.fn((tracker: any, _includeNonMatches?: boolean, stats?: Record<string, unknown>) => ({
                 accounts: [
                     {
                         accountId: 'acc-1',
@@ -106,7 +106,7 @@ function createRegistry() {
                 stats: { managedAccountsFound: 2, ...stats },
             })),
             totalFusionAccountCount: 2,
-            forEachISCAccount: jest.fn(async (send: (account: any) => void) => {
+            forEachISCAccount: vi.fn(async (send: (account: any) => void) => {
                 send({
                     key: 'fusion-1',
                     disabled: false,
@@ -130,7 +130,7 @@ function createRegistry() {
                 })
                 return { sent: 2, eligible: 2 }
             }),
-            getISCAccount: jest.fn(async (account: any) => ({
+            getISCAccount: vi.fn(async (account: any) => ({
                 key: account.key,
                 disabled: false,
                 attributes: {
@@ -140,47 +140,47 @@ function createRegistry() {
                     statuses: [],
                 },
             })),
-            initializeManagedAccountProcessing: jest.fn().mockResolvedValue(undefined),
-            processCorrelatedManagedAccounts: jest.fn().mockResolvedValue(undefined),
-            processUncorrelatedManagedAccounts: jest.fn().mockResolvedValue({ processed: 0, matchScoringMs: 0 }),
-            reconcilePendingFormState: jest.fn(),
+            initializeManagedAccountProcessing: vi.fn().mockResolvedValue(undefined),
+            processCorrelatedManagedAccounts: vi.fn().mockResolvedValue(undefined),
+            processUncorrelatedManagedAccounts: vi.fn().mockResolvedValue({ processed: 0, matchScoringMs: 0 }),
+            reconcilePendingFormState: vi.fn(),
         },
         forms: {
-            fetchFormData: jest.fn().mockResolvedValue(undefined),
-            fetchFormInstances: jest.fn().mockResolvedValue(undefined),
-            processFetchedFormData: jest.fn().mockResolvedValue(undefined),
+            fetchFormData: vi.fn().mockResolvedValue(undefined),
+            fetchFormInstances: vi.fn().mockResolvedValue(undefined),
+            processFetchedFormData: vi.fn().mockResolvedValue(undefined),
             pendingReviewContextByAccountId: new Map<string, any>(),
-            cleanUpForms: jest.fn(),
+            cleanUpForms: vi.fn(),
         },
         attributes: {
-            initializeCounters: jest.fn().mockResolvedValue(undefined),
-            saveState: jest.fn(),
-            refreshUniqueAttributes: jest.fn().mockResolvedValue(0),
+            initializeCounters: vi.fn().mockResolvedValue(undefined),
+            saveState: vi.fn(),
+            refreshUniqueAttributes: vi.fn().mockResolvedValue(0),
         },
         messaging: {
-            fetchSender: jest.fn().mockResolvedValue(undefined),
-            sendReportTo: jest.fn().mockResolvedValue(undefined),
-            renderFusionReportHtml: jest.fn(() => '<html><body>dry-run report</body></html>'),
+            fetchSender: vi.fn().mockResolvedValue(undefined),
+            sendReportTo: vi.fn().mockResolvedValue(undefined),
+            renderFusionReportHtml: vi.fn(() => '<html><body>dry-run report</body></html>'),
         },
         res: {
-            send: jest.fn(),
-            keepAlive: jest.fn(),
+            send: vi.fn(),
+            keepAlive: vi.fn(),
         },
     }
     let configuredRuntimeOptions: { writeToDisk?: boolean; sendReportTo?: string[] } = {}
 
     registry.reports = {
-        setDryRunRuntimeOptions: jest.fn((runtimeOptions: { writeToDisk?: boolean; sendReportTo?: string[] }) => {
+        setDryRunRuntimeOptions: vi.fn((runtimeOptions: { writeToDisk?: boolean; sendReportTo?: string[] }) => {
             configuredRuntimeOptions = { ...runtimeOptions }
         }),
-        ensureReportOutputDirectoryExists: jest.fn(async () => {
+        ensureReportOutputDirectoryExists: vi.fn(async () => {
             const path = await import('path')
             const fs = await import('fs')
             const reportsDir = path.join(process.cwd(), 'reports')
             fs.mkdirSync(reportsDir, { recursive: true })
             return reportsDir
         }),
-        initializeDryRunReport: jest.fn(
+        initializeDryRunReport: vi.fn(
             ({
                 fetchResult,
                 totalProcessingTime,
@@ -208,7 +208,7 @@ function createRegistry() {
                 return { report, preStreamingStats }
             }
         ),
-        finalizeDryRunReport: jest.fn(
+        finalizeDryRunReport: vi.fn(
             async ({
                 report,
                 fetchResult,
@@ -264,7 +264,7 @@ function createRegistry() {
 
 describe('dryRun', () => {
     afterEach(() => {
-        jest.restoreAllMocks()
+        vi.restoreAllMocks()
     })
 
     it('streams enriched rows and sends a final summary object', async () => {
@@ -312,7 +312,7 @@ describe('dryRun', () => {
 
     it('passes owner ids to fetchIdentities when fusionOwnerIsGlobalReviewer', async () => {
         const registry = createRegistry()
-        registry.sources.fetchGlobalOwnerIdentityIds = jest.fn().mockResolvedValue(['owner-missing-1'])
+        registry.sources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(['owner-missing-1'])
         registry.fusion.fusionOwnerIsGlobalReviewer = true
 
         await dryRun(registry, { schema: { attributes: [] }, includeMatched: true } as any)
@@ -662,7 +662,7 @@ describe('dryRun', () => {
 
     it('sends report email to explicit recipients even when report candidates have no identityId', async () => {
         const registry = createRegistry()
-        const totalElapsed = jest.fn().mockReturnValueOnce('14M 56S').mockReturnValue('28M 8S')
+        const totalElapsed = vi.fn().mockReturnValueOnce('14M 56S').mockReturnValue('28M 8S')
         const logForTimer = new LogService({ spConnDebugLoggingEnabled: false })
         const timer = logForTimer.timer()
         registry.log.timer.mockReturnValue({

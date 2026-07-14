@@ -1,29 +1,30 @@
 import { accountRead } from '../accountRead'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
+import type { Mock } from 'vitest'
 
-jest.mock('../helpers/rebuildFusionAccount', () => ({
-    rebuildFusionAccount: jest.fn(),
+vi.mock('../helpers/rebuildFusionAccount', () => ({
+    rebuildFusionAccount: vi.fn(),
 }))
 
 import { createRegistry as createMockRegistry } from './harness/registryMocking'
 
 function createRegistry() {
     const registry = createMockRegistry()
-    Object.assign(registry.fusion, { getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-1' }) })
+    Object.assign(registry.fusion, { getISCAccount: vi.fn().mockResolvedValue({ id: 'isc-1' }) })
     return registry
 }
 
 describe('accountRead', () => {
     afterEach(() => {
-        jest.restoreAllMocks()
-        jest.clearAllMocks()
+        vi.restoreAllMocks()
+        vi.clearAllMocks()
     })
 
     it('rebuilds and returns a single ISC account', async () => {
         const registry = createRegistry()
         const fusionAccount = { managedKey: 'fusion-1', name: 'Fusion User' }
-        ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue(fusionAccount)
 
         await accountRead(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)
 

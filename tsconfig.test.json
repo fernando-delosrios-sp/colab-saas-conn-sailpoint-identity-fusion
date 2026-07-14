@@ -2,7 +2,7 @@
     "extends": "./tsconfig.json",
     "compilerOptions": {
         "moduleResolution": "node",
-        "types": ["jest", "node"]
+        "types": ["node", "vitest/globals"]
     },
     "include": ["src/**/*"],
     "exclude": ["node_modules"]

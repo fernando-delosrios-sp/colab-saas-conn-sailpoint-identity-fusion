@@ -2,7 +2,7 @@ import { MessagingService } from '../messagingService'
 
 const createMessagingService = (accessToken: any) => {
     const workflowsApi = {
-        listWorkflows: jest.fn().mockResolvedValue({
+        listWorkflows: vi.fn().mockResolvedValue({
             data: [
                 {
                     id: 'wf-delayed-1',
@@ -11,21 +11,21 @@ const createMessagingService = (accessToken: any) => {
                 },
             ],
         }),
-        createWorkflow: jest.fn(),
-        testWorkflow: jest.fn().mockResolvedValue({ status: 200 }),
+        createWorkflow: vi.fn(),
+        testWorkflow: vi.fn().mockResolvedValue({ status: 200 }),
     }
 
     const client = {
         config: { accessToken },
         workflowsApi,
-        execute: jest.fn(async (fn: () => Promise<any>) => await fn()),
+        execute: vi.fn(async (fn: () => Promise<any>) => await fn()),
     } as any
 
     const log = {
-        debug: jest.fn(),
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
     } as any
 
     const config = {
@@ -69,7 +69,7 @@ describe('MessagingService delayed aggregation workflow', () => {
     })
 
     it('resolves access token from function provider', async () => {
-        const tokenProvider = jest.fn(async () => 'token-from-provider')
+        const tokenProvider = vi.fn(async () => 'token-from-provider')
         const { service, workflowsApi } = createMessagingService(tokenProvider)
 
         await service.scheduleDelayedAggregation({

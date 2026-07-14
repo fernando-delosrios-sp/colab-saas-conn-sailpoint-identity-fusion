@@ -35,7 +35,7 @@ describe('compileAccountPageJmespathFilter', () => {
         // Mock search to throw specifically when evaluating the page (not during compilation)
 
         const originalSearch = jmespath.search
-        jest.spyOn(jmespath, 'search').mockImplementation((data, expr) => {
+        vi.spyOn(jmespath, 'search').mockImplementation((data, expr) => {
             if ((data as any).accounts && (data as any).accounts.length > 0) {
                 throw new Error('Runtime execution error')
             }
@@ -46,7 +46,7 @@ describe('compileAccountPageJmespathFilter', () => {
                 /Invalid Accounts JMESPath filter for source "HR": Runtime execution error/
             )
         } finally {
-            jest.restoreAllMocks()
+            vi.restoreAllMocks()
         }
     })
 

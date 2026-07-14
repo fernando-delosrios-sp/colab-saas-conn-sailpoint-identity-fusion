@@ -1,24 +1,25 @@
 import { ConnectorError } from '@sailpoint/connector-sdk'
 import { accountEnable } from '../accountEnable'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
+import type { Mock } from 'vitest'
 
-jest.mock('../helpers/rebuildFusionAccount', () => ({
-    rebuildFusionAccount: jest.fn(),
+vi.mock('../helpers/rebuildFusionAccount', () => ({
+    rebuildFusionAccount: vi.fn(),
 }))
 
 import { createRegistry } from './harness/registryMocking'
 
 describe('accountEnable', () => {
     afterEach(() => {
-        jest.restoreAllMocks()
-        jest.clearAllMocks()
+        vi.restoreAllMocks()
+        vi.clearAllMocks()
     })
 
     it('pre-processes unique attributes and enables account', async () => {
         const registry = createRegistry()
         registry.fusion.getISCAccount.mockResolvedValue({ id: 'isc-enabled' })
-        const fusionAccount = { managedKey: 'fusion-1', enable: jest.fn() }
-        ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
+        const fusionAccount = { managedKey: 'fusion-1', enable: vi.fn() }
+        ;(rebuildFusionAccount as Mock).mockResolvedValue(fusionAccount)
 
         await accountEnable(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)
 
@@ -47,7 +48,7 @@ describe('accountEnable', () => {
     it('throws ConnectorError when caught', async () => {
         const registry = createRegistry()
         const error = new ConnectorError('Connector error')
-        ;(rebuildFusionAccount as jest.Mock).mockRejectedValue(error)
+        ;(rebuildFusionAccount as Mock).mockRejectedValue(error)
 
         await expect(
             accountEnable(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)
@@ -57,7 +58,7 @@ describe('accountEnable', () => {
     it('logs crash when non-ConnectorError is caught', async () => {
         const registry = createRegistry()
         const error = new Error('Generic error')
-        ;(rebuildFusionAccount as jest.Mock).mockRejectedValue(error)
+        ;(rebuildFusionAccount as Mock).mockRejectedValue(error)
 
         await accountEnable(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)
 

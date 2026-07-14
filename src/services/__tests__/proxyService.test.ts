@@ -53,7 +53,7 @@ describe('ProxyService.isProxyService', () => {
             proxyEnabled: true,
             proxyPassword: '', // Client provides empty password
         }
-        const mockLog = { info: jest.fn() }
+        const mockLog = { info: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
 
         expect(() => service.isProxyService()).toThrow('Proxy password mismatch')
@@ -65,7 +65,7 @@ describe('ProxyService.isProxyService', () => {
             proxyEnabled: true,
             proxyPassword: 'secret_password',
         }
-        const mockLog = { info: jest.fn() }
+        const mockLog = { info: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
 
         expect(service.isProxyService()).toBe(true)
@@ -81,7 +81,7 @@ describe('ProxyService.performFetch', () => {
 
     afterEach(() => {
         global.fetch = originalFetch
-        jest.clearAllMocks()
+        vi.clearAllMocks()
     })
 
     it('throws ConnectorError when fetch throws AbortError', async () => {
@@ -90,12 +90,12 @@ describe('ProxyService.performFetch', () => {
             proxyUrl: 'https://proxy.example.com',
             proxyRequestTimeoutMs: 5000,
         }
-        const mockLog = { error: jest.fn() }
+        const mockLog = { error: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
 
         const abortError = new Error('The operation was aborted')
         abortError.name = 'AbortError'
-        global.fetch = jest.fn().mockRejectedValue(abortError)
+        global.fetch = vi.fn().mockRejectedValue(abortError)
 
         await expect((service as any).performFetch({})).rejects.toMatchObject({
             message: 'Proxy request to https://proxy.example.com timed out after 5000 ms',
@@ -108,11 +108,11 @@ describe('ProxyService.performFetch', () => {
             proxyEnabled: true,
             proxyUrl: 'https://proxy.example.com',
         }
-        const mockLog = { error: jest.fn() }
+        const mockLog = { error: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
 
         const standardError = new Error('Network failure')
-        global.fetch = jest.fn().mockRejectedValue(standardError)
+        global.fetch = vi.fn().mockRejectedValue(standardError)
 
         await expect((service as any).performFetch({})).rejects.toMatchObject({
             message: 'Failed to connect to proxy server at https://proxy.example.com: Network failure',
@@ -126,10 +126,10 @@ describe('ProxyService.performFetch', () => {
             proxyEnabled: true,
             proxyUrl: 'https://proxy.example.com',
         }
-        const mockLog = { error: jest.fn() }
+        const mockLog = { error: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
 
-        global.fetch = jest.fn().mockRejectedValue('String error')
+        global.fetch = vi.fn().mockRejectedValue('String error')
 
         await expect((service as any).performFetch({})).rejects.toMatchObject({
             message: 'Failed to connect to proxy server at https://proxy.example.com: Unknown error',

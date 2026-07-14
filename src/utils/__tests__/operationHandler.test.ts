@@ -1,39 +1,40 @@
 import { createOperationHandler, OperationHandlerOptions } from '../operationHandler'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
+import type { Mock } from 'vitest'
 
 // Mock the ServiceRegistry class
-jest.mock('../../services/serviceRegistry', () => {
-    return {
-        ServiceRegistry: Object.assign(
-            jest.fn().mockImplementation((_config, _context, res, _operationName) => {
-                return {
-                    res,
-                    proxy: {
-                        isProxyService: jest.fn().mockReturnValue(false),
-                        isProxyMode: jest.fn().mockReturnValue(false),
-                        execute: jest.fn().mockImplementation(() => {
-                            res.send()
-                            return Promise.resolve(undefined)
-                        }),
-                    },
-                }
-            }),
-            {
-                run: jest.fn((_reg, callback) => callback()),
-            }
-        ),
-    }
+vi.mock('../../services/serviceRegistry', () => {
+    const serviceRegistryMock = vi.fn().mockImplementation((_config, _context, res, _operationName) => {
+        return {
+            res,
+            proxy: {
+                isProxyService: vi.fn().mockReturnValue(false),
+                isProxyMode: vi.fn().mockReturnValue(false),
+                execute: vi.fn().mockImplementation(() => {
+                    res.send()
+                    return Promise.resolve(undefined)
+                }),
+            },
+        }
+    })
+    const ServiceRegistry: any = new Proxy(serviceRegistryMock, {
+        construct(target, args) {
+            return target(...args)
+        },
+    })
+    ServiceRegistry.run = vi.fn((_reg, callback) => callback())
+    return { ServiceRegistry }
 })
 
 // Mock the logger
-jest.mock('@sailpoint/connector-sdk', () => {
-    const originalModule = jest.requireActual('@sailpoint/connector-sdk')
+vi.mock('@sailpoint/connector-sdk', async () => {
+    const originalModule = await vi.importActual<typeof import('@sailpoint/connector-sdk')>('@sailpoint/connector-sdk')
     return {
         ...originalModule,
         logger: {
-            info: jest.fn(),
-            error: jest.fn(),
+            info: vi.fn(),
+            error: vi.fn(),
         },
     }
 })
@@ -45,26 +46,26 @@ describe('createOperationHandler', () => {
         errorMessage: 'Default error message',
     }
 
-    let defaultFn: jest.Mock
+    let defaultFn: Mock
     let context: any
     let input: any
     let res: any
 
     beforeEach(() => {
-        jest.clearAllMocks()
-        jest.useFakeTimers()
+        vi.clearAllMocks()
+        vi.useFakeTimers()
 
-        defaultFn = jest.fn().mockImplementation((serviceRegistry: any) => {
+        defaultFn = vi.fn().mockImplementation((serviceRegistry: any) => {
             serviceRegistry.res.send()
             return Promise.resolve(undefined)
         })
         context = {}
         input = { data: 'testInput' }
-        res = { keepAlive: jest.fn(), send: jest.fn(), error: jest.fn() }
+        res = { keepAlive: vi.fn(), send: vi.fn(), error: vi.fn() }
     })
 
     afterEach(() => {
-        jest.useRealTimers()
+        vi.useRealTimers()
     })
 
     describe('Execution Modes (RunMode)', () => {
@@ -79,7 +80,7 @@ describe('createOperationHandler', () => {
         })
 
         it('should run in Custom mode when custom operation exists in context', async () => {
-            context[operationName] = jest.fn().mockImplementation((serviceRegistry: any) => {
+            context[operationName] = vi.fn().mockImplementation((serviceRegistry: any) => {
                 serviceRegistry.res.send()
                 return Promise.resolve(undefined)
             })
@@ -95,9 +96,9 @@ describe('createOperationHandler', () => {
             ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
                 res,
                 proxy: {
-                    isProxyService: jest.fn().mockReturnValue(false),
-                    isProxyMode: jest.fn().mockReturnValue(true),
-                    execute: jest.fn().mockImplementation(() => {
+                    isProxyService: vi.fn().mockReturnValue(false),
+                    isProxyMode: vi.fn().mockReturnValue(true),
+                    execute: vi.fn().mockImplementation(() => {
                         res.send()
                         return Promise.resolve(undefined)
                     }),
@@ -119,7 +120,7 @@ describe('createOperationHandler', () => {
             const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
             await handler(context, input, res)
 
-            jest.advanceTimersByTime(2000)
+            vi.advanceTimersByTime(2000)
             expect(res.keepAlive).not.toHaveBeenCalled()
         })
 
@@ -144,10 +145,10 @@ describe('createOperationHandler', () => {
             // Wait for interval to be set up
             await Promise.resolve()
 
-            jest.advanceTimersByTime(1000)
+            vi.advanceTimersByTime(1000)
             expect(res.keepAlive).toHaveBeenCalledTimes(1)
 
-            jest.advanceTimersByTime(1000)
+            vi.advanceTimersByTime(1000)
             expect(res.keepAlive).toHaveBeenCalledTimes(2)
 
             // Finish the operation
@@ -155,7 +156,7 @@ describe('createOperationHandler', () => {
             await promise
 
             // Ensure no more calls after finish
-            jest.advanceTimersByTime(1000)
+            vi.advanceTimersByTime(1000)
             expect(res.keepAlive).toHaveBeenCalledTimes(2)
         })
 
@@ -179,7 +180,7 @@ describe('createOperationHandler', () => {
 
             await Promise.resolve()
 
-            jest.advanceTimersByTime(1000)
+            vi.advanceTimersByTime(1000)
             expect(res.keepAlive).toHaveBeenCalledTimes(1)
 
             resolveFn!()
@@ -190,10 +191,10 @@ describe('createOperationHandler', () => {
             ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
                 res,
                 proxy: {
-                    isProxyService: jest.fn().mockReturnValue(false),
-                    isProxyMode: jest.fn().mockReturnValue(true),
-                    execute: jest.fn().mockImplementation(async () => {
-                        jest.advanceTimersByTime(1500)
+                    isProxyService: vi.fn().mockReturnValue(false),
+                    isProxyMode: vi.fn().mockReturnValue(true),
+                    execute: vi.fn().mockImplementation(async () => {
+                        vi.advanceTimersByTime(1500)
                         res.send()
                     }),
                 },
@@ -204,7 +205,7 @@ describe('createOperationHandler', () => {
 
             const promise = handler(context, input, res)
             await Promise.resolve()
-            jest.advanceTimersByTime(1000)
+            vi.advanceTimersByTime(1000)
             await promise
 
             expect(res.keepAlive).not.toHaveBeenCalled()
@@ -214,9 +215,9 @@ describe('createOperationHandler', () => {
             ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
                 res,
                 proxy: {
-                    isProxyService: jest.fn().mockReturnValue(true),
-                    isProxyMode: jest.fn().mockReturnValue(false),
-                    execute: jest.fn().mockImplementation(() => {
+                    isProxyService: vi.fn().mockReturnValue(true),
+                    isProxyMode: vi.fn().mockReturnValue(false),
+                    execute: vi.fn().mockImplementation(() => {
                         res.send()
                         return Promise.resolve(undefined)
                     }),
@@ -224,7 +225,7 @@ describe('createOperationHandler', () => {
             }))
 
             defaultFn.mockImplementation(async (serviceRegistry: any) => {
-                jest.advanceTimersByTime(1500)
+                vi.advanceTimersByTime(1500)
                 serviceRegistry.res.send()
             })
 
@@ -233,7 +234,7 @@ describe('createOperationHandler', () => {
 
             const promise = handler(context, input, res)
             await Promise.resolve()
-            jest.advanceTimersByTime(1000)
+            vi.advanceTimersByTime(1000)
             await promise
 
             expect(res.keepAlive).not.toHaveBeenCalled()

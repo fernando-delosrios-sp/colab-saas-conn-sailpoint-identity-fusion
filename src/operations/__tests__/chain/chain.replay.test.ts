@@ -18,15 +18,15 @@ import { MockRegistry } from './framework/ChainContext'
 
 let mockActiveRegistry: any = null
 
-jest.mock('../../../services/serviceRegistry', () => ({
+vi.mock('../../../services/serviceRegistry', () => ({
     ServiceRegistry: {
-        setCurrent: jest.fn((reg) => {
+        setCurrent: vi.fn((reg) => {
             mockActiveRegistry = reg
         }),
-        getCurrent: jest.fn(() => {
+        getCurrent: vi.fn(() => {
             return mockActiveRegistry
         }),
-        clear: jest.fn(() => {
+        clear: vi.fn(() => {
             mockActiveRegistry = null
         }),
     },

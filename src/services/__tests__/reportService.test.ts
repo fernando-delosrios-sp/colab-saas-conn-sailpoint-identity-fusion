@@ -4,7 +4,7 @@ import { ReportService } from '../reportService'
 describe('ReportService', () => {
     const createService = (overrides: Partial<any> = {}) => {
         const log = {
-            getAggregationIssueSummary: jest.fn(() => ({
+            getAggregationIssueSummary: vi.fn(() => ({
                 warningCount: 1,
                 errorCount: 2,
                 warningSamples: ['w1'],
@@ -13,15 +13,15 @@ describe('ReportService', () => {
         }
         const sources = {
             fusionAccountCount: 7,
-            getSourceByNameSafe: jest.fn((name?: string) =>
+            getSourceByNameSafe: vi.fn((name?: string) =>
                 name ? { sourceType: SourceType.Authoritative } : undefined
             ),
-            resolveIscAccountIdForManagedKey: jest.fn((id?: string) => id),
+            resolveIscAccountIdForManagedKey: vi.fn((id?: string) => id),
             managedAccountsAllById: new Map<string, any>(),
         }
         const identities = {
-            getIdentityById: jest.fn((id?: string) => (id ? { id, displayName: `Name ${id}` } : undefined)),
-            hydrateMissingIdentitiesById: jest.fn(async () => undefined),
+            getIdentityById: vi.fn((id?: string) => (id ? { id, displayName: `Name ${id}` } : undefined)),
+            hydrateMissingIdentitiesById: vi.fn(async () => undefined),
         }
         const forms = {
             finishedFusionDecisions: [],
@@ -35,16 +35,16 @@ describe('ReportService', () => {
             totalFusionAccountCount: 11,
             newManagedAccountsCount: 13,
             identitiesProcessedCount: 17,
-            getFusionIdentity: jest.fn(() => undefined),
-            getFusionAccountByManagedKey: jest.fn(() => undefined),
+            getFusionIdentity: vi.fn(() => undefined),
+            getFusionAccountByManagedKey: vi.fn(() => undefined),
             fusionIdentities: [],
         }
         const messaging = {
-            fetchSender: jest.fn(async () => undefined),
-            sendReport: jest.fn(async () => undefined),
-            sendReportTo: jest.fn(async () => undefined),
-            deliverReportToRecipients: jest.fn(async () => undefined),
-            renderFusionReportHtml: jest.fn(() => '<html/>'),
+            fetchSender: vi.fn(async () => undefined),
+            sendReport: vi.fn(async () => undefined),
+            sendReportTo: vi.fn(async () => undefined),
+            deliverReportToRecipients: vi.fn(async () => undefined),
+            renderFusionReportHtml: vi.fn(() => '<html/>'),
         }
         return {
             service: new ReportService(
@@ -70,7 +70,7 @@ describe('ReportService', () => {
                 ],
             },
             identities: {
-                hydrateMissingIdentitiesById: jest.fn(async (ids: string[]) => idsSeen.push(ids)),
+                hydrateMissingIdentitiesById: vi.fn(async (ids: string[]) => idsSeen.push(ids)),
             },
         })
 
@@ -148,7 +148,7 @@ describe('ReportService', () => {
         const { service } = createService({
             sources: {
                 managedAccountsAllById,
-                resolveIscAccountIdForManagedKey: jest.fn(() => undefined),
+                resolveIscAccountIdForManagedKey: vi.fn(() => undefined),
             },
             forms: {
                 finishedFusionDecisions: [
@@ -180,10 +180,10 @@ describe('ReportService', () => {
         // (found via identityId) already has iscAccountId set by addManagedAccountLayer.
         const { service } = createService({
             sources: {
-                resolveIscAccountIdForManagedKey: jest.fn(() => undefined),
+                resolveIscAccountIdForManagedKey: vi.fn(() => undefined),
             },
             fusion: {
-                getFusionIdentity: jest.fn((id: string) =>
+                getFusionIdentity: vi.fn((id: string) =>
                     id === 'id-new' ? { iscAccountId: 'isc-from-fusion' } : undefined
                 ),
             },
@@ -217,10 +217,10 @@ describe('ReportService', () => {
         // composite managed key in fusionAccountMap.
         const { service } = createService({
             sources: {
-                resolveIscAccountIdForManagedKey: jest.fn(() => undefined),
+                resolveIscAccountIdForManagedKey: vi.fn(() => undefined),
             },
             fusion: {
-                getFusionAccountByManagedKey: jest.fn((key: string) =>
+                getFusionAccountByManagedKey: vi.fn((key: string) =>
                     key === 'source-1::native-1' ? { iscAccountId: 'isc-from-fusion-map' } : undefined
                 ),
             },
@@ -255,10 +255,10 @@ describe('ReportService', () => {
         const identityAccounts = [{ managedKey: 'source-1::native-1', iscAccountId: 'isc-from-identity-scan' }]
         const { service } = createService({
             sources: {
-                resolveIscAccountIdForManagedKey: jest.fn(() => undefined),
+                resolveIscAccountIdForManagedKey: vi.fn(() => undefined),
             },
             fusion: {
-                getFusionAccountByManagedKey: jest.fn(() => undefined),
+                getFusionAccountByManagedKey: vi.fn(() => undefined),
                 get fusionIdentities() {
                     return identityAccounts
                 },
@@ -300,7 +300,7 @@ describe('ReportService', () => {
         const { service } = createService({
             sources: {
                 managedAccountsAllById,
-                resolveIscAccountIdForManagedKey: jest.fn(() => undefined),
+                resolveIscAccountIdForManagedKey: vi.fn(() => undefined),
             },
             forms: {
                 finishedFusionDecisions: [
@@ -348,7 +348,7 @@ describe('ReportService', () => {
     it('does not use raw identityId as selectedIdentityName fallback', () => {
         const { service } = createService({
             identities: {
-                getIdentityById: jest.fn(() => undefined),
+                getIdentityById: vi.fn(() => undefined),
             },
             forms: {
                 finishedFusionDecisions: [

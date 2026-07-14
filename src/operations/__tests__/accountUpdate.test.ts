@@ -1,33 +1,34 @@
 import { accountUpdate } from '../accountUpdate'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 import { executeActions } from '../actions'
+import type { Mock } from 'vitest'
 
-jest.mock('../helpers/rebuildFusionAccount', () => ({
-    rebuildFusionAccount: jest.fn(),
+vi.mock('../helpers/rebuildFusionAccount', () => ({
+    rebuildFusionAccount: vi.fn(),
 }))
 
-jest.mock('../actions', () => ({
-    executeActions: jest.fn(),
+vi.mock('../actions', () => ({
+    executeActions: vi.fn(),
 }))
 
 import { createRegistry as createMockRegistry } from './harness/registryMocking'
 
 function createRegistry() {
     const registry = createMockRegistry()
-    Object.assign(registry.fusion, { getISCAccount: jest.fn().mockResolvedValue({ id: 'isc-updated' }) })
+    Object.assign(registry.fusion, { getISCAccount: vi.fn().mockResolvedValue({ id: 'isc-updated' }) })
     return registry
 }
 
 describe('accountUpdate', () => {
     afterEach(() => {
-        jest.restoreAllMocks()
-        jest.clearAllMocks()
+        vi.restoreAllMocks()
+        vi.clearAllMocks()
     })
 
     it('executes action entitlement changes and returns updated account', async () => {
         const registry = createRegistry()
         const fusionAccount = { managedKey: 'fusion-1', name: 'Fusion User' }
-        ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue(fusionAccount)
 
         const input = {
             identity: 'fusion-1',
@@ -56,7 +57,7 @@ describe('accountUpdate', () => {
     it('skips correlation status recompute when removing correlated action', async () => {
         const registry = createRegistry()
         const fusionAccount = { managedKey: 'fusion-1', name: 'Fusion User' }
-        ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue(fusionAccount)
 
         await accountUpdate(registry, {
             identity: 'fusion-1',
@@ -69,7 +70,7 @@ describe('accountUpdate', () => {
 
     it('logs crash for unsupported entitlement change attribute', async () => {
         const registry = createRegistry()
-        ;(rebuildFusionAccount as jest.Mock).mockResolvedValue({ managedKey: 'fusion-1' })
+        ;(rebuildFusionAccount as Mock).mockResolvedValue({ managedKey: 'fusion-1' })
 
         await accountUpdate(registry, {
             identity: 'fusion-1',
@@ -103,8 +104,8 @@ describe('accountUpdate', () => {
                 delete this.attributes[attributeName]
             },
         }
-        ;(rebuildFusionAccount as jest.Mock).mockResolvedValue(fusionAccount)
-        ;(executeActions as jest.Mock).mockImplementation(async (account) => {
+        ;(rebuildFusionAccount as Mock).mockResolvedValue(fusionAccount)
+        ;(executeActions as Mock).mockImplementation(async (account) => {
             account.attributes.reverseNativeIdentity = 'native-after-action'
         })
 

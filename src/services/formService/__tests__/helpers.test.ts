@@ -106,15 +106,15 @@ describe('formService helpers', () => {
     describe('calculateExpirationDate', () => {
         it('should add days to current date', () => {
             const base = new Date('2024-01-15')
-            jest.useFakeTimers()
-            jest.setSystemTime(base)
+            vi.useFakeTimers()
+            vi.setSystemTime(base)
 
             const result = calculateExpirationDate(10)
             const expected = new Date(base)
             expected.setDate(expected.getDate() + 10)
             expect(new Date(result).toDateString()).toBe(expected.toDateString())
 
-            jest.useRealTimers()
+            vi.useRealTimers()
         })
     })
 

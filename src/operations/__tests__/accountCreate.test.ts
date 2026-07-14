@@ -2,16 +2,16 @@ import { accountCreate } from '../accountCreate'
 import { executeActions } from '../actions'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 
-jest.mock('../actions', () => ({
-    executeActions: jest.fn(),
+vi.mock('../actions', () => ({
+    executeActions: vi.fn(),
 }))
 
 import { createRegistry } from './harness/registryMocking'
 
 describe('accountCreate', () => {
     afterEach(() => {
-        jest.restoreAllMocks()
-        jest.clearAllMocks()
+        vi.restoreAllMocks()
+        vi.clearAllMocks()
     })
 
     it('creates fusion account from identity and executes actions', async () => {

@@ -2,6 +2,7 @@ import { accountList } from '../accountList'
 import { aggregationScenarios } from './fixtures/aggregationScenarios'
 import { AggregationScenario } from './fixtures/scenarioTypes'
 import { createBaseOperationRegistry, SourceConfigLike } from './harness/mockRegistry'
+import type { Mock } from 'vitest'
 
 function createMockRegistry(sourceConfigs: SourceConfigLike[]) {
     const { registry, schemas, sources, identities, fusion } = createBaseOperationRegistry(sourceConfigs)
@@ -66,7 +67,7 @@ function createTwoPassRegistry(scenario: AggregationScenario) {
 
 describe('accountList setup phase', () => {
     afterEach(() => {
-        jest.restoreAllMocks()
+        vi.restoreAllMocks()
     })
 
     it('refreshes schema after reverse-correlation setup so new attributes are retained', async () => {
@@ -77,7 +78,7 @@ describe('accountList setup phase', () => {
             correlationDisplayName: 'HR Native Identity',
         }
         const { registry, schemas, sources } = createMockRegistry([reverseSource])
-        sources.setupReverseCorrelationSources = jest.fn().mockResolvedValue(1)
+        sources.setupReverseCorrelationSources = vi.fn().mockResolvedValue(1)
         const input = { schema: { attributes: [] } } as any
 
         await accountList(registry, input)
@@ -133,7 +134,7 @@ describe('accountList setup phase', () => {
 
         ;(fusion as any).fusionOwnerIsGlobalReviewer = true
         const globalOwnerIds = Array.from({ length: 61 }, (_, i) => `identity-${i + 1}`)
-        ;(sources as any).fetchGlobalOwnerIdentityIds = jest.fn().mockResolvedValue(globalOwnerIds)
+        ;(sources as any).fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(globalOwnerIds)
 
         await accountList(registry, input)
 
@@ -186,7 +187,7 @@ describe('accountList setup phase', () => {
 
 describe('accountList two-pass aggregation lifecycle', () => {
     afterEach(() => {
-        jest.restoreAllMocks()
+        vi.restoreAllMocks()
     })
 
     it.each(aggregationScenarios)('$name', async (scenario) => {
@@ -201,7 +202,7 @@ describe('accountList two-pass aggregation lifecycle', () => {
         expect(fusion.processFusionIdentityDecisions).toHaveBeenCalledTimes(1)
         expect(sources.releaseProcessLock).toHaveBeenCalledTimes(1)
         expect(res.send).toHaveBeenCalledTimes(scenario.passData.pass1.outputAccounts.length)
-        ;(res.send as jest.Mock).mockClear()
+        ;(res.send as Mock).mockClear()
         setPass('pass2')
         await accountList(registry, input)
 

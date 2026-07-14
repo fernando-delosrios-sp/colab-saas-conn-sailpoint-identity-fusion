@@ -8,7 +8,7 @@ function createMockRegistry(sourceConfigs: SourceConfigLike[]) {
 
 describe('testConnection', () => {
     afterEach(() => {
-        jest.restoreAllMocks()
+        vi.restoreAllMocks()
     })
 
     it('enforces reverse correlation setup for reverse sources', async () => {

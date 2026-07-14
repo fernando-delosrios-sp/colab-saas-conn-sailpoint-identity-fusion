@@ -4,14 +4,14 @@ import { ConnectorError } from '@sailpoint/connector-sdk'
 
 describe('assert', () => {
     const mockLog = {
-        crash: jest.fn(),
-        error: jest.fn(),
-        warn: jest.fn(),
-        flush: jest.fn(),
+        crash: vi.fn(),
+        error: vi.fn(),
+        warn: vi.fn(),
+        flush: vi.fn(),
     }
 
     beforeEach(() => {
-        jest.clearAllMocks()
+        vi.clearAllMocks()
     })
 
     describe('assert - success cases', () => {

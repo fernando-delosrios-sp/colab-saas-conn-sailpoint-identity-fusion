@@ -5,11 +5,11 @@ describe('correlateAction', () => {
     it('correlates missing accounts on Add', async () => {
         const fusionAccount = {
             name: 'Fusion User',
-            removeAction: jest.fn(),
+            removeAction: vi.fn(),
         } as any
         const serviceRegistry = {
-            log: { debug: jest.fn() },
-            fusion: { correlateMissingAccountsPerSource: jest.fn().mockResolvedValue(undefined) },
+            log: { debug: vi.fn() },
+            fusion: { correlateMissingAccountsPerSource: vi.fn().mockResolvedValue(undefined) },
         } as any
 
         await correlateAction(fusionAccount, { op: AttributeChangeOp.Add, value: 'correlated' }, serviceRegistry)
@@ -21,11 +21,11 @@ describe('correlateAction', () => {
     it('removes correlated action entitlement on Remove', async () => {
         const fusionAccount = {
             name: 'Fusion User',
-            removeAction: jest.fn(),
+            removeAction: vi.fn(),
         } as any
         const serviceRegistry = {
-            log: { debug: jest.fn() },
-            fusion: { correlateMissingAccountsPerSource: jest.fn().mockResolvedValue(undefined) },
+            log: { debug: vi.fn() },
+            fusion: { correlateMissingAccountsPerSource: vi.fn().mockResolvedValue(undefined) },
         } as any
 
         await correlateAction(fusionAccount, { op: AttributeChangeOp.Remove, value: 'correlated' }, serviceRegistry)

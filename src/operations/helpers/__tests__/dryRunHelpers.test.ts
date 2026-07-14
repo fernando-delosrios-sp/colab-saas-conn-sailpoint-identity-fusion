@@ -29,10 +29,11 @@ import { DryRunOptionEmitCounter } from '../buildDryRunPayload'
 import { FusionAccount } from '../../../model/account'
 import { buildReportAccountIndex } from '../buildDryRunPayload'
 import * as buildDryRunPayload from '../buildDryRunPayload'
+import type { Mock } from 'vitest'
 
-jest.mock('../buildDryRunPayload', () => ({
-    ...jest.requireActual('../buildDryRunPayload'),
-    enrichISCAccountWithMatching: jest.fn(),
+vi.mock('../buildDryRunPayload', async () => ({
+    ...(await vi.importActual<typeof import('../buildDryRunPayload')>('../buildDryRunPayload')),
+    enrichISCAccountWithMatching: vi.fn(),
 }))
 
 describe('streamUncorrelatedAnalyzedRows', () => {
@@ -49,11 +50,11 @@ describe('streamUncorrelatedAnalyzedRows', () => {
 
     beforeEach(() => {
         mockContext = {
-            log: { info: jest.fn() },
-            fusion: { getISCAccount: jest.fn() },
+            log: { info: vi.fn() },
+            fusion: { getISCAccount: vi.fn() },
             schemas: { fusionIdentityAttribute: 'id' },
             config: { baseurl: 'http://localhost' },
-            sources: { resolveIscAccountIdForManagedKey: jest.fn((id: string) => id) },
+            sources: { resolveIscAccountIdForManagedKey: vi.fn((id: string) => id) },
         }
         mockAnalyzedAccounts = []
         mockReportIndex = buildReportAccountIndex([])
@@ -72,8 +73,8 @@ describe('streamUncorrelatedAnalyzedRows', () => {
             includeExisting: 0,
         }
         mockRowEmitter = {
-            emitRow: jest.fn().mockResolvedValue(undefined),
-            close: jest.fn().mockResolvedValue(undefined),
+            emitRow: vi.fn().mockResolvedValue(undefined),
+            close: vi.fn().mockResolvedValue(undefined),
             diskOutputPath: 'test-path',
         }
         runtimeOptions = {
@@ -86,7 +87,7 @@ describe('streamUncorrelatedAnalyzedRows', () => {
             includeDecisions: true,
             writeToDisk: false,
         }
-        jest.clearAllMocks()
+        vi.clearAllMocks()
     })
 
     it('returns sentRows immediately if selectedCategories is empty', async () => {
@@ -141,7 +142,7 @@ describe('streamUncorrelatedAnalyzedRows', () => {
 
         mockContext.fusion.getISCAccount.mockResolvedValueOnce(iscOutput1).mockResolvedValueOnce(iscOutput2)
 
-        const enrichMock = buildDryRunPayload.enrichISCAccountWithMatching as jest.Mock
+        const enrichMock = buildDryRunPayload.enrichISCAccountWithMatching as Mock
         enrichMock.mockReturnValueOnce({
             account: { attributes: { id: 'user1', statuses: ['nonMatched'] } },
             status: 'non-matched',

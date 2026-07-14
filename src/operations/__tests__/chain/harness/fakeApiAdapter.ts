@@ -3,7 +3,7 @@ import { IscApiAdapter } from '../../../../services/clientService/iscApiAdapter'
 
 /**
  * A test-only IscApiAdapter that returns mock API objects.
- * Each API getter returns a jest.fn()-backed object whose methods can be configured
+ * Each API getter returns a vi.fn()-backed object whose methods can be configured
  * to return prerecorded data from ChainState.
  */
 export class FakeApiAdapter implements IscApiAdapter {
@@ -12,7 +12,7 @@ export class FakeApiAdapter implements IscApiAdapter {
     // Mocks for all API endpoints
     private _accountsApi: AccountsV2025Api = {} as any
     private _identitiesApi: IdentitiesV2025Api = {} as any
-    private _searchApi: SearchApi = { searchPost: jest.fn() } as any
+    private _searchApi: SearchApi = { searchPost: vi.fn() } as any
     private _sourcesApi: SourcesV2025Api = {} as any
     private _customFormsApi: CustomFormsV2025Api = {} as any
     private _workflowsApi: WorkflowsV2025Api = {} as any
