@@ -266,6 +266,26 @@ $Normalize.address("Toronto, Ontario M5H 2N2", "CA")
 ## "Toronto, Ontario M5H 2N2"
 ```
 
+`Normalize.ascii(input, language?)` transliterates non-ASCII characters to their ASCII equivalents. The optional `language` parameter enables language-specific digraph rules. Supported languages: `"de"` (German: ä→ae, ö→oe, ü→ue, ß→ss), `"no"` (Norwegian), `"da"` (Danish), and `"sv"` (Swedish: ä→ae, ö→oe, å→aa, ø→oe). When no language is provided or the language is unrecognized, the helper falls back to generic transliteration (strips diacritics: ä→a, é→e, etc.). Output is always lowercase; chain with `$Normalize.name()` for proper-casing.
+
+```velocity
+## German (DACH) digraph rules
+$Normalize.ascii("Müller", "de")
+## "mueller"
+
+## Chain with Normalize.name for proper-casing
+$Normalize.name($Normalize.ascii("MÜLLER", "de"))
+## "Mueller"
+
+## Nordic digraph rules (Norwegian, Danish, Swedish)
+$Normalize.ascii("Søren Østergaard", "no")
+## "soeren oestergaard"
+
+## Generic transliteration fallback (no language)
+$Normalize.ascii("José García")
+## "jose garcia"
+```
+
 ---
 
 ## Order of operations

@@ -3,9 +3,63 @@ import { CountryCode, parsePhoneNumberFromString } from 'libphonenumber-js'
 import { State } from './geo/geoData'
 import { capitalizeFirst } from '../../../utils'
 import { parseAddressSync } from './addressParse'
+import { transliterate } from 'transliteration'
 
 /** Lowercase name particles treated as non-capitalised in proper-case formatting. */
 const NAME_PARTICLES = new Set(['van', 'von', 'de', 'del', 'della', 'di', 'da', 'le', 'la', 'der', 'den', 'du', 'y'])
+
+/**
+ * German (DACH) digraph replacements.
+ * ä→ae, ö→oe, ü→ue, ß→ss
+ */
+const DACH_DIGRAPHS: Record<string, string> = {
+    'ä': 'ae',
+    'ö': 'oe',
+    'ü': 'ue',
+    'ß': 'ss',
+}
+
+/**
+ * Nordic digraph replacements.
+ * ä→ae, ö→oe, å→aa, ø→oe
+ */
+const NORDIC_DIGRAPHS: Record<string, string> = {
+    'ä': 'ae',
+    'ö': 'oe',
+    'å': 'aa',
+    'ø': 'oe',
+}
+
+/**
+ * Language code to digraph rule set mapping.
+ * Multiple locale variants (e.g., de-DE, de-AT) resolve hierarchically to the base language.
+ */
+const LANGUAGE_RULES: Record<string, Record<string, string>> = {
+    de: DACH_DIGRAPHS,
+    no: NORDIC_DIGRAPHS,
+    da: NORDIC_DIGRAPHS,
+    sv: NORDIC_DIGRAPHS,
+}
+
+/**
+ * Resolves a language code to its digraph rule set.
+ * Supports hierarchical fallback: "de-DE" → "de" → rule set.
+ * Returns undefined if no rules match (falls back to generic transliteration).
+ */
+const resolveLanguage = (language: string): Record<string, string> | undefined => {
+    const key = language.toLowerCase()
+    if (LANGUAGE_RULES[key]) {
+        return LANGUAGE_RULES[key]
+    }
+    const dashIdx = key.indexOf('-')
+    if (dashIdx !== -1) {
+        const prefix = key.substring(0, dashIdx)
+        if (LANGUAGE_RULES[prefix]) {
+            return LANGUAGE_RULES[prefix]
+        }
+    }
+    return undefined
+}
 
 /**
  * Wraps a Normalize helper that may return undefined or throw.
@@ -368,6 +422,32 @@ const normalizeAddress = (address: string, countryCode: string = 'US'): string |
     return address.trim()
 }
 
+/**
+ * Transliterates non-ASCII characters to their ASCII equivalents.
+ * When a recognized language code is provided, applies language-specific digraph rules.
+ * Otherwise, falls back to the transliteration library for generic diacritic stripping.
+ * Always returns lowercase ASCII output.
+ * @param input - The string to transliterate
+ * @param language - Optional language code (e.g., "de", "no", "sv"). Supports hierarchical resolution (e.g., "de-DE" → "de").
+ * @returns Lowercase ASCII string, or undefined if input is empty/whitespace
+ */
+const normalizeAscii = (input: string, language?: string): string | undefined => {
+    if (!input || !input.trim()) return undefined
+
+    const rules = language ? resolveLanguage(language) : undefined
+    let result = input.toLowerCase()
+
+    if (rules) {
+        for (const [char, replacement] of Object.entries(rules)) {
+            result = result.split(char).join(replacement)
+        }
+    } else {
+        result = transliterate(result)
+    }
+
+    return result
+}
+
 export const Normalize = {
     date: withNormalizeFallback('date', normalizeDate),
     phone: withNormalizeFallback('phone', normalizePhoneNumber),
@@ -375,4 +455,5 @@ export const Normalize = {
     fullName: withNormalizeFallback('fullName', normalizeFullName),
     ssn: withNormalizeFallback('ssn', normalizeSSN),
     address: withNormalizeFallback('address', normalizeAddress),
+    ascii: withNormalizeFallback('ascii', normalizeAscii),
 }

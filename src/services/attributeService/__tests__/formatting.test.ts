@@ -345,6 +345,172 @@ describe('evaluateVelocityTemplate', () => {
     })
 
     // ========================================================================
+    // Normalize.ascii() - Diacritic Transliteration
+    // ========================================================================
+
+    describe('Normalize.ascii() - diacritic transliteration', () => {
+        describe('German (de) - DACH digraph rules', () => {
+            it('should convert German umlauts to digraphs', () => {
+                const context = { name: 'Müller' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de")', context)
+                expect(result).toBe('mueller')
+            })
+
+            it('should convert German sharp s to ss', () => {
+                const context = { name: 'Straße' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de")', context)
+                expect(result).toBe('strasse')
+            })
+
+            it('should handle multiple German characters in one string', () => {
+                const context = { name: 'Günther Müller' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de")', context)
+                expect(result).toBe('guenther mueller')
+            })
+
+            it('should resolve de-DE locale variant to DACH rules', () => {
+                const context = { name: 'Müller' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de-DE")', context)
+                expect(result).toBe('mueller')
+            })
+
+            it('should resolve de-AT locale variant to DACH rules', () => {
+                const context = { name: 'Müller' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de-AT")', context)
+                expect(result).toBe('mueller')
+            })
+
+            it('should resolve de-CH locale variant to DACH rules', () => {
+                const context = { name: 'Müller' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de-CH")', context)
+                expect(result).toBe('mueller')
+            })
+
+            it('should handle uppercase language code case-insensitively', () => {
+                const context = { name: 'Müller' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "DE")', context)
+                expect(result).toBe('mueller')
+            })
+
+            it('should handle mixed case language code', () => {
+                const context = { name: 'Müller' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "dE")', context)
+                expect(result).toBe('mueller')
+            })
+        })
+
+        describe('Nordic (no, da, sv) - Nordic digraph rules', () => {
+            it('should convert Norwegian characters to digraphs', () => {
+                const context = { name: 'Søren Østergaard' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "no")', context)
+                expect(result).toBe('soeren oestergaard')
+            })
+
+            it('should convert Danish characters to digraphs', () => {
+                const context = { name: 'Jørgen Ågaard' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "da")', context)
+                expect(result).toBe('joergen aagaard')
+            })
+
+            it('should convert Swedish characters to digraphs', () => {
+                const context = { name: 'Sören Åström' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "sv")', context)
+                expect(result).toBe('soeren aastroem')
+            })
+
+            it('should resolve no-NO locale variant to Nordic rules', () => {
+                const context = { name: 'Søren' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "no-NO")', context)
+                expect(result).toBe('soeren')
+            })
+
+            it('should resolve da-DK locale variant to Nordic rules', () => {
+                const context = { name: 'Jørgen' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "da-DK")', context)
+                expect(result).toBe('joergen')
+            })
+
+            it('should resolve sv-SE locale variant to Nordic rules', () => {
+                const context = { name: 'Sören' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "sv-SE")', context)
+                expect(result).toBe('soeren')
+            })
+        })
+
+        describe('Transliteration fallback', () => {
+            it('should fall back to transliteration when no language provided', () => {
+                const context = { name: 'José' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name)', context)
+                expect(result).toBe('jose')
+            })
+
+            it('should fall back to transliteration for unknown language', () => {
+                const context = { name: 'Müller' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "xyz")', context)
+                expect(result).toBe('muller')
+            })
+
+            it('should fall back to transliteration for French names', () => {
+                const context = { name: 'José García' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "fr")', context)
+                expect(result).toBe('jose garcia')
+            })
+
+            it('should fall back to transliteration for Spanish names', () => {
+                const context = { name: 'García' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "es")', context)
+                expect(result).toBe('garcia')
+            })
+        })
+
+        describe('Chaining with other Normalize helpers', () => {
+            it('should chain with Normalize.name to produce proper-cased DACH name', () => {
+                const context = { name: 'MÜLLER' }
+                const result = evaluateVelocityTemplate('$Normalize.name($Normalize.ascii($name, "de"))', context)
+                expect(result).toBe('Mueller')
+            })
+
+            it('should chain with Normalize.fullName to produce proper-cased DACH full name', () => {
+                const context = { name: 'GÜNTHER MÜLLER' }
+                const result = evaluateVelocityTemplate('$Normalize.fullName($Normalize.ascii($name, "de"))', context)
+                expect(result).toBe('Guenther Mueller')
+            })
+        })
+
+        describe('Edge cases', () => {
+            it('should return undefined for empty string', () => {
+                const context = { name: '' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de")', context)
+                expect(result).toBeUndefined()
+            })
+
+            it('should return undefined for whitespace-only input', () => {
+                const context = { name: '   ' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de")', context)
+                expect(result).toBeUndefined()
+            })
+
+            it('should handle pure ASCII input unchanged', () => {
+                const context = { name: 'hello' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de")', context)
+                expect(result).toBe('hello')
+            })
+
+            it('should always return lowercase output', () => {
+                const context = { name: 'MÜLLER' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de")', context)
+                expect(result).toBe('mueller')
+            })
+
+            it('should handle mixed case input producing lowercase output', () => {
+                const context = { name: 'MüLlEr' }
+                const result = evaluateVelocityTemplate('$Normalize.ascii($name, "de")', context)
+                expect(result).toBe('mueller')
+            })
+        })
+    })
+
+    // ========================================================================
     // AddressParse - City/State Lookup
     // ========================================================================
 
