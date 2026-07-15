@@ -29,6 +29,8 @@ function createRegistry() {
     registry.sources.saveBatchCumulativeCount = jest.fn().mockResolvedValue(undefined)
     registry.sources.clearFusionAccounts = jest.fn()
     registry.sources.aggregateDelayedSources = jest.fn().mockResolvedValue(undefined)
+    registry.sources.setProcessLock = jest.fn().mockResolvedValue(undefined)
+    registry.sources.releaseProcessLock = jest.fn().mockResolvedValue(undefined)
     return {
         registry,
         forms: registry.forms,

@@ -365,7 +365,7 @@
                             "label": "Skip accounts with missing ID?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Skip accounts that are missing a unique identity value. These accounts will be logged so you can review them later"
+                            "helpKey": "Skip accounts that are missing a unique identity value. When disabled, missing identity or display attributes are automatically populated with fallback values (UUID and account name, respectively)."
                         },
                         {
                             "key": "cascadeAggregationEnabled",
