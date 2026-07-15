@@ -365,6 +365,8 @@ export class AttributeService {
                 throw error
             }
         }
+
+        this.ensureCoreSchemaAttributes(fusionAccount)
     }
 
     /**
@@ -494,7 +496,10 @@ export class AttributeService {
         if (fusionAccount.type === FusionAccountKind.Decision && !fusionAccount.needsReset) return
         if (fusionAccount.isMatch) return
 
-        if (this.uniqueDefinitions.length === 0) return
+        if (this.uniqueDefinitions.length === 0) {
+            this.ensureCoreSchemaAttributes(fusionAccount)
+            return
+        }
 
         // Also refresh when any unique attribute value is missing or empty, to recover from
         // failed generation on a prior run (e.g. $account resolved to an identity object
@@ -504,7 +509,10 @@ export class AttributeService {
         )
 
         const shouldRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || hasMissingUniqueAttribute
-        if (!shouldRefresh) return
+        if (!shouldRefresh) {
+            this.ensureCoreSchemaAttributes(fusionAccount)
+            return
+        }
 
         this.log.debug(`Refreshing unique attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`)
 
@@ -525,6 +533,8 @@ export class AttributeService {
                 throw error
             }
         }
+
+        this.ensureCoreSchemaAttributes(fusionAccount)
     }
 
     /**
@@ -1162,6 +1172,38 @@ export class AttributeService {
         return undefined
     }
 
+    /**
+     * If the account lacks a value for the fusionIdentityAttribute or fusionDisplayAttribute,
+     * automatically generate/assign a fallback.
+     * Preserves any previously generated values from previousAttributes if available.
+     */
+    private ensureCoreSchemaAttributes(fusionAccount: FusionAccount): void {
+        const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
+
+        if (!this.skipAccountsWithMissingId && !isValidAttributeValue(fusionAccount.attributes[fusionIdentityAttribute])) {
+            const prevId = fusionAccount.previousAttributes?.[fusionIdentityAttribute]
+            if (isValidAttributeValue(prevId)) {
+                fusionAccount.attributes[fusionIdentityAttribute] = prevId
+            } else {
+                fusionAccount.attributes[fusionIdentityAttribute] = uuidv4()
+                this.log.debug(`Generated fallback UUID for missing identity attribute: ${fusionAccount.name}`)
+            }
+        }
+
+        if (!isValidAttributeValue(fusionAccount.attributes[fusionDisplayAttribute])) {
+            const prevDisplay = fusionAccount.previousAttributes?.[fusionDisplayAttribute]
+            if (isValidAttributeValue(prevDisplay)) {
+                fusionAccount.attributes[fusionDisplayAttribute] = prevDisplay
+            } else {
+                const defaultDisplay = trimStr(fusionAccount.name)
+                if (defaultDisplay) {
+                    fusionAccount.attributes[fusionDisplayAttribute] = defaultDisplay
+                    this.log.debug(`Generated fallback for missing display attribute: ${fusionAccount.name}`)
+                }
+            }
+        }
+    }
+
     // ------------------------------------------------------------------------
     // Private Attribute Processing Flow
     // ------------------------------------------------------------------------
@@ -1200,10 +1242,10 @@ export class AttributeService {
         fusionAccount: FusionAccount,
         context: Record<string, any>
     ): Promise<void> {
-        const { name, refresh } = definition
+        const { name, refresh, static: isStatic } = definition
         if (this.isSystemProvenanceAttribute(name)) return
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
-        const needsRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || refresh
+        const needsRefresh = isStatic ? fusionAccount.needsReset : (fusionAccount.needsRefresh || fusionAccount.needsReset || refresh)
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
         const canResetDisplay = fusionAccount.needsReset && name === fusionDisplayAttribute
         const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
