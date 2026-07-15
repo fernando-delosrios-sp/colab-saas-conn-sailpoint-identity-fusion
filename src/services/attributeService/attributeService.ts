@@ -33,7 +33,7 @@ import { isValidAttributeValue } from '../../utils/attributes'
 import { StateWrapper } from './stateWrapper'
 import { buildManagedAccountKey } from '../../model/managedAccountKey'
 import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/velocityAccountSnapshot'
-import { hasValue, missing, readString, trimStr } from '../../utils/safeRead'
+import { hasValue, isNullish, missing, readString, trimStr } from '../../utils/safeRead'
 import { runtimeDefaults } from '../../data/config'
 import { FusionAttribute } from '../../data/schema'
 
@@ -611,7 +611,7 @@ export class AttributeService {
 
         const uniqueId = fusionAccount.attributes[fusionIdentityAttribute] as string | undefined
 
-        if (this.skipAccountsWithMissingId && !uniqueId) {
+        if (isNullish(uniqueId) && this.skipAccountsWithMissingId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
                 `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
@@ -619,10 +619,9 @@ export class AttributeService {
             return undefined
         }
 
-        const managedKey = fusionAccount.managedKey
-        assert(managedKey, `Managed key is required for simple key`)
+        assert(uniqueId, `Unique ID is required for simple key`)
 
-        return SimpleKey(managedKey)
+        return SimpleKey(uniqueId)
     }
 
     /**
