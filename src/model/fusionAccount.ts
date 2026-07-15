@@ -357,10 +357,10 @@ export class FusionAccount {
      * @param fusionSourceId - The id of the Fusion source itself
      * @returns A fully initialized FusionAccount with restored state
      */
-    public static fromFusionAccount(account: Account, fusionSourceId: string): FusionAccount {
+    public static fromFusionAccount(account: Account): FusionAccount {
         const fusionAccount = new FusionAccount()
         const identityInfo = buildIdentityInfo(account)
-        const managedKey = `${fusionSourceId}::${account.nativeIdentity as string}`
+        const managedKey = account.nativeIdentity as string
 
         fusionAccount.initializeCoreState({
             type: FusionAccountKind.Fusion,

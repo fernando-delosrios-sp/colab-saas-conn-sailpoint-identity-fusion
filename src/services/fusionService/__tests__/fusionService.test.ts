@@ -268,7 +268,7 @@ describe('FusionService', () => {
             const result = await fusionService.processFusionAccounts()
 
             expect(result).toHaveLength(1)
-            expect(result[0].managedKey).toBe(`${FUSION_SOURCE_ID}::fusion-1`)
+            expect(result[0].managedKey).toBe(`fusion-1`)
         })
 
         it('removes the correlated identity from the identity work queue after processing', async () => {
@@ -463,7 +463,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            const fusionAccount = FusionAccount.fromFusionAccount(prior, FUSION_SOURCE_ID)
+            const fusionAccount = FusionAccount.fromFusionAccount(prior)
 
             // name is the source title (account.name) and is empty here; alias chain picks up the identity ref name
             expect(fusionAccount.name).toBeUndefined()
@@ -486,7 +486,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            const fusionAccount = FusionAccount.fromFusionAccount(prior, FUSION_SOURCE_ID)
+            const fusionAccount = FusionAccount.fromFusionAccount(prior)
 
             // No identityId was supplied, so IdentityInfo cannot be built: name-only references
             // are not treated as identity linkages.
@@ -509,7 +509,7 @@ describe('FusionService', () => {
                 identityId: 'identity-xyz',
             } as unknown as Account
 
-            const fusionAccount = FusionAccount.fromFusionAccount(prior, FUSION_SOURCE_ID)
+            const fusionAccount = FusionAccount.fromFusionAccount(prior)
 
             const identityDoc = {
                 id: 'identity-xyz',
@@ -2024,7 +2024,7 @@ describe('FusionService', () => {
                     accounts: ['missing-1'],
                     reverseNativeIdentity: 'existing-value',
                 },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
 
             await (fusionService as any).correlationManager.correlatePerSource(fusionAccount)
 
@@ -2044,7 +2044,7 @@ describe('FusionService', () => {
                 name: 'Fusion Account',
                 sourceName: 'Identity Fusion NG',
                 attributes: { accounts: ['source-a-id::native-no-meta'] },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
 
             const linkDecision = {
                 submitter: { id: 'rev-1', email: '', name: 'Reviewer' },
@@ -2235,7 +2235,7 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: { accounts: ['acct-missing-1'] },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
             // Simulate the flag that updateCorrelationStatus would set
             account.addMissingAccountId('acct-missing-1')
             account.updateCorrelationStatus()
@@ -2244,7 +2244,7 @@ describe('FusionService', () => {
             fusionService.setFusionAccount(account)
 
             const inIdentityMap = fusionService.getFusionIdentity('identity-1')
-            const inAccountMap = fusionService.getFusionAccountByManagedKey(`${FUSION_SOURCE_ID}::fusion-uncorr-1`)
+            const inAccountMap = fusionService.getFusionAccountByManagedKey(`fusion-uncorr-1`)
             expect(inIdentityMap).toBe(account)
             expect(inAccountMap).toBeUndefined()
         })
@@ -2256,11 +2256,11 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: true,
                 attributes: {},
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
 
             fusionService.setFusionAccount(account)
 
-            const inAccountMap = fusionService.getFusionAccountByManagedKey(`${FUSION_SOURCE_ID}::fusion-noident-1`)
+            const inAccountMap = fusionService.getFusionAccountByManagedKey(`fusion-noident-1`)
             expect(inAccountMap).toBe(account)
         })
 
@@ -2272,12 +2272,12 @@ describe('FusionService', () => {
                 name: 'Persisted Identity',
                 sourceName: 'Identity Fusion NG',
                 attributes: { identityId: 'identity-1' },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
 
             fusionService.setFusionAccount(account)
 
             expect(fusionService.getFusionIdentity('identity-1')).toBe(account)
-            expect(fusionService.getFusionAccountByManagedKey(`${FUSION_SOURCE_ID}::fusion-attr-1`)).toBeUndefined()
+            expect(fusionService.getFusionAccountByManagedKey(`fusion-attr-1`)).toBeUndefined()
         })
 
         it('stores persisted fusion accounts under the fusion-source composite key', () => {
@@ -2288,13 +2288,12 @@ describe('FusionService', () => {
                 attributes: {
                     originAccount: 'source-a-id::shared-native-id',
                 },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
 
             fusionService.setFusionAccount(account)
 
             expect(account.originAccountId).toBe('source-a-id::shared-native-id')
-            expect(fusionService.getFusionAccountByManagedKey(`${FUSION_SOURCE_ID}::legacy-native-id`)).toBe(account)
-            expect(fusionService.getFusionAccountByManagedKey('legacy-native-id')).toBeUndefined()
+            expect(fusionService.getFusionAccountByManagedKey(`legacy-native-id`)).toBe(account)
         })
 
         it('normalizes persisted origin composite key when restoring unmatched accounts', () => {
@@ -2305,13 +2304,12 @@ describe('FusionService', () => {
                 attributes: {
                     originAccount: ' source-a-id :: shared-native-id ',
                 },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
 
             fusionService.setFusionAccount(account)
 
             expect(account.originAccountId).toBe('source-a-id::shared-native-id')
-            expect(fusionService.getFusionAccountByManagedKey(`${FUSION_SOURCE_ID}::legacy-native-id`)).toBe(account)
-            expect(fusionService.getFusionAccountByManagedKey('legacy-native-id')).toBeUndefined()
+            expect(fusionService.getFusionAccountByManagedKey(`legacy-native-id`)).toBe(account)
         })
     })
 
@@ -2326,7 +2324,7 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {},
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
             const accountB = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-b',
                 identityId: 'identity-duplicate',
@@ -2334,7 +2332,7 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {},
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
 
             fusionService.setFusionAccount(accountA)
             fusionService.setFusionAccount(accountB)
@@ -2351,8 +2349,8 @@ describe('FusionService', () => {
             expect(conflictWarnings?.occurrences[0].identityId).toBe('identity-duplicate')
             expect(conflictWarnings?.occurrences[0].accountCount).toBe(2)
             expect(conflictWarnings?.occurrences[0].managedKeys).toEqual([
-                `${FUSION_SOURCE_ID}::fusion-a`,
-                `${FUSION_SOURCE_ID}::fusion-b`,
+                `fusion-a`,
+                `fusion-b`,
             ])
         })
 
@@ -2366,7 +2364,7 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {},
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
             const refreshed = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-a',
                 identityId: 'identity-1',
@@ -2374,7 +2372,7 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {},
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
 
             fusionService.setFusionAccount(original)
             fusionService.setFusionAccount(refreshed)
@@ -2395,7 +2393,7 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {},
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
             const accountB = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-b',
                 identityId: 'identity-duplicate',
@@ -2403,7 +2401,7 @@ describe('FusionService', () => {
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: false,
                 attributes: {},
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
 
             fusionService.setFusionAccount(accountA)
             fusionService.setFusionAccount(accountB)

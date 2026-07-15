@@ -221,9 +221,9 @@ describe('FusionAccount', () => {
             iscAccount.nativeIdentity = 'id-1'
             iscAccount.id = 'isc-1'
 
-            const restored = FusionAccount.fromFusionAccount(iscAccount, FUSION_SOURCE_ID)
+            const restored = FusionAccount.fromFusionAccount(iscAccount)
             expect(restored.statuses).toContain('baseline')
-            expect(restored.managedKey).toBe(`${FUSION_SOURCE_ID}::id-1`)
+            expect(restored.managedKey).toBe(`id-1`)
         })
 
         it('round trips the persisted identityId through attributes', () => {
@@ -238,7 +238,7 @@ describe('FusionAccount', () => {
             // Simulate ISC echo: only attributes + nativeIdentity + id are persisted, no top-level identityId
             iscAccount.attributes = { ...iscAccount.attributes }
 
-            const restored = FusionAccount.fromFusionAccount(iscAccount, FUSION_SOURCE_ID)
+            const restored = FusionAccount.fromFusionAccount(iscAccount)
             expect(restored.identityId).toBe('id-1')
             expect(restored.identityIdAttribute).toBe('id-1')
         })
@@ -350,7 +350,7 @@ describe('FusionAccount', () => {
             }) as unknown as Account
 
         it('preserves baseline and Identities for a record that already has baseline', () => {
-            const acc = FusionAccount.fromFusionAccount(buildPersistedAccount(), FUSION_SOURCE_ID)
+            const acc = FusionAccount.fromFusionAccount(buildPersistedAccount())
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
             expect(acc.sources).toContain(IDENTITIES_SOURCE_NAME)
@@ -358,8 +358,7 @@ describe('FusionAccount', () => {
 
         it('re-asserts baseline when the persisted statuses array is empty (identity-origin)', () => {
             const acc = FusionAccount.fromFusionAccount(
-                buildPersistedAccount({ statuses: [] }),
-                FUSION_SOURCE_ID
+                buildPersistedAccount({ statuses: [] })
             )
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
@@ -368,8 +367,7 @@ describe('FusionAccount', () => {
 
         it('re-asserts baseline when the persisted statuses key is missing (identity-origin)', () => {
             const acc = FusionAccount.fromFusionAccount(
-                buildPersistedAccount({ statuses: undefined }),
-                FUSION_SOURCE_ID
+                buildPersistedAccount({ statuses: undefined })
             )
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
@@ -378,8 +376,7 @@ describe('FusionAccount', () => {
 
         it('coexists with orphan when persisted statuses only carries orphan (identity-origin)', () => {
             const acc = FusionAccount.fromFusionAccount(
-                buildPersistedAccount({ statuses: ['orphan'] }),
-                FUSION_SOURCE_ID
+                buildPersistedAccount({ statuses: ['orphan'] })
             )
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
@@ -399,7 +396,7 @@ describe('FusionAccount', () => {
                     accounts: [],
                     statuses: [],
                 },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
             expect(acc.fromIdentity).toBe(false)
             expect(acc.statuses).not.toContain('baseline')
             expect(acc.sources).not.toContain(IDENTITIES_SOURCE_NAME)
@@ -417,7 +414,7 @@ describe('FusionAccount', () => {
                     accounts: ['src-a::correlated-1'],
                     'missing-accounts': ['src-a::missing-1'],
                 },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
             expect(acc.missingAccountIds).toContain('src-a::missing-1')
             expect(acc.missingAccountIds).not.toContain('src-a::correlated-1')
         })
@@ -431,7 +428,7 @@ describe('FusionAccount', () => {
                 attributes: {
                     accounts: ['src-a::correlated-1'],
                 },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
             expect(acc.missingAccountIds).toEqual([])
         })
     })
@@ -446,7 +443,7 @@ describe('FusionAccount', () => {
                 attributes: {
                     accounts: ['src-a::correlated-1', 'src-b::correlated-2'],
                 },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
             expect((acc as any).previousAccountIds).toContain('src-a::correlated-1')
             expect((acc as any).previousAccountIds).toContain('src-b::correlated-2')
         })
@@ -461,7 +458,7 @@ describe('FusionAccount', () => {
                     accounts: [],
                     history: ['[2026-01-01] event one', '[2026-01-02] event two'],
                 },
-            } as unknown as Account, FUSION_SOURCE_ID)
+            } as unknown as Account)
             expect(acc.history).toContain('[2026-01-01] event one')
             expect(acc.history).toContain('[2026-01-02] event two')
         })
