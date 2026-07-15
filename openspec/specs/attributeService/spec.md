@@ -24,8 +24,7 @@ The three documentation surfaces MUST describe the Velocity context variables ac
 #### Scenario: $sources is documented as a Map keyed by source name
 - **GIVEN** the in-app help for the Normal section
 - **WHEN** it describes `$sources`
-- **THEN** it explains that `$sources` is keyed by source name and accessed via `$sources.get('SourceName')`
-- **AND** it does not show `$sources.SourceName` (dot-access is not supported on a JavaScript Map from Velocity)
+- **THEN** it explains that `$sources` is keyed by source name and accessed with dot access, e.g. `$sources.SourceName`
 
 #### Scenario: $account versus $accounts[0] is explained
 - **GIVEN** the in-app help for the Normal section

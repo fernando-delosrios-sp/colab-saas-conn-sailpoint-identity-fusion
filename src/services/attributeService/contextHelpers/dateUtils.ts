@@ -5,8 +5,6 @@
  * Provides common date functions for use in Velocity templates
  */
 
-
-
 const FORMAT_TOKEN_REGEX = /yyyy|yy|MM|M|dd|d|HH|H|mm|m|ss|s|XXX|ZZZ|xxx|XX|ZZ|xx|X|Z|x/g
 
 const parseTimezoneOffset = (offsetStr: string): number => {
@@ -26,11 +24,11 @@ const parseTimezoneOffset = (offsetStr: string): number => {
 /**
  * Format a date to ISO string
  */
-export function format(date: Date | string | number, formatStr?: string): string {
+export function format(date: Date | string | number, formatStr?: string): string | undefined {
     const d = new Date(date)
 
     if (isNaN(d.getTime())) {
-        throw new Error('Invalid date')
+        return undefined
     }
 
     // If no format string, return ISO
@@ -76,7 +74,7 @@ export function format(date: Date | string | number, formatStr?: string): string
 /**
  * Parse a date from various formats
  */
-export function parse(dateStr: string | Date | number, formatStr?: string): Date {
+export function parse(dateStr: string | Date | number, formatStr?: string): Date | undefined {
     if (dateStr instanceof Date) {
         return new Date(dateStr)
     }
@@ -84,39 +82,49 @@ export function parse(dateStr: string | Date | number, formatStr?: string): Date
     if (typeof dateStr === 'number') {
         const d = new Date(dateStr)
         if (isNaN(d.getTime())) {
-            throw new Error('Invalid date')
+            return undefined
         }
         return d
     }
 
     if (typeof dateStr !== 'string') {
-        throw new Error('Invalid date')
+        return undefined
     }
 
     if (!formatStr) {
         const d = new Date(dateStr)
         if (isNaN(d.getTime())) {
-            throw new Error('Invalid date')
+            return undefined
         }
         return d
     }
 
     // Escape regex characters in the format string and remove escaping single quotes
-    const escapedFormat = formatStr
-        .replace(/[\\^$*+?.()|[\]{}]/g, '\\$&')
-        .replace(/'/g, '')
+    const escapedFormat = formatStr.replace(/[\\^$*+?.()|[\]{}]/g, '\\$&').replace(/'/g, '')
 
     // Supported date-fns token patterns (longest first to match correctly)
     const tokens = [
-        'yyyy', 'yy',
-        'MM', 'M',
-        'dd', 'd',
-        'HH', 'H',
-        'mm', 'm',
-        'ss', 's',
-        'XXX', 'ZZZ', 'xxx',
-        'XX', 'ZZ', 'xx',
-        'X', 'Z', 'x'
+        'yyyy',
+        'yy',
+        'MM',
+        'M',
+        'dd',
+        'd',
+        'HH',
+        'H',
+        'mm',
+        'm',
+        'ss',
+        's',
+        'XXX',
+        'ZZZ',
+        'xxx',
+        'XX',
+        'ZZ',
+        'xx',
+        'X',
+        'Z',
+        'x',
     ]
     const tokenRegex = new RegExp(tokens.join('|'), 'g')
     const matchedTokens: string[] = []
@@ -166,7 +174,7 @@ export function parse(dateStr: string | Date | number, formatStr?: string): Date
     const regex = new RegExp(`^${pattern}$`)
     const match = dateStr.match(regex)
     if (!match) {
-        throw new Error('Invalid date')
+        return undefined
     }
 
     let year = 1970
@@ -189,7 +197,7 @@ export function parse(dateStr: string | Date | number, formatStr?: string): Date
     for (let i = 0; i < matchedTokens.length; i++) {
         const token = matchedTokens[i]
         const rawVal = match[i + 1]
-        
+
         if (['yyyy', 'yy', 'MM', 'M', 'dd', 'd', 'HH', 'H', 'mm', 'm', 'ss', 's'].includes(token)) {
             const val = parseInt(rawVal, 10)
             switch (token) {
@@ -233,20 +241,20 @@ export function parse(dateStr: string | Date | number, formatStr?: string): Date
         }
     }
 
-    if (monthSet && (month < 0 || month > 11)) throw new Error('Invalid date')
-    if (daySet && (day < 1 || day > 31)) throw new Error('Invalid date')
-    if (hourSet && (hour < 0 || hour > 23)) throw new Error('Invalid date')
-    if (minuteSet && (minute < 0 || minute > 59)) throw new Error('Invalid date')
-    if (secondSet && (second < 0 || second > 59)) throw new Error('Invalid date')
+    if (monthSet && (month < 0 || month > 11)) return undefined
+    if (daySet && (day < 1 || day > 31)) return undefined
+    if (hourSet && (hour < 0 || hour > 23)) return undefined
+    if (minuteSet && (minute < 0 || minute > 59)) return undefined
+    if (secondSet && (second < 0 || second > 59)) return undefined
 
     const parsedDate = new Date(Date.UTC(year, month, day, hour, minute, second))
     if (isNaN(parsedDate.getTime())) {
-        throw new Error('Invalid date')
+        return undefined
     }
 
-    if (yearSet && parsedDate.getUTCFullYear() !== year) throw new Error('Invalid date')
-    if (monthSet && parsedDate.getUTCMonth() !== month) throw new Error('Invalid date')
-    if (daySet && parsedDate.getUTCDate() !== day) throw new Error('Invalid date')
+    if (yearSet && parsedDate.getUTCFullYear() !== year) return undefined
+    if (monthSet && parsedDate.getUTCMonth() !== month) return undefined
+    if (daySet && parsedDate.getUTCDate() !== day) return undefined
 
     if (hasTimezone) {
         parsedDate.setUTCMinutes(parsedDate.getUTCMinutes() - timezoneOffsetMinutes)
@@ -259,7 +267,7 @@ export function parse(dateStr: string | Date | number, formatStr?: string): Date
  * Parse an ISO-8601 date string.
  * Kept for compatibility with date-fns style usage in Velocity templates.
  */
-function parseISO(dateStr: string | Date | number): Date {
+function parseISO(dateStr: string | Date | number): Date | undefined {
     return parse(dateStr)
 }
 
@@ -267,10 +275,10 @@ function parseISO(dateStr: string | Date | number): Date {
  * Get year from date.
  * Uses UTC to avoid timezone shifts for midnight Z values.
  */
-function getYear(date: Date | string | number): number {
+function getYear(date: Date | string | number): number | undefined {
     const d = new Date(date)
     if (isNaN(d.getTime())) {
-        throw new Error('Invalid date')
+        return undefined
     }
     return d.getUTCFullYear()
 }
@@ -278,10 +286,10 @@ function getYear(date: Date | string | number): number {
 /**
  * Add days to a date (UTC)
  */
-export function addDays(date: Date | string | number, days: number): Date {
+export function addDays(date: Date | string | number, days: number): Date | undefined {
     const d = new Date(date)
     if (isNaN(d.getTime())) {
-        throw new Error('Invalid date')
+        return undefined
     }
     d.setUTCDate(d.getUTCDate() + days)
     return d
@@ -290,10 +298,10 @@ export function addDays(date: Date | string | number, days: number): Date {
 /**
  * Add months to a date (UTC)
  */
-export function addMonths(date: Date | string | number, months: number): Date {
+export function addMonths(date: Date | string | number, months: number): Date | undefined {
     const d = new Date(date)
     if (isNaN(d.getTime())) {
-        throw new Error('Invalid date')
+        return undefined
     }
     d.setUTCMonth(d.getUTCMonth() + months)
     return d
@@ -302,10 +310,10 @@ export function addMonths(date: Date | string | number, months: number): Date {
 /**
  * Add years to a date (UTC)
  */
-export function addYears(date: Date | string | number, years: number): Date {
+export function addYears(date: Date | string | number, years: number): Date | undefined {
     const d = new Date(date)
     if (isNaN(d.getTime())) {
-        throw new Error('Invalid date')
+        return undefined
     }
     d.setUTCFullYear(d.getUTCFullYear() + years)
     return d
@@ -314,21 +322,21 @@ export function addYears(date: Date | string | number, years: number): Date {
 /**
  * Subtract days from a date
  */
-export function subDays(date: Date | string | number, days: number): Date {
+export function subDays(date: Date | string | number, days: number): Date | undefined {
     return addDays(date, -days)
 }
 
 /**
  * Subtract months from a date
  */
-export function subMonths(date: Date | string | number, months: number): Date {
+export function subMonths(date: Date | string | number, months: number): Date | undefined {
     return addMonths(date, -months)
 }
 
 /**
  * Subtract years from a date
  */
-export function subYears(date: Date | string | number, years: number): Date {
+export function subYears(date: Date | string | number, years: number): Date | undefined {
     return addYears(date, -years)
 }
 
@@ -356,9 +364,12 @@ export function isEqual(date: Date | string | number, dateToCompare: Date | stri
 /**
  * Get the difference in calendar days between two dates (UTC)
  */
-export function differenceInDays(dateLeft: Date | string | number, dateRight: Date | string | number): number {
+export function differenceInDays(dateLeft: Date | string | number, dateRight: Date | string | number): number | undefined {
     const leftStart = startOfDay(dateLeft)
     const rightStart = startOfDay(dateRight)
+    if (!leftStart || !rightStart) {
+        return undefined
+    }
     const diff = leftStart.getTime() - rightStart.getTime()
     return Math.round(diff / (1000 * 60 * 60 * 24))
 }
@@ -366,10 +377,10 @@ export function differenceInDays(dateLeft: Date | string | number, dateRight: Da
 /**
  * Get start of day (UTC)
  */
-export function startOfDay(date: Date | string | number): Date {
+export function startOfDay(date: Date | string | number): Date | undefined {
     const d = new Date(date)
     if (isNaN(d.getTime())) {
-        throw new Error('Invalid date')
+        return undefined
     }
     d.setUTCHours(0, 0, 0, 0)
     return d
@@ -378,10 +389,10 @@ export function startOfDay(date: Date | string | number): Date {
 /**
  * Get end of day (UTC)
  */
-export function endOfDay(date: Date | string | number): Date {
+export function endOfDay(date: Date | string | number): Date | undefined {
     const d = new Date(date)
     if (isNaN(d.getTime())) {
-        throw new Error('Invalid date')
+        return undefined
     }
     d.setUTCHours(23, 59, 59, 999)
     return d

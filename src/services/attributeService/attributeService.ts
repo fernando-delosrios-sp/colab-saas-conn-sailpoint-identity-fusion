@@ -419,7 +419,7 @@ export class AttributeService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -614,7 +614,7 @@ export class AttributeService {
         if (isNullish(uniqueId) && this.skipAccountsWithMissingId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -733,7 +733,7 @@ export class AttributeService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} raw account(s) ` +
-            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -771,7 +771,7 @@ export class AttributeService {
 
         context.accounts = orderedAccounts
         context.previous = fusionAccount.attributeBag.previous
-        context.sources = fusionAccount.attributeBag.sources
+        context.sources = Object.fromEntries(fusionAccount.attributeBag.sources.entries())
         context.account = this.resolveOriginAccountObjectForVelocity(fusionAccount, orderedAccounts)
 
         if (fusionAccount.originSource) {
@@ -977,14 +977,6 @@ export class AttributeService {
             value = truncateResultToMaxLength(value, expression, context, definition.maxLength)
         }
 
-        try {
-            if (typeof value === 'string') {
-                value = JSON.parse(value)
-            }
-        } catch {
-            // Keep as string if parsing fails
-        }
-
         this.log.debug(
             `[${accountName}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
         )
@@ -1179,7 +1171,10 @@ export class AttributeService {
     private ensureCoreSchemaAttributes(fusionAccount: FusionAccount): void {
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
 
-        if (!this.skipAccountsWithMissingId && !isValidAttributeValue(fusionAccount.attributes[fusionIdentityAttribute])) {
+        if (
+            !this.skipAccountsWithMissingId &&
+            !isValidAttributeValue(fusionAccount.attributes[fusionIdentityAttribute])
+        ) {
             const prevId = fusionAccount.previousAttributes?.[fusionIdentityAttribute]
             if (isValidAttributeValue(prevId)) {
                 fusionAccount.attributes[fusionIdentityAttribute] = prevId
@@ -1244,7 +1239,9 @@ export class AttributeService {
         const { name, refresh, static: isStatic } = definition
         if (this.isSystemProvenanceAttribute(name)) return
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
-        const needsRefresh = isStatic ? fusionAccount.needsReset : (fusionAccount.needsRefresh || fusionAccount.needsReset || refresh)
+        const needsRefresh = isStatic
+            ? fusionAccount.needsReset
+            : fusionAccount.needsRefresh || fusionAccount.needsReset || refresh
         const hasValue = isValidAttributeValue(fusionAccount.attributes[name])
         const canResetDisplay = fusionAccount.needsReset && name === fusionDisplayAttribute
         const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
