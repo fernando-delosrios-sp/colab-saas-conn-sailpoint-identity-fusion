@@ -304,7 +304,7 @@ export class FusionService {
         )
         const results: FusionAccount[] = []
         await forEachBatched(fusionAccounts, async (x: Account) => {
-            const fusionAccount = FusionAccount.fromFusionAccount(x, this.sources.fusionSourceId)
+            const fusionAccount = FusionAccount.fromFusionAccount(x)
             this.setFusionAccount(fusionAccount)
             results.push(fusionAccount)
         })
@@ -429,7 +429,7 @@ export class FusionService {
         originIdentityInScope?: boolean
     ): Promise<FusionAccount> {
         const { refreshMapping, refreshDefinition, resetDefinition } = attributeOperations
-        const fusionAccount = FusionAccount.fromFusionAccount(account, this.sources.fusionSourceId)
+        const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${fusionAccount.managedKey}), ` +
                 `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
