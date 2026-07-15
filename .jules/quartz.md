@@ -12,3 +12,6 @@
 
 **Learning:** When multiple functions iterate over mixed-type arrays (e.g., parsing varying SDK shapes like strings or objects) to extract normalized string values, the loop and type-checking logic is often duplicated (e.g. in `toSetFromAttribute` and `normalizeActionTokens`).
 **Action:** Encapsulate the loop and type-checking logic into a shared helper function (like `normalizeArrayItems`) to eliminate duplicate code blocks, clarify intent, and ensure consistency when handling these mixed-type arrays.
+## 2026-07-15 - Simplify Sequential Boolean Assignment Fallbacks
+**Learning:** Sequential, nested `if/else` structures used simply to assign boolean values based on a single condition path are highly verbose and decrease code scannability.
+**Action:** Always replace nested `if/else` boolean assignments with a concise, direct boolean evaluation, leveraging the nullish coalescing operator (`??`) when falling back to default configuration values.

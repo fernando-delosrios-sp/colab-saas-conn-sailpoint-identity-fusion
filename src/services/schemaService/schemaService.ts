@@ -237,19 +237,7 @@ export class SchemaService {
         const attributes: SchemaAttribute[] = []
         for (const attribute of schema.attributes) {
             const attributeMap = this.attributeMap.get(attribute.name!)
-            if (attributeMap) {
-                if (attributeMap.attributeMerge === AttributeMergeMode.List) {
-                    attribute.multi = true
-                } else {
-                    attribute.multi = false
-                }
-            } else {
-                if (this.attributeMerge === AttributeMergeMode.List) {
-                    attribute.multi = true
-                } else {
-                    attribute.multi = false
-                }
-            }
+            attribute.multi = (attributeMap?.attributeMerge ?? this.attributeMerge) === AttributeMergeMode.List
             attribute.description = attribute.description || `${attribute.name} from ${sourceName}`
             attributes.push(attribute)
         }
