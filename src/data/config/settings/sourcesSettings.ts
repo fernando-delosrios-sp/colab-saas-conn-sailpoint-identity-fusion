@@ -2,7 +2,7 @@
  * connector-spec.json -> Source Settings -> Sources
  */
 import type { SourceConfig, SourcesSection } from '../../../model/config'
-import { assert, softAssert } from '../../../utils/assert'
+import { assert, softAssert } from './assertLite'
 import { extractBoolean } from '../../../utils/attributes'
 import { readBoolean } from '../../../utils/safeRead'
 

@@ -28,7 +28,9 @@
         "prettier": "npx prettier --write .",
         "prepack-zip": "npm ci && npm run build",
         "pack-zip": "spcx package",
-        "test": "jest --passWithNoTests --maxWorkers=50%"
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage"
     },
     "private": true,
     "dependencies": {

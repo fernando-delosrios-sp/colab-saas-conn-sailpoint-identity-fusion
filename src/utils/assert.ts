@@ -3,13 +3,19 @@ import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector
 /**
  * Tries to access the ServiceRegistry for rich logging (crash/warn/error).
  * Returns undefined if not yet initialized (e.g. during config loading).
- * Lazy-imported to avoid circular dependency with ServiceRegistry -> LogService -> assert.
+ *
+ * Uses a top-level import. The circular dependency
+ * (ServiceRegistry -> LogService -> assert) is broken by the fact that
+ * `ServiceRegistry` is only ACCESSED at call time (inside `tryGetServiceRegistry`),
+ * and Vitest's ESM live-binding semantics ensure the binding is resolved by
+ * the time the function is called (module graph finishes loading before
+ * any test runs).
  */
-function tryGetServiceRegistry(): unknown {
+import { ServiceRegistry } from '../services/serviceRegistry'
+
+function tryGetServiceRegistry(): ServiceRegistry | undefined {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports -- break cycle: ServiceRegistry -> LogService -> assert
-        const { ServiceRegistry } = require('../services/serviceRegistry')
-        return ServiceRegistry.getCurrent?.()
+        return ServiceRegistry.getCurrent()
     } catch {
         return undefined
     }

@@ -1,5 +1,8 @@
 # serviceRegistry Spec
 
+## Purpose
+
+The service registry (`src/services/serviceRegistry.ts`) is the connector's request-scoped service container. It uses Node's `AsyncLocalStorage` to make the long-lived service instances (config, log, lock, client, etc.) available to the operations layer without threading them through every call site, and resolves the right `Context` and `StandardCommand` for the current request. This spec defines the contract for what is available where, how scoped vs. unscoped services are distinguished, and what an operation can rely on by the time it starts executing.
 
 ## Requirements
 

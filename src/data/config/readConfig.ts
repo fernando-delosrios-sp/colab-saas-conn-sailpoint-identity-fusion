@@ -1,6 +1,5 @@
 import { readConfig, logger } from '@sailpoint/connector-sdk'
 import type { FusionConfig } from '../../model/config'
-import { assert } from '../../utils/assert'
 import { getInternalConfigFlat } from './internal'
 import * as advancedConnectionSettings from './settings/advancedConnectionSettings'
 import * as attributeMappingDefinitionsSettings from './settings/attributeMappingDefinitionsSettings'
@@ -36,7 +35,9 @@ const settingsPipeline = [
 export const safeReadConfig = async (): Promise<FusionConfig> => {
     logger.debug('Reading connector configuration')
     const sourceConfig = await readConfig()
-    assert(sourceConfig, 'Failed to read source configuration')
+    if (!sourceConfig) {
+        throw new Error('Failed to read source configuration')
+    }
 
     const rawConfig = {
         ...sourceConfig,

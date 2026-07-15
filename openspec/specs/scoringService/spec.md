@@ -1,5 +1,8 @@
 # scoringService Spec
 
+## Purpose
+
+The scoring service (`src/services/scoringService/`) computes the match score between an account value and a candidate identity value, according to the algorithm the operator configures on a matching rule. Supported algorithms include `binary` (100 if and only if the strings are identical, else 0), and the synthetic aggregate algorithms (`average`, `weighted-mean`) which operate on aggregate rows rather than real attribute rules. This spec defines the contract for each algorithm's score range, the `isMatch` derivation from the configured threshold, and how edge cases (empty inputs, mismatched types) are handled.
 
 ## Requirements
 

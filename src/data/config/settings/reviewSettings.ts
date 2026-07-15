@@ -1,7 +1,7 @@
 /**
  * connector-spec.json -> Attribute Matching Settings -> Review Settings
  */
-import { assert } from '../../../utils/assert'
+import { assert } from './assertLite'
 import { internalConfig } from '../internal'
 import type { ReviewSettingsSection } from '../../../model/config'
 

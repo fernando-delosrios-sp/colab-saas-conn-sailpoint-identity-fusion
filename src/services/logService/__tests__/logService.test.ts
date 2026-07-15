@@ -1,10 +1,10 @@
-const mockLogger = {
+const mockLogger = vi.hoisted(() => ({
     level: 'info',
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-}
+}))
 
 vi.mock('@sailpoint/connector-sdk', () => {
     class MockConnectorError extends Error {

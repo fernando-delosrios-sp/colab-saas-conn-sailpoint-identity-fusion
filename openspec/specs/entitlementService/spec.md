@@ -1,5 +1,8 @@
 # entitlementService Spec
 
+## Purpose
+
+The entitlement service (`src/services/entitlementService.ts`) models the lifecycle of an entitlement on a managed account: provisioning, deprovisioning, and the request/response transitions for create, enable, disable, update, and delete. It reads the canonical `Status` enum (`src/model/status.ts`) and the action set (`src/model/action.ts`) so the connector's behavior is consistent across operations. This spec defines the state machine that the operations layer drives when handling entitlement-mutating requests.
 
 ## Requirements
 

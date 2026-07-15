@@ -46,17 +46,17 @@
 
 ## 9. Update `package.json` scripts and `eslint.config.mjs`
 
-- [ ] 9.1 Replace `"test": "jest --passWithNoTests --maxWorkers=50%"` with `"test": "vitest run"`. Add `"test:watch": "vitest"` and `"test:coverage": "vitest run --coverage"`.
-- [ ] 9.2 In `eslint.config.mjs`, remove `'jest.config.js'` from the `ignores` list. Verify the file still lints clean.
+- [x] 9.1 Replace `"test": "jest --passWithNoTests --maxWorkers=50%"` with `"test": "vitest run"`. Add `"test:watch": "vitest"` and `"test:coverage": "vitest run --coverage"`.
+- [x] 9.2 In `eslint.config.mjs`, remove `'jest.config.js'` from the `ignores` list. Verify the file still lints clean.
 
 ## 10. Update `babel.config.cjs` comment
 
-- [ ] 10.1 Replace the misleading comment ("Used by Jest to transform ESM-only node_modules...") with an accurate one: the file is consumed by `ncc` during the production build to transform `double-metaphone` and `uuid` inside `dist/`.
+- [x] 10.1 Replace the misleading comment ("Used by Jest to transform ESM-only node_modules...") with an accurate one: the file is consumed by `ncc` during the production build to transform `double-metaphone` and `uuid` inside `dist/`.
 
 ## 11. Validation
 
-- [ ] 11.1 Run `npm test`; confirm all 77 test files pass with the same pass count as the baseline.
-- [ ] 11.2 Run `npm run build`; capture `dist/` checksum and diff against `/tmp/dist-before.sha256`. If files differ, investigate ncc/babel interaction.
-- [ ] 11.3 Run `npm run lint`; ensure no lint regressions.
-- [ ] 11.4 (Optional) Run `npm run test:coverage`; confirm the v8 coverage report generates under `coverage/`.
-- [ ] 11.5 (Manual) Run the test suite inside a memory-constrained shell (e.g. `systemd-run --scope -p MemoryMax=2G npm test`) to confirm the SSH-drop symptom is gone or markedly reduced.
+- [x] 11.1 Run `npm test`; confirm all 77 test files pass with the same pass count as the baseline.
+- [x] 11.2 Run `npm run build`; capture `dist/` checksum and diff against `/tmp/dist-before.sha256`. If files differ, investigate ncc/babel interaction.
+- [x] 11.3 Run `npm run lint`; ensure no lint regressions.
+- [x] 11.4 (Optional) Run `npm run test:coverage`; confirm the v8 coverage report generates under `coverage/`.
+- [x] 11.5 (Manual) Run the test suite inside a memory-constrained shell (e.g. `systemd-run --scope -p MemoryMax=2G npm test`) to confirm the SSH-drop symptom is gone or markedly reduced. **Skipped — environment lacks `systemd-run` and the session is not memory-constrained.** Manual re-run instructions are in `plan.md` Task 6 Step 3.
