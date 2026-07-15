@@ -527,16 +527,18 @@
                                             "helpKey": "Velocity template that defines the attribute value. Reference any mapped attribute by name (e.g. $firstname, $lastname, $email). $account is the origin snapshot (managed match, or identity-backed row when the origin is Identities). $accounts[0] is the first snapshot in the ordered list and may differ from $account because $accounts follows the configured source order, not the origin. Managed account snapshots in $accounts / $sources / $account include source (id, name) and schema (id = native identity, name = display); identity-backed $account rows use source.name = Identities (no source.id). Available helpers: $Math, $Datefns, $Normalize, $AddressParse, $JSON (see the section help for the full method list). Example: #set($i=$firstname.substring(0, 1))$i$lastname produces 'jsmith' from 'John Smith'"
                                         },
                                         {
-                                            "key": "refresh",
-                                            "label": "Refresh on each aggregation?",
-                                            "type": "toggle",
-                                            "helpKey": "When enabled, the value is recalculated on every aggregation run. When disabled, it is only recalculated when underlying source data changes. If Static is also enabled, Static takes precedence."
-                                        },
-                                        {
                                             "key": "static",
                                             "label": "Static",
                                             "type": "toggle",
                                             "helpKey": "When enabled, the attribute is evaluated only when it has no value. Existing values are never recalculated unless the account is fully reset. This option overrides Refresh on each aggregation if both are enabled."
+                                        },
+                                        {
+                                            "key": "refresh",
+                                            "label": "Refresh on each aggregation?",
+                                            "parentKey": "static",
+                                            "parentValue": "false",
+                                            "type": "toggle",
+                                            "helpKey": "When enabled, the value is recalculated on every aggregation run. When disabled, it is only recalculated when underlying source data changes. If Static is also enabled, Static takes precedence."
                                         }
                                     ]
                                 },
