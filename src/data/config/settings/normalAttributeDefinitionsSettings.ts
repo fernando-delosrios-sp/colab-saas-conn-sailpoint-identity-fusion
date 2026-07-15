@@ -5,6 +5,7 @@ import type { NormalAttributeDefinitionSettingsSection, NormalAttributeDefinitio
 
 export const connectorSpecInitialValues = {
     refresh: false,
+    static: false,
     trim: false,
 } as const
 

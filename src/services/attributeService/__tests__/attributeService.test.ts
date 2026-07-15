@@ -121,6 +121,101 @@ describe('AttributeService mapping targets for definition context', () => {
     })
 })
 
+describe('Static attribute evaluation logic', () => {
+    const createTestEnvironment = (staticDef: any) => {
+        const config = {
+            attributeMaps: [{ newAttribute: 'firstname', existingAttributes: ['fn'], attributeMerge: 'first' }],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [
+                {
+                    name: 'staticAttr',
+                    expression: '#set($val = "generated")#if($firstname)$firstname#else$val#end',
+                    refresh: false,
+                    static: true,
+                    spaces: false,
+                    trim: false,
+                    normalize: false,
+                    ...staticDef,
+                },
+            ],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'staticAttr']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'staticAttr' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const service = new AttributeService(config, schemas, sourceService, log)
+        return { service, config }
+    }
+
+    const createMockAccount = (initialAttributes: Record<string, any>, fnValue: string) => {
+        return {
+            type: 'managed',
+            needsRefresh: false,
+            needsReset: false,
+            name: 'id123',
+            sourceName: 'HR',
+            nativeIdentity: 'id123',
+            sources: ['HR'],
+            history: [],
+            managedAccounts: [{ sourceName: 'HR', nativeIdentity: 'n1', attributes: { fn: fnValue } }],
+            attributes: { ...initialAttributes },
+            attributeBag: {
+                current: {},
+                previous: {},
+                identity: {},
+                accounts: [],
+                sources: new Map([['HR', [{ fn: fnValue, source: { name: 'HR', id: 'hr1' }, schema: { id: 'id', name: 'name' } }]]]),
+            },
+            setNeedsRefresh(val: boolean) { this.needsRefresh = val },
+            setNeedsReset(val: boolean) { this.needsReset = val },
+        } as any
+    }
+
+    it('evaluates a static attribute when no value is present', async () => {
+        const { service } = createTestEnvironment({})
+        const fusionAccount = createMockAccount({ firstname: 'John' }, 'John')
+        fusionAccount.setNeedsRefresh(true)
+
+        service.mapAttributes(fusionAccount)
+        await service.refreshNormalAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.staticAttr).toBe('John')
+    })
+
+    it('does NOT re-evaluate a static attribute on subsequent aggregations even if needsRefresh is true', async () => {
+        const { service } = createTestEnvironment({})
+        const fusionAccount = createMockAccount({ firstname: 'Jane', staticAttr: 'OldValue' }, 'Jane')
+        fusionAccount.setNeedsRefresh(true)
+
+        service.mapAttributes(fusionAccount)
+        await service.refreshNormalAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.staticAttr).toBe('OldValue')
+    })
+
+    it('DOES re-evaluate a static attribute if needsReset is explicitly true', async () => {
+        const { service } = createTestEnvironment({})
+        const fusionAccount = createMockAccount({ firstname: 'Jane', staticAttr: 'OldValue' }, 'Jane')
+        fusionAccount.setNeedsRefresh(true)
+        fusionAccount.setNeedsReset(true)
+
+        service.mapAttributes(fusionAccount)
+        await service.refreshNormalAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.staticAttr).toBe('Jane')
+    })
+})
+
 describe('AttributeService mainAccount stale cleanup', () => {
     it('clears mainAccount when mapping no longer finds a supporting source value', () => {
         const config = {

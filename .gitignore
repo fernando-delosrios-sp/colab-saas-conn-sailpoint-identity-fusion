@@ -11,6 +11,7 @@
 .cline/
 .claude/
 .agent/
+.agents/
 *.iml
 cursor_settings_backup.json
 
@@ -47,3 +48,5 @@ logs/
 test-data/recordings/
 
 tools.yaml
+.worktrees/
+.worktrees/

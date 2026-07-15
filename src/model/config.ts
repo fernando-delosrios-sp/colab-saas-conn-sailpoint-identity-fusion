@@ -72,6 +72,8 @@ export interface NormalAttributeDefinition {
     trim: boolean
     /** Whether to regenerate this attribute on every aggregation */
     refresh: boolean
+    /** Whether this attribute evaluates only when it has no value */
+    static?: boolean
 }
 
 /**

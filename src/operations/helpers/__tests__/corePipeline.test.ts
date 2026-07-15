@@ -30,6 +30,8 @@ function createRegistry() {
     registry.sources.saveBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
     registry.sources.clearFusionAccounts = vi.fn()
     registry.sources.aggregateDelayedSources = vi.fn().mockResolvedValue(undefined)
+    registry.sources.setProcessLock = vi.fn().mockResolvedValue(undefined)
+    registry.sources.releaseProcessLock = vi.fn().mockResolvedValue(undefined)
     return {
         registry,
         forms: registry.forms,

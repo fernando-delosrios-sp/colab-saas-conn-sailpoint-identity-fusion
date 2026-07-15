@@ -44,6 +44,7 @@ For each attribute you want to generate, add an **Attribute Definition**:
 | **Trim leading and trailing spaces?** | Boolean             | Strip leading/trailing whitespace                                                             | Yes for most attributes                                                                                                                                                                                                                                           |
 | **Use incremental counter?**          | Boolean (optional)  | Unique definitions only: when `true`, `$counter` always increments instead of resetting on collision | Yes for counters that must never reuse a value; No (default) for collision-based disambiguation                                                                                                                                                                   |
 | **Refresh on each aggregation?**      | Boolean             | Recalculate every run (Normal definitions only)                                               | Yes if dynamic; No if stable                                                                                                                                                                                                                                      |
+| **Static**                            | Boolean             | Evaluate only when attribute has no value (Normal definitions only)                           | Yes for immutable attributes; overrides **Refresh on each aggregation?**                                                                                                                                                                                          |
 
 **Screenshot placeholder:** Attribute Definition with examples.
 Attribute definition example
@@ -54,12 +55,13 @@ Attribute definition example
 
 ### Normal type
 
-**Behavior:** Standard computed attribute; recalculated based on **Refresh on each aggregation?** setting.
+**Behavior:** Standard computed attribute; recalculated based on **Refresh on each aggregation?** and **Static** settings.
 
-| Refresh setting | Behavior                       | Use case                                                            |
-| --------------- | ------------------------------ | ------------------------------------------------------------------- |
-| Yes             | Recalculated every aggregation | Dynamic values that should update (full name, age, formatted dates) |
-| No              | Calculated once; persisted     | Stable values (initial assignment, one-time calculations)           |
+| Static | Refresh setting | Behavior                                                                   | Use case                                                            |
+| ------ | --------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| No     | Yes             | Recalculated every aggregation                                             | Dynamic values that should update (full name, age, formatted dates) |
+| No     | No              | Recalculated only when underlying source data changes                      | Standard values that update only when source data updates           |
+| Yes    | (Ignored)       | Calculated only when it has no value; existing values are never recalculated | Immutable values (initial assignment, one-time calculations)        |
 
 **Examples:**
 

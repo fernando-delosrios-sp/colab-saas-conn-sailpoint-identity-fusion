@@ -57,6 +57,7 @@ export class SourceService {
     private _fusionSourceOwner?: OwnerDto
     private _fusionSourceManagementWorkgroupId?: string
     private _fusionSourceWorkgroupMemberIds?: string[]
+    private _processLockAcquired = false
     private sourceSchemasCache: Map<string, SchemaV2025[]> = new Map()
 
     /** Per-run cache: managed source names that passed reverse-correlation setup/assert this session. */
@@ -1119,6 +1120,7 @@ export class SourceService {
             true,
             'SourceService>setProcessLock'
         )
+        this._processLockAcquired = true
     }
 
     /**
@@ -1132,7 +1134,7 @@ export class SourceService {
      * but not re-thrown, since this runs during cleanup.
      */
     public async releaseProcessLock(): Promise<void> {
-        if (!this.concurrencyCheckEnabled) {
+        if (!this.concurrencyCheckEnabled || !this._processLockAcquired) {
             return
         }
 
@@ -1145,6 +1147,7 @@ export class SourceService {
                 false,
                 'SourceService>releaseProcessLock'
             )
+            this._processLockAcquired = false
         } catch (error) {
             this.log.error(
                 `Failed to release processing lock: ${error instanceof Error ? error.message : String(error)}`
