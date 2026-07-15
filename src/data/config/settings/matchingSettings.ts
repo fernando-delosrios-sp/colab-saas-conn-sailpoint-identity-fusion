@@ -2,7 +2,7 @@
  * connector-spec.json -> Attribute Matching Settings -> Matching Settings
  */
 import { logger } from '@sailpoint/connector-sdk'
-import { assert, softAssert } from '../../../utils/assert'
+import { assert, softAssert } from './assertLite'
 import { extractBoolean } from '../../../utils/attributes'
 import { migrateConfigKey } from '../migration'
 import type { MatchingSettingsSection, MatchingConfig } from '../../../model/config'

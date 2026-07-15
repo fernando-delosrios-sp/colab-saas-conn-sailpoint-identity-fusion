@@ -1,5 +1,8 @@
 # schemaService Spec
 
+## Purpose
+
+The schema service (`src/services/schemaService/`) defines the connector's account schemas. It owns the `AccountSchema` and `SchemaAttribute` types, the `fusionAccountSchemaAttributes` catalog in `src/data/schema.ts`, and the `FusionAttribute` TypeScript enum that mirrors it. The enum must be a string-valued mirror of the catalog (excluding `name` and `id`) so that code can refer to attributes by a stable, type-checked symbol. This spec defines the contract between the catalog data, the enum, and the schema descriptions the connector advertises to SailPoint.
 
 ## Requirements
 

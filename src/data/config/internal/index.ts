@@ -12,7 +12,7 @@ export const internalConfig = {
     messagingService: internalConfigMessagingService,
     fusionService: internalConfigFusionService,
     formService: internalConfigFormService,
-} as const
+}
 
 
 /** Flattened for `readConfig` merge — matches `InternalConfig` on `FusionConfig`. */

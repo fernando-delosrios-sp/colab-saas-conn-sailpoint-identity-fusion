@@ -2,7 +2,7 @@
  * connector-spec.json -> Advanced Settings -> Developer Settings
  */
 import { logger } from '@sailpoint/connector-sdk'
-import { assert } from '../../../utils/assert'
+import { assert } from './assertLite'
 import { extractBoolean } from '../../../utils/attributes'
 import type { DeveloperSettingsSection } from '../../../model/config'
 

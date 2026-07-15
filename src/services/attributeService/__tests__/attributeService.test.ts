@@ -145,14 +145,14 @@ describe('Static attribute evaluation logic', () => {
         } as any
 
         const schemas = {
-            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'staticAttr']),
-            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'staticAttr' }]),
+            listSchemaAttributeNames: vi.fn(() => ['id', 'name', 'staticAttr']),
+            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'staticAttr' }]),
             fusionIdentityAttribute: 'id',
             fusionDisplayAttribute: 'name',
         } as any
 
         const sourceService = {} as any
-        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
         const service = new AttributeService(config, schemas, sourceService, log)
         return { service, config }
     }
@@ -296,85 +296,6 @@ describe('AttributeService mainAccount stale cleanup', () => {
         service.mapAttributes(fusionAccount)
         expect(fusionAccount.attributes.mainAccount).toBeUndefined()
     })
-})
-
-describe('AttributeService incremental counter seeding', () => {
-    const createService = () => {
-        const config = {
-            attributeMaps: [],
-            attributeMerge: 'first',
-            sources: [{ name: 'HR' }],
-            normalAttributeDefinitions: [],
-            uniqueAttributeDefinitions: [
-                {
-                    name: 'id',
-                    expression: 'NG$counter',
-                    useIncrementalCounter: true,
-                    digits: 3,
-                    counterStart: 1,
-                },
-            ],
-            skipAccountsWithMissingId: false,
-            forceAttributeRefresh: false,
-        } as any
-
-        const schemas = {
-            listSchemaAttributeNames: vi.fn(() => ['id', 'name']),
-            getSchemaAttributes: vi.fn(() => [{ name: 'id' }, { name: 'name' }]),
-            fusionIdentityAttribute: 'id',
-            fusionDisplayAttribute: 'name',
-        } as any
-
-        const sourceService = { fusionSourceId: 'src-1', patchSourceConfig: vi.fn() } as any
-        const log = {
-            debug: vi.fn(),
-            info: vi.fn(),
-            warn: vi.fn(),
-            error: vi.fn(),
-        } as any
-        const locks = {
-            withLock: vi.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
-            waitForAllPendingOperations: vi.fn(async () => undefined),
-        } as any
-
-        const service = new AttributeService(config, schemas, sourceService, log, locks)
-        service.setStateWrapper({})
-        return service
-    }
-
-    const createFusionAccount = (attrs: Record<string, any>) => {
-        const attributeBag = {
-            current: { ...attrs },
-            previous: {},
-            identity: {},
-            accounts: [],
-            sources: new Map<string, Record<string, any>[]>(),
-        }
-
-        const fusionAccount: any = {
-            type: 'managed',
-            needsRefresh: true,
-            needsReset: false,
-            name: 'neo-1',
-            sourceName: 'HR',
-            fromIdentity: false,
-            isIdentity: false,
-            sources: ['HR'],
-            history: [],
-            importHistory: vi.fn(),
-            attributeBag,
-        }
-
-        Object.defineProperty(fusionAccount, 'attributes', {
-            get: () => attributeBag.current,
-            set: (value) => {
-                attributeBag.current = value
-            },
-        })
-
-        return fusionAccount
-    }
-
 })
 
 describe('AttributeService mapping undefined behavior', () => {

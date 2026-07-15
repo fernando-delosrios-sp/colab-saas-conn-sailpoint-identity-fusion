@@ -1,4 +1,5 @@
-// Used by Jest to transform ESM-only node_modules (e.g. double-metaphone) to CommonJS
+// Consumed by @vercel/ncc during `npm run build` to transform the ESM-only
+// `double-metaphone` and `uuid` node_modules into CommonJS for `dist/`.
 module.exports = {
     presets: [['@babel/preset-env', { targets: { node: 'current' }, modules: 'commonjs' }]],
 }

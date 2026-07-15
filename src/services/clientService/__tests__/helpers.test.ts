@@ -8,11 +8,15 @@ import {
 import axiosRetry from 'axios-retry'
 import type { Mock } from 'vitest'
 
-vi.mock('axios-retry', () => ({
-    isNetworkError: vi.fn((err: any) => err?.isNetworkError === true),
-    isRetryableError: vi.fn((err: any) => err?.isRetryable === true),
-    default: {},
-}))
+vi.mock('axios-retry', () => {
+    const isNetworkError = vi.fn((err: any) => err?.isNetworkError === true)
+    const isRetryableError = vi.fn((err: any) => err?.isRetryable === true)
+    return {
+        isNetworkError,
+        isRetryableError,
+        default: { isNetworkError, isRetryableError },
+    }
+})
 
 describe('clientService helpers', () => {
     beforeEach(() => {

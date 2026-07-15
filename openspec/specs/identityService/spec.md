@@ -1,5 +1,8 @@
 # identityService Spec
 
+## Purpose
+
+The identity service (`src/services/identityService.ts`) is the connector's read-side adapter for SailPoint identities. It wraps the SailPoint API client's `AccountsApi` and `Search` resources and exposes identity-document operations used by correlation, change-detection, and the report operation. This spec defines the contract for how the connector searches, reads, and resolves identities on the upstream side.
 
 ## Requirements
 
