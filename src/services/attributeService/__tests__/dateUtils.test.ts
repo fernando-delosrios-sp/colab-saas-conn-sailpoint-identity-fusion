@@ -38,8 +38,8 @@ describe('attributeService dateUtils', () => {
             expect(result).toContain('2024')
         })
 
-        it('should throw for invalid date', () => {
-            expect(() => format('invalid')).toThrow('Invalid date')
+        it('should return undefined for invalid date', () => {
+            expect(format('invalid')).toBeUndefined()
         })
 
         it('should format timezone tokens correctly as UTC', () => {
@@ -57,8 +57,8 @@ describe('attributeService dateUtils', () => {
             expect(d.getUTCFullYear()).toBe(2024)
         })
 
-        it('should throw for invalid date', () => {
-            expect(() => parse('not-a-date')).toThrow('Invalid date')
+        it('should return undefined for invalid date', () => {
+            expect(parse('not-a-date')).toBeUndefined()
         })
 
         it('should parse date with timezone offsets correctly', () => {
