@@ -19,7 +19,7 @@ import { IdentityService } from '../identityService'
 import { MessagingService } from '../messagingService'
 import { SourceService } from '../sourceService'
 import { assert, softAssert } from '../../utils/assert'
-import { readString, readUnknown, trimStr } from '../../utils/safeRead'
+import { readFirstUnknown, readString, readUnknown, trimStr } from '../../utils/safeRead'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
 import {
@@ -408,9 +408,7 @@ export class FormService {
 
             if (doc) {
                 const attrs = readUnknown(doc, 'attributes')
-                const hydrated = normalizeEmail(
-                    readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail') ?? readUnknown(attrs, 'emailAddress')
-                )
+                const hydrated = normalizeEmail(readFirstUnknown(attrs, 'email', 'mail', 'emailAddress'))
                 if (hydrated) {
                     ;(c.attributes as Record<string, unknown>).email = hydrated
                 }
@@ -1329,11 +1327,7 @@ export class FormService {
     }
 
     private readFormDefinitionTimestamp(form: FormDefinitionResponseV2025): Date | undefined {
-        const rawTimestamp =
-            readUnknown(form, 'modified') ??
-            readUnknown(form, 'modifiedAt') ??
-            readUnknown(form, 'created') ??
-            readUnknown(form, 'createdAt')
+        const rawTimestamp = readFirstUnknown(form, 'modified', 'modifiedAt', 'created', 'createdAt')
 
         if (!rawTimestamp) {
             this.log.warn(`Form definition ${form.id || 'unknown'} missing timestamp fields; skipping stale check`)
@@ -1381,7 +1375,11 @@ export class FormService {
         this.log.debug(`Fetching forms with name pattern: ${namePattern}`)
 
         const forms = await this.client.paginate<FormDefinitionResponseV2025>(
-            async (params) => (await this.executeSearchFormDefinitions(params, 'FormService>findFormDefinitionsByName executeSearchFormDefinitions')) ?? { data: [] },
+            async (params) =>
+                (await this.executeSearchFormDefinitions(
+                    params,
+                    'FormService>findFormDefinitionsByName executeSearchFormDefinitions'
+                )) ?? { data: [] },
             requestParameters,
             undefined,
             'FormService>findFormDefinitionsByName searchFormDefinitionsByTenant'
@@ -1404,7 +1402,11 @@ export class FormService {
         this.log.debug(`Searching for form definition with exact name: ${formName}`)
 
         const forms = await this.client.paginate<FormDefinitionResponseV2025>(
-            async (params) => (await this.executeSearchFormDefinitions(params, 'FormService>getFormDefinitionByName executeSearchFormDefinitions')) ?? { data: [] },
+            async (params) =>
+                (await this.executeSearchFormDefinitions(
+                    params,
+                    'FormService>getFormDefinitionByName executeSearchFormDefinitions'
+                )) ?? { data: [] },
             requestParameters,
             undefined,
             'FormService>getFormDefinitionByName searchFormDefinitionsByTenant'
@@ -1539,11 +1541,7 @@ export class FormService {
 
     public async executeDeleteFormDefinition(formDefinitionID: string, context: string): Promise<void> {
         const { customFormsApi } = this.client
-        await this.client.execute(
-            () => customFormsApi.deleteFormDefinition({ formDefinitionID }),
-            undefined,
-            context
-        )
+        await this.client.execute(() => customFormsApi.deleteFormDefinition({ formDefinitionID }), undefined, context)
     }
 
     /**
@@ -1554,10 +1552,7 @@ export class FormService {
         assert(this.client, 'Client service is required')
 
         this.log.debug(`Deleting form definition: ${formDefinitionId}`)
-        await this.executeDeleteFormDefinition(
-            formDefinitionId,
-            `FormService>deleteForm id=${formDefinitionId}`
-        )
+        await this.executeDeleteFormDefinition(formDefinitionId, `FormService>deleteForm id=${formDefinitionId}`)
         this.log.debug(`Form definition deleted successfully: ${formDefinitionId}`)
     }
 }

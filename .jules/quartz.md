@@ -12,3 +12,7 @@
 
 **Learning:** When multiple functions iterate over mixed-type arrays (e.g., parsing varying SDK shapes like strings or objects) to extract normalized string values, the loop and type-checking logic is often duplicated (e.g. in `toSetFromAttribute` and `normalizeActionTokens`).
 **Action:** Encapsulate the loop and type-checking logic into a shared helper function (like `normalizeArrayItems`) to eliminate duplicate code blocks, clarify intent, and ensure consistency when handling these mixed-type arrays.
+## 2026-07-16 - Consolidating Nullish Coalescing Fallback Chains
+
+**Learning:** Dense fallback chains using the nullish coalescing operator (`??`) to check multiple attributes on an object (e.g., `readUnknown(obj, 'a') ?? readUnknown(obj, 'b') ?? readUnknown(obj, 'c')`) are hard to scan and repeat a lot of boilerplate.
+**Action:** Extract these dense chains into a specialized variadic helper like `readFirstUnknown(obj, 'a', 'b', 'c')` that iteratively checks for the first non-null/non-undefined value, significantly improving scanability and flow.

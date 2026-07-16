@@ -108,3 +108,17 @@ export function readPathNumber(source: unknown, path: string[], fallback?: numbe
     const value = readPathUnknown(source, path)
     return typeof value === 'number' ? value : fallback
 }
+
+/**
+ * Reads the first non-null, non-undefined value from an object given a list of keys.
+ * Mirrors the behavior of the ?? operator but in a loop.
+ */
+export function readFirstUnknown(source: unknown, ...keys: string[]): unknown {
+    for (const key of keys) {
+        const value = readUnknown(source, key)
+        if (value !== undefined && value !== null) {
+            return value
+        }
+    }
+    return undefined
+}
