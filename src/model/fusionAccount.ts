@@ -70,6 +70,7 @@ export class FusionAccount {
 
     // State flags
     private _uncorrelated = false
+    private _isIdentity = false
     private _disabled = false
     private _needsRefresh = false
     private _needsReset = false
@@ -303,6 +304,10 @@ export class FusionAccount {
             fusionAccount.importHistory(historyAttr)
         }
 
+        if (account.attributes?.originSource === 'Identities' || account.uncorrelated === false) {
+            fusionAccount._isIdentity = true
+        }
+
         return fusionAccount
     }
 
@@ -332,6 +337,7 @@ export class FusionAccount {
         })
         fusionAccount._originSource = 'Identities'
         fusionAccount._originAccount = identity.id ?? undefined
+        fusionAccount._isIdentity = true
         fusionAccount.setBaseline()
         return fusionAccount
     }
@@ -375,6 +381,9 @@ export class FusionAccount {
         fusionAccount.setUncorrelatedAccount(managedAccountKey)
         fusionAccount.setManagedAccount(account, false)
         fusionAccount.setNeedsReset(true)
+        if (account.uncorrelated === false) {
+            fusionAccount._isIdentity = true
+        }
         return fusionAccount
     }
 
@@ -517,7 +526,7 @@ export class FusionAccount {
 
     /** Whether this fusion account is associated to an ISC identity. */
     public get isIdentity(): boolean {
-        return this._identityId !== undefined
+        return this._isIdentity
     }
 
     /**
@@ -1119,6 +1128,7 @@ export class FusionAccount {
         this._attributeBag.identity = identity.attributes ?? {}
         this._attributeBag.identity.name = identity.name
         this._identityId = identity.id ?? undefined
+        this._isIdentity = true
 
         if (!this._needsRefresh && isNewerThan(identity.modified, this._modified)) {
             this._needsRefresh = true
