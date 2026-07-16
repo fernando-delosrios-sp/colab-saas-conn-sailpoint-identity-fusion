@@ -41,7 +41,6 @@ type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
 
 // Module-level regex constants — compiled once (hot attribute-evaluation path)
 const COUNTER_SUFFIX_RE = /\$counter$|\$\{counter\}$/
-const VELOCITY_VAR_RE = /(^|[^\\])\$(\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)/
 
 /**
  * Managed account key for matching `mainAccount` / `$originAccount` — composite `sourceId::nativeIdentity`
@@ -947,21 +946,7 @@ export class AttributeService {
             return undefined
         }
 
-        if (!value) {
-            this.log.error(`Failed to evaluate velocity template for attribute ${definition.name}`)
-            return undefined
-        }
-
-        // Compare to expression without trailing $counter (UniqueAttributeDefinition may auto-append it)
-        const exprWithoutCounter = expression.replace(COUNTER_SUFFIX_RE, '')
-        const outputMatchesExpression =
-            value === expression || (exprWithoutCounter !== expression && value === exprWithoutCounter)
-        if (outputMatchesExpression && this.hasVelocityVariableReference(exprWithoutCounter || expression)) {
-            this.log.warn(
-                `Velocity template for attribute ${definition.name} returned unresolved variable expression: ${value}`
-            )
-            return undefined
-        }
+        if (!value) return undefined
 
         if (definition.trim && typeof value === 'string') value = value.trim()
         if (definition.case && typeof value === 'string') value = switchCase(value, definition.case)
@@ -976,14 +961,6 @@ export class AttributeService {
         )
 
         return value
-    }
-
-    /**
-     * Detect whether an expression references at least one Velocity variable token.
-     * Examples: $name, ${name}. Excludes escaped tokens like \$name.
-     */
-    private hasVelocityVariableReference(expression: string): boolean {
-        return VELOCITY_VAR_RE.test(expression)
     }
 
     /**
