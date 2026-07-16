@@ -107,7 +107,8 @@ async function cascadeAggregateSources(
 export const rebuildFusionAccount = async (
     nativeIdentity: string,
     attributeOperations: AttributeOperations,
-    services: { fusion: FusionService; identities: IdentityService; sources: SourceService; log: LogService }
+    services: { fusion: FusionService; identities: IdentityService; sources: SourceService; log: LogService },
+    triggerCascadeAggregation: boolean = false
 ): Promise<FusionAccount | undefined> => {
     const { fusion, identities, sources, log } = services
 
@@ -129,7 +130,7 @@ export const rebuildFusionAccount = async (
 
     const parsedKeys = parseManagedAccountKeys(accountIds, log)
 
-    if (sources.isCascadeAggregationEnabled) {
+    if (triggerCascadeAggregation && sources.isCascadeAggregationEnabled) {
         await cascadeAggregateSources(
             parsedKeys.map((key) => key.sourceId),
             sources,

@@ -35,7 +35,7 @@ export const accountRead = async (serviceRegistry: ServiceRegistry, input: StdAc
             identities,
             sources,
             log,
-        })
+        }, true)
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.managedKey}`)
         timer.phase('Step 2: Rebuilding fusion account with fresh attributes')

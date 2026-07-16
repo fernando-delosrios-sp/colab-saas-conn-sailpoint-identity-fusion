@@ -38,7 +38,8 @@ describe('accountRead', () => {
                 identities: expect.any(Object),
                 sources: expect.any(Object),
                 log: expect.any(Object),
-            })
+            }),
+            true
         )
         expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(fusionAccount)
