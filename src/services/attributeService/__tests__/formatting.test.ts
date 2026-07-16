@@ -785,7 +785,7 @@ describe('evaluateVelocityTemplate', () => {
             expect(result).toBeUndefined()
         })
 
-        it('should demonstrate why $foreach.first fails (throws Error)', () => {
+        it('should not throw when using $foreach.first', () => {
             const context = {
                 NERMActiveAssignmentArray: JSON.stringify([
                     { start_date: '05/01/2026', end_date: '05/30/2026' },
@@ -808,7 +808,7 @@ describe('evaluateVelocityTemplate', () => {
 $latestAssignment.end_date
             `.trim()
             
-            expect(() => evaluateVelocityTemplate(expr, context)).toThrow()
+            expect(() => evaluateVelocityTemplate(expr, context)).not.toThrow()
         })
 
         it('should successfully get latest assignment using $foreach.index == 0', () => {

@@ -1258,6 +1258,7 @@ export class FusionAccount {
         this._identityInfo = buildIdentityInfo(identity)
         this._attributeBag.identity = identity.attributes ?? {}
         this._attributeBag.identity.name = identity.name
+        this._isIdentity = true
 
         if (!this._needsRefresh && isNewerThan(identity.modified, this._modified)) {
             this._needsRefresh = true
