@@ -24,6 +24,10 @@ export const testConnection = async (serviceRegistry: ServiceRegistry, _input: a
         sources.validateAccountJmespathFilters()
         timer.phase('Validated Accounts JMESPath filters')
 
+        await messaging.fetchSender()
+        log.info('Email sender workflow validated')
+        timer.phase('Validated email sender workflow')
+
         const delayedAggregationSources = sources.delayedAggregationSources
         if (delayedAggregationSources.length > 0) {
             await messaging.fetchDelayedAggregationSender()

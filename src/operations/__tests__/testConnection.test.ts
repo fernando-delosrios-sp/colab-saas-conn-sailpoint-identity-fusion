@@ -71,4 +71,12 @@ describe('testConnection', () => {
         expect(registry.log.crash).toHaveBeenCalledTimes(1)
         expect(registry.log.crash).toHaveBeenCalledWith('Failed to test connection', expect.any(Error))
     })
+
+    it('ensures email sender workflow validation', async () => {
+        const { registry } = createMockRegistry([{ name: 'AD', correlationMode: 'none' }])
+
+        await testConnection(registry, {})
+
+        expect(registry.messaging.fetchSender).toHaveBeenCalledTimes(1)
+    })
 })
