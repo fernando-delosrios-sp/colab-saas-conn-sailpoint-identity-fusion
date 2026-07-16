@@ -418,7 +418,7 @@ export class AttributeService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -556,7 +556,7 @@ export class AttributeService {
         if (this.skipAccountsWithMissingId && !uniqueId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -676,7 +676,7 @@ export class AttributeService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} raw account(s) ` +
-            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -1169,8 +1169,7 @@ export class AttributeService {
         const hasValue = isValidAttributeValue(existingValue)
         const isFusionIdentityAttribute = name === fusionIdentityAttribute
         const isFusionDisplayAttribute = name === fusionDisplayAttribute
-        const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
-        const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
+        const isExistingIdentity = fusionAccount.isIdentity
 
         const prevIsUnique = context.isUnique
         context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value, context)
