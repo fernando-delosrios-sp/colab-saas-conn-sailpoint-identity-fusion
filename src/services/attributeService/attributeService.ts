@@ -418,7 +418,7 @@ export class AttributeService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -556,7 +556,7 @@ export class AttributeService {
         if (this.skipAccountsWithMissingId && !uniqueId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -676,7 +676,7 @@ export class AttributeService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} raw account(s) ` +
-                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -869,21 +869,7 @@ export class AttributeService {
         }
 
         let value = evaluateVelocityTemplate(expression, context)
-        if (!value) {
-            this.log.error(`Failed to evaluate velocity template for attribute ${definition.name}`)
-            return undefined
-        }
-
-        // Compare to expression without trailing $counter (UniqueAttributeDefinition may auto-append it)
-        const exprWithoutCounter = expression.replace(COUNTER_SUFFIX_RE, '')
-        const outputMatchesExpression =
-            value === expression || (exprWithoutCounter !== expression && value === exprWithoutCounter)
-        if (outputMatchesExpression && this.hasVelocityVariableReference(exprWithoutCounter || expression)) {
-            this.log.warn(
-                `Velocity template for attribute ${definition.name} returned unresolved variable expression: ${value}`
-            )
-            return undefined
-        }
+        if (!value) return undefined
 
         if (definition.trim) value = value.trim()
         if (definition.case) value = switchCase(value, definition.case)
