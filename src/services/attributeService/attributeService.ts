@@ -773,13 +773,7 @@ export class AttributeService {
     }
 
     private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
-        const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
-        if (fusionAccount.fromIdentity) {
-            return (
-                trimStr(fusionAccount.name) ?? trimStr(identityBag?.name) ?? trimStr(fusionAccount.identityDisplayName)
-            )
-        }
-        return trimStr(fusionAccount.identityDisplayName) ?? trimStr(identityBag?.name) ?? trimStr(fusionAccount.name)
+        return trimStr(fusionAccount.name)
     }
 
     private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
