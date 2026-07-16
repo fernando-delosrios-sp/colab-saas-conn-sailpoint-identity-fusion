@@ -55,3 +55,72 @@ When all 5 hold → proactively suggest "ready to `/opsx:propose`?" — wait for
 - Opening a change for bug fix / typo
 
 Full detail: [superpowers-bridge README §Entry & exit gates](https://github.com/JiangWay/openspec-schemas/blob/main/superpowers-bridge/README.md#entry--exit-gates).
+
+## Build & Dev Commands
+
+| Command | Purpose |
+|---------|---------|
+| `npm run build` | Clean + sync spec + bundle with ncc to `dist/` |
+| `npm test` | Run Vitest suite (all `__tests__/**/*.test.ts`) |
+| `npm run test:watch` | Vitest in watch mode |
+| `npm run test:coverage` | Vitest with v8 coverage |
+| `npm run lint` | ESLint + knip (dead code check) |
+| `npm run lint:markdown` | markdownlint on README + docs |
+| `npm run dev` | Run connector locally with spcx + source maps |
+| `npm run docs:serve` | Build and serve MkDocs site locally |
+| `npm run prettier` | Format all files with Prettier |
+
+**Before committing:** run `npm run lint` (catches type issues, unused code, and style violations).
+
+## Project Structure
+
+```
+src/
+├── index.ts              # Connector entry point — registers all operations
+├── data/                  # Configuration, schema, action enums, status types
+│   └── config/            # Settings definitions (connection, matching, sources, etc.)
+├── model/                 # Domain models (FusionAccount, FusionConfig, etc.)
+├── operations/            # ISC connector operations (accountList, accountRead, etc.)
+│   └── helpers/           # Pipeline, dry-run, rebuild helpers
+├── services/              # Service layer (attribute, client, fusion, scoring, etc.)
+│   ├── attributeService/  # Map + Define engine (Velocity, normalization, UUID)
+│   ├── clientService/     # ISC API client (SDK adapter, queue, retry)
+│   ├── formService/       # Review form builder + processor
+│   ├── fusionService/     # Core aggregation, correlation, identity processing
+│   ├── scoringService/    # Match scoring (exact, name, trigram, string comparison)
+│   └── sourceService/     # Managed source account aggregation
+└── utils/                 # Shared utilities (safeRead, operationHandler, assert, etc.)
+```
+
+**Key patterns:**
+- Tests live in `__tests__/` directories alongside the code they test
+- Services follow `ServiceName/index.ts` barrel exports
+- Config settings each have their own file under `data/config/settings/`
+
+## Code Conventions
+
+### TypeScript
+- **Strict mode** enabled (`tsconfig.json`: `strict: true`)
+- **ES2022 target**, CommonJS modules, source maps on
+- ESLint with `typescript-eslint` recommended rules + `jsdoc` plugin
+- `no-explicit-any`: **off** — `any` is allowed where needed
+- `no-case-declarations`: **error** — wrap in `{}` blocks
+- `_` prefix on field names indicates **conventionally-private** members
+- Import style: ESM `import`/`export` for `.ts` files; `require()` only in `.cjs`/`.js` scripts
+
+### Formatting (Prettier)
+- 120 char width, 4-space tabs, single quotes, no semicolons, trailing commas (ES5)
+
+### Naming & Structure
+- Files: `camelCase.ts` for modules (`attributeService.ts`), `PascalCase.ts` for classes/models
+- Barrel exports: each service exports via `index.ts`
+- JSDoc on exported functions and classes (not enforced by lint, but used throughout)
+
+### Error Handling
+- Use `ConnectorError` from `@sailpoint/connector-sdk` for known operation errors
+- Wrap in `createOperationHandler` — catches unknown errors and re-throws as `ConnectorError`
+
+### Testing
+- **Vitest** with `globals: true` (no imports needed for `describe`/`it`/`expect`)
+- Test files: `*.test.ts` in `__tests__/` directories
+- 180s timeout (long-running integration tests)
