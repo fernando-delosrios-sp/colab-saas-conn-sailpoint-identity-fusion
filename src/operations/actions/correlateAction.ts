@@ -1,5 +1,6 @@
 import { AttributeChangeOp } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
+import { FusionAction } from '../../model/fusionAction'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { ActionChange } from './types'
 
@@ -21,7 +22,7 @@ export const correlateAction = async (
     } else if (change.op === AttributeChangeOp.Remove) {
         // Removing the correlate action does not undo established correlations.
         // It only clears the entitlement on this update response.
-        fusionAccount.removeAction('correlated')
+        fusionAccount.removeAction(FusionAction.Correlated)
         log.debug(`Correlate action removed for account ${fusionAccount.name}`)
     }
 }

@@ -6,6 +6,7 @@ import { isCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { IdentityService } from '../identityService'
 import { assert } from '../../utils/assert'
 import { readString, trimStr } from '../../utils/safeRead'
+import { FusionAttribute } from '../../data/schema'
 
 // ============================================================================
 // Internal Helpers
@@ -33,14 +34,14 @@ function normalizeScalar(value: unknown): string {
  */
 function readCorrelatedIdentityId(formInput: any): string | undefined {
     // Try flat structure first (as sent in createFormInstance)
-    const flat = readString(formInput, 'identityId')
+    const flat = readString(formInput, FusionAttribute.IdentityId)
     if (flat) return flat
 
     // Fall back to dictionary structure
     try {
         const dict = formInput as Record<string, any>
         const inputObj = Object.values(dict ?? {}).find(
-            (x: any) => x?.id === 'identityId' && (x.value || x.description)
+            (x: any) => x?.id === FusionAttribute.IdentityId && (x.value || x.description)
         )
         const value = inputObj?.value || inputObj?.description
         return typeof value === 'string' && value.length > 0 ? value : undefined
