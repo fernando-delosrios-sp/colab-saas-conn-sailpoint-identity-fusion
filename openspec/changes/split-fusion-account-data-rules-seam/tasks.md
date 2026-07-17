@@ -17,11 +17,11 @@
 
 ## 3. Extract layer rules
 
-- [ ] 3.1 Create `src/model/fusionAccountRules/layerRules.ts` with three exported functions: `addIdentityLayer`, `addManagedAccountLayer`, `addFusionDecisionLayer`
-- [ ] 3.2 Adapt `MatchContext` inside layer rules to use `state` object directly instead of closures over `this`
-- [ ] 3.3 Import helpers from other rule modules (`collectionRules`, `statusRules`, `historyRules`) for MatchContext callbacks
-- [ ] 3.4 Refactor `FusionAccount` layer methods into thin orchestrators delegating to `FusionAccountLayerRules`
-- [ ] 3.5 Verify: `npx tsc --noEmit`, `npx eslint "src/**/*.ts"`, `npx vitest run`
+- [x] 3.1 Create `src/model/fusionAccountRules/layerRules.ts` with three exported functions: `addIdentityLayer`, `addManagedAccountLayer`, `addFusionDecisionLayer`
+- [x] 3.2 Adapt `MatchContext` inside layer rules to use `state` object directly instead of closures over `this`
+- [x] 3.3 Import helpers from other rule modules (`collectionRules`, `statusRules`, `historyRules`) for MatchContext callbacks
+- [x] 3.4 Refactor `FusionAccount` layer methods into thin orchestrators delegating to `FusionAccountLayerRules`
+- [x] 3.5 Verify: `npx tsc --noEmit`, `npx eslint "src/**/*.ts"`, `npx vitest run`
 
 ## 4. Extract status, action, review, and correlation rules
 
