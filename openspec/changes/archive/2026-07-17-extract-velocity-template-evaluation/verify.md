@@ -27,7 +27,7 @@
 
 ### 4. Spec Compliance
 
-- [x] ✅ PASS — All ADDED requirements in `specs/attributeService/spec.md` are implemented:
+- [x] ✅ PASS — All ADDED requirements in `specs/attribute-service/spec.md` are implemented:
   - Unresolved Velocity variables render literally
   - Template evaluation returns structured result
   - Non-string Velocity results pass through unchanged
