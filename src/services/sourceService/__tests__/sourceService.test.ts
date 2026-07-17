@@ -618,3 +618,77 @@ describe('SourceService identity attribute create error mapping', () => {
         expect(message).toContain('blackmesa-id')
     })
 })
+
+
+describe('ensureIdentityAttribute', () => {
+    const setupIdentityAttributesApi = (overrides: {
+        existing?: { searchable: boolean }
+        updated?: any
+        created?: any
+        conflict?: boolean
+    } = {}) => {
+        const getIdentityAttribute = vi.fn().mockResolvedValue({ data: overrides.existing ?? null })
+        const putIdentityAttribute = vi.fn().mockResolvedValue({ data: overrides.updated ?? { name: 'attr' } })
+        const createIdentityAttribute = vi.fn().mockImplementation(async (payload: any) => {
+            if (overrides.conflict) {
+                const error: any = new Error('already exists')
+                error.response = { data: { detailMessage: 'already exists' } }
+                throw error
+            }
+            return { data: overrides.created ?? { name: payload.identityAttributeV2025.name } }
+        })
+
+        return { getIdentityAttribute, putIdentityAttribute, createIdentityAttribute }
+    }
+
+    const createServiceWithIdentityApi = (api: ReturnType<typeof setupIdentityAttributesApi>) => {
+        const { service } = createService()
+        ;(service as any).client.identityAttributesApi = api
+        return service
+    }
+
+    const expectedPayload = {
+        name: 'customAttr',
+        displayName: 'Custom Attribute',
+        searchable: true,
+        type: 'string',
+        multi: false,
+        standard: false,
+        system: false,
+    }
+
+    it('updates an existing non-searchable attribute with the searchable payload', async () => {
+        const api = setupIdentityAttributesApi({ existing: { searchable: false } })
+        const service = createServiceWithIdentityApi(api)
+
+        await (service as any).ensureIdentityAttribute('customAttr', 'Custom Attribute')
+
+        expect(api.putIdentityAttribute).toHaveBeenCalledWith({
+            name: 'customAttr',
+            identityAttributeV2025: expectedPayload,
+        })
+    })
+
+    it('creates a new searchable attribute with the same payload', async () => {
+        const api = setupIdentityAttributesApi()
+        const service = createServiceWithIdentityApi(api)
+
+        await (service as any).ensureIdentityAttribute('customAttr', 'Custom Attribute')
+
+        expect(api.createIdentityAttribute).toHaveBeenCalledWith({
+            identityAttributeV2025: expectedPayload,
+        })
+    })
+
+    it('retries as update with the same payload when create reports a conflict', async () => {
+        const api = setupIdentityAttributesApi({ conflict: true })
+        const service = createServiceWithIdentityApi(api)
+
+        await (service as any).ensureIdentityAttribute('customAttr', 'Custom Attribute')
+
+        expect(api.putIdentityAttribute).toHaveBeenCalledWith({
+            name: 'customAttr',
+            identityAttributeV2025: expectedPayload,
+        })
+    })
+})
