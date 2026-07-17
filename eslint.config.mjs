@@ -5,7 +5,7 @@ import jsdoc from 'eslint-plugin-jsdoc'
 
 export default [
     {
-        ignores: ['dist/', 'site/', 'babel.config.cjs'],
+        ignores: ['dist/', 'site/', 'babel.config.cjs', '.agents/skills/'],
     },
     { files: ['**/*.{js,mjs,cjs,ts}'] },
     { languageOptions: { globals: globals.node } },
