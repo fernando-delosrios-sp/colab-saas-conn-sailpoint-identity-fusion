@@ -6,8 +6,6 @@ import { FusionAccountKind } from '../fusionAccountTypes'
 import { StatusEntitlement } from '../statusEntitlement'
 
 describe('FusionAccount', () => {
-    const FUSION_SOURCE_ID = 'fusion-src'
-
     const minimalConfig = {
         sources: [
             { name: 'Source A', id: 'src-a', type: 'authoritative' },
