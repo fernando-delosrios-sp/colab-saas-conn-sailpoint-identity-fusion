@@ -14,7 +14,7 @@ export type SourceConfigLike = {
     correlationDisplayName?: string
 }
 
-export function createOperationTimer() {
+function createOperationTimer() {
     return {
         phase: vi.fn(),
         end: vi.fn(),
