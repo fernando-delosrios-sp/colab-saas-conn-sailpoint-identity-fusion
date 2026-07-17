@@ -1,22 +1,41 @@
-# reportService Spec
+## ADDED Requirements
 
-## Purpose
+### Requirement: Resolve report account ID from a FusionAccount
+The `resolveReportAccountId` function SHALL return the ISC account ID to use in report links for a given `FusionAccount`, preferring the stored ISC id and falling back to resolving the managed account key via `SourceService`.
 
-The report service (`src/services/reportService.ts`) builds the per-account reports the connector returns from its account operation. It reads `SourceType` and the `FusionDecision` model, normalizes optional and numeric fields with the `safeRead` helpers (`trimStr`, `readString`, `readNumber`), and assembles a `Report` shape that downstream operations can stream to the host. This spec defines the contract for how decisions are surfaced, what fields are guaranteed, and how missing/malformed upstream data is handled.
+#### Scenario: FusionAccount has a stored ISC account id
+- **WHEN** `fusionAccount.iscAccountId` is set
+- **THEN** `resolveReportAccountId` MUST return that value without calling `SourceService`
 
-## Requirements
+#### Scenario: FusionAccount has no ISC account id but has a managed account key
+- **WHEN** `fusionAccount.iscAccountId` is missing and `fusionAccount.managedAccountId` is present
+- **THEN** `resolveReportAccountId` MUST call `SourceService.resolveIscAccountIdForManagedKey` with the managed key and return the resolved id
 
+#### Scenario: FusionAccount has neither id
+- **WHEN** both `fusionAccount.iscAccountId` and `fusionAccount.managedAccountId` are missing
+- **THEN** `resolveReportAccountId` MUST return `undefined`
 
+---
 
-### Requirement: Report Fusion Blends section
-The system SHALL surface blended accounts in a dedicated "FUSION BLENDS" section in the HTML aggregation report.
+### Requirement: Resolve report account ID from a raw account key
+The `resolveReportAccountIdValue` function SHALL resolve an arbitrary account id value to an ISC account id using `SourceService`, returning `undefined` for empty inputs.
 
-#### Scenario: Aggregation completes with blended accounts
-- **WHEN** an aggregation run completes and one or more managed accounts have been blended into a Fusion account
-- **THEN** the report SHALL include a "FUSION BLENDS" section
-- **THEN** this section SHALL visually match the layout of "FUSION REVIEW DECISIONS"
-- **THEN** this section SHALL display the target Fusion account and the blended managed account details
+#### Scenario: Raw value is a managed account key
+- **WHEN** the input value is a non-empty managed account key
+- **THEN** `resolveReportAccountIdValue` MUST call `SourceService.resolveIscAccountIdForManagedKey` and return the resolved id
 
-#### Scenario: Aggregation completes with no blended accounts
-- **WHEN** an aggregation run completes and no managed accounts were blended
-- **THEN** the report SHALL NOT include the "FUSION BLENDS" section
+#### Scenario: Raw value is empty
+- **WHEN** the input value is `undefined` or empty
+- **THEN** `resolveReportAccountIdValue` MUST return `undefined` without calling `SourceService`
+
+## MODIFIED Requirements
+
+None.
+
+## REMOVED Requirements
+
+None.
+
+## RENAMED Requirements
+
+None.
