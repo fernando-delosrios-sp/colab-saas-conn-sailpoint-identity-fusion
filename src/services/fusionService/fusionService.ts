@@ -15,7 +15,6 @@ import { FusionDecision } from '../../model/form'
 import { ScoringService } from '../scoringService'
 import { SchemaService } from '../schemaService'
 import { FusionMatch, MatchCandidateType } from '../scoringService/types'
-import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../scoringService/scoringService'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats, OperationContext } from './types'
 import {
@@ -27,11 +26,9 @@ import {
 } from './batching'
 import { buildFusionReport } from './fusionReportBuilder'
 import { resolveReportAccountId as resolveReportAccountIdFn, resolveReportAccountIdValue as resolveReportAccountIdValueFn } from './reportAccountResolver'
+import { ManagedAccountAnalysisRecorder } from './managedAccountAnalysisRecorder'
 import { AggregationTracker } from './aggregationTracker'
 import {
-    buildMinimalFusionReportAccount,
-    fusionReportMatchCandidateAccountFields,
-    mapScoreReportsForFusionReport,
     createAutomaticAssignmentDecision,
     formatFusionMatchDiscoveryLog,
     hasIdentityBackedMatches as checkHasIdentityBackedMatches,
@@ -62,6 +59,7 @@ export class FusionService {
     public correlationManager: CorrelationManager
     private decisionProcessor: DecisionProcessor
     private managedAccountAnalyzer: ManagedAccountAnalyzer
+    private analysisRecorder: ManagedAccountAnalysisRecorder
 
     public get fusionIdentityMap(): Map<string, FusionAccount> {
         return this._repository.fusionIdentityMap
@@ -146,6 +144,17 @@ export class FusionService {
         this.fusionReportOnAggregation = config.fusionReportOnAggregation ?? false
         this.reportAttributes = config.fusionFormAttributes ?? []
         this.urlContext = createUrlContext(config.baseurl)
+        this.analysisRecorder = new ManagedAccountAnalysisRecorder({
+            log: this.log,
+            tracker: () => this.tracker,
+            urlContext: this.urlContext,
+            reportAttributes: this.reportAttributes,
+            sourcesByName: this.sourcesByName,
+            config: this.config,
+            analyzer: this.managedAccountAnalyzer,
+            sources: this.sources,
+            shouldCaptureReportData: () => this.shouldCaptureManagedAccountReportData(),
+        })
         this.commandType = commandType
         this.operationContext = operationContext
         this.deleteEmpty = config.deleteEmpty
@@ -985,7 +994,7 @@ export class FusionService {
                     !reviewers || reviewers.size === 0
                         ? 'Match review form was not created: no reviewers available for this source'
                         : `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
-                this.trackFailedMatching(fusionAccount, message)
+                this.analysisRecorder.trackFailed(fusionAccount, message)
             } else {
                 const eligibleReviewerCount = [...(reviewers ?? [])].filter((r) => r.identityId).length
                 if (eligibleReviewerCount > 0 && outcome.newReviewInstancesQueued === 0) {
@@ -996,7 +1005,7 @@ export class FusionService {
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            this.trackFailedMatching(fusionAccount, `Form creation failed: ${message}`)
+            this.analysisRecorder.trackFailed(fusionAccount, `Form creation failed: ${message}`)
         }
         fusionAccount.clearFusionIdentityReferences()
         return undefined
@@ -1078,7 +1087,18 @@ export class FusionService {
     public async analyzeManagedAccount(account: Account): Promise<FusionAccount> {
         const analysis = await this.managedAccountAnalyzer.analyzeIdentityPhase(account)
         await this.managedAccountAnalyzer.analyzeDeferredPhase(analysis)
-        this.recordManagedAccountAnalysis(analysis)
+        this.analysisRecorder.recordAnalysis(analysis)
+
+        const { fusionAccount, sourceType } = analysis
+        if (
+            !fusionAccount.isMatch &&
+            sourceType === SourceType.Authoritative &&
+            this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)
+        ) {
+            this.setFusionAccount(fusionAccount)
+            this.registerCurrentRunUnmatchedCandidate(fusionAccount)
+        }
+
         return analysis.fusionAccount
     }
 
@@ -1091,7 +1111,16 @@ export class FusionService {
         deferredPhaseExecuted: boolean
     ): Promise<FusionAccount | undefined> {
         const { account, fusionAccount, sourceInfo, sourceType, hasIdentityBackedMatches } = analysis
-        this.recordManagedAccountAnalysis(analysis)
+        this.analysisRecorder.recordAnalysis(analysis)
+
+        if (
+            !fusionAccount.isMatch &&
+            sourceType === SourceType.Authoritative &&
+            this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)
+        ) {
+            this.setFusionAccount(fusionAccount)
+            this.registerCurrentRunUnmatchedCandidate(fusionAccount)
+        }
 
         if (hasIdentityBackedMatches) {
             return this.handleIdentityBackedMatch(fusionAccount, account, sourceInfo)
@@ -1106,87 +1135,6 @@ export class FusionService {
         return this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
     }
 
-    private recordManagedAccountAnalysis(analysis: ManagedAccountAnalysisContext): void {
-        const { account, fusionAccount, sourceType, hasIdentityBackedMatches, fusionIdentityComparisons } = analysis
-        const { name, sourceName } = account
-        const tracker = this.tracker
-        tracker.fusionIdentityComparisonsByAccount.set(fusionAccount, fusionIdentityComparisons)
-        if (fusionAccount.isMatch) {
-            if (hasIdentityBackedMatches) {
-                const identityMatches = fusionAccount.fusionMatches.filter(
-                    (m) => (m.candidateType ?? MatchCandidateType.Identity) === MatchCandidateType.Identity
-                )
-                const { headline, summary } = formatFusionMatchDiscoveryLog(identityMatches, false)
-                this.log.info(`${headline}: ${name} [${sourceName}] - ${summary}`)
-            }
-            if (!this.shouldCaptureManagedAccountReportData()) return
-            const reportAccountId = this.resolveReportAccountId(fusionAccount)
-            if (hasIdentityBackedMatches) {
-                tracker.matchAccounts.push(fusionAccount)
-                return
-            }
-            const deferredMatches = fusionAccount.fusionMatches
-                .filter((match) => match.candidateType === MatchCandidateType.NewUnmatched)
-                .map((match) => {
-                    const fields = fusionReportMatchCandidateAccountFields(match)
-                    const fi = match.fusionIdentity
-                    const peerIdentityId = fi?.identityId
-                    const peerManagedAccountReportId = this.resolveReportAccountIdValue(fi?.managedAccountId)
-                    const candidateAccountReportId = this.resolveReportAccountIdValue(fields.accountId)
-                    const identityUrl =
-                        (peerIdentityId ? this.urlContext.identity(peerIdentityId) : undefined) ??
-                        (peerManagedAccountReportId
-                            ? this.urlContext.humanAccount(peerManagedAccountReportId)
-                            : undefined) ??
-                        (candidateAccountReportId ? this.urlContext.humanAccount(candidateAccountReportId) : undefined)
-                    return {
-                        ...fields,
-                        identityName: match.identityName,
-                        identityId: peerIdentityId,
-                        identityUrl,
-                        isMatch: true,
-                        candidateType: MatchCandidateType.NewUnmatched,
-                        exact: isExactAttributeMatchScores(match.scores),
-                        scores: mapScoreReportsForFusionReport(match.scores),
-                    }
-                })
-            tracker.deferredMatchReportData.push({
-                ...buildMinimalFusionReportAccount(
-                    fusionAccount,
-                    this.urlContext,
-                    this.sourcesByName.get(fusionAccount.sourceName)?.sourceType,
-                    this.reportAttributes,
-                    undefined,
-                    reportAccountId
-                ),
-                deferred: true,
-                fusionIdentityComparisons,
-                matches: deferredMatches,
-            })
-            return
-        }
-        this.log.debug(`No match found for managed account: ${name} [${sourceName}]`)
-        if (
-            sourceType === SourceType.Authoritative &&
-            this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)
-        ) {
-            this.setFusionAccount(fusionAccount)
-            this.registerCurrentRunUnmatchedCandidate(fusionAccount)
-        }
-        if (!this.shouldCaptureManagedAccountReportData()) return
-        tracker.analyzedNonMatchReportData.push({
-            ...buildMinimalFusionReportAccount(
-                fusionAccount,
-                this.urlContext,
-                this.sourcesByName.get(fusionAccount.sourceName)?.sourceType,
-                this.reportAttributes,
-                undefined,
-                this.resolveReportAccountId(fusionAccount)
-            ),
-            fusionIdentityComparisons,
-        })
-    }
-
     /**
      * Deferred matching.
      *
@@ -1195,27 +1143,6 @@ export class FusionService {
      */
     public isDeferredMatchingEnabledForSource(sourceName: string | undefined): boolean {
         return this.managedAccountAnalyzer.isDeferredMatchingEnabledForSource(sourceName)
-    }
-
-    /**
-     * Records a failed matching for inclusion in the fusion report.
-     * Called when form creation fails (excessive candidates or runtime error).
-     */
-    private trackFailedMatching(fusionAccount: FusionAccount, error: string): void {
-        this.log.error(`Failed matching for account ${fusionAccount.name} [${fusionAccount.sourceName}]: ${error}`)
-        if (this.shouldCaptureManagedAccountReportData()) {
-            this.tracker.failedMatchingAccounts.push({
-                ...buildMinimalFusionReportAccount(
-                    fusionAccount,
-                    this.urlContext,
-                    this.sourcesByName.get(fusionAccount.sourceName)?.sourceType,
-                    this.reportAttributes,
-                    error,
-                    this.resolveReportAccountId(fusionAccount)
-                ),
-                fusionIdentityComparisons: this.tracker.fusionIdentityComparisonsByAccount.get(fusionAccount) ?? 0,
-            })
-        }
     }
 
     /**
