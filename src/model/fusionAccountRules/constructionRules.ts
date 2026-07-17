@@ -217,6 +217,37 @@ function ensureBaselineForIdentityOrigin(state: FusionAccountState): void {
 }
 
 /**
+ * Imports persisted history entries into the state's history array,
+ * normalizing, deduplicating, and enforcing the configured max length.
+ */
+export function importHistoryIntoState(state: FusionAccountState, history: unknown[]): void {
+    const normalizedHistory = history
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+
+    const dedupedHistory: string[] = []
+    for (const entry of normalizedHistory) {
+        if (dedupedHistory[dedupedHistory.length - 1] !== entry) {
+            dedupedHistory.push(entry)
+        }
+    }
+
+    state.history = dedupedHistory.slice(-state.maxHistoryMessages)
+}
+
+/**
+ * Restores persisted collection references and history.
+ */
+function restorePersistedCollections(state: FusionAccountState, account: Account): void {
+    initializePreviousAccountIds(state, account.attributes)
+    const historyAttr = getAccountAttribute(account, FusionAttribute.History)
+    if (Array.isArray(historyAttr) && historyAttr.length > 0) {
+        importHistoryIntoState(state, historyAttr)
+    }
+}
+
+/**
  * Determines whether state indicates an identity-origin record, using the same logic as
  * `FusionAccount.fromIdentity`.
  */
@@ -241,7 +272,7 @@ function isFromIdentity(state: FusionAccountState): boolean {
  * 3. `initializeAttributeState` — current/previous attribute bags and collection sets (missing-accounts, reviews, statuses, actions).
  * 4. `restoreOriginMetadata` — persisted originSource/originAccount; re-asserts baseline for identity-origin records.
  * 5. `restoreIdentityLinkage` — identityId fallback from persisted attributes when the SDK Account does not expose it.
- * 6. `initializePreviousAccountIds` — persisted previous account IDs (history is imported by the caller).
+ * 6. `restorePersistedCollections` — previous account IDs and history import.
  *
  * @param account - The ISC Account object from the fusion source
  * @param state - The state container to populate
@@ -265,7 +296,7 @@ export function buildFromFusionAccount(account: Account, state: FusionAccountSta
     initializeAttributeState(state, account.attributes, FusionAccountKind.Fusion, managedKey)
     restoreOriginMetadata(state, account)
     restoreIdentityLinkage(state, account)
-    initializePreviousAccountIds(state, account.attributes)
+    restorePersistedCollections(state, account)
 }
 
 /**
