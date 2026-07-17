@@ -39,3 +39,5 @@ export type FusionAttributeBag = {
     /** Attribute objects grouped by source name (supports multi-account-per-source scenarios) */
     sources: Map<string, Attributes[]>
 }
+
+export { FusionAccountState } from './fusionAccountState'

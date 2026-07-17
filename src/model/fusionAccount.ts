@@ -165,7 +165,7 @@ export class FusionAccount {
     public static fromIdentity(identity: IdentityDocument): FusionAccount {
         const fusionAccount = new FusionAccount()
         buildFromIdentity(identity, fusionAccount.state)
-        fusionAccount.setBaseline()
+        setBaseline(fusionAccount.state)
         return fusionAccount
     }
 
@@ -180,7 +180,7 @@ export class FusionAccount {
     public static fromManagedAccount(account: Account): FusionAccount {
         const fusionAccount = new FusionAccount()
         buildFromManagedAccount(account, fusionAccount.state)
-        fusionAccount.setManagedAccount(account, false)
+        setManagedAccountLayer(fusionAccount.state, account, false)
         fusionAccount.setNeedsReset(true)
         return fusionAccount
     }
@@ -819,31 +819,6 @@ export class FusionAccount {
         importHistory(this.state, history)
     }
 
-    /**
-     * Helper method to add an item to a Set and optionally log history
-     */
-    private addToSet<T>(set: Set<T>, item: T, message?: string): boolean {
-        const initialSize = set.size
-        set.add(item)
-        const added = set.size > initialSize
-        if (added && message) {
-            addHistory(this.state, message)
-        }
-        return added
-    }
-
-    /**
-     * Helper method to remove an item from a Set and optionally log history
-     * @returns true if the item was removed, false otherwise
-     */
-    private removeFromSet<T>(set: Set<T>, item: T, message?: string): boolean {
-        const removed = set.delete(item)
-        if (removed && message) {
-            addHistory(this.state, message)
-        }
-        return removed
-    }
-
     // ============================================================================
     // Layer Methods - Add data layers (must be called in order)
     // ============================================================================
@@ -912,28 +887,6 @@ export class FusionAccount {
         addFusionDecisionLayer(this.state, decision)
     }
 
-    // ============================================================================
-    // Internal Layer Helpers
-    // ============================================================================
-
-    /**
-     * Processes a single managed source account into this fusion account.
-     * Triggers refresh if the account is new or recently modified and adds
-     * its attributes to the source attribute layers.
-     *
-     * ID-set membership (_accountIds / _missingAccountIds) is managed by the
-     * caller (addManagedAccountLayer); this method only handles refresh logic
-     * and source-attribute bookkeeping.
-     *
-     * @param account - The managed account to absorb
-     */
-    private setManagedAccount(
-        account: Account,
-        addBlendHistory: boolean = true,
-        skipBlendHistoryForManagedKeys?: ReadonlySet<string>
-    ): boolean {
-        return setManagedAccountLayer(this.state, account, addBlendHistory, skipBlendHistoryForManagedKeys)
-    }
     /** Sets whether this account's attributes need refreshing. */
     public setNeedsRefresh(refresh: boolean) {
         this.state.needsRefresh = refresh
@@ -942,15 +895,6 @@ export class FusionAccount {
     /** Sets whether this account's generated attributes need a full reset. */
     public setNeedsReset(reset: boolean) {
         this.state.needsReset = reset
-    }
-
-    // ============================================================================
-    // Status Setting Methods (private - called by factory methods and layer methods)
-    // ============================================================================
-
-    /** Marks this account with "baseline" status (created from an identity in authoritative mode). */
-    private setBaseline(): void {
-        setBaseline(this.state)
     }
 
     /** Marks this account as NonMatched (no Match found, pending review). */
