@@ -461,4 +461,75 @@ describe('FusionAccount', () => {
             expect(acc.history).toContain('[2026-01-02] event two')
         })
     })
+describe('addManagedAccountLayer identity matching', () => {
+    it('claims accounts by identityId index and marks them correlated', () => {
+        const identity: IdentityDocument = {
+            id: 'id-1',
+            name: 'test-identity',
+            attributes: {},
+        } as any
+        const acc = FusionAccount.fromIdentity(identity)
+
+        const account: Account = {
+            id: 'isc-acc-1',
+            sourceId: 'src-a',
+            nativeIdentity: 'native-1',
+            sourceName: 'Source A',
+            attributes: {},
+        } as any
+        const accountsById = new Map<string, Account>([['src-a::native-1', account]])
+        const accountsByIdentityId = new Map<string, Set<string>>([['id-1', new Set(['src-a::native-1'])]])
+
+        acc.addManagedAccountLayer(accountsById, accountsByIdentityId)
+
+        expect(acc.accountIds).toContain('src-a::native-1')
+        expect(acc.missingAccountIds).not.toContain('src-a::native-1')
+        expect(accountsById.size).toBe(0)
+        expect(accountsByIdentityId.has('id-1')).toBe(false)
+    })
+
+    it('claims accounts from previous run via previousAccountIds', () => {
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-1',
+            id: 'isc-1',
+            name: 'Persisted Account',
+            sourceName: 'Identity Fusion NG',
+            attributes: {
+                accounts: ['src-a::native-1'],
+            },
+        } as unknown as Account)
+
+        const account: Account = {
+            id: 'isc-acc-1',
+            sourceId: 'src-a',
+            nativeIdentity: 'native-1',
+            sourceName: 'Source A',
+            attributes: {},
+        } as any
+        const accountsById = new Map<string, Account>([['src-a::native-1', account]])
+        const accountsByIdentityId = new Map<string, Set<string>>()
+
+        acc.addManagedAccountLayer(accountsById, accountsByIdentityId)
+
+        expect(acc.accountIds).toContain('src-a::native-1')
+        expect(acc.missingAccountIds).toContain('src-a::native-1')
+        expect(accountsById.size).toBe(0)
+    })
+
+    it('sets orphan status when identity-origin account loses all managed accounts and identity is out of scope', () => {
+        const identity: IdentityDocument = { id: 'id-1', name: 'test-identity', attributes: {} } as any
+        const acc = FusionAccount.fromIdentity(identity)
+        acc.setOriginIdentityInScope(false)
+
+        const accountsById = new Map<string, Account>()
+        const accountsByIdentityId = new Map<string, Set<string>>()
+        const allAccountsById = new Map<string, Account>()
+
+        acc.addManagedAccountLayer(accountsById, accountsByIdentityId, allAccountsById, true)
+
+        expect(acc.isOrphan()).toBe(true)
+        expect(acc.statuses).toContain('orphan')
+    })
+})
+
 })
