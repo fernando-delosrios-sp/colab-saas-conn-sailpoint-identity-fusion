@@ -1,6 +1,7 @@
 import { accountUpdate } from '../accountUpdate'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 import { executeActions } from '../actions'
+import { FusionAction } from '../../model/fusionAction'
 import type { Mock } from 'vitest'
 
 vi.mock('../helpers/rebuildFusionAccount', () => ({
@@ -62,7 +63,7 @@ describe('accountUpdate', () => {
         await accountUpdate(registry, {
             identity: 'fusion-1',
             schema: { attributes: [] },
-            changes: [{ attribute: 'actions', op: 'Remove', value: 'correlated' }],
+            changes: [{ attribute: 'actions', op: 'Remove', value: FusionAction.Correlated }],
         } as any)
 
         expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(fusionAccount, true, false)

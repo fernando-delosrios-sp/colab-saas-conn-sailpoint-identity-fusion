@@ -2,6 +2,7 @@ import { AttributeChangeOp, ConnectorError, StdAccountUpdateInput } from '@sailp
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { FusionAttribute } from '../data/schema'
+import { FusionAction } from '../model/fusionAction'
 import { assert } from '../utils/assert'
 import { executeActions } from './actions'
 import { ATTR_OPS_NONE } from '../services/attributeService/types'
@@ -70,7 +71,7 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
                 const actionValues = [change.value].flat().map((value) => String(value).split(':')[0])
                 if (
                     change.op === AttributeChangeOp.Remove &&
-                    actionValues.some((value) => value === 'correlate' || value === 'correlated')
+                    actionValues.some((value) => value === 'correlate' || value === FusionAction.Correlated)
                 ) {
                     shouldRecomputeCorrelationStatus = false
                 }

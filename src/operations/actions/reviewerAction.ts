@@ -1,5 +1,6 @@
 import { AttributeChangeOp } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
+import { FusionAction } from '../../model/fusionAction'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { assert } from '../../utils/assert'
 import { ActionChange } from './types'
@@ -17,8 +18,8 @@ export const reviewerAction = async (
 
     log.debug(`Reviewer action called for account ${fusionAccount.name} with operation ${change.op}`)
 
-    assert(change.value.startsWith('reviewer:'), `Invalid reviewer action value: ${change.value}`)
-    const sourceId = change.value.slice('reviewer:'.length)
+    assert(change.value.startsWith(FusionAction.ReviewerPrefix), `Invalid reviewer action value: ${change.value}`)
+    const sourceId = change.value.slice(FusionAction.ReviewerPrefix.length)
     assert(sourceId, `Missing reviewer source id in action value: ${change.value}`)
 
     if (change.op === AttributeChangeOp.Add) {
