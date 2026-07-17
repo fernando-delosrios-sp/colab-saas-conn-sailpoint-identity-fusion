@@ -42,8 +42,8 @@
 
 ## 6. Add contract test
 
-- [ ] 6.1 Append to `src/model/__tests__/fusionAccount.test.ts` a `FusionAccount state facade` describe block verifying that facade mutations are reflected in `state` and vice versa
-- [ ] 6.2 Verify new test passes: `npx vitest run src/model/__tests__/fusionAccount.test.ts -t "FusionAccount state facade"`
+- [x] 6.1 Append to `src/model/__tests__/fusionAccount.test.ts` a `FusionAccount state facade` describe block verifying that facade mutations are reflected in `state` and vice versa
+- [x] 6.2 Verify new test passes: `npx vitest run src/model/__tests__/fusionAccount.test.ts -t "FusionAccount state facade"`
 
 ## 7. Final verification
 
