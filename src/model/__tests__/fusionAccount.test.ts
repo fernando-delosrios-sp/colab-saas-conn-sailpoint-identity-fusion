@@ -2,7 +2,7 @@ import { FusionAccount, IDENTITIES_SOURCE_NAME } from '../fusionAccount'
 import { FusionConfig, SourceType } from '../config'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionDecision } from '../form'
-import { FusionAccountKind } from '../fusionAccountTypes'
+import { FusionAccountKind, FusionAccountState } from '../fusionAccountTypes'
 import { StatusEntitlement } from '../statusEntitlement'
 
 describe('FusionAccount', () => {
@@ -607,6 +607,25 @@ describe('FusionAccount', () => {
             expect(acc.accountIds).toContain('src-a::native-1')
             expect(acc.missingAccountIds).not.toContain('src-a::native-1')
             expect(acc.attributes.accounts).toContain('src-a::native-1')
+        })
+    })
+
+    describe('FusionAccount state facade', () => {
+        it('exposes the same mutable state through the facade as through the state object', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
+            const state = (acc as any).state as FusionAccountState
+
+            acc.addAccountId('src-a::native-1')
+            expect(state.accountIds.has('src-a::native-1')).toBe(true)
+            expect(acc.accountIds).toContain('src-a::native-1')
+
+            acc.addStatus('test-status')
+            expect(state.statuses.has('test-status')).toBe(true)
+            expect(acc.statuses).toContain('test-status')
+
+            acc.setCorrelatedAccount('src-a::native-1')
+            expect(state.accountIds.has('src-a::native-1')).toBe(true)
+            expect(state.missingAccountIds.has('src-a::native-1')).toBe(false)
         })
     })
 })
