@@ -33,6 +33,19 @@ export function getUIOriginFromBaseUrl(baseUrl: string | undefined): string | un
 }
 
 // ============================================================================
+// Generic Admin URL Builder
+// ============================================================================
+
+function buildAdminUrl(
+    uiOrigin: string | undefined,
+    id: string | undefined,
+    buildPath: (encodedId: string) => string
+): string | undefined {
+    if (!uiOrigin || !id) return undefined
+    return `${uiOrigin}/ui/a/admin/${buildPath(encodeURIComponent(id))}`
+}
+
+// ============================================================================
 // Identity URL Builders
 // ============================================================================
 
@@ -44,10 +57,7 @@ export function getUIOriginFromBaseUrl(baseUrl: string | undefined): string | un
  * @returns The full URL to the identity details page, or undefined if inputs are invalid
  */
 export function buildIdentityUrl(uiOrigin: string | undefined, identityId: string | undefined): string | undefined {
-    if (!uiOrigin || !identityId) return undefined
-
-    const encodedId = encodeURIComponent(identityId)
-    return `${uiOrigin}/ui/a/admin/identities/${encodedId}/details/attributes`
+    return buildAdminUrl(uiOrigin, identityId, (encodedId) => `identities/${encodedId}/details/attributes`)
 }
 
 /**
@@ -57,10 +67,7 @@ export function buildIdentityAccountsUrl(
     uiOrigin: string | undefined,
     identityId: string | undefined
 ): string | undefined {
-    if (!uiOrigin || !identityId) return undefined
-
-    const encodedId = encodeURIComponent(identityId)
-    return `${uiOrigin}/ui/a/admin/identities/${encodedId}/accounts`
+    return buildAdminUrl(uiOrigin, identityId, (encodedId) => `identities/${encodedId}/accounts`)
 }
 
 // ============================================================================
@@ -71,20 +78,14 @@ export function buildIdentityAccountsUrl(
  * Builds a URL to a source's details page in the ISC UI.
  */
 export function buildSourceUrl(uiOrigin: string | undefined, sourceId: string | undefined): string | undefined {
-    if (!uiOrigin || !sourceId) return undefined
-
-    const encodedId = encodeURIComponent(sourceId)
-    return `${uiOrigin}/ui/a/admin/connections/sources/${encodedId}`
+    return buildAdminUrl(uiOrigin, sourceId, (encodedId) => `connections/sources/${encodedId}`)
 }
 
 /**
  * Builds a URL to a source's accounts page in the ISC UI.
  */
 export function buildSourceAccountsUrl(uiOrigin: string | undefined, sourceId: string | undefined): string | undefined {
-    if (!uiOrigin || !sourceId) return undefined
-
-    const encodedId = encodeURIComponent(sourceId)
-    return `${uiOrigin}/ui/a/admin/connections/sources/${encodedId}/accounts`
+    return buildAdminUrl(uiOrigin, sourceId, (encodedId) => `connections/sources/${encodedId}/accounts`)
 }
 
 // ============================================================================
@@ -95,10 +96,7 @@ export function buildSourceAccountsUrl(uiOrigin: string | undefined, sourceId: s
  * Builds a URL to an account's details page in the ISC UI.
  */
 export function buildAccountUrl(uiOrigin: string | undefined, accountId: string | undefined): string | undefined {
-    if (!uiOrigin || !accountId) return undefined
-
-    const encodedId = encodeURIComponent(accountId)
-    return `${uiOrigin}/ui/a/admin/accounts/${encodedId}`
+    return buildAdminUrl(uiOrigin, accountId, (encodedId) => `accounts/${encodedId}`)
 }
 
 /**
@@ -108,10 +106,7 @@ function buildHumanAccountManagementUrl(
     uiOrigin: string | undefined,
     accountId: string | undefined
 ): string | undefined {
-    if (!uiOrigin || !accountId) return undefined
-
-    const encodedId = encodeURIComponent(accountId)
-    return `${uiOrigin}/ui/a/admin/accounts-management/human-accounts/${encodedId}`
+    return buildAdminUrl(uiOrigin, accountId, (encodedId) => `accounts-management/human-accounts/${encodedId}`)
 }
 
 // ============================================================================
@@ -122,10 +117,7 @@ function buildHumanAccountManagementUrl(
  * Builds a URL to a workflow's details page in the ISC UI.
  */
 export function buildWorkflowUrl(uiOrigin: string | undefined, workflowId: string | undefined): string | undefined {
-    if (!uiOrigin || !workflowId) return undefined
-
-    const encodedId = encodeURIComponent(workflowId)
-    return `${uiOrigin}/ui/a/admin/workflows/${encodedId}`
+    return buildAdminUrl(uiOrigin, workflowId, (encodedId) => `workflows/${encodedId}`)
 }
 
 // ============================================================================
@@ -136,10 +128,7 @@ export function buildWorkflowUrl(uiOrigin: string | undefined, workflowId: strin
  * Builds a URL to a form definition's details page in the ISC UI.
  */
 export function buildFormDefinitionUrl(uiOrigin: string | undefined, formId: string | undefined): string | undefined {
-    if (!uiOrigin || !formId) return undefined
-
-    const encodedId = encodeURIComponent(formId)
-    return `${uiOrigin}/ui/a/admin/forms/${encodedId}`
+    return buildAdminUrl(uiOrigin, formId, (encodedId) => `forms/${encodedId}`)
 }
 
 // ============================================================================

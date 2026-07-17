@@ -137,4 +137,29 @@ describe('url', () => {
             expect(ctx.account('acc1')).toBe(`${uiOrigin}/ui/a/admin/accounts/acc1`)
         })
     })
+
+    describe('url builders', () => {
+        const origin = 'https://tenant.identitynow.com'
+
+        it.each([
+            ['identity', buildIdentityUrl, `${origin}/ui/a/admin/identities/id-1/details/attributes`],
+            ['identityAccounts', buildIdentityAccountsUrl, `${origin}/ui/a/admin/identities/id-1/accounts`],
+            ['source', buildSourceUrl, `${origin}/ui/a/admin/connections/sources/id-1`],
+            ['sourceAccounts', buildSourceAccountsUrl, `${origin}/ui/a/admin/connections/sources/id-1/accounts`],
+            ['account', buildAccountUrl, `${origin}/ui/a/admin/accounts/id-1`],
+            ['workflow', buildWorkflowUrl, `${origin}/ui/a/admin/workflows/id-1`],
+            ['form', buildFormDefinitionUrl, `${origin}/ui/a/admin/forms/id-1`],
+        ])('builds %s URL', (_label, fn, expected) => {
+            expect((fn as any)(origin, 'id-1')).toBe(expected)
+        })
+
+        it('encodes IDs', () => {
+            expect(buildIdentityUrl(origin, 'a/b')).toBe(`${origin}/ui/a/admin/identities/a%2Fb/details/attributes`)
+        })
+
+        it('returns undefined when origin or id is missing', () => {
+            expect(buildIdentityUrl(undefined, 'id-1')).toBeUndefined()
+            expect(buildIdentityUrl(origin, undefined)).toBeUndefined()
+        })
+    })
 })
