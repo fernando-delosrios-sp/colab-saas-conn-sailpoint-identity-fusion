@@ -521,13 +521,13 @@ describe('AttributeService template evaluation fallback behavior', () => {
         return fusionAccount
     }
 
-    it('returns undefined when unresolved variable expression is rendered unchanged', async () => {
+    it('renders unresolved variable literally per standard Velocity semantics', async () => {
         const service = createServiceWithExpression('${firstname}')
         const fusionAccount = createFusionAccount()
 
         await service.refreshNormalAttributes(fusionAccount)
 
-        expect(fusionAccount.attributes.computed).toBeUndefined()
+        expect(fusionAccount.attributes.computed).toBe('${firstname}')
     })
 
     it('keeps literal expressions that do not reference variables', async () => {
@@ -539,7 +539,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
         expect(fusionAccount.attributes.computed).toBe('static-literal')
     })
 
-    it('clears attribute when unresolved expression was previously set by mapping', async () => {
+    it('renders unresolved expression literally per standard Velocity semantics', async () => {
         const config = {
             attributeMaps: [{ newAttribute: 'computed', existingAttributes: ['computed'], attributeMerge: 'first' }],
             attributeMerge: 'first',
@@ -611,10 +611,10 @@ describe('AttributeService template evaluation fallback behavior', () => {
 
         await service.refreshNormalAttributes(fusionAccount)
 
-        expect(fusionAccount.attributes.computed).toBeUndefined()
+        expect(fusionAccount.attributes.computed).toBe('${firstname}${lastname}')
     })
 
-    it('returns UUID fallback for unique definition with unresolved vars when $counter is auto-appended', async () => {
+    it('renders unique definition with unresolved vars literally per standard Velocity semantics', async () => {
         const config = {
             attributeMaps: [],
             attributeMerge: 'first',
@@ -680,7 +680,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
 
         await service.refreshUniqueAttributes(fusionAccount)
 
-        expect(fusionAccount.attributes.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+        expect(fusionAccount.attributes.id).toBe('${firstname}${lastname}')
     })
 
     it('does not auto-append $counter when unique expression includes $UUID', async () => {
@@ -1496,7 +1496,7 @@ describe('AttributeService identity immutability by account lifecycle', () => {
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshUniqueAttributes(fusionAccount)
 
-        expect(fusionAccount.attributes.id).toBe('generated-id')
+        expect(fusionAccount.attributes.id).toBe('seed-id')
     })
 
     it('keeps id immutable for existing fusion account attached to identity', async () => {
@@ -1760,7 +1760,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBeUndefined()
+        expect(fusionAccount.attributes.derived).toBe('$account.employeeNumber')
     })
 
     it('keeps $account undefined when origin is Identities and identity bag is empty', async () => {
@@ -1797,7 +1797,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBeUndefined()
+        expect(fusionAccount.attributes.derived).toBe('$account.source.name$account.schema.id')
     })
 
     it('does not resolve managed $account by transient account.id fallback', async () => {
@@ -1846,7 +1846,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBeUndefined()
+        expect(fusionAccount.attributes.derived).toBe('$account.employeeNumber')
     })
 
     it('does not synthesize identity-backed schema values when origin snapshot is missing', async () => {
@@ -1883,7 +1883,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBeUndefined()
+        expect(fusionAccount.attributes.derived).toBe('$account.schema.name:$account.schema.id')
     })
 
     it('keeps schema-name expressions undefined when identity origin snapshot is missing', async () => {
@@ -1920,7 +1920,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         }
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBeUndefined()
+        expect(fusionAccount.attributes.derived).toBe('$account.schema.name')
     })
 
     it('uses $originAccount id string in expressions', async () => {
@@ -2069,7 +2069,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             normalAttributeDefinitions: [
                 {
                     name: 'id',
-                    expression: '$noSuchVar',
+                    expression: '$!noSuchVar',
                     case: 'same',
                     normalize: false,
                     spaces: false,
@@ -2117,7 +2117,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             normalAttributeDefinitions: [
                 {
                     name: 'id',
-                    expression: '$noSuchVar',
+                    expression: '$!noSuchVar',
                     case: 'same',
                     normalize: false,
                     spaces: false,
@@ -2164,7 +2164,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             normalAttributeDefinitions: [
                 {
                     name: 'name',
-                    expression: '$noSuchVar',
+                    expression: '$!noSuchVar',
                     case: 'same',
                     normalize: false,
                     spaces: false,
@@ -2213,7 +2213,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             uniqueAttributeDefinitions: [
                 {
                     name: 'id',
-                    expression: '$noSuchVar',
+                    expression: '$!noSuchVar',
                     useIncrementalCounter: false,
                     normalize: false,
                     spaces: false,
@@ -2221,7 +2221,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
                 },
                 {
                     name: 'name',
-                    expression: '$noSuchVar',
+                    expression: '$!noSuchVar',
                     useIncrementalCounter: false,
                     normalize: false,
                     spaces: false,
@@ -2268,7 +2268,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             normalAttributeDefinitions: [
                 {
                     name: 'nickname',
-                    expression: '$noSuchVar',
+                    expression: '$!noSuchVar',
                     case: 'same',
                     normalize: false,
                     spaces: false,
@@ -2315,7 +2315,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             normalAttributeDefinitions: [
                 {
                     name: 'name',
-                    expression: '$noSuchVar',
+                    expression: '$!noSuchVar',
                     case: 'same',
                     normalize: false,
                     spaces: false,
@@ -2657,8 +2657,7 @@ describe('AttributeService maxLength ordering after post-processing transforms',
         expect(fusionAccount.attributes.nickname.length).toBe(5)
     })
 
-    it('applyUniqueValueOutputTransforms and evaluateTemplate produce the same result for the same definition and raw input', async () => {
-        const service = buildService({})
+    it('applyOutputTransforms produces the same result for the same definition and raw input', async () => {
         const definition: any = {
             name: 'login',
             expression: '$firstName.$lastName$counter',
@@ -2670,14 +2669,14 @@ describe('AttributeService maxLength ordering after post-processing transforms',
             maxLength: 10,
         }
         const context = { firstName: '  John ', lastName: ' Doe ', counter: '01' }
-        const evaluateResult = (service as any).evaluateTemplate(definition, context, 'test')
-        const transformsResult = (service as any).applyUniqueValueOutputTransforms(
-            definition,
+        const { applyOutputTransforms } = await import('../templateEvaluator')
+        const transformsResult = applyOutputTransforms(
             '  John . Doe 01',
+            definition,
             definition.expression,
             context
         )
-        expect(evaluateResult).toBe(transformsResult)
+        expect(transformsResult).toBe('john.doe01')
     })
 })
 

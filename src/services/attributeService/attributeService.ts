@@ -12,14 +12,8 @@ import { FusionAccountKind } from '../../model/fusionAccountTypes'
 import { SchemaService } from '../schemaService'
 import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { CompoundKey, CompoundKeyType, SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
-import {
-    evaluateVelocityTemplate,
-    normalize,
-    padNumber,
-    removeSpaces,
-    switchCase,
-    truncateResultToMaxLength,
-} from './formatting'
+import { padNumber } from './formatting'
+import { evaluateAttributeTemplate, applyOutputTransforms } from './templateEvaluator'
 import { LockService } from '../lockService'
 export type RenderContext = Record<string, any>
 
@@ -36,11 +30,6 @@ import { velocitySnapshotSchemaId, velocitySnapshotSourceId } from '../../utils/
 import { hasValue, isNullish, missing, readString, trimStr } from '../../utils/safeRead'
 import { runtimeDefaults } from '../../data/config'
 import { FusionAttribute } from '../../data/schema'
-
-type AnyDefinition = NormalAttributeDefinition | UniqueAttributeDefinition
-
-// Module-level regex constants — compiled once (hot attribute-evaluation path)
-const COUNTER_SUFFIX_RE = /\$counter$|\$\{counter\}$/
 
 /**
  * Managed account key for matching `mainAccount` / `$originAccount` — composite `sourceId::nativeIdentity`
@@ -922,48 +911,6 @@ export class AttributeService {
     // ------------------------------------------------------------------------
 
     /**
-     * Evaluate template expression and apply transformations
-     */
-    private evaluateTemplate(
-        definition: AnyDefinition,
-        context: RenderContext,
-        accountName?: string,
-        expressionOverride?: string
-    ): any {
-        const expression = expressionOverride ?? definition.expression
-        if (!expression) {
-            this.log.error(`Expression is required for attribute ${definition.name}`)
-            return undefined
-        }
-
-        let value: any
-        try {
-            value = evaluateVelocityTemplate(expression, context)
-        } catch (error) {
-            this.log.error(
-                `Failed to evaluate velocity template for attribute ${definition.name}: ${error instanceof Error ? error.message : String(error)}`
-            )
-            return undefined
-        }
-
-        if (!value) return undefined
-
-        if (definition.trim && typeof value === 'string') value = value.trim()
-        if (definition.case && typeof value === 'string') value = switchCase(value, definition.case)
-        if (definition.spaces && typeof value === 'string') value = removeSpaces(value)
-        if (definition.normalize && typeof value === 'string') value = normalize(value)
-        if (definition.maxLength && typeof value === 'string' && value.length > definition.maxLength) {
-            value = truncateResultToMaxLength(value, expression, context, definition.maxLength)
-        }
-
-        this.log.debug(
-            `[${accountName}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
-        )
-
-        return value
-    }
-
-    /**
      * Generate a unique attribute value with uniqueness enforcement.
      *
      * Handles three modes via the same definition type:
@@ -1022,8 +969,16 @@ export class AttributeService {
 
             this.injectUUIDIfNeeded(definition, context)
 
-            const value = this.evaluateTemplate(definition, context, fusionAccount.name)
+            const result = evaluateAttributeTemplate(definition, context)
+            if (result.error) {
+                this.log.error(result.error)
+                return undefined
+            }
+            const value = result.value
             if (value === undefined || value === null) return undefined
+            this.log.debug(
+                `[${fusionAccount.name}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
+            )
 
             const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
             if (!registeredValues.has(strValue)) {
@@ -1058,8 +1013,16 @@ export class AttributeService {
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             this.injectUUIDIfNeeded(definition, context)
 
-            const value = this.evaluateTemplate(definition, context, fusionAccount.name, effectiveExpression)
+            const result = evaluateAttributeTemplate(definition, context, { expressionOverride: effectiveExpression })
+            if (result.error) {
+                this.log.error(result.error)
+                return undefined
+            }
+            const value = result.value
             if (value === undefined || value === null) return undefined
+            this.log.debug(
+                `[${fusionAccount.name}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
+            )
 
             const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
             if (!registeredValues.has(strValue)) {
@@ -1238,7 +1201,11 @@ export class AttributeService {
         // For accounts linked to a platform Identity, ensure the display name remains aligned with the identity name
         if (this.applyDisplayAttributeOverrideIfApplicable(fusionAccount, name)) return
 
-        const value = this.evaluateTemplate(definition, context, fusionAccount.name)
+        const result = evaluateAttributeTemplate(definition, context)
+        if (result.error) {
+            this.log.error(result.error)
+        }
+        const value = result.value
         if (value === undefined) {
             const fallback = this.fusionAttributeSafeDefault(
                 name,
@@ -1257,6 +1224,9 @@ export class AttributeService {
             delete context[name]
             return
         }
+        this.log.debug(
+            `[${fusionAccount.name}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
+        )
         fusionAccount.attributes[name] = value
         context[name] = value
     }
@@ -1366,29 +1336,9 @@ export class AttributeService {
         if (missing(value)) return false
         const raw = String(value)
 
-        const transformed = this.applyUniqueValueOutputTransforms(definition, raw, definition.expression, context)
+        const transformed = applyOutputTransforms(raw, definition, definition.expression, context)
         if (transformed === '') return false
 
         return !this.getUniqueValues(definition.name).has(transformed)
-    }
-
-    /** Match {@link evaluateTemplate} post-velocity transforms for a unique definition (including maxLength). */
-    private applyUniqueValueOutputTransforms(
-        definition: UniqueAttributeDefinition,
-        raw: string,
-        expression: string | undefined,
-        context: RenderContext
-    ): string {
-        let s = raw
-        if (definition.trim) s = s.trim()
-        if (definition.case) s = switchCase(s, definition.case)
-        if (definition.spaces) s = removeSpaces(s)
-        if (definition.normalize) s = normalize(s)
-        if (definition.maxLength && s.length > definition.maxLength) {
-            s = expression
-                ? truncateResultToMaxLength(s, expression, context, definition.maxLength)
-                : s.substring(0, definition.maxLength)
-        }
-        return s
     }
 }

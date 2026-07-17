@@ -2,6 +2,7 @@
 
 ## 2.2.0
 
+- (2026-07-17) Extracted Velocity template evaluation into a dedicated `templateEvaluator.ts` module with `evaluateAttributeTemplate` and `applyOutputTransforms` functions. Standard Velocity semantics now apply: unresolved variables render literally (`$var` → `"$var"`); use `$!var` for quiet suppression.
 - (2026-07-15) Added `$Normalize.ascii` Velocity helper for transliterating non-ASCII characters to ASCII, with optional language-specific digraph rules (German, Nordic).
 - (2026-07-15) Added **Static** option to Normal attribute definitions — attributes are evaluated only when they have no value, preventing recalculation on subsequent aggregations.
 - (2026-07-15) Added `$String` to available Velocity template helpers in connector-spec.
