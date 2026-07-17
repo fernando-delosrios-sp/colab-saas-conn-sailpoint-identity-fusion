@@ -226,7 +226,7 @@ export function extractArray<T = any>(attributes: Record<string, any>, key: stri
  * toSetFromAttribute(null, 'tags')
  * // Returns: Set()
  */
-function extractObjectValue(item: object): string | undefined {
+export function extractObjectIdentifierValue(item: object): string | undefined {
     const pick = readUnknown(item, 'id') ?? readUnknown(item, 'value') ?? readUnknown(item, 'name')
     return hasValue(pick) ? String(pick) : undefined
 }
@@ -243,7 +243,7 @@ function normalizeArrayItems(arr: any[]): string[] {
             continue
         }
         if (typeof item === 'object') {
-            const val = extractObjectValue(item)
+            const val = extractObjectIdentifierValue(item)
             if (val !== undefined) normalized.push(val)
         }
     }
@@ -275,7 +275,7 @@ export function normalizeActionTokens(raw: unknown): string[] {
         return [String(raw)]
     }
     if (typeof raw === 'object') {
-        const val = extractObjectValue(raw as object)
+        const val = extractObjectIdentifierValue(raw as object)
         return val !== undefined ? [val] : []
     }
     return []

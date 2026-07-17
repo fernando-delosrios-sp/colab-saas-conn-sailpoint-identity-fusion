@@ -12,6 +12,7 @@ import {
     extractBoolean,
     extractNumber,
     extractArray,
+    extractObjectIdentifierValue,
     toSetFromAttribute,
     normalizeActionTokens,
     getDisplayName,
@@ -218,6 +219,18 @@ describe('attributes', () => {
         })
     })
 
+    describe('extractObjectIdentifierValue', () => {
+        it('prefers id over value over name', () => {
+            expect(extractObjectIdentifierValue({ id: 'i', value: 'v', name: 'n' })).toBe('i')
+            expect(extractObjectIdentifierValue({ value: 'v', name: 'n' })).toBe('v')
+            expect(extractObjectIdentifierValue({ name: 'n' })).toBe('n')
+        })
+
+        it('returns undefined when no identifier is present', () => {
+            expect(extractObjectIdentifierValue({})).toBeUndefined()
+        })
+    })
+
     describe('toSetFromAttribute', () => {
         it('should convert array to Set', () => {
             const set = toSetFromAttribute({ tags: ['a', 'b', 'c'] }, 'tags')
@@ -231,6 +244,11 @@ describe('attributes', () => {
         it('should return empty Set for null attributes', () => {
             expect(toSetFromAttribute(null, 'tags')).toEqual(new Set())
         })
+
+        it('normalizes object references using the identifier fallback', () => {
+            const set = toSetFromAttribute({ tags: [{ id: 'a' }, { value: 'b' }, { name: 'c' }] }, 'tags')
+            expect([...set]).toEqual(['a', 'b', 'c'])
+        })
     })
 
     describe('normalizeActionTokens', () => {
@@ -242,6 +260,7 @@ describe('attributes', () => {
             expect(normalizeActionTokens(['fusion', 'report:x'])).toEqual(['fusion', 'report:x'])
             expect(normalizeActionTokens([{ id: 'correlated' }])).toEqual(['correlated'])
             expect(normalizeActionTokens({ id: 'report' })).toEqual(['report'])
+            expect(normalizeActionTokens({ name: 'fusion' })).toEqual(['fusion'])
         })
 
         it('returns empty list for null, empty string, or unrecognizable values', () => {
