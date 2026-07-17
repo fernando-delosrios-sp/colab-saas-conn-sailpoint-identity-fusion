@@ -287,7 +287,17 @@ export class LogService {
         }
 
         const url = this.externalLoggingUrl
-        if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
+        let parsedUrl: URL
+        try {
+            parsedUrl = new URL(url)
+        } catch {
+            return
+        }
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+            return
+        }
+        const forbiddenHostnames = ['localhost', '127.0.0.1', '169.254.169.254']
+        if (forbiddenHostnames.includes(parsedUrl.hostname)) {
             return
         }
         const doFetch = () =>
@@ -299,7 +309,15 @@ export class LogService {
             }).then(() => {})
 
         const pending: Promise<void> = (
-            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW, label: 'LogService>sendExternalLog', noRetry: true }).then(() => {}) : doFetch()
+            this.apiQueue
+                ? this.apiQueue
+                      .enqueue(doFetch, {
+                          priority: QueuePriority.LOW,
+                          label: 'LogService>sendExternalLog',
+                          noRetry: true,
+                      })
+                      .then(() => {})
+                : doFetch()
         )
             .catch(() => {})
             .finally(() => {
@@ -518,7 +536,12 @@ export class LogService {
      */
     metric(name: string, startedAt: number, data?: Record<string, any>): void {
         const durationMs = Date.now() - startedAt
-        const dataStr = data ? ' ' + Object.entries(data).map(([k, v]) => `${k}=${v}`).join(' ') : ''
+        const dataStr = data
+            ? ' ' +
+              Object.entries(data)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(' ')
+            : ''
         this.info(`Performance metric: ${name} durationMs=${durationMs}${dataStr}`)
     }
 
