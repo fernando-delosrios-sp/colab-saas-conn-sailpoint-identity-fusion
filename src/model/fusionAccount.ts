@@ -1,9 +1,7 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { isNewerThan } from '../utils/date'
-import { getAccountAttribute } from '../utils/attributes'
 import { FusionDecision } from './form'
 import { FusionConfig, SourceType } from './config'
-import { FusionAttribute } from '../data/schema'
 import { Attributes, ConnectorError, ConnectorErrorType, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { FusionMatch } from '../services/scoringService'
 import { FusionAccountState } from './fusionAccountState'
@@ -26,6 +24,7 @@ import {
     buildFromIdentity,
     buildFromManagedAccount,
     IDENTITIES_SOURCE_NAME,
+    importHistoryIntoState,
 } from './fusionAccountRules/constructionRules'
 import {
     preserveMissingAccountContext,
@@ -128,10 +127,6 @@ export class FusionAccount {
     public static fromFusionAccount(account: Account): FusionAccount {
         const fusionAccount = new FusionAccount()
         buildFromFusionAccount(account, fusionAccount.state)
-        const historyAttr = getAccountAttribute(account, FusionAttribute.History)
-        if (Array.isArray(historyAttr) && historyAttr.length > 0) {
-            fusionAccount.importHistory(historyAttr)
-        }
         return fusionAccount
     }
 
@@ -882,19 +877,7 @@ export class FusionAccount {
      * Import history from existing account, respecting max history limit
      */
     public importHistory(history: string[]): void {
-        const normalizedHistory = history
-            .filter((entry): entry is string => typeof entry === 'string')
-            .map((entry) => entry.trim())
-            .filter((entry) => entry.length > 0)
-
-        const dedupedHistory: string[] = []
-        for (const entry of normalizedHistory) {
-            if (dedupedHistory[dedupedHistory.length - 1] !== entry) {
-                dedupedHistory.push(entry)
-            }
-        }
-
-        this.state.history = dedupedHistory.slice(-this.state.maxHistoryMessages)
+        importHistoryIntoState(this.state, history)
     }
 
     /**
