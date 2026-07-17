@@ -834,8 +834,8 @@ export class AttributeService {
      * 3) Any non-configured sources are appended in map insertion order.
      */
     private getOrderedAccountsForContext(fusionAccount: FusionAccount): Record<string, any>[] {
-        const { sources, accounts } = fusionAccount.attributeBag
-        if (sources.size === 0) return accounts
+        const { sources, sourceAccountContexts } = fusionAccount.attributeBag
+        if (sources.size === 0) return sourceAccountContexts
 
         const ordered = this.buildOrderedAccountList(sources)
         return this.prioritizeMainAccount(ordered, fusionAccount)

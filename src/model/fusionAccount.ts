@@ -22,6 +22,7 @@ import {
 } from './managedAccountKey'
 import { missing, readString, trimStr } from '../utils/safeRead'
 import { StatusEntitlement } from './statusEntitlement'
+import { FusionAction } from './fusionAction'
 import { buildIdentityInfo } from './fusionAccountUtils'
 import {
     preserveMissingAccountContext,
@@ -127,7 +128,7 @@ export class FusionAccount {
         previous: {},
         current: {},
         identity: {},
-        accounts: [],
+        sourceAccountContexts: [],
         sources: new Map(),
     }
 
@@ -313,7 +314,7 @@ export class FusionAccount {
      */
     private restoreIdentityLinkage(account: Account): void {
         if (this._identityInfo?.id) return
-        const identityId = getAccountStringAttribute(account, 'identityId')
+        const identityId = getAccountStringAttribute(account, FusionAttribute.IdentityId)
         if (identityId && identityId.trim().length > 0) {
             this.setIdentityIdAttribute(identityId.trim())
         }
@@ -985,13 +986,13 @@ export class FusionAccount {
 
     /** Marks this fusion account's identity as a reviewer for the given source. */
     public setSourceReviewer(sourceId: string): void {
-        this._actions.add(`reviewer:${sourceId}`)
+        this._actions.add(`${FusionAction.ReviewerPrefix}${sourceId}`)
         this.addStatus(StatusEntitlement.Reviewer)
     }
 
     /** Removes reviewer assignment for the given source and updates reviewer status when needed. */
     public removeSourceReviewer(sourceId: string): void {
-        this._actions.delete(`reviewer:${sourceId}`)
+        this._actions.delete(`${FusionAction.ReviewerPrefix}${sourceId}`)
         if (!this._actionsHasReviewerScope()) {
             this._statuses.delete(StatusEntitlement.Reviewer)
         }
@@ -999,7 +1000,7 @@ export class FusionAccount {
 
     /** Returns the source IDs this account's identity is configured to review. */
     public listReviewerSources(): string[] {
-        const prefix = 'reviewer:'
+        const prefix = FusionAction.ReviewerPrefix
         // ⚡ Bolt: Iterate Set directly to prevent Array.from heap allocation
         const result: string[] = []
         for (const action of this._actions) {
@@ -1012,7 +1013,7 @@ export class FusionAccount {
 
     /** True when at least one source-scoped reviewer action remains on the account. */
     private _actionsHasReviewerScope(): boolean {
-        const prefix = 'reviewer:'
+        const prefix = FusionAction.ReviewerPrefix
         // ⚡ Bolt: Iterate Set directly to prevent Array.from heap allocation
         for (const action of this._actions) {
             if (action.startsWith(prefix)) {
@@ -1074,7 +1075,7 @@ export class FusionAccount {
         bag[FusionAttribute.History] = [...this._history]
         if (this._originSource !== undefined) bag[FusionAttribute.OriginSource] = this._originSource
         if (this._originAccount !== undefined) bag[FusionAttribute.OriginAccount] = this._originAccount
-        if (this._identityInfo?.id) bag['identityId'] = this._identityInfo.id
+        if (this._identityInfo?.id) bag[FusionAttribute.IdentityId] = this._identityInfo.id
     }
 
     /** Queues a review URL for deferred addition (resolved during getISCAccount). */
@@ -1493,7 +1494,7 @@ export class FusionAccount {
             this._sources.delete(IDENTITIES_SOURCE_NAME)
             this._sources.add(account.sourceName)
             this._attributeBag.sources.set(account.sourceName, existingSourceAccounts)
-            this._attributeBag.accounts.push(contextAttributes)
+            this._attributeBag.sourceAccountContexts.push(contextAttributes)
             // Invalidate cached sourceAttributeMap since sources changed
             this.sourceAttributeMapCache = undefined
         }
@@ -1519,7 +1520,7 @@ export class FusionAccount {
     private setUncorrelatedStatus(): void {
         this._uncorrelated = true
         this._statuses.add(StatusEntitlement.Uncorrelated)
-        this._actions.delete('correlated')
+        this._actions.delete(FusionAction.Correlated)
     }
 
     /** Sets a specific account ID as uncorrelated and adds it to both account ID sets. */
@@ -1614,11 +1615,11 @@ export class FusionAccount {
 
         if (hasAllAccountsCorrelated) {
             this._statuses.delete(StatusEntitlement.Uncorrelated)
-            this._actions.add('correlated')
+            this._actions.add(FusionAction.Correlated)
             this._uncorrelated = false
         } else {
             this._statuses.add(StatusEntitlement.Uncorrelated)
-            this._actions.delete('correlated')
+            this._actions.delete(FusionAction.Correlated)
             this._uncorrelated = true
         }
     }
