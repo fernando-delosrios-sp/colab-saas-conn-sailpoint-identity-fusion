@@ -9,7 +9,8 @@ import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
 import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../scoringService/scoringService'
 import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
 import { UrlContext } from '../../utils/url'
-import { SourceInfo } from '../sourceService'
+import { SourceInfo, SourceService } from '../sourceService'
+import { resolveReportAccountId } from './reportAccountResolver'
 
 export interface FusionReportState {
     conflictingFusionIdentityAccounts: Map<string, Map<string, string>>
@@ -22,7 +23,7 @@ export interface FusionReportState {
     sourcesByName: Map<string, SourceInfo>
     reportAttributes: string[]
     fusionIdentityComparisonsByAccount: WeakMap<FusionAccount, number>
-    resolveReportAccountId: (account: FusionAccount) => string | undefined
+    sources: SourceService
     fusionAutoAssignmentScore?: number
 }
 
@@ -94,7 +95,7 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
                 sourceInfo?.sourceType,
                 state.reportAttributes,
                 undefined,
-                state.resolveReportAccountId(fusionAccount)
+                resolveReportAccountId(fusionAccount, state.sources)
             ),
             fusionIdentityComparisons: state.fusionIdentityComparisonsByAccount.get(fusionAccount) ?? 0,
             matches,
