@@ -1511,6 +1511,21 @@ export class SourceService {
         this.log.info(`Added reverse correlation attribute "${attributeName}" to Fusion source schema`)
     }
 
+    private buildSearchableIdentityAttributePayload(
+        name: string,
+        displayName: string
+    ): { name: string; displayName: string; searchable: true; type: 'string'; multi: false; standard: false; system: false } {
+        return {
+            name,
+            displayName,
+            searchable: true,
+            type: 'string',
+            multi: false,
+            standard: false,
+            system: false,
+        }
+    }
+
     /**
      * Ensure the ISC identity attribute exists and is searchable.
      */
@@ -1533,15 +1548,7 @@ export class SourceService {
                     identityAttributesApi
                         .putIdentityAttribute({
                             name: attributeName,
-                            identityAttributeV2025: {
-                                name: attributeName,
-                                displayName,
-                                searchable: true,
-                                type: 'string',
-                                multi: false,
-                                standard: false,
-                                system: false,
-                            },
+                            identityAttributeV2025: this.buildSearchableIdentityAttributePayload(attributeName, displayName),
                         })
                         .then((r) => r.data),
                 QueuePriority.HIGH,
@@ -1558,15 +1565,7 @@ export class SourceService {
         }
 
         const createPayload = {
-            identityAttributeV2025: {
-                name: attributeName,
-                displayName,
-                searchable: true,
-                type: 'string',
-                multi: false,
-                standard: false,
-                system: false,
-            },
+            identityAttributeV2025: this.buildSearchableIdentityAttributePayload(attributeName, displayName),
         }
         let created: any
         try {
@@ -1587,15 +1586,7 @@ export class SourceService {
                         identityAttributesApi
                             .putIdentityAttribute({
                                 name: attributeName,
-                                identityAttributeV2025: {
-                                    name: attributeName,
-                                    displayName,
-                                    searchable: true,
-                                    type: 'string',
-                                    multi: false,
-                                    standard: false,
-                                    system: false,
-                                },
+                                identityAttributeV2025: this.buildSearchableIdentityAttributePayload(attributeName, displayName),
                             })
                             .then((r) => r.data),
                     QueuePriority.HIGH,
