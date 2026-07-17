@@ -8,9 +8,7 @@ import { FusionAccountState } from './fusionAccountState'
 import { FusionAccountKind } from './fusionAccountTypes'
 import type { FusionAttributeBag, FusionManagedAccountInfo, IdentityInfo } from './fusionAccountTypes'
 import {
-    buildManagedAccountKey,
     getManagedAccountKeyFromAccount,
-    isCompositeManagedAccountKey,
     normalizeCompositeManagedAccountKey,
     parseManagedAccountKey,
 } from './managedAccountKey'
@@ -27,12 +25,10 @@ import {
     importHistoryIntoState,
 } from './fusionAccountRules/constructionRules'
 import {
-    preserveMissingAccountContext,
-    processIdentityMatchedAccounts,
-    processPreviousRunMatchedAccounts,
-    pruneDeletedManagedAccounts,
-    type MatchContext,
-} from './fusionAccountMatcher'
+    addFusionDecisionLayer,
+    addIdentityLayer,
+    addManagedAccountLayer,
+} from './fusionAccountRules/layerRules'
 
 /**
  * The ISC virtual source name that represents an identity-origin fusion account.
@@ -916,26 +912,7 @@ export class FusionAccount {
      * @param identity - The correlated ISC identity document
      */
     public addIdentityLayer(identity: IdentityDocument): void {
-        this.state.email = identity.attributes?.email as string
-        this.state.identityInfo = buildIdentityInfo(identity)
-        this.state.attributeBag.identity = identity.attributes ?? {}
-        this.state.attributeBag.identity.name = identity.name
-        this.state.isIdentity = true
-
-        if (!this.state.needsRefresh && isNewerThan(identity.modified, this.state.modified)) {
-            this.state.needsRefresh = true
-        }
-
-        for (const account of identity.accounts ?? []) {
-            if (!this.state.sourceConfigNamesSet.has(account.source?.name ?? '')) continue
-            const managedAccountKey = buildManagedAccountKey({
-                sourceId: account.source?.id,
-                nativeIdentity: readString(account, 'nativeIdentity'),
-            })
-            if (managedAccountKey) {
-                this.setCorrelatedAccount(managedAccountKey)
-            }
-        }
+        addIdentityLayer(this.state, identity)
     }
 
     /**
@@ -966,85 +943,16 @@ export class FusionAccount {
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
         onBlend?: (account: Account) => void
     ): void {
-        const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> => {
-            // ⚡ Bolt: Iterate Set directly to prevent Array.from heap allocation
-            const result = new Set<string>()
-            for (const key of input) {
-                const normalized = normalizeCompositeManagedAccountKey(key)
-                if (normalized !== undefined) {
-                    result.add(normalized)
-                }
-            }
-            return result
-        }
-
-        this.state.previousAccountIds = normalizeManagedAccountKeySet(this.state.previousAccountIds)
-        this.state.missingAccountIds = normalizeManagedAccountKeySet(this.state.missingAccountIds)
-        this.state.accountIds = normalizeManagedAccountKeySet(this.state.accountIds)
-
-        const ctx: MatchContext = {
-            identityId: this.identityId,
-            previousAccountIds: this.state.previousAccountIds,
-            missingAccountIdsSet: this.state.missingAccountIds,
-            accountIdsSet: this.state.accountIds,
-            setCorrelatedAccount: (id: string) => this.setCorrelatedAccount(id),
-            setUncorrelatedAccount: (id: string) => this.setUncorrelatedAccount(id),
-            setManagedAccount: (account: Account, addHistory: boolean, skipKeys?: ReadonlySet<string>) =>
-                this.setManagedAccount(account, addHistory, skipKeys),
-            hasManagedAccountInfo: (accountId: string) => this.state.managedAccountInfo.has(accountId),
-            setManagedAccountInfo: (accountId: string, sourceName: string, nativeIdentity: string) =>
-                this.setManagedAccountInfo(accountId, sourceName, nativeIdentity),
-            deleteManagedAccountInfo: (accountId: string) => this.state.managedAccountInfo.delete(accountId),
-            addHistory: (message: string) => this.addHistory(message),
-            setNeedsRefresh: (refresh: boolean) => this.setNeedsRefresh(refresh),
-            deleteAccountId: (id: string) => this.state.accountIds.delete(id),
-            deleteMissingAccountId: (id: string) => this.state.missingAccountIds.delete(id),
-        }
-
-        processIdentityMatchedAccounts(
-            ctx,
+        addManagedAccountLayer(
+            this.state,
             accountsById,
             accountsByIdentityId,
+            allAccountsById,
+            pruneDeletedManagedAccountsFlag,
             addBlendHistory,
             skipBlendHistoryForManagedKeys,
             onBlend
         )
-        processPreviousRunMatchedAccounts(
-            ctx,
-            accountsById,
-            accountsByIdentityId,
-            addBlendHistory,
-            skipBlendHistoryForManagedKeys,
-            onBlend
-        )
-
-        // Prune account references that no longer exist in the managed-account inventory.
-        if (pruneDeletedManagedAccountsFlag && allAccountsById) {
-            pruneDeletedManagedAccounts(ctx, allAccountsById)
-        }
-
-        if (allAccountsById) {
-            preserveMissingAccountContext(ctx, allAccountsById)
-        }
-
-        // Update orphan status based on final account state
-        // Managed-origin accounts are orphaned when they have no managed accounts.
-        // Identity-origin accounts are orphaned when they have no managed accounts AND
-        // their origin identity is not present in the configured identity scope.
-        if (this.state.accountIds.size === 0) {
-            if (this.fromIdentity) {
-                const originIdentityId = this.originAccountId ?? this.identityId
-                if (originIdentityId && !this.originIdentityInScope) {
-                    this.state.statuses.add(StatusEntitlement.Orphan)
-                    this.state.needsRefresh = false
-                }
-            } else {
-                this.state.statuses.add(StatusEntitlement.Orphan)
-                this.state.needsRefresh = false
-            }
-        } else {
-            this.state.statuses.delete(StatusEntitlement.Orphan)
-        }
     }
 
     /**
@@ -1058,23 +966,7 @@ export class FusionAccount {
      * @param decision - The fusion decision from the review form
      */
     public addFusionDecisionLayer(decision: FusionDecision): void {
-        const managedKey = trimStr(decision.account.id) ?? ''
-        if (!isCompositeManagedAccountKey(managedKey)) {
-            throw new ConnectorError(
-                `Fusion decision account id must be a managed account key (sourceId::nativeIdentity), received: "${managedKey || 'empty'}".`,
-                ConnectorErrorType.Generic
-            )
-        }
-        this.setUncorrelatedAccount(managedKey)
-        const sourceType = decision.sourceType ?? SourceType.Authoritative
-
-        if (decision.newIdentity) {
-            if (sourceType === SourceType.Authoritative) {
-                this.setManual(decision)
-            }
-        } else {
-            this.setAuthorized(decision)
-        }
+        addFusionDecisionLayer(this.state, decision)
     }
 
     // ============================================================================

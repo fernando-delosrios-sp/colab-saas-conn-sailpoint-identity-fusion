@@ -4,8 +4,9 @@ context: |
   Package manager: npm
   Project: colab-saas-conn-sailpoint-identity-fusion
 rules:
+  design:
+    - Use C4 diagram logic for architecture when appropriate
   specs:
     - Write clear Acceptance Criteria following Gherkin format where applicable
-    - Use C4 diagram logic for architecture when appropriate
   tasks:
     - Keep tasks small, independent, and verifiable
