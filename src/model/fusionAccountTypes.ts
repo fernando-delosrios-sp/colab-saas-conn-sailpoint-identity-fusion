@@ -35,7 +35,7 @@ export type FusionAttributeBag = {
     /** Attributes from the correlated ISC identity */
     identity: Attributes
     /** Flat list of attribute objects from all managed source accounts */
-    accounts: Attributes[]
+    sourceAccountContexts: Attributes[]
     /** Attribute objects grouped by source name (supports multi-account-per-source scenarios) */
     sources: Map<string, Attributes[]>
 }

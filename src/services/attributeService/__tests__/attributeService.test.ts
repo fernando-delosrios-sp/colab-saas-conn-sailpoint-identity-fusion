@@ -63,7 +63,7 @@ describe('AttributeService mapping targets for definition context', () => {
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([
                 [
                     'HR',
@@ -173,7 +173,7 @@ describe('Static attribute evaluation logic', () => {
                 current: {},
                 previous: {},
                 identity: {},
-                accounts: [],
+                sourceAccountContexts: [],
                 sources: new Map([['HR', [{ fn: fnValue, source: { name: 'HR', id: 'hr1' }, schema: { id: 'id', name: 'name' } }]]]),
             },
             setNeedsRefresh(val: boolean) { this.needsRefresh = val },
@@ -253,7 +253,7 @@ describe('AttributeService mainAccount stale cleanup', () => {
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([
                 [
                     'HR',
@@ -335,7 +335,7 @@ describe('AttributeService mapping undefined behavior', () => {
             current: { nickname: 'old-value' },
             previous: { nickname: 'old-value' },
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([
                 [
                     'HR',
@@ -415,7 +415,7 @@ describe('AttributeService mapping undefined behavior', () => {
             current: { nickname: 'old-value' },
             previous: { nickname: 'old-value' },
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', []]]),
         }
         const fusionAccount: any = {
@@ -493,7 +493,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -579,7 +579,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([
                 ['HR', [{ computed: '${firstname}${lastname}', source: { name: 'HR' } }]],
             ]),
@@ -653,7 +653,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -721,7 +721,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -803,7 +803,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -883,7 +883,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -962,7 +962,7 @@ fallback
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -1030,7 +1030,7 @@ used
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -1128,7 +1128,7 @@ describe('AttributeService mainAccount override', () => {
                 : { id: 'fusion-id-1', name: 'immutable-name' },
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([
                 [
                     'HR',
@@ -1291,7 +1291,7 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
             current: { id: 'fusion-id-1', name: 'immutable-name' },
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([
                 [
                     'HR',
@@ -1388,7 +1388,7 @@ describe('AttributeService unique identity reset for managed accounts', () => {
             current: { id: 'mapped-id' },
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -1473,7 +1473,7 @@ describe('AttributeService identity immutability by account lifecycle', () => {
             current: { id: 'seed-id' },
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -1505,7 +1505,7 @@ describe('AttributeService identity immutability by account lifecycle', () => {
             current: { id: 'persisted-id' },
             previous: { id: 'persisted-id' },
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -1592,7 +1592,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([
                 [
                     'HR',
@@ -1641,7 +1641,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([
                 [
                     'HR',
@@ -1690,7 +1690,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             current: {},
             previous: {},
             identity: { employeeNumber: 'E-ID' },
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([
                 [
                     'HR',
@@ -1739,7 +1739,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             current: {},
             previous: {},
             identity: { employeeNumber: 'E-ID' },
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>(),
         }
         const fusionAccount: any = {
@@ -1776,7 +1776,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>(),
         }
         const fusionAccount: any = {
@@ -1813,7 +1813,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             current: {},
             previous: {},
             identity: { employeeNumber: 'E-ID' },
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([
                 [
                     'HR',
@@ -1862,7 +1862,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             current: { name: 'Fusion Name', id: 'Fusion ID' },
             previous: {},
             identity: { name: 'Identity Name', id: 'Identity ID', displayName: 'Identity Display Name' },
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>(),
         }
         const fusionAccount: any = {
@@ -1899,7 +1899,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             current: {},
             previous: {},
             identity: { name: 'Identity Name', displayName: 'Identity Display Name' },
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>(),
         }
         const fusionAccount: any = {
@@ -1936,7 +1936,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>(),
         }
         const fusionAccount: any = {
@@ -2002,7 +2002,7 @@ describe('AttributeService unique value registration', () => {
             current: { id: 'persisted-id-1' },
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
 
@@ -2086,7 +2086,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
         const fusionAccount: any = {
@@ -2134,7 +2134,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             current: { originAccount: 'from-attrs-only' },
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
         const fusionAccount: any = {
@@ -2181,7 +2181,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
         const fusionAccount: any = {
@@ -2236,7 +2236,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
         const fusionAccount: any = {
@@ -2285,7 +2285,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             current: { nickname: 'stale' },
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
         const fusionAccount: any = {
@@ -2332,7 +2332,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             current: {},
             previous: {},
             identity: { name: 'Hosting Identity Name' },
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
         const fusionAccount: any = {
@@ -2371,7 +2371,7 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
             current: {},
             previous: {},
             identity: { name: 'Hosting Identity Name Correlated' },
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
         const fusionAccount: any = {
@@ -2463,7 +2463,7 @@ describe('AttributeService error handling', () => {
             current: { ...attrs },
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map(),
             primaryAccount: {
                 id: '123',
@@ -2572,7 +2572,7 @@ describe('AttributeService maxLength ordering after post-processing transforms',
             current: { ...attrs },
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
         const fusionAccount: any = {
@@ -2720,7 +2720,7 @@ describe('AttributeService refreshUniqueAttributes early skip rules', () => {
             current: {},
             previous: {},
             identity: {},
-            accounts: [],
+            sourceAccountContexts: [],
             sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
         }
         const fusionAccount: any = {
