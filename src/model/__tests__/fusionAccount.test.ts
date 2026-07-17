@@ -532,4 +532,52 @@ describe('addManagedAccountLayer identity matching', () => {
     })
 })
 
+describe('pruneDeletedManagedAccounts', () => {
+    it('removes account references that no longer exist in the inventory', () => {
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-1',
+            id: 'isc-1',
+            name: 'Persisted Account',
+            sourceName: 'Identity Fusion NG',
+            attributes: {
+                accounts: ['src-a::old-1'],
+                'missing-accounts': ['src-a::old-2'],
+            },
+        } as unknown as Account)
+
+        // Ensure previousAccountIds is hydrated from persisted accounts
+        expect((acc as any).previousAccountIds).toContain('src-a::old-1')
+
+        const accountsById = new Map<string, Account>()
+        const accountsByIdentityId = new Map<string, Set<string>>()
+        const allAccountsById = new Map<string, Account>()
+
+        acc.addManagedAccountLayer(accountsById, accountsByIdentityId, allAccountsById, true)
+
+        expect(acc.accountIds).not.toContain('src-a::old-1')
+        expect(acc.missingAccountIds).not.toContain('src-a::old-2')
+        expect(acc.history.some((h) => h.includes('Removed managed account missing reference'))).toBe(true)
+    })
+
+    it('clears needsRefresh when a managed-origin account becomes orphan after pruning', () => {
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-2',
+            id: 'isc-2',
+            name: 'Persisted Account',
+            sourceName: 'Identity Fusion NG',
+            attributes: {
+                accounts: ['src-a::gone'],
+            },
+        } as unknown as Account)
+
+        const accountsById = new Map<string, Account>()
+        const accountsByIdentityId = new Map<string, Set<string>>()
+        const allAccountsById = new Map<string, Account>()
+
+        acc.addManagedAccountLayer(accountsById, accountsByIdentityId, allAccountsById, true)
+
+        expect(acc.needsRefresh).toBe(false)
+    })
+})
+
 })
