@@ -47,7 +47,7 @@
 
 ## 7. Final verification
 
-- [ ] 7.1 Run full lint: `npx eslint "src/**/*.ts"` — expected no errors
-- [ ] 7.2 Run full typecheck: `npx tsc --noEmit` — expected no errors
-- [ ] 7.3 Run full test suite: `npx vitest run` — expected all tests pass (981 passed / 2 skipped baseline)
+- [x] 7.1 Run full lint: `npx eslint "src/**/*.ts"` — expected no errors
+- [x] 7.2 Run full typecheck: `npx tsc --noEmit` — expected no errors
+- [x] 7.3 Run full test suite: `npx vitest run` — expected all tests pass (989 passed / 2 skipped)
 - [ ] 7.4 Confirm file size: `wc -l src/model/fusionAccount.ts src/model/fusionAccountState.ts src/model/fusionAccountRules/*.ts` — each under ~400 lines
