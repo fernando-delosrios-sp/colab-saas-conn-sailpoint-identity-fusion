@@ -15,6 +15,9 @@
   - Created `src/model/fusionAction.ts` with `Correlated = 'correlated'` and `ReviewerPrefix = 'reviewer:'`.
   - Replaced raw `'identityId'`, `'correlated'`, and `'reviewer:'` strings in `src/model/fusionAccount.ts` with the new constants.
   - Extended `src/data/__tests__/schema.test.ts` to assert 11 attributes and the runtime value of `IdentityId`.
+- **Review follow-up:**
+  - Cleaned up commit history so the refactor commit contains only source changes.
+  - Migrated remaining raw `'correlated'`, `'reviewer:'`, and `'identityId'` strings in `src/operations/actions/`, `src/data/action.ts`, and `src/services/formService/` to `FusionAction`/`FusionAttribute`.
 
 ## What was tested
 
@@ -40,13 +43,19 @@
 - `src/data/schema.ts`
 - `src/data/__tests__/schema.test.ts`
 - `src/model/fusionAction.ts` (new)
+- `src/operations/accountUpdate.ts`
+- `src/operations/actions/correlateAction.ts`
+- `src/operations/actions/reviewerAction.ts`
+- `src/data/action.ts`
+- `src/services/formService/formBuilder.ts`
+- `src/services/formService/formProcessor.ts`
 
 ## Self-review findings
 
 - Internal `attributeBag.accounts` renamed to `sourceAccountContexts` ✅
 - `FusionAttribute` extended with `IdentityId` ✅
 - `FusionAction` constants introduced for `correlated` and `reviewer:` ✅
-- Raw strings replaced with constants in `fusionAccount.ts` ✅
+- Raw strings replaced with constants across `fusionAccount.ts`, action handlers, and form service ✅
 - Persisted attribute names unchanged for round-trip compatibility ✅
 - `npm run lint` passes ✅
 - `npx tsc --noEmit` passes ✅
@@ -54,9 +63,10 @@
 
 ## Issues or concerns
 
-None. The first `git add -A` during Task 2 accidentally staged the pre-existing `.superpowers/` and `plans/` untracked files; they were committed together with the refactor. This is cosmetic only — the actual source changes are clean and atomic per task.
+None. History was rewritten to remove scaffolding files from the source refactor commit, and remaining raw strings were migrated to the new constants.
 
 ## Commits
 
-- `8e7be13` — refactor: rename attributeBag.accounts to sourceAccountContexts
-- `61316b5` — refactor: centralize attribute-bag keys in FusionAttribute/FusionAction enums
+- `refactor: rename attributeBag.accounts to sourceAccountContexts and centralize keys`
+- `docs: add Plan 004 implementation report`
+- `refactor: migrate remaining action and identityId raw strings to constants`
