@@ -11,16 +11,6 @@ import { AttributeService } from '../../../../services/attributeService/attribut
 import { SchemaService } from '../../../../services/schemaService/schemaService'
 import type { Mock } from 'vitest'
 
-const replayOutputs = new Map<string, unknown>()
-
-export function setExpectedOutput(stepId: string, output: unknown): void {
-    replayOutputs.set(stepId, output)
-}
-
-export function getExpectedOutput(stepId: string): unknown {
-    return replayOutputs.get(stepId)
-}
-
 function findIdentityIdForIscAccount(iscAccount: any, state: any): string | undefined {
     const attributes = iscAccount.attributes ?? {}
     const accounts = [...(attributes.accounts ?? []), attributes.originAccount, attributes.mainAccount].filter(Boolean)
