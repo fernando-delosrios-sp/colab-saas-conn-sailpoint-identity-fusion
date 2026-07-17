@@ -26,6 +26,7 @@ import {
     yieldToEventLoop,
 } from './batching'
 import { buildFusionReport } from './fusionReportBuilder'
+import { resolveReportAccountId as resolveReportAccountIdFn, resolveReportAccountIdValue as resolveReportAccountIdValueFn } from './reportAccountResolver'
 import { AggregationTracker } from './aggregationTracker'
 import {
     buildMinimalFusionReportAccount,
@@ -1232,11 +1233,7 @@ export class FusionService {
      * Prefers the account's stored ISC id; falls back to source cache lookup.
      */
     private resolveReportAccountId(fusionAccount: FusionAccount): string | undefined {
-        const iscId = fusionAccount.iscAccountId
-        if (iscId) return iscId
-        const managedKey = fusionAccount.managedAccountId
-        if (!managedKey) return undefined
-        return this.sources.resolveIscAccountIdForManagedKey(managedKey)
+        return resolveReportAccountIdFn(fusionAccount, this.sources)
     }
 
     /**
@@ -1244,8 +1241,7 @@ export class FusionService {
      * Returns undefined if the account can't be resolved to an ISC id.
      */
     private resolveReportAccountIdValue(accountId?: string): string | undefined {
-        if (!accountId) return undefined
-        return this.sources.resolveIscAccountIdForManagedKey(accountId)
+        return resolveReportAccountIdValueFn(accountId, this.sources)
     }
 
     // ------------------------------------------------------------------------
@@ -1794,7 +1790,7 @@ export class FusionService {
                 sourcesByName: this.sourcesByName,
                 reportAttributes: this.reportAttributes,
                 fusionIdentityComparisonsByAccount: tracker.fusionIdentityComparisonsByAccount,
-                resolveReportAccountId: (account) => this.resolveReportAccountId(account),
+                sources: this.sources,
                 fusionAutoAssignmentScore: this.config.fusionAutoAssignmentScore,
             },
             includeNonMatches,
