@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { FusionAccount } from '../../model/account'
+import type { FusionAccount } from '../../../model/account'
 import { resolveReportAccountId, resolveReportAccountIdValue } from '../reportAccountResolver'
 
 describe('reportAccountResolver', () => {
