@@ -18,6 +18,8 @@ import { IDENTITIES_SOURCE_NAME } from './constructionRules'
 import { addAccountId, removeMissingAccountId } from './collectionRules'
 import { setManual, setAuthorized, setUncorrelatedAccount } from './statusRules'
 import { addHistory, formatHistoryAccountInfo } from './historyRules'
+import { FusionMatch } from '../../services/scoringService'
+import type { FusionAccount } from '../fusionAccount'
 import {
     preserveMissingAccountContext,
     processIdentityMatchedAccounts,
@@ -285,5 +287,21 @@ export function addFusionDecisionLayer(state: FusionAccountState, decision: Fusi
         }
     } else {
         setAuthorized(state, decision)
+    }
+}
+
+/** Records a Match match result and sets the isMatch flag. */
+export function addFusionMatch(state: FusionAccountState, fusionMatch: FusionMatch): void {
+    state.fusionMatches.push(fusionMatch)
+    state.isMatch = true
+}
+
+/**
+ * Clears fusionIdentity references from matches to reduce memory retention.
+ * identityId and identityName are retained for report generation.
+ */
+export function clearFusionIdentityReferences(state: FusionAccountState): void {
+    for (const match of state.fusionMatches) {
+        ;(match as { fusionIdentity?: FusionAccount }).fusionIdentity = undefined
     }
 }

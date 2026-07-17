@@ -1,4 +1,6 @@
 import { FusionAccountState } from '../fusionAccountState'
+import { StatusEntitlement } from '../statusEntitlement'
+import { IDENTITIES_SOURCE_NAME } from './constructionRules'
 import { addHistory } from './historyRules'
 
 /**
@@ -65,4 +67,42 @@ export function addSource(state: FusionAccountState, source: string, message?: s
  */
 export function removeSource(state: FusionAccountState, source: string, message?: string): void {
     removeFromSet(state, state.sources, source, message)
+}
+
+/**
+ * Returns missing account IDs that belong to a given source,
+ * using the managed account info map for source lookup.
+ */
+export function getMissingAccountIdsForSource(state: FusionAccountState, sourceName: string): string[] {
+    const result: string[] = []
+    for (const id of state.missingAccountIds) {
+        const info = state.managedAccountInfo.get(id)
+        if (info && info.source.name === sourceName) {
+            result.push(id)
+        }
+    }
+    return result
+}
+
+/**
+ * Remove a source account and update orphan status if needed.
+ */
+export function removeSourceAccount(state: FusionAccountState, id: string): void {
+    removeAccountId(state, id)
+
+    const originFromAttributes = state.attributeBag.current?.originSource
+    const legacyOriginFromAttributes = state.attributeBag.current?.sourceOrigin
+    const fromIdentity =
+        state.originSource === IDENTITIES_SOURCE_NAME ||
+        originFromAttributes === IDENTITIES_SOURCE_NAME ||
+        legacyOriginFromAttributes === IDENTITIES_SOURCE_NAME
+
+    if (state.accountIds.size === 0) {
+        if (!fromIdentity || (fromIdentity && !state.originIdentityInScope)) {
+            state.statuses.add(StatusEntitlement.Orphan)
+            addHistory(state, `Account became orphan after removing source account: ${id}`)
+        }
+    }
+
+    addHistory(state, `Source account removed: ${id}`)
 }

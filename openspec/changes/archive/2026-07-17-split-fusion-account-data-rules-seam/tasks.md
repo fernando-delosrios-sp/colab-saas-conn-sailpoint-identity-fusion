@@ -36,7 +36,7 @@
 
 - [x] 5.1 Create `src/model/fusionAccountRules/historyRules.ts` with `addHistory`, `importHistory`, `formatHistoryAccountInfo`, `normalizeHistoryLabel`
 - [x] 5.2 Remove all private helpers from `FusionAccount.ts` — only imports, static config/configure, factory methods, accessors, mutators (all delegating), `toISCAccount()`, and `buildIdentityInfo` re-export remain
-- [ ] 5.3 Verify final facade contains no internal logic: `wc -l src/model/fusionAccount.ts` under ~400 lines
+- [x] 5.3 Verify final facade contains no internal logic: `wc -l src/model/fusionAccount.ts` under ~400 lines
 - [x] 5.4 Re-export `FusionAccountState` from `src/model/fusionAccountTypes.ts`
 - [x] 5.5 Verify: `npx tsc --noEmit`, `npx eslint "src/**/*.ts"`, `npx vitest run`
 
@@ -50,4 +50,4 @@
 - [x] 7.1 Run full lint: `npx eslint "src/**/*.ts"` — expected no errors
 - [x] 7.2 Run full typecheck: `npx tsc --noEmit` — expected no errors
 - [x] 7.3 Run full test suite: `npx vitest run` — expected all tests pass (989 passed / 2 skipped)
-- [ ] 7.4 Confirm file size: `wc -l src/model/fusionAccount.ts src/model/fusionAccountState.ts src/model/fusionAccountRules/*.ts` — each under ~400 lines
+- [x] 7.4 Confirm file size: `wc -l src/model/fusionAccount.ts src/model/fusionAccountState.ts src/model/fusionAccountRules/*.ts` — each under ~400 lines

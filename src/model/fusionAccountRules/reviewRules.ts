@@ -1,6 +1,7 @@
 import { FusionAccountState } from '../fusionAccountState'
 import { StatusEntitlement } from '../statusEntitlement'
 import { addToSet, removeFromSet } from './collectionRules'
+import { resolveCorrelationPromises } from './correlationRules'
 
 /** Adds a review URL to the supplied state. */
 export function addReview(state: FusionAccountState, review: string, message?: string): void {
@@ -68,4 +69,20 @@ export async function resolveReviewPromises(state: FusionAccountState): Promise<
             addPendingReviewUrl(state, result.value)
         }
     }
+}
+
+/**
+ * Resolve all pending operations (reviews and correlations).
+ * @param awaitCorrelations - When false, correlation promises are left running
+ *   in the background so the caller can proceed without waiting for the queue to drain.
+ */
+export async function resolvePendingOperations(
+    state: FusionAccountState,
+    awaitCorrelations = true
+): Promise<void> {
+    await resolveReviewPromises(state)
+    if (awaitCorrelations) {
+        await resolveCorrelationPromises(state)
+    }
+    resolvePendingReviewUrls(state)
 }

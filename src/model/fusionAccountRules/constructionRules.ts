@@ -20,17 +20,10 @@ import {
     normalizeCompositeManagedAccountKey,
 } from '../managedAccountKey'
 import { buildIdentityInfo } from '../fusionAccountUtils'
+import { addHistory, formatHistoryAccountInfo } from './historyRules'
 
-/**
- * The ISC virtual source name that represents an identity-origin fusion account.
- */
 export const IDENTITIES_SOURCE_NAME = 'Identities'
 
-/**
- * Initializes scalar core fields from the factory input.
- * `type` and `managedKey` are required; everything else is optional.
- * Booleans use explicit undefined checks so `false` values are preserved.
- */
 function initializeCoreState(
     state: FusionAccountState,
     config: {
@@ -61,18 +54,11 @@ function initializeCoreState(
     if (config.isIdentity !== undefined) state.isIdentity = config.isIdentity
 }
 
-/**
- * Initializes the source name set from an array or existing Set.
- */
 function initializeSources(state: FusionAccountState, sources: string[] | Set<string> | undefined): void {
     if (!sources) return
     state.sources = Array.isArray(sources) ? new Set(sources) : sources
 }
 
-/**
- * Seeds the attribute bag and hydrates collection sets from persisted attributes.
- * Previous attributes are stored only for existing fusion accounts to save memory.
- */
 function initializeAttributeState(
     state: FusionAccountState,
     attributes: Attributes | null | undefined,
@@ -90,45 +76,26 @@ function initializeAttributeState(
     initializeActions(state, attributes)
 }
 
-/**
- * Hydrates the missing-account ID set from persisted attributes.
- */
 function initializeMissingAccountIds(state: FusionAccountState, attributes: Attributes | null | undefined): void {
     state.missingAccountIds = attributeToSet(attributes, FusionAttribute.MissingAccounts)
 }
 
-/**
- * Hydrates the review URL set from persisted attributes.
- */
 function initializeReviews(state: FusionAccountState, attributes: Attributes | null | undefined): void {
     state.reviews = attributeToSet(attributes, FusionAttribute.Reviews)
 }
 
-/**
- * Hydrates the status entitlement set from persisted attributes.
- */
 function initializeStatuses(state: FusionAccountState, attributes: Attributes | null | undefined): void {
     state.statuses = attributeToSet(attributes, FusionAttribute.Statuses)
 }
 
-/**
- * Hydrates the action set from persisted attributes.
- */
 function initializeActions(state: FusionAccountState, attributes: Attributes | null | undefined): void {
     state.actions = attributeToSet(attributes, FusionAttribute.Actions)
 }
 
-/**
- * Hydrates the previous account ID set from persisted attributes.
- */
 function initializePreviousAccountIds(state: FusionAccountState, attributes: Attributes | null | undefined): void {
     state.previousAccountIds = attributeToSet(attributes, FusionAttribute.Accounts)
 }
 
-/**
- * Derives the initial source set for a persisted fusion account.
- * Adds the virtual IDENTITIES_SOURCE_NAME source when the persisted statuses include baseline.
- */
 function deriveBaselineSourceSet(attributes: Attributes | null | undefined): Set<string> {
     const sourceSet = new Set<string>()
     const statuses = attributeToSet(attributes, FusionAttribute.Statuses)
@@ -138,9 +105,6 @@ function deriveBaselineSourceSet(attributes: Attributes | null | undefined): Set
     return sourceSet
 }
 
-/**
- * Sets the origin source and account for managed-origin creation paths.
- */
 function setOrigin(
     state: FusionAccountState,
     sourceName: string | null | undefined,
@@ -150,20 +114,12 @@ function setOrigin(
     state.originAccount = accountId ?? undefined
 }
 
-/**
- * Marks this account as identity-origin and applies the baseline status.
- * Keeps `originSource === IDENTITIES_SOURCE_NAME` and the `baseline` entitlement in sync.
- */
 function markIdentityOrigin(state: FusionAccountState, accountId: string | null | undefined): void {
     state.originSource = IDENTITIES_SOURCE_NAME
     state.originAccount = accountId ?? undefined
     state.statuses.add(StatusEntitlement.Baseline)
 }
 
-/**
- * Restores persisted origin metadata from an existing fusion account.
- * Also re-asserts baseline status when the restored origin is IDENTITIES_SOURCE_NAME.
- */
 function restoreOriginMetadata(state: FusionAccountState, account: Account): void {
     const originSource = getAccountStringAttribute(account, FusionAttribute.OriginSource)
     if (originSource) {
@@ -180,10 +136,6 @@ function restoreOriginMetadata(state: FusionAccountState, account: Account): voi
     ensureBaselineForIdentityOrigin(state)
 }
 
-/**
- * Restores identity linkage from persisted attributes when the SDK Account
- * does not expose identityId directly.
- */
 function restoreIdentityLinkage(state: FusionAccountState, account: Account): void {
     if (state.identityInfo?.id) return
     const identityId = getAccountStringAttribute(account, FusionAttribute.IdentityId)
@@ -192,12 +144,7 @@ function restoreIdentityLinkage(state: FusionAccountState, account: Account): vo
     }
 }
 
-/**
- * Sets the identity ID on `_identityInfo`, creating the bag if absent. Idempotent.
- * Non-string/empty values are stored as empty string (consistent with `buildIdentityInfo`),
- * so `hasValue(identityId)` returns false and the account is correctly treated as uncorrelated.
- */
-function setIdentityIdAttribute(state: FusionAccountState, value: string | undefined): void {
+export function setIdentityIdAttribute(state: FusionAccountState, value: string | undefined): void {
     const trimmed = trimStr(value) ?? ''
     if (!state.identityInfo) {
         state.identityInfo = { id: trimmed, name: '', displayName: '' }
@@ -206,9 +153,6 @@ function setIdentityIdAttribute(state: FusionAccountState, value: string | undef
     state.identityInfo.id = trimmed
 }
 
-/**
- * Defensively re-asserts baseline status and Identities source for identity-origin records.
- */
 function ensureBaselineForIdentityOrigin(state: FusionAccountState): void {
     if (isFromIdentity(state) && !state.statuses.has(StatusEntitlement.Baseline)) {
         state.statuses.add(StatusEntitlement.Baseline)
@@ -216,10 +160,6 @@ function ensureBaselineForIdentityOrigin(state: FusionAccountState): void {
     }
 }
 
-/**
- * Imports persisted history entries into the state's history array,
- * normalizing, deduplicating, and enforcing the configured max length.
- */
 export function importHistoryIntoState(state: FusionAccountState, history: unknown[]): void {
     const normalizedHistory = history
         .filter((entry): entry is string => typeof entry === 'string')
@@ -236,9 +176,6 @@ export function importHistoryIntoState(state: FusionAccountState, history: unkno
     state.history = dedupedHistory.slice(-state.maxHistoryMessages)
 }
 
-/**
- * Restores persisted collection references and history.
- */
 function restorePersistedCollections(state: FusionAccountState, account: Account): void {
     initializePreviousAccountIds(state, account.attributes)
     const historyAttr = getAccountAttribute(account, FusionAttribute.History)
@@ -247,10 +184,6 @@ function restorePersistedCollections(state: FusionAccountState, account: Account
     }
 }
 
-/**
- * Determines whether state indicates an identity-origin record, using the same logic as
- * `FusionAccount.fromIdentity`.
- */
 function isFromIdentity(state: FusionAccountState): boolean {
     const originFromAttributes = state.attributeBag.current?.originSource
     const legacyOriginFromAttributes = state.attributeBag.current?.sourceOrigin
@@ -323,6 +256,8 @@ export function buildFromIdentity(identity: IdentityDocument, state: FusionAccou
     initializeAttributeState(state, identity.attributes, FusionAccountKind.Identity, managedKey)
     markIdentityOrigin(state, identity.id)
     setIdentityIdAttribute(state, identity.id)
+    state.statuses.add(StatusEntitlement.Baseline)
+    addHistory(state, `Set ${formatHistoryAccountInfo(state.name, state.sourceName)} as baseline`)
 }
 
 /**
