@@ -16,8 +16,8 @@ import {
 } from '../managedAccountKey'
 import { IDENTITIES_SOURCE_NAME } from './constructionRules'
 import { addAccountId, removeMissingAccountId } from './collectionRules'
-import { setUncorrelatedAccount } from './statusRules'
-import { addHistory } from './historyRules'
+import { setManual, setAuthorized, setUncorrelatedAccount } from './statusRules'
+import { addHistory, formatHistoryAccountInfo } from './historyRules'
 import {
     preserveMissingAccountContext,
     processIdentityMatchedAccounts,
@@ -30,59 +30,9 @@ import {
 // Internal helpers
 // ============================================================================
 
-function normalizeHistoryLabel(value: unknown, fallback: string): string {
-    return trimStr(value) ?? fallback
-}
-
-function formatHistoryAccountInfo(name: unknown, source: unknown): string {
-    const accountLabel = normalizeHistoryLabel(name, 'Unknown account')
-    const sourceLabel = normalizeHistoryLabel(source, 'Unknown source')
-    return `${accountLabel} [${sourceLabel}]`
-}
-
 function setCorrelatedAccount(state: FusionAccountState, accountId: string): void {
     addAccountId(state, accountId)
     removeMissingAccountId(state, accountId)
-}
-
-function createDecisionHistoryMessage(decision: FusionDecision, action: string): string {
-    const submitterName = normalizeHistoryLabel(
-        decision.submitter.name || decision.submitter.email,
-        'Unknown reviewer'
-    )
-    const accountInfo = formatHistoryAccountInfo(decision.account.name, decision.account.sourceName)
-    const sourceType = decision.sourceType ?? SourceType.Authoritative
-
-    if (action === 'manual') {
-        return `Set ${accountInfo} as new account by ${submitterName}`
-    }
-
-    if (decision.automaticAssignment === true) {
-        return `Auto-assigned ${accountInfo} to existing identity`
-    }
-    if (sourceType === SourceType.Record) {
-        return `Assigned record ${accountInfo} to existing identity by ${submitterName}`
-    }
-    if (sourceType === SourceType.Orphan) {
-        return `Assigned orphan account ${accountInfo} to existing identity by ${submitterName}`
-    }
-    return `Set ${accountInfo} as authorized by ${submitterName}`
-}
-
-function setManual(state: FusionAccountState, decision: FusionDecision): void {
-    state.statuses.delete(StatusEntitlement.NonMatched)
-    state.statuses.add(StatusEntitlement.Manual)
-    addHistory(state, createDecisionHistoryMessage(decision, 'manual'))
-}
-
-function setAuthorized(state: FusionAccountState, decision: FusionDecision): void {
-    state.statuses.delete(StatusEntitlement.NonMatched)
-    if (decision.automaticAssignment === true) {
-        state.statuses.add(StatusEntitlement.Auto)
-    } else {
-        state.statuses.add(StatusEntitlement.Authorized)
-    }
-    addHistory(state, createDecisionHistoryMessage(decision, 'authorized'))
 }
 
 // ============================================================================

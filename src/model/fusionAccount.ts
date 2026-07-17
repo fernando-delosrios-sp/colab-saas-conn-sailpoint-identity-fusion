@@ -1,20 +1,12 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
-import { isNewerThan } from '../utils/date'
 import { FusionDecision } from './form'
-import { FusionConfig, SourceType } from './config'
+import { FusionConfig } from './config'
 import { Attributes, ConnectorError, ConnectorErrorType, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { FusionMatch } from '../services/scoringService'
 import { FusionAccountState } from './fusionAccountState'
 import { FusionAccountKind } from './fusionAccountTypes'
 import type { FusionAttributeBag, FusionManagedAccountInfo, IdentityInfo } from './fusionAccountTypes'
-import {
-    getManagedAccountKeyFromAccount,
-    normalizeCompositeManagedAccountKey,
-    parseManagedAccountKey,
-} from './managedAccountKey'
-import { missing, readString, trimStr } from '../utils/safeRead'
-import { StatusEntitlement } from './statusEntitlement'
-import { FusionAction } from './fusionAction'
+import { trimStr } from '../utils/safeRead'
 import { buildIdentityInfo } from './fusionAccountUtils'
 import {
     buildFromFusionAccount,
@@ -22,13 +14,49 @@ import {
     buildFromIdentity,
     buildFromManagedAccount,
     IDENTITIES_SOURCE_NAME,
-    importHistoryIntoState,
 } from './fusionAccountRules/constructionRules'
+
 import {
     addFusionDecisionLayer,
     addIdentityLayer,
     addManagedAccountLayer,
+    setManagedAccount as setManagedAccountLayer,
 } from './fusionAccountRules/layerRules'
+import {
+    addAction,
+    addFusionDecision,
+    listReviewerSources,
+    removeAction,
+    removeSourceReviewer,
+    setSourceReviewer,
+} from './fusionAccountRules/actionRules'
+import {
+    addCorrelationPromise,
+    resolveCorrelationPromises,
+    setCorrelatedAccount,
+    updateCorrelationStatus,
+} from './fusionAccountRules/correlationRules'
+import {
+    addAccountId,
+    addMissingAccountId,
+    addSource,
+    removeAccountId,
+    removeMissingAccountId,
+    removeSource,
+} from './fusionAccountRules/collectionRules'
+import {
+    addFusionReview,
+    addPendingReviewUrl,
+    addReview,
+    addReviewPromise,
+    clearFusionReviews,
+    removeFusionReview,
+    removeReview,
+    resolvePendingReviewUrls,
+    resolveReviewPromises,
+} from './fusionAccountRules/reviewRules'
+import { addStatus, hasStatus, isOrphan, markAsOrphan, removeStatus, setBaseline, setNonMatched } from './fusionAccountRules/statusRules'
+import { addHistory, importHistory } from './fusionAccountRules/historyRules'
 
 /**
  * The ISC virtual source name that represents an identity-origin fusion account.
@@ -569,22 +597,22 @@ export class FusionAccount {
 
     /** Adds a managed account ID to the correlated set, with optional history message. */
     public addAccountId(id: string, message?: string): void {
-        this.addToSet(this.state.accountIds, id, message)
+        addAccountId(this.state, id, message)
     }
 
     /** Removes a managed account ID from the correlated set, with optional history message. */
     public removeAccountId(id: string, message?: string): void {
-        this.removeFromSet(this.state.accountIds, id, message)
+        removeAccountId(this.state, id, message)
     }
 
     /** Adds an account ID to the missing (uncorrelated) set. */
     public addMissingAccountId(id: string, message?: string): void {
-        this.addToSet(this.state.missingAccountIds, id, message)
+        addMissingAccountId(this.state, id, message)
     }
 
     /** Removes an account ID from the missing set (i.e. it has been correlated). */
     public removeMissingAccountId(id: string, message?: string): void {
-        this.removeFromSet(this.state.missingAccountIds, id, message)
+        removeMissingAccountId(this.state, id, message)
     }
 
     // ============================================================================
@@ -636,17 +664,17 @@ export class FusionAccount {
 
     /** Adds a status entitlement to this fusion account. */
     public addStatus(status: string, message?: string): void {
-        this.addToSet(this.state.statuses, status, message)
+        addStatus(this.state, status, message)
     }
 
     /** Removes a status entitlement from this fusion account. */
     public removeStatus(status: string, message?: string): void {
-        this.removeFromSet(this.state.statuses, status, message)
+        removeStatus(this.state, status, message)
     }
 
     /** Checks whether this fusion account has a given status. */
     public hasStatus(status: string): boolean {
-        return this.state.statuses.has(status)
+        return hasStatus(this.state, status)
     }
 
     // ============================================================================
@@ -655,51 +683,27 @@ export class FusionAccount {
 
     /** Adds an action entitlement to this fusion account. */
     public addAction(action: string, message?: string): void {
-        this.addToSet(this.state.actions, action, message)
+        addAction(this.state, action, message)
     }
 
     /** Removes an action entitlement from this fusion account. */
     public removeAction(action: string, message?: string): void {
-        this.removeFromSet(this.state.actions, action, message)
+        removeAction(this.state, action, message)
     }
 
     /** Marks this fusion account's identity as a reviewer for the given source. */
     public setSourceReviewer(sourceId: string): void {
-        this.state.actions.add(`${FusionAction.ReviewerPrefix}${sourceId}`)
-        this.addStatus(StatusEntitlement.Reviewer)
+        setSourceReviewer(this.state, sourceId)
     }
 
     /** Removes reviewer assignment for the given source and updates reviewer status when needed. */
     public removeSourceReviewer(sourceId: string): void {
-        this.state.actions.delete(`${FusionAction.ReviewerPrefix}${sourceId}`)
-        if (!this._actionsHasReviewerScope()) {
-            this.state.statuses.delete(StatusEntitlement.Reviewer)
-        }
+        removeSourceReviewer(this.state, sourceId)
     }
 
     /** Returns the source IDs this account's identity is configured to review. */
     public listReviewerSources(): string[] {
-        const prefix = FusionAction.ReviewerPrefix
-        // ⚡ Bolt: Iterate Set directly to prevent Array.from heap allocation
-        const result: string[] = []
-        for (const action of this.state.actions) {
-            if (action.startsWith(prefix)) {
-                result.push(action.slice(prefix.length))
-            }
-        }
-        return result
-    }
-
-    /** True when at least one source-scoped reviewer action remains on the account. */
-    private _actionsHasReviewerScope(): boolean {
-        const prefix = FusionAction.ReviewerPrefix
-        // ⚡ Bolt: Iterate Set directly to prevent Array.from heap allocation
-        for (const action of this.state.actions) {
-            if (action.startsWith(prefix)) {
-                return true
-            }
-        }
-        return false
+        return listReviewerSources(this.state)
     }
 
     // ============================================================================
@@ -708,26 +712,22 @@ export class FusionAccount {
 
     /** Adds a review URL to this fusion account. */
     public addReview(review: string, message?: string): void {
-        this.addToSet(this.state.reviews, review, message)
+        addReview(this.state, review, message)
     }
 
     /** Removes a review URL from this fusion account. */
     public removeReview(review: string, message?: string): void {
-        this.removeFromSet(this.state.reviews, review, message)
+        removeReview(this.state, review, message)
     }
 
     /** Adds a fusion review URL and sets the "activeReviews" status. */
     public addFusionReview(reviewUrl: string): void {
-        this.state.reviews.add(reviewUrl)
-        this.state.statuses.add(StatusEntitlement.ActiveReviews)
+        addFusionReview(this.state, reviewUrl)
     }
 
     /** Removes a fusion review URL. Clears "activeReviews" status if no reviews remain. */
     public removeFusionReview(reviewUrl: string): void {
-        this.state.reviews.delete(reviewUrl)
-        if (this.state.reviews.size === 0) {
-            this.state.statuses.delete(StatusEntitlement.ActiveReviews)
-        }
+        removeFusionReview(this.state, reviewUrl)
     }
 
     /**
@@ -735,8 +735,7 @@ export class FusionAccount {
      * Used for reviewers so their reviews attribute reflects only current form instance URLs.
      */
     public clearFusionReviews(): void {
-        this.state.reviews.clear()
-        this.state.statuses.delete(StatusEntitlement.ActiveReviews)
+        clearFusionReviews(this.state)
     }
 
     /**
@@ -749,26 +748,17 @@ export class FusionAccount {
 
     /** Queues a review URL for deferred addition (resolved during getISCAccount). */
     public addPendingReviewUrl(reviewUrl: string): void {
-        if (reviewUrl) {
-            this.state.pendingReviewUrls.add(reviewUrl)
-        }
+        addPendingReviewUrl(this.state, reviewUrl)
     }
 
     /** Adds a promise that will resolve to a review URL once the form is created. */
     public addReviewPromise(promise: Promise<string | undefined>): void {
-        if (promise) {
-            this.state.reviewPromises.push(promise)
-        }
+        addReviewPromise(this.state, promise)
     }
 
     /** Converts all pending review URLs into active fusion reviews. */
     public resolvePendingReviewUrls(): void {
-        if (this.state.pendingReviewUrls.size === 0) return
-
-        for (const url of this.state.pendingReviewUrls) {
-            this.addFusionReview(url)
-        }
-        this.state.pendingReviewUrls.clear()
+        resolvePendingReviewUrls(this.state)
     }
 
     /**
@@ -777,39 +767,11 @@ export class FusionAccount {
      *   in the background so the caller can proceed without waiting for the queue to drain.
      */
     public async resolvePendingOperations(awaitCorrelations = true): Promise<void> {
-        await this.resolveReviewPromises()
+        await resolveReviewPromises(this.state)
         if (awaitCorrelations) {
-            await this.resolveCorrelationPromises()
+            await resolveCorrelationPromises(this.state)
         }
-        this.resolvePendingReviewUrls()
-    }
-
-    /**
-     * Resolve all pending review promises
-     */
-    private async resolveReviewPromises(): Promise<void> {
-        if (this.state.reviewPromises.length === 0) return
-
-        const reviewResults = await Promise.allSettled(this.state.reviewPromises)
-        this.state.reviewPromises = []
-
-        for (const result of reviewResults) {
-            if (result.status === 'fulfilled' && result.value) {
-                this.addPendingReviewUrl(result.value)
-            }
-        }
-    }
-
-    /**
-     * Resolve all pending correlation promises
-     */
-    private async resolveCorrelationPromises(): Promise<void> {
-        if (this.state.correlationPromises.length === 0) return
-
-        // Wait for all correlation promises to complete
-        // setCorrelatedAccount is called in the promise handlers, which updates state
-        await Promise.allSettled(this.state.correlationPromises)
-        this.state.correlationPromises = []
+        resolvePendingReviewUrls(this.state)
     }
 
     // ============================================================================
@@ -818,12 +780,12 @@ export class FusionAccount {
 
     /** Adds a source name to this fusion account's source set. */
     public addSource(source: string, message?: string): void {
-        this.addToSet(this.state.sources, source, message)
+        addSource(this.state, source, message)
     }
 
     /** Removes a source name from this fusion account's source set. */
     public removeSource(source: string, message?: string): void {
-        this.removeFromSet(this.state.sources, source, message)
+        removeSource(this.state, source, message)
     }
 
     // ============================================================================
@@ -851,29 +813,10 @@ export class FusionAccount {
     // ============================================================================
 
     /**
-     * Add a dated history entry
-     */
-    private addHistory(message: string): void {
-        const normalizedMessage = trimStr(message) ?? ''
-        if (missing(normalizedMessage)) return
-
-        const now = new Date().toISOString().split('T')[0]
-        const datedMessage = `[${now}] ${normalizedMessage}`
-        const previousMessage = this.state.history[this.state.history.length - 1]
-        if (previousMessage === datedMessage) return
-        this.state.history.push(datedMessage)
-
-        // Enforce maximum history size by keeping only the most recent entries
-        if (this.state.history.length > this.state.maxHistoryMessages) {
-            this.state.history = this.state.history.slice(-this.state.maxHistoryMessages)
-        }
-    }
-
-    /**
      * Import history from existing account, respecting max history limit
      */
     public importHistory(history: string[]): void {
-        importHistoryIntoState(this.state, history)
+        importHistory(this.state, history)
     }
 
     /**
@@ -884,7 +827,7 @@ export class FusionAccount {
         set.add(item)
         const added = set.size > initialSize
         if (added && message) {
-            this.addHistory(message)
+            addHistory(this.state, message)
         }
         return added
     }
@@ -896,7 +839,7 @@ export class FusionAccount {
     private removeFromSet<T>(set: Set<T>, item: T, message?: string): boolean {
         const removed = set.delete(item)
         if (removed && message) {
-            this.addHistory(message)
+            addHistory(this.state, message)
         }
         return removed
     }
@@ -989,69 +932,7 @@ export class FusionAccount {
         addBlendHistory: boolean = true,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>
     ): boolean {
-        const accountId = getManagedAccountKeyFromAccount(account)
-        if (!accountId) {
-            throw new ConnectorError(
-                'Cannot absorb managed account without sourceId and nativeIdentity (composite key).',
-                ConnectorErrorType.Generic
-            )
-        }
-        const normalizedKey = normalizeCompositeManagedAccountKey(accountId) ?? accountId
-        const skipBlendReplay =
-            Boolean(skipBlendHistoryForManagedKeys?.has(normalizedKey)) ||
-            Boolean(skipBlendHistoryForManagedKeys?.has(accountId))
-        const recordBlendHistory = addBlendHistory && !skipBlendReplay
-        const isNewAccount = !this.state.previousAccountIds.has(accountId)
-
-        if (account.id) this.state.iscAccountId = account.id
-
-        if (isNewAccount) {
-            this.setNeedsRefresh(true)
-            if (recordBlendHistory) {
-                const accountLabel = trimStr(account.name ?? account.nativeIdentity ?? accountId) || accountId
-                const sourceLabel = account.sourceName ?? this.state.sourceName
-                this.addHistory(
-                    `Blended managed account ${this.formatHistoryAccountInfo(accountLabel, sourceLabel)}`
-                )
-            }
-        }
-        if (!this.state.needsRefresh) {
-            const thresholdMs = this.state.fusionAccountRefreshThresholdInSeconds * 1000
-            if (isNewerThan(account.modified, this.state.modified, thresholdMs)) {
-                this.state.needsRefresh = true
-            }
-        }
-
-        if (account.sourceName) {
-            const parsedKey = parseManagedAccountKey(accountId)
-            const schemaNative = trimStr(account.nativeIdentity ?? parsedKey?.nativeIdentity) || accountId
-            this.setManagedAccountInfo(accountId, account.sourceName, schemaNative)
-
-            const contextAttributes = {
-                ...(account.attributes ?? {}),
-                name: trimStr(account.name ?? account.nativeIdentity) || accountId,
-                source: {
-                    id: trimStr(readString(account, 'sourceId', '')) ?? '',
-                    name: account.sourceName ?? '',
-                },
-                schema: {
-                    name: trimStr(account.name ?? account.nativeIdentity) || accountId,
-                    id: schemaNative,
-                },
-                // IdentityIQ-style compatibility: true means account is disabled.
-                IIQDisabled: Boolean(account.disabled),
-            } as unknown as Attributes
-
-            const existingSourceAccounts = this.state.attributeBag.sources.get(account.sourceName) || []
-            existingSourceAccounts.push(contextAttributes)
-            this.state.sources.delete(IDENTITIES_SOURCE_NAME)
-            this.state.sources.add(account.sourceName)
-            this.state.attributeBag.sources.set(account.sourceName, existingSourceAccounts)
-            this.state.attributeBag.sourceAccountContexts.push(contextAttributes)
-            // Invalidate cached sourceAttributeMap since sources changed
-            this.state.sourceAttributeMapCache = undefined
-        }
-        return recordBlendHistory && isNewAccount
+        return setManagedAccountLayer(this.state, account, addBlendHistory, skipBlendHistoryForManagedKeys)
     }
     /** Sets whether this account's attributes need refreshing. */
     public setNeedsRefresh(refresh: boolean) {
@@ -1067,92 +948,14 @@ export class FusionAccount {
     // Status Setting Methods (private - called by factory methods and layer methods)
     // ============================================================================
 
-    /**
-     * Shared logic for setting uncorrelated status
-     */
-    private setUncorrelatedStatus(): void {
-        this.state.uncorrelated = true
-        this.state.statuses.add(StatusEntitlement.Uncorrelated)
-        this.state.actions.delete(FusionAction.Correlated)
-    }
-
-    /** Sets a specific account ID as uncorrelated and adds it to both account ID sets. */
-    private setUncorrelatedAccount(accountId?: string): void {
-        if (!accountId) return
-
-        this.addAccountId(accountId)
-        this.addMissingAccountId(accountId)
-        this.setUncorrelatedStatus()
-    }
-
     /** Marks this account with "baseline" status (created from an identity in authoritative mode). */
     private setBaseline(): void {
-        this.state.statuses.add(StatusEntitlement.Baseline)
-        this.addHistory(`Set ${this.formatHistoryAccountInfo(this.name, this.state.sourceName)} as baseline`)
+        setBaseline(this.state)
     }
 
     /** Marks this account as NonMatched (no Match found, pending review). */
     public setNonMatched(): void {
-        this.state.statuses.add(StatusEntitlement.NonMatched)
-        this.addHistory(`Set ${this.formatHistoryAccountInfo(this.name, this.state.sourceName)} as NonMatched`)
-    }
-
-    /**
-     * Builds a history message for decision actions, varying wording by source type.
-     * - authoritative manual: "new account"
-     * - authoritative merge (reviewer): "authorized"
-     * - authoritative merge (automaticAssignment): "Auto-assigned …"
-     * - record authorized: "assigned record"
-     * - orphan authorized: "assigned orphan account"
-     *
-     * Record/orphan manual (no-match) decisions never reach here because
-     * addFusionDecisionLayer skips setManual for those source types.
-     */
-    private createDecisionHistoryMessage(decision: FusionDecision, action: string): string {
-        const submitterName = this.normalizeHistoryLabel(
-            decision.submitter.name || decision.submitter.email,
-            'Unknown reviewer'
-        )
-        const accountInfo = this.formatHistoryAccountInfo(decision.account.name, decision.account.sourceName)
-        const sourceType = decision.sourceType ?? SourceType.Authoritative
-
-        if (action === 'manual') {
-            return `Set ${accountInfo} as new account by ${submitterName}`
-        }
-
-        if (decision.automaticAssignment === true) {
-            return `Auto-assigned ${accountInfo} to existing identity`
-        }
-        if (sourceType === SourceType.Record) {
-            return `Assigned record ${accountInfo} to existing identity by ${submitterName}`
-        }
-        if (sourceType === SourceType.Orphan) {
-            return `Assigned orphan account ${accountInfo} to existing identity by ${submitterName}`
-        }
-        return `Set ${accountInfo} as authorized by ${submitterName}`
-    }
-
-    /** Marks this account as "manual" (reviewer decided to create a new identity or confirmed no match). */
-    private setManual(decision: FusionDecision): void {
-        this.state.statuses.delete(StatusEntitlement.NonMatched)
-        this.state.statuses.add(StatusEntitlement.Manual)
-        const message = this.createDecisionHistoryMessage(decision, 'manual')
-        this.addHistory(message)
-    }
-
-    /**
-     * Marks merge-into-existing decisions: reviewer-approved adds `authorized`;
-     * exact-match automatic assignment adds `auto` only (not `authorized`).
-     */
-    private setAuthorized(decision: FusionDecision): void {
-        this.state.statuses.delete(StatusEntitlement.NonMatched)
-        if (decision.automaticAssignment === true) {
-            this.state.statuses.add(StatusEntitlement.Auto)
-        } else {
-            this.state.statuses.add(StatusEntitlement.Authorized)
-        }
-        const message = this.createDecisionHistoryMessage(decision, 'authorized')
-        this.addHistory(message)
+        setNonMatched(this.state)
     }
 
     // ============================================================================
@@ -1164,17 +967,7 @@ export class FusionAccount {
      * Should be called after all layers are added to ensure correct status/action
      */
     public updateCorrelationStatus(): void {
-        const hasAllAccountsCorrelated = this.state.missingAccountIds.size === 0
-
-        if (hasAllAccountsCorrelated) {
-            this.state.statuses.delete(StatusEntitlement.Uncorrelated)
-            this.state.actions.add(FusionAction.Correlated)
-            this.state.uncorrelated = false
-        } else {
-            this.state.statuses.add(StatusEntitlement.Uncorrelated)
-            this.state.actions.delete(FusionAction.Correlated)
-            this.state.uncorrelated = true
-        }
+        updateCorrelationStatus(this.state)
     }
 
     /**
@@ -1185,20 +978,12 @@ export class FusionAccount {
      * @param promise - Optional promise from the correlation API call
      */
     public setCorrelatedAccount(accountId: string, promise?: Promise<unknown>): void {
-        this.addAccountId(accountId)
-        this.removeMissingAccountId(accountId)
-        if (promise) {
-            this.addCorrelationPromise(accountId, promise)
-        }
+        setCorrelatedAccount(this.state, accountId, promise)
     }
 
     /** Tracks a correlation promise for deferred resolution during getISCAccount. */
     public addCorrelationPromise(_accountId: string, promise: Promise<unknown>): void {
-        if (!promise) return
-
-        // Track the promise - it will be resolved in getISCAccount via resolvePendingOperations
-        // The promise handler (in correlateAccounts) will call setCorrelatedAccount on success
-        this.state.correlationPromises.push(promise)
+        addCorrelationPromise(this.state, _accountId, promise)
     }
 
     // ============================================================================
@@ -1207,41 +992,27 @@ export class FusionAccount {
 
     /** Whether this account has lost all its managed source accounts. */
     public isOrphan(): boolean {
-        return this.state.statuses.has(StatusEntitlement.Orphan)
+        return isOrphan(this.state)
     }
 
     /** Adds a fusion decision action entitlement with a history entry. */
     public addFusionDecision(decision: string): void {
-        this.addAction(decision, `Fusion decision added: ${decision}`)
+        addFusionDecision(this.state, decision)
     }
 
     /**
      * Remove a source account and update orphan status if needed
      */
     public removeSourceAccount(id: string): void {
-        this.state.accountIds.delete(id)
+        removeAccountId(this.state, id)
 
         if (this.state.accountIds.size === 0) {
             if (!this.fromIdentity || (this.fromIdentity && !this.originIdentityInScope)) {
-                this.markAsOrphan()
-                this.addHistory(`Account became orphan after removing source account: ${id}`)
+                markAsOrphan(this.state)
+                addHistory(this.state, `Account became orphan after removing source account: ${id}`)
             }
         }
 
-        this.addHistory(`Source account removed: ${id}`)
-    }
-
-    private normalizeHistoryLabel(value: unknown, fallback: string): string {
-        return trimStr(value) ?? fallback
-    }
-
-    private formatHistoryAccountInfo(name: unknown, source: unknown): string {
-        const accountLabel = this.normalizeHistoryLabel(name, 'Unknown account')
-        const sourceLabel = this.normalizeHistoryLabel(source, 'Unknown source')
-        return `${accountLabel} [${sourceLabel}]`
-    }
-
-    private markAsOrphan(): void {
-        this.state.statuses.add(StatusEntitlement.Orphan)
+        addHistory(this.state, `Source account removed: ${id}`)
     }
 }
