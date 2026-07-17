@@ -461,4 +461,152 @@ describe('FusionAccount', () => {
             expect(acc.history).toContain('[2026-01-02] event two')
         })
     })
+
+    describe('addManagedAccountLayer identity matching', () => {
+        it('claims accounts by identityId index and marks them correlated', () => {
+            const identity: IdentityDocument = {
+                id: 'id-1',
+                name: 'test-identity',
+                attributes: {},
+            } as any
+            const acc = FusionAccount.fromIdentity(identity)
+
+            const account: Account = {
+                id: 'isc-acc-1',
+                sourceId: 'src-a',
+                nativeIdentity: 'native-1',
+                sourceName: 'Source A',
+                attributes: {},
+            } as any
+            const accountsById = new Map<string, Account>([['src-a::native-1', account]])
+            const accountsByIdentityId = new Map<string, Set<string>>([['id-1', new Set(['src-a::native-1'])]])
+
+            acc.addManagedAccountLayer(accountsById, accountsByIdentityId)
+
+            expect(acc.accountIds).toContain('src-a::native-1')
+            expect(acc.missingAccountIds).not.toContain('src-a::native-1')
+            expect(accountsById.size).toBe(0)
+            expect(accountsByIdentityId.has('id-1')).toBe(false)
+        })
+
+        it('claims accounts from previous run via previousAccountIds', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    accounts: ['src-a::native-1'],
+                },
+            } as unknown as Account)
+
+            const account: Account = {
+                id: 'isc-acc-1',
+                sourceId: 'src-a',
+                nativeIdentity: 'native-1',
+                sourceName: 'Source A',
+                attributes: {},
+            } as any
+            const accountsById = new Map<string, Account>([['src-a::native-1', account]])
+            const accountsByIdentityId = new Map<string, Set<string>>()
+
+            acc.addManagedAccountLayer(accountsById, accountsByIdentityId)
+
+            expect(acc.accountIds).toContain('src-a::native-1')
+            expect(acc.missingAccountIds).toContain('src-a::native-1')
+            expect(accountsById.size).toBe(0)
+        })
+
+        it('sets orphan status when identity-origin account loses all managed accounts and identity is out of scope', () => {
+            const identity: IdentityDocument = { id: 'id-1', name: 'test-identity', attributes: {} } as any
+            const acc = FusionAccount.fromIdentity(identity)
+            acc.setOriginIdentityInScope(false)
+
+            const accountsById = new Map<string, Account>()
+            const accountsByIdentityId = new Map<string, Set<string>>()
+            const allAccountsById = new Map<string, Account>()
+
+            acc.addManagedAccountLayer(accountsById, accountsByIdentityId, allAccountsById, true)
+
+            expect(acc.isOrphan()).toBe(true)
+            expect(acc.statuses).toContain('orphan')
+        })
+    })
+
+    describe('pruneDeletedManagedAccounts', () => {
+        it('removes account references that no longer exist in the inventory', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    accounts: ['src-a::old-1'],
+                    'missing-accounts': ['src-a::old-2'],
+                },
+            } as unknown as Account)
+
+            // Ensure previousAccountIds is hydrated from persisted accounts
+            expect((acc as any).previousAccountIds).toContain('src-a::old-1')
+
+            const accountsById = new Map<string, Account>()
+            const accountsByIdentityId = new Map<string, Set<string>>()
+            const allAccountsById = new Map<string, Account>()
+
+            acc.addManagedAccountLayer(accountsById, accountsByIdentityId, allAccountsById, true)
+
+            expect(acc.accountIds).not.toContain('src-a::old-1')
+            expect(acc.missingAccountIds).not.toContain('src-a::old-2')
+            expect(acc.history.some((h) => h.includes('Removed managed account missing reference'))).toBe(true)
+        })
+
+        it('clears needsRefresh when a managed-origin account becomes orphan after pruning', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-2',
+                id: 'isc-2',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    accounts: ['src-a::gone'],
+                },
+            } as unknown as Account)
+
+            const accountsById = new Map<string, Account>()
+            const accountsByIdentityId = new Map<string, Set<string>>()
+            const allAccountsById = new Map<string, Account>()
+
+            acc.addManagedAccountLayer(accountsById, accountsByIdentityId, allAccountsById, true)
+
+            expect(acc.isOrphan()).toBe(true)
+            expect(acc.needsRefresh).toBe(false)
+        })
+    })
+
+    describe('attribute-bag setters', () => {
+        it('addAccountId adds to correlated set and sync reflects it', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
+            acc.addAccountId('src-a::native-1')
+            acc.syncCollectionAttributesToBag()
+            expect(acc.accountIds).toContain('src-a::native-1')
+            expect(acc.attributes.accounts).toContain('src-a::native-1')
+        })
+
+        it('addMissingAccountId adds to missing set and sync reflects it', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
+            acc.addMissingAccountId('src-a::missing-1')
+            acc.syncCollectionAttributesToBag()
+            expect(acc.missingAccountIds).toContain('src-a::missing-1')
+            expect(acc.attributes['missing-accounts']).toContain('src-a::missing-1')
+        })
+
+        it('setCorrelatedAccount moves an id from missing to correlated', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
+            acc.addMissingAccountId('src-a::native-1')
+            acc.setCorrelatedAccount('src-a::native-1')
+            acc.syncCollectionAttributesToBag()
+            expect(acc.accountIds).toContain('src-a::native-1')
+            expect(acc.missingAccountIds).not.toContain('src-a::native-1')
+            expect(acc.attributes.accounts).toContain('src-a::native-1')
+        })
+    })
 })
