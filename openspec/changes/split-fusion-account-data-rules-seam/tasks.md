@@ -25,20 +25,20 @@
 
 ## 4. Extract status, action, review, and correlation rules
 
-- [ ] 4.1 Create `src/model/fusionAccountRules/statusRules.ts` with `addStatus`, `removeStatus`, `hasStatus`, `setUncorrelatedAccount`, `setBaseline`, `setNonMatched`, `setManual`, `setAuthorized`, `createDecisionHistoryMessage`, `formatHistoryAccountInfo`, `normalizeHistoryLabel`, `isOrphan`, `markAsOrphan`
-- [ ] 4.2 Create `src/model/fusionAccountRules/actionRules.ts` with `addAction`, `removeAction`, `setSourceReviewer`, `removeSourceReviewer`, `listReviewerSources`, `actionsHasReviewerScope`
-- [ ] 4.3 Create `src/model/fusionAccountRules/reviewRules.ts` with `addReview`, `removeReview`, `addFusionReview`, `removeFusionReview`, `clearFusionReviews`, `addPendingReviewUrl`, `resolvePendingReviewUrls`, `resolveReviewPromises`
-- [ ] 4.4 Create `src/model/fusionAccountRules/correlationRules.ts` with `setCorrelatedAccount`, `addCorrelationPromise`, `resolveCorrelationPromises`, `updateCorrelationStatus`
-- [ ] 4.5 Refactor `FusionAccount` remaining mutators into thin orchestrators delegating to respective rule modules
-- [ ] 4.6 Verify: `npx tsc --noEmit`, `npx eslint "src/**/*.ts"`, `npx vitest run`
+- [x] 4.1 Create `src/model/fusionAccountRules/statusRules.ts` with `addStatus`, `removeStatus`, `hasStatus`, `setUncorrelatedAccount`, `setBaseline`, `setNonMatched`, `setManual`, `setAuthorized`, `createDecisionHistoryMessage`, `formatHistoryAccountInfo`, `normalizeHistoryLabel`, `isOrphan`, `markAsOrphan`
+- [x] 4.2 Create `src/model/fusionAccountRules/actionRules.ts` with `addAction`, `removeAction`, `setSourceReviewer`, `removeSourceReviewer`, `listReviewerSources`, `actionsHasReviewerScope`
+- [x] 4.3 Create `src/model/fusionAccountRules/reviewRules.ts` with `addReview`, `removeReview`, `addFusionReview`, `removeFusionReview`, `clearFusionReviews`, `addPendingReviewUrl`, `resolvePendingReviewUrls`, `resolveReviewPromises`
+- [x] 4.4 Create `src/model/fusionAccountRules/correlationRules.ts` with `setCorrelatedAccount`, `addCorrelationPromise`, `resolveCorrelationPromises`, `updateCorrelationStatus`
+- [x] 4.5 Refactor `FusionAccount` remaining mutators into thin orchestrators delegating to respective rule modules
+- [x] 4.6 Verify: `npx tsc --noEmit`, `npx eslint "src/**/*.ts"`, `npx vitest run`
 
 ## 5. Extract history rules and finish facade
 
-- [ ] 5.1 Create `src/model/fusionAccountRules/historyRules.ts` with `addHistory`, `importHistory`, `formatHistoryAccountInfo`, `normalizeHistoryLabel`
-- [ ] 5.2 Remove all private helpers from `FusionAccount.ts` — only imports, static config/configure, factory methods, accessors, mutators (all delegating), `toISCAccount()`, and `buildIdentityInfo` re-export remain
+- [x] 5.1 Create `src/model/fusionAccountRules/historyRules.ts` with `addHistory`, `importHistory`, `formatHistoryAccountInfo`, `normalizeHistoryLabel`
+- [x] 5.2 Remove all private helpers from `FusionAccount.ts` — only imports, static config/configure, factory methods, accessors, mutators (all delegating), `toISCAccount()`, and `buildIdentityInfo` re-export remain
 - [ ] 5.3 Verify final facade contains no internal logic: `wc -l src/model/fusionAccount.ts` under ~400 lines
-- [ ] 5.4 Re-export `FusionAccountState` from `src/model/fusionAccountTypes.ts`
-- [ ] 5.5 Verify: `npx tsc --noEmit`, `npx eslint "src/**/*.ts"`, `npx vitest run`
+- [x] 5.4 Re-export `FusionAccountState` from `src/model/fusionAccountTypes.ts`
+- [x] 5.5 Verify: `npx tsc --noEmit`, `npx eslint "src/**/*.ts"`, `npx vitest run`
 
 ## 6. Add contract test
 
