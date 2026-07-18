@@ -124,3 +124,7 @@ src/
 - **Vitest** with `globals: true` (no imports needed for `describe`/`it`/`expect`)
 - Test files: `*.test.ts` in `__tests__/` directories
 - 180s timeout (long-running integration tests)
+
+## Ubiquitous Language
+
+AI agents MUST use the canonical terms defined in `openspec/specs/ubiquitous-language/spec.md` when generating code, documentation, or configuration. Before introducing a new domain term, add it to the spec first.
