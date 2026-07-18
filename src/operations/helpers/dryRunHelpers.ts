@@ -4,11 +4,16 @@ import * as path from 'path'
 import { finished, pipeline } from 'stream/promises'
 import { StdAccountListInput, StdAccountListOutput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
-import { AggregationStats, FusionReport, FusionReportAccount, FusionReportStats } from '../../services/fusionService/types'
+import {
+    AggregationStats,
+    FusionReport,
+    FusionReportAccount,
+    FusionReportStats,
+} from '../../services/fusionService/types'
 import { AggregationTracker } from '../../services/fusionService/aggregationTracker'
 import { isExactAttributeMatchScores } from '../../services/scoringService/exactMatch'
 import { FusionAccount } from '../../model/account'
-import { readArray, readBoolean, readPathString, readUnknown, trimStr } from '../../utils/safeRead'
+import { readArray, readBoolean, readPathString, readPathUnknown, readUnknown, trimStr } from '../../utils/safeRead'
 import {
     buildReportAccountIndex,
     buildDryRunSummary,
@@ -55,7 +60,11 @@ export type DryRunIssueSummary = {
 
 export type DryRunHelpersContext = {
     config?: { baseurl?: string; managedAccountsBatchSize?: number }
-    log: { info: (message: string) => void; metric: (name: string, startedAt: number, data?: Record<string, any>) => void; track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number } }
+    log: {
+        info: (message: string) => void
+        metric: (name: string, startedAt: number, data?: Record<string, any>) => void
+        track: (name: string) => { done: (data?: Record<string, any>) => number; elapsedMs: () => number }
+    }
     res: { send: (payload: unknown) => void }
     reports: {
         ensureReportOutputDirectoryExists: () => Promise<string>
@@ -78,8 +87,14 @@ export type DryRunHelpersContext = {
         clearFusionAccounts: () => void
     }
     fusion: {
-        generateReport: (tracker: AggregationTracker, includeNonMatches?: boolean, stats?: FusionReportStats) => FusionReport
-        forEachISCAccount: (callback: (account: StdAccountListOutput) => void) => Promise<{ sent: number; eligible: number }>
+        generateReport: (
+            tracker: AggregationTracker,
+            includeNonMatches?: boolean,
+            stats?: FusionReportStats
+        ) => FusionReport
+        forEachISCAccount: (
+            callback: (account: StdAccountListOutput) => void
+        ) => Promise<{ sent: number; eligible: number }>
         getISCAccount: (
             account: FusionAccount,
             includeUncorrelated: boolean
@@ -626,11 +641,7 @@ const categorizeRow = (
     }
     if (status === 'deferred') categories.push('deferred')
 
-    const reviewPending = readBoolean(
-        readUnknown(readUnknown(enrichedAccount, 'attributes'), 'review'),
-        'pending',
-        false
-    )
+    const reviewPending = readBoolean(readPathUnknown(enrichedAccount, ['attributes', 'review']), 'pending', false)
     if (reviewPending) categories.push('review')
 
     if (relatedAccounts.some((accountId: string) => decisionAccountIds.has(accountId))) {
@@ -677,7 +688,7 @@ const emitGroupedRows = async (
                 correlationContext: correlationStatus,
                 ...matchingStatus
             } = matching ?? {}
-            const relatedRaw = readUnknown(readUnknown(row.account, 'attributes'), 'accounts')
+            const relatedRaw = readPathUnknown(row.account, ['attributes', 'accounts'])
             const relatedIds = Array.isArray(relatedRaw) ? relatedRaw.map((x) => String(x)) : []
             const reviewStatus = {
                 pendingReviews: readBoolean(review, 'pending', false),
@@ -756,7 +767,7 @@ const getEmissionKey = (account: any): string => {
     if (attributeId) return attributeId
     const originAccount = readPathString(account, ['attributes', 'originAccount'])
     if (originAccount) return originAccount
-    return JSON.stringify(readUnknown(readUnknown(account, 'attributes'), 'accounts') ?? [])
+    return JSON.stringify(readPathUnknown(account, ['attributes', 'accounts']) ?? [])
 }
 
 export const refreshUniqueAttributesForDryRun = async (
