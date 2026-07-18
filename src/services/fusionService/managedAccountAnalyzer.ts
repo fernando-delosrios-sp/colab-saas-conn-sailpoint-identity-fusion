@@ -35,7 +35,7 @@ export interface ManagedAccountAnalyzerState {
 export class ManagedAccountAnalyzer {
     constructor(private state: ManagedAccountAnalyzerState) {}
 
-    public async analyzeIdentityPhase(account: Account): Promise<ManagedAccountAnalysisContext> {
+    public async scoreIdentityCandidates(account: Account): Promise<ManagedAccountAnalysisContext> {
         const { name, sourceName } = account
         const fusionAccount = await this.state.preProcessManagedAccount(account)
         const sourceInfo = account.sourceName ? this.state.sourcesByName.get(account.sourceName) : undefined
@@ -80,7 +80,7 @@ export class ManagedAccountAnalyzer {
         }
     }
 
-    public async analyzeDeferredPhase(analysis: ManagedAccountAnalysisContext): Promise<void> {
+    public async scoreDeferredCandidates(analysis: ManagedAccountAnalysisContext): Promise<void> {
         if (analysis.hasIdentityBackedMatches) {
             return
         }
