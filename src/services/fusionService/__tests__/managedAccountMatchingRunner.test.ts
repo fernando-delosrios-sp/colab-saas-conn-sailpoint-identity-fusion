@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
-import { ManagedAccountPassRunner, ManagedAccountPassRunnerState } from '../managedAccountPassRunner'
+import { ManagedAccountMatchingRunner, ManagedAccountMatchingRunnerState } from '../managedAccountMatchingRunner'
 import { CandidateRegistry } from '../candidateRegistry'
 import { SourceType } from '../../../model/config'
 
-function makeRunner(overrides: Partial<ManagedAccountPassRunnerState> = {}): {
-    runner: ManagedAccountPassRunner
-    state: ManagedAccountPassRunnerState
+function makeRunner(overrides: Partial<ManagedAccountMatchingRunnerState> = {}): {
+    runner: ManagedAccountMatchingRunner
+    state: ManagedAccountMatchingRunnerState
     analyzeIdentityPhase: ReturnType<typeof vi.fn>
     analyzeDeferredPhase: ReturnType<typeof vi.fn>
     processAccount: ReturnType<typeof vi.fn>
@@ -19,7 +19,7 @@ function makeRunner(overrides: Partial<ManagedAccountPassRunnerState> = {}): {
     const analyzeIdentityPhase = vi.fn()
     const analyzeDeferredPhase = vi.fn()
     const processAccount = vi.fn()
-    const state: ManagedAccountPassRunnerState = {
+    const state: ManagedAccountMatchingRunnerState = {
         config: { managedAccountsBatchSize: 10 } as any,
         log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
         managedAccountAnalyzer: {
@@ -31,7 +31,7 @@ function makeRunner(overrides: Partial<ManagedAccountPassRunnerState> = {}): {
         processAccount,
         ...overrides,
     }
-    const runner = new ManagedAccountPassRunner(state)
+    const runner = new ManagedAccountMatchingRunner(state)
     return { runner, state, analyzeIdentityPhase, analyzeDeferredPhase, processAccount, candidateRegistry }
 }
 
@@ -39,7 +39,7 @@ function makeAccount(name: string, sourceName: string = 'Source A'): any {
     return { name, sourceName, id: `id-${name}`, nativeIdentity: `nat-${name}` }
 }
 
-describe('ManagedAccountPassRunner', () => {
+describe('ManagedAccountMatchingRunner', () => {
     it('returns identity-match for matched account', async () => {
         const { runner, analyzeIdentityPhase } = makeRunner()
         const fusionAccount = { isMatch: true } as any
@@ -102,7 +102,7 @@ describe('ManagedAccountPassRunner', () => {
         analyzeDeferredPhase.mockImplementation((analysis: any) => {
             analysis.fusionAccount.fusionMatches = [{ candidateType: 'new-unmatched', identityName: 'peer', scores: [] }]
         })
-        const runner = new ManagedAccountPassRunner({
+        const runner = new ManagedAccountMatchingRunner({
             config: { managedAccountsBatchSize: 10 } as any,
             log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
             managedAccountAnalyzer: { analyzeIdentityPhase, analyzeDeferredPhase, isDeferredMatchingEnabledForSource: vi.fn().mockReturnValue(true) } as any,
@@ -140,7 +140,7 @@ describe('ManagedAccountPassRunner', () => {
             fusionIdentityComparisons: 5,
             hasIdentityBackedMatches: false,
         })
-        const runner = new ManagedAccountPassRunner({
+        const runner = new ManagedAccountMatchingRunner({
             config: { managedAccountsBatchSize: 10 } as any,
             log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
             managedAccountAnalyzer: { analyzeIdentityPhase, analyzeDeferredPhase: vi.fn(), isDeferredMatchingEnabledForSource: vi.fn().mockReturnValue(true) } as any,
