@@ -4,49 +4,51 @@ This page defines the canonical terms used throughout the connector, its configu
 
 ## Accounts
 
-### Fusion account
+### ISC account
 
-The connector’s consolidated ISC account. It is produced by the **Map** and **Define** steps and may then be scored in the **Match** step.
+Any account object from Identity Security Cloud.
 
-### Fusion identity
+### Managed source account
 
-A **Fusion account that became an identity** in Identity Security Cloud. Once a Fusion account is the authoritative account for an identity, it is useful to distinguish it as a Fusion identity.
-
-### Identity-based Fusion account
-
-A **Fusion account whose origin is an identity**. These accounts are seeded from an existing ISC identity during aggregation (for example when **Include identities in the scope?** is enabled) rather than from a managed source account.
-
-### Managed account / managed source account
-
-An account from one of the sources configured under **Source Settings → Sources**. The connector fetches these accounts from ISC and merges their attributes into Fusion accounts.
+An ISC account from one of the sources configured under **Source Settings → Sources**. The connector fetches these accounts and merges their attributes into Fusion accounts.
 
 ### Managed account key
 
-The composite identifier `sourceId::nativeIdentity` that uniquely identifies a managed account within ISC.
+The composite identifier `sourceId::nativeIdentity` that uniquely identifies a managed source account within ISC.
 
-## Processing states
+### Fusion account
 
-### Baseline
+The consolidated ISC account produced by the **Map** and **Define** steps.
 
-An existing identity that is included in the identity scope and used as a comparison point during the **Match** step.
+### Fusion identity
 
-### Uncorrelated
+A Fusion account that has been correlated to an ISC identity and is treated as that identity's authoritative account.
 
-A Fusion account or managed account that is not yet linked to a known identity. Uncorrelated managed accounts are the primary input to the **Match** step.
+### Identity-origin Fusion account
 
-### Non-matched / `nonMatched`
+A Fusion account seeded from an existing ISC identity during aggregation (for example when **Include identities in the scope?** is enabled), rather than from a managed source account.
 
-A managed account that completed the **Match** step without finding any acceptable identity candidate. The status entitlement value is `nonMatched`; the matching status string is `non-matched`.
+### Provisional Fusion account
 
-### Orphan
+A Fusion account created from a managed source account before its match fate has been decided.
 
-A Fusion account that no longer has any contributing managed source accounts. Depending on configuration, orphan accounts may be removed or disabled.
+## Operation structure
 
-### Deferred
+### Operation
 
-A match result where the best candidate is another new unmatched account from the same source in the same aggregation run. The connector defers creating a new identity until a later aggregation can compare against the established baseline.
+A connector entry point such as `std:account:list` (the **accountList operation**) or `custom:dryrun` (the **dryRun operation**).
 
-## Framework steps
+### Phase
+
+A major stage of an operation pipeline (for example the identity documents phase, the Fusion accounts phase, the managed accounts phase, or the report phase).
+
+### Sweep
+
+A traversal of a set of accounts with a single purpose within a phase.
+
+### Aggregation
+
+The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters.
 
 ### Map
 
@@ -58,7 +60,43 @@ Computing new attributes (normal attributes) and generating persistent unique at
 
 ### Match
 
-Scoring Fusion accounts against the identity baseline using similarity algorithms, optional automatic assignment, and optional manual review workflows.
+The product step that determines whether a Fusion account corresponds to an existing identity, using scoring and optional automatic assignment or manual review.
+
+<!-- markdownlint-disable MD024 -->
+
+## Matching
+
+### Matching
+
+The business process of determining whether a new Fusion account is potentially part of an existing identity.
+
+### Scoring
+
+The similarity-calculation method used by matching to compare attribute values.
+
+<!-- markdownlint-enable MD024 -->
+
+### Combined match score
+
+The weighted mean of evaluated rule similarities used to decide whether a candidate is a potential match.
+
+### Potential match
+
+A candidate whose combined match score meets or exceeds the configured threshold and whose mandatory rules pass.
+
+### Automatic assignment
+
+The decision to link a matched Fusion account to a specific identity without manual review when the combined score meets the automatic assignment threshold.
+
+## Candidates
+
+### Identity candidate
+
+A candidate for matching that is an existing ISC identity (or a Fusion identity already in the baseline).
+
+### Deferred candidate
+
+A candidate for matching that is another provisional Fusion account from the same source in the same operation, causing identity creation to be deferred until the next aggregation.
 
 ## Source types
 
@@ -74,20 +112,24 @@ Managed source accounts that run **Map** and **Define** and may register unique 
 
 Managed source accounts whose unmatched rows are dropped; optionally, stale orphan accounts can be disabled.
 
-## Correlation, matching, and assignment
+## Processing states
 
-### Correlation
+### Baseline
 
-Linking a managed source account to an existing ISC identity (or to a Fusion identity) so that ISC treats them as the same person.
+An existing identity that is included in the identity scope and used as a comparison point during the **Match** step.
 
-### Matching
+### Uncorrelated
 
-The similarity scoring that determines whether a Fusion account likely corresponds to an existing identity.
+A Fusion account or managed source account that is not yet linked to a known identity.
 
-### Assignment
+### Non-matched / `nonMatched`
 
-The decision that links a matched Fusion account or managed account to a specific identity, either automatically or through a manual review form.
+A managed source account that completed the **Match** step without finding any acceptable identity candidate. The status entitlement value is `nonMatched`; the matching status string is `non-matched`.
 
-### Deferred matching
+### Orphan
 
-A per-source option for **Authoritative accounts**. When enabled, unmatched accounts are also compared against other new unmatched accounts from the same source in the same aggregation run. If the strongest match is such a peer, identity creation is deferred until the next aggregation, when that peer is part of the baseline.
+A Fusion account that no longer has any contributing managed source accounts. Depending on configuration, orphan accounts may be removed or disabled.
+
+### Deferred
+
+A match result where the best candidate is a deferred candidate from the same source in the same operation. The connector defers creating a new identity until a later aggregation can compare against the established baseline.
