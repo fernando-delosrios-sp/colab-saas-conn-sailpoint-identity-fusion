@@ -1,7 +1,7 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceType } from '../../model/config'
-import { LogService, PhaseTimer } from '../logService'
+import { LogService } from '../logService'
 import { FormService } from '../formService'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { IdentityService } from '../identityService'
@@ -42,7 +42,9 @@ import { FusionAccountRepository } from './fusionAccountRepository'
 import { IdentityProcessor } from './identityProcessor'
 import { CorrelationManager } from './correlationManager'
 import { DecisionProcessor } from './decisionProcessor'
-import { ManagedAccountAnalyzer, ManagedAccountAnalysisContext } from './managedAccountAnalyzer'
+import { ManagedAccountAnalyzer } from './managedAccountAnalyzer'
+import { CandidateRegistry } from './candidateRegistry'
+import { ManagedAccountPassRunner } from './managedAccountPassRunner'
 
 // ============================================================================
 // FusionService Class
@@ -60,6 +62,8 @@ export class FusionService {
     private decisionProcessor: DecisionProcessor
     private managedAccountAnalyzer: ManagedAccountAnalyzer
     private analysisRecorder: ManagedAccountAnalysisRecorder
+    private candidateRegistry: CandidateRegistry
+    private passRunner: ManagedAccountPassRunner
 
     public get fusionIdentityMap(): Map<string, FusionAccount> {
         return this._repository.fusionIdentityMap
@@ -137,6 +141,18 @@ export class FusionService {
         this.correlationManager = new CorrelationManager(this)
         this.decisionProcessor = new DecisionProcessor(this)
         this.managedAccountAnalyzer = new ManagedAccountAnalyzer(this)
+        this.candidateRegistry = new CandidateRegistry({
+            fusionAccountMap: this._repository.fusionAccountMap,
+            sourcesByName: this.sourcesByName,
+            log: this.log,
+        })
+        this.passRunner = new ManagedAccountPassRunner({
+            config: this.config,
+            log: this.log,
+            managedAccountAnalyzer: this.managedAccountAnalyzer,
+            candidateRegistry: this.candidateRegistry,
+            processAccount: (account: Account) => this.processManagedAccount(account),
+        })
         FusionAccount.configure(config)
         this.configSourceNames = new Set(config.sources.map((s) => s.name))
         this.reset = config.reset
@@ -716,92 +732,27 @@ export class FusionService {
         batchSize: number,
         managedAccountProcessingStartedAt: number
     ): Promise<number> {
-        const initialQueueSize = queuedAccounts.length
-        const logProgressEvery = Math.max(1, Math.min(getManagedAccountsBatchSize(this.config), initialQueueSize))
-        let processed = 0
-
-        const parallelAccounts: Account[] = []
-        const deferredGroups = new Map<string, Account[]>()
-        for (const account of queuedAccounts) {
-            if (this.isDeferredMatchingEnabledForSource(account.sourceName ?? undefined)) {
-                const sourceKey = this.deferredMatchingSourceKey(account.sourceName)
-                const existing = deferredGroups.get(sourceKey)
-                if (existing) existing.push(account)
-                else deferredGroups.set(sourceKey, [account])
-            } else {
-                parallelAccounts.push(account)
+        const results = await this.passRunner.execute(
+            queuedAccounts,
+            batchSize,
+            managedAccountProcessingStartedAt
+        )
+        for (const result of results) {
+            this.analysisRecorder.recordAnalysis(result.analysis)
+            const { fusionAccount, account, sourceInfo, sourceType } = result.analysis
+            switch (result.resolution) {
+                case 'identity-match':
+                    await this.handleIdentityBackedMatch(fusionAccount, account, sourceInfo)
+                    break
+                case 'deferred-match':
+                    await this.handleDeferredMatch(fusionAccount, account)
+                    break
+                case 'non-match':
+                    await this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
+                    break
             }
         }
-
-        const logProgressIfNeeded = (): void => {
-            if (processed === 1 || processed % logProgressEvery === 0 || processed === initialQueueSize) {
-                this.log.info(
-                    `Managed accounts progress: ${processed}/${initialQueueSize} analyzed | RUN ELAPSED ${PhaseTimer.formatElapsed(
-                        Date.now() - managedAccountProcessingStartedAt
-                    )}`
-                )
-            }
-        }
-
-        const runParallelAccounts = async (): Promise<void> => {
-            for (let i = 0; i < parallelAccounts.length; i += batchSize) {
-                const batch = parallelAccounts.slice(i, i + batchSize)
-                await Promise.all(batch.map((account) => this.processManagedAccount(account)))
-                processed += batch.length
-                logProgressIfNeeded()
-                await yieldToEventLoop()
-            }
-        }
-
-        const runDeferredGroups = async (): Promise<void> => {
-            const deferredGroupEntries = Array.from(deferredGroups.entries())
-            await Promise.all(
-                deferredGroupEntries.map(async ([sourceKey, accounts]) => {
-                    let sequentiallyProcessed = 0
-                    const deferredPhaseSequentialQueue: ManagedAccountAnalysisContext[] = []
-
-                    // Phase A: preprocess + identity scoring in parallel for this source.
-                    for (let i = 0; i < accounts.length; i += batchSize) {
-                        const batch = accounts.slice(i, i + batchSize)
-                        const phaseAResults = await Promise.all(
-                            batch.map((account) => this.managedAccountAnalyzer.analyzeIdentityPhase(account))
-                        )
-
-                        for (const analysis of phaseAResults) {
-                            if (analysis.hasIdentityBackedMatches) {
-                                await this.completeManagedAccountFromAnalysis(analysis, false)
-                                processed += 1
-                                sequentiallyProcessed += 1
-                                logProgressIfNeeded()
-                            } else {
-                                deferredPhaseSequentialQueue.push(analysis)
-                            }
-                        }
-                        await yieldToEventLoop()
-                    }
-
-                    // Phase B: preserve deferred-matching visibility for this source only.
-                    for (const analysis of deferredPhaseSequentialQueue) {
-                        await this.managedAccountAnalyzer.analyzeDeferredPhase(analysis)
-                        await this.completeManagedAccountFromAnalysis(analysis, true)
-                        processed += 1
-                        sequentiallyProcessed += 1
-                        logProgressIfNeeded()
-                        await yieldToEventLoop()
-                    }
-
-                    if (sequentiallyProcessed > 0) {
-                        this.log.debug(
-                            `Deferred matching pass for source "${sourceKey}" analyzed ${sequentiallyProcessed} account(s) (phaseA parallel, phaseB sequential)`
-                        )
-                    }
-                })
-            )
-        }
-
-        await Promise.all([runParallelAccounts(), runDeferredGroups()])
-
-        return processed
+        return results.length
     }
 
     /**
@@ -866,19 +817,25 @@ export class FusionService {
             return this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
         }
 
-        const fusionAccount = await this.analyzeManagedAccount(account)
-        const identityBackedMatches = checkHasIdentityBackedMatches(fusionAccount)
-        const newUnmatchedPeerMatches = checkHasNewUnmatchedPeerMatches(fusionAccount)
-
-        if (identityBackedMatches) {
-            return this.handleIdentityBackedMatch(fusionAccount, account, sourceInfo)
+        const results = await this.passRunner.execute(
+            [account],
+            1,
+            Date.now()
+        )
+        if (results.length === 0) return undefined
+        const result = results[0]
+        this.analysisRecorder.recordAnalysis(result.analysis)
+        const { fusionAccount, sourceInfo: analysisSourceInfo, sourceType: analysisSourceType } = result.analysis
+        switch (result.resolution) {
+            case 'identity-match':
+                return this.handleIdentityBackedMatch(fusionAccount, account, analysisSourceInfo)
+            case 'deferred-match':
+                return this.handleDeferredMatch(fusionAccount, account)
+            case 'non-match':
+                return this.handleNonMatch(fusionAccount, account, analysisSourceType, analysisSourceInfo)
+            default:
+                return undefined
         }
-
-        if (newUnmatchedPeerMatches) {
-            return this.handleDeferredMatch(fusionAccount, account)
-        }
-
-        return this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
     }
 
     /**
@@ -1049,10 +1006,19 @@ export class FusionService {
         assert(map, 'Managed accounts have not been loaded')
         this.currentRunMatchScoringMs = 0
         const results: FusionAccount[] = []
+
+        const accounts = [...map.values()]
+        const runnerResults = await this.passRunner.execute(
+            accounts,
+            this._managedAccountProcessingBatchSize || 1,
+            Date.now()
+        )
+
         let processed = 0
         const yieldEveryManaged = getManagedAccountEventLoopYieldEvery(this.config)
-        for (const account of map.values()) {
-            const fusionAccount = await this.analyzeManagedAccount(account)
+        for (const result of runnerResults) {
+            this.analysisRecorder.recordAnalysis(result.analysis)
+            const { fusionAccount, account } = result.analysis
             if (
                 fusionAccount.isMatch &&
                 !checkHasIdentityBackedMatches(fusionAccount) &&
@@ -1073,66 +1039,8 @@ export class FusionService {
         return results
     }
 
-    /**
-     * Analyzes a single managed account by scoring it against all existing fusion identities.
-     * Tracks the account for reporting when reporting is enabled.
-     *
-     * Memory: Only populates matchAccounts/analyzedNonMatchReportData when
-     * fusionReportOnAggregation is true, command is not StdAccountList, or operation is `custom:dryrun`.
-     * Stores minimal FusionReportAccount for non-matches when report data is needed.
-     *
-     * @param account - The managed source account to analyze
-     * @returns The scored FusionAccount with match results populated
-     */
-    public async analyzeManagedAccount(account: Account): Promise<FusionAccount> {
-        const analysis = await this.managedAccountAnalyzer.analyzeIdentityPhase(account)
-        await this.managedAccountAnalyzer.analyzeDeferredPhase(analysis)
-        this.analysisRecorder.recordAnalysis(analysis)
-
-        const { fusionAccount, sourceType } = analysis
-        if (
-            !fusionAccount.isMatch &&
-            sourceType === SourceType.Authoritative &&
-            this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)
-        ) {
-            this.setFusionAccount(fusionAccount)
-            this.registerCurrentRunUnmatchedCandidate(fusionAccount)
-        }
-
-        return analysis.fusionAccount
-    }
-
     public addMatchScoringTimeMs(ms: number): void {
         this.currentRunMatchScoringMs += ms
-    }
-
-    private async completeManagedAccountFromAnalysis(
-        analysis: ManagedAccountAnalysisContext,
-        deferredPhaseExecuted: boolean
-    ): Promise<FusionAccount | undefined> {
-        const { account, fusionAccount, sourceInfo, sourceType, hasIdentityBackedMatches } = analysis
-        this.analysisRecorder.recordAnalysis(analysis)
-
-        if (
-            !fusionAccount.isMatch &&
-            sourceType === SourceType.Authoritative &&
-            this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)
-        ) {
-            this.setFusionAccount(fusionAccount)
-            this.registerCurrentRunUnmatchedCandidate(fusionAccount)
-        }
-
-        if (hasIdentityBackedMatches) {
-            return this.handleIdentityBackedMatch(fusionAccount, account, sourceInfo)
-        }
-
-        if (!deferredPhaseExecuted) {
-            return undefined
-        }
-        if (checkHasNewUnmatchedPeerMatches(fusionAccount)) {
-            return this.handleDeferredMatch(fusionAccount, account)
-        }
-        return this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
     }
 
     /**
@@ -1416,23 +1324,9 @@ export class FusionService {
         await this.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount)
         this.setFusionAccount(fusionAccount)
         if (this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
-            this.registerCurrentRunUnmatchedCandidate(fusionAccount)
+            this.candidateRegistry.register(fusionAccount)
         }
         return fusionAccount
-    }
-
-    private registerCurrentRunUnmatchedCandidate(fusionAccount: FusionAccount): void {
-        const { managedKey } = fusionAccount
-        if (!managedKey || !this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) return
-        const sourceKey = this.deferredMatchingSourceKey(fusionAccount.sourceName)
-        if (!sourceKey) return
-        const setForSource = this.currentRunUnmatchedFusionManagedKeysBySource.get(sourceKey) ?? new Set<string>()
-        setForSource.add(managedKey)
-        this.currentRunUnmatchedFusionManagedKeysBySource.set(sourceKey, setForSource)
-    }
-
-    private deferredMatchingSourceKey(sourceName: string | null | undefined): string {
-        return sourceName ?? ''
     }
 
     /**
@@ -1556,17 +1450,7 @@ export class FusionService {
     }
 
     public currentRunUnmatchedCandidatesForSource(sourceName: string | null | undefined): Iterable<FusionAccount> {
-        return this._currentRunUnmatchedCandidatesIterableForSource(this.deferredMatchingSourceKey(sourceName))
-    }
-
-    /** Generator that yields unmatched candidates without allocating intermediate arrays. */
-    private *_currentRunUnmatchedCandidatesIterableForSource(sourceKey: string): Iterable<FusionAccount> {
-        const sourceCandidates = this.currentRunUnmatchedFusionManagedKeysBySource.get(sourceKey)
-        if (!sourceCandidates) return
-        for (const managedKey of sourceCandidates) {
-            const account = this.fusionAccountMap.get(managedKey)
-            if (account) yield account
-        }
+        return this.candidateRegistry.queryForSource(sourceName)
     }
 
     /**
@@ -1609,12 +1493,12 @@ export class FusionService {
         this._managedAccountProcessingStartedAt = Date.now()
 
         this.tracker.newManagedAccountsCount = map.size
-        this.currentRunUnmatchedFusionManagedKeysBySource.clear()
+        this.candidateRegistry.clear()
         this.autoAssignedIdentityIds.clear()
         this.currentRunMatchScoringMs = 0
 
         for (const fusionAccount of this.fusionAccountMap.values()) {
-            this.registerCurrentRunUnmatchedCandidate(fusionAccount)
+            this.candidateRegistry.register(fusionAccount)
         }
 
         this.validateManagedSourceReviewers()

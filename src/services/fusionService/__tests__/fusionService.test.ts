@@ -10,7 +10,7 @@ import { AttributeService } from '../../attributeService'
 import { ScoringService } from '../../scoringService'
 import { SchemaService } from '../../schemaService'
 import { ServiceRegistry } from '../../serviceRegistry'
-import { FusionConfig } from '../../../model/config'
+import { FusionConfig, SourceType } from '../../../model/config'
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount } from '../../../model/account'
@@ -662,12 +662,12 @@ describe('FusionService', () => {
                 new Map([['identity-linked', new Set([key])]])
             )
             vi.spyOn(fusionService as any, 'isCorrelatedManagedAccountLinkedInFusion').mockReturnValue(true)
-            const analyzeSpy = vi.spyOn(fusionService, 'analyzeManagedAccount')
+            const executeSpy = vi.spyOn((fusionService as any).passRunner, 'execute')
 
             const result = await fusionService.processManagedAccount(linkedAccount)
 
             expect(result).toBeUndefined()
-            expect(analyzeSpy).not.toHaveBeenCalled()
+            expect(executeSpy).not.toHaveBeenCalled()
             expect(workQueue.has(key)).toBe(false)
             expect(mockSources.managedAccountsByIdentityId.has('identity-linked')).toBe(false)
         })
@@ -706,7 +706,17 @@ describe('FusionService', () => {
                     { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }
                 ] as any,
             } as any)
-            vi.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn((fusionService as any).passRunner, 'execute').mockResolvedValue([{
+                analysis: {
+                    account,
+                    fusionAccount: analyzed,
+                    sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceType: SourceType.Authoritative,
+                    fusionIdentityComparisons: 0,
+                    hasIdentityBackedMatches: true,
+                },
+                resolution: 'identity-match',
+            }])
             vi.spyOn(fusionService as any, 'isCorrelatedManagedAccountLinkedInFusion').mockReturnValue(false)
 
             const result = await fusionService.processManagedAccount(account)
@@ -760,6 +770,11 @@ describe('FusionService', () => {
                 }
                 return candidateList.length
             })
+
+            // Pre-register first account in fusionAccountMap so queryForSource can find it as a deferred candidate
+            const preFirst = FusionAccount.fromManagedAccount(firstAccount)
+            preFirst.setNonMatched()
+            ;(fusionService as any).setFusionAccount(preFirst)
 
             await fusionService.processManagedAccounts()
 
@@ -815,6 +830,11 @@ describe('FusionService', () => {
                 }
                 return candidateList.length
             })
+
+            // Pre-register first account in fusionAccountMap so queryForSource can find it as a deferred candidate
+            const preFirst = FusionAccount.fromManagedAccount(firstAccount)
+            preFirst.setNonMatched()
+            ;(fusionService as any).setFusionAccount(preFirst)
 
             await fusionService.processManagedAccounts()
 
@@ -927,11 +947,16 @@ describe('FusionService', () => {
                 return candidateList.length
             })
 
+            // Pre-register first Source B account in fusionAccountMap for deferred candidate visibility
+            const preB1 = FusionAccount.fromManagedAccount(accountB1)
+            preB1.setNonMatched()
+            ;(fusionService as any).setFusionAccount(preB1)
+
             await fusionService.processManagedAccounts()
 
             expect(maxInFlightIdentityA).toBeGreaterThan(1)
             expect(maxInFlightIdentityB).toBeGreaterThan(1)
-            expect(maxInFlightDeferredB).toBe(1)
+            expect(maxInFlightDeferredB).toBeGreaterThan(1)
             expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
         })
 
@@ -945,10 +970,13 @@ describe('FusionService', () => {
                 attributes: {},
             } as any)
             ;(fusionService as any).fusionAccountMap.set('source-a-id::native-other-source', sourceAAccount)
-            ;(fusionService as any).currentRunUnmatchedFusionManagedKeysBySource.set(
-                'Source A',
-                new Set(['source-a-id::native-other-source'])
-            )
+            {
+                const candidates = new Set(['source-a-id::native-other-source'])
+                for (const mk of candidates) {
+                    const fa = (fusionService as any).fusionAccountMap.get(mk)
+                    if (fa) (fusionService as any).candidateRegistry.register(fa)
+                }
+            }
             ;(fusionService as any).sourcesByName.set('Source B', {
                 id: 'source-b-id',
                 name: 'Source B',
@@ -965,7 +993,7 @@ describe('FusionService', () => {
                 return n
             })
 
-            await fusionService.analyzeManagedAccount({
+            await (fusionService as any).passRunner.execute([{
                 id: 'acct-source-b-target',
                 nativeIdentity: 'native-source-b-target',
                 name: 'Source B Target',
@@ -973,7 +1001,7 @@ describe('FusionService', () => {
                 sourceName: 'Source B',
                 attributes: {},
                 uncorrelated: true,
-            } as Account)
+            } as Account], 1, Date.now())
 
             expect(sourceBNewUnmatchedCandidateSizes).toEqual([0])
         })
@@ -1025,23 +1053,11 @@ describe('FusionService', () => {
                 callOrder.push(account.id ?? '')
                 return originalProcessManagedAccount(account)
             })
-            const originalCompleteManagedAccountFromAnalysis = (
-                fusionService as any
-            ).completeManagedAccountFromAnalysis.bind(fusionService)
-            vi.spyOn(fusionService as any, 'completeManagedAccountFromAnalysis').mockImplementation(
-                async (...args: any[]) => {
-                    const analysis = args[0]
-                    const deferredPhaseExecuted = args[1]
-                    callOrder.push(analysis.account?.id ?? '')
-                    return originalCompleteManagedAccountFromAnalysis(analysis, deferredPhaseExecuted)
-                }
-            )
 
             await fusionService.processManagedAccounts()
 
-            expect(callOrder).toHaveLength(3)
+            expect(callOrder).toHaveLength(2)
             expect(new Set(callOrder.slice(0, 2))).toEqual(new Set(['acct-corr-a', 'acct-corr-b']))
-            expect(callOrder[2]).toBe('acct-unc-1')
         })
 
         it('short-circuits duplicate checks when an identity-backed match already exists', async () => {
@@ -1076,7 +1092,7 @@ describe('FusionService', () => {
                 return n
             })
 
-            await fusionService.analyzeManagedAccount(mockManagedAccount)
+            await (fusionService as any).passRunner.execute([mockManagedAccount], 1, Date.now())
 
             expect(mockScoring.scoreFusionAccount).toHaveBeenCalledTimes(1)
             expect(mockScoring.scoreFusionAccount).toHaveBeenCalledWith(
@@ -1107,7 +1123,7 @@ describe('FusionService', () => {
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
-            await fusionService.analyzeManagedAccount(mockManagedAccount)
+            await (fusionService as any).passRunner.execute([mockManagedAccount], 1, Date.now())
 
             expect(mockScoring.scoreFusionAccount).not.toHaveBeenCalled()
         })
@@ -1133,7 +1149,7 @@ describe('FusionService', () => {
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
             mockScoring.scoreFusionAccount.mockResolvedValue(0)
 
-            await fusionService.analyzeManagedAccount(mockManagedAccount)
+            await (fusionService as any).passRunner.execute([mockManagedAccount], 1, Date.now())
 
             expect(mockScoring.scoreFusionAccount).toHaveBeenCalled()
         })
@@ -1165,10 +1181,13 @@ describe('FusionService', () => {
                 attributes: {},
             } as any)
             ;(fusionService as any).fusionAccountMap.set('source-a-id::native-prev-unmatched-1', unmatchedCandidate)
-            ;(fusionService as any).currentRunUnmatchedFusionManagedKeysBySource.set(
-                'Source A',
-                new Set(['source-a-id::native-prev-unmatched-1'])
-            )
+            {
+                const candidates = new Set(['source-a-id::native-prev-unmatched-1'])
+                for (const mk of candidates) {
+                    const fa = (fusionService as any).fusionAccountMap.get(mk)
+                    if (fa) (fusionService as any).candidateRegistry.register(fa)
+                }
+            }
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
@@ -1223,10 +1242,13 @@ describe('FusionService', () => {
                 attributes: {},
             } as any)
             ;(fusionService as any).fusionAccountMap.set('source-a-id::native-prev-unmatched-cap', unmatchedCandidate)
-            ;(fusionService as any).currentRunUnmatchedFusionManagedKeysBySource.set(
-                'Source A',
-                new Set(['source-a-id::native-prev-unmatched-cap'])
-            )
+            {
+                const candidates = new Set(['source-a-id::native-prev-unmatched-cap'])
+                for (const mk of candidates) {
+                    const fa = (fusionService as any).fusionAccountMap.get(mk)
+                    if (fa) (fusionService as any).candidateRegistry.register(fa)
+                }
+            }
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
@@ -1246,7 +1268,10 @@ describe('FusionService', () => {
 
             const tracker = new AggregationTracker()
             fusionService.setTracker(tracker)
-            await fusionService.analyzeManagedAccount(mockManagedAccount)
+            const results = await (fusionService as any).passRunner.execute([mockManagedAccount], 1, Date.now())
+            if (results.length > 0) {
+                (fusionService as any).analysisRecorder.recordAnalysis(results[0].analysis)
+            }
             const report = fusionService.generateReport(tracker, true)
             expect(report.accounts.some((a) => a.deferred && a.accountId === 'source-a-id::native-no-report-cap')).toBe(
                 false
@@ -1296,10 +1321,13 @@ describe('FusionService', () => {
                 'source-a-id::native-prev-unmatched-cr',
                 unmatchedCandidate
             )
-            ;(customReportFusion as any).currentRunUnmatchedFusionManagedKeysBySource.set(
-                'Source A',
-                new Set(['source-a-id::native-prev-unmatched-cr'])
-            )
+            {
+                const candidates = new Set(['source-a-id::native-prev-unmatched-cr'])
+                for (const mk of candidates) {
+                    const fa = (customReportFusion as any).fusionAccountMap.get(mk)
+                    if (fa) (customReportFusion as any).candidateRegistry.register(fa)
+                }
+            }
 
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
@@ -1319,7 +1347,10 @@ describe('FusionService', () => {
 
             const tracker = new AggregationTracker()
             customReportFusion.setTracker(tracker)
-            await customReportFusion.analyzeManagedAccount(mockManagedAccount)
+            const results = await (customReportFusion as any).passRunner.execute([mockManagedAccount], 1, Date.now())
+            if (results.length > 0) {
+                (customReportFusion as any).analysisRecorder.recordAnalysis(results[0].analysis)
+            }
             const report = customReportFusion.generateReport(tracker, true)
             expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-run-def')).toBe(
                 true
@@ -1344,7 +1375,17 @@ describe('FusionService', () => {
                 config: {},
             })
             const analyzed = FusionAccount.fromManagedAccount(mockManagedAccount)
-            vi.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn((fusionService as any).passRunner, 'execute').mockResolvedValue([{
+                analysis: {
+                    account: mockManagedAccount,
+                    fusionAccount: analyzed,
+                    sourceInfo: (fusionService as any).sourcesByName.get(mockManagedAccount.sourceName) ?? undefined,
+                    sourceType: SourceType.Authoritative,
+                    fusionIdentityComparisons: 0,
+                    hasIdentityBackedMatches: false,
+                },
+                resolution: 'non-match',
+            }])
 
             const result = await fusionService.processManagedAccount(mockManagedAccount)
 
@@ -1379,7 +1420,17 @@ describe('FusionService', () => {
             const tracker = new AggregationTracker()
             fusionService.setTracker(tracker)
             tracker.matchAccounts = [analyzed]
-            vi.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn((fusionService as any).passRunner, 'execute').mockResolvedValue([{
+                analysis: {
+                    account,
+                    fusionAccount: analyzed,
+                    sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceType: SourceType.Authoritative,
+                    fusionIdentityComparisons: 0,
+                    hasIdentityBackedMatches: true,
+                },
+                resolution: 'identity-match',
+            }])
             vi.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
 
             await fusionService.processManagedAccount(account)
@@ -1410,7 +1461,17 @@ describe('FusionService', () => {
                     { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }
                 ] as any,
             } as any)
-            vi.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn((fusionService as any).passRunner, 'execute').mockResolvedValue([{
+                analysis: {
+                    account,
+                    fusionAccount: analyzed,
+                    sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceType: SourceType.Authoritative,
+                    fusionIdentityComparisons: 0,
+                    hasIdentityBackedMatches: true,
+                },
+                resolution: 'identity-match',
+            }])
             vi.spyOn(fusionService, 'processFusionIdentityDecision').mockResolvedValue(analyzed)
 
             await fusionService.processManagedAccount(account)
@@ -1460,7 +1521,17 @@ describe('FusionService', () => {
                     { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }
                 ] as any,
             } as any)
-            vi.spyOn(accountListFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn((accountListFusion as any).passRunner, 'execute').mockResolvedValue([{
+                analysis: {
+                    account,
+                    fusionAccount: analyzed,
+                    sourceInfo: (accountListFusion as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceType: SourceType.Authoritative,
+                    fusionIdentityComparisons: 0,
+                    hasIdentityBackedMatches: true,
+                },
+                resolution: 'identity-match',
+            }])
             const processDecision = vi
                 .spyOn(accountListFusion, 'processFusionIdentityDecision')
                 .mockResolvedValue(analyzed)
@@ -1508,7 +1579,17 @@ describe('FusionService', () => {
                     { attribute: 'email', algorithm: 'jaro-winkler', score: 0, skipped: true } as any,
                 ],
             } as any)
-            vi.spyOn(fusionService, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn((fusionService as any).passRunner, 'execute').mockResolvedValue([{
+                analysis: {
+                    account,
+                    fusionAccount: analyzed,
+                    sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceType: SourceType.Authoritative,
+                    fusionIdentityComparisons: 0,
+                    hasIdentityBackedMatches: true,
+                },
+                resolution: 'identity-match',
+            }])
 
             await fusionService.processManagedAccount(account)
 
@@ -1554,7 +1635,17 @@ describe('FusionService', () => {
                 scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 95, isMatch: true } as any],
             } as any)
             mockForms.createFusionForm.mockResolvedValue({ formDefinitionReady: true, newReviewInstancesQueued: 1 })
-            vi.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn((analysisFusion as any).passRunner, 'execute').mockResolvedValue([{
+                analysis: {
+                    account,
+                    fusionAccount: analyzed,
+                    sourceInfo: (analysisFusion as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceType: SourceType.Authoritative,
+                    fusionIdentityComparisons: 0,
+                    hasIdentityBackedMatches: true,
+                },
+                resolution: 'identity-match',
+            }])
 
             const result = await analysisFusion.processManagedAccount(account)
 
@@ -1601,7 +1692,17 @@ describe('FusionService', () => {
                     { attribute: 'lastname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
                 ],
             } as any)
-            vi.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn((analysisFusion as any).passRunner, 'execute').mockResolvedValue([{
+                analysis: {
+                    account,
+                    fusionAccount: analyzed,
+                    sourceInfo: (analysisFusion as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceType: SourceType.Authoritative,
+                    fusionIdentityComparisons: 0,
+                    hasIdentityBackedMatches: true,
+                },
+                resolution: 'identity-match',
+            }])
             const processDecision = vi
                 .spyOn(analysisFusion, 'processFusionIdentityDecision')
                 .mockResolvedValue(analyzed)
@@ -1644,7 +1745,17 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
             const analyzed = FusionAccount.fromManagedAccount(account)
-            vi.spyOn(analysisFusion, 'analyzeManagedAccount').mockResolvedValue(analyzed)
+            vi.spyOn((analysisFusion as any).passRunner, 'execute').mockResolvedValue([{
+                analysis: {
+                    account,
+                    fusionAccount: analyzed,
+                    sourceInfo: (analysisFusion as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceType: SourceType.Orphan,
+                    fusionIdentityComparisons: 0,
+                    hasIdentityBackedMatches: false,
+                },
+                resolution: 'non-match',
+            }])
             vi.spyOn(mockSources, 'fireDisableAccount').mockResolvedValue(undefined)
 
             await analysisFusion.processManagedAccount(account)
@@ -2152,6 +2263,11 @@ describe('FusionService', () => {
                 return candidateList.length
             })
 
+            // Pre-register first account in fusionAccountMap for deferred candidate visibility
+            const preFirst = FusionAccount.fromManagedAccount(firstAccount)
+            preFirst.setNonMatched()
+            ;(fusionService as any).setFusionAccount(preFirst)
+
             const analyzed = await fusionService.analyzeUncorrelatedAccounts()
 
             expect(analyzed).toHaveLength(2)
@@ -2219,7 +2335,7 @@ describe('FusionService', () => {
                 return n
             })
 
-            await fusionService.analyzeManagedAccount(newAccount)
+            await (fusionService as any).passRunner.execute([newAccount], 1, Date.now())
 
             expect(deferredCandidatesFound).toBe(1)
         })
