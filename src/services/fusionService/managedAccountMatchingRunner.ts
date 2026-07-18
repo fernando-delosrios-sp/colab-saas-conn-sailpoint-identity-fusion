@@ -7,7 +7,7 @@ import type { CandidateRegistry } from './candidateRegistry'
 import { yieldToEventLoop } from './batching'
 import { hasNewUnmatchedPeerMatches as checkHasNewUnmatchedPeerMatches } from './helpers'
 
-export interface ManagedAccountPassRunnerState {
+export interface ManagedAccountMatchingRunnerState {
     readonly config: FusionConfig
     readonly log: LogService
     readonly managedAccountAnalyzer: ManagedAccountAnalyzer
@@ -27,8 +27,8 @@ interface PendingDeferred {
     account: Account
 }
 
-export class ManagedAccountPassRunner {
-    constructor(private readonly state: ManagedAccountPassRunnerState) {}
+export class ManagedAccountMatchingRunner {
+    constructor(private readonly state: ManagedAccountMatchingRunnerState) {}
 
     async execute(
         accounts: Account[],

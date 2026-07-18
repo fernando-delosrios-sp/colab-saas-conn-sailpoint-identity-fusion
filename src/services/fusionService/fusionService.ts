@@ -44,7 +44,7 @@ import { CorrelationManager } from './correlationManager'
 import { DecisionProcessor } from './decisionProcessor'
 import { ManagedAccountAnalyzer } from './managedAccountAnalyzer'
 import { CandidateRegistry } from './candidateRegistry'
-import { ManagedAccountPassRunner } from './managedAccountPassRunner'
+import { ManagedAccountMatchingRunner } from './managedAccountMatchingRunner'
 
 // ============================================================================
 // FusionService Class
@@ -63,7 +63,7 @@ export class FusionService {
     private managedAccountAnalyzer: ManagedAccountAnalyzer
     private analysisRecorder: ManagedAccountAnalysisRecorder
     private candidateRegistry: CandidateRegistry
-    private passRunner: ManagedAccountPassRunner
+    private passRunner: ManagedAccountMatchingRunner
 
     public get fusionIdentityMap(): Map<string, FusionAccount> {
         return this._repository.fusionIdentityMap
@@ -146,7 +146,7 @@ export class FusionService {
             sourcesByName: this.sourcesByName,
             log: this.log,
         })
-        this.passRunner = new ManagedAccountPassRunner({
+        this.passRunner = new ManagedAccountMatchingRunner({
             config: this.config,
             log: this.log,
             managedAccountAnalyzer: this.managedAccountAnalyzer,
