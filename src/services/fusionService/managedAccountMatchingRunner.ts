@@ -68,14 +68,14 @@ export class ManagedAccountMatchingRunner {
 
         for (let i = 0; i < accounts.length; i += batchSize) {
             const batch = accounts.slice(i, i + batchSize)
-            const phaseAResults = await Promise.all(
+            const identityResults = await Promise.all(
                 batch.map((account) =>
                     this.state.managedAccountAnalyzer.scoreIdentityCandidates(account)
                 )
             )
 
-            for (let j = 0; j < phaseAResults.length; j++) {
-                const analysis = phaseAResults[j]
+            for (let j = 0; j < identityResults.length; j++) {
+                const analysis = identityResults[j]
                 const account = batch[j]
                 processedCount++
                 logProgress()
