@@ -1,0 +1,112 @@
+import { AccountV2025 as Account } from 'sailpoint-api-client'
+import { PhaseTimer } from '../logService'
+import type { FusionConfig } from '../../model/config'
+import type { LogService } from '../logService'
+import type { ManagedAccountAnalyzer, ManagedAccountAnalysisContext } from './managedAccountAnalyzer'
+import type { CandidateRegistry } from './candidateRegistry'
+import { yieldToEventLoop } from './batching'
+import { hasNewUnmatchedPeerMatches as checkHasNewUnmatchedPeerMatches } from './helpers'
+
+export interface ManagedAccountPassRunnerState {
+    readonly config: FusionConfig
+    readonly log: LogService
+    readonly managedAccountAnalyzer: ManagedAccountAnalyzer
+    readonly candidateRegistry: CandidateRegistry
+    processAccount(account: Account): Promise<any>
+}
+
+export type ManagedAccountPassResolution = 'identity-match' | 'deferred-match' | 'non-match'
+
+export interface ManagedAccountPassResult {
+    analysis: ManagedAccountAnalysisContext
+    resolution: ManagedAccountPassResolution
+}
+
+interface PendingDeferred {
+    analysis: ManagedAccountAnalysisContext
+    account: Account
+}
+
+export class ManagedAccountPassRunner {
+    constructor(private readonly state: ManagedAccountPassRunnerState) {}
+
+    async execute(
+        accounts: Account[],
+        batchSize: number,
+        managedAccountProcessingStartedAt: number
+    ): Promise<ManagedAccountPassResult[]> {
+        const initialQueueSize = accounts.length
+        let processedCount = 0
+        const results: ManagedAccountPassResult[] = []
+
+        const logProgressEvery = Math.max(
+            1,
+            Math.min(batchSize, initialQueueSize)
+        )
+
+        const logProgress = (): void => {
+            if (
+                processedCount === 1 ||
+                processedCount % logProgressEvery === 0 ||
+                processedCount === initialQueueSize
+            ) {
+                this.state.log.info(
+                    `Managed accounts progress: ${processedCount}/${initialQueueSize} analyzed | RUN ELAPSED ${PhaseTimer.formatElapsed(
+                        Date.now() - managedAccountProcessingStartedAt
+                    )}`
+                )
+            }
+        }
+
+        const hasDeferredMatching = (account: Account): boolean => {
+            return this.state.managedAccountAnalyzer.isDeferredMatchingEnabledForSource(
+                account.sourceName ?? undefined
+            )
+        }
+
+        const pendingDeferred: PendingDeferred[] = []
+
+        for (let i = 0; i < accounts.length; i += batchSize) {
+            const batch = accounts.slice(i, i + batchSize)
+            const phaseAResults = await Promise.all(
+                batch.map((account) =>
+                    this.state.managedAccountAnalyzer.analyzeIdentityPhase(account)
+                )
+            )
+
+            for (let j = 0; j < phaseAResults.length; j++) {
+                const analysis = phaseAResults[j]
+                const account = batch[j]
+                processedCount++
+                logProgress()
+
+                if (analysis.hasIdentityBackedMatches) {
+                    results.push({ analysis, resolution: 'identity-match' })
+                } else if (hasDeferredMatching(account)) {
+                    this.state.candidateRegistry.register(analysis.fusionAccount)
+                    pendingDeferred.push({ analysis, account })
+                } else {
+                    results.push({ analysis, resolution: 'non-match' })
+                }
+            }
+            await yieldToEventLoop()
+        }
+
+        for (let i = 0; i < pendingDeferred.length; i += batchSize) {
+            const batch = pendingDeferred.slice(i, i + batchSize)
+            await Promise.all(
+                batch.map(async (pending) => {
+                    await this.state.managedAccountAnalyzer.analyzeDeferredPhase(pending.analysis)
+                    if (checkHasNewUnmatchedPeerMatches(pending.analysis.fusionAccount)) {
+                        results.push({ analysis: pending.analysis, resolution: 'deferred-match' })
+                    } else {
+                        results.push({ analysis: pending.analysis, resolution: 'non-match' })
+                    }
+                })
+            )
+            await yieldToEventLoop()
+        }
+
+        return results
+    }
+}

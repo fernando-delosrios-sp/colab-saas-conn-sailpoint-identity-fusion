@@ -1,0 +1,175 @@
+import { describe, it, expect, vi } from 'vitest'
+import { ManagedAccountPassRunner, ManagedAccountPassRunnerState } from '../managedAccountPassRunner'
+import { CandidateRegistry } from '../candidateRegistry'
+import { SourceType } from '../../../model/config'
+
+function makeRunner(overrides: Partial<ManagedAccountPassRunnerState> = {}): {
+    runner: ManagedAccountPassRunner
+    state: ManagedAccountPassRunnerState
+    analyzeIdentityPhase: ReturnType<typeof vi.fn>
+    analyzeDeferredPhase: ReturnType<typeof vi.fn>
+    processAccount: ReturnType<typeof vi.fn>
+    candidateRegistry: CandidateRegistry
+} {
+    const candidateRegistry = new CandidateRegistry({
+        fusionAccountMap: new Map(),
+        sourcesByName: new Map(),
+        log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+    })
+    const analyzeIdentityPhase = vi.fn()
+    const analyzeDeferredPhase = vi.fn()
+    const processAccount = vi.fn()
+    const state: ManagedAccountPassRunnerState = {
+        config: { managedAccountsBatchSize: 10 } as any,
+        log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+        managedAccountAnalyzer: {
+            analyzeIdentityPhase,
+            analyzeDeferredPhase,
+            isDeferredMatchingEnabledForSource: vi.fn().mockReturnValue(true),
+        } as any,
+        candidateRegistry,
+        processAccount,
+        ...overrides,
+    }
+    const runner = new ManagedAccountPassRunner(state)
+    return { runner, state, analyzeIdentityPhase, analyzeDeferredPhase, processAccount, candidateRegistry }
+}
+
+function makeAccount(name: string, sourceName: string = 'Source A'): any {
+    return { name, sourceName, id: `id-${name}`, nativeIdentity: `nat-${name}` }
+}
+
+describe('ManagedAccountPassRunner', () => {
+    it('returns identity-match for matched account', async () => {
+        const { runner, analyzeIdentityPhase } = makeRunner()
+        const fusionAccount = { isMatch: true } as any
+        analyzeIdentityPhase.mockResolvedValue({
+            account: { name: 'acct1', sourceName: 'Source A' },
+            fusionAccount,
+            sourceInfo: undefined,
+            sourceType: SourceType.Authoritative,
+            fusionIdentityComparisons: 5,
+            hasIdentityBackedMatches: true,
+        })
+        const results = await runner.execute([makeAccount('acct1')], 10, Date.now())
+        expect(results).toHaveLength(1)
+        expect(results[0].resolution).toBe('identity-match')
+        expect(results[0].analysis.hasIdentityBackedMatches).toBe(true)
+    })
+
+    it('returns non-match for non-deferred unmatched account', async () => {
+        const { runner, analyzeIdentityPhase } = makeRunner()
+        analyzeIdentityPhase.mockResolvedValue({
+            account: { name: 'acct1', sourceName: 'Source A' },
+            fusionAccount: { isMatch: false } as any,
+            sourceInfo: undefined,
+            sourceType: SourceType.Authoritative,
+            fusionIdentityComparisons: 5,
+            hasIdentityBackedMatches: false,
+        })
+        ;(runner as any).state.managedAccountAnalyzer.isDeferredMatchingEnabledForSource.mockReturnValue(false)
+        const results = await runner.execute([makeAccount('acct1')], 10, Date.now())
+        expect(results).toHaveLength(1)
+        expect(results[0].resolution).toBe('non-match')
+    })
+
+    it('queues deferred-pending and runs pass 2 for deferred-matched account', async () => {
+        const sources = new Map()
+        sources.set('Source A', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
+        const fusionMap = new Map()
+        const candidateRegistry = new CandidateRegistry({
+            fusionAccountMap: fusionMap,
+            sourcesByName: sources,
+            log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+        })
+        const analyzeIdentityPhase = vi.fn()
+        const analyzeDeferredPhase = vi.fn()
+        const fusionAccount = {
+            managedKey: 'src-a::nat-1',
+            sourceName: 'Source A',
+            isMatch: false,
+            fusionMatches: [],
+        } as any
+        fusionMap.set('src-a::nat-1', fusionAccount)
+        analyzeIdentityPhase.mockResolvedValue({
+            account: { name: 'acct1', sourceName: 'Source A', sourceId: 'src-a', nativeIdentity: 'nat-1' },
+            fusionAccount,
+            sourceInfo: undefined,
+            sourceType: SourceType.Authoritative,
+            fusionIdentityComparisons: 5,
+            hasIdentityBackedMatches: false,
+        })
+        analyzeDeferredPhase.mockImplementation((analysis: any) => {
+            analysis.fusionAccount.fusionMatches = [{ candidateType: 'new-unmatched', identityName: 'peer', scores: [] }]
+        })
+        const runner = new ManagedAccountPassRunner({
+            config: { managedAccountsBatchSize: 10 } as any,
+            log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+            managedAccountAnalyzer: { analyzeIdentityPhase, analyzeDeferredPhase, isDeferredMatchingEnabledForSource: vi.fn().mockReturnValue(true) } as any,
+            candidateRegistry,
+            processAccount: vi.fn(),
+        })
+        const results = await runner.execute([makeAccount('acct1')], 10, Date.now())
+        expect(results).toHaveLength(1)
+        expect(results[0].resolution).toBe('deferred-match')
+        expect(analyzeDeferredPhase).toHaveBeenCalledTimes(1)
+    })
+
+    it('registers candidate in pass 1 for deferred-pending accounts', async () => {
+        const sources = new Map()
+        sources.set('Source A', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
+        const fusionMap = new Map()
+        const candidateRegistry = new CandidateRegistry({
+            fusionAccountMap: fusionMap,
+            sourcesByName: sources,
+            log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+        })
+        const analyzeIdentityPhase = vi.fn()
+        const fusionAccount = {
+            managedKey: 'src-a::nat-1',
+            sourceName: 'Source A',
+            isMatch: false,
+            fusionMatches: [],
+        } as any
+        fusionMap.set('src-a::nat-1', fusionAccount)
+        analyzeIdentityPhase.mockResolvedValue({
+            account: { name: 'acct1', sourceName: 'Source A', sourceId: 'src-a', nativeIdentity: 'nat-1' },
+            fusionAccount,
+            sourceInfo: undefined,
+            sourceType: SourceType.Authoritative,
+            fusionIdentityComparisons: 5,
+            hasIdentityBackedMatches: false,
+        })
+        const runner = new ManagedAccountPassRunner({
+            config: { managedAccountsBatchSize: 10 } as any,
+            log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+            managedAccountAnalyzer: { analyzeIdentityPhase, analyzeDeferredPhase: vi.fn(), isDeferredMatchingEnabledForSource: vi.fn().mockReturnValue(true) } as any,
+            candidateRegistry,
+            processAccount: vi.fn(),
+        })
+        await runner.execute([makeAccount('acct1')], 10, Date.now())
+        expect([...candidateRegistry.queryForSource('Source A')]).toHaveLength(1)
+    })
+
+    it('handles empty input', async () => {
+        const { runner } = makeRunner()
+        const results = await runner.execute([], 10, Date.now())
+        expect(results).toHaveLength(0)
+    })
+
+    it('respects batch boundaries', async () => {
+        const { runner, analyzeIdentityPhase } = makeRunner()
+        analyzeIdentityPhase.mockResolvedValue({
+            account: { name: 'acct', sourceName: 'Source A' },
+            fusionAccount: { isMatch: true } as any,
+            sourceInfo: undefined,
+            sourceType: SourceType.Authoritative,
+            fusionIdentityComparisons: 1,
+            hasIdentityBackedMatches: true,
+        })
+        const accounts = Array.from({ length: 5 }, (_, i) => makeAccount(`acct${i}`))
+        const results = await runner.execute(accounts, 2, Date.now())
+        expect(results).toHaveLength(5)
+        expect(results.every((r) => r.resolution === 'identity-match')).toBe(true)
+    })
+})
