@@ -6,7 +6,7 @@ import { FusionMatch } from '../services/scoringService'
 import { FusionAccountState } from './fusionAccountState'
 import type { FusionManagedAccountInfo, IdentityInfo } from './fusionAccountTypes'
 import { buildIdentityInfo } from './fusionAccountUtils'
-import { setIdentityIdAttribute } from './fusionAccountRules/constructionRules'
+import { IDENTITIES_SOURCE_NAME, setIdentityIdAttribute } from './fusionAccountRules/constructionRules'
 import {
     addFusionDecisionLayer,
     addFusionMatch,

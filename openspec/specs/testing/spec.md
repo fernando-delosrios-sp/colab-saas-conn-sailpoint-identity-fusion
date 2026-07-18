@@ -23,3 +23,23 @@ The project's automated test suite MUST execute under Vitest, not Jest. All file
 - **THEN** the test environment is `node`
 - **AND** the include patterns cover both `src/**/__tests__/**/*.test.ts` and `src/**/*.test.ts`
 - **AND** the same fixture and harness directories excluded by the prior `jest.config.js` remain excluded via the `exclude` glob
+
+### Requirement: Test file conventions
+
+Test files SHALL follow the project's testing conventions for naming, placement, and configuration.
+
+#### Scenario: Test files use correct naming
+- **WHEN** a developer creates a test file
+- **THEN** the file is named `*.test.ts`
+
+#### Scenario: Test files are placed in correct directories
+- **WHEN** a developer creates a test file
+- **THEN** the file is placed in a `__tests__/` directory alongside the code it tests
+
+#### Scenario: Vitest globals are used
+- **WHEN** a developer writes a test file
+- **THEN** the test uses Vitest globals (describe, it, expect, etc.) without explicit imports
+
+#### Scenario: Test timeout is respected
+- **WHEN** a developer writes a test
+- **THEN** the test respects the 180s timeout configured in vitest.config.ts
