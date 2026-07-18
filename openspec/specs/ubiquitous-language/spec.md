@@ -13,10 +13,12 @@ This spec is the master reference for the project's domain vocabulary. `docs/con
 `openspec/specs/ubiquitous-language/spec.md` SHALL be the authoritative source for canonical domain terms, definitions, and usage rules. `docs/concepts/glossary.md` and all other artifacts SHALL reflect the definitions in this spec.
 
 #### Scenario: Glossary entry conflicts with spec
+
 - **WHEN** a glossary entry uses a different definition or term than this spec
 - **THEN** the glossary MUST be updated to match this spec
 
 #### Scenario: Code uses a term not defined in the spec
+
 - **WHEN** a developer introduces a new domain term in code or documentation
 - **THEN** the term SHALL be added to this spec before it is used elsewhere
 
@@ -25,10 +27,12 @@ This spec is the master reference for the project's domain vocabulary. `docs/con
 All new domain terms, states, or classifications SHALL be defined in this spec before they are used in code, configuration, or documentation.
 
 #### Scenario: Introducing a new account state
+
 - **WHEN** a new account state or processing outcome is introduced
 - **THEN** it SHALL be defined in this spec with a precise name, definition, and usage rule before appearing in code or configuration
 
 #### Scenario: Introducing a new candidate type
+
 - **WHEN** a new candidate type or classification is introduced
 - **THEN** it SHALL be defined in this spec before it is used in types, APIs, or dry-run output
 
@@ -37,14 +41,17 @@ All new domain terms, states, or classifications SHALL be defined in this spec b
 Source code SHALL use the canonical terms from this spec for variable names, function names, type names, class names, file names, and comments.
 
 #### Scenario: Variable naming follows ubiquitous language
+
 - **WHEN** a developer declares a variable representing a domain concept
 - **THEN** the variable name SHALL match the canonical term (e.g., `fusionAccount`, not `consolidatedAccount`; `managedSourceAccount`, not `rawAccount`)
 
 #### Scenario: Function naming follows ubiquitous language
+
 - **WHEN** a developer creates a function that operates on domain concepts
 - **THEN** the function name SHALL use canonical terms (e.g., `scoreIdentityCandidates`, not `analyzeIdentityPhase`; `hasDeferredMatches`, not `hasNewUnmatchedPeerMatches`)
 
 #### Scenario: Type naming follows ubiquitous language
+
 - **WHEN** a developer defines a type, enum, or class for a domain concept
 - **THEN** the type name SHALL use canonical terms (e.g., `MatchCandidateType.Deferred`, not `NewUnmatched`; `ManagedAccountMatchingRunner`, not `ManagedAccountPassRunner`)
 
@@ -53,10 +60,12 @@ Source code SHALL use the canonical terms from this spec for variable names, fun
 Connector configuration (`connector-spec.json`, settings definitions, and UI labels) SHALL use canonical terms for field names, labels, help text, and option values.
 
 #### Scenario: Configuration field naming
+
 - **WHEN** a configuration field represents a domain concept
 - **THEN** the field name and label SHALL use the canonical term
 
 #### Scenario: Configuration help text
+
 - **WHEN** help text explains a configuration option
 - **THEN** the help text SHALL use canonical terms consistently
 
@@ -65,10 +74,12 @@ Connector configuration (`connector-spec.json`, settings definitions, and UI lab
 All documentation (`docs/`, `README.md`, inline comments) SHALL use canonical terms consistently. Retired terms (such as `consolidated account`, `raw account`, `pass`, or `new-unmatched`) SHALL be replaced with their canonical successors.
 
 #### Scenario: Guide documentation
+
 - **WHEN** a guide explains a concept or process
 - **THEN** the guide SHALL use canonical terms (e.g., "Fusion account", not "consolidated account"; "deferred candidate", not "new-unmatched peer")
 
 #### Scenario: Operation documentation
+
 - **WHEN** an operation is documented
 - **THEN** the documentation SHALL use canonical terms for inputs, outputs, phases, sweeps, and behavior
 
@@ -77,10 +88,12 @@ All documentation (`docs/`, `README.md`, inline comments) SHALL use canonical te
 AI agents (via `.agents/AGENTS.md` and related instructions) SHALL be instructed to use canonical terms when generating code, documentation, or configuration.
 
 #### Scenario: Agent generates code
+
 - **WHEN** an AI agent generates or modifies code
 - **THEN** the agent SHALL use canonical terms for identifiers and comments
 
 #### Scenario: Agent generates documentation
+
 - **WHEN** an AI agent generates or modifies documentation
 - **THEN** the agent SHALL use canonical terms consistently and SHALL retire outdated synonyms
 
@@ -89,14 +102,17 @@ AI agents (via `.agents/AGENTS.md` and related instructions) SHALL be instructed
 Code, configuration, and documentation SHALL use the account taxonomy defined in this spec and SHALL distinguish between ISC accounts, managed source accounts, Fusion accounts, Fusion identities, identity-origin Fusion accounts, and provisional Fusion accounts.
 
 #### Scenario: Referring to an incoming source account
+
 - **WHEN** describing an account fetched from a configured Fusion source
 - **THEN** the term "managed source account" SHALL be used, not "raw account" or "source record"
 
 #### Scenario: Referring to a pre-decision Fusion account
+
 - **WHEN** describing a Fusion account created from a managed source account before its match fate is decided
 - **THEN** the term "provisional Fusion account" SHALL be used
 
 #### Scenario: Referring to a Fusion account seeded from an identity
+
 - **WHEN** describing a Fusion account created from an existing ISC identity rather than a managed source account
 - **THEN** the term "identity-origin Fusion account" SHALL be used, not "identity-based Fusion account"
 
@@ -105,14 +121,17 @@ Code, configuration, and documentation SHALL use the account taxonomy defined in
 The terms **operation**, **phase**, and **sweep** SHALL be used as defined in this spec. Generic terms such as "run", "pass", or "round" SHALL NOT be used when a more precise term applies.
 
 #### Scenario: Naming a connector entry point
+
 - **WHEN** referring to a connector entry point such as `std:account:list` or `custom:dryrun`
 - **THEN** the term "operation" SHALL be used (e.g., "accountList operation", "dryRun operation")
 
 #### Scenario: Naming a major pipeline stage
+
 - **WHEN** referring to a major stage of an operation pipeline
 - **THEN** the term "phase" SHALL be used (e.g., "managed accounts phase")
 
 #### Scenario: Naming a focused account traversal
+
 - **WHEN** referring to a traversal of a set of accounts with a single purpose within a phase
 - **THEN** the term "sweep" SHALL be used, not "pass" or "round"
 
@@ -121,14 +140,17 @@ The terms **operation**, **phase**, and **sweep** SHALL be used as defined in th
 The terms **matching** and **scoring** SHALL be used as defined in this spec. Matching is the business process; scoring is the similarity-calculation technique it uses. The product step name remains **Match**.
 
 #### Scenario: Describing the business process
+
 - **WHEN** describing whether a new Fusion account potentially belongs to an existing identity
 - **THEN** the term "matching" SHALL be used
 
 #### Scenario: Describing the similarity calculation
+
 - **WHEN** describing the algorithmic computation of a similarity value
 - **THEN** the term "scoring" SHALL be used
 
 #### Scenario: Naming the product step
+
 - **WHEN** referring to the Map/Define/Match step in user-facing documentation
 - **THEN** the term "Match" (capitalized) SHALL be used
 
@@ -137,10 +159,12 @@ The terms **matching** and **scoring** SHALL be used as defined in this spec. Ma
 Candidate types SHALL be **identity** or **deferred**. The retired term `new-unmatched` and its wire value `new-unmatched` SHALL NOT be used.
 
 #### Scenario: Internal type naming
+
 - **WHEN** defining a candidate type enum or constant
 - **THEN** the value SHALL be `Deferred`, not `NewUnmatched`
 
 #### Scenario: Dry-run wire output
+
 - **WHEN** emitting candidate type in dry-run output
 - **THEN** the wire value SHALL be `deferred` and SHALL NOT be translated from another internal value
 
@@ -149,14 +173,17 @@ Candidate types SHALL be **identity** or **deferred**. The retired term `new-unm
 The term **aggregation** SHALL refer to the ISC source-refresh operation. When ambiguity is possible, the terms **managed source aggregation** or **Fusion source aggregation** SHALL be used. Generic "processing run" SHALL be replaced with the specific operation name.
 
 #### Scenario: Describing source refresh
+
 - **WHEN** describing an ISC source-refresh operation
 - **THEN** the term "aggregation" MAY be used
 
 #### Scenario: Distinguishing source refreshes
+
 - **WHEN** describing aggregation of a configured Fusion source versus a managed source
 - **THEN** the terms "Fusion source aggregation" or "managed source aggregation" SHALL be used
 
 #### Scenario: Describing a connector invocation
+
 - **WHEN** describing the execution of a connector entry point
 - **THEN** the specific operation name (e.g., "accountList operation") SHALL be used, not "processing run"
 
@@ -165,10 +192,12 @@ The term **aggregation** SHALL refer to the ISC source-refresh operation. When a
 Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or documentation. Retired terms include, but are not limited to: `consolidated account`, `raw account`, `identity-based Fusion account`, `pass`, `round`, `new-unmatched`, `NewUnmatched`, `analyzeIdentityPhase`, `analyzeDeferredPhase`, `hasNewUnmatchedPeerMatches`, and `ManagedAccountPassRunner`.
 
 #### Scenario: Code review discovers a retired term
+
 - **WHEN** a code review finds a retired term in identifiers or comments
 - **THEN** the contributor SHALL rename or rewrite it to use the canonical term
 
 #### Scenario: Documentation review discovers a retired term
+
 - **WHEN** a documentation review finds a retired term
 - **THEN** the contributor SHALL replace it with the canonical term
 
@@ -218,7 +247,7 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 | Term | Definition |
 |------|------------|
 | **Identity candidate** | A candidate for matching that is an existing ISC identity (or a Fusion identity already in the baseline). |
-| **Deferred candidate** | A candidate for matching that is another new unmatched managed source account from the same source in the same operation, causing identity creation to be deferred until the next aggregation. |
+| **Deferred candidate** | A candidate for matching that is another provisional Fusion account from the same source in the same operation, causing identity creation to be deferred until the next aggregation. |
 
 ### Source types
 
