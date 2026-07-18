@@ -70,7 +70,7 @@ export class ManagedAccountMatchingRunner {
             const batch = accounts.slice(i, i + batchSize)
             const phaseAResults = await Promise.all(
                 batch.map((account) =>
-                    this.state.managedAccountAnalyzer.analyzeIdentityPhase(account)
+                    this.state.managedAccountAnalyzer.scoreIdentityCandidates(account)
                 )
             )
 
@@ -96,7 +96,7 @@ export class ManagedAccountMatchingRunner {
             const batch = pendingDeferred.slice(i, i + batchSize)
             await Promise.all(
                 batch.map(async (pending) => {
-                    await this.state.managedAccountAnalyzer.analyzeDeferredPhase(pending.analysis)
+                    await this.state.managedAccountAnalyzer.scoreDeferredCandidates(pending.analysis)
                     if (checkHasNewUnmatchedPeerMatches(pending.analysis.fusionAccount)) {
                         results.push({ analysis: pending.analysis, resolution: 'deferred-match' })
                     } else {

@@ -6,8 +6,8 @@ import { SourceType } from '../../../model/config'
 function makeRunner(overrides: Partial<ManagedAccountMatchingRunnerState> = {}): {
     runner: ManagedAccountMatchingRunner
     state: ManagedAccountMatchingRunnerState
-    analyzeIdentityPhase: ReturnType<typeof vi.fn>
-    analyzeDeferredPhase: ReturnType<typeof vi.fn>
+    scoreIdentityCandidates: ReturnType<typeof vi.fn>
+    scoreDeferredCandidates: ReturnType<typeof vi.fn>
     processAccount: ReturnType<typeof vi.fn>
     candidateRegistry: CandidateRegistry
 } {
@@ -16,15 +16,15 @@ function makeRunner(overrides: Partial<ManagedAccountMatchingRunnerState> = {}):
         sourcesByName: new Map(),
         log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
     })
-    const analyzeIdentityPhase = vi.fn()
-    const analyzeDeferredPhase = vi.fn()
+    const scoreIdentityCandidates = vi.fn()
+    const scoreDeferredCandidates = vi.fn()
     const processAccount = vi.fn()
     const state: ManagedAccountMatchingRunnerState = {
         config: { managedAccountsBatchSize: 10 } as any,
         log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
         managedAccountAnalyzer: {
-            analyzeIdentityPhase,
-            analyzeDeferredPhase,
+            scoreIdentityCandidates,
+            scoreDeferredCandidates,
             isDeferredMatchingEnabledForSource: vi.fn().mockReturnValue(true),
         } as any,
         candidateRegistry,
@@ -32,7 +32,7 @@ function makeRunner(overrides: Partial<ManagedAccountMatchingRunnerState> = {}):
         ...overrides,
     }
     const runner = new ManagedAccountMatchingRunner(state)
-    return { runner, state, analyzeIdentityPhase, analyzeDeferredPhase, processAccount, candidateRegistry }
+    return { runner, state, scoreIdentityCandidates, scoreDeferredCandidates, processAccount, candidateRegistry }
 }
 
 function makeAccount(name: string, sourceName: string = 'Source A'): any {
@@ -41,9 +41,9 @@ function makeAccount(name: string, sourceName: string = 'Source A'): any {
 
 describe('ManagedAccountMatchingRunner', () => {
     it('returns identity-match for matched account', async () => {
-        const { runner, analyzeIdentityPhase } = makeRunner()
+        const { runner, scoreIdentityCandidates } = makeRunner()
         const fusionAccount = { isMatch: true } as any
-        analyzeIdentityPhase.mockResolvedValue({
+        scoreIdentityCandidates.mockResolvedValue({
             account: { name: 'acct1', sourceName: 'Source A' },
             fusionAccount,
             sourceInfo: undefined,
@@ -58,8 +58,8 @@ describe('ManagedAccountMatchingRunner', () => {
     })
 
     it('returns non-match for non-deferred unmatched account', async () => {
-        const { runner, analyzeIdentityPhase } = makeRunner()
-        analyzeIdentityPhase.mockResolvedValue({
+        const { runner, scoreIdentityCandidates } = makeRunner()
+        scoreIdentityCandidates.mockResolvedValue({
             account: { name: 'acct1', sourceName: 'Source A' },
             fusionAccount: { isMatch: false } as any,
             sourceInfo: undefined,
@@ -82,8 +82,8 @@ describe('ManagedAccountMatchingRunner', () => {
             sourcesByName: sources,
             log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
         })
-        const analyzeIdentityPhase = vi.fn()
-        const analyzeDeferredPhase = vi.fn()
+        const scoreIdentityCandidates = vi.fn()
+        const scoreDeferredCandidates = vi.fn()
         const fusionAccount = {
             managedKey: 'src-a::nat-1',
             sourceName: 'Source A',
@@ -91,7 +91,7 @@ describe('ManagedAccountMatchingRunner', () => {
             fusionMatches: [],
         } as any
         fusionMap.set('src-a::nat-1', fusionAccount)
-        analyzeIdentityPhase.mockResolvedValue({
+        scoreIdentityCandidates.mockResolvedValue({
             account: { name: 'acct1', sourceName: 'Source A', sourceId: 'src-a', nativeIdentity: 'nat-1' },
             fusionAccount,
             sourceInfo: undefined,
@@ -99,20 +99,20 @@ describe('ManagedAccountMatchingRunner', () => {
             fusionIdentityComparisons: 5,
             hasIdentityBackedMatches: false,
         })
-        analyzeDeferredPhase.mockImplementation((analysis: any) => {
+        scoreDeferredCandidates.mockImplementation((analysis: any) => {
             analysis.fusionAccount.fusionMatches = [{ candidateType: 'new-unmatched', identityName: 'peer', scores: [] }]
         })
         const runner = new ManagedAccountMatchingRunner({
             config: { managedAccountsBatchSize: 10 } as any,
             log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
-            managedAccountAnalyzer: { analyzeIdentityPhase, analyzeDeferredPhase, isDeferredMatchingEnabledForSource: vi.fn().mockReturnValue(true) } as any,
+            managedAccountAnalyzer: { scoreIdentityCandidates, scoreDeferredCandidates, isDeferredMatchingEnabledForSource: vi.fn().mockReturnValue(true) } as any,
             candidateRegistry,
             processAccount: vi.fn(),
         })
         const results = await runner.execute([makeAccount('acct1')], 10, Date.now())
         expect(results).toHaveLength(1)
         expect(results[0].resolution).toBe('deferred-match')
-        expect(analyzeDeferredPhase).toHaveBeenCalledTimes(1)
+        expect(scoreDeferredCandidates).toHaveBeenCalledTimes(1)
     })
 
     it('registers candidate in pass 1 for deferred-pending accounts', async () => {
@@ -124,7 +124,7 @@ describe('ManagedAccountMatchingRunner', () => {
             sourcesByName: sources,
             log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
         })
-        const analyzeIdentityPhase = vi.fn()
+        const scoreIdentityCandidates = vi.fn()
         const fusionAccount = {
             managedKey: 'src-a::nat-1',
             sourceName: 'Source A',
@@ -132,7 +132,7 @@ describe('ManagedAccountMatchingRunner', () => {
             fusionMatches: [],
         } as any
         fusionMap.set('src-a::nat-1', fusionAccount)
-        analyzeIdentityPhase.mockResolvedValue({
+        scoreIdentityCandidates.mockResolvedValue({
             account: { name: 'acct1', sourceName: 'Source A', sourceId: 'src-a', nativeIdentity: 'nat-1' },
             fusionAccount,
             sourceInfo: undefined,
@@ -143,7 +143,7 @@ describe('ManagedAccountMatchingRunner', () => {
         const runner = new ManagedAccountMatchingRunner({
             config: { managedAccountsBatchSize: 10 } as any,
             log: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
-            managedAccountAnalyzer: { analyzeIdentityPhase, analyzeDeferredPhase: vi.fn(), isDeferredMatchingEnabledForSource: vi.fn().mockReturnValue(true) } as any,
+            managedAccountAnalyzer: { scoreIdentityCandidates, scoreDeferredCandidates: vi.fn(), isDeferredMatchingEnabledForSource: vi.fn().mockReturnValue(true) } as any,
             candidateRegistry,
             processAccount: vi.fn(),
         })
@@ -158,8 +158,8 @@ describe('ManagedAccountMatchingRunner', () => {
     })
 
     it('respects batch boundaries', async () => {
-        const { runner, analyzeIdentityPhase } = makeRunner()
-        analyzeIdentityPhase.mockResolvedValue({
+        const { runner, scoreIdentityCandidates } = makeRunner()
+        scoreIdentityCandidates.mockResolvedValue({
             account: { name: 'acct', sourceName: 'Source A' },
             fusionAccount: { isMatch: true } as any,
             sourceInfo: undefined,
