@@ -1,7 +1,13 @@
 # recording-service Spec
 
+## Purpose
+
+The recording service captures the outcomes of managed-account analysis (matches, deferred peer matches, non-matches, and failures) into the aggregation tracker so they can be reported to downstream connector operations and aggregation consumers.
+
+## Requirements
+
 ### Requirement: Record managed account analysis for identity-backed matches
-The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL record an identity-backed match by pushing the `FusionAccount` into `tracker.matchAccounts` and logging match discovery information.
+The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL be called exactly once per managed account after the two-pass analysis (identity scoring + deferred peer scoring) completes. It SHALL record an identity-backed match by pushing the `FusionAccount` into `tracker.matchAccounts` and logging match discovery information. The method SHALL NOT be called during intermediate phases of the analysis pipeline.
 
 #### Scenario: Account has identity-backed matches
 - **WHEN** `recordAnalysis` is called with a `FusionAccount` whose `isMatch` is true and `hasIdentityBackedMatches` is true
@@ -11,7 +17,7 @@ The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL record an ident
 ---
 
 ### Requirement: Record managed account analysis for deferred matches
-The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL record deferred match candidates into `tracker.deferredMatchReportData` when report data capture is enabled and the account is not identity-backed.
+The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL be called exactly once per managed account after the two-pass analysis completes. It SHALL record deferred match candidates into `tracker.deferredMatchReportData` when report data capture is enabled and the account has peer matches but no identity-backed matches.
 
 #### Scenario: Account has new unmatched peer matches
 - **WHEN** `recordAnalysis` is called with a `FusionAccount` whose `isMatch` is true, `hasIdentityBackedMatches` is false, and matches have candidate type `NewUnmatched`
@@ -20,15 +26,16 @@ The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL record deferred
 ---
 
 ### Requirement: Record managed account analysis for non-matches
-The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL record non-matching accounts into `tracker.analyzedNonMatchReportData` when report data capture is enabled and deferred matching is not active for authoritative sources.
+The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL be called exactly once per managed account after the two-pass analysis completes. It SHALL record non-matching accounts into `tracker.analyzedNonMatchReportData` when report data capture is enabled. The method SHALL NOT receive a `deferredPhaseExecuted` parameter; the caller guarantees both analysis phases are complete before recording.
 
 #### Scenario: Account does not match and report capture is enabled
 - **WHEN** `recordAnalysis` is called with a non-matching account and report data capture is enabled
 - **THEN** `tracker.analyzedNonMatchReportData` MUST receive a minimal fusion report account with comparison count and resolved report account id
 
-#### Scenario: Authoritative account is deferred
-- **WHEN** `recordAnalysis` is called with a non-matching authoritative account and deferred matching is enabled for the source
-- **THEN** the recorder MUST skip recording non-match report data for that account
+#### Scenario: Account recorded once regardless of deferred status
+- **WHEN** `recordAnalysis` is called with an account from a deferred-enabled source that did not match in either pass
+- **THEN** the recorder MUST record the non-match exactly once
+- **AND** the recorder MUST NOT check whether the account was deferred (the caller guarantees this)
 
 ---
 
@@ -39,15 +46,3 @@ The `ManagedAccountAnalysisRecorder.trackFailed` method SHALL record a failed ma
 - **WHEN** `trackFailed` is called with a `FusionAccount` and an error message
 - **THEN** a warning/error message MUST be logged
 - **AND** `tracker.failedMatchingAccounts` MUST contain a minimal fusion report account with the error message and resolved report account id
-
-## MODIFIED Requirements
-
-None.
-
-## REMOVED Requirements
-
-None.
-
-## RENAMED Requirements
-
-None.
