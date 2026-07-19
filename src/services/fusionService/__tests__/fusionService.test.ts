@@ -99,6 +99,18 @@ describe('FusionService', () => {
             get: vi.fn(() => new Map()),
             configurable: true,
         })
+
+        // Redirect fusionRun.managedAccountsById/ByIdentityId to mockSources getters
+        // so that test spies on mockSources flow through to production code accessing fusionRun directly.
+        Object.defineProperty(fusionRun, 'managedAccountsById', {
+            get: () => mockSources.managedAccountsById,
+            configurable: true,
+        })
+        Object.defineProperty(fusionRun, 'managedAccountsByIdentityId', {
+            get: () => mockSources.managedAccountsByIdentityId,
+            configurable: true,
+        })
+
         Object.defineProperty(mockSources, 'managedAccountsAllById', {
             get: vi.fn(() => new Map()),
             configurable: true,

@@ -113,7 +113,7 @@ function countManagedAccountsByType(sources: ServiceRegistry['sources']): {
     let managedAccountsFoundRecord = 0
     let managedAccountsFoundOrphan = 0
 
-    for (const account of sources.managedAccountsById.values()) {
+    for (const account of sources.fusionRun.managedAccountsById.values()) {
         const sourceType = sources.getSourceByNameSafe(account.sourceName)?.sourceType ?? SourceType.Authoritative
         if (sourceType === SourceType.Record) {
             managedAccountsFoundRecord++
@@ -125,7 +125,7 @@ function countManagedAccountsByType(sources: ServiceRegistry['sources']): {
     }
 
     return {
-        managedAccountsFound: sources.managedAccountsById.size,
+        managedAccountsFound: sources.fusionRun.managedAccountsById.size,
         managedAccountsFoundAuthoritative,
         managedAccountsFoundRecord,
         managedAccountsFoundOrphan,
@@ -192,7 +192,7 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry, _options: C
     const processedFusionAccounts = await fusion.processFusionAccounts()
     refreshOp.done({ count: processedFusionAccounts.length })
 
-    log.info(`Refresh phase complete - ${sources.managedAccountsById.size} unprocessed account(s) remaining`)
+    log.info(`Refresh phase complete - ${sources.fusionRun.managedAccountsById.size} unprocessed account(s) remaining`)
 }
 
 /** Phase 4: Identity, decision, and managed account processing (including form reconciliation). */
@@ -232,7 +232,7 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
     log.info('Reconciling pending form state (candidates + reviewer links)')
     fusion.reconcilePendingFormState()
 
-    log.info(`Process phase complete - ${sources.managedAccountsById.size} unprocessed account(s) remaining`)
+    log.info(`Process phase complete - ${sources.fusionRun.managedAccountsById.size} unprocessed account(s) remaining`)
 }
 
 /** Phase 5: Unique attribute refresh. */
@@ -246,7 +246,7 @@ export async function uniqueAttributesPhase(
     const count = await fusion.refreshUniqueAttributes()
     refreshOp.done({ count })
 
-    log.info(`Work queue processing complete - ${sources.managedAccountsById.size} unprocessed account(s) remaining`)
+    log.info(`Work queue processing complete - ${sources.fusionRun.managedAccountsById.size} unprocessed account(s) remaining`)
 }
 
 /**

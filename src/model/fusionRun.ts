@@ -18,7 +18,7 @@ export interface RunStateSnapshot {
 
 export class FusionRun {
     readonly managedAccountsById = new Map<string, Account>()
-    readonly managedAccountsByIdentityId = new Map<string, Account[]>()
+    readonly managedAccountsByIdentityId = new Map<string, Set<string>>()
     readonly fusionAccountMap = new Map<string, FusionAccount>()
     readonly fusionIdentityMap = new Map<string, FusionAccount>()
     readonly identityMap = new Map<string, IdentityDocument>()

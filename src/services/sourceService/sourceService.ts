@@ -128,7 +128,7 @@ export class SourceService {
         config: FusionConfig,
         private log: LogService,
         private client: ClientService,
-        private fusionRun: FusionRun
+        public fusionRun: FusionRun
     ) {
         this.config = config
         this.sources = config.sources

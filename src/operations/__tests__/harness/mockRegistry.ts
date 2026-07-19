@@ -58,6 +58,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
             return sourceConfigs.filter((sc) => sc.correlationMode === 'reverse')
         },
         managedSources: [],
+        fusionRun: { managedAccountsById: new Map() },
         managedAccountsById: new Map(),
         managedAccountsAllById: new Map(),
         managedAccountsByIdentityId: new Map(),

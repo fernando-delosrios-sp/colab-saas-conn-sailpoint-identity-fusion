@@ -35,10 +35,10 @@ function createRegistry() {
             hasFusionSource: true,
             fusionSourceOwner: { id: 'fusion-owner-1', type: 'IDENTITY' },
             fetchGlobalOwnerIdentityIds: vi.fn().mockResolvedValue(['fusion-owner-1']),
-            managedAccountsById: new Map<string, any>([
+            fusionRun: { managedAccountsById: new Map<string, any>([
                 ['acc-1', { id: 'acc-1', sourceName: 'HR' }],
                 ['acc-2', { id: 'acc-2', sourceName: 'IT' }],
-            ]),
+            ]) },
             fusionAccountCount: 2,
             fetchAllSources: vi.fn().mockResolvedValue(undefined),
             fetchFusionAccounts: vi.fn().mockResolvedValue(undefined),
@@ -438,7 +438,7 @@ describe('dryRun', () => {
 
     it('filters rows to exact-match entries when includeExact is true', async () => {
         const registry = createRegistry()
-        registry.sources.managedAccountsById.set('acc-3', { id: 'acc-3', sourceName: 'HR' })
+        registry.sources.fusionRun.managedAccountsById.set('acc-3', { id: 'acc-3', sourceName: 'HR' })
 
         registry.fusion.generateReport.mockImplementation(
             (tracker: any, _includeNonMatches?: boolean, stats?: Record<string, unknown>) => ({

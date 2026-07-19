@@ -1132,7 +1132,7 @@ export class FormService {
             return undefined
         }
 
-        const workQueue = this.sources.managedAccountsById
+        const workQueue = this.sources.fusionRun.managedAccountsById
         const allById = this.sources.managedAccountsAllById
         assert(workQueue, 'Managed accounts have not been loaded')
 
@@ -1151,11 +1151,11 @@ export class FormService {
             workQueue.delete(accountId)
             const identityId = account.identityId
             if (identityId) {
-                const accountIdsForIdentity = this.sources.managedAccountsByIdentityId.get(identityId)
+                const accountIdsForIdentity = this.sources.fusionRun.managedAccountsByIdentityId.get(identityId)
                 if (accountIdsForIdentity) {
                     accountIdsForIdentity.delete(accountId)
                     if (accountIdsForIdentity.size === 0) {
-                        this.sources.managedAccountsByIdentityId.delete(identityId)
+                        this.sources.fusionRun.managedAccountsByIdentityId.delete(identityId)
                     }
                 }
             }

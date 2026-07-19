@@ -24,7 +24,7 @@ function mockTrackedOperation(log: { metric: Mock }): { done: Mock; elapsedMs: M
 
 function createRegistry() {
     const registry = createMockRegistry()
-    registry.sources.managedAccountsById = new Map()
+    registry.sources.fusionRun.managedAccountsById = new Map()
     registry.sources.managedSources = []
     registry.sources.clearManagedAccounts = vi.fn()
     registry.sources.saveBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
@@ -78,7 +78,7 @@ describe('corePipeline phase split', () => {
             }),
         }
         const identities = { clear: vi.fn(() => callOrder.push('identities.clear')), identityCount: 0 }
-        const sources = { managedAccountsById: new Map() }
+        const sources = { fusionRun: { managedAccountsById: new Map() } }
         const log = { info: vi.fn(), metric: vi.fn(), track: vi.fn() }
         const trackedOp = mockTrackedOperation(log)
         log.track.mockReturnValue(trackedOp)
@@ -147,7 +147,7 @@ describe('corePipeline outputPhase', () => {
         const sources = {
             fetchManagedAccounts: vi.fn().mockResolvedValue(undefined),
             fetchFusionAccounts: vi.fn().mockResolvedValue(undefined),
-            managedAccountsById: new Map(),
+            fusionRun: { managedAccountsById: new Map() },
             managedSources: [],
             getSourceByNameSafe: vi.fn(),
             fusionAccountCount: 0,

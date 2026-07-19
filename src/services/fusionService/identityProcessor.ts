@@ -97,10 +97,10 @@ export class IdentityProcessor {
             fusionAccount.setNeedsReset(true)
             fusionAccount.setOriginIdentityInScope(true)
 
-            assert(this.fusionService.sources.managedAccountsById, 'Managed accounts have not been loaded')
+            assert(this.fusionService.fusionRun.managedAccountsById, 'Managed accounts have not been loaded')
             fusionAccount.addManagedAccountLayer(
-                this.fusionService.sources.managedAccountsById,
-                this.fusionService.sources.managedAccountsByIdentityId,
+                this.fusionService.fusionRun.managedAccountsById,
+                this.fusionService.fusionRun.managedAccountsByIdentityId,
                 this.fusionService.sources.managedAccountsAllById,
                 this.fusionService.shouldPruneDeletedManagedAccounts(),
                 false,

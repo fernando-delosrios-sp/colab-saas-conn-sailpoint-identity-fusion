@@ -149,8 +149,8 @@ export class DecisionProcessor {
             : undefined
 
         fusionAccount.addManagedAccountLayer(
-            this.fusionService.sources.managedAccountsById,
-            this.fusionService.sources.managedAccountsByIdentityId,
+            this.fusionService.fusionRun.managedAccountsById,
+            this.fusionService.fusionRun.managedAccountsByIdentityId,
             this.fusionService.sources.managedAccountsAllById,
             this.fusionService.shouldPruneDeletedManagedAccounts(),
             false,
@@ -169,7 +169,7 @@ export class DecisionProcessor {
             const sourceInfo = this.fusionService.sourcesByName.get(fusionDecision.account.sourceName)
             const decisionManagedKey = trimStr(fusionDecision.account.id) ?? ''
             const managedAccount = decisionManagedKey
-                ? this.fusionService.sources.managedAccountsById.get(decisionManagedKey)
+                ? this.fusionService.fusionRun.managedAccountsById.get(decisionManagedKey)
                 : undefined
             if (await this.fusionService.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccount)) {
                 if (sourceType === SourceType.Record) {

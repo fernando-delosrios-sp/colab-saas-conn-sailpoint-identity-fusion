@@ -12,9 +12,9 @@
 ## 2. Move State into FusionRun
 
 - [x] 2.1 Move managedAccountsById, managedAccountsByIdentityId from SourceService to FusionRun
-- [ ] 2.2 Move identityMap, identityCount from IdentityService to FusionRun
-- [ ] 2.3 Move fusionAccountMap, fusionIdentityMap from FusionService to FusionRun
-- [ ] 2.4 Move autoAssignedIdentityIds, linkedAccountKeyIndex, analysisRecorder from FusionService to FusionRun
+- [x] 2.2 Move identityMap, identityCount from IdentityService to FusionRun
+- [x] 2.3 Move fusionAccountMap, fusionIdentityMap from FusionService to FusionRun
+- [x] 2.4 Move autoAssignedIdentityIds, linkedAccountKeyIndex, analysisRecorder from FusionService to FusionRun
 - [ ] 2.5 Move sourcesByName, managedSources from SourceService to FusionRun
 - [ ] 2.6 Move form decisions and pending state from FormService to FusionRun
 - [ ] 2.7 Update all service methods to read/write FusionRun instead of internal fields
