@@ -216,10 +216,10 @@ export interface SourceConfig {
     correlationAttribute?: string
     correlationDisplayName?: string
     /**
-     * Deferred matching: after identity matching, also compare to other
-     * unmatched accounts from the same source in this operation. If the only strong match is
-     * such a deferred candidate, defer instead of creating another Fusion identity until the next aggregation.
-     * When false, skip that check (normal unmatched handling). Default true; disable
+     * Deferred candidate matching: after identity scoring, also compare to other
+     * provisional Fusion accounts from the same source in this operation. If the only strong match is
+     * a deferred candidate, defer instead of creating another Fusion identity until the next aggregation.
+     * When false, skip that check (normal non-matched handling). Default true; disable
      * when one person may appear as multiple accounts in a single aggregation.
      */
     deferredMatching?: boolean

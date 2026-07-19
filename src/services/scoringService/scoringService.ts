@@ -336,7 +336,7 @@ export class ScoringService {
     }
 
     /**
-     * Deferred matching compares a managed account against current-operation unmatched deferred candidates.
+     * Deferred candidate matching compares a managed account against current-operation non-matched deferred candidates.
      * Guard against accidental self-comparison to prevent a perfect self-match.
      */
     private isSameDeferredCandidate(fusionAccount: FusionAccount, fusionIdentity: FusionAccount): boolean {

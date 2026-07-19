@@ -397,7 +397,7 @@ An **enforced correlation role** is an automatically assigned ISC role that oper
 
 **Step 1–2: Aggregation and merging**
 
-When Account aggregation operations on the Fusion source:
+When an account aggregation operation runs on the Fusion source:
 
 1. If **Account aggregation mode** is set to **Aggregate before processing** for any source, trigger aggregation on those sources first
 2. Wait for source aggregations to complete (poll task status every 30 seconds, up to the per-source **Aggregation wait timeout (minutes)**)

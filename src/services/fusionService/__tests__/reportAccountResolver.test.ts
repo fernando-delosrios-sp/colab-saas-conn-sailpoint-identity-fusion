@@ -23,7 +23,7 @@ describe('reportAccountResolver', () => {
         expect(resolveReportAccountId(account, makeSources())).toBeUndefined()
     })
 
-    it('resolves a raw account id value', () => {
+    it('resolves a managed source account id value', () => {
         const sources = makeSources('resolved-isc')
         expect(resolveReportAccountIdValue('src::nat-1', sources)).toBe('resolved-isc')
         expect(sources.resolveIscAccountIdForManagedKey).toHaveBeenCalledWith('src::nat-1')

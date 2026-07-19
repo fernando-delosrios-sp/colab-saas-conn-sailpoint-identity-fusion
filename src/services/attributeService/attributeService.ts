@@ -720,7 +720,7 @@ export class AttributeService {
         }
 
         this.log.debug(
-            `Registered unique values from ${accounts.length} raw account(s) ` +
+            `Registered unique values from ${accounts.length} managed source account(s) ` +
             `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }

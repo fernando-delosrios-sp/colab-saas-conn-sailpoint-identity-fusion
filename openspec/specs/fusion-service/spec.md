@@ -180,7 +180,7 @@ Each rule module (`constructionRules`, `layerRules`, `statusRules`, `actionRules
 - **THEN** the getter returns `"test@example.com"`
 
 ### Requirement: FusionService SHALL own a CandidateRegistry collaborator
-The `FusionService` constructor MUST instantiate a `CandidateRegistry` with the fusion account map, sources-by-name map, and log. The registry SHALL be the single source of truth for per-source unmatched candidate registration and query during the two-pass managed account analysis lifecycle.
+The `FusionService` constructor MUST instantiate a `CandidateRegistry` with the fusion account map, sources-by-name map, and log. The registry SHALL be the single source of truth for per-source unmatched candidate registration and query during the two-sweep managed account analysis lifecycle.
 
 #### Scenario: Registry is wired in constructor
 - **WHEN** `FusionService` is constructed
@@ -188,10 +188,10 @@ The `FusionService` constructor MUST instantiate a `CandidateRegistry` with the 
 - **AND** the instance is assigned to `this.candidateRegistry`
 
 ### Requirement: CandidateRegistry SHALL register accounts keyed by source
-The `CandidateRegistry.register` method MUST add the given `FusionAccount`'s managed key to the candidate set for that account's source. Only accounts from authoritative sources with deferred matching enabled SHALL be registered.
+The `CandidateRegistry.register` method MUST add the given `FusionAccount`'s managed key to the candidate set for that account's source. Only accounts from authoritative sources with deferred candidate matching enabled SHALL be registered.
 
 #### Scenario: Deferred-enabled authoritative account is registered
-- **WHEN** `register` is called with a `FusionAccount` whose source is authoritative and deferred-matching-enabled
+- **WHEN** `register` is called with a `FusionAccount` whose source is authoritative and deferred-candidate-matching-enabled
 - **THEN** the account's managed key is added to the candidate set for that source
 
 #### Scenario: Non-authoritative account is not registered
@@ -220,52 +220,52 @@ The `CandidateRegistry.clear` method MUST reset all registered candidates. Fusio
 - **WHEN** `initializeManagedAccountProcessing` runs
 - **THEN** `candidateRegistry.clear()` is called, resetting all candidate sets
 
-### Requirement: FusionService SHALL own a ManagedAccountPassRunner collaborator
-The `FusionService` constructor MUST instantiate a `ManagedAccountPassRunner` with a dependency-inverted state interface. The runner SHALL NOT reference `FusionService` directly.
+### Requirement: FusionService SHALL own a ManagedAccountMatchingRunner collaborator
+The `FusionService` constructor MUST instantiate a `ManagedAccountMatchingRunner` with a dependency-inverted state interface. The runner SHALL NOT reference `FusionService` directly.
 
 #### Scenario: Runner is wired in constructor
 - **WHEN** `FusionService` is constructed
-- **THEN** a `ManagedAccountPassRunner` instance is created with a `ManagedAccountPassRunnerState` containing `config`, `log`, `managedAccountAnalyzer`, `candidateRegistry`, and `processAccount`
+- **THEN** a `ManagedAccountMatchingRunner` instance is created with a `ManagedAccountMatchingRunnerState` containing `config`, `log`, `managedAccountAnalyzer`, `candidateRegistry`, and `processAccount`
 - **AND** the runner has no direct reference to `FusionService`
 
-### Requirement: ManagedAccountPassRunner SHALL execute two-pass analysis
-The runner's `execute` method MUST: (Pass 1) run identity-phase analysis on all accounts in parallel batches, classify results as identity-match, deferred-pending, or non-match, and register deferred-pending candidates; (Pass 2) run deferred-phase analysis on all pending accounts in parallel batches, classifying results as deferred-match or non-match.
+### Requirement: ManagedAccountMatchingRunner SHALL execute two-sweep analysis
+The runner's `execute` method MUST: (identity scoring sweep) run identity-phase analysis on all accounts in parallel batches, classify results as identity-match, deferred-pending, or non-match, and register deferred-pending candidates; (deferred scoring sweep) run deferred-phase analysis on all pending accounts in parallel batches, classifying results as deferred-match or non-match.
 
 #### Scenario: Identity match produces identity-match result
-- **WHEN** Pass 1 identity scoring produces `hasIdentityBackedMatches: true`
+- **WHEN** identity scoring produces `hasIdentityBackedMatches: true`
 - **THEN** the runner emits a result with resolution `identity-match`
 
-#### Scenario: Deferred-enabled unmatched account is queued for Pass 2
-- **WHEN** an account from a deferred-matching-enabled authoritative source has no identity match after Pass 1
+#### Scenario: Deferred-enabled unmatched account is queued for deferred scoring sweep
+- **WHEN** an account from a deferred-candidate-matching-enabled authoritative source has no identity match after identity scoring sweep
 - **THEN** the account is registered as a candidate via `candidateRegistry.register`
-- **AND** the account is queued for Pass 2
+- **AND** the account is queued for deferred scoring sweep
 
 #### Scenario: Non-deferred unmatched account produces non-match
-- **WHEN** an account from a source WITHOUT deferred matching has no identity match after Pass 1
+- **WHEN** an account from a source WITHOUT deferred candidate matching has no identity match after identity scoring sweep
 - **THEN** the result has resolution `non-match`
 
-#### Scenario: Peer match in Pass 2 produces deferred-match result
-- **WHEN** Pass 2 deferred scoring produces a peer match with candidate type `NewUnmatched`
+#### Scenario: Deferred candidate match in deferred scoring sweep produces deferred-match result
+- **WHEN** deferred scoring produces a deferred candidate match with candidate type `Deferred`
 - **THEN** the result has resolution `deferred-match`
 
-#### Scenario: No peer match in Pass 2 produces non-match result
-- **WHEN** Pass 2 deferred scoring produces no match
+#### Scenario: No deferred candidate match in deferred scoring sweep produces non-match result
+- **WHEN** deferred scoring produces no match
 - **THEN** the result has resolution `non-match`
 
-#### Scenario: Pass 2 runs in parallel batches
-- **WHEN** Pass 2 has 50 pending accounts and batch size is 10
+#### Scenario: Deferred scoring sweep runs in parallel batches
+- **WHEN** the deferred scoring sweep has 50 pending accounts and batch size is 10
 - **THEN** deferred scoring runs in 5 parallel batches of 10
-- **AND** each account scores against per-source candidates registered during Pass 1
+- **AND** each account scores against per-source candidates registered during identity scoring sweep
 
-### Requirement: ManagedAccountPassRunner SHALL return structured results without side effects
-The `execute` method MUST NOT call `recordAnalysis` or any dispatch handler. It MUST return an array of `ManagedAccountPassResult` objects, each containing the `ManagedAccountAnalysisContext` and a `resolution` string.
+### Requirement: ManagedAccountMatchingRunner SHALL return structured results without side effects
+The `execute` method MUST NOT call `recordAnalysis` or any dispatch handler. It MUST return an array of `ManagedAccountMatchingResult` objects, each containing the `ManagedAccountAnalysisContext` and a `resolution` string.
 
 #### Scenario: Runner returns clean results
 - **WHEN** `execute` completes
-- **THEN** an array of `ManagedAccountPassResult` objects is returned
+- **THEN** an array of `ManagedAccountMatchingResult` objects is returned
 - **AND** no calls to `recordAnalysis`, `handleIdentityBackedMatch`, `handleDeferredMatch`, or `handleNonMatch` are made
 
-### Requirement: ManagedAccountPassRunner SHALL report progress during execution
+### Requirement: ManagedAccountMatchingRunner SHALL report progress during execution
 The runner MUST log progress at intervals matching current behavior (first account, every log-every-N accounts, final account) including processed count and elapsed time.
 
 #### Scenario: Progress is logged at intervals

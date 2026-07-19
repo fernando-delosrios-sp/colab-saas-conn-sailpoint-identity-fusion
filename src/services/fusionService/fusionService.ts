@@ -1044,7 +1044,7 @@ export class FusionService {
     }
 
     /**
-     * Deferred matching.
+     * Deferred candidate matching.
      *
      * Default is enabled to preserve existing behavior unless explicitly disabled
      * per-source via config.
