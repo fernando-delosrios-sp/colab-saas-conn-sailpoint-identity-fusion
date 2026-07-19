@@ -96,7 +96,7 @@ Configure **Source Settings → Sources** to specify which sources contribute ac
 | ---------------------------------------- | ----------------------------------- | --------------------------- | -------------------------------------------------------- |
 | **Source name**                          | Exact ISC source name               | Always (required)           | Case-sensitive; verify in Admin → Connections → Sources  |
 | **Account aggregation mode**             | **Do not aggregate**                | Default; faster             | Uses existing account data                               |
-| **Account aggregation mode**             | **Aggregate before processing**     | Real-time accuracy critical | Each Fusion run triggers fresh source aggregation first  |
+| **Account aggregation mode**             | **Aggregate before processing**     | Real-time accuracy critical | Each Fusion source aggregation operation triggers fresh source aggregation first  |
 | **Account aggregation mode**             | **Delayed aggregation**             | Non-blocking refresh        | Refreshes source accounts after Fusion returns results   |
 | **Account filter**                       | Empty                               | Default; all accounts       | Leave empty initially                                    |
 | **Account filter**                       | `attributes.accountType:"employee"` | Subset of accounts          | Filter by account attribute                              |
