@@ -45,6 +45,7 @@ import { DecisionProcessor } from './decisionProcessor'
 import { ManagedAccountAnalyzer } from './managedAccountAnalyzer'
 import { CandidateRegistry } from './candidateRegistry'
 import { ManagedAccountMatchingRunner } from './managedAccountMatchingRunner'
+import { FusionRun } from '../../model/fusionRun'
 
 // ============================================================================
 // FusionService Class
@@ -61,15 +62,14 @@ export class FusionService {
     public correlationManager: CorrelationManager
     private decisionProcessor: DecisionProcessor
     private managedAccountAnalyzer: ManagedAccountAnalyzer
-    private analysisRecorder: ManagedAccountAnalysisRecorder
     private candidateRegistry: CandidateRegistry
     private matchingRunner: ManagedAccountMatchingRunner
 
     public get fusionIdentityMap(): Map<string, FusionAccount> {
-        return this._repository.fusionIdentityMap
+        return this.fusionRun.fusionIdentityMap
     }
     public get fusionAccountMap(): Map<string, FusionAccount> {
-        return this._repository.fusionAccountMap
+        return this.fusionRun.fusionAccountMap
     }
     public get _reviewersBySourceId(): Map<string, Set<FusionAccount>> {
         return this._repository.reviewersBySourceId
@@ -78,16 +78,16 @@ export class FusionService {
         return this._repository.sourcesWithoutReviewers
     }
     public get currentRunNonMatchedFusionManagedKeysBySource(): Map<string, Set<string>> {
-        return this._repository.currentRunNonMatchedFusionManagedKeysBySource
+        return this.fusionRun.currentRunNonMatchedKeysBySource
     }
     public get autoAssignedIdentityIds(): Set<string> {
-        return this._repository.autoAssignedIdentityIds
+        return this.fusionRun.autoAssignedIdentityIds
     }
     public get _linkedAccountKeyIndex(): Set<string> | undefined {
-        return this._repository.linkedAccountKeyIndex
+        return this.fusionRun.linkedAccountKeyIndex
     }
     public set _linkedAccountKeyIndex(value: Set<string> | undefined) {
-        this._repository.linkedAccountKeyIndex = value
+        this.fusionRun.linkedAccountKeyIndex = value
     }
 
     private _tracker?: AggregationTracker
@@ -105,8 +105,6 @@ export class FusionService {
     public readonly commandType?: StandardCommand
     /** Connector operation name (e.g. {@link OperationContext.AccountList}) — used when SDK commandType alone is ambiguous. */
     private readonly operationContext?: OperationContext
-    /** Accumulates Match scoring duration within a single managed-account analysis sweep. */
-    private currentRunMatchScoringMs = 0
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -133,16 +131,17 @@ export class FusionService {
         public attributes: AttributeService,
         public scoring: ScoringService,
         public schemas: SchemaService,
+        private fusionRun: FusionRun,
         commandType?: StandardCommand,
         operationContext?: OperationContext
     ) {
-        this._repository = new FusionAccountRepository(log)
+        this._repository = new FusionAccountRepository(log, this.fusionRun)
         this.identityProcessor = new IdentityProcessor(this)
         this.correlationManager = new CorrelationManager(this)
         this.decisionProcessor = new DecisionProcessor(this)
         this.managedAccountAnalyzer = new ManagedAccountAnalyzer(this)
         this.candidateRegistry = new CandidateRegistry({
-            fusionAccountMap: this._repository.fusionAccountMap,
+            fusionAccountMap: this.fusionRun.fusionAccountMap,
             sourcesByName: this.sourcesByName,
             log: this.log,
         })
@@ -160,7 +159,7 @@ export class FusionService {
         this.fusionReportOnAggregation = config.fusionReportOnAggregation ?? false
         this.reportAttributes = config.fusionFormAttributes ?? []
         this.urlContext = createUrlContext(config.baseurl)
-        this.analysisRecorder = new ManagedAccountAnalysisRecorder({
+        this.fusionRun.analysisRecorder = new ManagedAccountAnalysisRecorder({
             log: this.log,
             tracker: () => this.tracker,
             urlContext: this.urlContext,
@@ -738,7 +737,7 @@ export class FusionService {
             managedAccountProcessingStartedAt
         )
         for (const result of results) {
-            this.analysisRecorder.recordAnalysis(result.analysis)
+            this.fusionRun.analysisRecorder!.recordAnalysis(result.analysis)
             const { fusionAccount, account, sourceInfo, sourceType } = result.analysis
             switch (result.resolution) {
                 case 'identity-match':
@@ -824,7 +823,7 @@ export class FusionService {
         )
         if (results.length === 0) return undefined
         const result = results[0]
-        this.analysisRecorder.recordAnalysis(result.analysis)
+        this.fusionRun.analysisRecorder!.recordAnalysis(result.analysis)
         const { fusionAccount, sourceInfo: analysisSourceInfo, sourceType: analysisSourceType } = result.analysis
         switch (result.resolution) {
             case 'identity-match':
@@ -951,7 +950,7 @@ export class FusionService {
                     !reviewers || reviewers.size === 0
                         ? 'Match review form was not created: no reviewers available for this source'
                         : `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
-                this.analysisRecorder.trackFailed(fusionAccount, message)
+                this.fusionRun.analysisRecorder!.trackFailed(fusionAccount, message)
             } else {
                 const eligibleReviewerCount = [...(reviewers ?? [])].filter((r) => r.identityId).length
                 if (eligibleReviewerCount > 0 && outcome.newReviewInstancesQueued === 0) {
@@ -962,7 +961,7 @@ export class FusionService {
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            this.analysisRecorder.trackFailed(fusionAccount, `Form creation failed: ${message}`)
+            this.fusionRun.analysisRecorder!.trackFailed(fusionAccount, `Form creation failed: ${message}`)
         }
         fusionAccount.clearFusionIdentityReferences()
         return undefined
@@ -1004,7 +1003,7 @@ export class FusionService {
     public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
-        this.currentRunMatchScoringMs = 0
+        this.fusionRun.matchScoringMs = 0
         const results: FusionAccount[] = []
 
         const accounts = [...map.values()]
@@ -1017,7 +1016,7 @@ export class FusionService {
         let processed = 0
         const yieldEveryManaged = getManagedAccountEventLoopYieldEvery(this.config)
         for (const result of runnerResults) {
-            this.analysisRecorder.recordAnalysis(result.analysis)
+            this.fusionRun.analysisRecorder!.recordAnalysis(result.analysis)
             const { fusionAccount, account } = result.analysis
             if (
                 fusionAccount.isMatch &&
@@ -1040,7 +1039,7 @@ export class FusionService {
     }
 
     public addMatchScoringTimeMs(ms: number): void {
-        this.currentRunMatchScoringMs += ms
+        this.fusionRun.matchScoringMs += ms
     }
 
     /**
@@ -1495,7 +1494,7 @@ export class FusionService {
         this.tracker.newManagedAccountsCount = map.size
         this.candidateRegistry.clear()
         this.autoAssignedIdentityIds.clear()
-        this.currentRunMatchScoringMs = 0
+        this.fusionRun.matchScoringMs = 0
 
         for (const fusionAccount of this.fusionAccountMap.values()) {
             this.candidateRegistry.register(fusionAccount)
@@ -1539,7 +1538,7 @@ export class FusionService {
             this._managedAccountProcessingStartedAt
         )
         this._managedAccountProcessingState = 'idle'
-        return { processed, matchScoringMs: this.currentRunMatchScoringMs }
+        return { processed, matchScoringMs: this.fusionRun.matchScoringMs }
     }
 
     /**

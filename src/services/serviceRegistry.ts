@@ -117,6 +117,7 @@ export class ServiceRegistry {
                 this.attributes,
                 this.scoring,
                 this.schemas,
+                this.fusionRun,
                 commandType,
                 operationContext as OperationContext | undefined
             )

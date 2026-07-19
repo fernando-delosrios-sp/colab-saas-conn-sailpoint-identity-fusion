@@ -5,36 +5,28 @@ import { getFusionIdentityConflictTrackingKey } from './helpers'
 import { mapValuesToArray } from './collections'
 import { LogService } from '../logService'
 import { AggregationTracker } from './aggregationTracker'
+import { FusionRun } from '../../model/fusionRun'
 
 export class FusionAccountRepository {
-    /**
-     * Maps ISC identity id to the Fusion account that became that identity.
-     * A Fusion identity is a Fusion account that has been promoted to an ISC identity.
-     */
-    public readonly fusionIdentityMap: Map<string, FusionAccount> = new Map()
-    public readonly fusionAccountMap: Map<string, FusionAccount> = new Map()
     public readonly reviewersBySourceId: Map<string, Set<FusionAccount>> = new Map()
     public readonly sourcesWithoutReviewers: Set<string> = new Set()
-    public readonly currentRunNonMatchedFusionManagedKeysBySource: Map<string, Set<string>> = new Map()
-    public readonly autoAssignedIdentityIds: Set<string> = new Set()
-    public linkedAccountKeyIndex: Set<string> | undefined
 
-    constructor(private log: LogService) {}
+    constructor(private log: LogService, private fusionRun: FusionRun) {}
 
     public get totalFusionAccountCount(): number {
-        return this.fusionIdentityMap.size + this.fusionAccountMap.size
+        return this.fusionRun.fusionIdentityMap.size + this.fusionRun.fusionAccountMap.size
     }
 
     public get fusionAccounts(): FusionAccount[] {
-        return mapValuesToArray(this.fusionAccountMap)
+        return mapValuesToArray(this.fusionRun.fusionAccountMap)
     }
 
     public get fusionIdentities(): Iterable<FusionAccount> {
-        return this.fusionIdentityMap.values()
+        return this.fusionRun.fusionIdentityMap.values()
     }
 
     public *fusionIdentitiesExcluding(excludeIds: ReadonlySet<string>): Iterable<FusionAccount> {
-        for (const identity of this.fusionIdentityMap.values()) {
+        for (const identity of this.fusionRun.fusionIdentityMap.values()) {
             if (!identity.identityId || !excludeIds.has(identity.identityId)) {
                 yield identity
             }
@@ -42,11 +34,11 @@ export class FusionAccountRepository {
     }
 
     public getFusionIdentity(identityId: string): FusionAccount | undefined {
-        return this.fusionIdentityMap.get(identityId)
+        return this.fusionRun.fusionIdentityMap.get(identityId)
     }
 
     public getFusionAccountByManagedKey(managedKey: string): FusionAccount | undefined {
-        return this.fusionAccountMap.get(managedKey)
+        return this.fusionRun.fusionAccountMap.get(managedKey)
     }
 
     public setFusionAccount(fusionAccount: FusionAccount, tracker?: AggregationTracker): void {
@@ -54,7 +46,7 @@ export class FusionAccountRepository {
         const hasIdentityId = hasValue(identityId)
 
         if (hasIdentityId && fusionAccount.type !== FusionAccountKind.Managed) {
-            const existingFusionAccount = this.fusionIdentityMap.get(identityId!)
+            const existingFusionAccount = this.fusionRun.fusionIdentityMap.get(identityId!)
             const existingKey = existingFusionAccount
                 ? getFusionIdentityConflictTrackingKey(existingFusionAccount)
                 : undefined
@@ -62,13 +54,13 @@ export class FusionAccountRepository {
             if (existingFusionAccount && existingKey !== incomingKey) {
                 this.trackConflictingFusionIdentity(identityId!, existingFusionAccount, fusionAccount, tracker)
             }
-            this.fusionIdentityMap.set(identityId!, fusionAccount)
+            this.fusionRun.fusionIdentityMap.set(identityId!, fusionAccount)
         } else {
             assert(
                 fusionAccount.managedKey,
                 'Fusion account must have a managedKey to be added to fusion account map'
             )
-            this.fusionAccountMap.set(fusionAccount.managedKey, fusionAccount)
+            this.fusionRun.fusionAccountMap.set(fusionAccount.managedKey, fusionAccount)
         }
     }
 
@@ -101,7 +93,7 @@ export class FusionAccountRepository {
     }
 
     public clearCurrentRunState(): void {
-        this.currentRunNonMatchedFusionManagedKeysBySource.clear()
-        this.autoAssignedIdentityIds.clear()
+        this.fusionRun.currentRunNonMatchedKeysBySource.clear()
+        this.fusionRun.autoAssignedIdentityIds.clear()
     }
 }
