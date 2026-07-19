@@ -38,7 +38,7 @@ export async function setupPhase(
     schema: any,
     options: CorePipelineOptions
 ): Promise<boolean> {
-    const { log, fusion, schemas, sources, attributes, config } = serviceRegistry
+    const { log, fusion, schemas, sources, define, config } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
     const isReset = fusion.isReset()
     const forceAttributeRefresh = isPersistent && config.forceAttributeRefresh
@@ -97,7 +97,7 @@ export async function setupPhase(
         aggregateManagedSourcesOp.done({ sources: sources.managedSources.length })
     }
 
-    await attributes.initializeCounters()
+    await define.initializeCounters()
     log.info('Attribute counters initialized')
 
     return true
@@ -299,10 +299,10 @@ async function sendAccountsToPlatform(
 }
 
 async function savePersistentState(
-    attributes: ServiceRegistry['attributes'],
+    define: ServiceRegistry['define'],
     sources: ServiceRegistry['sources']
 ): Promise<void> {
-    await attributes.saveState()
+    await define.saveState()
     await sources.saveBatchCumulativeCount()
 }
 
@@ -323,7 +323,7 @@ async function finalizeFormOperations(forms: ServiceRegistry['forms']): Promise<
 
 /** Phase 6: Cleanup, send accounts to platform, save state. Only mostly used by accountList. */
 export async function outputPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<number> {
-    const { log, fusion, forms, sources, attributes, messaging, res } = serviceRegistry
+    const { log, fusion, forms, sources, define, messaging, res } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
 
     if (process.env.RECORD_MODE !== 'true') {
@@ -354,7 +354,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     sendAccountsOp.done({ sent, eligible })
 
     const saveStateOp = log.track('outputPhase.savePersistentState')
-    await savePersistentState(attributes, sources)
+    await savePersistentState(define, sources)
     log.info('Attribute state saved')
     log.info('Batch cumulative count saved')
     saveStateOp.done()

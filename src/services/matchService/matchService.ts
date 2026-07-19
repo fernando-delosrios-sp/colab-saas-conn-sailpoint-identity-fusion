@@ -1,8 +1,8 @@
 import { FusionAccount } from '../../model/account'
 import { FusionConfig } from '../../model/config'
 import { LogService } from '../logService'
-import { ScoringService } from '../scoringService/scoringService'
-import { MatchCandidateType } from '../scoringService/types'
+import { ScoringService } from './scoringService'
+import { MatchCandidateType } from './types'
 
 export class MatchService {
     private readonly scoringService: ScoringService

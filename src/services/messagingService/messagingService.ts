@@ -15,7 +15,7 @@ import { normalizeLanguageCode } from './localization'
 import { IdentityService } from '../identityService'
 import { SourceService } from '../sourceService'
 import { FusionReport } from '../fusionService/types'
-import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
+import { isExactAttributeMatchScores } from '../matchService/exactMatch'
 import { readString } from '../../utils/safeRead'
 import {
     registerHandlebarsHelpers,

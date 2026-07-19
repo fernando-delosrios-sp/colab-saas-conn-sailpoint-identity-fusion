@@ -2,7 +2,7 @@ import { ConnectorError, StdAccountEnableInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
-import { ATTR_OPS_RESET } from '../services/attributeService/types'
+import { ATTR_OPS_RESET } from '../services/defineService/types'
 
 /**
  * Account enable operation - Re-enables a previously disabled fusion account.
@@ -29,21 +29,21 @@ import { ATTR_OPS_RESET } from '../services/attributeService/types'
  * @param input - SDK input containing the account identity to enable
  */
 export const accountEnable = async (serviceRegistry: ServiceRegistry, input: StdAccountEnableInput) => {
-    const { log, fusion, sources, schemas, attributes, res, identities } = serviceRegistry
+    const { log, fusion, sources, schemas, define, res, identities } = serviceRegistry
 
     try {
         log.info(`Enabling account: ${input.identity}`)
         assert(input.identity, 'Account identity is required')
         const timer = log.timer()
 
-        await attributes.initializeCounters()
+        await define.initializeCounters()
         await sources.fetchAllSources()
         await schemas.setFusionAccountSchema(input.schema)
         timer.phase('Step 1: Loading sources and schema')
 
         await sources.fetchFusionAccounts()
         // Bulk-register unique values directly from managed source accounts (lightweight, no FusionAccount hydration)
-        attributes.registerUniqueValuesFromManagedSourceAccounts(sources.fusionAccounts)
+        define.registerUniqueValuesFromManagedSourceAccounts(sources.fusionAccounts)
         // Still need preProcessFusionAccounts to populate the identity-linked Fusion account map
         const preProcessOp = log.track('FusionService.preProcessFusionAccounts')
         const preProcessedAccounts = await fusion.preProcessFusionAccounts()
@@ -59,7 +59,7 @@ export const accountEnable = async (serviceRegistry: ServiceRegistry, input: Std
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.managedKey}`)
 
-        await attributes.refreshUniqueAttributes(fusionAccount)
+        await define.refreshUniqueAttributes(fusionAccount)
         timer.phase('Step 3: Rebuilding target fusion account with fresh attributes')
 
         fusionAccount.enable()

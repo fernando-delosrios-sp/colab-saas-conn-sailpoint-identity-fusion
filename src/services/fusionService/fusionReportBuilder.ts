@@ -5,8 +5,8 @@ import {
     fusionReportMatchCandidateAccountFields,
     mapScoreReportsForFusionReport,
 } from './helpers'
-import { isExactAttributeMatchScores } from '../scoringService/exactMatch'
-import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../scoringService/scoringService'
+import { isExactAttributeMatchScores } from '../matchService/exactMatch'
+import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchService/scoringService'
 import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
 import { UrlContext } from '../../utils/url'
 import { SourceInfo, SourceService } from '../sourceService'

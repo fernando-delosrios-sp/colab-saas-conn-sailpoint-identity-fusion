@@ -18,7 +18,7 @@ import { IDENTITIES_SOURCE_NAME } from './constructionRules'
 import { addAccountId, removeMissingAccountId } from './collectionRules'
 import { setManual, setAuthorized, setUncorrelatedAccount } from './statusRules'
 import { addHistory, formatHistoryAccountInfo } from './historyRules'
-import { FusionMatch } from '../../services/scoringService'
+import { FusionMatch } from '../../services/matchService'
 import type { FusionAccount } from '../fusionAccount'
 import {
     preserveMissingAccountContext,

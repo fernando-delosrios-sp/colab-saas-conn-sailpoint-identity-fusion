@@ -6,11 +6,9 @@ import { LogService } from '../../logService'
 import { IdentityService } from '../../identityService'
 import { SourceService } from '../../sourceService'
 import { FormService } from '../../formService'
-import { AttributeService } from '../../attributeService'
 import { MapService } from '../../mapService'
 import { DefineService } from '../../defineService'
 import { MatchService } from '../../matchService'
-import { ScoringService } from '../../scoringService'
 import { SchemaService } from '../../schemaService'
 import { ServiceRegistry } from '../../serviceRegistry'
 import { FusionConfig, SourceType } from '../../../model/config'
@@ -26,11 +24,9 @@ vi.mock('../../logService')
 vi.mock('../../identityService')
 vi.mock('../../sourceService')
 vi.mock('../../formService')
-vi.mock('../../attributeService')
 vi.mock('../../mapService')
 vi.mock('../../defineService')
 vi.mock('../../matchService')
-vi.mock('../../scoringService')
 vi.mock('../../schemaService')
 
 describe('FusionService', () => {
@@ -42,10 +38,8 @@ describe('FusionService', () => {
     let mockIdentities: Mocked<IdentityService>
     let mockSources: Mocked<SourceService>
     let mockForms: Mocked<FormService>
-    let mockAttributes: Mocked<AttributeService>
     let mockMapService: Mocked<MapService>
     let mockDefineService: Mocked<DefineService>
-    let mockScoring: Mocked<ScoringService>
     let mockMatchService: Mocked<MatchService>
     let mockSchemas: Mocked<SchemaService>
     let mockConfig: FusionConfig
@@ -90,14 +84,6 @@ describe('FusionService', () => {
         ) as Mocked<FormService>
         const mockLocks = {} as any
         mockSchemas = new SchemaService(mockConfig, mockLog, mockSources, mockClient) as Mocked<SchemaService>
-        mockAttributes = new AttributeService(
-            mockConfig,
-            mockSchemas,
-            mockSources,
-            mockLog,
-            mockLocks
-        ) as Mocked<AttributeService>
-        mockScoring = new ScoringService(mockConfig, mockLog) as Mocked<ScoringService>
         mockMapService = new MapService(
             mockConfig,
             mockLog
@@ -189,9 +175,7 @@ describe('FusionService', () => {
             sources: mockSources,
             identities: mockIdentities,
             schemas: mockSchemas,
-            attributes: mockAttributes,
             forms: mockForms,
-            scoring: mockScoring,
             map: mockMapService,
             define: mockDefineService,
             match: mockMatchService,

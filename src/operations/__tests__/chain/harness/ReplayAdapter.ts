@@ -6,8 +6,9 @@ import { buildManagedAccountKey } from '../../../../model/managedAccountKey'
 import {
     processAttributeMapping as _processAttributeMapping,
     buildAttributeMappingConfig as _buildAttributeMappingConfig,
-} from '../../../../services/attributeService/helpers'
-import { AttributeService } from '../../../../services/attributeService/attributeService'
+} from '../../../../services/mapService/helpers'
+import { MapService } from '../../../../services/mapService/mapService'
+import { DefineService } from '../../../../services/defineService/defineService'
 import { SchemaService } from '../../../../services/schemaService/schemaService'
 import type { Mock } from 'vitest'
 
@@ -446,43 +447,30 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
 
     // Mock the fusion service behavior specifically for replay runs
     const activeFusionIdentities = new Map<string, any>()
-
-    const attributeService = new AttributeService(
+    const mapService = new MapService(
+        context.config as any,
+        registry.log,
+    )
+    const defineService = new DefineService(
         context.config as any,
         registry.schemas as any,
-        registry.sources as any,
-        registry.log as any,
-        {
-            withLock: async (key: string, fn: () => Promise<any>) => await fn(),
-        } as any
+        registry.log,
+        {} as any,
     )
-
-    registry.fusion.processFusionAccount = vi.fn().mockImplementation(async (account) => {
-        const fusionAccount = FusionAccount.fromFusionAccount(account)
-        if (account.identityId) {
-            const identity = registry.identities.getIdentityById(account.identityId)
-            if (identity) {
-                fusionAccount.addIdentityLayer(identity)
-            }
+    registry.fusion.refreshUniqueAttributes = vi.fn().mockResolvedValue(0)
+    registry.fusion.processFusionAccounts = vi.fn().mockImplementation(async () => {
+        const processed = []
+        const state = new EntityState(context)
+        const faList = state.getFusionAccounts()
+        for (const fusionAccount of faList) {
+            // Evaluate and map attributes using real MapService/DefineService logic
+            mapService.mapAttributes(fusionAccount, registry.fusion as any)
+            await defineService.refreshNormalAttributes(fusionAccount)
+            await defineService.refreshUniqueAttributes(fusionAccount)
+            defineService.refreshReverseCorrelationAttributes(fusionAccount)
+            processed.push(fusionAccount)
         }
-        fusionAccount.addManagedAccountLayer(
-            registry.sources.fusionRun.managedAccountsById,
-            registry.sources.fusionRun.managedAccountsByIdentityId,
-            registry.sources.managedAccountsAllById,
-            true,
-            true
-        )
-
-        // Force refresh in replay mode to ensure any state changes (like modified identities) propagate
-        fusionAccount.setNeedsRefresh(true)
-
-        // Evaluate and map attributes using real AttributeService logic
-        attributeService.mapAttributes(fusionAccount)
-        await attributeService.refreshNormalAttributes(fusionAccount)
-        await attributeService.refreshUniqueAttributes(fusionAccount)
-        attributeService.refreshReverseCorrelationAttributes(fusionAccount)
-
-        return fusionAccount
+        return processed
     })
 
     registry.fusion.processFusionAccounts = vi.fn().mockImplementation(async () => {
@@ -529,11 +517,11 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         // Force refresh to ensure attributes evaluate
         fusionAccount.setNeedsRefresh(true)
 
-        // Evaluate and map attributes using real AttributeService logic
-        attributeService.mapAttributes(fusionAccount)
-        await attributeService.refreshNormalAttributes(fusionAccount)
-        await attributeService.refreshUniqueAttributes(fusionAccount)
-        attributeService.refreshReverseCorrelationAttributes(fusionAccount)
+        // Evaluate and map attributes using real MapService/DefineService logic
+        mapService.mapAttributes(fusionAccount, registry.fusion as any)
+        await defineService.refreshNormalAttributes(fusionAccount)
+        await defineService.refreshUniqueAttributes(fusionAccount)
+        defineService.refreshReverseCorrelationAttributes(fusionAccount)
 
         activeFusionIdentities.set(identity.id, fusionAccount)
 

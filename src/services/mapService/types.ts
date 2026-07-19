@@ -1,1 +1,1 @@
-export { AttributeMappingConfig } from '../attributeService/types'
+export { AttributeMappingConfig } from '../defineService/types'

@@ -54,4 +54,16 @@ export class DefineService {
         this.log.debug(`DefineService.getSimpleKey for account: ${fusionAccount.name}`)
         return undefined
     }
+
+    public async initializeCounters(): Promise<void> {
+        this.log.debug('DefineService.initializeCounters')
+    }
+
+    public registerUniqueValuesFromManagedSourceAccounts(_fusionAccounts: Iterable<any>): void {
+        this.log.debug('DefineService.registerUniqueValuesFromManagedSourceAccounts')
+    }
+
+    public async saveState(): Promise<void> {
+        this.log.debug('DefineService.saveState')
+    }
 }

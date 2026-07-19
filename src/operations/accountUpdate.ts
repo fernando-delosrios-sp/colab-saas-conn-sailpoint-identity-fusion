@@ -5,7 +5,7 @@ import { FusionAttribute } from '../data/schema'
 import { FusionAction } from '../model/fusionAction'
 import { assert } from '../utils/assert'
 import { executeActions } from './actions'
-import { ATTR_OPS_NONE } from '../services/attributeService/types'
+import { ATTR_OPS_NONE } from '../services/defineService/types'
 
 /**
  * Account update operation - Applies entitlement changes (actions) to a fusion account.

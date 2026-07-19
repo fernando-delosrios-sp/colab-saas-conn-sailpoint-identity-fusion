@@ -12,7 +12,7 @@ import { FusionAccountKind } from '../../model/fusionAccountTypes'
 import { Attributes } from '@sailpoint/connector-sdk'
 import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
-import { hasValue, trimStr } from '../../utils/safeRead'
+import { trimStr } from '../../utils/safeRead'
 import { buildManagedAccountKey } from '../../model/managedAccountKey'
 import {
     velocitySnapshotSchemaId,
