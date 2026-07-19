@@ -335,7 +335,7 @@ describe('dryRun', () => {
                         fusionIdentityComparisons: 1,
                         matches: [
                             {
-                                identityName: 'Deferred candidate unmatched',
+                                identityName: 'Deferred candidate non-matched',
                                 isMatch: true,
                                 candidateType: 'deferred',
                                 scores: [],
