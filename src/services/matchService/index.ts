@@ -1,3 +1,3 @@
 export { MatchService } from './matchService'
-export type { FusionMatch, ScoreReport } from '../scoringService/types'
-export { MatchCandidateType } from '../scoringService/types'
+export type { FusionMatch, ScoreReport } from './types'
+export { MatchCandidateType } from './types'

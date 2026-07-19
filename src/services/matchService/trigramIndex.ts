@@ -1,6 +1,6 @@
 import { FusionAccount } from '../../model/account'
 import { missing } from '../../utils/safeRead'
-import { normalizeLIG3 } from './helpers'
+import { normalizeLIG3 } from './scoringHelpers'
 
 /**
  * Inverted trigram index: maps a 3-character window to the set of FusionAccounts

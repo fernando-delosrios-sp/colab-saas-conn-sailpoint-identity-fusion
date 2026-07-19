@@ -128,12 +128,12 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         scheduleDelayedAggregation: vi.fn().mockResolvedValue(undefined),
     }
 
-    const attributes = {
+    const define = {
         initializeCounters: vi.fn().mockResolvedValue(undefined),
         registerUniqueValuesFromManagedSourceAccounts: vi.fn(),
         refreshUniqueAttributes: vi.fn().mockResolvedValue(undefined),
         saveState: vi.fn().mockResolvedValue(undefined),
-    }
+}
 
     const fakeAdapter = new FakeApiAdapter(sourceConfigs as any)
     const client = new ClientService(fakeAdapter, null, { sources: sourceConfigs } as any, { info: vi.fn(), debug: vi.fn(), error: vi.fn(), warn: vi.fn() } as any)
@@ -155,7 +155,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         forms,
         fusion,
         messaging,
-        attributes,
+        define,
         client,
     } as any
 

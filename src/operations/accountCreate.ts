@@ -25,7 +25,7 @@ import { executeActions } from './actions'
  * @param input - SDK input containing the identity name and requested actions
  */
 export const accountCreate = async (serviceRegistry: ServiceRegistry, input: StdAccountCreateInput) => {
-    const { log, identities, sources, schemas, fusion, attributes, res } = serviceRegistry
+    const { log, identities, sources, schemas, fusion, define, res } = serviceRegistry
 
     let identityName: string | undefined
     try {
@@ -50,9 +50,9 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
 
         // 2. Fetch all fusion accounts and register unique attribute values
         await sources.fetchFusionAccounts()
-        await attributes.initializeCounters()
+        await define.initializeCounters()
         // Bulk-register unique values directly from managed source accounts (lightweight, no FusionAccount hydration)
-        attributes.registerUniqueValuesFromManagedSourceAccounts(sources.fusionAccounts)
+        define.registerUniqueValuesFromManagedSourceAccounts(sources.fusionAccounts)
         // Still need preProcessFusionAccounts to populate the identity-linked Fusion account map for duplicate checking
         const preProcessOp = log.track('FusionService.preProcessFusionAccounts')
         const preProcessedAccounts = await fusion.preProcessFusionAccounts()
@@ -67,7 +67,7 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
         log.debug(`Found fusion identity: ${fusionIdentity.managedKey}`)
         fusionIdentity.addStatus(StatusEntitlement.Requested, 'Status set by accountCreate operation')
 
-        await attributes.refreshUniqueAttributes(fusionIdentity)
+        await define.refreshUniqueAttributes(fusionIdentity)
         timer.phase('Step 3: Processing identity')
 
         const actions = normalizeActionTokens(input.attributes.actions)

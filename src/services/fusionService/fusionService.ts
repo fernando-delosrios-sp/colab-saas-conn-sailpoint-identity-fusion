@@ -15,8 +15,8 @@ import { createUrlContext, UrlContext } from '../../utils/url'
 import { mapValuesToArray, forEachBatched, compact } from './collections'
 import { FusionDecision } from '../../model/form'
 import { SchemaService } from '../schemaService'
-import { FusionMatch, MatchCandidateType } from '../scoringService/types'
-import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../scoringService/scoringService'
+import { FusionMatch, MatchCandidateType } from '../matchService/types'
+import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchService/scoringService'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats, OperationContext } from './types'
 import {
     batchProcess as batchProcessWithConfig,
@@ -35,7 +35,7 @@ import {
     hasIdentityCandidateMatches as checkHasIdentityCandidateMatches,
     hasDeferredCandidateMatches as checkHasDeferredCandidateMatches,
 } from './helpers'
-import { AttributeOperations } from '../attributeService/types'
+import { AttributeOperations } from '../defineService/types'
 import { getManagedAccountKeyFromAccount, normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 import { hasValue, trimStr } from '../../utils/safeRead'

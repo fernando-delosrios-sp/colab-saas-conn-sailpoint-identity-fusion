@@ -5,7 +5,7 @@ import {
     getAccountStringAttribute,
     getAccountAttribute,
 } from '../../utils/attributes'
-import { attrSplit } from '../../services/attributeService/helpers'
+import { attrSplit } from '../../services/mapService/helpers'
 import { FusionAttribute } from '../../data/schema'
 import { readString, trimStr } from '../../utils/safeRead'
 import { StatusEntitlement } from '../statusEntitlement'

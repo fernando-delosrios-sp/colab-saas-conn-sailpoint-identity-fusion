@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, vi } from 'vitest'
 import { MapService } from '../mapService'
 import { FusionRun } from '../../../model/fusionRun'
 import { FusionAccount } from '../../../model/account'

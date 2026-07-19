@@ -1,7 +1,7 @@
 import { assert } from '../../utils/assert'
 import { promiseAllBatched } from '../../services/fusionService/collections'
 import { FusionAccount } from '../../model/account'
-import { AttributeOperations } from '../../services/attributeService/types'
+import { AttributeOperations } from '../../services/defineService/types'
 import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
 import { FusionAttribute } from '../../data/schema'
 import { toSetFromAttribute as attributeToSet } from '../../utils/attributes'

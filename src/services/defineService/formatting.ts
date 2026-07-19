@@ -5,7 +5,7 @@ import { transliterate } from 'transliteration'
 import { v4 as uuidv4 } from 'uuid'
 type RenderContext = Record<string, any>
 import { logger } from '@sailpoint/connector-sdk'
-import { contextHelpers } from '../attributeService/contextHelpers'
+import { contextHelpers } from './contextHelpers'
 
 // Cache for compiled Velocity templates to avoid repeated parsing
 // Key: template expression, Value: compiled template

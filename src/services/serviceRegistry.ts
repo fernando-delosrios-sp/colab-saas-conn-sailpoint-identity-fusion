@@ -13,9 +13,7 @@ import { FormService } from './formService'
 import { MapService } from './mapService'
 import { DefineService } from './defineService'
 import { MatchService } from './matchService'
-import { AttributeService } from './attributeService'
 import { EntitlementService } from './entitlementService'
-import { ScoringService } from './scoringService'
 import { MessagingService } from './messagingService'
 import { ProxyService } from './proxyService'
 import { ReportService } from './reportService'
@@ -41,9 +39,7 @@ export class ServiceRegistry {
     public identities: IdentityService
     public schemas: SchemaService
     public forms: FormService
-    public attributes: AttributeService
     public entitlements: EntitlementService
-    public scoring: ScoringService
     public map: MapService
     public define: DefineService
     public match: MatchService
@@ -94,7 +90,6 @@ export class ServiceRegistry {
         // Initialize services that don't depend on others
         this.sources = context.sourceService ?? new SourceService(this.config, this.log, this.client, this.fusionRun)
         this.entitlements = context.entitlementService ?? new EntitlementService(this.sources)
-        this.scoring = context.scoringService ?? new ScoringService(this.config, this.log)
         this.identities =
             context.identityService ?? new IdentityService(this.config, this.log, this.client, this.sources, this.fusionRun)
         this.messaging =
@@ -107,9 +102,6 @@ export class ServiceRegistry {
         // Initialize services that depend on others (in dependency order)
         this.schemas = context.schemaService ?? new SchemaService(this.config, this.log, this.sources, this.identities)
         const commandType = context.commandType as StandardCommand | undefined
-        this.attributes =
-            context.attributesService ??
-            new AttributeService(this.config, this.schemas, this.sources, this.log, this.locks)
 
         // Initialize new services (Tasks 6-8)
         this.map = context.mapService ?? new MapService(this.config, this.log)

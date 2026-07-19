@@ -6,7 +6,7 @@ import {
     getFormOwner,
     resolveIdentitiesSelectLabel,
 } from '../helpers'
-import { MatchCandidateType } from '../../scoringService/types'
+import { MatchCandidateType } from '../../matchService/types'
 
 describe('formService helpers', () => {
     describe('countIdentityCandidateFusionMatches', () => {

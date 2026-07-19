@@ -26,7 +26,7 @@ import {
     extractCandidateIdsFromFormInput,
     getReviewerInfo,
 } from './formProcessor'
-import { FusionMatch } from '../scoringService/types'
+import { FusionMatch } from '../matchService/types'
 
 export type { PendingReviewFormContext,  PendingReviewAccountContext } from './types'
 

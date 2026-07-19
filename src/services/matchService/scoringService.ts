@@ -16,12 +16,13 @@ import {
     scoreLIG3Normalized,
     scoreNameMatcher,
     scoreNameMatcherNormalized,
-} from './helpers'
+} from './scoringHelpers'
 import { normalizeName as normalizeNameForMatcher } from './nameMatching'
 import { TrigramIndex, buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
 import { isExactAttributeMatchScores } from './exactMatch'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { LogService } from '../logService'
+
 import { missing, trimStr } from '../../utils/safeRead'
 
 /** Build a skipped ScoreReport without spreading the full MatchingConfig. */
