@@ -272,12 +272,12 @@ The runner MUST log progress at intervals matching current behavior (first accou
 - **WHEN** `execute` processes 100 accounts with log-every 20
 - **THEN** progress is logged at accounts 1, 20, 40, 60, 80, 100
 
-### Requirement: FusionService SHALL delegate uncorrelated pass to the runner
-`runUncorrelatedManagedAccountPass` MUST call `runner.execute()`, iterate results, call `recordAnalysis` once per result, and dispatch to the appropriate handler via a flat switch on resolution.
+### Requirement: FusionService SHALL delegate uncorrelated scoring sweep to the runner
+`runUncorrelatedManagedAccountSweep` MUST call `runner.execute()`, iterate results, call `recordAnalysis` once per result, and dispatch to the appropriate handler via a flat switch on resolution.
 
 #### Scenario: Runner is called with queued accounts
-- **WHEN** `runUncorrelatedManagedAccountPass` is called
-- **THEN** `passRunner.execute` is invoked with queued accounts, batch size, and start time
+- **WHEN** `runUncorrelatedManagedAccountSweep` is called
+- **THEN** `matchingRunner.execute` is invoked with queued accounts, batch size, and start time
 
 #### Scenario: Each result is recorded and dispatched
 - **WHEN** the runner returns results
@@ -291,11 +291,11 @@ The runner MUST log progress at intervals matching current behavior (first accou
 
 #### Scenario: Uncorrelated account processed via runner
 - **WHEN** `processManagedAccount` receives an uncorrelated account (`uncorrelated === true`)
-- **THEN** `passRunner.execute` is called with `[account]` and batch size 1
+- **THEN** `matchingRunner.execute` is called with `[account]` and batch size 1
 - **AND** the returned result is dispatched via `handleIdentityMatch`, `handleDeferredMatch`, or `handleNonMatch`
 
 ### Requirement: FusionService SHALL call recordAnalysis exactly once per account
-`recordAnalysis` SHALL be called exactly once for each account's analysis, after the runner returns. No account SHALL be recorded more than once during the managed account processing pass.
+`recordAnalysis` SHALL be called exactly once for each account's analysis, after the runner returns. No account SHALL be recorded more than once during the managed account processing sweep.
 
 #### Scenario: Record is called once per result
 - **WHEN** the runner returns N results
