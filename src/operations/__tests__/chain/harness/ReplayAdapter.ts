@@ -208,14 +208,14 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             set.add(key)
         }
     }
-    registry.sources.managedAccountsById = map
+    registry.sources.fusionRun.managedAccountsById = map
     registry.sources.managedAccountsAllById = new Map(map)
-    registry.sources.managedAccountsByIdentityId = byIdentity
+    registry.sources.fusionRun.managedAccountsByIdentityId = byIdentity
 
     registry.sources.fetchManagedAccounts = vi.fn().mockImplementation(async () => {
-        registry.sources.managedAccountsById = map
+        registry.sources.fusionRun.managedAccountsById = map
         registry.sources.managedAccountsAllById = new Map(map)
-        registry.sources.managedAccountsByIdentityId = byIdentity
+        registry.sources.fusionRun.managedAccountsByIdentityId = byIdentity
     })
 
     registry.sources.fetchManagedAccount = vi
@@ -228,14 +228,14 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             )
             if (account) {
                 const key = buildManagedAccountKey(account) || account.id
-                registry.sources.managedAccountsById.set(key, account)
+                registry.sources.fusionRun.managedAccountsById.set(key, account)
                 registry.sources.managedAccountsAllById.set(key, account)
                 const identityId = account.identityId || account.identity?.id
                 if (identityId) {
-                    let set = registry.sources.managedAccountsByIdentityId.get(identityId)
+                    let set = registry.sources.fusionRun.managedAccountsByIdentityId.get(identityId)
                     if (!set) {
                         set = new Set<string>()
-                        registry.sources.managedAccountsByIdentityId.set(identityId, set)
+                        registry.sources.fusionRun.managedAccountsByIdentityId.set(identityId, set)
                     }
                     set.add(key)
                 }
@@ -466,8 +466,8 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             }
         }
         fusionAccount.addManagedAccountLayer(
-            registry.sources.managedAccountsById,
-            registry.sources.managedAccountsByIdentityId,
+            registry.sources.fusionRun.managedAccountsById,
+            registry.sources.fusionRun.managedAccountsByIdentityId,
             registry.sources.managedAccountsAllById,
             true,
             true
@@ -519,8 +519,8 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         const fusionAccount = FusionAccount.fromIdentity(identity)
         fusionAccount.addIdentityLayer(identity)
         fusionAccount.addManagedAccountLayer(
-            registry.sources.managedAccountsById,
-            registry.sources.managedAccountsByIdentityId,
+            registry.sources.fusionRun.managedAccountsById,
+            registry.sources.fusionRun.managedAccountsByIdentityId,
             registry.sources.managedAccountsAllById,
             true,
             true

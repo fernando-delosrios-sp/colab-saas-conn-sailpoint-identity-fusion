@@ -44,6 +44,7 @@ export function createRegistry() {
             clearReverseCorrelationReadinessCache: vi.fn(),
             setupReverseCorrelationSources: vi.fn().mockImplementation((_schemaAttrNames: Set<string>) => Promise.resolve(0)),
             aggregateManagedSources: vi.fn().mockResolvedValue(undefined),
+            fusionRun: { managedAccountsById: new Map() },
         },
         schemas: {
             setFusionAccountSchema: vi.fn().mockResolvedValue(undefined),

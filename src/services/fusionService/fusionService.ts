@@ -131,7 +131,7 @@ export class FusionService {
         public attributes: AttributeService,
         public scoring: ScoringService,
         public schemas: SchemaService,
-        private fusionRun: FusionRun,
+        public fusionRun: FusionRun,
         commandType?: StandardCommand,
         operationContext?: OperationContext
     ) {
@@ -347,7 +347,7 @@ export class FusionService {
      * - Phase 4: processManagedAccounts processes only what remains (uncorrelated accounts)
      *
      * Each fusion account processes in parallel using Promise.all, but all share the same
-     * work queue (this.sources.managedAccountsById). As accounts are matched, they're
+     * work queue (this.fusionRun.managedAccountsById). As accounts are matched, they're
      * deleted from the queue via addManagedAccountLayer.
      *
      * Memory Optimization:
@@ -436,7 +436,7 @@ export class FusionService {
      * account's normal attribute values.
      *
      * Work Queue Integration:
-     * addManagedAccountLayer receives the direct reference to this.sources.managedAccountsById,
+     * addManagedAccountLayer receives the direct reference to this.fusionRun.managedAccountsById,
      * which is the shared work queue. As accounts are matched and processed, they're deleted
      * from the queue to prevent duplicate processing in later phases.
      *
@@ -460,7 +460,7 @@ export class FusionService {
                 `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
-        assert(this.sources.managedAccountsById, 'Managed accounts have not been loaded')
+        assert(this.fusionRun.managedAccountsById, 'Managed accounts have not been loaded')
 
         const reviewerSources = fusionAccount.listReviewerSources()
         reviewerSources.forEach((sourceId) => this.setReviewerForSource(fusionAccount, sourceId))
@@ -520,8 +520,8 @@ export class FusionService {
         // Pass direct reference to work queue - deletions will remove processed accounts
         // No snapshot or copy needed: JavaScript's event loop ensures atomic operations
         fusionAccount.addManagedAccountLayer(
-            this.sources.managedAccountsById,
-            this.sources.managedAccountsByIdentityId,
+            this.fusionRun.managedAccountsById,
+            this.fusionRun.managedAccountsByIdentityId,
             this.sources.managedAccountsAllById,
             this.shouldPruneDeletedManagedAccounts(),
             true,
@@ -646,7 +646,7 @@ export class FusionService {
      * - Phase 3: processIdentities removes accounts belonging to identities
      * - Phase 4: processManagedAccounts (this method) processes ONLY what remains
      *
-     * At this point, the work queue (this.sources.managedAccountsById) contains ONLY
+     * At this point, the work queue (this.fusionRun.managedAccountsById) contains ONLY
      * uncorrelated accounts that don't belong to any existing fusion account or identity.
      * These are the truly new accounts that need Match review.
      *
@@ -1001,7 +1001,7 @@ export class FusionService {
      * @returns Array of FusionAccount with match results populated for each
      */
     public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
-        const map = this.sources.managedAccountsById
+        const map = this.fusionRun.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
         this.fusionRun.matchScoringMs = 0
         const results: FusionAccount[] = []
@@ -1256,18 +1256,18 @@ export class FusionService {
      */
     private removeManagedAccountFromWorkQueue(account: Account): void {
         const id = getManagedAccountKeyFromAccount(account)
-        const byId = this.sources.managedAccountsById
+        const byId = this.fusionRun.managedAccountsById
         if (!id || !byId?.has(id)) {
             return
         }
         byId.delete(id)
         const identityId = account.identityId
         if (identityId) {
-            const idSet = this.sources.managedAccountsByIdentityId.get(identityId)
+            const idSet = this.fusionRun.managedAccountsByIdentityId.get(identityId)
             if (idSet) {
                 idSet.delete(id)
                 if (idSet.size === 0) {
-                    this.sources.managedAccountsByIdentityId.delete(identityId)
+                    this.fusionRun.managedAccountsByIdentityId.delete(identityId)
                 }
             }
         }
@@ -1485,7 +1485,7 @@ export class FusionService {
         if (this._managedAccountProcessingState !== 'idle') {
             throw new Error('Managed account processing already initialized')
         }
-        const map = this.sources.managedAccountsById
+        const map = this.fusionRun.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
 
         this._managedAccountProcessingBatchSize = Math.max(1, getManagedAccountsBatchSize(this.config))
@@ -1515,7 +1515,7 @@ export class FusionService {
     /** Correlated account sweep: resolve linked/correlated managed accounts before uncorrelated scoring. */
     public async processCorrelatedManagedAccounts(): Promise<void> {
         this.ensureManagedAccountProcessingInitialized()
-        const map = this.sources.managedAccountsById
+        const map = this.fusionRun.managedAccountsById
         await this.runCorrelatedAccountSweep(map)
         this._linkedAccountKeyIndex = undefined
     }
@@ -1526,7 +1526,7 @@ export class FusionService {
      */
     public async processUncorrelatedManagedAccounts(): Promise<{ processed: number; matchScoringMs: number }> {
         this.ensureManagedAccountProcessingInitialized()
-        const map = this.sources.managedAccountsById
+        const map = this.fusionRun.managedAccountsById
         const queuedAccounts = [...map.values()]
         const initialQueueSize = queuedAccounts.length
         this.log.info(

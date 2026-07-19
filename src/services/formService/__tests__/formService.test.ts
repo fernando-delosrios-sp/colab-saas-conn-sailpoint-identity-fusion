@@ -157,9 +157,11 @@ describe('FormService managed work queue synchronization', () => {
         const managedAccountsByIdentityId = new Map([[identityId, new Set([managedKey])]])
 
         const sources = {
-            managedAccountsById,
+            fusionRun: {
+                managedAccountsById,
+                managedAccountsByIdentityId,
+            },
             managedAccountsAllById,
-            managedAccountsByIdentityId,
         } as any
 
         const service = new FormService(
