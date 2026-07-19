@@ -23,13 +23,13 @@ function findIdentityIdForIscAccount(iscAccount: any, state: any): string | unde
             if (snapshot?.managedAccounts) {
                 if (Array.isArray(snapshot.managedAccounts)) {
                     allManaged.push(...snapshot.managedAccounts)
-                } else {
-                    for (const passAccounts of Object.values(snapshot.managedAccounts)) {
-                        if (Array.isArray(passAccounts)) {
-                            allManaged.push(...passAccounts)
-                        }
+            } else {
+                for (const sweepAccounts of Object.values(snapshot.managedAccounts)) {
+                    if (Array.isArray(sweepAccounts)) {
+                        allManaged.push(...sweepAccounts)
                     }
                 }
+            }
             }
             const ma = allManaged.find(
                 (m: any) =>
@@ -160,7 +160,7 @@ function ensureFusionAccountsPopulated(step: StepDefinition, context: ChainConte
 export function buildReplayContext(step: StepDefinition, context: ChainContext): ChainContext {
     ensureFusionAccountsPopulated(step, context)
     const state = context.state
-    const pass = step.pass ?? 1
+    const sweep = step.sweep ?? 1
 
     // Configure the shared configuration of FusionAccount with context configuration
     FusionAccount.configure(context.config as any)
@@ -192,7 +192,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         })) as any[]
     })
 
-    const managedAccounts = state.getManagedAccounts(pass)
+    const managedAccounts = state.getManagedAccounts(sweep)
     const map = new Map<string, unknown>()
     const byIdentity = new Map<string, Set<string>>()
     for (const account of managedAccounts) {
@@ -261,9 +261,9 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             if (Array.isArray(snapshot.managedAccounts)) {
                 allManaged.push(...snapshot.managedAccounts)
             } else {
-                for (const passAccounts of Object.values(snapshot.managedAccounts)) {
-                    if (Array.isArray(passAccounts)) {
-                        allManaged.push(...passAccounts)
+                for (const sweepAccounts of Object.values(snapshot.managedAccounts)) {
+                    if (Array.isArray(sweepAccounts)) {
+                        allManaged.push(...sweepAccounts)
                     }
                 }
             }
@@ -430,7 +430,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
                 config: src,
             }
         }
-        const ma = state.getManagedAccounts(pass).find((a: any) => a.sourceId === sourceId)
+        const ma = state.getManagedAccounts(sweep).find((a: any) => a.sourceId === sourceId)
         if (ma) {
             const name = ma.sourceName
             const configSrc = scenarioSources.find((s) => s.name === name)
@@ -540,15 +540,15 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         // Also add to state so that getISCAccount and output see it!
         const managedKey = fusionAccount.managedKey
         if (managedKey) {
-            const rawAccount = {
+            const stateFusionAccount = {
                 key: { simple: { id: managedKey } },
                 managedKey,
                 identityId: identity.id,
                 attributes: { ...fusionAccount.attributes },
                 disabled: fusionAccount.disabled,
             }
-            state.addFusionAccount(rawAccount)
-            console.log('processIdentity mock: added raw fusion account to state:', managedKey)
+            state.addFusionAccount(stateFusionAccount)
+            console.log('processIdentity mock: added fusion account to state:', managedKey)
         }
 
         return fusionAccount
@@ -590,12 +590,12 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         }
 
         const managedKey = fusionAccount.managedKey
-        const rawAccount = state.getFusionAccount(managedKey)
-        if (rawAccount) {
-            rawAccount.attributes = { ...fusionAccount.attributes }
-            rawAccount.disabled = fusionAccount.disabled
+        const stateFusionAccount = state.getFusionAccount(managedKey)
+        if (stateFusionAccount) {
+            stateFusionAccount.attributes = { ...fusionAccount.attributes }
+            stateFusionAccount.disabled = fusionAccount.disabled
         } else {
-            const newRaw: any = {
+            const newStateFusionAccount: any = {
                 key: fusionAccount.key || {
                     simple: {
                         id: managedKey,
@@ -606,9 +606,9 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
                 disabled: fusionAccount.disabled,
                 identityId: fusionAccount.identityId,
             }
-            state.addFusionAccount(newRaw)
-            fusionAccounts.push(newRaw)
-            fusionMap.set(managedKey, newRaw)
+            state.addFusionAccount(newStateFusionAccount)
+            fusionAccounts.push(newStateFusionAccount)
+            fusionMap.set(managedKey, newStateFusionAccount)
         }
 
         const attributes = registry.schemas.getFusionAttributeSubset(fusionAccount.attributes)

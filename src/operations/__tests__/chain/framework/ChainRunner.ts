@@ -6,7 +6,7 @@ import { ChainContext } from './ChainContext'
 export interface StepDefinition {
     id: string
     operation: string
-    pass?: number
+    sweep?: number
     description?: string
     input?: Record<string, unknown>
     expectedOutput?: unknown
@@ -208,7 +208,7 @@ export class ChainRunner {
             state: this.state,
             config: this.scenario.config as Record<string, unknown>,
             options: {
-                pass: step.pass ?? 1,
+                sweep: step.sweep ?? 1,
                 stepId: step.id,
             },
             scenario: this.scenario,

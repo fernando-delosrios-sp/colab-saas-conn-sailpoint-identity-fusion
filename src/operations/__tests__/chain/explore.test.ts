@@ -22,11 +22,11 @@ describe('Run and Inspect Step-1 Output', () => {
         registerStepFn('accountList', async (step, context) => {
             const replayCtx = buildReplayContext(step, context);
             const registry = replayCtx.registry as unknown as MockRegistry;
-            context.state.setPassIndex(step.pass ?? 1);
+            context.state.setSweepIndex(step.sweep ?? 1);
             await accountList(registry as any, (step.input ?? { schema: { attributes: [] } }) as any);
             return {
                 operation: step.operation,
-                pass: step.pass,
+                sweep: step.sweep,
                 outputs: collectOutputs(replayCtx),
             };
         });

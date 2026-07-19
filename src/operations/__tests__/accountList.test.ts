@@ -9,9 +9,9 @@ function createMockRegistry(sourceConfigs: SourceConfigLike[]) {
     return { registry, schemas, sources, identities, fusion }
 }
 
-function createTwoPassRegistry(scenario: AggregationScenario) {
-    const currentPass = { value: 'pass1' as 'pass1' | 'pass2' }
-    const dataByPass = scenario.passData
+function createTwoSweepRegistry(scenario: AggregationScenario) {
+    const currentSweep = { value: 'sweep1' as 'sweep1' | 'sweep2' }
+    const dataBySweep = scenario.sweepData
     const decisionHistory: string[][] = []
 
     const { registry, sources } = createMockRegistry(scenario.sourceConfigs)
@@ -25,9 +25,9 @@ function createTwoPassRegistry(scenario: AggregationScenario) {
     )
 
     sources.fetchManagedAccounts.mockImplementation(async () => {
-        const passData = dataByPass[currentPass.value]
+        const sweepData = dataBySweep[currentSweep.value]
         const map = new Map<string, { id: string; sourceName: string }>()
-        for (const account of passData.managedAccounts) {
+        for (const account of sweepData.managedAccounts) {
             map.set(account.id, account)
         }
         sources.managedAccountsById = map
@@ -36,15 +36,15 @@ function createTwoPassRegistry(scenario: AggregationScenario) {
 
     sources.fusionAccountCount = 2
     identities.fetchIdentities.mockImplementation(async () => {
-        identities.identityCount = dataByPass[currentPass.value].identitiesFound
+        identities.identityCount = dataBySweep[currentSweep.value].identitiesFound
     })
 
     forms.processFetchedFormData.mockImplementation(async () => {
-        decisionHistory.push([...dataByPass[currentPass.value].decisions])
+        decisionHistory.push([...dataBySweep[currentSweep.value].decisions])
     })
 
     fusion.forEachISCAccount.mockImplementation(async (sendFn: (account: unknown) => void) => {
-        const output = dataByPass[currentPass.value].outputAccounts
+        const output = dataBySweep[currentSweep.value].outputAccounts
         for (const account of output) {
             sendFn(account)
         }
@@ -59,8 +59,8 @@ function createTwoPassRegistry(scenario: AggregationScenario) {
         fusion,
         res,
         decisionHistory,
-        setPass: (pass: 'pass1' | 'pass2') => {
-            currentPass.value = pass
+        setSweep: (sweep: 'sweep1' | 'sweep2') => {
+            currentSweep.value = sweep
         },
     }
 }
@@ -185,32 +185,32 @@ describe('accountList setup phase', () => {
     })
 })
 
-describe('accountList two-pass aggregation lifecycle', () => {
+describe('accountList two-sweep aggregation lifecycle', () => {
     afterEach(() => {
         vi.restoreAllMocks()
     })
 
     it.each(aggregationScenarios)('$name', async (scenario) => {
-        const { registry, sources, forms, fusion, res, decisionHistory, setPass } = createTwoPassRegistry(scenario)
+        const { registry, sources, forms, fusion, res, decisionHistory, setSweep } = createTwoSweepRegistry(scenario)
         const input = { schema: { attributes: [] } } as any
 
-        setPass('pass1')
+        setSweep('sweep1')
         await accountList(registry, input)
 
         expect(forms.fetchFormInstances).toHaveBeenCalledTimes(1)
         expect(forms.processFetchedFormData).toHaveBeenCalledTimes(1)
         expect(fusion.processFusionIdentityDecisions).toHaveBeenCalledTimes(1)
         expect(sources.releaseProcessLock).toHaveBeenCalledTimes(1)
-        expect(res.send).toHaveBeenCalledTimes(scenario.passData.pass1.outputAccounts.length)
+        expect(res.send).toHaveBeenCalledTimes(scenario.sweepData.sweep1.outputAccounts.length)
         ;(res.send as Mock).mockClear()
-        setPass('pass2')
+        setSweep('sweep2')
         await accountList(registry, input)
 
         expect(forms.fetchFormInstances).toHaveBeenCalledTimes(2)
         expect(forms.processFetchedFormData).toHaveBeenCalledTimes(2)
         expect(fusion.processFusionIdentityDecisions).toHaveBeenCalledTimes(2)
         expect(sources.releaseProcessLock).toHaveBeenCalledTimes(2)
-        expect(decisionHistory).toEqual([scenario.passData.pass1.decisions, scenario.passData.pass2.decisions])
-        expect(res.send).toHaveBeenCalledTimes(scenario.passData.pass2.outputAccounts.length)
+        expect(decisionHistory).toEqual([scenario.sweepData.sweep1.decisions, scenario.sweepData.sweep2.decisions])
+        expect(res.send).toHaveBeenCalledTimes(scenario.sweepData.sweep2.outputAccounts.length)
     })
 })

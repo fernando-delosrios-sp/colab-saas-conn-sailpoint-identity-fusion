@@ -2,13 +2,13 @@ import { AggregationScenario } from './scenarioTypes'
 
 export const aggregationScenarios: AggregationScenario[] = [
     {
-        name: 'keeps pass1 pending decision and applies pass2 correlation output',
+        name: 'keeps sweep1 pending decision and applies sweep2 correlation output',
         sourceConfigs: [
             { name: 'HR', correlationMode: 'none', sourceType: 'authoritative' },
             { name: 'Payroll', correlationMode: 'none', sourceType: 'record' },
         ],
-        passData: {
-            pass1: {
+        sweepData: {
+            sweep1: {
                 identitiesFound: 1,
                 managedAccounts: [
                     { id: 'acct-1', sourceName: 'HR' },
@@ -17,7 +17,7 @@ export const aggregationScenarios: AggregationScenario[] = [
                 decisions: ['pending-review'],
                 outputAccounts: [],
             },
-            pass2: {
+            sweep2: {
                 identitiesFound: 1,
                 managedAccounts: [{ id: 'acct-1', sourceName: 'HR' }],
                 decisions: ['approved-correlate:id-1'],
@@ -26,16 +26,16 @@ export const aggregationScenarios: AggregationScenario[] = [
         },
     },
     {
-        name: 're-evaluates pass2 with rejection and keeps unmatched output empty',
+        name: 're-evaluates sweep2 with rejection and keeps non-matched output empty',
         sourceConfigs: [{ name: 'Contractor', correlationMode: 'none', sourceType: 'orphan' }],
-        passData: {
-            pass1: {
+        sweepData: {
+            sweep1: {
                 identitiesFound: 2,
                 managedAccounts: [{ id: 'acct-99', sourceName: 'Contractor' }],
                 decisions: ['pending-review'],
                 outputAccounts: [],
             },
-            pass2: {
+            sweep2: {
                 identitiesFound: 2,
                 managedAccounts: [{ id: 'acct-99', sourceName: 'Contractor' }],
                 decisions: ['rejected-new-identity:false'],
