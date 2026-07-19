@@ -36,7 +36,11 @@ A Fusion account created from a managed source account before its match fate has
 
 ### Operation
 
-A connector entry point such as `std:account:list` (the **accountList operation**) or `custom:dryrun` (the **dryRun operation**).
+A connector entry point such as `std:account:list` (the **accountList operation**) or `custom:dryrun` (the **dryRun operation**). The operation is the command definition.
+
+### Operation run
+
+A single execution or instance of an operation. A run is the execution of an operation.
 
 ### Phase
 

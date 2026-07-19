@@ -27,7 +27,7 @@ export function removeFusionReview(state: FusionAccountState, reviewUrl: string)
     }
 }
 
-/** Clear all fusion review URLs so they can be repopulated from the current operation. */
+/** Clear all fusion review URLs so they can be repopulated from the current run. */
 export function clearFusionReviews(state: FusionAccountState): void {
     state.reviews.clear()
     state.statuses.delete(StatusEntitlement.ActiveReviews)

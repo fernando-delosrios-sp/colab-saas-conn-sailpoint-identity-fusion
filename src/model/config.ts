@@ -217,7 +217,7 @@ export interface SourceConfig {
     correlationDisplayName?: string
     /**
      * Deferred candidate matching: after identity scoring, also compare to other
-     * provisional Fusion accounts from the same source in this operation. If the only strong match is
+     * provisional Fusion accounts from the same source in this run. If the only strong match is
      * a deferred candidate, defer instead of creating another Fusion identity until the next aggregation.
      * When false, skip that check (normal non-matched handling). Default true; disable
      * when one person may appear as multiple accounts in a single aggregation.

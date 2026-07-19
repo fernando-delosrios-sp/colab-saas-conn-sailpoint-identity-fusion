@@ -361,7 +361,7 @@ export class FusionAccountBase {
     }
 
     /**
-     * Clear all fusion review URLs so they can be repopulated from the current operation.
+     * Clear all fusion review URLs so they can be repopulated from the current run.
      * Used for reviewers so their reviews attribute reflects only current form instance URLs.
      */
     public clearFusionReviews(): void {

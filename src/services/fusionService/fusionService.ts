@@ -77,8 +77,8 @@ export class FusionService {
     public get _sourcesWithoutReviewers(): Set<string> {
         return this._repository.sourcesWithoutReviewers
     }
-    public get currentOperationNonMatchedFusionManagedKeysBySource(): Map<string, Set<string>> {
-        return this._repository.currentOperationNonMatchedFusionManagedKeysBySource
+    public get currentRunNonMatchedFusionManagedKeysBySource(): Map<string, Set<string>> {
+        return this._repository.currentRunNonMatchedFusionManagedKeysBySource
     }
     public get autoAssignedIdentityIds(): Set<string> {
         return this._repository.autoAssignedIdentityIds
@@ -106,7 +106,7 @@ export class FusionService {
     /** Connector operation name (e.g. {@link OperationContext.AccountList}) — used when SDK commandType alone is ambiguous. */
     private readonly operationContext?: OperationContext
     /** Accumulates Match scoring duration within a single managed-account analysis sweep. */
-    private currentOperationMatchScoringMs = 0
+    private currentRunMatchScoringMs = 0
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -397,7 +397,7 @@ export class FusionService {
      * 1. Re-fetches the latest pending form instances via {@link FusionForms.fetchFormData}
      *    so the current account's pending decisions are reflected.
      * 2. Calls {@link reconcilePendingFormState} to drop stale 'candidate' / 'reviews'
-     *    entries (which may reference accounts not present in this operation) and
+     *    entries (which may reference accounts not present in this run) and
      *    rebuild them from the currently-known pending (unanswered) form instances,
      *    so the serialized output only references the account being returned.
      */
@@ -786,7 +786,7 @@ export class FusionService {
      * @param account - The ISC account from a managed source (typically uncorrelated on the work queue)
      * @returns The fusion account produced or updated, or undefined if skipped or sent for manual review.
      *          Deferred candidate matches (deferred candidate is another provisional Fusion account from the same source) are removed from
-     *          the managed-account work queue for this operation; they are expected to be re-fetched next aggregation.
+     *          the managed-account work queue for this run; they are expected to be re-fetched next aggregation.
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
@@ -1004,7 +1004,7 @@ export class FusionService {
     public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
-        this.currentOperationMatchScoringMs = 0
+        this.currentRunMatchScoringMs = 0
         const results: FusionAccount[] = []
 
         const accounts = [...map.values()]
@@ -1040,7 +1040,7 @@ export class FusionService {
     }
 
     public addMatchScoringTimeMs(ms: number): void {
-        this.currentOperationMatchScoringMs += ms
+        this.currentRunMatchScoringMs += ms
     }
 
     /**
@@ -1252,7 +1252,7 @@ export class FusionService {
     }
 
     /**
-     * Drops a managed account from the work queue for this operation so deferred accounts are not
+     * Drops a managed account from the work queue for this run so deferred accounts are not
      * counted as unprocessed or touched again until the next aggregation reloads them from sources.
      */
     private removeManagedAccountFromWorkQueue(account: Account): void {
@@ -1449,7 +1449,7 @@ export class FusionService {
         }
     }
 
-    public currentOperationDeferredCandidatesForSource(sourceName: string | null | undefined): Iterable<FusionAccount> {
+    public currentRunDeferredCandidatesForSource(sourceName: string | null | undefined): Iterable<FusionAccount> {
         return this.candidateRegistry.queryForSource(sourceName)
     }
 
@@ -1495,7 +1495,7 @@ export class FusionService {
         this.tracker.newManagedAccountsCount = map.size
         this.candidateRegistry.clear()
         this.autoAssignedIdentityIds.clear()
-        this.currentOperationMatchScoringMs = 0
+        this.currentRunMatchScoringMs = 0
 
         for (const fusionAccount of this.fusionAccountMap.values()) {
             this.candidateRegistry.register(fusionAccount)
@@ -1539,7 +1539,7 @@ export class FusionService {
             this._managedAccountProcessingStartedAt
         )
         this._managedAccountProcessingState = 'idle'
-        return { processed, matchScoringMs: this.currentOperationMatchScoringMs }
+        return { processed, matchScoringMs: this.currentRunMatchScoringMs }
     }
 
     /**
