@@ -7,12 +7,13 @@ import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { IdentityService } from '../identityService'
 import { SourceInfo, SourceService } from '../sourceService'
 import { FusionAccount } from '../../model/account'
-import { AttributeService } from '../attributeService'
+import { MapService } from '../mapService'
+import { DefineService } from '../defineService'
+import { MatchService } from '../matchService'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
 import { mapValuesToArray, forEachBatched, compact } from './collections'
 import { FusionDecision } from '../../model/form'
-import { ScoringService } from '../scoringService'
 import { SchemaService } from '../schemaService'
 import { FusionMatch, MatchCandidateType } from '../scoringService/types'
 import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../scoringService/scoringService'
@@ -116,8 +117,9 @@ export class FusionService {
      * @param identities - Identity service for identity lookups and correlation
      * @param sources - Source service for accessing source accounts and config
      * @param forms - Form service for creating and managing review forms
-     * @param attributes - Attribute service for mapping and generating attributes
-     * @param scoring - Scoring service for Match similarity scoring
+     * @param mapService - Map service for attribute mapping from source accounts
+     * @param defineService - Define service for attribute definition and generation
+     * @param matchService - Match service for identity matching and scoring
      * @param schemas - Schema service for attribute schema lookups
      * @param commandType - The current SDK command type (e.g. StdAccountList)
      * @param operationContext - Handler operation name from the connector (e.g. {@link OperationContext.CustomDryRun})
@@ -128,8 +130,9 @@ export class FusionService {
         public identities: IdentityService,
         public sources: SourceService,
         public forms: FormService,
-        public attributes: AttributeService,
-        public scoring: ScoringService,
+        private mapService: MapService,
+        private defineService: DefineService,
+        public matchService: MatchService,
         public schemas: SchemaService,
         public fusionRun: FusionRun,
         commandType?: StandardCommand,
@@ -217,9 +220,9 @@ export class FusionService {
      * map source attributes, refresh normal attributes, then refresh reverse correlation attributes.
      */
     public async applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void> {
-        this.attributes.mapAttributes(fusionAccount)
-        await this.attributes.refreshNormalAttributes(fusionAccount)
-        this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
+        this.mapService.mapAttributes(fusionAccount, this.fusionRun)
+        await this.defineService.refreshNormalAttributes(fusionAccount)
+        this.defineService.refreshReverseCorrelationAttributes(fusionAccount)
     }
 
     // ------------------------------------------------------------------------
@@ -412,7 +415,7 @@ export class FusionService {
         await this.batchProcess(
             allAccounts,
             'Unique-attribute generation',
-            (account) => this.attributes.refreshUniqueAttributes(account),
+            (account) => this.defineService.refreshUniqueAttributes(account),
             getManagedAccountsBatchSize(this.config)
         )
         return allAccounts.length
@@ -536,7 +539,7 @@ export class FusionService {
         await yieldToEventLoop()
 
         if (!resetDefinition) {
-            await this.attributes.registerUniqueAttributes(fusionAccount)
+            await this.defineService.registerUniqueAttributes(fusionAccount)
         }
 
         fusionAccount.setNeedsRefresh(
@@ -870,7 +873,7 @@ export class FusionService {
         account?: Account
     ): Promise<boolean> {
         if (sourceType === SourceType.Record) {
-            await this.attributes.registerUniqueAttributes(fusionAccount)
+            await this.defineService.registerUniqueAttributes(fusionAccount)
             return true
         }
         if (sourceType === SourceType.Orphan) {
@@ -1211,10 +1214,10 @@ export class FusionService {
      */
     private setCoreSchemaAttributes(fusionAccount: FusionAccount): boolean {
         // Enforce hosting identity name display override if correlated
-        this.attributes.applyDisplayAttributeOverride(fusionAccount)
+        this.defineService.applyDisplayAttributeOverride(fusionAccount)
 
         // Generate and assign key for interim accounts (key postponed from processIdentity/processFusionIdentityDecision)
-        const key = fusionAccount.key ?? this.attributes.getSimpleKey(fusionAccount)
+        const key = fusionAccount.key ?? this.defineService.getSimpleKey(fusionAccount)
         if (!key) {
             return false
         }
@@ -1505,7 +1508,7 @@ export class FusionService {
         // Build the trigram blocking index over all currently-loaded fusion identities so that
         // each managed account can skip the vast majority of identity comparisons.
         // The index is rebuilt each run (identity pool may change between runs).
-        this.scoring.buildTrigramIndex(this.fusionIdentities)
+        this.matchService.buildTrigramIndex(this.fusionIdentities)
 
         this.buildLinkedAccountKeyIndex()
 
