@@ -4,7 +4,7 @@ import { SourceInfo } from '../sourceService'
 import { coerceBoolean } from '../../utils/safeRead'
 import { FusionAccount } from '../../model/account'
 import { MatchCandidateType } from '../scoringService/types'
-import { hasIdentityBackedMatches as checkHasIdentityBackedMatches } from './helpers'
+import { hasIdentityCandidateMatches as checkHasIdentityCandidateMatches } from './helpers'
 import type { FusionConfig } from '../../model/config'
 import type { ScoringService } from '../scoringService/scoringService'
 import type { LogService } from '../logService'
@@ -16,7 +16,7 @@ export type ManagedAccountAnalysisContext = {
     sourceInfo: SourceInfo | undefined
     sourceType: SourceType
     fusionIdentityComparisons: number
-    hasIdentityBackedMatches: boolean
+    hasIdentityCandidateMatches: boolean
 }
 
 export interface ManagedAccountAnalyzerState {
@@ -42,7 +42,7 @@ export class ManagedAccountAnalyzer {
         const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
         const recordMatchingEnabled = this.isRecordMatchingEnabledForSource(account.sourceName ?? undefined)
         let fusionIdentityComparisons = 0
-        let hasIdentityBackedMatches = false
+        let hasIdentityCandidateMatches = false
 
         if (recordMatchingEnabled) {
             const excludeIds =
@@ -62,7 +62,7 @@ export class ManagedAccountAnalyzer {
                 this.state.config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
             )
             this.state.addMatchScoringTimeMs(Date.now() - identityScoringStarted)
-            hasIdentityBackedMatches = checkHasIdentityBackedMatches(fusionAccount)
+            hasIdentityCandidateMatches = checkHasIdentityCandidateMatches(fusionAccount)
         } else {
             this.state.log.debug(
                 `Skipping Match scoring for record source account: ${name} [${sourceName}] ` +
@@ -76,12 +76,12 @@ export class ManagedAccountAnalyzer {
             sourceInfo,
             sourceType,
             fusionIdentityComparisons,
-            hasIdentityBackedMatches,
+            hasIdentityCandidateMatches,
         }
     }
 
     public async scoreDeferredCandidates(analysis: ManagedAccountAnalysisContext): Promise<void> {
-        if (analysis.hasIdentityBackedMatches) {
+        if (analysis.hasIdentityCandidateMatches) {
             return
         }
         if (!this.isDeferredMatchingEnabledForSource(analysis.account.sourceName ?? undefined)) {

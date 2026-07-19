@@ -489,9 +489,9 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         const processed = []
         const faList = state.getFusionAccounts()
         console.log('processFusionAccounts mock: got managed source accounts count:', faList.length)
-        for (const rawAccount of faList) {
-            const processedFa = await registry.fusion.processFusionAccount(rawAccount)
-            const managedKey = rawAccount.managedKey // Use rawAccount's managedKey to match what's in state
+        for (const managedSourceAccount of faList) {
+            const processedFa = await registry.fusion.processFusionAccount(managedSourceAccount)
+            const managedKey = managedSourceAccount.managedKey // Use managed source account's managedKey to match what's in state
             const existingInState = state.getFusionAccount(managedKey)
             console.log(
                 `processFusionAccounts mock: processed account managedKey=${managedKey}, existingInState=${!!existingInState}`

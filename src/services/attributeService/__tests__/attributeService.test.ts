@@ -1849,7 +1849,7 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         expect(fusionAccount.attributes.derived).toBe('$account.employeeNumber')
     })
 
-    it('does not synthesize identity-backed schema values when origin snapshot is missing', async () => {
+    it('does not synthesize identity-origin schema values when origin snapshot is missing', async () => {
         const { sourceService, log, locks } = velocityDeps()
         const service = new AttributeService(
             velocityConfig('$account.schema.name:$account.schema.id', [{ name: 'HR' }]),

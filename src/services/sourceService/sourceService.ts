@@ -60,7 +60,7 @@ export class SourceService {
     private _processLockAcquired = false
     private sourceSchemasCache: Map<string, SchemaV2025[]> = new Map()
 
-    /** Per-run cache: managed source names that passed reverse-correlation setup/assert this session. */
+    /** Per-operation cache: managed source names that passed reverse-correlation setup/assert this session. */
     private reverseCorrelationReadinessBySourceName = new Set<string>()
 
     // Account caching and work queue

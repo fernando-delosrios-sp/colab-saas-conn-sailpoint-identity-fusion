@@ -207,10 +207,10 @@ export function createAutomaticAssignmentDecision(
     }
 }
 
-export function hasIdentityBackedMatches(fusionAccount: FusionAccount): boolean {
+export function hasIdentityCandidateMatches(fusionAccount: FusionAccount): boolean {
     return fusionAccount.fusionMatches.some((match) => (match.candidateType ?? 'identity') === 'identity')
 }
 
-export function hasDeferredMatches(fusionAccount: FusionAccount): boolean {
+export function hasDeferredCandidateMatches(fusionAccount: FusionAccount): boolean {
     return fusionAccount.fusionMatches.some((match) => match.candidateType === 'deferred')
 }

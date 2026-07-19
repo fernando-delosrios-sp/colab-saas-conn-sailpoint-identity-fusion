@@ -31,7 +31,7 @@ export class ManagedAccountAnalysisRecorder {
     constructor(private readonly deps: ManagedAccountAnalysisRecorderDeps) {}
 
     recordAnalysis(analysis: ManagedAccountAnalysisContext): void {
-        const { account, fusionAccount, sourceType, hasIdentityBackedMatches, fusionIdentityComparisons } = analysis
+        const { account, fusionAccount, sourceType, hasIdentityCandidateMatches, fusionIdentityComparisons } = analysis
         const { name, sourceName } = account
         const { log, tracker, urlContext, reportAttributes, sourcesByName, analyzer, sources, shouldCaptureReportData } =
             this.deps
@@ -39,7 +39,7 @@ export class ManagedAccountAnalysisRecorder {
 
         trackerInstance.fusionIdentityComparisonsByAccount.set(fusionAccount, fusionIdentityComparisons)
         if (fusionAccount.isMatch) {
-            if (hasIdentityBackedMatches) {
+            if (hasIdentityCandidateMatches) {
                 const identityMatches = fusionAccount.fusionMatches.filter(
                     (m) => (m.candidateType ?? MatchCandidateType.Identity) === MatchCandidateType.Identity
                 )
@@ -48,7 +48,7 @@ export class ManagedAccountAnalysisRecorder {
             }
             if (!shouldCaptureReportData()) return
             const reportAccountId = resolveReportAccountId(fusionAccount, sources)
-            if (hasIdentityBackedMatches) {
+            if (hasIdentityCandidateMatches) {
                 trackerInstance.matchAccounts.push(fusionAccount)
                 return
             }

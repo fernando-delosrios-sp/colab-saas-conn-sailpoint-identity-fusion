@@ -471,7 +471,7 @@ export class AttributeService {
      * (such as usernames) that may have been reassigned while it was disabled.
      *
      * Additionally, if any unique attribute is currently empty or missing (e.g. because a
-     * prior generation failed when `$account` resolved to an identity-backed object lacking
+     * prior generation failed when `$account` resolved to an identity-origin object lacking
      * managed-account attributes), this method will attempt to regenerate those values
      * regardless of the needsRefresh flag, preventing a permanent empty-attribute state.
      *
@@ -773,7 +773,7 @@ export class AttributeService {
     }
 
     /**
-     * Velocity `$account`: origin snapshot (managed account shape or identity-backed).
+     * Velocity `$account`: origin snapshot (managed account shape or identity-origin).
      * `$originAccount` remains the origin key string (set on context above).
      */
     private resolveOriginAccountObjectForVelocity(

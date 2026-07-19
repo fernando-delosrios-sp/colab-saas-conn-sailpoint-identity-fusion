@@ -28,7 +28,7 @@ The three documentation surfaces MUST describe the Velocity context variables ac
 #### Scenario: $account versus $accounts[0] is explained
 - **GIVEN** the in-app help for the Normal section
 - **WHEN** it describes `$account`
-- **THEN** it explains that `$account` is the origin snapshot (the managed account matching the origin id, or the identity-backed row when the origin is `Identities`)
+- **THEN** it explains that `$account` is the origin snapshot (the managed account matching the origin id, or the identity-origin row when the origin is `Identities`)
 - **AND** it notes that `$accounts[0]` may differ from `$account` when the `mainAccount` attribute is set, in which case the `mainAccount` snapshot is moved to `$accounts[0]`
 
 ### Requirement: Velocity helper methods are accurately documented
@@ -351,7 +351,7 @@ Rule: For identity-origin Fusion accounts, the root identity name SHALL be avail
 - **WHEN** a Velocity expression references `$name`
 - **THEN** the result is "Mapped Name"
 
-#### Scenario: `$account.name` resolves for identity-backed origin snapshot
+#### Scenario: `$account.name` resolves for identity-origin origin snapshot
 - **GIVEN** an identity-origin Fusion account with origin source "Identities"
 - **WHEN** a Velocity expression references `$account.name`
 - **THEN** the result is the account display name

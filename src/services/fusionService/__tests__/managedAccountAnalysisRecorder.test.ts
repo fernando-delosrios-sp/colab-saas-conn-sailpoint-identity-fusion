@@ -51,7 +51,7 @@ describe('ManagedAccountAnalysisRecorder', () => {
             fusionAccount,
             sourceInfo: undefined,
             sourceType: SourceType.Authoritative,
-            hasIdentityBackedMatches: true,
+            hasIdentityCandidateMatches: true,
             fusionIdentityComparisons: 5,
         })
         expect(tracker.matchAccounts).toContain(fusionAccount)
@@ -73,7 +73,7 @@ describe('ManagedAccountAnalysisRecorder', () => {
             fusionAccount,
             sourceInfo: undefined,
             sourceType: SourceType.Authoritative,
-            hasIdentityBackedMatches: false,
+            hasIdentityCandidateMatches: false,
             fusionIdentityComparisons: 3,
         })
         expect(tracker.deferredMatchReportData.length).toBe(1)
@@ -89,7 +89,7 @@ describe('ManagedAccountAnalysisRecorder', () => {
             fusionAccount,
             sourceInfo: undefined,
             sourceType: SourceType.Authoritative,
-            hasIdentityBackedMatches: false,
+            hasIdentityCandidateMatches: false,
             fusionIdentityComparisons: 0,
         })
         expect(tracker.analyzedNonMatchReportData.length).toBe(0)

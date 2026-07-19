@@ -3,7 +3,7 @@ import { FusionAccount } from '../../model/account'
 import { assert } from '../../utils/assert'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing, effectiveSkipMatchIfThresholdNotMet } from '../../model/config'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
-import { countIdentityBackedFusionMatches } from '../formService/helpers'
+import { countIdentityCandidateFusionMatches } from '../formService/helpers'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
 import {
     normalizeLIG3,
@@ -279,7 +279,7 @@ export class ScoringService {
      * @param fusionAccount - The account to score (typically a new/unmatched account)
      * @param fusionIdentities - The set of existing fusion identities to compare against
      * @param maxIdentityMatches - When set, stop scoring against further identities once this many
-     *   threshold-passing identity-backed matches are recorded (same cap as the review form).
+     *   threshold-passing identity-origin matches are recorded (same cap as the review form).
      *   Omitted or undefined disables this early exit (e.g. tests).
      */
     public async scoreFusionAccount(
@@ -322,7 +322,7 @@ export class ScoringService {
             }
             if (
                 maxIdentity !== undefined &&
-                countIdentityBackedFusionMatches(fusionAccount.fusionMatchesRaw) >= maxIdentity
+                countIdentityCandidateFusionMatches(fusionAccount.fusionMatchesRaw) >= maxIdentity
             ) {
                 break
             }

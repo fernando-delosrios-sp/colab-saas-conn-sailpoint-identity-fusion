@@ -549,7 +549,7 @@ describe('FusionService', () => {
             expect(fusionService.getFusionIdentity('identity-1')).toBeDefined()
         })
 
-        it('marks new identity-backed fusion accounts for unique reset', async () => {
+        it('marks new identity-origin fusion accounts for unique reset', async () => {
             const mockIdentity = {
                 id: 'identity-reset-1',
                 name: 'Reset Identity',
@@ -713,7 +713,7 @@ describe('FusionService', () => {
                     sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
-                    hasIdentityBackedMatches: true,
+                    hasIdentityCandidateMatches: true,
                 },
                 resolution: 'identity-match',
             }])
@@ -1060,7 +1060,7 @@ describe('FusionService', () => {
             expect(new Set(callOrder.slice(0, 2))).toEqual(new Set(['acct-corr-a', 'acct-corr-b']))
         })
 
-        it('short-circuits duplicate checks when an identity-backed match already exists', async () => {
+        it('short-circuits duplicate checks when an identity-origin match already exists', async () => {
             const mockManagedAccount = {
                 id: 'acct-short-circuit-1',
                 nativeIdentity: 'native-short-circuit-1',
@@ -1382,7 +1382,7 @@ describe('FusionService', () => {
                     sourceInfo: (fusionService as any).sourcesByName.get(mockManagedAccount.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
-                    hasIdentityBackedMatches: false,
+                    hasIdentityCandidateMatches: false,
                 },
                 resolution: 'non-match',
             }])
@@ -1427,7 +1427,7 @@ describe('FusionService', () => {
                     sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
-                    hasIdentityBackedMatches: true,
+                    hasIdentityCandidateMatches: true,
                 },
                 resolution: 'identity-match',
             }])
@@ -1468,7 +1468,7 @@ describe('FusionService', () => {
                     sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
-                    hasIdentityBackedMatches: true,
+                    hasIdentityCandidateMatches: true,
                 },
                 resolution: 'identity-match',
             }])
@@ -1528,7 +1528,7 @@ describe('FusionService', () => {
                     sourceInfo: (accountListFusion as any).sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
-                    hasIdentityBackedMatches: true,
+                    hasIdentityCandidateMatches: true,
                 },
                 resolution: 'identity-match',
             }])
@@ -1586,7 +1586,7 @@ describe('FusionService', () => {
                     sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
-                    hasIdentityBackedMatches: true,
+                    hasIdentityCandidateMatches: true,
                 },
                 resolution: 'identity-match',
             }])
@@ -1642,7 +1642,7 @@ describe('FusionService', () => {
                     sourceInfo: (analysisFusion as any).sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
-                    hasIdentityBackedMatches: true,
+                    hasIdentityCandidateMatches: true,
                 },
                 resolution: 'identity-match',
             }])
@@ -1699,7 +1699,7 @@ describe('FusionService', () => {
                     sourceInfo: (analysisFusion as any).sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
-                    hasIdentityBackedMatches: true,
+                    hasIdentityCandidateMatches: true,
                 },
                 resolution: 'identity-match',
             }])
@@ -1752,7 +1752,7 @@ describe('FusionService', () => {
                     sourceInfo: (analysisFusion as any).sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Orphan,
                     fusionIdentityComparisons: 0,
-                    hasIdentityBackedMatches: false,
+                    hasIdentityCandidateMatches: false,
                 },
                 resolution: 'non-match',
             }])
