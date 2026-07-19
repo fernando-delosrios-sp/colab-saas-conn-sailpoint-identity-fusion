@@ -15,7 +15,7 @@ export class FusionAccountRepository {
     public readonly fusionAccountMap: Map<string, FusionAccount> = new Map()
     public readonly reviewersBySourceId: Map<string, Set<FusionAccount>> = new Map()
     public readonly sourcesWithoutReviewers: Set<string> = new Set()
-    public readonly currentRunUnmatchedFusionManagedKeysBySource: Map<string, Set<string>> = new Map()
+    public readonly currentOperationNonMatchedFusionManagedKeysBySource: Map<string, Set<string>> = new Map()
     public readonly autoAssignedIdentityIds: Set<string> = new Set()
     public linkedAccountKeyIndex: Set<string> | undefined
 
@@ -101,7 +101,7 @@ export class FusionAccountRepository {
     }
 
     public clearCurrentRunState(): void {
-        this.currentRunUnmatchedFusionManagedKeysBySource.clear()
+        this.currentOperationNonMatchedFusionManagedKeysBySource.clear()
         this.autoAssignedIdentityIds.clear()
     }
 }

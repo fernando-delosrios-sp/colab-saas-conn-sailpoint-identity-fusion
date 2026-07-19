@@ -1846,7 +1846,7 @@ describe('FusionService', () => {
             mockAttributes.mapAttributes.mockImplementation((a) => a)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
-            const spyFinalize = vi.spyOn(fusionService as any, 'finalizeAuthoritativeUnmatched')
+            const spyFinalize = vi.spyOn(fusionService as any, 'finalizeAuthoritativeNonMatch')
 
             const result = await fusionService.processManagedAccount(mockManagedAccount)
 
@@ -1883,7 +1883,7 @@ describe('FusionService', () => {
                 config: {},
             })
 
-            const spyFinalize = vi.spyOn(fusionService as any, 'finalizeAuthoritativeUnmatched')
+            const spyFinalize = vi.spyOn(fusionService as any, 'finalizeAuthoritativeNonMatch')
 
             const result = await fusionService.processManagedAccount(mockManagedAccount)
 
