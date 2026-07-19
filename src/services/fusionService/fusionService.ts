@@ -701,8 +701,8 @@ export class FusionService {
         }
     }
 
-    private async runCorrelatedManagedAccountPrePass(map: Map<string, Account>): Promise<void> {
-        // Pre-pass: resolve all correlated managed accounts before uncorrelated scoring begins.
+    private async runCorrelatedAccountSweep(map: Map<string, Account>): Promise<void> {
+        // Correlated account sweep: resolve all correlated managed accounts before uncorrelated scoring begins.
         // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion row)
         // are registered as non-matches in the identity-linked Fusion account map here, so they are immediately visible
         // as deferred-match candidates when uncorrelated accounts are scored in the main pass.
@@ -712,7 +712,7 @@ export class FusionService {
         }
 
         this.log.info(
-            `Pre-pass: resolving ${correlatedAccounts.length} correlated managed account(s) before uncorrelated scoring`
+            `Correlated account sweep: resolving ${correlatedAccounts.length} correlated managed account(s) before uncorrelated scoring`
         )
         await this.batchProcess(
             correlatedAccounts,
@@ -720,12 +720,12 @@ export class FusionService {
             (account) => this.processManagedAccount(account),
             this._managedAccountProcessingBatchSize
         )
-        this.log.info(`Pre-pass complete: ${map.size} uncorrelated account(s) queued for scoring`)
+        this.log.info(`Correlated account sweep complete: ${map.size} uncorrelated account(s) queued for scoring`)
     }
 
     /**
      * Main pass: drains the remaining uncorrelated managed-account queue after the
-     * correlated pre-pass has claimed linked/correlated entries.
+     * correlated account sweep has claimed linked/correlated entries.
      */
     private async runUncorrelatedManagedAccountPass(
         queuedAccounts: Account[],
@@ -1279,7 +1279,7 @@ export class FusionService {
      * (platform Fusion row or identity-backed Fusion row), or when its identityId matches
      * a loaded identity-backed Fusion account.
      *
-     * Uses _linkedAccountKeyIndex (O(1)) when available (set by processManagedAccounts pre-pass),
+     * Uses _linkedAccountKeyIndex (O(1)) when available (set by the correlated account sweep),
      * falling back to a linear scan of fusionAccountMap + identity-linked Fusion account map for standalone calls.
      */
     private isCorrelatedManagedAccountLinkedInFusion(account: Account): boolean {
@@ -1513,16 +1513,16 @@ export class FusionService {
         this._managedAccountProcessingState = 'initialized'
     }
 
-    /** Correlated pre-pass: resolve linked/correlated managed accounts before uncorrelated scoring. */
+    /** Correlated account sweep: resolve linked/correlated managed accounts before uncorrelated scoring. */
     public async processCorrelatedManagedAccounts(): Promise<void> {
         this.ensureManagedAccountProcessingInitialized()
         const map = this.sources.managedAccountsById
-        await this.runCorrelatedManagedAccountPrePass(map)
+        await this.runCorrelatedAccountSweep(map)
         this._linkedAccountKeyIndex = undefined
     }
 
     /**
-     * Uncorrelated main pass: drain remaining work-queue entries after the correlated pre-pass.
+     * Uncorrelated main pass: drain remaining work-queue entries after the correlated account sweep.
      * @returns Processed count and match scoring duration for metric emission.
      */
     public async processUncorrelatedManagedAccounts(): Promise<{ processed: number; matchScoringMs: number }> {
