@@ -1131,7 +1131,7 @@ export class SourceService {
      *
      * Called in `finally` blocks to ensure the lock is always released after an aggregation
      * completes (whether successfully or with an error). Errors during release are logged
-     * but not re-thrown, since this operations during cleanup.
+     * but not re-thrown, since this operation runs during cleanup.
      */
     public async releaseProcessLock(): Promise<void> {
         if (!this.concurrencyCheckEnabled || !this._processLockAcquired) {

@@ -302,7 +302,7 @@ Understanding the sequence helps design correct configurations:
 **Key insights:**
 
 - Normal attribute definitions run **before** Match matching. Their output is available to the scoring engine and to unique definitions.
-- Unique attribute definitions run **after** all Match matching has completed (as a global pass over every account). They can reference normal attribute values but not the other way around.
+- Unique attribute definitions run **after** all Match matching has completed (as a global sweep over every account). They can reference normal attribute values but not the other way around.
 - Attribute Definition expressions can reference attributes created by Attribute Mapping. Ensure mapped attributes exist before referencing in expressions.
 
 ---

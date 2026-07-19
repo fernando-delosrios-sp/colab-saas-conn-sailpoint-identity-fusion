@@ -17,7 +17,7 @@ The `resolveReportAccountId` function SHALL return the ISC account ID to use in 
 
 ---
 
-### Requirement: Resolve report account ID from a raw account key
+### Requirement: Resolve report account ID from a managed account key
 The `resolveReportAccountIdValue` function SHALL resolve an arbitrary account id value to an ISC account id using `SourceService`, returning `undefined` for empty inputs.
 
 #### Scenario: Raw value is a managed account key

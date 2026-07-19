@@ -68,7 +68,7 @@ const compareMatchesForForm = (a: FusionMatch, b: FusionMatch): number => {
     return ida.localeCompare(idb)
 }
 
-/** Matches counted toward the review-form cap (excludes deferred same-operation deferred candidates). */
+/** Matches counted toward the review-form cap (excludes same-operation deferred candidates). */
 export const countIdentityBackedFusionMatches = (matches: readonly FusionMatch[] | undefined): number => {
     if (!matches) return 0
     let n = 0

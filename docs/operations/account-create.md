@@ -19,7 +19,7 @@ The Account Create operation creates a new fusion account for a specific identit
 
 3.  **Fusion Account Pre-processing**:
     - Fetches all existing fusion accounts from sources and initializes attribute counters.
-    - Bulk-registers unique attribute values directly from raw account data (lightweight path — avoids full account hydration).
+    - Bulk-registers unique attribute values directly from managed source account data (lightweight path — avoids full account hydration).
     - Pre-processes fusion accounts to populate the identity map used for duplicate account detection.
 
 4.  **Identity Processing**:
