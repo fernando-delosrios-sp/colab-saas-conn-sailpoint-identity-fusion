@@ -779,7 +779,7 @@ export class FusionService {
      * After scoring, the account is either assigned automatically to the matched identity
      * (perfect scores when enabled), sent for manual review (partial match), or handled
      * based on the source type:
-     * - authoritative: added as unmatched new identity (output as ISC account)
+     * - authoritative: added as non-matched new identity (output as ISC account)
      * - record: unique attributes registered but not output as ISC account
      * - orphan: dropped immediately; optionally fires a disable operation
      *
