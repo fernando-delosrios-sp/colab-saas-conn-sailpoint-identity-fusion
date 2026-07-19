@@ -10,7 +10,7 @@ The recording service captures the outcomes of managed-account analysis (matches
 The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL be called exactly once per managed account after the two-sweep analysis (identity scoring + deferred candidate scoring) completes. It SHALL record an identity-origin match by pushing the `FusionAccount` into `tracker.matchAccounts` and logging match discovery information. The method SHALL NOT be called during intermediate phases of the analysis pipeline.
 
 #### Scenario: Account has identity-origin matches
-- **WHEN** `recordAnalysis` is called with a `FusionAccount` whose `isMatch` is true and `hasIdentityBackedMatches` is true
+- **WHEN** `recordAnalysis` is called with a `FusionAccount` whose `isMatch` is true and `hasIdentityCandidateMatches` is true
 - **THEN** the `FusionAccount` MUST be added to `tracker.matchAccounts`
 - **AND** `tracker.fusionIdentityComparisonsByAccount` MUST be updated with the comparison count
 
@@ -20,7 +20,7 @@ The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL be called exact
 The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL be called exactly once per managed account after the two-sweep analysis completes. It SHALL record deferred match candidates into `tracker.deferredMatchReportData` when report data capture is enabled and the account has deferred candidate matches but no identity-origin matches.
 
 #### Scenario: Account has deferred candidate matches
-- **WHEN** `recordAnalysis` is called with a `FusionAccount` whose `isMatch` is true, `hasIdentityBackedMatches` is false, and matches have candidate type `Deferred`
+- **WHEN** `recordAnalysis` is called with a `FusionAccount` whose `isMatch` is true, `hasIdentityCandidateMatches` is false, and matches have candidate type `Deferred`
 - **THEN** `tracker.deferredMatchReportData` MUST receive a report account with `deferred: true`, comparison count, and mapped match candidates
 
 ---
