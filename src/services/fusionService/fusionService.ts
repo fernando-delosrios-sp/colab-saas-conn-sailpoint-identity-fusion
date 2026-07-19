@@ -77,8 +77,8 @@ export class FusionService {
     public get _sourcesWithoutReviewers(): Set<string> {
         return this._repository.sourcesWithoutReviewers
     }
-    public get currentRunUnmatchedFusionManagedKeysBySource(): Map<string, Set<string>> {
-        return this._repository.currentRunUnmatchedFusionManagedKeysBySource
+    public get currentOperationNonMatchedFusionManagedKeysBySource(): Map<string, Set<string>> {
+        return this._repository.currentOperationNonMatchedFusionManagedKeysBySource
     }
     public get autoAssignedIdentityIds(): Set<string> {
         return this._repository.autoAssignedIdentityIds
@@ -895,7 +895,7 @@ export class FusionService {
             )
             return undefined
         }
-        return this.finalizeAuthoritativeUnmatched(fusionAccount)
+        return this.finalizeAuthoritativeNonMatch(fusionAccount)
     }
 
     private async handleExactMatch(
@@ -985,7 +985,7 @@ export class FusionService {
         if (await this.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, account)) {
             return undefined
         }
-        await this.finalizeAuthoritativeUnmatched(fusionAccount)
+        await this.finalizeAuthoritativeNonMatch(fusionAccount)
         const mk = getManagedAccountKeyFromAccount(account)
         this.log.debug(
             `Registered managed account as fusion account: ${account.name} [${account.sourceName}] (${mk ?? 'no-key'})`
@@ -1319,7 +1319,7 @@ export class FusionService {
         this.pendingDisableOperations.add(op)
     }
 
-    private async finalizeAuthoritativeUnmatched(fusionAccount: FusionAccount): Promise<FusionAccount> {
+    private async finalizeAuthoritativeNonMatch(fusionAccount: FusionAccount): Promise<FusionAccount> {
         fusionAccount.setNonMatched()
         await this.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount)
         this.setFusionAccount(fusionAccount)
