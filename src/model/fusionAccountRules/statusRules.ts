@@ -30,7 +30,7 @@ export function hasStatus(state: FusionAccountState, status: string): boolean {
 }
 
 /** Shared logic for setting uncorrelated status. */
-export function setUncorrelatedStatus(state: FusionAccountState): void {
+function setUncorrelatedStatus(state: FusionAccountState): void {
     state.uncorrelated = true
     state.statuses.add(StatusEntitlement.Uncorrelated)
     state.actions.delete(FusionAction.Correlated)
@@ -45,15 +45,6 @@ export function setUncorrelatedAccount(state: FusionAccountState, accountId?: st
     setUncorrelatedStatus(state)
 }
 
-/** Marks the state with "baseline" status (created from an identity in authoritative mode). */
-export function setBaseline(state: FusionAccountState): void {
-    state.statuses.add(StatusEntitlement.Baseline)
-    addHistory(
-        state,
-        `Set ${formatHistoryAccountInfo(state.name, state.sourceName)} as baseline`
-    )
-}
-
 /** Marks the state as NonMatched (no Match found, pending review). */
 export function setNonMatched(state: FusionAccountState): void {
     state.statuses.add(StatusEntitlement.NonMatched)
@@ -66,7 +57,7 @@ export function setNonMatched(state: FusionAccountState): void {
 /**
  * Builds a history message for decision actions, varying wording by source type.
  */
-export function createDecisionHistoryMessage(
+function createDecisionHistoryMessage(
     _state: FusionAccountState,
     decision: FusionDecision,
     action: string
@@ -118,9 +109,4 @@ export function setAuthorized(state: FusionAccountState, decision: FusionDecisio
 /** Whether the state has the orphan status. */
 export function isOrphan(state: FusionAccountState): boolean {
     return state.statuses.has(StatusEntitlement.Orphan)
-}
-
-/** Marks the state as orphan. */
-export function markAsOrphan(state: FusionAccountState): void {
-    state.statuses.add(StatusEntitlement.Orphan)
 }

@@ -73,7 +73,7 @@ describe('ManagedAccountMatchingRunner', () => {
         expect(results[0].resolution).toBe('non-match')
     })
 
-    it('queues deferred-pending and runs pass 2 for deferred-matched account', async () => {
+    it('queues deferred-pending and runs deferred scoring sweep for deferred-matched account', async () => {
         const sources = new Map()
         sources.set('Source A', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
         const fusionMap = new Map()
@@ -100,7 +100,7 @@ describe('ManagedAccountMatchingRunner', () => {
             hasIdentityBackedMatches: false,
         })
         scoreDeferredCandidates.mockImplementation((analysis: any) => {
-            analysis.fusionAccount.fusionMatches = [{ candidateType: 'deferred', identityName: 'peer', scores: [] }]
+            analysis.fusionAccount.fusionMatches = [{ candidateType: 'deferred', identityName: 'deferred candidate', scores: [] }]
         })
         const runner = new ManagedAccountMatchingRunner({
             config: { managedAccountsBatchSize: 10 } as any,
@@ -115,7 +115,7 @@ describe('ManagedAccountMatchingRunner', () => {
         expect(scoreDeferredCandidates).toHaveBeenCalledTimes(1)
     })
 
-    it('registers candidate in pass 1 for deferred-pending accounts', async () => {
+    it('registers candidate in identity scoring sweep for deferred-pending accounts', async () => {
         const sources = new Map()
         sources.set('Source A', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
         const fusionMap = new Map()

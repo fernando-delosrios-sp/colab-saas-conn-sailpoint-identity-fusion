@@ -216,16 +216,16 @@ export interface SourceConfig {
     correlationAttribute?: string
     correlationDisplayName?: string
     /**
-     * Deferred matching: after identity matching, also compare to other new
-     * unmatched accounts from the same source in this run. If the only strong match is
-     * such a peer, defer instead of creating another Fusion identity until a later run.
+     * Deferred matching: after identity matching, also compare to other
+     * unmatched accounts from the same source in this operation. If the only strong match is
+     * such a deferred candidate, defer instead of creating another Fusion identity until the next aggregation.
      * When false, skip that check (normal unmatched handling). Default true; disable
      * when one person may appear as multiple accounts in a single aggregation.
      */
     deferredMatching?: boolean
     /**
      * Record sources only: when true (default), record accounts are scored in the Match
-     * phase against identities (and deferred peers when enabled). When false, Match
+     * phase against identities (and deferred candidates when enabled). When false, Match
      * scoring is skipped; the account still maps attributes and contributes to unique
      * attribute registration (for example reserving third-party identifiers).
      */
@@ -336,7 +336,7 @@ export interface DeveloperSettingsSection {
      */
     managedAccountsBatchSize?: number
     /**
-     * Force recalculation of all computed Normal-type attributes on every aggregation run,
+     * Force recalculation of all computed Normal-type attributes on every aggregation,
      * even when no changes were detected.
      */
     forceAttributeRefresh: boolean

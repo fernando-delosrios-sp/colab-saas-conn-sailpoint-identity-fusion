@@ -107,7 +107,7 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 
 | Use case                  | Configuration       | Benefit                                     |
 | ------------------------- | ------------------- | ------------------------------------------- |
-| **Production monitoring** | Enable, Info level  | Track aggregation runs, errors, performance |
+| **Production monitoring** | Enable, Info level  | Track aggregation operations, errors, performance |
 | **Troubleshooting**       | Enable, Debug level | Detailed logs for issue diagnosis           |
 | **Compliance/audit**      | Enable, Info level  | Centralized audit trail                     |
 | **Performance analysis**  | Enable, Info level  | Track timing, throughput, bottlenecks       |

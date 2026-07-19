@@ -380,7 +380,7 @@ An **enforced correlation role** is an automatically assigned ISC role that oper
 
 | Step | Actor         | Action                                                              | Output                                     |
 | ---- | ------------- | ------------------------------------------------------------------- | ------------------------------------------ |
-| 1    | **Connector** | Account aggregation runs (manual or scheduled)                      | Reads accounts from configured sources     |
+| 1    | **Connector** | Account aggregation operations (manual or scheduled)                      | Reads accounts from configured sources     |
 | 2    | **Connector** | Merges source account data into Fusion accounts                     | Consolidated accounts per person           |
 | 3    | **Connector** | Compares each Fusion account to identities in scope                 | Similarity scores per identity + attribute |
 | 4    | **Connector** | If similarity threshold met and automatic assignment does not apply | Creates review form                        |
@@ -397,7 +397,7 @@ An **enforced correlation role** is an automatically assigned ISC role that oper
 
 **Step 1–2: Aggregation and merging**
 
-When account aggregation runs on the Fusion source:
+When Account aggregation operations on the Fusion source:
 
 1. If **Account aggregation mode** is set to **Aggregate before processing** for any source, trigger aggregation on those sources first
 2. Wait for source aggregations to complete (poll task status every 30 seconds, up to the per-source **Aggregation wait timeout (minutes)**)

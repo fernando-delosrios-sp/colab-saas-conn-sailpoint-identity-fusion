@@ -15,11 +15,11 @@ export interface ManagedAccountMatchingRunnerState {
     processAccount(account: Account): Promise<any>
 }
 
-export type ManagedAccountPassResolution = 'identity-match' | 'deferred-match' | 'non-match'
+type ManagedAccountMatchingResolution = 'identity-match' | 'deferred-match' | 'non-match'
 
-export interface ManagedAccountPassResult {
+export interface ManagedAccountMatchingResult {
     analysis: ManagedAccountAnalysisContext
-    resolution: ManagedAccountPassResolution
+    resolution: ManagedAccountMatchingResolution
 }
 
 interface PendingDeferred {
@@ -34,10 +34,10 @@ export class ManagedAccountMatchingRunner {
         accounts: Account[],
         batchSize: number,
         managedAccountProcessingStartedAt: number
-    ): Promise<ManagedAccountPassResult[]> {
+    ): Promise<ManagedAccountMatchingResult[]> {
         const initialQueueSize = accounts.length
         let processedCount = 0
-        const results: ManagedAccountPassResult[] = []
+        const results: ManagedAccountMatchingResult[] = []
 
         const logProgressEvery = Math.max(
             1,
@@ -51,7 +51,7 @@ export class ManagedAccountMatchingRunner {
                 processedCount === initialQueueSize
             ) {
                 this.state.log.info(
-                    `Managed accounts progress: ${processedCount}/${initialQueueSize} analyzed | RUN ELAPSED ${PhaseTimer.formatElapsed(
+                    `Managed accounts progress: ${processedCount}/${initialQueueSize} analyzed | OPERATION ELAPSED ${PhaseTimer.formatElapsed(
                         Date.now() - managedAccountProcessingStartedAt
                     )}`
                 )

@@ -69,9 +69,9 @@ export class SourceService {
     // 2. Work Queue: Gets depleted as accounts are processed (deleted) in order:
     //    fetchFormData → processFusionAccounts → processIdentities → processManagedAccounts
     public managedAccountsById: Map<string, Account> = new Map()
-    // Snapshot of managed accounts loaded for this run (never depleted by work-queue processing)
+    // Snapshot of managed accounts loaded for this operation (never depleted by work-queue processing)
     public managedAccountsAllById: Map<string, Account> = new Map()
-    // Secondary index: identityId → Set of account IDs for O(1) identity-based lookups
+    // Secondary index: identityId → Set of account IDs for O(1) identity-origin lookups
     // in addManagedAccountLayer. Kept in sync with managedAccountsById.
     public managedAccountsByIdentityId: Map<string, Set<string>> = new Map()
     public fusionAccountsByNativeIdentity?: Map<string, Account>
@@ -272,14 +272,14 @@ export class SourceService {
     }
 
     /**
-     * How many fusion accounts are loaded for this run.
+     * How many fusion accounts are loaded for this operation.
      */
     public get fusionAccountCount(): number {
         return this.fusionAccountsByNativeIdentity?.size ?? 0
     }
 
     /**
-     * Whether a Fusion source has been discovered for this run.
+     * Whether a Fusion source has been discovered for this operation.
      */
     public get hasFusionSource(): boolean {
         return !!this._fusionSourceId
@@ -379,7 +379,7 @@ export class SourceService {
             this._fusionSourceManagementWorkgroupId = undefined
             this._fusionSourceWorkgroupMemberIds = undefined
             this.log.warn(
-                'Fusion source not found for this run. Continuing with managed sources only (custom report mode).'
+                'Fusion source not found for this operation. Continuing with managed sources only (custom report mode).'
             )
         }
 
@@ -1103,7 +1103,7 @@ export class SourceService {
 
         const processing = (currentSource!.connectorAttributes as any)?.processing
         if (processing === 'true' || processing === true) {
-            this.log.warn('Processing flag is active. Aborting this run.')
+            this.log.warn('Processing flag is active. Aborting this operation.')
             // Reset the flag so the next attempt can proceed
             // await this.releaseProcessLock()
             throw new ConnectorError(
@@ -1131,7 +1131,7 @@ export class SourceService {
      *
      * Called in `finally` blocks to ensure the lock is always released after an aggregation
      * completes (whether successfully or with an error). Errors during release are logged
-     * but not re-thrown, since this runs during cleanup.
+     * but not re-thrown, since this operations during cleanup.
      */
     public async releaseProcessLock(): Promise<void> {
         if (!this.concurrencyCheckEnabled || !this._processLockAcquired) {

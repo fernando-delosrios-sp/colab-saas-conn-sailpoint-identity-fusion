@@ -160,7 +160,7 @@ function ensureBaselineForIdentityOrigin(state: FusionAccountState): void {
     }
 }
 
-export function importHistoryIntoState(state: FusionAccountState, history: unknown[]): void {
+function importHistoryIntoState(state: FusionAccountState, history: unknown[]): void {
     const normalizedHistory = history
         .filter((entry): entry is string => typeof entry === 'string')
         .map((entry) => entry.trim())

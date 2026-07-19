@@ -3,7 +3,7 @@ import { FusionReportAccount, FusionReportBlend } from './types'
 
 /**
  * AggregationTracker acts as a stateful container for compiling and tracking
- * report metrics, matched accounts, conflicts, and diagnostics during an aggregation run.
+ * report metrics, matched accounts, conflicts, and diagnostics during an aggregation operation.
  * By encapsulating this state, we keep FusionService stateless and avoid memory leaks.
  */
 export class AggregationTracker {

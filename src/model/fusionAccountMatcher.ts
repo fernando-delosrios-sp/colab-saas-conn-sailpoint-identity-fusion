@@ -24,7 +24,7 @@ export interface MatchContext {
 }
 
 /**
- * Phase 1: Identity-based matching via index (O(1) lookup)
+ * Identity-origin matching via index (O(1) lookup)
  */
 export function processIdentityMatchedAccounts(
     ctx: MatchContext,
@@ -125,7 +125,7 @@ export function pruneDeletedManagedAccounts(ctx: MatchContext, allAccountsById: 
     }
     if (removedAnyReference) {
         // Deleting managed-account references changes mapping/definition context.
-        // Force a refresh so dependent attributes are recomputed in the same run.
+        // Force a refresh so dependent attributes are recomputed in the same operation.
         ctx.setNeedsRefresh(true)
     }
 }

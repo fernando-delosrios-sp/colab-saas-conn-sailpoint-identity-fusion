@@ -27,7 +27,7 @@ export function removeFusionReview(state: FusionAccountState, reviewUrl: string)
     }
 }
 
-/** Clear all fusion review URLs so they can be repopulated from the current run. */
+/** Clear all fusion review URLs so they can be repopulated from the current operation. */
 export function clearFusionReviews(state: FusionAccountState): void {
     state.reviews.clear()
     state.statuses.delete(StatusEntitlement.ActiveReviews)
@@ -58,7 +58,7 @@ export function resolvePendingReviewUrls(state: FusionAccountState): void {
 }
 
 /** Resolves all pending review promises. */
-export async function resolveReviewPromises(state: FusionAccountState): Promise<void> {
+async function resolveReviewPromises(state: FusionAccountState): Promise<void> {
     if (state.reviewPromises.length === 0) return
 
     const reviewResults = await Promise.allSettled(state.reviewPromises)

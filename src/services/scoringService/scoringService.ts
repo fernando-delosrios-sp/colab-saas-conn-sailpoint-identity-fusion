@@ -74,7 +74,7 @@ export class ScoringService {
     private readonly nameNormalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
 
     /**
-     * Trigram blocking index — built once per pipeline run over the full identity pool.
+     * Trigram blocking index — built once per pipeline operation over the full identity pool.
      * Maps each mandatory attribute name to its inverted trigram index.
      * Reduces O(n×m) identity comparisons to O(n×k) where k << m.
      *
@@ -196,7 +196,7 @@ export class ScoringService {
      * candidates, since a missing or non-matching non-mandatory attribute does not disqualify a pair.
      *
      * @param identities - All fusion identities to index (pass `fusionIdentityMap.values()` — collected
-     *   internally into an array so generators can be reused across multiple attribute passes)
+     *   internally into an array so generators can be reused across multiple attribute sweeps)
      */
     public buildTrigramIndex(identities: Iterable<FusionAccount>): void {
         this.trigramIndexByAttribute.clear()
@@ -206,7 +206,7 @@ export class ScoringService {
         const mandatoryConfigs = this.matchingConfigs.filter((c) => c.mandatory === true)
         if (mandatoryConfigs.length === 0) return
 
-        // Collect once; generators can only be iterated once but we need one pass per attribute.
+        // Collect once; generators can only be iterated once but we need one sweep per attribute.
         const identityArray = Array.from(identities)
         for (const config of mandatoryConfigs) {
             const idx = buildAttributeIndex(identityArray, config.attribute)
@@ -336,7 +336,7 @@ export class ScoringService {
     }
 
     /**
-     * Deferred matching compares a managed account against current-run unmatched peers.
+     * Deferred matching compares a managed account against current-operation unmatched deferred candidates.
      * Guard against accidental self-comparison to prevent a perfect self-match.
      */
     private isSameDeferredCandidate(fusionAccount: FusionAccount, fusionIdentity: FusionAccount): boolean {

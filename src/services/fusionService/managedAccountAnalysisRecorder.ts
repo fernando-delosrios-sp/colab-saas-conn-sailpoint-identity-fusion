@@ -58,17 +58,17 @@ export class ManagedAccountAnalysisRecorder {
                 .map((match) => {
                     const fields = fusionReportMatchCandidateAccountFields(match)
                     const fi = match.fusionIdentity
-                    const peerIdentityId = fi?.identityId
-                    const peerManagedAccountReportId = resolveReportAccountIdValue(fi?.managedAccountId, sources)
+                    const deferredCandidateIdentityId = fi?.identityId
+                    const deferredCandidateManagedAccountReportId = resolveReportAccountIdValue(fi?.managedAccountId, sources)
                     const candidateAccountReportId = resolveReportAccountIdValue(fields.accountId, sources)
                     const identityUrl =
-                        (peerIdentityId ? urlContext.identity(peerIdentityId) : undefined) ??
-                        (peerManagedAccountReportId ? urlContext.humanAccount(peerManagedAccountReportId) : undefined) ??
+                        (deferredCandidateIdentityId ? urlContext.identity(deferredCandidateIdentityId) : undefined) ??
+                        (deferredCandidateManagedAccountReportId ? urlContext.humanAccount(deferredCandidateManagedAccountReportId) : undefined) ??
                         (candidateAccountReportId ? urlContext.humanAccount(candidateAccountReportId) : undefined)
                     return {
                         ...fields,
                         identityName: match.identityName,
-                        identityId: peerIdentityId,
+                        identityId: deferredCandidateIdentityId,
                         identityUrl,
                         isMatch: true,
                         candidateType: MatchCandidateType.Deferred,
