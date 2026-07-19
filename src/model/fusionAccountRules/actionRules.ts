@@ -41,7 +41,7 @@ export function listReviewerSources(state: FusionAccountState): string[] {
 }
 
 /** True when at least one source-scoped reviewer action remains on the state. */
-export function actionsHasReviewerScope(state: FusionAccountState): boolean {
+function actionsHasReviewerScope(state: FusionAccountState): boolean {
     const prefix = FusionAction.ReviewerPrefix
     for (const action of state.actions) {
         if (action.startsWith(prefix)) {

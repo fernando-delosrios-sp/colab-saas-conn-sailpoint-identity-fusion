@@ -606,7 +606,7 @@ The connector handles this automatically. When it detects a stuck processing fla
 1. Confirm no other aggregation is currently in progress
 
 2. Run account aggregation again
-   (The first attempt auto-cleared the stuck flag; this run proceeds normally)
+   (The first attempt auto-cleared the stuck flag; this operation proceeds normally)
 
 3. Verify accounts updated
 ```

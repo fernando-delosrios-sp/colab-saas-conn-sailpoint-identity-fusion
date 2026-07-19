@@ -63,7 +63,7 @@ export class FusionService {
     private managedAccountAnalyzer: ManagedAccountAnalyzer
     private analysisRecorder: ManagedAccountAnalysisRecorder
     private candidateRegistry: CandidateRegistry
-    private passRunner: ManagedAccountMatchingRunner
+    private matchingRunner: ManagedAccountMatchingRunner
 
     public get fusionIdentityMap(): Map<string, FusionAccount> {
         return this._repository.fusionIdentityMap
@@ -105,7 +105,7 @@ export class FusionService {
     public readonly commandType?: StandardCommand
     /** Connector operation name (e.g. {@link OperationContext.AccountList}) — used when SDK commandType alone is ambiguous. */
     private readonly operationContext?: OperationContext
-    /** Accumulates Match scoring duration within a single managed-account analysis pass. */
+    /** Accumulates Match scoring duration within a single managed-account analysis sweep. */
     private currentRunMatchScoringMs = 0
 
     // ------------------------------------------------------------------------
@@ -146,7 +146,7 @@ export class FusionService {
             sourcesByName: this.sourcesByName,
             log: this.log,
         })
-        this.passRunner = new ManagedAccountMatchingRunner({
+        this.matchingRunner = new ManagedAccountMatchingRunner({
             config: this.config,
             log: this.log,
             managedAccountAnalyzer: this.managedAccountAnalyzer,
@@ -705,7 +705,7 @@ export class FusionService {
         // Correlated account sweep: resolve all correlated managed accounts before uncorrelated scoring begins.
         // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion row)
         // are registered as non-matches in the identity-linked Fusion account map here, so they are immediately visible
-        // as deferred-match candidates when uncorrelated accounts are scored in the main pass.
+        // as deferred-match candidates when uncorrelated accounts are scored in the uncorrelated scoring sweep.
         const correlatedAccounts = [...map.values()].filter((a) => a.uncorrelated === false)
         if (correlatedAccounts.length === 0) {
             return
@@ -724,15 +724,15 @@ export class FusionService {
     }
 
     /**
-     * Main pass: drains the remaining uncorrelated managed-account queue after the
+     * Uncorrelated scoring sweep: drains the remaining uncorrelated managed-account queue after the
      * correlated account sweep has claimed linked/correlated entries.
      */
-    private async runUncorrelatedManagedAccountPass(
+    private async runUncorrelatedManagedAccountSweep(
         queuedAccounts: Account[],
         batchSize: number,
         managedAccountProcessingStartedAt: number
     ): Promise<number> {
-        const results = await this.passRunner.execute(
+        const results = await this.matchingRunner.execute(
             queuedAccounts,
             batchSize,
             managedAccountProcessingStartedAt
@@ -785,8 +785,8 @@ export class FusionService {
      *
      * @param account - The ISC account from a managed source (typically uncorrelated on the work queue)
      * @returns The fusion account produced or updated, or undefined if skipped or sent for manual review.
-     *          Deferred-matching matches (peer is another new unmatched account from the same source) are removed from
-     *          the managed-account work queue for this run; they are expected to be re-fetched next aggregation.
+     *          Deferred-matching matches (deferred candidate is another unmatched account from the same source) are removed from
+     *          the managed-account work queue for this operation; they are expected to be re-fetched next aggregation.
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
@@ -817,7 +817,7 @@ export class FusionService {
             return this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
         }
 
-        const results = await this.passRunner.execute(
+        const results = await this.matchingRunner.execute(
             [account],
             1,
             Date.now()
@@ -1008,7 +1008,7 @@ export class FusionService {
         const results: FusionAccount[] = []
 
         const accounts = [...map.values()]
-        const runnerResults = await this.passRunner.execute(
+        const runnerResults = await this.matchingRunner.execute(
             accounts,
             this._managedAccountProcessingBatchSize || 1,
             Date.now()
@@ -1252,7 +1252,7 @@ export class FusionService {
     }
 
     /**
-     * Drops a managed account from the work queue for this run so deferred accounts are not
+     * Drops a managed account from the work queue for this operation so deferred accounts are not
      * counted as unprocessed or touched again until the next aggregation reloads them from sources.
      */
     private removeManagedAccountFromWorkQueue(account: Account): void {
@@ -1377,7 +1377,7 @@ export class FusionService {
 
     /**
      * Populate a reviewer's fusion reviews from pending (unanswered) form instances.
-     * Clears existing reviews so only current-run pending URLs are included.
+     * Clears existing reviews so only current-operation pending URLs are included.
      */
     private populateReviewerFusionReviewsFromPending(reviewer: FusionAccount): void {
         reviewer.clearFusionReviews()
@@ -1522,7 +1522,7 @@ export class FusionService {
     }
 
     /**
-     * Uncorrelated main pass: drain remaining work-queue entries after the correlated account sweep.
+     * Uncorrelated scoring sweep: drain remaining work-queue entries after the correlated account sweep.
      * @returns Processed count and match scoring duration for metric emission.
      */
     public async processUncorrelatedManagedAccounts(): Promise<{ processed: number; matchScoringMs: number }> {
@@ -1533,7 +1533,7 @@ export class FusionService {
         this.log.info(
             `Processing ${initialQueueSize} managed account(s): analyzing uncorrelated work-queue entries (matching and scoring vs identities)`
         )
-        const processed = await this.runUncorrelatedManagedAccountPass(
+        const processed = await this.runUncorrelatedManagedAccountSweep(
             queuedAccounts,
             this._managedAccountProcessingBatchSize,
             this._managedAccountProcessingStartedAt

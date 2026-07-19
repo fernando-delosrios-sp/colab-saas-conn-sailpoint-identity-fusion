@@ -28,7 +28,7 @@ export interface IdentityInfo {
  * and per-source account attribute arrays for merge operations.
  */
 export type FusionAttributeBag = {
-    /** Attributes from the previous aggregation run (used for change detection) */
+    /** Attributes from the previous aggregation (used for change detection) */
     previous: Attributes
     /** Current computed attributes (result of mapping + generation) */
     current: Attributes

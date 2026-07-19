@@ -6,7 +6,7 @@ import { FusionMatch } from '../services/scoringService'
 import { FusionAccountState } from './fusionAccountState'
 import type { FusionManagedAccountInfo, IdentityInfo } from './fusionAccountTypes'
 import { buildIdentityInfo } from './fusionAccountUtils'
-import { IDENTITIES_SOURCE_NAME, setIdentityIdAttribute } from './fusionAccountRules/constructionRules'
+import { setIdentityIdAttribute } from './fusionAccountRules/constructionRules'
 import {
     addFusionDecisionLayer,
     addFusionMatch,
@@ -56,7 +56,7 @@ import { importHistory } from './fusionAccountRules/historyRules'
  * Re-exported from the construction rules module so the canonical value lives with
  * the construction rules while the public API surface remains unchanged.
  */
-export { IDENTITIES_SOURCE_NAME }
+
 
 /**
  * Core domain model representing a fusion account in the Identity Fusion connector.
@@ -361,7 +361,7 @@ export class FusionAccountBase {
     }
 
     /**
-     * Clear all fusion review URLs so they can be repopulated from the current run.
+     * Clear all fusion review URLs so they can be repopulated from the current operation.
      * Used for reviewers so their reviews attribute reflects only current form instance URLs.
      */
     public clearFusionReviews(): void {

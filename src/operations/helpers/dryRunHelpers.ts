@@ -331,7 +331,7 @@ export const prepareDryRunOutputData = async (
     context: Pick<DryRunHelpersContext, 'attributes' | 'config' | 'fusion' | 'log'>,
     runtimeOptions: DryRunRuntimeOptions
 ): Promise<PreparedDryRunOutputData> => {
-    // Do not run a second managed-account analysis pass during dry-run output prep.
+    // Do not run a second managed-account analysis sweep during dry-run output prep.
     // This phase should only refresh unique attributes for accounts already processed upstream.
     const analyzedUncorrelatedAccounts: FusionAccount[] = []
     const uniqueRefreshOp = context.log.track('dryRun.refreshUniqueAttributes')
@@ -450,7 +450,7 @@ export const streamUncorrelatedAnalyzedRows = async (
 }
 
 /**
- * Deferred-matching matches do not create a fusion account in the run, so the managed
+ * Deferred-matching matches do not create a fusion account in the operation, so the managed
  * account id never appears on any `forEachISCAccount` row. Emit synthetic ISC-shaped stubs so
  * `enrichISCAccountWithMatching` can attach the deferred FusionReportAccount slice.
  */
