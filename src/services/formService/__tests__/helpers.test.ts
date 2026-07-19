@@ -10,7 +10,7 @@ import { MatchCandidateType } from '../../scoringService/types'
 
 describe('formService helpers', () => {
     describe('countIdentityBackedFusionMatches', () => {
-        it('counts identity candidates and excludes deferred deferred', () => {
+        it('counts identity candidates and excludes deferred candidates', () => {
             expect(
                 countIdentityBackedFusionMatches([
                     { identityId: 'a', identityName: 'A', scores: [] } as any,
