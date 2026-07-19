@@ -22,8 +22,6 @@ interface RecordedStep {
     stepId: string
     operation: string
     sweep?: number
-    /** @deprecated Backward-compatible alias; new code uses `sweep`. */
-    pass?: number
     input: unknown
     output: unknown[]
     stateAfter: StateSnapshot
@@ -71,10 +69,6 @@ export class RecordingService {
             for (const line of content.split('\n')) {
                 if (!line) continue
                 const step = JSON.parse(line) as RecordedStep
-                // Backward compatibility: older recordings stored the traversal index as `pass`.
-                if (step.sweep == null && step.pass != null) {
-                    step.sweep = step.pass
-                }
                 this.steps.push(step)
                 const match = step.stepId.match(/^step-(\d+)$/)
                 if (match) {
@@ -243,9 +237,7 @@ export class RecordingService {
         const scenarioSteps = this.steps.map((step) => ({
             id: step.stepId,
             operation: step.operation,
-            // `sweep` is the traversal index; `pass` is retained for wire-format/backward-compatibility.
             sweep: step.sweep,
-            pass: step.sweep,
             description: `Recorded ${step.operation} — ${step.duration}ms, ${step.output.length} outputs`,
             input: step.input as Record<string, unknown>,
             expectedOutput:
