@@ -1006,7 +1006,7 @@ describe('FusionService', () => {
             expect(sourceBDeferredCandidateSizes).toEqual([0])
         })
 
-        it('resolves all correlated accounts in pre-pass before uncorrelated batch processing', async () => {
+        it('resolves all correlated accounts in the correlated account sweep before uncorrelated batch processing', async () => {
             fusionService.config.managedAccountsBatchSize = 2
             const correlatedA = {
                 id: 'acct-corr-a',
