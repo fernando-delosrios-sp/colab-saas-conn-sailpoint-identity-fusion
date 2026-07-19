@@ -105,17 +105,13 @@ export function createOperationHandler(
                 operationName,
                 input,
                 res,
-                serviceRegistry.sources,
-                serviceRegistry.identities,
-                serviceRegistry.forms
+                serviceRegistry.fusionRun
             )
             await ServiceRegistry.run(serviceRegistry, () =>
                 runOperation(runMode, operationName, context, serviceRegistry, input, defaultFn)
             )
             serviceRegistry.recording?.endOperation(
-                serviceRegistry.sources,
-                serviceRegistry.identities,
-                serviceRegistry.forms
+                serviceRegistry.fusionRun
             )
         } catch (error) {
             if (error instanceof ConnectorError) throw error
