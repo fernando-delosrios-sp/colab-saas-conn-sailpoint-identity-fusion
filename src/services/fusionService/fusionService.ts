@@ -1377,7 +1377,7 @@ export class FusionService {
 
     /**
      * Populate a reviewer's fusion reviews from pending (unanswered) form instances.
-     * Clears existing reviews so only current-operation pending URLs are included.
+     * Clears existing reviews so only current-run pending URLs are included.
      */
     private populateReviewerFusionReviewsFromPending(reviewer: FusionAccount): void {
         reviewer.clearFusionReviews()

@@ -410,7 +410,7 @@ export const buildDryRunSummary = (params: {
 }): DryRunSummary => {
     const deferredMatchesCount = params.reportAccounts.filter((x) => Boolean(x.deferred) && x.matches.length > 0).length
 
-    // Operation-wide totals (dry-run account slice + fusion stats)
+    // Run-wide totals (dry-run account slice + fusion stats)
     const stats = params.stats ?? {}
     const totalFusionAccounts = stats.totalFusionAccounts ?? stats.fusionAccountsFound ?? 0
     /** Same value as `totals.fusionAccountsExisting` — authoritative fusion account inventory for this run. */

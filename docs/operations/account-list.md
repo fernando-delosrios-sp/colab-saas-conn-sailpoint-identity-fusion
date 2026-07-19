@@ -183,7 +183,7 @@ When a source is configured with `correlationMode: correlate`, correlations are 
 
 ### Reviewer validation for managed account scoring
 
-Before the managed account scoring loop begins, each managed source is validated for reviewer availability. Sources that lack a valid reviewer cannot create review forms for partial matches, making the scoring step unnecessary. Accounts from these sources skip scoring entirely and are added as unmatched. A single error is logged per source, avoiding the per-account warning that would otherwise repeat for every managed account without a reviewer.
+Before the managed account scoring loop begins, each managed source is validated for reviewer availability. Sources that lack a valid reviewer cannot create review forms for partial matches, making the scoring step unnecessary. Accounts from these sources skip scoring entirely and are added as non-matched. A single error is logged per source, avoiding the per-account warning that would otherwise repeat for every managed account without a reviewer.
 
 ### Machine account exclusion
 

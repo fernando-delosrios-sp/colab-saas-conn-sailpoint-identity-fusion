@@ -104,7 +104,7 @@ A candidate for matching that is an existing ISC identity (or a Fusion identity 
 
 ### Deferred candidate
 
-A candidate for matching that is another provisional Fusion account from the same source in the same operation, causing identity creation to be deferred until the next aggregation.
+A candidate for matching that is another provisional Fusion account from the same source in the same operation run, causing identity creation to be deferred until the next aggregation.
 
 ## Source types
 
@@ -114,11 +114,11 @@ Managed source accounts that create new ISC identities when they do not match an
 
 ### Records
 
-Managed source accounts that run **Map** and **Define** and may register unique attributes, but do not create Fusion accounts for unmatched rows.
+Managed source accounts that run **Map** and **Define** and may register unique attributes, but do not create Fusion accounts for non-matched rows.
 
 ### Orphan accounts
 
-Managed source accounts whose unmatched rows are dropped; optionally, stale orphan accounts can be disabled.
+Managed source accounts whose non-matched rows are dropped; optionally, stale orphan accounts can be disabled.
 
 ## Processing states
 
@@ -140,4 +140,4 @@ A Fusion account that no longer has any contributing managed source accounts. De
 
 ### Deferred
 
-A match result where the best candidate is a deferred candidate from the same source in the same operation. The connector defers creating a new identity until a later aggregation can compare against the established baseline.
+A match result where the best candidate is a deferred candidate from the same source in the same operation run. The connector defers creating a new identity until a later aggregation can compare against the established baseline.

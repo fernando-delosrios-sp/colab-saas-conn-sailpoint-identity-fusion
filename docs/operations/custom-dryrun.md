@@ -9,7 +9,7 @@ The `custom:dryrun` operation runs a non-persistent aggregation analysis. It exe
 1. **PHASE 1 – Setup and initialization**: Same as `std:account:list` setup phase (sources, schema, counters). If a reset flag is detected the operation aborts early.
 2. **PHASE 2 – Fetch data in parallel**: Loads fusion accounts, identities, managed accounts, and form data concurrently.
 3. **PHASE 3 – Refresh**: Refreshes existing fusion accounts with latest source data.
-4. **PHASE 4 – Process**: Processes identities, managed accounts, and form reconciliation — the full matching and scoring pipeline operations here. No state is persisted and no external API side-effects are triggered (`isPersistent = false`).
+4. **PHASE 4 – Process**: Processes identities, managed accounts, and form reconciliation — the full matching and scoring pipeline runs here. No state is persisted and no external API side-effects are triggered (`isPersistent = false`).
 5. **PHASE 5 – Output preparation**: Runs the unique attribute phase and assembles the dry-run output rows.
 6. **PHASE 6 – Output**: Streams enriched ISC account rows (filtered by `include*` flags) followed by a final `custom:dryrun:summary` object. If `writeToDisk: true`, rows and summary are written as pretty-printed JSON under `./reports` instead of being streamed; only the summary is returned.
 

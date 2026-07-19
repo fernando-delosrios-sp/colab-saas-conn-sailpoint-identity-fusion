@@ -726,7 +726,7 @@ describe('FusionService', () => {
             expect(byIdentity.has('identity-exact')).toBe(false)
         })
 
-        it('uses current-operation non-matched managed source accounts as deferred candidates for subsequent managed accounts', async () => {
+        it('uses current-run non-matched managed source accounts as deferred candidates for subsequent managed accounts', async () => {
             fusionService.config.managedAccountsBatchSize = 1
             const firstAccount = {
                 id: 'acct-seq-1',
@@ -2760,7 +2760,7 @@ describe('FusionService', () => {
             expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
         })
 
-        it('correlates accounts for authorized decisions to the selected identity in the same operation', async () => {
+        it('correlates accounts for authorized decisions to the selected identity in the same run', async () => {
             const managedAccount = {
                 id: 'acct-authz-1',
                 name: 'Authorized User',

@@ -1146,7 +1146,7 @@ export class AttributeService {
      *   prevent destruction of the identity linkage.
      *
      * Generated values are written to both the account's attribute bag and the shared
-     * Velocity context, making them available to subsequent definitions in the same operation.
+     * Velocity context, making them available to subsequent definitions in the same run.
      */
     /**
      * Process a single normal attribute definition for an account (Define phase of Map-Define-Match).
@@ -1163,7 +1163,7 @@ export class AttributeService {
      *   prevent destruction of the identity linkage.
      *
      * Generated values are written to both the account's attribute bag and the shared
-     * Velocity context, making them available to subsequent definitions in the same operation.
+     * Velocity context, making them available to subsequent definitions in the same run.
      */
     private async processNormalDefinition(
         definition: NormalAttributeDefinition,

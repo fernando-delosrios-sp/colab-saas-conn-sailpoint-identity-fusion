@@ -74,7 +74,7 @@ export class ScoringService {
     private readonly nameNormalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
 
     /**
-     * Trigram blocking index — built once per pipeline operation over the full identity pool.
+     * Trigram blocking index — built once per pipeline run over the full identity pool.
      * Maps each mandatory attribute name to its inverted trigram index.
      * Reduces O(n×m) identity comparisons to O(n×k) where k << m.
      *
@@ -336,7 +336,7 @@ export class ScoringService {
     }
 
     /**
-     * Deferred candidate matching compares a managed account against current-operation non-matched deferred candidates.
+     * Deferred candidate matching compares a managed account against current-run non-matched deferred candidates.
      * Guard against accidental self-comparison to prevent a perfect self-match.
      */
     private isSameDeferredCandidate(fusionAccount: FusionAccount, fusionIdentity: FusionAccount): boolean {

@@ -254,15 +254,15 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 | Term | Definition |
 |------|------------|
 | **Identity candidate** | A candidate for matching that is an existing ISC identity (or a Fusion identity already in the baseline). |
-| **Deferred candidate** | A candidate for matching that is another provisional Fusion account from the same source in the same operation, causing identity creation to be deferred until the next aggregation. |
+| **Deferred candidate** | A candidate for matching that is another provisional Fusion account from the same source in the same operation run, causing identity creation to be deferred until the next aggregation. |
 
 ### Source types
 
 | Term | Definition |
 |------|------------|
 | **Authoritative accounts** | Managed source accounts that create new ISC identities when they do not match an existing identity. Fusion typically owns correlation decisions for these sources. |
-| **Records** | Managed source accounts that run **Map** and **Define** and may register unique attributes, but do not create Fusion accounts for unmatched rows. |
-| **Orphan accounts** | Managed source accounts whose unmatched rows are dropped; optionally, stale orphan accounts can be disabled. |
+| **Records** | Managed source accounts that run **Map** and **Define** and may register unique attributes, but do not create Fusion accounts for non-matched rows. |
+| **Orphan accounts** | Managed source accounts whose non-matched rows are dropped; optionally, stale orphan accounts can be disabled. |
 
 ### Processing states and outcomes
 
@@ -272,7 +272,7 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 | **Uncorrelated** | A Fusion account or managed source account that is not yet linked to a known identity. |
 | **Non-matched / `nonMatched`** | A managed source account that completed the **Match** step without finding any acceptable identity candidate. The status entitlement value is `nonMatched`; the matching status string is `non-matched`. |
 | **Orphan** | A Fusion account that no longer has any contributing managed source accounts. Depending on configuration, orphan accounts may be removed or disabled. |
-| **Deferred** | A match result where the best candidate is a deferred candidate from the same source in the same operation. The connector defers creating a new identity until a later aggregation can compare against the established baseline. |
+| **Deferred** | A match result where the best candidate is a deferred candidate from the same source in the same operation run. The connector defers creating a new identity until a later aggregation can compare against the established baseline. |
 
 ## Retired Terms
 
@@ -288,6 +288,6 @@ The following terms are retired and SHALL NOT be used in new code, configuration
 | `new-unmatched` / `NewUnmatched` | deferred / `Deferred` |
 | `analyzeIdentityPhase` | `scoreIdentityCandidates` |
 | `analyzeDeferredPhase` | `scoreDeferredCandidates` |
-| `hasNewUnmatchedPeerMatches` | `hasDeferredMatches` |
+| `hasNewUnmatchedPeerMatches` | `hasDeferredCandidateMatches` |
 | `ManagedAccountPassRunner` | `ManagedAccountMatchingRunner` |
 | `processing run` | operation run, or the specific operation name when referring to the command definition |

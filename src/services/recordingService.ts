@@ -237,6 +237,8 @@ export class RecordingService {
         const scenarioSteps = this.steps.map((step) => ({
             id: step.stepId,
             operation: step.operation,
+            // `pass` is retained for wire-format/backward-compatibility. It is not the retired
+            // matching-traversal term; the connector uses "sweep" for traversal vocabulary.
             pass: step.pass,
             description: `Recorded ${step.operation} — ${step.duration}ms, ${step.output.length} outputs`,
             input: step.input as Record<string, unknown>,
