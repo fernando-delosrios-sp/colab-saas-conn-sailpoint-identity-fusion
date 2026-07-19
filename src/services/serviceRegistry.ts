@@ -17,6 +17,7 @@ import { MessagingService } from './messagingService'
 import { ProxyService } from './proxyService'
 import { ReportService } from './reportService'
 import { RecordingService } from './recordingService'
+import { FusionRun } from '../model/fusionRun'
 
 /**
  * Central dependency injection container for all connector services.
@@ -44,6 +45,7 @@ export class ServiceRegistry {
     public reports: ReportService
     public proxy: ProxyService
     public recording?: RecordingService
+    public fusionRun: FusionRun
 
     /**
      * Creates a new ServiceRegistry, initializing all services in dependency order.
@@ -60,6 +62,8 @@ export class ServiceRegistry {
         public res: Response<any>,
         operationContext?: string
     ) {
+        this.fusionRun = new FusionRun()
+
         // Initialize core services first
         const logConfig = operationContext ? { ...config, operationContext } : config
         this.log = context.logService ?? new LogService(logConfig)
