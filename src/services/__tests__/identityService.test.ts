@@ -1,5 +1,6 @@
 import { IdentityDocument } from 'sailpoint-api-client'
 import { FusionConfig } from '../../model/config'
+import { FusionRun } from '../../model/fusionRun'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
 import { SourceService } from '../sourceService'
@@ -63,7 +64,7 @@ function makeService(overrides: {
     const client = makeClient(overrides.searchResultsByQuery)
     const sources = makeSources()
     const config = makeConfig(overrides.config)
-    const service = new IdentityService(config, log, client as unknown as ClientService, sources as unknown as SourceService)
+    const service = new IdentityService(config, log, client as unknown as ClientService, sources as unknown as SourceService, new FusionRun())
     return { service, client }
 }
 

@@ -90,7 +90,7 @@ export class ServiceRegistry {
         this.entitlements = context.entitlementService ?? new EntitlementService(this.sources)
         this.scoring = context.scoringService ?? new ScoringService(this.config, this.log)
         this.identities =
-            context.identityService ?? new IdentityService(this.config, this.log, this.client, this.sources)
+            context.identityService ?? new IdentityService(this.config, this.log, this.client, this.sources, this.fusionRun)
         this.messaging =
             context.messagingService ??
             new MessagingService(this.config, this.log, this.client, this.sources, this.identities)
