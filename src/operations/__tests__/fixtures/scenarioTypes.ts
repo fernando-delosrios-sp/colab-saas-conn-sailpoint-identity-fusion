@@ -1,6 +1,6 @@
 import { SourceConfigLike } from '../harness/mockRegistry'
 
-type AggregationPassData = {
+type AggregationSweepData = {
     identitiesFound: number
     managedAccounts: Array<{ id: string; sourceName: string }>
     decisions: string[]
@@ -10,8 +10,8 @@ type AggregationPassData = {
 export type AggregationScenario = {
     name: string
     sourceConfigs: SourceConfigLike[]
-    passData: {
-        pass1: AggregationPassData
-        pass2: AggregationPassData
+    sweepData: {
+        sweep1: AggregationSweepData
+        sweep2: AggregationSweepData
     }
 }

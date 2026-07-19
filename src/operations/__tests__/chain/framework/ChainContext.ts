@@ -31,7 +31,7 @@ export interface ChainContext {
     state: ChainState
     config?: Record<string, unknown>
     options: {
-        pass: number
+        sweep: number
         stepId: string
     }
     scenario?: any

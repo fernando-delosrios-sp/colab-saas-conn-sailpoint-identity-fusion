@@ -60,7 +60,7 @@ export interface StepResult {
 export class ChainState {
     private state: ChainStateSnapshot
     private stepResults: StepResult[] = []
-    private passIndex = 0
+    private sweepIndex = 0
 
     constructor(initialState?: ChainStateSnapshot) {
         this.state = initialState ?? {
@@ -102,25 +102,25 @@ export class ChainState {
         }
     }
 
-    getManagedAccounts(pass?: number): ChainManagedAccount[] {
+    getManagedAccounts(sweep?: number): ChainManagedAccount[] {
         const stateAccounts = this.state.managedAccounts
         if (Array.isArray(stateAccounts)) {
             return stateAccounts as unknown as ChainManagedAccount[]
         }
-        const key = pass ? `pass${pass}` : this.activePassKey()
+        const key = sweep ? `sweep${sweep}` : this.activeSweepKey()
         return stateAccounts[key] ?? []
     }
 
-    private activePassKey(): string {
-        return `pass${this.passIndex || 1}`
+    private activeSweepKey(): string {
+        return `sweep${this.sweepIndex || 1}`
     }
 
-    setPassIndex(index: number): void {
-        this.passIndex = index
+    setSweepIndex(index: number): void {
+        this.sweepIndex = index
     }
 
-    getPassIndex(): number {
-        return this.passIndex
+    getSweepIndex(): number {
+        return this.sweepIndex
     }
 
     getFusionAccounts(): ChainFusionAccount[] {
@@ -185,7 +185,7 @@ export class ChainState {
                         this.addOrUpdateManagedAccount(account, stateAccounts as unknown as ChainManagedAccount[])
                     }
                 } else {
-                    const key = this.activePassKey()
+                    const key = this.activeSweepKey()
                     if (!stateAccounts[key]) {
                         stateAccounts[key] = []
                     }
@@ -196,17 +196,17 @@ export class ChainState {
             } else if (ma && typeof ma === 'object') {
                 const stateAccounts = this.state.managedAccounts
                 if (Array.isArray(stateAccounts)) {
-                    for (const passAccounts of Object.values(ma as Record<string, ChainManagedAccount[]>)) {
-                        for (const account of passAccounts) {
+                    for (const sweepAccounts of Object.values(ma as Record<string, ChainManagedAccount[]>)) {
+                        for (const account of sweepAccounts) {
                             this.addOrUpdateManagedAccount(account, stateAccounts as unknown as ChainManagedAccount[])
                         }
                     }
                 } else {
-                    for (const [key, passAccounts] of Object.entries(ma as Record<string, ChainManagedAccount[]>)) {
+                    for (const [key, sweepAccounts] of Object.entries(ma as Record<string, ChainManagedAccount[]>)) {
                         if (!stateAccounts[key]) {
                             stateAccounts[key] = []
                         }
-                        for (const account of passAccounts) {
+                        for (const account of sweepAccounts) {
                             this.addOrUpdateManagedAccount(account, stateAccounts[key])
                         }
                     }

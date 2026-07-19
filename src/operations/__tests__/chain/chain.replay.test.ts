@@ -78,7 +78,7 @@ function registerAllStepFns(): void {
         const replayCtx = buildReplayContext(step, context)
         const registry = replayCtx.registry as unknown as MockRegistry
 
-        context.state.setPassIndex(step.pass ?? 1)
+        context.state.setSweepIndex(step.sweep ?? 1)
 
         try {
             await accountList(registry as any, (step.input ?? { schema: { attributes: [] } }) as any)
@@ -92,7 +92,7 @@ function registerAllStepFns(): void {
 
         return {
             operation: step.operation,
-            pass: step.pass,
+            sweep: step.sweep,
             outputs: collectOutputs(replayCtx),
         }
     })
