@@ -232,7 +232,7 @@ The `FusionService` constructor MUST instantiate a `ManagedAccountMatchingRunner
 The runner's `execute` method MUST: (identity scoring sweep) run identity-phase analysis on all accounts in parallel batches, classify results as identity-match, deferred-pending, or non-match, and register deferred-pending candidates; (deferred scoring sweep) run deferred-phase analysis on all pending accounts in parallel batches, classifying results as deferred-match or non-match.
 
 #### Scenario: Identity match produces identity-match result
-- **WHEN** identity scoring produces `hasIdentityBackedMatches: true`
+- **WHEN** identity scoring produces `hasIdentityCandidateMatches: true`
 - **THEN** the runner emits a result with resolution `identity-match`
 
 #### Scenario: Deferred-enabled unmatched account is queued for deferred scoring sweep
@@ -263,7 +263,7 @@ The `execute` method MUST NOT call `recordAnalysis` or any dispatch handler. It 
 #### Scenario: Runner returns clean results
 - **WHEN** `execute` completes
 - **THEN** an array of `ManagedAccountMatchingResult` objects is returned
-- **AND** no calls to `recordAnalysis`, `handleIdentityBackedMatch`, `handleDeferredMatch`, or `handleNonMatch` are made
+- **AND** no calls to `recordAnalysis`, `handleIdentityMatch`, `handleDeferredMatch`, or `handleNonMatch` are made
 
 ### Requirement: ManagedAccountMatchingRunner SHALL report progress during execution
 The runner MUST log progress at intervals matching current behavior (first account, every log-every-N accounts, final account) including processed count and elapsed time.
@@ -282,7 +282,7 @@ The runner MUST log progress at intervals matching current behavior (first accou
 #### Scenario: Each result is recorded and dispatched
 - **WHEN** the runner returns results
 - **THEN** `recordAnalysis` is called once for each result
-- **AND** `identity-match` dispatches to `handleIdentityBackedMatch`
+- **AND** `identity-match` dispatches to `handleIdentityMatch`
 - **AND** `deferred-match` dispatches to `handleDeferredMatch`
 - **AND** `non-match` dispatches to `handleNonMatch`
 
@@ -292,7 +292,7 @@ The runner MUST log progress at intervals matching current behavior (first accou
 #### Scenario: Uncorrelated account processed via runner
 - **WHEN** `processManagedAccount` receives an uncorrelated account (`uncorrelated === true`)
 - **THEN** `passRunner.execute` is called with `[account]` and batch size 1
-- **AND** the returned result is dispatched via `handleIdentityBackedMatch`, `handleDeferredMatch`, or `handleNonMatch`
+- **AND** the returned result is dispatched via `handleIdentityMatch`, `handleDeferredMatch`, or `handleNonMatch`
 
 ### Requirement: FusionService SHALL call recordAnalysis exactly once per account
 `recordAnalysis` SHALL be called exactly once for each account's analysis, after the runner returns. No account SHALL be recorded more than once during the managed account processing pass.
