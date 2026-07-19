@@ -100,7 +100,7 @@ export class FusionAccountRepository {
         )
     }
 
-    public clearCurrentRunState(): void {
+    public clearCurrentOperationState(): void {
         this.currentOperationNonMatchedFusionManagedKeysBySource.clear()
         this.autoAssignedIdentityIds.clear()
     }
