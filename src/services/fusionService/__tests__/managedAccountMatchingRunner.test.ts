@@ -100,7 +100,7 @@ describe('ManagedAccountMatchingRunner', () => {
             hasIdentityBackedMatches: false,
         })
         scoreDeferredCandidates.mockImplementation((analysis: any) => {
-            analysis.fusionAccount.fusionMatches = [{ candidateType: 'new-unmatched', identityName: 'peer', scores: [] }]
+            analysis.fusionAccount.fusionMatches = [{ candidateType: 'deferred', identityName: 'peer', scores: [] }]
         })
         const runner = new ManagedAccountMatchingRunner({
             config: { managedAccountsBatchSize: 10 } as any,

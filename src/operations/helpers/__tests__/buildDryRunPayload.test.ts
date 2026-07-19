@@ -98,7 +98,7 @@ describe('buildDryRunPayload', () => {
                 deferred: true,
                 fusionIdentityComparisons: 2,
                 matches: [
-                    { identityName: 'Unmatched Candidate', isMatch: true, candidateType: 'new-unmatched', scores: [] },
+                    { identityName: 'Unmatched Candidate', isMatch: true, candidateType: 'deferred', scores: [] },
                 ],
             },
         ])

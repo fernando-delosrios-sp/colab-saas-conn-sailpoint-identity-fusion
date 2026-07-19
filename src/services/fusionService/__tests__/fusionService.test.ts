@@ -759,12 +759,12 @@ describe('FusionService', () => {
 
             mockScoring.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
-                if (candidateType !== 'new-unmatched') return candidateList.length
+                if (candidateType !== 'deferred') return candidateList.length
                 if (candidateList.length > 0) {
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Current run unmatched',
-                        candidateType: 'new-unmatched',
+                        candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any],
                     } as any)
                 }
@@ -819,12 +819,12 @@ describe('FusionService', () => {
                     await new Promise((resolve) => setTimeout(resolve, 5))
                 }
                 const candidateList = Array.from(candidates)
-                if (candidateType !== 'new-unmatched') return candidateList.length
+                if (candidateType !== 'deferred') return candidateList.length
                 if (candidateList.length > 0) {
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Current run unmatched',
-                        candidateType: 'new-unmatched',
+                        candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any],
                     } as any)
                 }
@@ -929,7 +929,7 @@ describe('FusionService', () => {
                     }
                     return candidateList.length
                 }
-                if (candidateType !== 'new-unmatched') {
+                if (candidateType !== 'deferred') {
                     return candidateList.length
                 }
                 inFlightDeferredB += 1
@@ -939,7 +939,7 @@ describe('FusionService', () => {
                     fusionAccount.addFusionMatch({
                         identityId: '',
                         identityName: 'Current run unmatched source B',
-                        candidateType: 'new-unmatched',
+                        candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                     } as any)
                 }
@@ -986,10 +986,10 @@ describe('FusionService', () => {
             mockAttributes.mapAttributes.mockImplementation((account) => account)
             mockAttributes.refreshNormalAttributes.mockResolvedValue()
 
-            const sourceBNewUnmatchedCandidateSizes: number[] = []
+            const sourceBDeferredCandidateSizes: number[] = []
             mockScoring.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
                 const n = Array.from(candidates).length
-                if (candidateType === 'new-unmatched') sourceBNewUnmatchedCandidateSizes.push(n)
+                if (candidateType === 'deferred') sourceBDeferredCandidateSizes.push(n)
                 return n
             })
 
@@ -1003,7 +1003,7 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account], 1, Date.now())
 
-            expect(sourceBNewUnmatchedCandidateSizes).toEqual([0])
+            expect(sourceBDeferredCandidateSizes).toEqual([0])
         })
 
         it('resolves all correlated accounts in pre-pass before uncorrelated batch processing', async () => {
@@ -1154,7 +1154,7 @@ describe('FusionService', () => {
             expect(mockScoring.scoreFusionAccount).toHaveBeenCalled()
         })
 
-        it('logs deferred matches and suppresses output for new-unmatched candidate matches', async () => {
+        it('logs deferred matches and suppresses output for deferred candidate matches', async () => {
             const mockManagedAccount = {
                 id: 'acct-deferred-1',
                 nativeIdentity: 'native-deferred-1',
@@ -1194,11 +1194,11 @@ describe('FusionService', () => {
 
             mockScoring.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
-                if (candidateType === 'new-unmatched') {
+                if (candidateType === 'deferred') {
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Unmatched Candidate',
-                        candidateType: 'new-unmatched',
+                        candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                     } as any)
                 }
@@ -1255,11 +1255,11 @@ describe('FusionService', () => {
 
             mockScoring.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
-                if (candidateType === 'new-unmatched') {
+                if (candidateType === 'deferred') {
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Unmatched Candidate',
-                        candidateType: 'new-unmatched',
+                        candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                     } as any)
                 }
@@ -1334,11 +1334,11 @@ describe('FusionService', () => {
 
             mockScoring.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
-                if (candidateType === 'new-unmatched') {
+                if (candidateType === 'deferred') {
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Unmatched Candidate CR',
-                        candidateType: 'new-unmatched',
+                        candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                     } as any)
                 }
@@ -2249,12 +2249,12 @@ describe('FusionService', () => {
 
             mockScoring.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
-                if (candidateType !== 'new-unmatched') return candidateList.length
+                if (candidateType !== 'deferred') return candidateList.length
                 if (candidateList.length > 0) {
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'A. Wesker',
-                        candidateType: 'new-unmatched',
+                        candidateType: 'deferred',
                         scores: [
                             { attribute: 'lastname', algorithm: 'jaro-winkler', score: 100, isMatch: true } as any,
                         ],
@@ -2271,7 +2271,7 @@ describe('FusionService', () => {
             const analyzed = await fusionService.analyzeUncorrelatedAccounts()
 
             expect(analyzed).toHaveLength(2)
-            expect(analyzed[1].fusionMatches.some((match) => match.candidateType === 'new-unmatched')).toBe(true)
+            expect(analyzed[1].fusionMatches.some((match) => match.candidateType === 'deferred')).toBe(true)
             expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
         })
 
@@ -2319,13 +2319,13 @@ describe('FusionService', () => {
             let deferredCandidatesFound = 0
             mockScoring.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
                 const n = Array.from(candidates).length
-                if (candidateType === 'new-unmatched') {
+                if (candidateType === 'deferred') {
                     deferredCandidatesFound = n
                     if (n > 0) {
                         _account.addFusionMatch({
                             identityId: '',
                             identityName: 'Previously Persisted Non-Match',
-                            candidateType: 'new-unmatched',
+                            candidateType: 'deferred',
                             scores: [
                                 { attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any,
                             ],

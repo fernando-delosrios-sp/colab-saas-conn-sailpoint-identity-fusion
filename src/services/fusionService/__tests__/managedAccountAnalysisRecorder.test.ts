@@ -65,7 +65,7 @@ describe('ManagedAccountAnalysisRecorder', () => {
             sourceName: 'HR',
             isMatch: true,
             fusionMatches: [
-                { candidateType: MatchCandidateType.NewUnmatched, identityName: 'Jane', scores: [] },
+                { candidateType: MatchCandidateType.Deferred, identityName: 'Jane', scores: [] },
             ],
         } as any
         recorder.recordAnalysis({

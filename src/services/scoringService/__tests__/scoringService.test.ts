@@ -493,7 +493,7 @@ describe('ScoringService deferred candidate matching', () => {
         const compared = await service.scoreFusionAccount(
             managedCandidate,
             [managedCandidate],
-            MatchCandidateType.NewUnmatched
+            MatchCandidateType.Deferred
         )
 
         expect(compared).toBe(0)
@@ -537,7 +537,7 @@ describe('ScoringService deferred candidate matching', () => {
         const compared = await service.scoreFusionAccount(
             analyzedManagedCandidate,
             [persistedUnmatchedCandidate],
-            MatchCandidateType.NewUnmatched
+            MatchCandidateType.Deferred
         )
 
         expect(compared).toBe(0)
@@ -579,7 +579,7 @@ describe('ScoringService deferred candidate matching', () => {
         const compared = await service.scoreFusionAccount(
             analyzedManagedCandidate,
             [persistedUnmatchedCandidate],
-            MatchCandidateType.NewUnmatched
+            MatchCandidateType.Deferred
         )
 
         expect(compared).toBe(0)

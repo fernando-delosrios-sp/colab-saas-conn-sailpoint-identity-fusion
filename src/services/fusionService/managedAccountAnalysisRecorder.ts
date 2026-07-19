@@ -54,7 +54,7 @@ export class ManagedAccountAnalysisRecorder {
             }
             const sourceTypeValue = sourcesByName.get(fusionAccount.sourceName)?.sourceType
             const deferredMatches = fusionAccount.fusionMatches
-                .filter((match) => match.candidateType === MatchCandidateType.NewUnmatched)
+                .filter((match) => match.candidateType === MatchCandidateType.Deferred)
                 .map((match) => {
                     const fields = fusionReportMatchCandidateAccountFields(match)
                     const fi = match.fusionIdentity
@@ -71,7 +71,7 @@ export class ManagedAccountAnalysisRecorder {
                         identityId: peerIdentityId,
                         identityUrl,
                         isMatch: true,
-                        candidateType: MatchCandidateType.NewUnmatched,
+                        candidateType: MatchCandidateType.Deferred,
                         exact: isExactAttributeMatchScores(match.scores),
                         scores: mapScoreReportsForFusionReport(match.scores),
                     }

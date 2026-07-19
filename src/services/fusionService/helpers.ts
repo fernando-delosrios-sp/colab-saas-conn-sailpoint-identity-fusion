@@ -211,6 +211,6 @@ export function hasIdentityBackedMatches(fusionAccount: FusionAccount): boolean 
     return fusionAccount.fusionMatches.some((match) => (match.candidateType ?? 'identity') === 'identity')
 }
 
-export function hasNewUnmatchedPeerMatches(fusionAccount: FusionAccount): boolean {
-    return fusionAccount.fusionMatches.some((match) => match.candidateType === 'new-unmatched')
+export function hasDeferredMatches(fusionAccount: FusionAccount): boolean {
+    return fusionAccount.fusionMatches.some((match) => match.candidateType === 'deferred')
 }
