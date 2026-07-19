@@ -16,7 +16,7 @@ import { mapValuesToArray, forEachBatched, compact } from './collections'
 import { FusionDecision } from '../../model/form'
 import { SchemaService } from '../schemaService'
 import { FusionMatch, MatchCandidateType } from '../matchService/types'
-import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchService/scoringService'
+import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchService/matchService'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats, OperationContext } from './types'
 import {
     batchProcess as batchProcessWithConfig,

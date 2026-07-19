@@ -6,7 +6,7 @@ import {
     mapScoreReportsForFusionReport,
 } from './helpers'
 import { isExactAttributeMatchScores } from '../matchService/exactMatch'
-import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchService/scoringService'
+import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchService/matchService'
 import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
 import { UrlContext } from '../../utils/url'
 import { SourceInfo, SourceService } from '../sourceService'
