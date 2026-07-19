@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { MatchService } from '../scoringService'
+import { MatchService } from '../matchService'
 
 describe('MatchService', () => {
     const mockLog = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as any
