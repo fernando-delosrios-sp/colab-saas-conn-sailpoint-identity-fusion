@@ -10,6 +10,9 @@ import { FusionService } from './fusionService'
 import { IdentityService } from './identityService'
 import { SchemaService } from './schemaService'
 import { FormService } from './formService'
+import { MapService } from './mapService'
+import { DefineService } from './defineService'
+import { MatchService } from './matchService'
 import { AttributeService } from './attributeService'
 import { EntitlementService } from './entitlementService'
 import { ScoringService } from './scoringService'
@@ -41,6 +44,9 @@ export class ServiceRegistry {
     public attributes: AttributeService
     public entitlements: EntitlementService
     public scoring: ScoringService
+    public map: MapService
+    public define: DefineService
+    public match: MatchService
     public messaging: MessagingService
     public reports: ReportService
     public proxy: ProxyService
@@ -104,6 +110,15 @@ export class ServiceRegistry {
         this.attributes =
             context.attributesService ??
             new AttributeService(this.config, this.schemas, this.sources, this.log, this.locks)
+
+        // Initialize new services (Tasks 6-8)
+        this.map = context.mapService ?? new MapService(this.config, this.log)
+        this.define =
+            context.defineService ??
+            new DefineService(this.config, this.schemas, this.log, this.locks)
+        this.match =
+            context.matchService ??
+            new MatchService(this.config, this.log)
 
         // Initialize FusionService last (depends on multiple services)
         this.fusion =
