@@ -106,7 +106,7 @@ export class FusionService {
     /** Connector operation name (e.g. {@link OperationContext.AccountList}) — used when SDK commandType alone is ambiguous. */
     private readonly operationContext?: OperationContext
     /** Accumulates Match scoring duration within a single managed-account analysis sweep. */
-    private currentRunMatchScoringMs = 0
+    private currentOperationMatchScoringMs = 0
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -1004,7 +1004,7 @@ export class FusionService {
     public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
-        this.currentRunMatchScoringMs = 0
+        this.currentOperationMatchScoringMs = 0
         const results: FusionAccount[] = []
 
         const accounts = [...map.values()]
@@ -1040,7 +1040,7 @@ export class FusionService {
     }
 
     public addMatchScoringTimeMs(ms: number): void {
-        this.currentRunMatchScoringMs += ms
+        this.currentOperationMatchScoringMs += ms
     }
 
     /**
@@ -1449,7 +1449,7 @@ export class FusionService {
         }
     }
 
-    public currentRunUnmatchedCandidatesForSource(sourceName: string | null | undefined): Iterable<FusionAccount> {
+    public currentOperationDeferredCandidatesForSource(sourceName: string | null | undefined): Iterable<FusionAccount> {
         return this.candidateRegistry.queryForSource(sourceName)
     }
 
@@ -1495,7 +1495,7 @@ export class FusionService {
         this.tracker.newManagedAccountsCount = map.size
         this.candidateRegistry.clear()
         this.autoAssignedIdentityIds.clear()
-        this.currentRunMatchScoringMs = 0
+        this.currentOperationMatchScoringMs = 0
 
         for (const fusionAccount of this.fusionAccountMap.values()) {
             this.candidateRegistry.register(fusionAccount)
@@ -1539,7 +1539,7 @@ export class FusionService {
             this._managedAccountProcessingStartedAt
         )
         this._managedAccountProcessingState = 'idle'
-        return { processed, matchScoringMs: this.currentRunMatchScoringMs }
+        return { processed, matchScoringMs: this.currentOperationMatchScoringMs }
     }
 
     /**

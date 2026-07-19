@@ -726,7 +726,7 @@ describe('FusionService', () => {
             expect(byIdentity.has('identity-exact')).toBe(false)
         })
 
-        it('uses current-operation unmatched accounts as deferred candidates for subsequent managed accounts', async () => {
+        it('uses current-operation non-matched managed source accounts as deferred candidates for subsequent managed accounts', async () => {
             fusionService.config.managedAccountsBatchSize = 1
             const firstAccount = {
                 id: 'acct-seq-1',
@@ -2399,7 +2399,7 @@ describe('FusionService', () => {
         it('stores persisted fusion accounts under the fusion-source composite key', () => {
             const account = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'legacy-native-id',
-                name: 'Legacy Unmatched',
+                name: 'Legacy Non-matched',
                 sourceName: 'Identity Fusion NG',
                 attributes: {
                     originAccount: 'source-a-id::shared-native-id',
@@ -2412,10 +2412,10 @@ describe('FusionService', () => {
             expect(fusionService.getFusionAccountByManagedKey(`legacy-native-id`)).toBe(account)
         })
 
-        it('normalizes persisted origin composite key when restoring unmatched accounts', () => {
+        it('normalizes persisted origin composite key when restoring non-matched managed source accounts', () => {
             const account = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'legacy-native-id',
-                name: 'Legacy Unmatched',
+                name: 'Legacy Non-matched',
                 sourceName: 'Identity Fusion NG',
                 attributes: {
                     originAccount: ' source-a-id :: shared-native-id ',

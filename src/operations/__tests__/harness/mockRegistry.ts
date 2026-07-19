@@ -129,7 +129,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
 
     const attributes = {
         initializeCounters: vi.fn().mockResolvedValue(undefined),
-        registerUniqueValuesFromRawAccounts: vi.fn(),
+        registerUniqueValuesFromManagedSourceAccounts: vi.fn(),
         refreshUniqueAttributes: vi.fn().mockResolvedValue(undefined),
         saveState: vi.fn().mockResolvedValue(undefined),
     }

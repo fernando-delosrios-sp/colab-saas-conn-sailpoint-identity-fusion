@@ -43,7 +43,7 @@ export const accountEnable = async (serviceRegistry: ServiceRegistry, input: Std
 
         await sources.fetchFusionAccounts()
         // Bulk-register unique values directly from managed source accounts (lightweight, no FusionAccount hydration)
-        attributes.registerUniqueValuesFromRawAccounts(sources.fusionAccounts)
+        attributes.registerUniqueValuesFromManagedSourceAccounts(sources.fusionAccounts)
         // Still need preProcessFusionAccounts to populate the identity-linked Fusion account map
         const preProcessOp = log.track('FusionService.preProcessFusionAccounts')
         const preProcessedAccounts = await fusion.preProcessFusionAccounts()

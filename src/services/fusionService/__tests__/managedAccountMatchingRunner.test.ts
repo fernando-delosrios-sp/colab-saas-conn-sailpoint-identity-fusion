@@ -57,7 +57,7 @@ describe('ManagedAccountMatchingRunner', () => {
         expect(results[0].analysis.hasIdentityCandidateMatches).toBe(true)
     })
 
-    it('returns non-match for non-deferred unmatched account', async () => {
+    it('returns non-match for non-deferred non-matched managed source account', async () => {
         const { runner, scoreIdentityCandidates } = makeRunner()
         scoreIdentityCandidates.mockResolvedValue({
             account: { name: 'acct1', sourceName: 'Source A' },
