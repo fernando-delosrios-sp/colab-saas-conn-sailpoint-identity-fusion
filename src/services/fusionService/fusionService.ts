@@ -785,7 +785,7 @@ export class FusionService {
      *
      * @param account - The ISC account from a managed source (typically uncorrelated on the work queue)
      * @returns The fusion account produced or updated, or undefined if skipped or sent for manual review.
-     *          Deferred-matching matches (deferred candidate is another unmatched account from the same source) are removed from
+     *          Deferred candidate matches (deferred candidate is another provisional Fusion account from the same source) are removed from
      *          the managed-account work queue for this operation; they are expected to be re-fetched next aggregation.
      */
     public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {

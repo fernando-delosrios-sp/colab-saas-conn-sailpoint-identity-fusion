@@ -276,7 +276,7 @@ export class ScoringService {
      *
      * Yields periodically so heavy Match scoring does not block the Node event loop.
      *
-     * @param fusionAccount - The account to score (typically a new/unmatched account)
+     * @param fusionAccount - The account to score (typically a provisional Fusion account)
      * @param fusionIdentities - The set of existing fusion identities to compare against
      * @param maxIdentityMatches - When set, stop scoring against further identities once this many
      *   threshold-passing identity-origin matches are recorded (same cap as the review form).
