@@ -92,7 +92,7 @@ export class ManagedAccountAnalyzer {
         analysis.fusionIdentityComparisons += await this.state.scoring.scoreFusionAccount(
             analysis.fusionAccount,
             this.state.currentRunUnmatchedCandidatesForSource(analysis.account.sourceName),
-            MatchCandidateType.NewUnmatched
+            MatchCandidateType.Deferred
         )
         this.state.addMatchScoringTimeMs(Date.now() - deferredScoringStarted)
     }

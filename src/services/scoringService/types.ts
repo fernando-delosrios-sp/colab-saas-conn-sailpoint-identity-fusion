@@ -7,7 +7,7 @@ import { MatchingConfig } from '../../model/config'
 
 export enum MatchCandidateType {
     Identity = 'identity',
-    NewUnmatched = 'new-unmatched',
+    Deferred = 'deferred',
 }
 
 /**

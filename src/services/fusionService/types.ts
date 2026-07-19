@@ -47,7 +47,7 @@ export type FusionReportMatch = {
     /** Whether this candidate is considered a match overall */
     isMatch: boolean
     /** Candidate source used for downstream diagnostics/reporting. */
-    candidateType?: 'identity' | 'new-unmatched'
+    candidateType?: 'identity' | 'deferred'
     /** 
      * True when every configured rule scored 100 with none skipped (exact attribute match).
      * @deprecated Use auto or manual instead.

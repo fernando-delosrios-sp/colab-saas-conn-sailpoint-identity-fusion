@@ -32,7 +32,7 @@ import {
     createAutomaticAssignmentDecision,
     formatFusionMatchDiscoveryLog,
     hasIdentityBackedMatches as checkHasIdentityBackedMatches,
-    hasNewUnmatchedPeerMatches as checkHasNewUnmatchedPeerMatches,
+    hasDeferredMatches as checkHasDeferredMatches,
 } from './helpers'
 import { AttributeOperations } from '../attributeService/types'
 import { getManagedAccountKeyFromAccount, normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
@@ -969,7 +969,7 @@ export class FusionService {
     }
 
     private handleDeferredMatch(fusionAccount: FusionAccount, account: Account): undefined {
-        const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'new-unmatched')
+        const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'deferred')
         const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
         this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}; skipping account for now`)
         this.removeManagedAccountFromWorkQueue(account)
@@ -1022,10 +1022,10 @@ export class FusionService {
             if (
                 fusionAccount.isMatch &&
                 !checkHasIdentityBackedMatches(fusionAccount) &&
-                checkHasNewUnmatchedPeerMatches(fusionAccount)
+                checkHasDeferredMatches(fusionAccount)
             ) {
                 const deferredMatches = fusionAccount.fusionMatches.filter(
-                    (m) => m.candidateType === MatchCandidateType.NewUnmatched
+                    (m) => m.candidateType === MatchCandidateType.Deferred
                 )
                 const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
                 this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}`)

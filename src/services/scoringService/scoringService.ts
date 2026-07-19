@@ -307,7 +307,7 @@ export class ScoringService {
         let yieldCounter = 0
         for (const fusionIdentity of fusionIdentities) {
             if (
-                candidateType === MatchCandidateType.NewUnmatched &&
+                candidateType === MatchCandidateType.Deferred &&
                 this.isSameDeferredCandidate(fusionAccount, fusionIdentity)
             ) {
                 continue

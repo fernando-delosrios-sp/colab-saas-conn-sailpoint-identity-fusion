@@ -337,7 +337,7 @@ describe('dryRun', () => {
                             {
                                 identityName: 'Peer unmatched',
                                 isMatch: true,
-                                candidateType: 'new-unmatched',
+                                candidateType: 'deferred',
                                 scores: [],
                             },
                         ],

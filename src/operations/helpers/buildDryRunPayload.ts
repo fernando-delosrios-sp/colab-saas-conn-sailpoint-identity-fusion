@@ -185,11 +185,6 @@ export const buildReportAccountIndex = (reportAccounts: FusionReportAccount[]): 
     return index
 }
 
-const wireCandidateType = (ct: FusionReportMatch['candidateType']): MatchingCandidate['candidateType'] => {
-    if (ct === 'new-unmatched') return 'deferred'
-    return 'identity'
-}
-
 const mapScoresToThresholdWire = (scores: FusionReportMatch['scores'] | undefined): MatchingCandidate['scores'] =>
     scores?.map((s) => {
         const { fusionScore, ...rest } = s
@@ -239,7 +234,7 @@ const buildMatchingPayload = (
                 accountId: match.accountId,
                 accountName: match.accountName,
                 isMatch: match.isMatch,
-                candidateType: wireCandidateType(match.candidateType),
+                candidateType: match.candidateType,
                 exact: match.exact,
                 scores: mapScoresToThresholdWire(match.scores),
             })

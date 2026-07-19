@@ -5,7 +5,7 @@ import type { LogService } from '../logService'
 import type { ManagedAccountAnalyzer, ManagedAccountAnalysisContext } from './managedAccountAnalyzer'
 import type { CandidateRegistry } from './candidateRegistry'
 import { yieldToEventLoop } from './batching'
-import { hasNewUnmatchedPeerMatches as checkHasNewUnmatchedPeerMatches } from './helpers'
+import { hasDeferredMatches as checkHasDeferredMatches } from './helpers'
 
 export interface ManagedAccountMatchingRunnerState {
     readonly config: FusionConfig
@@ -97,7 +97,7 @@ export class ManagedAccountMatchingRunner {
             await Promise.all(
                 batch.map(async (pending) => {
                     await this.state.managedAccountAnalyzer.scoreDeferredCandidates(pending.analysis)
-                    if (checkHasNewUnmatchedPeerMatches(pending.analysis.fusionAccount)) {
+                    if (checkHasDeferredMatches(pending.analysis.fusionAccount)) {
                         results.push({ analysis: pending.analysis, resolution: 'deferred-match' })
                     } else {
                         results.push({ analysis: pending.analysis, resolution: 'non-match' })
