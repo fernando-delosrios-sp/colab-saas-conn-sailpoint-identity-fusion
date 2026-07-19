@@ -1,0 +1,88 @@
+# define-service Spec (Delta)
+
+## ADDED Requirements
+
+### Requirement: DefineService evaluates Velocity templates for normal attributes
+
+DefineService SHALL evaluate Apache Velocity templates for Normal attribute definitions, rendering values from the Velocity context built from the FusionAccount's attribute bag, managed account snapshots, identity data, and helper objects.
+
+#### Scenario: Normal attribute rendered from Velocity expression
+- **WHEN** DefineService.refreshNormalAttributes is called with a FusionAccount
+- **THEN** each Normal attribute definition's expression SHALL be evaluated against the Velocity context
+- **AND** the rendered value SHALL be written to fusionAccount.attributes[definition.name]
+
+### Requirement: DefineService generates unique attribute values with collision handling
+
+DefineService SHALL generate unique attribute values for Unique attribute definitions, using the configured uniqueness strategy (UUID, incremental counter, or collision-based disambiguation with $counter).
+
+#### Scenario: UUID-based unique attribute generated
+- **GIVEN** a Unique definition with expression containing $UUID
+- **WHEN** refreshUniqueAttributes evaluates the definition
+- **THEN** a v4 UUID SHALL be generated and injected into the context as $UUID
+- **AND** if the generated value collides, a new UUID SHALL be generated
+
+#### Scenario: Collision-based unique attribute with $counter
+- **GIVEN** a Unique definition with expression that generates a colliding value
+- **WHEN** refreshUniqueAttributes evaluates the definition
+- **THEN** $counter SHALL be appended and incremented until a unique value is found
+- **AND** $counter on the first attempt SHALL be the empty string
+
+#### Scenario: Incremental counter unique attribute
+- **GIVEN** a Unique definition with useIncrementalCounter enabled
+- **WHEN** refreshUniqueAttributes evaluates the definition
+- **THEN** the persistent counter SHALL increment on each evaluation
+- **AND** the generated value SHALL incorporate the incremented counter
+
+### Requirement: DefineService manages unique value registries
+
+DefineService SHALL maintain per-attribute sets of registered unique values to prevent collisions. It SHALL provide register and unregister operations for lifecycle management.
+
+#### Scenario: Unique values registered after generation
+- **WHEN** a unique attribute value is successfully generated
+- **THEN** the value SHALL be added to the registered set for that attribute
+
+#### Scenario: Unique values unregistered on account removal
+- **WHEN** unregisterUniqueAttributes is called for a FusionAccount
+- **THEN** all unique values owned by that account SHALL be removed from registered sets
+
+### Requirement: DefineService applies output transforms in canonical order
+
+DefineService SHALL apply the transform pipeline (trim → case → spaces → normalize → counter-aware maxLength) to Velocity-rendered values in exact order.
+
+#### Scenario: All transforms applied in order
+- **WHEN** a raw value "  HELLO WORLD  " is processed with trim, lower, spaces, maxLength:11
+- **THEN** trim produces "HELLO WORLD"
+- **AND** case produces "hello world"
+- **AND** spaces produces "helloworld"
+- **AND** maxLength leaves "helloworld" unchanged
+
+### Requirement: DefineService ensures core schema attributes are never empty
+
+DefineService SHALL guarantee that fusionIdentityAttribute and fusionDisplayAttribute always have values, falling back to generated UUIDs or account names when no definition produces a value.
+
+#### Scenario: Identity attribute falls back to UUID
+- **GIVEN** a FusionAccount with no definition producing an identity attribute value
+- **WHEN** ensureCoreSchemaAttributes is called
+- **THEN** a v4 UUID SHALL be assigned to fusionIdentityAttribute
+
+#### Scenario: Display attribute falls back to account name
+- **GIVEN** a FusionAccount with no definition producing a display attribute value
+- **WHEN** ensureCoreSchemaAttributes is called
+- **THEN** the account name SHALL be assigned to fusionDisplayAttribute
+
+### Requirement: DefineService manages counter state
+
+DefineService SHALL persist counter state across operation runs via StateWrapper, using LockService for thread-safe increments in parallel processing.
+
+#### Scenario: Persistent counter increments safely
+- **WHEN** two concurrent operations increment the same counter
+- **THEN** each SHALL receive a unique increment value
+- **AND** no values SHALL be skipped or duplicated
+
+### Requirement: DefineService is stateless between methods
+
+DefineService SHALL receive FusionRun as a parameter for accessing shared state. Internal caches (unique registries, counter state) SHALL be thread-safe and not leak between operation runs.
+
+#### Scenario: DefineService can be shared across concurrent operations
+- **WHEN** two concurrent operations call DefineService methods with different FusionRun instances
+- **THEN** there SHALL be no cross-contamination of unique registries or counter state
