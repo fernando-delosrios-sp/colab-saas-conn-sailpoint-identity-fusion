@@ -33,7 +33,7 @@ describe('FusionService', () => {
     const FUSION_SOURCE_ID = 'fusion-src'
 
     let fusionService: FusionService
-    let fusionRun: FusionRun
+    let run: FusionRun
     let mockLog: Mocked<LogService>
     let mockIdentities: Mocked<IdentityService>
     let mockSources: Mocked<SourceService>
@@ -45,7 +45,7 @@ describe('FusionService', () => {
     let mockConfig: FusionConfig
 
     beforeEach(() => {
-        fusionRun = new FusionRun()
+        run = new FusionRun()
 
         // Mock config with Type assertion
         mockConfig = {
@@ -109,13 +109,13 @@ describe('FusionService', () => {
             configurable: true,
         })
 
-        // Redirect fusionRun.managedAccountsById/ByIdentityId to mockSources getters
-        // so that test spies on mockSources flow through to production code accessing fusionRun directly.
-        Object.defineProperty(fusionRun, 'managedAccountsById', {
+        // Redirect run.managedAccountsById/ByIdentityId to mockSources getters
+        // so that test spies on mockSources flow through to production code accessing run directly.
+        Object.defineProperty(run, 'managedAccountsById', {
             get: () => mockSources.managedAccountsById,
             configurable: true,
         })
-        Object.defineProperty(fusionRun, 'managedAccountsByIdentityId', {
+        Object.defineProperty(run, 'managedAccountsByIdentityId', {
             get: () => mockSources.managedAccountsByIdentityId,
             configurable: true,
         })
@@ -164,7 +164,7 @@ describe('FusionService', () => {
             mockDefineService,
             mockMatchService,
             mockSchemas,
-            fusionRun,
+            run,
             StandardCommand.StdAccountList
         )
         fusionService.setTracker(new AggregationTracker())
@@ -997,11 +997,11 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;fusionRun.fusionAccountMap.set('source-a-id::native-other-source', sourceAAccount)
+            ;run.fusionAccountMap.set('source-a-id::native-other-source', sourceAAccount)
             {
                 const candidates = new Set(['source-a-id::native-other-source'])
                 for (const mk of candidates) {
-                    const fa = fusionRun.fusionAccountMap.get(mk)
+                    const fa = run.fusionAccountMap.get(mk)
                     if (fa) (fusionService as any).candidateRegistry.register(fa)
                 }
             }
@@ -1208,11 +1208,11 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;fusionRun.fusionAccountMap.set('source-a-id::native-prev-nonmatch-1', nonMatchedCandidate)
+            ;run.fusionAccountMap.set('source-a-id::native-prev-nonmatch-1', nonMatchedCandidate)
             {
                 const candidates = new Set(['source-a-id::native-prev-nonmatch-1'])
                 for (const mk of candidates) {
-                    const fa = fusionRun.fusionAccountMap.get(mk)
+                    const fa = run.fusionAccountMap.get(mk)
                     if (fa) (fusionService as any).candidateRegistry.register(fa)
                 }
             }
@@ -1269,11 +1269,11 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;fusionRun.fusionAccountMap.set('source-a-id::native-prev-nonmatch-cap', nonMatchedCandidate)
+            ;run.fusionAccountMap.set('source-a-id::native-prev-nonmatch-cap', nonMatchedCandidate)
             {
                 const candidates = new Set(['source-a-id::native-prev-nonmatch-cap'])
                 for (const mk of candidates) {
-                    const fa = fusionRun.fusionAccountMap.get(mk)
+                    const fa = run.fusionAccountMap.get(mk)
                     if (fa) (fusionService as any).candidateRegistry.register(fa)
                 }
             }
@@ -1298,7 +1298,7 @@ describe('FusionService', () => {
             fusionService.setTracker(tracker)
             const results = await (fusionService as any).matchingRunner.execute([mockManagedAccount], 1, Date.now())
             if (results.length > 0) {
-                fusionRun.analysisRecorder!.recordAnalysis(results[0].analysis)
+                run.analysisRecorder!.recordAnalysis(results[0].analysis)
             }
             const report = fusionService.generateReport(tracker, true)
             expect(report.accounts.some((a) => a.deferred && a.accountId === 'source-a-id::native-no-report-cap')).toBe(
@@ -1317,7 +1317,7 @@ describe('FusionService', () => {
                 mockDefineService,
                 mockMatchService,
                 mockSchemas,
-                fusionRun,
+                run,
                 StandardCommand.StdAccountList,
                 OperationContext.CustomDryRun
             )
@@ -1347,14 +1347,14 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;fusionRun.fusionAccountMap.set(
+            ;run.fusionAccountMap.set(
                 'source-a-id::native-prev-nonmatch-cr',
                 nonMatchedCandidate
             )
             {
                 const candidates = new Set(['source-a-id::native-prev-nonmatch-cr'])
                 for (const mk of candidates) {
-                    const fa = fusionRun.fusionAccountMap.get(mk)
+                    const fa = run.fusionAccountMap.get(mk)
                     if (fa) (customReportFusion as any).candidateRegistry.register(fa)
                 }
             }
@@ -1379,7 +1379,7 @@ describe('FusionService', () => {
             customReportFusion.setTracker(tracker)
             const results = await (customReportFusion as any).matchingRunner.execute([mockManagedAccount], 1, Date.now())
             if (results.length > 0) {
-                fusionRun.analysisRecorder!.recordAnalysis(results[0].analysis)
+                run.analysisRecorder!.recordAnalysis(results[0].analysis)
             }
             const report = customReportFusion.generateReport(tracker, true)
             expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-run-def')).toBe(
@@ -1529,7 +1529,7 @@ describe('FusionService', () => {
                 mockDefineService,
                 mockMatchService,
                 mockSchemas,
-                fusionRun,
+                run,
                 undefined,
                 OperationContext.AccountList
             )
@@ -1639,7 +1639,7 @@ describe('FusionService', () => {
                 mockDefineService,
                 mockMatchService,
                 mockSchemas,
-                fusionRun,
+                run,
                 undefined
             )
             analysisFusion.setTracker(new AggregationTracker())
@@ -1699,7 +1699,7 @@ describe('FusionService', () => {
                 mockDefineService,
                 mockMatchService,
                 mockSchemas,
-                fusionRun,
+                run,
                 undefined
             )
             analysisFusion.setTracker(new AggregationTracker())
@@ -1760,7 +1760,7 @@ describe('FusionService', () => {
                 mockDefineService,
                 mockMatchService,
                 mockSchemas,
-                fusionRun,
+                run,
                 undefined
             )
             analysisFusion.setTracker(new AggregationTracker())
@@ -2323,7 +2323,7 @@ describe('FusionService', () => {
                 attributes: {},
             } as any)
             persistedNonMatch.setNonMatched()
-            ;fusionRun.fusionAccountMap.set(
+            ;run.fusionAccountMap.set(
                 'source-a-id::native-persisted-nonmatch',
                 persistedNonMatch
             )

@@ -67,10 +67,10 @@ export class FusionService {
     private matchingRunner: ManagedAccountMatchingRunner
 
     public get fusionIdentityMap(): Map<string, FusionAccount> {
-        return this.fusionRun.fusionIdentityMap
+        return this.run.fusionIdentityMap
     }
     public get fusionAccountMap(): Map<string, FusionAccount> {
-        return this.fusionRun.fusionAccountMap
+        return this.run.fusionAccountMap
     }
     public get _reviewersBySourceId(): Map<string, Set<FusionAccount>> {
         return this._repository.reviewersBySourceId
@@ -79,16 +79,16 @@ export class FusionService {
         return this._repository.sourcesWithoutReviewers
     }
     public get currentRunNonMatchedFusionManagedKeysBySource(): Map<string, Set<string>> {
-        return this.fusionRun.currentRunNonMatchedKeysBySource
+        return this.run.currentRunNonMatchedKeysBySource
     }
     public get autoAssignedIdentityIds(): Set<string> {
-        return this.fusionRun.autoAssignedIdentityIds
+        return this.run.autoAssignedIdentityIds
     }
     public get _linkedAccountKeyIndex(): Set<string> | undefined {
-        return this.fusionRun.linkedAccountKeyIndex
+        return this.run.linkedAccountKeyIndex
     }
     public set _linkedAccountKeyIndex(value: Set<string> | undefined) {
-        this.fusionRun.linkedAccountKeyIndex = value
+        this.run.linkedAccountKeyIndex = value
     }
 
     private _tracker?: AggregationTracker
@@ -134,17 +134,17 @@ export class FusionService {
         private defineService: DefineService,
         public matchService: MatchService,
         public schemas: SchemaService,
-        public fusionRun: FusionRun,
+        public run: FusionRun,
         commandType?: StandardCommand,
         operationContext?: OperationContext
     ) {
-        this._repository = new FusionAccountRepository(log, this.fusionRun)
+        this._repository = new FusionAccountRepository(log, this.run)
         this.identityProcessor = new IdentityProcessor(this)
         this.correlationManager = new CorrelationManager(this)
         this.decisionProcessor = new DecisionProcessor(this)
         this.managedAccountAnalyzer = new ManagedAccountAnalyzer(this)
         this.candidateRegistry = new CandidateRegistry({
-            fusionAccountMap: this.fusionRun.fusionAccountMap,
+            fusionAccountMap: this.run.fusionAccountMap,
             sourcesByName: this.sourcesByName,
             log: this.log,
         })
@@ -162,7 +162,7 @@ export class FusionService {
         this.fusionReportOnAggregation = config.fusionReportOnAggregation ?? false
         this.reportAttributes = config.fusionFormAttributes ?? []
         this.urlContext = createUrlContext(config.baseurl)
-        this.fusionRun.analysisRecorder = new ManagedAccountAnalysisRecorder({
+        this.run.analysisRecorder = new ManagedAccountAnalysisRecorder({
             log: this.log,
             tracker: () => this.tracker,
             urlContext: this.urlContext,
@@ -220,7 +220,7 @@ export class FusionService {
      * map source attributes, refresh normal attributes, then refresh reverse correlation attributes.
      */
     public async applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void> {
-        this.mapService.mapAttributes(fusionAccount, this.fusionRun)
+        this.mapService.mapAttributes(fusionAccount, this.run)
         await this.defineService.refreshNormalAttributes(fusionAccount)
         this.defineService.refreshReverseCorrelationAttributes(fusionAccount)
     }
@@ -350,7 +350,7 @@ export class FusionService {
      * - Phase 4: processManagedAccounts processes only what remains (uncorrelated accounts)
      *
      * Each fusion account processes in parallel using Promise.all, but all share the same
-     * work queue (this.fusionRun.managedAccountsById). As accounts are matched, they're
+     * work queue (this.run.managedAccountsById). As accounts are matched, they're
      * deleted from the queue via addManagedAccountLayer.
      *
      * Memory Optimization:
@@ -439,7 +439,7 @@ export class FusionService {
      * account's normal attribute values.
      *
      * Work Queue Integration:
-     * addManagedAccountLayer receives the direct reference to this.fusionRun.managedAccountsById,
+     * addManagedAccountLayer receives the direct reference to this.run.managedAccountsById,
      * which is the shared work queue. As accounts are matched and processed, they're deleted
      * from the queue to prevent duplicate processing in later phases.
      *
@@ -463,7 +463,7 @@ export class FusionService {
                 `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
-        assert(this.fusionRun.managedAccountsById, 'Managed accounts have not been loaded')
+        assert(this.run.managedAccountsById, 'Managed accounts have not been loaded')
 
         const reviewerSources = fusionAccount.listReviewerSources()
         reviewerSources.forEach((sourceId) => this.setReviewerForSource(fusionAccount, sourceId))
@@ -523,8 +523,8 @@ export class FusionService {
         // Pass direct reference to work queue - deletions will remove processed accounts
         // No snapshot or copy needed: JavaScript's event loop ensures atomic operations
         fusionAccount.addManagedAccountLayer(
-            this.fusionRun.managedAccountsById,
-            this.fusionRun.managedAccountsByIdentityId,
+            this.run.managedAccountsById,
+            this.run.managedAccountsByIdentityId,
             this.sources.managedAccountsAllById,
             this.shouldPruneDeletedManagedAccounts(),
             true,
@@ -649,7 +649,7 @@ export class FusionService {
      * - Phase 3: processIdentities removes accounts belonging to identities
      * - Phase 4: processManagedAccounts (this method) processes ONLY what remains
      *
-     * At this point, the work queue (this.fusionRun.managedAccountsById) contains ONLY
+     * At this point, the work queue (this.run.managedAccountsById) contains ONLY
      * uncorrelated accounts that don't belong to any existing fusion account or identity.
      * These are the truly new accounts that need Match review.
      *
@@ -740,7 +740,7 @@ export class FusionService {
             managedAccountProcessingStartedAt
         )
         for (const result of results) {
-            this.fusionRun.analysisRecorder!.recordAnalysis(result.analysis)
+            this.run.analysisRecorder!.recordAnalysis(result.analysis)
             const { fusionAccount, account, sourceInfo, sourceType } = result.analysis
             switch (result.resolution) {
                 case 'identity-match':
@@ -826,7 +826,7 @@ export class FusionService {
         )
         if (results.length === 0) return undefined
         const result = results[0]
-        this.fusionRun.analysisRecorder!.recordAnalysis(result.analysis)
+        this.run.analysisRecorder!.recordAnalysis(result.analysis)
         const { fusionAccount, sourceInfo: analysisSourceInfo, sourceType: analysisSourceType } = result.analysis
         switch (result.resolution) {
             case 'identity-match':
@@ -953,7 +953,7 @@ export class FusionService {
                     !reviewers || reviewers.size === 0
                         ? 'Match review form was not created: no reviewers available for this source'
                         : `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
-                this.fusionRun.analysisRecorder!.trackFailed(fusionAccount, message)
+                this.run.analysisRecorder!.trackFailed(fusionAccount, message)
             } else {
                 const eligibleReviewerCount = [...(reviewers ?? [])].filter((r) => r.identityId).length
                 if (eligibleReviewerCount > 0 && outcome.newReviewInstancesQueued === 0) {
@@ -964,7 +964,7 @@ export class FusionService {
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            this.fusionRun.analysisRecorder!.trackFailed(fusionAccount, `Form creation failed: ${message}`)
+            this.run.analysisRecorder!.trackFailed(fusionAccount, `Form creation failed: ${message}`)
         }
         fusionAccount.clearFusionIdentityReferences()
         return undefined
@@ -1004,9 +1004,9 @@ export class FusionService {
      * @returns Array of FusionAccount with match results populated for each
      */
     public async analyzeUncorrelatedAccounts(): Promise<FusionAccount[]> {
-        const map = this.fusionRun.managedAccountsById
+        const map = this.run.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
-        this.fusionRun.matchScoringMs = 0
+        this.run.matchScoringMs = 0
         const results: FusionAccount[] = []
 
         const accounts = [...map.values()]
@@ -1019,7 +1019,7 @@ export class FusionService {
         let processed = 0
         const yieldEveryManaged = getManagedAccountEventLoopYieldEvery(this.config)
         for (const result of runnerResults) {
-            this.fusionRun.analysisRecorder!.recordAnalysis(result.analysis)
+            this.run.analysisRecorder!.recordAnalysis(result.analysis)
             const { fusionAccount, account } = result.analysis
             if (
                 fusionAccount.isMatch &&
@@ -1042,7 +1042,7 @@ export class FusionService {
     }
 
     public addMatchScoringTimeMs(ms: number): void {
-        this.fusionRun.matchScoringMs += ms
+        this.run.matchScoringMs += ms
     }
 
     /**
@@ -1259,18 +1259,18 @@ export class FusionService {
      */
     private removeManagedAccountFromWorkQueue(account: Account): void {
         const id = getManagedAccountKeyFromAccount(account)
-        const byId = this.fusionRun.managedAccountsById
+        const byId = this.run.managedAccountsById
         if (!id || !byId?.has(id)) {
             return
         }
         byId.delete(id)
         const identityId = account.identityId
         if (identityId) {
-            const idSet = this.fusionRun.managedAccountsByIdentityId.get(identityId)
+            const idSet = this.run.managedAccountsByIdentityId.get(identityId)
             if (idSet) {
                 idSet.delete(id)
                 if (idSet.size === 0) {
-                    this.fusionRun.managedAccountsByIdentityId.delete(identityId)
+                    this.run.managedAccountsByIdentityId.delete(identityId)
                 }
             }
         }
@@ -1488,7 +1488,7 @@ export class FusionService {
         if (this._managedAccountProcessingState !== 'idle') {
             throw new Error('Managed account processing already initialized')
         }
-        const map = this.fusionRun.managedAccountsById
+        const map = this.run.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
 
         this._managedAccountProcessingBatchSize = Math.max(1, getManagedAccountsBatchSize(this.config))
@@ -1497,7 +1497,7 @@ export class FusionService {
         this.tracker.newManagedAccountsCount = map.size
         this.candidateRegistry.clear()
         this.autoAssignedIdentityIds.clear()
-        this.fusionRun.matchScoringMs = 0
+        this.run.matchScoringMs = 0
 
         for (const fusionAccount of this.fusionAccountMap.values()) {
             this.candidateRegistry.register(fusionAccount)
@@ -1518,7 +1518,7 @@ export class FusionService {
     /** Correlated account sweep: resolve linked/correlated managed accounts before uncorrelated scoring. */
     public async processCorrelatedManagedAccounts(): Promise<void> {
         this.ensureManagedAccountProcessingInitialized()
-        const map = this.fusionRun.managedAccountsById
+        const map = this.run.managedAccountsById
         await this.runCorrelatedAccountSweep(map)
         this._linkedAccountKeyIndex = undefined
     }
@@ -1529,7 +1529,7 @@ export class FusionService {
      */
     public async processUncorrelatedManagedAccounts(): Promise<{ processed: number; matchScoringMs: number }> {
         this.ensureManagedAccountProcessingInitialized()
-        const map = this.fusionRun.managedAccountsById
+        const map = this.run.managedAccountsById
         const queuedAccounts = [...map.values()]
         const initialQueueSize = queuedAccounts.length
         this.log.info(
@@ -1541,7 +1541,7 @@ export class FusionService {
             this._managedAccountProcessingStartedAt
         )
         this._managedAccountProcessingState = 'idle'
-        return { processed, matchScoringMs: this.fusionRun.matchScoringMs }
+        return { processed, matchScoringMs: this.run.matchScoringMs }
     }
 
     /**

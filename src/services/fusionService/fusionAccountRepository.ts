@@ -11,22 +11,22 @@ export class FusionAccountRepository {
     public readonly reviewersBySourceId: Map<string, Set<FusionAccount>> = new Map()
     public readonly sourcesWithoutReviewers: Set<string> = new Set()
 
-    constructor(private log: LogService, private fusionRun: FusionRun) {}
+    constructor(private log: LogService, private run: FusionRun) {}
 
     public get totalFusionAccountCount(): number {
-        return this.fusionRun.fusionIdentityMap.size + this.fusionRun.fusionAccountMap.size
+        return this.run.fusionIdentityMap.size + this.run.fusionAccountMap.size
     }
 
     public get fusionAccounts(): FusionAccount[] {
-        return mapValuesToArray(this.fusionRun.fusionAccountMap)
+        return mapValuesToArray(this.run.fusionAccountMap)
     }
 
     public get fusionIdentities(): Iterable<FusionAccount> {
-        return this.fusionRun.fusionIdentityMap.values()
+        return this.run.fusionIdentityMap.values()
     }
 
     public *fusionIdentitiesExcluding(excludeIds: ReadonlySet<string>): Iterable<FusionAccount> {
-        for (const identity of this.fusionRun.fusionIdentityMap.values()) {
+        for (const identity of this.run.fusionIdentityMap.values()) {
             if (!identity.identityId || !excludeIds.has(identity.identityId)) {
                 yield identity
             }
@@ -34,11 +34,11 @@ export class FusionAccountRepository {
     }
 
     public getFusionIdentity(identityId: string): FusionAccount | undefined {
-        return this.fusionRun.fusionIdentityMap.get(identityId)
+        return this.run.fusionIdentityMap.get(identityId)
     }
 
     public getFusionAccountByManagedKey(managedKey: string): FusionAccount | undefined {
-        return this.fusionRun.fusionAccountMap.get(managedKey)
+        return this.run.fusionAccountMap.get(managedKey)
     }
 
     public setFusionAccount(fusionAccount: FusionAccount, tracker?: AggregationTracker): void {
@@ -46,7 +46,7 @@ export class FusionAccountRepository {
         const hasIdentityId = hasValue(identityId)
 
         if (hasIdentityId && fusionAccount.type !== FusionAccountKind.Managed) {
-            const existingFusionAccount = this.fusionRun.fusionIdentityMap.get(identityId!)
+            const existingFusionAccount = this.run.fusionIdentityMap.get(identityId!)
             const existingKey = existingFusionAccount
                 ? getFusionIdentityConflictTrackingKey(existingFusionAccount)
                 : undefined
@@ -54,13 +54,13 @@ export class FusionAccountRepository {
             if (existingFusionAccount && existingKey !== incomingKey) {
                 this.trackConflictingFusionIdentity(identityId!, existingFusionAccount, fusionAccount, tracker)
             }
-            this.fusionRun.fusionIdentityMap.set(identityId!, fusionAccount)
+            this.run.fusionIdentityMap.set(identityId!, fusionAccount)
         } else {
             assert(
                 fusionAccount.managedKey,
                 'Fusion account must have a managedKey to be added to fusion account map'
             )
-            this.fusionRun.fusionAccountMap.set(fusionAccount.managedKey, fusionAccount)
+            this.run.fusionAccountMap.set(fusionAccount.managedKey, fusionAccount)
         }
     }
 
@@ -93,7 +93,7 @@ export class FusionAccountRepository {
     }
 
     public clearCurrentRunState(): void {
-        this.fusionRun.currentRunNonMatchedKeysBySource.clear()
-        this.fusionRun.autoAssignedIdentityIds.clear()
+        this.run.currentRunNonMatchedKeysBySource.clear()
+        this.run.autoAssignedIdentityIds.clear()
     }
 }
