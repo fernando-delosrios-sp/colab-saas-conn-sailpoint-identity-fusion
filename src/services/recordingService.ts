@@ -1,21 +1,12 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { LogService } from './logService'
-import { SourceService } from './sourceService'
-import { IdentityService } from './identityService'
-import { FormService } from './formService'
+import { FusionRun } from '../model/fusionRun'
 import { FusionConfig } from '../model/config'
 
 function sanitizeForJson(value: unknown): unknown {
     if (value === undefined || value === null) return value
     return JSON.parse(JSON.stringify(value))
-}
-
-interface StateSnapshot {
-    identities: unknown[]
-    managedAccounts: unknown[]
-    fusionAccounts: unknown[]
-    formDecisions: unknown[]
 }
 
 interface RecordedStep {
@@ -24,7 +15,7 @@ interface RecordedStep {
     sweep?: number
     input: unknown
     output: unknown[]
-    stateAfter: StateSnapshot
+    stateAfter: any
     timestamp: string
     duration: number
 }
@@ -115,9 +106,7 @@ export class RecordingService {
         operation: string,
         input: unknown,
         res: { send: (value: unknown) => void },
-        sources: SourceService,
-        identities: IdentityService,
-        forms: FormService
+        run: FusionRun
     ): void {
         this.stepIndex++
         this.currentStep = {
@@ -126,7 +115,7 @@ export class RecordingService {
             sweep: operation === 'accountList' ? this.stepIndex : undefined,
             input: sanitizeForJson(input),
             output: [],
-            stateAfter: this.snapshotState(sources, identities, forms),
+            stateAfter: run.snapshot() as any,
             timestamp: new Date().toISOString(),
             duration: 0,
         }
@@ -144,10 +133,10 @@ export class RecordingService {
         }
     }
 
-    endOperation(sources: SourceService, identities: IdentityService, forms: FormService): void {
+    endOperation(run: FusionRun): void {
         if (!this.currentStep) return
 
-        this.currentStep.stateAfter = this.snapshotState(sources, identities, forms)
+        this.currentStep.stateAfter = run.snapshot() as any
         this.currentStep.duration = Date.now() - new Date(this.currentStep.timestamp).getTime()
         this.steps.push({ ...this.currentStep })
         this.persistStep(this.currentStep)
@@ -162,38 +151,7 @@ export class RecordingService {
         this.currentStep = null
     }
 
-    private snapshotState(sources: SourceService, identities: IdentityService, forms: FormService): StateSnapshot {
-        let managedAccounts: unknown[] = []
-        if (sources?.managedAccountsAllById) {
-            managedAccounts = Array.from(sources.managedAccountsAllById.values()).map((a) => sanitizeForJson(a))
-        }
 
-        let fusionAccounts: unknown[] = []
-        if (sources?.fusionAccountsByNativeIdentity) {
-            fusionAccounts = Array.from(sources.fusionAccountsByNativeIdentity.values()).map((a) => sanitizeForJson(a))
-        }
-
-        let identityList: unknown[] = []
-        try {
-            identityList = Array.from(identities.identityValues()).map((i) => sanitizeForJson(i))
-        } catch {
-            /* identityValues may not be accessible in all contexts */
-        }
-
-        let formDecisions: unknown[] = []
-        try {
-            formDecisions = forms.fusionIdentityDecisions
-        } catch {
-            /* may not be accessible */
-        }
-
-        return {
-            identities: identityList,
-            managedAccounts,
-            fusionAccounts,
-            formDecisions,
-        }
-    }
 
     async finalize(): Promise<string> {
         if (this.finalized) return ''
