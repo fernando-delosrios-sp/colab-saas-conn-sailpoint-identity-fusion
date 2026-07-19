@@ -41,8 +41,8 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         },
     }
 
-    const fusionRun = new FusionRun()
-    const service = new SourceService(config, log, client, fusionRun)
+    const run = new FusionRun()
+    const service = new SourceService(config, log, client, run)
     const sourceInfo: SourceInfo = {
         id: 'managed-source-id',
         name: 'HR Source',
@@ -84,9 +84,9 @@ describe('SourceService Accounts JMESPath filter', () => {
         ;(service as any)._allSources = [sourceInfo]
         await service.fetchManagedAccounts()
 
-        expect((service as any).fusionRun.managedAccountsById.size).toBe(1)
-        expect((service as any).fusionRun.managedAccountsById.has('managed-source-id::eng-1')).toBe(true)
-        expect((service as any).fusionRun.managedAccountsById.has('managed-source-id::fin-1')).toBe(false)
+        expect((service as any).run.managedAccountsById.size).toBe(1)
+        expect((service as any).run.managedAccountsById.has('managed-source-id::eng-1')).toBe(true)
+        expect((service as any).run.managedAccountsById.has('managed-source-id::fin-1')).toBe(false)
     })
 
     it('rejects invalid JMESPath expressions in validation', () => {
@@ -192,7 +192,7 @@ describe('SourceService fetchManagedAccount (sourceId + nativeIdentity)', () => 
 
         await service.fetchManagedAccount('unknown-source-id', 'user-1')
 
-        expect((service as any).fusionRun.managedAccountsById.size).toBe(0)
+        expect((service as any).run.managedAccountsById.size).toBe(0)
         expect(log.warn).toHaveBeenCalledWith(
             expect.stringContaining('non-configured or non-managed source "unknown-source-id"')
         )
@@ -219,8 +219,8 @@ describe('SourceService fetchManagedAccount (sourceId + nativeIdentity)', () => 
                 filters: expect.stringContaining('nativeIdentity eq "user-1"'),
             })
         )
-        expect((service as any).fusionRun.managedAccountsById.size).toBe(1)
-        expect((service as any).fusionRun.managedAccountsById.get('managed-source-id::user-1')).toBeDefined()
+        expect((service as any).run.managedAccountsById.size).toBe(1)
+        expect((service as any).run.managedAccountsById.get('managed-source-id::user-1')).toBeDefined()
         expect(service.managedAccountsByIdentityId.get('id-1')?.has('managed-source-id::user-1')).toBe(true)
     })
 
@@ -230,7 +230,7 @@ describe('SourceService fetchManagedAccount (sourceId + nativeIdentity)', () => 
 
         await service.fetchManagedAccount('managed-source-id', 'bob')
 
-        expect((service as any).fusionRun.managedAccountsById.size).toBe(0)
+        expect((service as any).run.managedAccountsById.size).toBe(0)
     })
 
     it('leaves inventory empty when JMESPath filter discards the candidate', async () => {
@@ -251,7 +251,7 @@ describe('SourceService fetchManagedAccount (sourceId + nativeIdentity)', () => 
 
         await service.fetchManagedAccount('managed-source-id', 'fin-1')
 
-        expect((service as any).fusionRun.managedAccountsById.size).toBe(0)
+        expect((service as any).run.managedAccountsById.size).toBe(0)
     })
 })
 

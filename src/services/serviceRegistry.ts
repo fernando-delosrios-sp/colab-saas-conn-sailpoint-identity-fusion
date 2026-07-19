@@ -47,7 +47,7 @@ export class ServiceRegistry {
     public reports: ReportService
     public proxy: ProxyService
     public recording?: RecordingService
-    public fusionRun: FusionRun
+    public run: FusionRun
 
     /**
      * Creates a new ServiceRegistry, initializing all services in dependency order.
@@ -64,7 +64,7 @@ export class ServiceRegistry {
         public res: Response<any>,
         operationContext?: string
     ) {
-        this.fusionRun = new FusionRun()
+        this.run = new FusionRun()
 
         // Initialize core services first
         const logConfig = operationContext ? { ...config, operationContext } : config
@@ -88,10 +88,10 @@ export class ServiceRegistry {
         }
 
         // Initialize services that don't depend on others
-        this.sources = context.sourceService ?? new SourceService(this.config, this.log, this.client, this.fusionRun)
+        this.sources = context.sourceService ?? new SourceService(this.config, this.log, this.client, this.run)
         this.entitlements = context.entitlementService ?? new EntitlementService(this.sources)
         this.identities =
-            context.identityService ?? new IdentityService(this.config, this.log, this.client, this.sources, this.fusionRun)
+            context.identityService ?? new IdentityService(this.config, this.log, this.client, this.sources, this.run)
         this.messaging =
             context.messagingService ??
             new MessagingService(this.config, this.log, this.client, this.sources, this.identities)
@@ -125,7 +125,7 @@ export class ServiceRegistry {
                 this.define,
                 this.match,
                 this.schemas,
-                this.fusionRun,
+                this.run,
                 commandType,
                 operationContext as OperationContext | undefined
             )

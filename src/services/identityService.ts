@@ -61,7 +61,7 @@ export class IdentityService {
         private log: LogService,
         private client: ClientService,
         private sources: SourceService,
-        private fusionRun: FusionRun
+        private run: FusionRun
     ) {
         this.identityScopeQuery = config.identityScopeQuery
         this.includeIdentities = config.includeIdentities ?? true
@@ -77,15 +77,15 @@ export class IdentityService {
      * and identityValues() for iteration when no array is needed.
      */
     public get identities(): IdentityDocument[] {
-        assert(this.fusionRun.identityMap, 'Identities not fetched')
-        return Array.from(this.fusionRun.identityMap.values())
+        assert(this.run.identityMap, 'Identities not fetched')
+        return Array.from(this.run.identityMap.values())
     }
 
     /**
      * Get the number of cached identities without creating an intermediate array.
      */
     public get identityCount(): number {
-        return this.fusionRun.identityMap.size
+        return this.run.identityMap.size
     }
 
     /**
@@ -93,7 +93,7 @@ export class IdentityService {
      * Avoids creating a temporary array when only iteration is needed.
      */
     public identityValues(): IterableIterator<IdentityDocument> {
-        return this.fusionRun.identityMap.values()
+        return this.run.identityMap.values()
     }
 
     // ------------------------------------------------------------------------
@@ -120,18 +120,18 @@ export class IdentityService {
                     QueuePriority.HIGH,
                     'IdentityService>fetchIdentities searchPost'
                 )
-                this.fusionRun.identityMap.clear()
+                this.run.identityMap.clear()
                 for (const identity of identities) {
-                    this.fusionRun.identityMap.set(identity.protected ? '-' : identity.id, identity)
+                    this.run.identityMap.set(identity.protected ? '-' : identity.id, identity)
                 }
-                this.fusionRun.identityMap.delete('-')
+                this.run.identityMap.delete('-')
                 this.identityIdsInScope = new Set(
                     identities.filter((identity) => !identity.protected).map((identity) => identity.id)
                 )
             }, `Failed to fetch identities using scope query "${this.identityScopeQuery}"`)
         } else if (this.includeIdentities) {
             this.log.info('No identity scope query defined, skipping global identity fetch.')
-            this.fusionRun.identityMap.clear()
+            this.run.identityMap.clear()
             this.identityIdsInScope = new Set()
         }
 
@@ -139,7 +139,7 @@ export class IdentityService {
             await this.hydrateMissingIdentitiesById(additionalIdentityIds)
             for (const id of additionalIdentityIds) {
                 if (!id) continue
-                const identity = this.fusionRun.identityMap.get(id)
+                const identity = this.run.identityMap.get(id)
                 if (identity && !identity.protected) {
                     this.identityIdsInScope.add(id)
                 }
@@ -198,7 +198,7 @@ export class IdentityService {
                 QueuePriority.HIGH,
                 'IdentityService>fetchIdentityById searchPost'
             )
-            identities.forEach((identity) => this.fusionRun.identityMap.set(identity.id, identity))
+            identities.forEach((identity) => this.run.identityMap.set(identity.id, identity))
             return identities[0]
         }, `Failed to fetch identity by ID "${id}"`)
     }
@@ -220,7 +220,7 @@ export class IdentityService {
                 QueuePriority.HIGH,
                 'IdentityService>fetchIdentityByName searchPost'
             )
-            identities.forEach((identity) => this.fusionRun.identityMap.set(identity.id, identity))
+            identities.forEach((identity) => this.run.identityMap.set(identity.id, identity))
             return identities[0]
         }, `Failed to fetch identity by name "${name}"`)
     }
@@ -237,7 +237,7 @@ export class IdentityService {
      */
     public getIdentityById(id?: string): IdentityDocument | undefined {
         if (!id) return undefined
-        return this.fusionRun.identityMap.get(id)
+        return this.run.identityMap.get(id)
     }
 
     /**
@@ -345,7 +345,7 @@ export class IdentityService {
      * @param id - The identity ID to remove from the cache
      */
     public deleteIdentity(id: string): void {
-        this.fusionRun.identityMap.delete(id)
+        this.run.identityMap.delete(id)
     }
 
     /**
@@ -373,7 +373,7 @@ export class IdentityService {
      * Clear the identity cache
      */
     public clear(): void {
-        this.fusionRun.identityMap.clear()
+        this.run.identityMap.clear()
         this.identityIdsInScope.clear()
     }
 
