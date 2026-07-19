@@ -27,7 +27,7 @@ export interface ManagedAccountAnalyzerState {
     readonly sourcesByName: Map<string, SourceInfo>
     readonly fusionIdentities: Iterable<FusionAccount>
     fusionIdentitiesExcluding(excludeIds: ReadonlySet<string>): Iterable<FusionAccount>
-    currentRunUnmatchedCandidatesForSource(sourceName: string | null | undefined): Iterable<FusionAccount>
+    currentOperationDeferredCandidatesForSource(sourceName: string | null | undefined): Iterable<FusionAccount>
     preProcessManagedAccount(account: Account): Promise<FusionAccount>
     addMatchScoringTimeMs(ms: number): void
 }
@@ -91,7 +91,7 @@ export class ManagedAccountAnalyzer {
         const deferredScoringStarted = Date.now()
         analysis.fusionIdentityComparisons += await this.state.scoring.scoreFusionAccount(
             analysis.fusionAccount,
-            this.state.currentRunUnmatchedCandidatesForSource(analysis.account.sourceName),
+            this.state.currentOperationDeferredCandidatesForSource(analysis.account.sourceName),
             MatchCandidateType.Deferred
         )
         this.state.addMatchScoringTimeMs(Date.now() - deferredScoringStarted)

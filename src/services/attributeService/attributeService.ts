@@ -695,7 +695,7 @@ export class AttributeService {
     }
 
     /**
-     * Lightweight bulk registration of unique attribute values from raw Account objects.
+     * Lightweight bulk registration of unique attribute values from managed source account objects.
      * Reads unique attribute values directly from account.attributes without creating
      * FusionAccount instances, avoiding the overhead of full object hydration.
      *
@@ -703,9 +703,9 @@ export class AttributeService {
      * for single-account operations (create, enable) where only uniqueness
      * enforcement is needed.
      *
-     * @param accounts - Raw Account objects from the platform
+     * @param accounts - Managed source account objects from the platform
      */
-    public registerUniqueValuesFromRawAccounts(accounts: Account[]): void {
+    public registerUniqueValuesFromManagedSourceAccounts(accounts: Account[]): void {
         if (this.uniqueDefinitions.length === 0) return
 
         for (const definition of this.uniqueDefinitions) {

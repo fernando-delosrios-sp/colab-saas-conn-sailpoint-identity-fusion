@@ -180,7 +180,7 @@ Each rule module (`constructionRules`, `layerRules`, `statusRules`, `actionRules
 - **THEN** the getter returns `"test@example.com"`
 
 ### Requirement: FusionService SHALL own a CandidateRegistry collaborator
-The `FusionService` constructor MUST instantiate a `CandidateRegistry` with the fusion account map, sources-by-name map, and log. The registry SHALL be the single source of truth for per-source unmatched candidate registration and query during the two-sweep managed account analysis lifecycle.
+The `FusionService` constructor MUST instantiate a `CandidateRegistry` with the fusion account map, sources-by-name map, and log. The registry SHALL be the single source of truth for per-source deferred candidate registration and query during the two-sweep managed account analysis lifecycle.
 
 #### Scenario: Registry is wired in constructor
 - **WHEN** `FusionService` is constructed
@@ -235,12 +235,12 @@ The runner's `execute` method MUST: (identity scoring sweep) run identity-phase 
 - **WHEN** identity scoring produces `hasIdentityCandidateMatches: true`
 - **THEN** the runner emits a result with resolution `identity-match`
 
-#### Scenario: Deferred-enabled unmatched account is queued for deferred scoring sweep
+#### Scenario: Deferred-enabled non-matched managed source account is queued for deferred scoring sweep
 - **WHEN** an account from a deferred-candidate-matching-enabled authoritative source has no identity match after identity scoring sweep
 - **THEN** the account is registered as a candidate via `candidateRegistry.register`
 - **AND** the account is queued for deferred scoring sweep
 
-#### Scenario: Non-deferred unmatched account produces non-match
+#### Scenario: Non-deferred non-matched managed source account produces non-match
 - **WHEN** an account from a source WITHOUT deferred candidate matching has no identity match after identity scoring sweep
 - **THEN** the result has resolution `non-match`
 

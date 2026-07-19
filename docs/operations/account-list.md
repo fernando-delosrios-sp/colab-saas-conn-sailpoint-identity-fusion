@@ -72,20 +72,20 @@ flowchart TD
         - **Record**: Registers unique attributes but drops the account from ISC output.
         - **Orphan**: Drops the account entirely (and optionally triggers a background disable operation).
         - **Identity**: Proceeds to matching pipeline.
-    - **Reviewer validation**: Before scoring begins, each managed source is checked for valid reviewers. Sources without a configured reviewer are logged once as an error and their accounts bypass scoring entirely, being added as unmatched directly.
-    - For sources with valid reviewers, the full matching pipeline executes: scoring, automatic assignment on threshold match (when enabled and combined score meets or exceeds threshold), review form creation (for partial matches), or unmatched addition.
+    - **Reviewer validation**: Before scoring begins, each managed source is checked for valid reviewers. Sources without a configured reviewer are logged once as an error and their accounts bypass scoring entirely, being added as non-matched directly.
+    - For sources with valid reviewers, the full matching pipeline executes: scoring, automatic assignment on threshold match (when enabled and combined score meets or exceeds threshold), review form creation (for partial matches), or non-matched addition.
 
 <details>
 <summary><b>View Graphic: Managed Account Processing (Step 6)</b></summary>
 
 ```mermaid
 flowchart TD
-    A[Unmatched Managed Account] --> B{Source Type?}
+    A[Non-matched managed source account] --> B{Source Type?}
     B -- Record --> C[Register Unique Attributes & Drop]
     B -- Orphan --> D[Drop Account]
     D -.-> E([Optional: Disable Action])
     B -- Identity --> F{Valid Reviewer Setup?}
-    F -- No --> G[Skip Scoring: Add as Unmatched]
+    F -- No --> G[Skip Scoring: Add as Non-matched]
     F -- Yes --> H[Run Matching/Scoring Engine]
     H --> I{Score Thresholds}
     I -- Perfect Match --> J[Assign automatically]
