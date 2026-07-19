@@ -49,12 +49,12 @@ describe('ManagedAccountMatchingRunner', () => {
             sourceInfo: undefined,
             sourceType: SourceType.Authoritative,
             fusionIdentityComparisons: 5,
-            hasIdentityBackedMatches: true,
+            hasIdentityCandidateMatches: true,
         })
         const results = await runner.execute([makeAccount('acct1')], 10, Date.now())
         expect(results).toHaveLength(1)
         expect(results[0].resolution).toBe('identity-match')
-        expect(results[0].analysis.hasIdentityBackedMatches).toBe(true)
+        expect(results[0].analysis.hasIdentityCandidateMatches).toBe(true)
     })
 
     it('returns non-match for non-deferred unmatched account', async () => {
@@ -65,7 +65,7 @@ describe('ManagedAccountMatchingRunner', () => {
             sourceInfo: undefined,
             sourceType: SourceType.Authoritative,
             fusionIdentityComparisons: 5,
-            hasIdentityBackedMatches: false,
+            hasIdentityCandidateMatches: false,
         })
         ;(runner as any).state.managedAccountAnalyzer.isDeferredMatchingEnabledForSource.mockReturnValue(false)
         const results = await runner.execute([makeAccount('acct1')], 10, Date.now())
@@ -97,7 +97,7 @@ describe('ManagedAccountMatchingRunner', () => {
             sourceInfo: undefined,
             sourceType: SourceType.Authoritative,
             fusionIdentityComparisons: 5,
-            hasIdentityBackedMatches: false,
+            hasIdentityCandidateMatches: false,
         })
         scoreDeferredCandidates.mockImplementation((analysis: any) => {
             analysis.fusionAccount.fusionMatches = [{ candidateType: 'deferred', identityName: 'deferred candidate', scores: [] }]
@@ -138,7 +138,7 @@ describe('ManagedAccountMatchingRunner', () => {
             sourceInfo: undefined,
             sourceType: SourceType.Authoritative,
             fusionIdentityComparisons: 5,
-            hasIdentityBackedMatches: false,
+            hasIdentityCandidateMatches: false,
         })
         const runner = new ManagedAccountMatchingRunner({
             config: { managedAccountsBatchSize: 10 } as any,
@@ -165,7 +165,7 @@ describe('ManagedAccountMatchingRunner', () => {
             sourceInfo: undefined,
             sourceType: SourceType.Authoritative,
             fusionIdentityComparisons: 1,
-            hasIdentityBackedMatches: true,
+            hasIdentityCandidateMatches: true,
         })
         const accounts = Array.from({ length: 5 }, (_, i) => makeAccount(`acct${i}`))
         const results = await runner.execute(accounts, 2, Date.now())

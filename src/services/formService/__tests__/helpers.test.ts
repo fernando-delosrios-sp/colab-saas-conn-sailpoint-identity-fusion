@@ -2,17 +2,17 @@ import {
     buildCandidateList,
     buildFormName,
     calculateExpirationDate,
-    countIdentityBackedFusionMatches,
+    countIdentityCandidateFusionMatches,
     getFormOwner,
     resolveIdentitiesSelectLabel,
 } from '../helpers'
 import { MatchCandidateType } from '../../scoringService/types'
 
 describe('formService helpers', () => {
-    describe('countIdentityBackedFusionMatches', () => {
+    describe('countIdentityCandidateFusionMatches', () => {
         it('counts identity candidates and excludes deferred candidates', () => {
             expect(
-                countIdentityBackedFusionMatches([
+                countIdentityCandidateFusionMatches([
                     { identityId: 'a', identityName: 'A', scores: [] } as any,
                     {
                         identityId: 'b',

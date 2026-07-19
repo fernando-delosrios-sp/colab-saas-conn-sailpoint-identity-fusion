@@ -5,7 +5,7 @@ import type { LogService } from '../logService'
 import type { ManagedAccountAnalyzer, ManagedAccountAnalysisContext } from './managedAccountAnalyzer'
 import type { CandidateRegistry } from './candidateRegistry'
 import { yieldToEventLoop } from './batching'
-import { hasDeferredMatches as checkHasDeferredMatches } from './helpers'
+import { hasDeferredCandidateMatches as checkHasDeferredCandidateMatches } from './helpers'
 
 export interface ManagedAccountMatchingRunnerState {
     readonly config: FusionConfig
@@ -80,7 +80,7 @@ export class ManagedAccountMatchingRunner {
                 processedCount++
                 logProgress()
 
-                if (analysis.hasIdentityBackedMatches) {
+                if (analysis.hasIdentityCandidateMatches) {
                     results.push({ analysis, resolution: 'identity-match' })
                 } else if (hasDeferredMatching(account)) {
                     this.state.candidateRegistry.register(analysis.fusionAccount)
@@ -97,7 +97,7 @@ export class ManagedAccountMatchingRunner {
             await Promise.all(
                 batch.map(async (pending) => {
                     await this.state.managedAccountAnalyzer.scoreDeferredCandidates(pending.analysis)
-                    if (checkHasDeferredMatches(pending.analysis.fusionAccount)) {
+                    if (checkHasDeferredCandidateMatches(pending.analysis.fusionAccount)) {
                         results.push({ analysis: pending.analysis, resolution: 'deferred-match' })
                     } else {
                         results.push({ analysis: pending.analysis, resolution: 'non-match' })

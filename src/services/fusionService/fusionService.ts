@@ -31,8 +31,8 @@ import { AggregationTracker } from './aggregationTracker'
 import {
     createAutomaticAssignmentDecision,
     formatFusionMatchDiscoveryLog,
-    hasIdentityBackedMatches as checkHasIdentityBackedMatches,
-    hasDeferredMatches as checkHasDeferredMatches,
+    hasIdentityCandidateMatches as checkHasIdentityCandidateMatches,
+    hasDeferredCandidateMatches as checkHasDeferredCandidateMatches,
 } from './helpers'
 import { AttributeOperations } from '../attributeService/types'
 import { getManagedAccountKeyFromAccount, normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
@@ -742,7 +742,7 @@ export class FusionService {
             const { fusionAccount, account, sourceInfo, sourceType } = result.analysis
             switch (result.resolution) {
                 case 'identity-match':
-                    await this.handleIdentityBackedMatch(fusionAccount, account, sourceInfo)
+                    await this.handleIdentityMatch(fusionAccount, account, sourceInfo)
                     break
                 case 'deferred-match':
                     await this.handleDeferredMatch(fusionAccount, account)
@@ -828,7 +828,7 @@ export class FusionService {
         const { fusionAccount, sourceInfo: analysisSourceInfo, sourceType: analysisSourceType } = result.analysis
         switch (result.resolution) {
             case 'identity-match':
-                return this.handleIdentityBackedMatch(fusionAccount, account, analysisSourceInfo)
+                return this.handleIdentityMatch(fusionAccount, account, analysisSourceInfo)
             case 'deferred-match':
                 return this.handleDeferredMatch(fusionAccount, account)
             case 'non-match':
@@ -915,12 +915,12 @@ export class FusionService {
     }
 
     /**
-     * Dispatches an identity-backed match to either exact-match (auto-assign) or
+     * Dispatches an identity match to either exact-match (auto-assign) or
      * partial-match (review form) handling. In analysis-only / dry-run modes it
      * clears identity references and returns undefined so the match report keeps
      * its data but no fusion state is mutated.
      */
-    private async handleIdentityBackedMatch(
+    private async handleIdentityMatch(
         fusionAccount: FusionAccount,
         account: Account,
         sourceInfo: SourceInfo | undefined
@@ -1021,8 +1021,8 @@ export class FusionService {
             const { fusionAccount, account } = result.analysis
             if (
                 fusionAccount.isMatch &&
-                !checkHasIdentityBackedMatches(fusionAccount) &&
-                checkHasDeferredMatches(fusionAccount)
+                !checkHasIdentityCandidateMatches(fusionAccount) &&
+                checkHasDeferredCandidateMatches(fusionAccount)
             ) {
                 const deferredMatches = fusionAccount.fusionMatches.filter(
                     (m) => m.candidateType === MatchCandidateType.Deferred
@@ -1276,8 +1276,8 @@ export class FusionService {
 
     /**
      * True when this managed account is already represented on a loaded Fusion account
-     * (platform Fusion row or identity-backed Fusion row), or when its identityId matches
-     * a loaded identity-backed Fusion account.
+     * (platform Fusion row or identity-origin Fusion row), or when its identityId matches
+     * a loaded identity-origin Fusion account.
      *
      * Uses _linkedAccountKeyIndex (O(1)) when available (set by the correlated account sweep),
      * falling back to a linear scan of fusionAccountMap + identity-linked Fusion account map for standalone calls.

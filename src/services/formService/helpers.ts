@@ -69,7 +69,7 @@ const compareMatchesForForm = (a: FusionMatch, b: FusionMatch): number => {
 }
 
 /** Matches counted toward the review-form cap (excludes same-operation deferred candidates). */
-export const countIdentityBackedFusionMatches = (matches: readonly FusionMatch[] | undefined): number => {
+export const countIdentityCandidateFusionMatches = (matches: readonly FusionMatch[] | undefined): number => {
     if (!matches) return 0
     let n = 0
     for (const m of matches) {
