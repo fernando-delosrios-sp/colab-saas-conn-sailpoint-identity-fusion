@@ -222,6 +222,7 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 | **Operation** | A connector entry point such as `std:account:list` (the **accountList operation**) or `custom:dryrun` (the **dryRun operation**). |
 | **Phase** | A major stage of an operation pipeline (for example the identity documents phase, the Fusion accounts phase, the managed accounts phase, or the report phase). |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
+| **Correlated account sweep** | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts. |
 | **Aggregation** | The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters. |
 
 ### Framework steps

@@ -46,6 +46,10 @@ A major stage of an operation pipeline (for example the identity documents phase
 
 A traversal of a set of accounts with a single purpose within a phase.
 
+### Correlated account sweep
+
+A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts.
+
 ### Aggregation
 
 The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters.
