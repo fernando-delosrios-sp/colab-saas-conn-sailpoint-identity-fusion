@@ -500,7 +500,7 @@ describe('ScoringService deferred candidate matching', () => {
         expect(managedCandidate.addFusionMatch).not.toHaveBeenCalled()
     })
 
-    it('does not compare against persisted unmatched candidate representing the same managed account', async () => {
+    it('does not compare against persisted non-matched candidate representing the same managed account', async () => {
         const service = new ScoringService(
             {
                 matchingConfigs: [
@@ -523,9 +523,9 @@ describe('ScoringService deferred candidate matching', () => {
             addFusionMatch: vi.fn(),
         } as any
 
-        // Simulates a previously persisted unmatched fusion account shape where
+        // Simulates a previously persisted non-matched fusion account shape where
         // managedAccountId may not be present but the same managed key is retained.
-        const persistedUnmatchedCandidate = {
+        const persistedNonMatchedCandidate = {
             attributes: { email: 'self@example.com' },
             managedAccountId: undefined,
             managedKeyOrUndefined: 'fusion-simple-key',
@@ -536,7 +536,7 @@ describe('ScoringService deferred candidate matching', () => {
 
         const compared = await service.scoreFusionAccount(
             analyzedManagedCandidate,
-            [persistedUnmatchedCandidate],
+            [persistedNonMatchedCandidate],
             MatchCandidateType.Deferred
         )
 
@@ -567,7 +567,7 @@ describe('ScoringService deferred candidate matching', () => {
             addFusionMatch: vi.fn(),
         } as any
 
-        const persistedUnmatchedCandidate = {
+        const persistedNonMatchedCandidate = {
             attributes: { email: 'self@example.com' },
             managedAccountId: undefined,
             managedKeyOrUndefined: 'fusion-simple-key',
@@ -578,7 +578,7 @@ describe('ScoringService deferred candidate matching', () => {
 
         const compared = await service.scoreFusionAccount(
             analyzedManagedCandidate,
-            [persistedUnmatchedCandidate],
+            [persistedNonMatchedCandidate],
             MatchCandidateType.Deferred
         )
 

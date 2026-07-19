@@ -21,6 +21,8 @@ interface StateSnapshot {
 interface RecordedStep {
     stepId: string
     operation: string
+    sweep?: number
+    /** @deprecated Backward-compatible alias; new code uses `sweep`. */
     pass?: number
     input: unknown
     output: unknown[]
@@ -69,6 +71,10 @@ export class RecordingService {
             for (const line of content.split('\n')) {
                 if (!line) continue
                 const step = JSON.parse(line) as RecordedStep
+                // Backward compatibility: older recordings stored the traversal index as `pass`.
+                if (step.sweep == null && step.pass != null) {
+                    step.sweep = step.pass
+                }
                 this.steps.push(step)
                 const match = step.stepId.match(/^step-(\d+)$/)
                 if (match) {
@@ -123,7 +129,7 @@ export class RecordingService {
         this.currentStep = {
             stepId: `step-${this.stepIndex}`,
             operation,
-            pass: operation === 'accountList' ? this.stepIndex : undefined,
+            sweep: operation === 'accountList' ? this.stepIndex : undefined,
             input: sanitizeForJson(input),
             output: [],
             stateAfter: this.snapshotState(sources, identities, forms),
@@ -139,8 +145,8 @@ export class RecordingService {
 
         this.log.debug(`Recording step ${this.stepIndex}: ${operation}`)
         if (process.env.VERBOSE_RECORDING === 'true') {
-            const passInfo = this.currentStep.pass ? ` (pass ${this.currentStep.pass})` : ''
-            console.log(`[Recording] → ${operation}${passInfo} started`)
+            const sweepInfo = this.currentStep.sweep ? ` (sweep ${this.currentStep.sweep})` : ''
+            console.log(`[Recording] → ${operation}${sweepInfo} started`)
         }
     }
 
@@ -156,8 +162,8 @@ export class RecordingService {
             `Recorded step ${this.currentStep.stepId} — ${this.currentStep.output.length} output(s), ${this.currentStep.duration}ms`
         )
         if (process.env.VERBOSE_RECORDING === 'true') {
-            const passInfo = this.currentStep.pass ? ` (pass ${this.currentStep.pass})` : ''
-            console.log(`[Recording] ← ${this.currentStep.operation}${passInfo} completed — ${this.currentStep.duration}ms, ${this.currentStep.output.length} outputs`)
+            const sweepInfo = this.currentStep.sweep ? ` (sweep ${this.currentStep.sweep})` : ''
+            console.log(`[Recording] ← ${this.currentStep.operation}${sweepInfo} completed — ${this.currentStep.duration}ms, ${this.currentStep.output.length} outputs`)
         }
         this.currentStep = null
     }
@@ -237,9 +243,9 @@ export class RecordingService {
         const scenarioSteps = this.steps.map((step) => ({
             id: step.stepId,
             operation: step.operation,
-            // `pass` is retained for wire-format/backward-compatibility. It is not the retired
-            // matching-traversal term; the connector uses "sweep" for traversal vocabulary.
-            pass: step.pass,
+            // `sweep` is the traversal index; `pass` is retained for wire-format/backward-compatibility.
+            sweep: step.sweep,
+            pass: step.sweep,
             description: `Recorded ${step.operation} — ${step.duration}ms, ${step.output.length} outputs`,
             input: step.input as Record<string, unknown>,
             expectedOutput:
