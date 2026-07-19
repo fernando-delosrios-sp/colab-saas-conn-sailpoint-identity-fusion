@@ -285,7 +285,7 @@ async function reportPhase(
         phaseTiming: timer.getPhaseBreakdown(),
     }
 
-    // Aggregation reports: stats only for non-matches; per-account unmatched rows are omitted (see generateReport includeNonMatches).
+    // Aggregation reports: stats only for non-matches; per-account non-matched rows are omitted (see generateReport includeNonMatches).
     await generateReport(false, serviceRegistry, stats)
 
     reportOp.done()

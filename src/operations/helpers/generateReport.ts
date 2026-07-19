@@ -41,7 +41,7 @@ export async function fetchAndProcessForReport(serviceRegistry: ServiceRegistry)
  * Callers that need to self-fetch should call {@link fetchAndProcessForReport} first
  * and pass the returned stats as `aggregationStats`.
  *
- * Aggregation and account-action reports use `includeNonMatches: false` so unmatched managed
+ * Aggregation and account-action reports use `includeNonMatches: false` so non-matched managed
  * accounts are not listed per row; {@link FusionReportStats} still carries consolidated counters.
  *
  * Recipients are resolved automatically from global owners (source owner + governance group).

@@ -125,7 +125,7 @@ export function pruneDeletedManagedAccounts(ctx: MatchContext, allAccountsById: 
     }
     if (removedAnyReference) {
         // Deleting managed-account references changes mapping/definition context.
-        // Force a refresh so dependent attributes are recomputed in the same operation.
+        // Force a refresh so dependent attributes are recomputed in the same run.
         ctx.setNeedsRefresh(true)
     }
 }
