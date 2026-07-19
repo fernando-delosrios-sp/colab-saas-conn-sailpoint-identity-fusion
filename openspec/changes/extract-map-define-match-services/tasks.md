@@ -11,7 +11,7 @@
 
 ## 2. Move State into FusionRun
 
-- [ ] 2.1 Move managedAccountsById, managedAccountsByIdentityId from SourceService to FusionRun
+- [x] 2.1 Move managedAccountsById, managedAccountsByIdentityId from SourceService to FusionRun
 - [ ] 2.2 Move identityMap, identityCount from IdentityService to FusionRun
 - [ ] 2.3 Move fusionAccountMap, fusionIdentityMap from FusionService to FusionRun
 - [ ] 2.4 Move autoAssignedIdentityIds, linkedAccountKeyIndex, analysisRecorder from FusionService to FusionRun
