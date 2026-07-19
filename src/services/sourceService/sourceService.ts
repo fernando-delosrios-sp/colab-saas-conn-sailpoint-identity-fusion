@@ -20,6 +20,7 @@ import {
     buildIscAccountsQueryFilter,
 } from './accountFilters'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { FusionRun } from '../../model/fusionRun'
 
 
 type ReverseCorrelationArtifact =
@@ -63,12 +64,6 @@ export class SourceService {
     /** Per-run cache: managed source names that passed reverse-correlation setup/assert this session. */
     private reverseCorrelationReadinessBySourceName = new Set<string>()
 
-    // Account caching and work queue
-    // managedAccountsById serves dual purpose:
-    // 1. Cache: Provides fast lookup of managed accounts by ID
-    // 2. Work Queue: Gets depleted as accounts are processed (deleted) in order:
-    //    fetchFormData → processFusionAccounts → processIdentities → processManagedAccounts
-    public managedAccountsById: Map<string, Account> = new Map()
     // Snapshot of managed accounts loaded for this run (never depleted by work-queue processing)
     public managedAccountsAllById: Map<string, Account> = new Map()
     // Secondary index: identityId → Set of account IDs for O(1) identity-origin lookups
@@ -86,7 +81,7 @@ export class SourceService {
      * deleted during processing, but this ensures any remaining references are cleared.
      */
     public clearManagedAccounts(): void {
-        this.managedAccountsById.clear()
+        this.fusionRun.managedAccountsById.clear()
         this.managedAccountsAllById.clear()
         this.managedAccountsByIdentityId.clear()
         this.log.debug('Managed accounts cache cleared from memory')
@@ -127,11 +122,13 @@ export class SourceService {
      * @param config - Fusion configuration containing source definitions and aggregation settings
      * @param log - Logger instance
      * @param client - API client for ISC source and account operations
+     * @param fusionRun - Per-run state container for managed accounts
      */
     constructor(
         config: FusionConfig,
         private log: LogService,
-        private client: ClientService
+        private client: ClientService,
+        private fusionRun: FusionRun
     ) {
         this.config = config
         this.sources = config.sources
@@ -204,15 +201,15 @@ export class SourceService {
      * @returns Array of accounts currently in the work queue
      */
     public get managedAccounts(): Account[] {
-        assert(this.managedAccountsById, 'Managed accounts have not been loaded')
-        return Array.from(this.managedAccountsById.values())
+        assert(this.fusionRun.managedAccountsById, 'Managed accounts have not been loaded')
+        return Array.from(this.fusionRun.managedAccountsById.values())
     }
 
     /**
      * Get the number of managed accounts in the work queue without creating an array.
      */
     public get managedAccountCount(): number {
-        return this.managedAccountsById.size
+        return this.fusionRun.managedAccountsById.size
     }
 
     /**
@@ -710,7 +707,7 @@ export class SourceService {
                             if (!accountKey) {
                                 continue
                             }
-                            this.managedAccountsById.set(accountKey, account)
+                            this.fusionRun.managedAccountsById.set(accountKey, account)
                             this.managedAccountsAllById.set(accountKey, account)
                             if (account.identityId) {
                                 let idSet = this.managedAccountsByIdentityId.get(account.identityId)
@@ -741,7 +738,7 @@ export class SourceService {
                     }
                 })
             )
-            this.log.debug(`Total managed accounts loaded: ${this.managedAccountsById.size}`)
+            this.log.debug(`Total managed accounts loaded: ${this.fusionRun.managedAccountsById.size}`)
         }, 'Failed to fetch managed accounts')
     }
 
@@ -799,7 +796,7 @@ export class SourceService {
             )
             return
         }
-        this.managedAccountsById.set(accountKey, managedAccount)
+        this.fusionRun.managedAccountsById.set(accountKey, managedAccount)
         this.managedAccountsAllById.set(accountKey, managedAccount)
         if (managedAccount.identityId) {
             let idSet = this.managedAccountsByIdentityId.get(managedAccount.identityId)
@@ -818,7 +815,7 @@ export class SourceService {
     public resolveIscAccountIdForManagedKey(managedKey: string): string | undefined {
         const key = trimStr(managedKey)
         if (key === undefined) return undefined
-        const account = this.managedAccountsAllById.get(key) ?? this.managedAccountsById.get(key)
+        const account = this.managedAccountsAllById.get(key) ?? this.fusionRun.managedAccountsById.get(key)
         return trimStr(account?.id)
     }
 

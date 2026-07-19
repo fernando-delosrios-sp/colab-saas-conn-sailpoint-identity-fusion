@@ -86,7 +86,7 @@ export class ServiceRegistry {
         }
 
         // Initialize services that don't depend on others
-        this.sources = context.sourceService ?? new SourceService(this.config, this.log, this.client)
+        this.sources = context.sourceService ?? new SourceService(this.config, this.log, this.client, this.fusionRun)
         this.entitlements = context.entitlementService ?? new EntitlementService(this.sources)
         this.scoring = context.scoringService ?? new ScoringService(this.config, this.log)
         this.identities =

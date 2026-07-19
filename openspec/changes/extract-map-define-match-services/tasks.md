@@ -2,12 +2,12 @@
 
 ## 1. FusionRun — Centralized State Container
 
-- [ ] 1.1 Create `src/model/fusionRun.ts` with FusionRun class and RunStateSnapshot type
-- [ ] 1.2 Define FusionRun fields: managedAccounts, identities, fusionAccounts, matching state, metrics
-- [ ] 1.3 Implement FusionRun.snapshot() method returning serializable RunStateSnapshot
-- [ ] 1.4 Implement FusionRun.restore(snapshot) method for deterministic replay
-- [ ] 1.5 Write FusionRun unit tests (construction, snapshot, restore)
-- [ ] 1.6 Update ServiceRegistry to instantiate FusionRun before other services
+- [x] 1.1 Create `src/model/fusionRun.ts` with FusionRun class and RunStateSnapshot type
+- [x] 1.2 Define FusionRun fields: managedAccounts, identities, fusionAccounts, matching state, metrics
+- [x] 1.3 Implement FusionRun.snapshot() method returning serializable RunStateSnapshot
+- [x] 1.4 Implement FusionRun.restore(snapshot) method for deterministic replay
+- [x] 1.5 Write FusionRun unit tests (construction, snapshot, restore)
+- [x] 1.6 Update ServiceRegistry to instantiate FusionRun before other services
 
 ## 2. Move State into FusionRun
 
