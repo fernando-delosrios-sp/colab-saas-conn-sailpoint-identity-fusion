@@ -179,126 +179,34 @@ Each rule module (`constructionRules`, `layerRules`, `statusRules`, `actionRules
 - **WHEN** `fusionAccount.email` is accessed after `state.email` is set to `"test@example.com"`
 - **THEN** the getter returns `"test@example.com"`
 
-### Requirement: FusionService SHALL own a CandidateRegistry collaborator
-The `FusionService` constructor MUST instantiate a `CandidateRegistry` with the fusion account map, sources-by-name map, and log. The registry SHALL be the single source of truth for per-source deferred candidate registration and query during the two-sweep managed account analysis lifecycle.
+### Requirement: FusionService delegates matching to MatchService
 
-#### Scenario: Registry is wired in constructor
-- **WHEN** `FusionService` is constructed
-- **THEN** a `CandidateRegistry` instance is created with `fusionAccountMap`, `sourcesByName`, and `log`
-- **AND** the instance is assigned to `this.candidateRegistry`
+FusionService SHALL delegate all managed account matching to MatchService. FusionService SHALL NOT directly call scoring methods, manage candidate registries, or orchestrate matching sweeps.
 
-### Requirement: CandidateRegistry SHALL register accounts keyed by source
-The `CandidateRegistry.register` method MUST add the given `FusionAccount`'s managed key to the candidate set for that account's source. Only accounts from authoritative sources with deferred candidate matching enabled SHALL be registered.
+#### Scenario: Uncorrelated managed accounts delegated to MatchService
+- **WHEN** processUncorrelatedManagedAccounts is called
+- **THEN** MatchService.processUncorrelatedManagedAccounts SHALL be invoked with FusionRun
+- **AND** FusionService SHALL NOT call ManagedAccountMatchingRunner directly
 
-#### Scenario: Deferred-enabled authoritative account is registered
-- **WHEN** `register` is called with a `FusionAccount` whose source is authoritative and deferred-candidate-matching-enabled
-- **THEN** the account's managed key is added to the candidate set for that source
+#### Scenario: Process phase delegates matching
+- **WHEN** the process phase runs in the pipeline
+- **THEN** MatchService SHALL handle all match sweep orchestration
+- **AND** FusionService SHALL only call MatchService entry points
 
-#### Scenario: Non-authoritative account is not registered
-- **WHEN** `register` is called with a `FusionAccount` whose source type is `Record`
-- **THEN** the account is NOT added to any candidate set
+### Requirement: FusionService receives state via FusionRun
 
-#### Scenario: Account with no managed key is not registered
-- **WHEN** `register` is called with a `FusionAccount` whose `managedKey` is undefined
-- **THEN** the account is NOT added to any candidate set
+FusionService SHALL access all shared run state through FusionRun at construction time. Internal maps previously held on FusionService (fusionAccountMap, fusionIdentityMap, autoAssignedIdentityIds, analysisRecorder) SHALL move to FusionRun.
 
-### Requirement: CandidateRegistry SHALL query candidates per source
-The `CandidateRegistry.queryForSource` method MUST return an `Iterable<FusionAccount>` containing only candidates registered for the given source name.
+#### Scenario: FusionService reads fusion accounts from FusionRun
+- **WHEN** FusionService needs to iterate fusion accounts
+- **THEN** it SHALL read from run.fusionAccountMap, not this.fusionAccountMap
 
-#### Scenario: Candidates are returned for the requested source
-- **WHEN** `queryForSource` is called with source name `"Source A"`
-- **THEN** only candidates registered with source key `"Source A"` are yielded
+### Requirement: FusionService retains pipeline orchestration
 
-#### Scenario: No candidates returns empty iterable
-- **WHEN** `queryForSource` is called with a source name that has no registered candidates
-- **THEN** an empty iterable is returned (no errors)
+FusionService SHALL retain responsibility for pipeline phase coordination (setup, fetch, refresh, process, output), reviewer management, identity processing delegation, ISC account output, and report generation.
 
-### Requirement: CandidateRegistry SHALL be clearable for initialization
-The `CandidateRegistry.clear` method MUST reset all registered candidates. FusionService MUST call `clear` during `initializeManagedAccountProcessing`.
-
-#### Scenario: Clear is called during initialization
-- **WHEN** `initializeManagedAccountProcessing` runs
-- **THEN** `candidateRegistry.clear()` is called, resetting all candidate sets
-
-### Requirement: FusionService SHALL own a ManagedAccountMatchingRunner collaborator
-The `FusionService` constructor MUST instantiate a `ManagedAccountMatchingRunner` with a dependency-inverted state interface. The runner SHALL NOT reference `FusionService` directly.
-
-#### Scenario: Runner is wired in constructor
-- **WHEN** `FusionService` is constructed
-- **THEN** a `ManagedAccountMatchingRunner` instance is created with a `ManagedAccountMatchingRunnerState` containing `config`, `log`, `managedAccountAnalyzer`, `candidateRegistry`, and `processAccount`
-- **AND** the runner has no direct reference to `FusionService`
-
-### Requirement: ManagedAccountMatchingRunner SHALL execute two-sweep analysis
-The runner's `execute` method MUST: (identity scoring sweep) run identity-phase analysis on all accounts in parallel batches, classify results as identity-match, deferred-pending, or non-match, and register deferred-pending candidates; (deferred scoring sweep) run deferred-phase analysis on all pending accounts in parallel batches, classifying results as deferred-match or non-match.
-
-#### Scenario: Identity match produces identity-match result
-- **WHEN** identity scoring produces `hasIdentityCandidateMatches: true`
-- **THEN** the runner emits a result with resolution `identity-match`
-
-#### Scenario: Deferred-enabled non-matched managed source account is queued for deferred scoring sweep
-- **WHEN** an account from a deferred-candidate-matching-enabled authoritative source has no identity match after identity scoring sweep
-- **THEN** the account is registered as a candidate via `candidateRegistry.register`
-- **AND** the account is queued for deferred scoring sweep
-
-#### Scenario: Non-deferred non-matched managed source account produces non-match
-- **WHEN** an account from a source WITHOUT deferred candidate matching has no identity match after identity scoring sweep
-- **THEN** the result has resolution `non-match`
-
-#### Scenario: Deferred candidate match in deferred scoring sweep produces deferred-match result
-- **WHEN** deferred scoring produces a deferred candidate match with candidate type `Deferred`
-- **THEN** the result has resolution `deferred-match`
-
-#### Scenario: No deferred candidate match in deferred scoring sweep produces non-match result
-- **WHEN** deferred scoring produces no match
-- **THEN** the result has resolution `non-match`
-
-#### Scenario: Deferred scoring sweep runs in parallel batches
-- **WHEN** the deferred scoring sweep has 50 pending accounts and batch size is 10
-- **THEN** deferred scoring runs in 5 parallel batches of 10
-- **AND** each account scores against per-source candidates registered during identity scoring sweep
-
-### Requirement: ManagedAccountMatchingRunner SHALL return structured results without side effects
-The `execute` method MUST NOT call `recordAnalysis` or any dispatch handler. It MUST return an array of `ManagedAccountMatchingResult` objects, each containing the `ManagedAccountAnalysisContext` and a `resolution` string.
-
-#### Scenario: Runner returns clean results
-- **WHEN** `execute` completes
-- **THEN** an array of `ManagedAccountMatchingResult` objects is returned
-- **AND** no calls to `recordAnalysis`, `handleIdentityMatch`, `handleDeferredMatch`, or `handleNonMatch` are made
-
-### Requirement: ManagedAccountMatchingRunner SHALL report progress during execution
-The runner MUST log progress at intervals matching current behavior (first account, every log-every-N accounts, final account) including processed count and elapsed time.
-
-#### Scenario: Progress is logged at intervals
-- **WHEN** `execute` processes 100 accounts with log-every 20
-- **THEN** progress is logged at accounts 1, 20, 40, 60, 80, 100
-
-### Requirement: FusionService SHALL delegate uncorrelated scoring sweep to the runner
-`runUncorrelatedManagedAccountSweep` MUST call `runner.execute()`, iterate results, call `recordAnalysis` once per result, and dispatch to the appropriate handler via a flat switch on resolution.
-
-#### Scenario: Runner is called with queued accounts
-- **WHEN** `runUncorrelatedManagedAccountSweep` is called
-- **THEN** `matchingRunner.execute` is invoked with queued accounts, batch size, and start time
-
-#### Scenario: Each result is recorded and dispatched
-- **WHEN** the runner returns results
-- **THEN** `recordAnalysis` is called once for each result
-- **AND** `identity-match` dispatches to `handleIdentityMatch`
-- **AND** `deferred-match` dispatches to `handleDeferredMatch`
-- **AND** `non-match` dispatches to `handleNonMatch`
-
-### Requirement: FusionService SHALL use runner for single-account analysis in processManagedAccount
-`processManagedAccount` for uncorrelated accounts MUST call the runner with a single-account batch. The `analyzeManagedAccount` method SHALL be removed. The `completeManagedAccountFromAnalysis` method SHALL be removed.
-
-#### Scenario: Uncorrelated account processed via runner
-- **WHEN** `processManagedAccount` receives an uncorrelated account (`uncorrelated === true`)
-- **THEN** `matchingRunner.execute` is called with `[account]` and batch size 1
-- **AND** the returned result is dispatched via `handleIdentityMatch`, `handleDeferredMatch`, or `handleNonMatch`
-
-### Requirement: FusionService SHALL call recordAnalysis exactly once per account
-`recordAnalysis` SHALL be called exactly once for each account's analysis, after the runner returns. No account SHALL be recorded more than once during the managed account processing sweep.
-
-#### Scenario: Record is called once per result
-- **WHEN** the runner returns N results
-- **THEN** `analysisRecorder.recordAnalysis` is called exactly N times
-- **AND** no account's analysis is recorded more than once
+#### Scenario: Pipeline phases still orchestrated by FusionService
+- **WHEN** the aggregation pipeline runs
+- **THEN** phase transitions SHALL be coordinated by FusionService
+- **AND** MapService, DefineService, and MatchService SHALL be invoked at the appropriate phase boundaries
 

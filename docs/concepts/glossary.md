@@ -141,3 +141,9 @@ A Fusion account that no longer has any contributing managed source accounts. De
 ### Deferred
 
 A match result where the best candidate is a deferred candidate from the same source in the same operation run. The connector defers creating a new identity until a later aggregation can compare against the established baseline.
+
+## Services
+
+| Term | Definition |
+|------|------------|
+| **FusionRun** | The centralized state object for a single operation run. Holds all data loaded during the run and serves as the single source of truth for stateless services. Supports `snapshot()` and `restore()` for recording and deterministic replay. |
