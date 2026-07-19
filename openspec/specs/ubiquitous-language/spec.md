@@ -48,7 +48,7 @@ Source code SHALL use the canonical terms from this spec for variable names, fun
 #### Scenario: Function naming follows ubiquitous language
 
 - **WHEN** a developer creates a function that operates on domain concepts
-- **THEN** the function name SHALL use canonical terms (e.g., `scoreIdentityCandidates`, not `analyzeIdentityPhase`; `hasDeferredMatches`, not `hasNewUnmatchedPeerMatches`)
+- **THEN** the function name SHALL use canonical terms (e.g., `scoreIdentityCandidates`, not `analyzeIdentityPhase`; `hasDeferredCandidateMatches`, not `hasNewUnmatchedPeerMatches`)
 
 #### Scenario: Type naming follows ubiquitous language
 

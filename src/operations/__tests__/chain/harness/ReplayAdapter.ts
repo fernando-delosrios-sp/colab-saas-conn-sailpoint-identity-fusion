@@ -23,13 +23,13 @@ function findIdentityIdForIscAccount(iscAccount: any, state: any): string | unde
             if (snapshot?.managedAccounts) {
                 if (Array.isArray(snapshot.managedAccounts)) {
                     allManaged.push(...snapshot.managedAccounts)
-            } else {
-                for (const sweepAccounts of Object.values(snapshot.managedAccounts)) {
-                    if (Array.isArray(sweepAccounts)) {
-                        allManaged.push(...sweepAccounts)
+                } else {
+                    for (const sweepAccounts of Object.values(snapshot.managedAccounts)) {
+                        if (Array.isArray(sweepAccounts)) {
+                            allManaged.push(...sweepAccounts)
+                        }
                     }
                 }
-            }
             }
             const ma = allManaged.find(
                 (m: any) =>
