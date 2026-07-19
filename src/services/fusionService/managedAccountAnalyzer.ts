@@ -6,7 +6,7 @@ import { FusionAccount } from '../../model/account'
 import { MatchCandidateType } from '../matchService/types'
 import { hasIdentityCandidateMatches as checkHasIdentityCandidateMatches } from './helpers'
 import type { FusionConfig } from '../../model/config'
-import type { MatchService } from '../matchService/matchService'
+import type { MatchService } from '../matchService'
 import type { LogService } from '../logService'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 
