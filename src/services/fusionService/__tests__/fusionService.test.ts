@@ -763,7 +763,7 @@ describe('FusionService', () => {
                 if (candidateList.length > 0) {
                     account.addFusionMatch({
                         identityId: '',
-                        identityName: 'Current operation unmatched',
+                        identityName: 'Current operation non-match',
                         candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any],
                     } as any)
@@ -823,7 +823,7 @@ describe('FusionService', () => {
                 if (candidateList.length > 0) {
                     account.addFusionMatch({
                         identityId: '',
-                        identityName: 'Current operation unmatched',
+                        identityName: 'Current operation non-match',
                         candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any],
                     } as any)
@@ -938,7 +938,7 @@ describe('FusionService', () => {
                 if (fusionAccount.sourceName === 'Source B' && candidateList.length > 0) {
                     fusionAccount.addFusionMatch({
                         identityId: '',
-                        identityName: 'Current operation unmatched source B',
+                        identityName: 'Current operation non-match source B',
                         candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                     } as any)
@@ -1172,17 +1172,17 @@ describe('FusionService', () => {
                 config: {},
             })
 
-            const unmatchedCandidate = FusionAccount.fromManagedAccount({
-                id: 'acct-prev-unmatched-1',
-                nativeIdentity: 'native-prev-unmatched-1',
-                name: 'Unmatched Candidate',
+            const nonMatchedCandidate = FusionAccount.fromManagedAccount({
+                id: 'acct-prev-nonmatch-1',
+                nativeIdentity: 'native-prev-nonmatch-1',
+                name: 'Non-matched Candidate',
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;(fusionService as any).fusionAccountMap.set('source-a-id::native-prev-unmatched-1', unmatchedCandidate)
+            ;(fusionService as any).fusionAccountMap.set('source-a-id::native-prev-nonmatch-1', nonMatchedCandidate)
             {
-                const candidates = new Set(['source-a-id::native-prev-unmatched-1'])
+                const candidates = new Set(['source-a-id::native-prev-nonmatch-1'])
                 for (const mk of candidates) {
                     const fa = (fusionService as any).fusionAccountMap.get(mk)
                     if (fa) (fusionService as any).candidateRegistry.register(fa)
@@ -1197,7 +1197,7 @@ describe('FusionService', () => {
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
                         identityId: '',
-                        identityName: 'Unmatched Candidate',
+                        identityName: 'Non-matched Candidate',
                         candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                     } as any)
@@ -1233,17 +1233,17 @@ describe('FusionService', () => {
                 config: {},
             })
 
-            const unmatchedCandidate = FusionAccount.fromManagedAccount({
-                id: 'acct-prev-unmatched-cap',
-                nativeIdentity: 'native-prev-unmatched-cap',
-                name: 'Unmatched Candidate',
+            const nonMatchedCandidate = FusionAccount.fromManagedAccount({
+                id: 'acct-prev-nonmatch-cap',
+                nativeIdentity: 'native-prev-nonmatch-cap',
+                name: 'Non-matched Candidate',
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;(fusionService as any).fusionAccountMap.set('source-a-id::native-prev-unmatched-cap', unmatchedCandidate)
+            ;(fusionService as any).fusionAccountMap.set('source-a-id::native-prev-nonmatch-cap', nonMatchedCandidate)
             {
-                const candidates = new Set(['source-a-id::native-prev-unmatched-cap'])
+                const candidates = new Set(['source-a-id::native-prev-nonmatch-cap'])
                 for (const mk of candidates) {
                     const fa = (fusionService as any).fusionAccountMap.get(mk)
                     if (fa) (fusionService as any).candidateRegistry.register(fa)
@@ -1258,7 +1258,7 @@ describe('FusionService', () => {
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
                         identityId: '',
-                        identityName: 'Unmatched Candidate',
+                        identityName: 'Non-matched Candidate',
                         candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                     } as any)
@@ -1309,20 +1309,20 @@ describe('FusionService', () => {
                 config: {},
             })
 
-            const unmatchedCandidate = FusionAccount.fromManagedAccount({
-                id: 'acct-prev-unmatched-cr',
-                nativeIdentity: 'native-prev-unmatched-cr',
-                name: 'Unmatched Candidate CR',
+            const nonMatchedCandidate = FusionAccount.fromManagedAccount({
+                id: 'acct-prev-nonmatch-cr',
+                nativeIdentity: 'native-prev-nonmatch-cr',
+                name: 'Non-matched Candidate CR',
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
             ;(customReportFusion as any).fusionAccountMap.set(
-                'source-a-id::native-prev-unmatched-cr',
-                unmatchedCandidate
+                'source-a-id::native-prev-nonmatch-cr',
+                nonMatchedCandidate
             )
             {
-                const candidates = new Set(['source-a-id::native-prev-unmatched-cr'])
+                const candidates = new Set(['source-a-id::native-prev-nonmatch-cr'])
                 for (const mk of candidates) {
                     const fa = (customReportFusion as any).fusionAccountMap.get(mk)
                     if (fa) (customReportFusion as any).candidateRegistry.register(fa)
@@ -1337,7 +1337,7 @@ describe('FusionService', () => {
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
                         identityId: '',
-                        identityName: 'Unmatched Candidate CR',
+                        identityName: 'Non-matched Candidate CR',
                         candidateType: 'deferred',
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                     } as any)
@@ -1357,9 +1357,9 @@ describe('FusionService', () => {
             )
         })
 
-        it('records only unmatched history when creating a new authoritative non-match fusion account', async () => {
+        it('records only non-match history when creating a new authoritative non-match fusion account', async () => {
             const mockManagedAccount = {
-                id: 'acct-unmatched-1',
+                id: 'acct-nonmatch-1',
                 nativeIdentity: 'NE00002',
                 name: 'Matt Usalen NE00002 Assignment00002',
                 sourceId: 'src-nerm',
@@ -1794,7 +1794,7 @@ describe('FusionService', () => {
             )
         })
 
-        it('should set reverse correlation attribute for first-run unmatched authoritative accounts', async () => {
+        it('should set reverse correlation attribute for first-run non-matched authoritative accounts', async () => {
             const mockManagedAccount = {
                 id: 'acct-1',
                 nativeIdentity: 'native-1',
@@ -2182,7 +2182,7 @@ describe('FusionService', () => {
             ])
         })
 
-        it('sets reverse correlation attribute for unmatched authoritative accounts without checking platform prerequisites', async () => {
+        it('sets reverse correlation attribute for non-matched authoritative accounts without checking platform prerequisites', async () => {
             const mockManagedAccount = {
                 id: 'acct-2',
                 nativeIdentity: 'native-2',
@@ -2368,7 +2368,7 @@ describe('FusionService', () => {
         it('routes fusion account without identityId to fusionAccountMap', () => {
             const account = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-noident-1',
-                name: 'Unmatched Account',
+                name: 'Non-matched Account',
                 sourceName: 'Identity Fusion NG',
                 uncorrelated: true,
                 attributes: {},
