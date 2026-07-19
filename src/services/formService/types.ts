@@ -40,7 +40,7 @@ export type PendingReviewAccountContext = {
 
 /** Result of `FormService.createFusionForm` for reporting and duplicate-review handling. */
 export type CreateFusionFormOutcome = {
-    /** True when a form definition was resolved and candidate IDs were registered for this operation. */
+    /** True when a form definition was resolved and candidate IDs were registered for this run. */
     formDefinitionReady: boolean
     /** How many reviewers had a new form instance creation queued (async); 0 when all were skipped or ineligible. */
     newReviewInstancesQueued: number

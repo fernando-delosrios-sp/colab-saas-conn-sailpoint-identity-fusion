@@ -6,13 +6,13 @@ import { createUrlContext } from '../../utils/url'
 import { readPathString } from '../../utils/safeRead'
 
 /**
- * Row-level outcome for the ISC account in this operation.
+ * Row-level outcome for the ISC account in this run.
  *
  * - 'matched' / 'deferred' / 'non-matched' describe outcomes for managed accounts
- *   with a Match attempt in this operation that relate to the ISC account.
+ *   with a Match attempt in this run that relate to the ISC account.
  * - 'review-error' reflects form creation / review processing errors.
  * - 'not-analyzed' is reserved for ISC accounts with no related Match attempts
- *   in this operation (existing Fusion-only context).
+ *   in this run (existing Fusion-only context).
  */
 export type MatchingStatus = 'matched' | 'deferred' | 'non-matched' | 'review-error' | 'not-analyzed'
 
@@ -119,7 +119,7 @@ type MatchingCandidate = {
 
 type MatchingPayload = {
     status: MatchingStatus
-    /** Sum of fusion identity comparisons for related managed accounts in this operation. */
+    /** Sum of fusion identity comparisons for related managed accounts in this run. */
     matchAttempts: number
     /** Total match candidates found (length of `matches`). */
     matchedAccounts: number
@@ -192,7 +192,7 @@ const mapScoresToThresholdWire = (scores: FusionReportMatch['scores'] | undefine
     })
 
 const deriveMatchingStatus = (reportAccounts: FusionReportAccount[]): MatchingStatus => {
-    // No report accounts linked to this ISC account in this operation -> existing Fusion-only.
+    // No report accounts linked to this ISC account in this run -> existing Fusion-only.
     if (reportAccounts.length === 0) return 'not-analyzed'
     if (reportAccounts.some((x) => x.deferred)) return 'deferred'
     if (reportAccounts.some((x) => x.error)) return 'review-error'
@@ -413,7 +413,7 @@ export const buildDryRunSummary = (params: {
     // Operation-wide totals (dry-run account slice + fusion stats)
     const stats = params.stats ?? {}
     const totalFusionAccounts = stats.totalFusionAccounts ?? stats.fusionAccountsFound ?? 0
-    /** Same value as `totals.fusionAccountsExisting` — authoritative fusion account inventory for this operation. */
+    /** Same value as `totals.fusionAccountsExisting` — authoritative fusion account inventory for this run. */
     const existingFusionAccounts = stats.fusionAccountsFound ?? totalFusionAccounts
     const matches = params.reportAccounts.filter((x) => x.matches.length > 0 && !x.deferred).length
     const nonMatches = params.reportAccounts.filter((x) => !x.deferred && x.matches.length === 0).length

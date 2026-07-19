@@ -73,7 +73,7 @@ export class DecisionProcessor {
      * 1. Re-fetches the latest pending form instances via {@link FusionForms.fetchFormData}
      *    so the current account's pending decisions are reflected.
      * 2. Calls {@link reconcilePendingFormState} to drop stale 'candidate' / 'reviews'
-     *    entries (which may reference accounts not present in this operation) and
+     *    entries (which may reference accounts not present in this run) and
      *    rebuild them from the currently-known pending (unanswered) form instances,
      *    so the serialized output only references the account being returned.
      */

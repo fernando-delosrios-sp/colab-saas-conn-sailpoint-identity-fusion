@@ -51,7 +51,7 @@ export class ManagedAccountMatchingRunner {
                 processedCount === initialQueueSize
             ) {
                 this.state.log.info(
-                    `Managed accounts progress: ${processedCount}/${initialQueueSize} analyzed | OPERATION ELAPSED ${PhaseTimer.formatElapsed(
+                    `Managed accounts progress: ${processedCount}/${initialQueueSize} analyzed | RUN ELAPSED ${PhaseTimer.formatElapsed(
                         Date.now() - managedAccountProcessingStartedAt
                     )}`
                 )

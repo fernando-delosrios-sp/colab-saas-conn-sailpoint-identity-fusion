@@ -79,7 +79,7 @@ export type FusionReportAccount = {
     accountAttributes?: Record<string, any>
     /** List of identity match candidates with their scores */
     matches: FusionReportMatch[]
-    /** How many fusion identity accounts were compared against this managed account in this operation (per scoring sweeps). */
+    /** How many fusion identity accounts were compared against this managed account in this run (per scoring sweeps). */
     fusionIdentityComparisons?: number
     /** Error message when form creation failed (excessive candidates or runtime error) */
     error?: string
@@ -223,7 +223,7 @@ export type FusionReportIdentityConflictOccurrence = {
 
 /** Report warnings section payload. */
 export type FusionReportWarnings = {
-    /** Guidance + conflicting identity occurrences detected in this operation */
+    /** Guidance + conflicting identity occurrences detected in this run */
     identityConflicts?: {
         message: string
         affectedIdentities: number
@@ -256,7 +256,7 @@ export type FusionReport = {
     stats?: FusionReportStats
     /** Finished reviewer decisions processed from fusion reviews */
     fusionReviewDecisions?: FusionReportDecision[]
-    /** Blending events executed during this operation */
+    /** Blending events executed during this run */
     fusionBlends?: FusionReportBlend[]
     /** Global warnings surfaced during report generation */
     warnings?: FusionReportWarnings

@@ -136,7 +136,7 @@ export class FormService {
         } else {
             this.log.debug(
                 `Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern} ` +
-                    '(stale cleanup disabled for this operation)'
+                    '(stale cleanup disabled for this run)'
             )
         }
         this._formsFound = activeForms.length
@@ -613,32 +613,32 @@ export class FormService {
         }
     }
 
-    /** Number of form definitions created during this operation */
+    /** Number of form definitions created during this run */
     public get formsCreated(): number {
         return this._formsCreated
     }
 
-    /** Number of form definitions found during fetchFormData for this operation */
+    /** Number of form definitions found during fetchFormData for this run */
     public get formsFound(): number {
         return this._formsFound
     }
 
-    /** Number of form instances (review assignments) created during this operation */
+    /** Number of form instances (review assignments) created during this run */
     public get formInstancesCreated(): number {
         return this._formInstancesCreated
     }
 
-    /** Number of form instances found during fetchFormData for this operation */
+    /** Number of form instances found during fetchFormData for this run */
     public get formInstancesFound(): number {
         return this._formInstancesFound
     }
 
-    /** Number of answered form instances processed in this operation */
+    /** Number of answered form instances processed in this run */
     public get answeredFormInstancesProcessed(): number {
         return this._answeredFormInstancesProcessed
     }
 
-    /** All finished decisions processed from answered form instances in this operation */
+    /** All finished decisions processed from answered form instances in this run */
     public get finishedFusionDecisions(): FusionDecision[] {
         return this._finishedFusionDecisions
     }
@@ -1102,7 +1102,7 @@ export class FormService {
     }
 
     /**
-     * Check if a managed account is present in this operation's source inventory.
+     * Check if a managed account is present in this run's source inventory.
      * Uses managedAccountsAllById (full snapshot), not managedAccountsById (work queue),
      * because the queue is depleted during fetchFormData when completed forms remove entries.
      */
@@ -1140,14 +1140,14 @@ export class FormService {
         // run may have already removed the account from the queue only.
         const account = workQueue.get(accountId) ?? allById.get(accountId)
         if (!account) {
-            // Account not in this operation's managed inventory, return undefined.
+            // Account not in this run's managed inventory, return undefined.
             // The form will be deleted due to missing account check in analyzeFormInstances.
             return undefined
         }
 
         if (shouldRemoveAccountFromMap) {
             // Form is still pending (no response and not all cancelled), so remove
-            // the managed account from this operation's work queue to avoid duplicate processing.
+            // the managed account from this run's work queue to avoid duplicate processing.
             workQueue.delete(accountId)
             const identityId = account.identityId
             if (identityId) {

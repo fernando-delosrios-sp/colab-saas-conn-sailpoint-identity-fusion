@@ -125,6 +125,11 @@ The terms **operation**, **phase**, and **sweep** SHALL be used as defined in th
 - **WHEN** referring to a connector entry point such as `std:account:list` or `custom:dryrun`
 - **THEN** the term "operation" SHALL be used (e.g., "accountList operation", "dryRun operation")
 
+#### Scenario: Naming an execution of a connector entry point
+
+- **WHEN** referring to a single execution or instance of a connector operation
+- **THEN** the term "operation run" or "run" SHALL be used (e.g., "an accountList operation run", "during the run"), not "processing run" or "aggregation run"
+
 #### Scenario: Naming a major pipeline stage
 
 - **WHEN** referring to a major stage of an operation pipeline
@@ -219,7 +224,8 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 
 | Term | Definition |
 |------|------------|
-| **Operation** | A connector entry point such as `std:account:list` (the **accountList operation**) or `custom:dryrun` (the **dryRun operation**). |
+| **Operation** | A connector entry point such as `std:account:list` (the **accountList operation**) or `custom:dryrun` (the **dryRun operation**). The operation is the command definition. |
+| **Operation run** | A single execution or instance of an operation. A run is the execution of an operation. |
 | **Phase** | A major stage of an operation pipeline (for example the identity documents phase, the Fusion accounts phase, the managed accounts phase, or the report phase). |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
 | **Correlated account sweep** | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts. |
@@ -284,4 +290,4 @@ The following terms are retired and SHALL NOT be used in new code, configuration
 | `analyzeDeferredPhase` | `scoreDeferredCandidates` |
 | `hasNewUnmatchedPeerMatches` | `hasDeferredMatches` |
 | `ManagedAccountPassRunner` | `ManagedAccountMatchingRunner` |
-| `processing run` | the specific operation name |
+| `processing run` | operation run, or the specific operation name when referring to the command definition |
