@@ -2,13 +2,16 @@ import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
 import { FusionConfig } from '../../model/config'
 import { LogService } from '../logService'
-import { FusionService } from './fusionService'
+import { IdentityService } from '../identityService'
+import { SourceService } from '../sourceService'
 
 export class CorrelationManager {
     constructor(
         private config: FusionConfig,
         private log: LogService,
-        private fusionService: FusionService
+        private sources: SourceService,
+        private identities: IdentityService,
+        private isAggregationMode: () => boolean
     ) {}
 
     /**
@@ -37,12 +40,12 @@ export class CorrelationManager {
             ? missingIds.filter((accountId) => {
                   const info = fusionAccount.getManagedAccountInfo(accountId)
                   if (!info) {
-                      this.fusionService.log.debug(
+                      this.log.debug(
                           `Skipping per-source correlation for missing managed key "${accountId}" on ${fusionAccount.name}: source context not available`
                       )
                       return false
                   }
-                  const sourceConfig = this.fusionService.sources.getSourceConfig(info.source.name)
+                  const sourceConfig = this.sources.getSourceConfig(info.source.name)
                   return (sourceConfig?.correlationMode ?? 'none') === 'correlate'
               })
             : []
@@ -57,7 +60,7 @@ export class CorrelationManager {
                 assignedSource &&
                 missingIds.includes(assignedKey) &&
                 !fusionAccount.getManagedAccountInfo(assignedKey) &&
-                (this.fusionService.sources.getSourceConfig(assignedSource)?.correlationMode ?? 'none') === 'correlate' &&
+                (this.sources.getSourceConfig(assignedSource)?.correlationMode ?? 'none') === 'correlate' &&
                 !directCorrelateIds.includes(assignedKey)
             ) {
                 directCorrelateIds.push(assignedKey)
@@ -66,12 +69,12 @@ export class CorrelationManager {
 
         // Direct correlation
         if (directCorrelateIds.length > 0) {
-            await this.fusionService.identities.correlateAccounts(fusionAccount, directCorrelateIds)
+            await this.identities.correlateAccounts(fusionAccount, directCorrelateIds)
         } else if (forceDirectCorrelation && canDirectCorrelate && missingIds.length > 0) {
-            this.fusionService.log.debug(
+            this.log.debug(
                 `No per-source direct-correlation targets for ${fusionAccount.name}; forcing direct correlation for ${missingIds.length} missing account(s) due to explicit correlated action`
             )
-            await this.fusionService.identities.correlateAccounts(fusionAccount, [...missingIds])
+            await this.identities.correlateAccounts(fusionAccount, [...missingIds])
         }
     }
 
@@ -82,7 +85,7 @@ export class CorrelationManager {
         fusionAccount: FusionAccount,
         authorizedLinkDecision?: FusionDecision
     ): Promise<void> {
-        if (!this.fusionService.isAggregationAccountListMode()) return
+        if (!this.isAggregationMode()) return
         if (fusionAccount.missingAccountIdsSet.size === 0) return
         await this.correlatePerSource(fusionAccount, authorizedLinkDecision)
     }

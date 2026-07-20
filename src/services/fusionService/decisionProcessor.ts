@@ -175,7 +175,7 @@ export class DecisionProcessor {
         }
 
         if (fusionDecision.newIdentity) {
-            const sourceInfo = this.fusionService.sourcesByName.get(fusionDecision.account.sourceName)
+            const sourceInfo = this.run.sourcesByName.get(fusionDecision.account.sourceName)
             const decisionManagedKey = trimStr(fusionDecision.account.id) ?? ''
             const managedAccount = decisionManagedKey
                 ? this.fusionService.run.managedAccountsById.get(decisionManagedKey)

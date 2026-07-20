@@ -739,7 +739,7 @@ describe('FusionService', () => {
                 analysis: {
                     account,
                     fusionAccount: analyzed,
-                    sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceInfo: (fusionService as any).run.sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
                     hasIdentityCandidateMatches: true,
@@ -919,13 +919,13 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
-            ;(fusionService as any).sourcesByName.set('Source A', {
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: { deferredMatching: false },
             })
-            ;(fusionService as any).sourcesByName.set('Source B', {
+            ;(fusionService as any).run.sourcesByName.set('Source B', {
                 id: 'source-b-id',
                 name: 'Source B',
                 sourceType: 'authoritative',
@@ -1006,7 +1006,7 @@ describe('FusionService', () => {
                     if (fa) (fusionService as any).candidateRegistry.register(fa)
                 }
             }
-            ;(fusionService as any).sourcesByName.set('Source B', {
+            ;(fusionService as any).run.sourcesByName.set('Source B', {
                 id: 'source-b-id',
                 name: 'Source B',
                 sourceType: 'authoritative',
@@ -1142,7 +1142,7 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account
 
-            ;(fusionService as any).sourcesByName.set('Record Skip Match Source', {
+            ;(fusionService as any).run.sourcesByName.set('Record Skip Match Source', {
                 id: 'src-record-skip',
                 name: 'Record Skip Match Source',
                 sourceType: 'record',
@@ -1167,7 +1167,7 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account
 
-            ;(fusionService as any).sourcesByName.set('Record Default Source', {
+            ;(fusionService as any).run.sourcesByName.set('Record Default Source', {
                 id: 'src-record-default',
                 name: 'Record Default Source',
                 sourceType: 'record',
@@ -1194,7 +1194,7 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            ;(fusionService as any).sourcesByName.set('Source A', {
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -1255,7 +1255,7 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account
 
-            ;(fusionService as any).sourcesByName.set('Source A', {
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -1333,7 +1333,7 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account
 
-            ;(customReportFusion as any).sourcesByName.set('Source A', {
+            ;(customReportFusion as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -1399,7 +1399,7 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            ;(fusionService as any).sourcesByName.set('NERM', {
+            ;(fusionService as any).run.sourcesByName.set('NERM', {
                 id: 'src-nerm',
                 name: 'NERM',
                 sourceType: 'authoritative',
@@ -1410,7 +1410,7 @@ describe('FusionService', () => {
                 analysis: {
                     account: mockManagedAccount,
                     fusionAccount: analyzed,
-                    sourceInfo: (fusionService as any).sourcesByName.get(mockManagedAccount.sourceName) ?? undefined,
+                    sourceInfo: (fusionService as any).run.sourcesByName.get(mockManagedAccount.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
                     hasIdentityCandidateMatches: false,
@@ -1455,7 +1455,7 @@ describe('FusionService', () => {
                 analysis: {
                     account,
                     fusionAccount: analyzed,
-                    sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceInfo: (fusionService as any).run.sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
                     hasIdentityCandidateMatches: true,
@@ -1496,7 +1496,7 @@ describe('FusionService', () => {
                 analysis: {
                     account,
                     fusionAccount: analyzed,
-                    sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceInfo: (fusionService as any).run.sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
                     hasIdentityCandidateMatches: true,
@@ -1584,7 +1584,7 @@ describe('FusionService', () => {
         it('does not assign automatically when a rule was skipped (missing)', async () => {
             ;(fusionService as any).config.fusionEnableAutoAssignment = true
             ;(fusionService as any).config.fusionAutoAssignmentScore = 100
-            ;(fusionService as any).sourcesByName.set('LH2', {
+            ;(fusionService as any).run.sourcesByName.set('LH2', {
                 id: 'src-lh2',
                 name: 'LH2',
                 sourceType: 'authoritative',
@@ -1616,7 +1616,7 @@ describe('FusionService', () => {
                 analysis: {
                     account,
                     fusionAccount: analyzed,
-                    sourceInfo: (fusionService as any).sourcesByName.get(account.sourceName) ?? undefined,
+                    sourceInfo: (fusionService as any).run.sourcesByName.get(account.sourceName) ?? undefined,
                     sourceType: SourceType.Authoritative,
                     fusionIdentityComparisons: 0,
                     hasIdentityCandidateMatches: true,
@@ -1850,7 +1850,7 @@ describe('FusionService', () => {
                 correlationAttribute: 'reverseNativeIdentity',
                 correlationDisplayName: 'Reverse Native Identity',
             })
-            ;(fusionService as any).sourcesByName.set('Source A', {
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -1875,7 +1875,7 @@ describe('FusionService', () => {
                 uncorrelated: false,
             } as Account
 
-            ;(fusionService as any).sourcesByName.set('Source A', {
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -1915,7 +1915,7 @@ describe('FusionService', () => {
                 uncorrelated: false,
             } as Account
 
-            ;(fusionService as any).sourcesByName.set('Source A', {
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -2238,7 +2238,7 @@ describe('FusionService', () => {
                 correlationAttribute: 'reverseNativeIdentity',
                 correlationDisplayName: 'Reverse Native Identity',
             })
-            ;(fusionService as any).sourcesByName.set('Source A', {
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -2277,7 +2277,7 @@ describe('FusionService', () => {
                     ['source-a-id::native-analyze-2', secondAccount],
                 ])
             )
-            ;(fusionService as any).sourcesByName.set('Source A', {
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -2329,7 +2329,7 @@ describe('FusionService', () => {
                 persistedNonMatch
             )
 
-            ;(fusionService as any).sourcesByName.set('Source A', {
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -2902,7 +2902,7 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            ;(fusionService as any).sourcesByName.set('Orphan Source', {
+            ;(fusionService as any).run.sourcesByName.set('Orphan Source', {
                 id: 'src-orphan-1',
                 name: 'Orphan Source',
                 sourceType: 'orphan',

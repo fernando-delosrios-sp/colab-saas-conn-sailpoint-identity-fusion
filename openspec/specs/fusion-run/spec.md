@@ -32,6 +32,8 @@ FusionRun SHALL contain maps and sets for all data loaded and processed during a
 - **THEN** run.fusionAccountMap SHALL contain all fusion accounts
 - **AND** run.fusionIdentityMap SHALL contain identity-linked fusion accounts
 - **AND** run.autoAssignedIdentityIds SHALL track automatically assigned identities
+- **AND** run.sourcesByName SHALL map managed source names to SourceInfo
+- **AND** run.currentRunNonMatchedKeysBySource SHALL track non-matched account keys per source
 
 #### Scenario: FusionRun contains matching state
 - **WHEN** matching sweeps run
@@ -45,7 +47,7 @@ FusionRun SHALL expose a `snapshot()` method that returns a complete serializabl
 
 #### Scenario: Snapshot captures complete state
 - **WHEN** run.snapshot() is called during a run
-- **THEN** the returned snapshot SHALL contain: identities, managedAccounts, fusionAccounts, fusionIdentities, formDecisions, autoAssignedIds, analysisRecord, matchScoringMs, phaseTimings
+- **THEN** the returned snapshot SHALL contain: managedAccounts, fusionAccounts, identities, formDecisions, autoAssignedIds, matchScoringMs, phaseTimings
 - **AND** the snapshot SHALL be JSON-serializable
 
 #### Scenario: Restore reconstructs identical state
