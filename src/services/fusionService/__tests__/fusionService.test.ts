@@ -223,9 +223,9 @@ describe('FusionService', () => {
             mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
             mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
-            run.pendingCandidateIdentityIds = new Set([identityId])
-            run.pendingReviewUrlsByCandidateId = new Map([[identityId, [reviewUrl]]])
-            run.pendingReviewUrlsByReviewerId = new Map()
+            ;(run as any)._pendingCandidateIdentityIds = new Set([identityId])
+            ;(run as any)._pendingReviewUrlsByCandidateId = new Map([[identityId, [reviewUrl]]])
+            ;(run as any)._pendingReviewUrlsByReviewerId = new Map()
 
             const output = await fusionService.getISCAccount(fusionAccount)
 
@@ -248,9 +248,9 @@ describe('FusionService', () => {
             mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
             mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
-            run.pendingCandidateIdentityIds = new Set()
-            run.pendingReviewUrlsByCandidateId = new Map()
-            run.pendingReviewUrlsByReviewerId = new Map([[identityId, [reviewUrl]]])
+            ;(run as any)._pendingCandidateIdentityIds = new Set()
+            ;(run as any)._pendingReviewUrlsByCandidateId = new Map()
+            ;(run as any)._pendingReviewUrlsByReviewerId = new Map([[identityId, [reviewUrl]]])
 
             const output = await fusionService.getISCAccount(fusionAccount)
 
@@ -983,11 +983,11 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;run.fusionAccountMap.set('source-a-id::native-other-source', sourceAAccount)
+            ;(run as any)._fusionAccountMap.set('source-a-id::native-other-source', sourceAAccount)
             {
                 const candidates = new Set(['source-a-id::native-other-source'])
                 for (const mk of candidates) {
-                    const fa = run.fusionAccountMap.get(mk)
+                    const fa = (run as any)._fusionAccountMap.get(mk)
                     if (fa) (fusionService as any).candidateRegistry.register(fa)
                 }
             }
@@ -1194,11 +1194,11 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;run.fusionAccountMap.set('source-a-id::native-prev-nonmatch-1', nonMatchedCandidate)
+            ;(run as any)._fusionAccountMap.set('source-a-id::native-prev-nonmatch-1', nonMatchedCandidate)
             {
                 const candidates = new Set(['source-a-id::native-prev-nonmatch-1'])
                 for (const mk of candidates) {
-                    const fa = run.fusionAccountMap.get(mk)
+                    const fa = (run as any)._fusionAccountMap.get(mk)
                     if (fa) (fusionService as any).candidateRegistry.register(fa)
                 }
             }
@@ -1255,11 +1255,11 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;run.fusionAccountMap.set('source-a-id::native-prev-nonmatch-cap', nonMatchedCandidate)
+            ;(run as any)._fusionAccountMap.set('source-a-id::native-prev-nonmatch-cap', nonMatchedCandidate)
             {
                 const candidates = new Set(['source-a-id::native-prev-nonmatch-cap'])
                 for (const mk of candidates) {
-                    const fa = run.fusionAccountMap.get(mk)
+                    const fa = (run as any)._fusionAccountMap.get(mk)
                     if (fa) (fusionService as any).candidateRegistry.register(fa)
                 }
             }
@@ -1333,14 +1333,14 @@ describe('FusionService', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            ;run.fusionAccountMap.set(
+            ;(run as any)._fusionAccountMap.set(
                 'source-a-id::native-prev-nonmatch-cr',
                 nonMatchedCandidate
             )
             {
                 const candidates = new Set(['source-a-id::native-prev-nonmatch-cr'])
                 for (const mk of candidates) {
-                    const fa = run.fusionAccountMap.get(mk)
+                    const fa = (run as any)._fusionAccountMap.get(mk)
                     if (fa) (customReportFusion as any).candidateRegistry.register(fa)
                 }
             }
@@ -2309,7 +2309,7 @@ describe('FusionService', () => {
                 attributes: {},
             } as any)
             persistedNonMatch.setNonMatched()
-            ;run.fusionAccountMap.set(
+            ;(run as any)._fusionAccountMap.set(
                 'source-a-id::native-persisted-nonmatch',
                 persistedNonMatch
             )

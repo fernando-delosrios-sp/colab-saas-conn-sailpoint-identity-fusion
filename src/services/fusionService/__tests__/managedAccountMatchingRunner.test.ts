@@ -11,8 +11,9 @@ function makeRunner(overrides: Partial<ManagedAccountMatchingRunnerState> = {}):
     processAccount: ReturnType<typeof vi.fn>
     candidateRegistry: CandidateRegistry
 } {
+    const fusionMap = new Map()
     const candidateRegistry = new CandidateRegistry({
-        fusionAccountMap: new Map(),
+        getFusionAccount: (key: string) => fusionMap.get(key),
         sourcesByName: new Map(),
         log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
     })
@@ -78,7 +79,7 @@ describe('ManagedAccountMatchingRunner', () => {
         sources.set('Source A', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
         const fusionMap = new Map()
         const candidateRegistry = new CandidateRegistry({
-            fusionAccountMap: fusionMap,
+            getFusionAccount: (key: string) => fusionMap.get(key),
             sourcesByName: sources,
             log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
         })
@@ -120,7 +121,7 @@ describe('ManagedAccountMatchingRunner', () => {
         sources.set('Source A', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
         const fusionMap = new Map()
         const candidateRegistry = new CandidateRegistry({
-            fusionAccountMap: fusionMap,
+            getFusionAccount: (key: string) => fusionMap.get(key),
             sourcesByName: sources,
             log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
         })

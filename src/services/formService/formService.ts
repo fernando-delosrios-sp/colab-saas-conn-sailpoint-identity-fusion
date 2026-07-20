@@ -172,17 +172,15 @@ export class FormService {
         }
         this._fetchedFormInstances = []
 
-        const fusionDecisionsCount = this.run.fusionIdentityDecisions?.length ?? 0
+        const fusionDecisionsCount = this.run.fusionIdentityDecisions.length
         this.log.debug(`Form data fetch completed - ${fusionDecisionsCount} fusion decision(s)`)
     }
 
     private resetFormDataState(): void {
         this.run.clearDecisions()
         this.fusionAssignmentDecisionMap = new Map()
-        this.run.pendingReviewUrlsByReviewerId = new Map()
+        this.run.clearReviewUrls()
         this._pendingReviewContextByAccountId = new Map()
-        this.run.pendingCandidateIdentityIds = new Set()
-        this.run.pendingReviewUrlsByCandidateId = new Map()
         this._finishedFusionDecisions = []
         this._formsFound = 0
         this._formInstancesFound = 0
@@ -659,10 +657,11 @@ export class FormService {
      * Get all fusion identity decisions
      */
     public getFusionIdentityDecision(identityUid: string): FusionDecision | undefined {
-        if (!this.run.fusionIdentityDecisions) {
+        const decisions = this.run.fusionIdentityDecisions
+        if (decisions.length === 0) {
             return undefined
         }
-        return this.run.fusionIdentityDecisions.find((decision) => decision.account.id === identityUid)
+        return decisions.find((decision) => decision.account.id === identityUid)
     }
 
     /**
@@ -909,7 +908,7 @@ export class FormService {
      * Process fusion form instances and extract decisions
      */
     private async processFusionFormInstances(formInstances: FormInstanceResponseV2025[]): Promise<void> {
-        assert(this.run.fusionIdentityDecisions, 'Fusion identity decisions array is not initialized')
+        assert(Array.isArray(this.run.fusionIdentityDecisions), 'Fusion identity decisions array is not initialized')
         assert(this.fusionAssignmentDecisionMap, 'Fusion assignment decision map is not initialized')
         assert(formInstances, 'Form instances array is required')
 

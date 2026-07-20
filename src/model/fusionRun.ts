@@ -44,19 +44,19 @@ export interface WorkQueue {
 export class FusionRun implements WorkQueue {
     readonly managedAccountsById = new Map<string, Account>()
     readonly managedAccountsByIdentityId = new Map<string, Set<string>>()
-    readonly fusionAccountMap = new Map<string, FusionAccount>()
-    readonly fusionIdentityMap = new Map<string, FusionAccount>()
-    readonly identityMap = new Map<string, IdentityDocument>()
+    private readonly _fusionAccountMap = new Map<string, FusionAccount>()
+    private readonly _fusionIdentityMap = new Map<string, FusionAccount>()
+    private readonly _identityMap = new Map<string, IdentityDocument>()
     readonly sourcesByName = new Map<string, SourceInfo>()
-    readonly autoAssignedIdentityIds = new Set<string>()
-    readonly currentRunNonMatchedKeysBySource = new Map<string, Set<string>>()
+    private readonly _autoAssignedIdentityIds = new Set<string>()
+    private readonly _currentRunNonMatchedKeysBySource = new Map<string, Set<string>>()
     readonly reviewersBySourceId = new Map<string, Set<FusionAccount>>()
     readonly sourcesWithoutReviewers = new Set<string>()
-    linkedAccountKeyIndex: Set<string> | undefined
-    fusionIdentityDecisions: FusionDecision[] = []
-    pendingCandidateIdentityIds: Set<string> = new Set()
-    pendingReviewUrlsByReviewerId: Map<string, string[]> = new Map()
-    pendingReviewUrlsByCandidateId: Map<string, string[]> = new Map()
+    private _linkedAccountKeyIndex: Set<string> | undefined
+    private _fusionIdentityDecisions: FusionDecision[] = []
+    private _pendingCandidateIdentityIds: Set<string> = new Set()
+    private _pendingReviewUrlsByReviewerId: Map<string, string[]> = new Map()
+    private _pendingReviewUrlsByCandidateId: Map<string, string[]> = new Map()
     fusionBlends: FusionReportBlend[] = []
     matchScoringMs = 0
     analysisRecorder?: ManagedAccountAnalysisRecorder
@@ -64,6 +64,76 @@ export class FusionRun implements WorkQueue {
     phaseTimings: { phase: string; elapsed: string }[] = []
     managedSources: SourceInfo[] = []
     managedAccountsAllById?: Map<string, Account>
+
+    get autoAssignedCount(): number {
+        return this._autoAssignedIdentityIds.size
+    }
+
+    get autoAssignedIdentityIds(): ReadonlySet<string> {
+        return this._autoAssignedIdentityIds
+    }
+
+    get identityCount(): number {
+        return this._identityMap.size
+    }
+
+    get allIdentities(): IdentityDocument[] {
+        return Array.from(this._identityMap.values())
+    }
+
+    identityValues(): IterableIterator<IdentityDocument> {
+        return this._identityMap.values()
+    }
+
+    get fusionAccountMap(): ReadonlyMap<string, FusionAccount> {
+        return this._fusionAccountMap
+    }
+
+    get linkedAccountKeyIndex(): ReadonlySet<string> | undefined {
+        return this._linkedAccountKeyIndex
+    }
+
+    addToLinkedAccountIndex(key: string): void {
+        this._linkedAccountKeyIndex?.add(key)
+    }
+
+    get fusionIdentityDecisions(): readonly FusionDecision[] {
+        return this._fusionIdentityDecisions
+    }
+
+    get pendingCandidateIdentityIds(): ReadonlySet<string> {
+        return this._pendingCandidateIdentityIds
+    }
+
+    get pendingReviewerUrlKeys(): IterableIterator<string> {
+        return this._pendingReviewUrlsByReviewerId.keys()
+    }
+
+    get pendingCandidateUrlKeys(): IterableIterator<string> {
+        return this._pendingReviewUrlsByCandidateId.keys()
+    }
+
+    clearReviewUrls(): void {
+        this._pendingReviewUrlsByReviewerId = new Map()
+        this._pendingReviewUrlsByCandidateId = new Map()
+        this._pendingCandidateIdentityIds = new Set()
+    }
+
+    get pendingReviewUrlsByReviewerId(): ReadonlyMap<string, string[]> {
+        return this._pendingReviewUrlsByReviewerId
+    }
+
+    get pendingReviewUrlsByCandidateId(): ReadonlyMap<string, string[]> {
+        return this._pendingReviewUrlsByCandidateId
+    }
+
+    get fusionIdentityMap(): ReadonlyMap<string, FusionAccount> {
+        return this._fusionIdentityMap
+    }
+
+    get identityMap(): ReadonlyMap<string, IdentityDocument> {
+        return this._identityMap
+    }
 
     constructor(public log?: LogService) {}
 
@@ -126,59 +196,59 @@ export class FusionRun implements WorkQueue {
     registerFusionAccount(fusionAccount: FusionAccount, tracker?: AggregationTracker): void {
         const identityId = fusionAccount.identityId
         if (hasValue(identityId) && fusionAccount.type !== FusionAccountKind.Managed) {
-            const existingFusionAccount = this.fusionIdentityMap.get(identityId!)
+            const existingFusionAccount = this._fusionIdentityMap.get(identityId!)
             if (existingFusionAccount) {
                 this._trackConflictingFusionIdentity(identityId!, existingFusionAccount, fusionAccount, tracker)
             }
-            this.fusionIdentityMap.set(identityId!, fusionAccount)
+            this._fusionIdentityMap.set(identityId!, fusionAccount)
         } else {
             assert(
                 fusionAccount.managedKey,
                 'Fusion account must have a managedKey to be added to fusion account map'
             )
-            this.fusionAccountMap.set(fusionAccount.managedKey, fusionAccount)
+            this._fusionAccountMap.set(fusionAccount.managedKey, fusionAccount)
         }
     }
 
     removeFusionAccount(fa: FusionAccount): boolean {
         const managedKey = fa.managedKey
-        if (managedKey && this.fusionAccountMap.get(managedKey) === fa) {
-            return this.fusionAccountMap.delete(managedKey)
+        if (managedKey && this._fusionAccountMap.get(managedKey) === fa) {
+            return this._fusionAccountMap.delete(managedKey)
         }
-        for (const [id, account] of this.fusionIdentityMap.entries()) {
+        for (const [id, account] of this._fusionIdentityMap.entries()) {
             if (account === fa) {
-                return this.fusionIdentityMap.delete(id)
+                return this._fusionIdentityMap.delete(id)
             }
         }
         return false
     }
 
     getFusionIdentity(identityId: string): FusionAccount | undefined {
-        return this.fusionIdentityMap.get(identityId)
+        return this._fusionIdentityMap.get(identityId)
     }
 
     getFusionAccountByManagedKey(managedKey: string): FusionAccount | undefined {
-        return this.fusionAccountMap.get(managedKey)
+        return this._fusionAccountMap.get(managedKey)
     }
 
     hasFusionIdentity(identityId: string): boolean {
-        return this.fusionIdentityMap.has(identityId)
+        return this._fusionIdentityMap.has(identityId)
     }
 
     get totalFusionAccountCount(): number {
-        return this.fusionIdentityMap.size + this.fusionAccountMap.size
+        return this._fusionIdentityMap.size + this._fusionAccountMap.size
     }
 
     get allFusionAccounts(): FusionAccount[] {
-        return mapValuesToArray(this.fusionAccountMap)
+        return mapValuesToArray(this._fusionAccountMap)
     }
 
     get allFusionIdentities(): Iterable<FusionAccount> {
-        return this.fusionIdentityMap.values()
+        return this._fusionIdentityMap.values()
     }
 
     *fusionIdentitiesExcluding(excludeIds: ReadonlySet<string>): Iterable<FusionAccount> {
-        for (const identity of this.fusionIdentityMap.values()) {
+        for (const identity of this._fusionIdentityMap.values()) {
             if (!identity.identityId || !excludeIds.has(identity.identityId)) {
                 yield identity
             }
@@ -202,13 +272,13 @@ export class FusionRun implements WorkQueue {
         )
         if (identityAccountIds.size === 0) return undefined
 
-        for (const account of this.fusionAccountMap.values()) {
+        for (const account of this._fusionAccountMap.values()) {
             if (this._hasIntersectingManagedAccounts(account, identityAccountIds)) {
                 return account
             }
         }
 
-        for (const [existingIdentityId, account] of this.fusionIdentityMap.entries()) {
+        for (const [existingIdentityId, account] of this._fusionIdentityMap.entries()) {
             if (existingIdentityId === identity.id) continue
             if (this._hasIntersectingManagedAccounts(account, identityAccountIds)) {
                 return account
@@ -219,80 +289,80 @@ export class FusionRun implements WorkQueue {
     }
 
     addIdentity(id: string, doc: IdentityDocument): void {
-        this.identityMap.set(id, doc)
+        this._identityMap.set(id, doc)
     }
 
     removeIdentity(id: string): void {
-        this.identityMap.delete(id)
+        this._identityMap.delete(id)
     }
 
     clearIdentities(): void {
-        this.identityMap.clear()
+        this._identityMap.clear()
     }
 
     getIdentity(id: string): IdentityDocument | undefined {
-        return this.identityMap.get(id)
+        return this._identityMap.get(id)
     }
 
     hasIdentity(id: string): boolean {
-        return this.identityMap.has(id)
+        return this._identityMap.has(id)
     }
 
     markAutoAssigned(identityId: string): void {
-        this.autoAssignedIdentityIds.add(identityId)
+        this._autoAssignedIdentityIds.add(identityId)
     }
 
     isAutoAssigned(identityId: string): boolean {
-        return this.autoAssignedIdentityIds.has(identityId)
+        return this._autoAssignedIdentityIds.has(identityId)
     }
 
     resetScoringState(): void {
-        this.autoAssignedIdentityIds.clear()
+        this._autoAssignedIdentityIds.clear()
         this.matchScoringMs = 0
     }
 
     initLinkedAccountIndex(): void {
-        this.linkedAccountKeyIndex = new Set<string>()
+        this._linkedAccountKeyIndex = new Set<string>()
     }
 
     clearLinkedAccountIndex(): void {
-        this.linkedAccountKeyIndex = undefined
+        this._linkedAccountKeyIndex = undefined
     }
 
     addDecision(decision: FusionDecision): void {
-        this.fusionIdentityDecisions.push(decision)
+        this._fusionIdentityDecisions.push(decision)
     }
 
     clearDecisions(): void {
-        this.fusionIdentityDecisions = []
+        this._fusionIdentityDecisions = []
     }
 
     addReviewUrlForReviewer(reviewerId: string, url: string): void {
-        const list = this.pendingReviewUrlsByReviewerId.get(reviewerId) ?? []
+        const list = this._pendingReviewUrlsByReviewerId.get(reviewerId) ?? []
         list.push(url)
-        this.pendingReviewUrlsByReviewerId.set(reviewerId, list)
+        this._pendingReviewUrlsByReviewerId.set(reviewerId, list)
     }
 
     addReviewUrlForCandidate(candidateId: string, url: string): void {
-        const list = this.pendingReviewUrlsByCandidateId.get(candidateId) ?? []
+        const list = this._pendingReviewUrlsByCandidateId.get(candidateId) ?? []
         list.push(url)
-        this.pendingReviewUrlsByCandidateId.set(candidateId, list)
+        this._pendingReviewUrlsByCandidateId.set(candidateId, list)
     }
 
     addPendingCandidateId(candidateId: string): void {
-        this.pendingCandidateIdentityIds.add(candidateId)
+        this._pendingCandidateIdentityIds.add(candidateId)
     }
 
     getReviewerUrls(reviewerId: string): string[] | undefined {
-        return this.pendingReviewUrlsByReviewerId.get(reviewerId)
+        return this._pendingReviewUrlsByReviewerId.get(reviewerId)
     }
 
     getCandidateUrls(candidateId: string): string[] | undefined {
-        return this.pendingReviewUrlsByCandidateId.get(candidateId)
+        return this._pendingReviewUrlsByCandidateId.get(candidateId)
     }
 
     clearNonMatchedKeys(): void {
-        this.currentRunNonMatchedKeysBySource.clear()
+        this._currentRunNonMatchedKeysBySource.clear()
     }
 
     private _hasIntersectingManagedAccounts(
@@ -351,18 +421,18 @@ export class FusionRun implements WorkQueue {
     snapshot(): RunStateSnapshot {
         return {
             managedAccounts: Array.from(this.managedAccountsById.values()),
-            fusionAccounts: Array.from(this.fusionAccountMap.values()),
-            identities: Array.from(this.identityMap.values()),
-            fusionIdentityDecisions: this.fusionIdentityDecisions.map((d) => ({ ...d })),
-            pendingCandidateIdentityIds: Array.from(this.pendingCandidateIdentityIds),
-            pendingReviewUrlsByReviewerId: Object.fromEntries(this.pendingReviewUrlsByReviewerId),
-            pendingReviewUrlsByCandidateId: Object.fromEntries(this.pendingReviewUrlsByCandidateId),
+            fusionAccounts: Array.from(this._fusionAccountMap.values()),
+            identities: Array.from(this._identityMap.values()),
+            fusionIdentityDecisions: this._fusionIdentityDecisions.map((d) => ({ ...d })),
+            pendingCandidateIdentityIds: Array.from(this._pendingCandidateIdentityIds),
+            pendingReviewUrlsByReviewerId: Object.fromEntries(this._pendingReviewUrlsByReviewerId),
+            pendingReviewUrlsByCandidateId: Object.fromEntries(this._pendingReviewUrlsByCandidateId),
             sourcesByName: Object.fromEntries(this.sourcesByName),
             currentRunNonMatchedKeysBySource: Object.fromEntries(
-                Array.from(this.currentRunNonMatchedKeysBySource).map(([k, v]) => [k, Array.from(v)])
+                Array.from(this._currentRunNonMatchedKeysBySource).map(([k, v]) => [k, Array.from(v)])
             ),
             fusionBlends: this.fusionBlends,
-            autoAssignedIds: Array.from(this.autoAssignedIdentityIds),
+            autoAssignedIds: Array.from(this._autoAssignedIdentityIds),
             matchScoringMs: this.matchScoringMs,
             phaseTimings: this.phaseTimings,
         }
@@ -373,30 +443,30 @@ export class FusionRun implements WorkQueue {
         for (const account of snapshot.managedAccounts) {
             this.managedAccountsById.set((account as any).id ?? (account as any).name, account as Account)
         }
-        this.fusionAccountMap.clear()
+        this._fusionAccountMap.clear()
         for (const account of snapshot.fusionAccounts) {
-            this.fusionAccountMap.set((account as any).managedKey ?? (account as any).name, account as FusionAccount)
+            this._fusionAccountMap.set((account as any).managedKey ?? (account as any).name, account as FusionAccount)
         }
-        this.identityMap.clear()
+        this._identityMap.clear()
         for (const identity of snapshot.identities) {
-            this.identityMap.set((identity as any).id, identity as IdentityDocument)
+            this._identityMap.set((identity as any).id, identity as IdentityDocument)
         }
-        this.fusionIdentityDecisions = snapshot.fusionIdentityDecisions as FusionDecision[]
-        this.pendingCandidateIdentityIds = new Set(snapshot.pendingCandidateIdentityIds)
-        this.pendingReviewUrlsByReviewerId = new Map(Object.entries(snapshot.pendingReviewUrlsByReviewerId))
-        this.pendingReviewUrlsByCandidateId = new Map(Object.entries(snapshot.pendingReviewUrlsByCandidateId))
+        this._fusionIdentityDecisions = snapshot.fusionIdentityDecisions as FusionDecision[]
+        this._pendingCandidateIdentityIds = new Set(snapshot.pendingCandidateIdentityIds)
+        this._pendingReviewUrlsByReviewerId = new Map(Object.entries(snapshot.pendingReviewUrlsByReviewerId))
+        this._pendingReviewUrlsByCandidateId = new Map(Object.entries(snapshot.pendingReviewUrlsByCandidateId))
         this.sourcesByName.clear()
         for (const [k, v] of Object.entries(snapshot.sourcesByName)) {
             this.sourcesByName.set(k, v as SourceInfo)
         }
-        this.currentRunNonMatchedKeysBySource.clear()
+        this._currentRunNonMatchedKeysBySource.clear()
         for (const [k, v] of Object.entries(snapshot.currentRunNonMatchedKeysBySource)) {
-            this.currentRunNonMatchedKeysBySource.set(k, new Set(v))
+            this._currentRunNonMatchedKeysBySource.set(k, new Set(v))
         }
         this.fusionBlends = snapshot.fusionBlends as FusionReportBlend[]
-        this.autoAssignedIdentityIds.clear()
+        this._autoAssignedIdentityIds.clear()
         for (const id of snapshot.autoAssignedIds) {
-            this.autoAssignedIdentityIds.add(id)
+            this._autoAssignedIdentityIds.add(id)
         }
         this.matchScoringMs = snapshot.matchScoringMs
         this.phaseTimings = snapshot.phaseTimings

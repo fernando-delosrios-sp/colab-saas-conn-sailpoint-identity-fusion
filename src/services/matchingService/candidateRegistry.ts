@@ -5,7 +5,7 @@ import { coerceBoolean } from '../../utils/safeRead'
 import type { LogService } from '../logService'
 
 export interface CandidateRegistryDeps {
-    readonly fusionAccountMap: Map<string, FusionAccount>
+    readonly getFusionAccount: (key: string) => FusionAccount | undefined
     readonly sourcesByName: Map<string, SourceInfo>
     readonly log: LogService
 }
@@ -31,7 +31,7 @@ export class CandidateRegistry {
         const sourceCandidates = this.candidatesBySource.get(sourceKey)
         if (!sourceCandidates) return
         for (const managedKey of sourceCandidates) {
-            const account = this.deps.fusionAccountMap.get(managedKey)
+            const account = this.deps.getFusionAccount(managedKey)
             if (account) yield account
         }
     }

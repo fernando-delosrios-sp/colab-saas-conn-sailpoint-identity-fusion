@@ -61,7 +61,7 @@ export class DecisionProcessor {
         }
 
         // Clear stale transient state, re-apply candidate statuses, and sync attributes.
-        for (const account of this.run.fusionAccountMap.values()) {
+        for (const account of this.run.allFusionAccounts) {
             account.removeStatus(StatusEntitlement.Candidate)
             account.clearFusionReviews()
 
@@ -73,18 +73,21 @@ export class DecisionProcessor {
             account.syncCollectionAttributesToBag()
         }
 
-        for (const [identityId, identity] of this.run.fusionIdentityMap.entries()) {
+        for (const identity of this.run.allFusionIdentities) {
+            const identityId = identity.identityId
             identity.removeStatus(StatusEntitlement.Candidate)
             identity.clearFusionReviews()
 
-            if (candidateIdsNeedingStatus.has(identityId)) {
+            if (identityId && candidateIdsNeedingStatus.has(identityId)) {
                 identity.addStatus(StatusEntitlement.Candidate)
             }
 
-            const urls = pendingReviewUrlsByReviewerId.get(identityId)
-            if (urls?.length) {
-                for (const url of urls) {
-                    identity.addFusionReview(url)
+            if (identityId) {
+                const urls = pendingReviewUrlsByReviewerId.get(identityId)
+                if (urls?.length) {
+                    for (const url of urls) {
+                        identity.addFusionReview(url)
+                    }
                 }
             }
 
@@ -121,7 +124,7 @@ export class DecisionProcessor {
      * @returns The fusion accounts produced by the new identity decisions
      */
     public async processFusionIdentityDecisions(): Promise<FusionAccount[]> {
-        const fusionIdentityDecisions = this.run.fusionIdentityDecisions
+        const fusionIdentityDecisions = [...this.run.fusionIdentityDecisions]
         this.log.info(
             `Processing fusion identity decisions: applying ${fusionIdentityDecisions.length} reviewer form decision(s) (new identity or merge into existing)`
         )
