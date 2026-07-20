@@ -5,8 +5,6 @@ import { LogService } from '../logService'
 import { FusionRun } from '../../model/fusionRun'
 import { compact } from './collections'
 import { batchProcess } from './collections'
-import { buildManagedAccountKey } from '../../model/managedAccountKey'
-import { readString } from '../../utils/safeRead'
 import { assert } from '../../utils/assert'
 import type { IdentityService } from '../identityService'
 import type { SourceService } from '../sourceService'
@@ -84,30 +82,21 @@ export class IdentityProcessor {
     public async processIdentity(identity: IdentityDocument): Promise<FusionAccount | undefined> {
         const identityId = identity.id
 
-        if (!this.run.fusionIdentityMap.has(identityId)) {
-            const existingAccount = this.findFusionAccountByIdentityManagedAccounts(identity)
+        if (!this.run.hasFusionIdentity(identityId)) {
+            const existingAccount = this.run.findFusionAccountForIdentity(
+                identity,
+                this.deps.configSourceNames
+            )
             if (existingAccount) {
                 this.log.debug(
                     `Reusing existing Fusion account ${existingAccount.managedKey} for identity ` +
                         `${identity.name} (${identityId}) - prevents duplicate baseline creation`
                 )
-                // Remove from whichever map currently holds it
-                if (this.run.fusionAccountMap.get(existingAccount.managedKey) === existingAccount) {
-                    this.run.fusionAccountMap.delete(existingAccount.managedKey)
-                } else {
-                    for (const [staleId, fa] of this.run.fusionIdentityMap.entries()) {
-                        if (fa === existingAccount) {
-                            this.run.fusionIdentityMap.delete(staleId)
-                            break
-                        }
-                    }
-                }
-                // Update identity reference; refresh mapping/normal defs but preserve unique attrs
+                this.run.removeFusionAccount(existingAccount)
                 existingAccount.addIdentityLayer(identity)
                 existingAccount.setIdentityIdAttribute(identityId)
                 existingAccount.setNeedsRefresh(true)
-                // Register under the new identity ID so callers (e.g. getFusionIdentity) can find it
-                this.run.fusionIdentityMap.set(identityId, existingAccount)
+                this.run.registerFusionAccount(existingAccount)
                 this.log.debug(
                     `Re-registered existing Fusion account under new identity: ${identity.name} (${identityId})`
                 )
@@ -136,49 +125,6 @@ export class IdentityProcessor {
             this.log.debug(`Registered identity as fusion account: ${identity.name} (${identityId})`)
             return fusionAccount
         }
-        return undefined
-    }
-
-    private hasIntersectingManagedAccounts(account: FusionAccount, identityAccountIds: Set<string>): boolean {
-        for (const id of account.accountIdsSet) {
-            if (identityAccountIds.has(id)) return true
-        }
-        for (const id of account.missingAccountIdsSet) {
-            if (identityAccountIds.has(id)) return true
-        }
-        return false
-    }
-
-    private findFusionAccountByIdentityManagedAccounts(identity: IdentityDocument): FusionAccount | undefined {
-        const sourceNames = this.deps.configSourceNames
-        const identityAccountIds = new Set<string>(
-            (identity.accounts ?? [])
-                .filter((a) => sourceNames.has(a.source?.name ?? ''))
-                .map((a) =>
-                    buildManagedAccountKey({
-                        sourceId: a.source?.id,
-                        nativeIdentity: readString(a, 'nativeIdentity'),
-                    })
-                )
-                .filter((value): value is string => Boolean(value))
-        )
-        if (identityAccountIds.size === 0) return undefined
-
-        // Check uncorrelated accounts first
-        for (const account of this.run.fusionAccountMap.values()) {
-            if (this.hasIntersectingManagedAccounts(account, identityAccountIds)) {
-                return account
-            }
-        }
-
-        // Check for accounts from stale identity IDs
-        for (const [existingIdentityId, account] of this.run.fusionIdentityMap.entries()) {
-            if (existingIdentityId === identity.id) continue
-            if (this.hasIntersectingManagedAccounts(account, identityAccountIds)) {
-                return account
-            }
-        }
-
         return undefined
     }
 }

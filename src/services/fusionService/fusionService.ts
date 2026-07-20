@@ -36,7 +36,6 @@ import { AttributeOperations } from '../definitionService/types'
 import { getManagedAccountKeyFromAccount, normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 import { hasValue, trimStr } from '../../utils/safeRead'
-import { FusionAccountRepository } from './fusionAccountRepository'
 import { IdentityProcessor } from './identityProcessor'
 import { CorrelationManager } from './correlationManager'
 import { DecisionProcessor } from './decisionProcessor'
@@ -56,7 +55,6 @@ import { FusionRun } from '../../model/fusionRun'
  * All data structures are passed in as parameters.
  */
 export class FusionService {
-    private _repository: FusionAccountRepository
     private identityProcessor: IdentityProcessor
     public correlationManager: CorrelationManager
     private decisionProcessor: DecisionProcessor
@@ -74,10 +72,10 @@ export class FusionService {
     }
 
     public get _reviewersBySourceId(): Map<string, Set<FusionAccount>> {
-        return this._repository.reviewersBySourceId
+        return this.run.reviewersBySourceId
     }
     public get _sourcesWithoutReviewers(): Set<string> {
-        return this._repository.sourcesWithoutReviewers
+        return this.run.sourcesWithoutReviewers
     }
 
     private _tracker?: AggregationTracker
@@ -126,7 +124,6 @@ export class FusionService {
         commandType?: StandardCommand,
         operationContext?: OperationContext
     ) {
-        this._repository = new FusionAccountRepository(log, this.run)
         FusionAccount.configure(config)
         this.configSourceNames = new Set(config.sources.map((s) => s.name))
         this.identityProcessor = new IdentityProcessor(config, log, this.run, { identities: this.identities, tracker: () => this.tracker, sources: this.sources, configSourceNames: this.configSourceNames, initializeSourceReviewers: () => this.initializeSourceReviewers(), shouldPruneDeletedManagedAccounts: () => this.shouldPruneDeletedManagedAccounts(), registerFusionBlend: (fa, a) => this.registerFusionBlend(fa, a), applyAttributeProcessing: (fa) => this.applyAttributeProcessing(fa), setFusionAccount: (fa) => this.setFusionAccount(fa) })
@@ -266,7 +263,7 @@ export class FusionService {
      * @returns The Fusion account for this identity, or undefined if not found
      */
     public getFusionIdentity(identityId: string): FusionAccount | undefined {
-        return this.run.fusionIdentityMap.get(identityId)
+        return this.run.getFusionIdentity(identityId)
     }
 
     /**
@@ -715,14 +712,14 @@ export class FusionService {
         // Build a one-shot flat index of every account key already linked in a loaded Fusion row.
         // isCorrelatedManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
         // of scanning fusionAccountMap + identity-linked Fusion account map (O(A+I)) for every correlated account.
-        this.run.linkedAccountKeyIndex = new Set<string>()
+        this.run.initLinkedAccountIndex()
         for (const fa of this.run.fusionAccountMap.values()) {
-            for (const key of fa.accountIdsSet) this.run.linkedAccountKeyIndex.add(key)
-            for (const key of fa.missingAccountIdsSet) this.run.linkedAccountKeyIndex.add(key)
+            for (const key of fa.accountIdsSet) this.run.linkedAccountKeyIndex!.add(key)
+            for (const key of fa.missingAccountIdsSet) this.run.linkedAccountKeyIndex!.add(key)
         }
         for (const fa of this.run.fusionIdentityMap.values()) {
-            for (const key of fa.accountIdsSet) this.run.linkedAccountKeyIndex.add(key)
-            for (const key of fa.missingAccountIdsSet) this.run.linkedAccountKeyIndex.add(key)
+            for (const key of fa.accountIdsSet) this.run.linkedAccountKeyIndex!.add(key)
+            for (const key of fa.missingAccountIdsSet) this.run.linkedAccountKeyIndex!.add(key)
         }
     }
 
@@ -1179,7 +1176,7 @@ export class FusionService {
         }
 
         if (fusionAccount.listReviewerSources().length > 0) {
-            const reviewerUrls = this.run.pendingReviewUrlsByReviewerId.get(identityId)
+            const reviewerUrls = this.run.getReviewerUrls(identityId)
             if (reviewerUrls?.length) {
                 for (const u of reviewerUrls) {
                     fusionAccount.addFusionReview(u)
@@ -1210,7 +1207,7 @@ export class FusionService {
             }
         }
         const identityId = account.identityId
-        if (hasValue(identityId) && this.run.fusionIdentityMap.has(identityId)) {
+        if (hasValue(identityId) && this.run.hasFusionIdentity(identityId)) {
             return true
         }
         return false
@@ -1291,7 +1288,7 @@ export class FusionService {
         reviewer.clearFusionReviews()
         const identityId = reviewer.identityId
         if (!identityId) return
-        const urls = this.run.pendingReviewUrlsByReviewerId.get(identityId)
+        const urls = this.run.getReviewerUrls(identityId)
         if (!urls?.length) return
         for (const url of urls) {
             reviewer.addFusionReview(url)
@@ -1314,7 +1311,7 @@ export class FusionService {
 
         const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
         for (const reviewerId of globalOwnerIds) {
-            const reviewer = this.run.fusionIdentityMap.get(reviewerId)
+            const reviewer = this.run.getFusionIdentity(reviewerId)
             if (!reviewer) {
                 continue
             }
@@ -1345,7 +1342,7 @@ export class FusionService {
      * Avoids creating a temporary array when only iteration is needed (e.g. scoring).
      */
     public get fusionIdentities(): Iterable<FusionAccount> {
-        return this.run.fusionIdentityMap.values()
+        return this.run.allFusionIdentities
     }
 
     /**
@@ -1405,8 +1402,7 @@ export class FusionService {
 
         this.tracker.newManagedAccountsCount = map.size
         this.candidateRegistry.clear()
-        this.run.autoAssignedIdentityIds.clear()
-        this.run.matchScoringMs = 0
+        this.run.resetScoringState()
 
         for (const fusionAccount of this.run.fusionAccountMap.values()) {
             this.candidateRegistry.register(fusionAccount)
@@ -1429,7 +1425,7 @@ export class FusionService {
         this.ensureManagedAccountProcessingInitialized()
         const map = this.run.managedAccountsById
         await this.runCorrelatedAccountSweep(map)
-        this.run.linkedAccountKeyIndex = undefined
+        this.run.clearLinkedAccountIndex()
     }
 
     /**
@@ -1457,7 +1453,7 @@ export class FusionService {
      * Records conflicting correlated Fusion accounts and logs warning guidance.
      */
     public setFusionAccount(fusionAccount: FusionAccount): void {
-        this._repository.setFusionAccount(fusionAccount, this._tracker)
+        this.run.registerFusionAccount(fusionAccount, this._tracker)
     }
 
     public registerFusionBlend(fusionAccount: FusionAccount, account: Account): void {
@@ -1481,7 +1477,7 @@ export class FusionService {
      * @returns The fusion account, or undefined if not found
      */
     public getFusionAccountByManagedKey(managedKey: string): FusionAccount | undefined {
-        return this.run.fusionAccountMap.get(managedKey)
+        return this.run.getFusionAccountByManagedKey(managedKey)
     }
 
     /**

@@ -69,6 +69,7 @@ export class ServiceRegistry {
         // Initialize core services first
         const logConfig = operationContext ? { ...config, operationContext } : config
         this.log = context.logService ?? new LogService(logConfig)
+        this.run.log = this.log
         this.locks = context.lockService ?? new InMemoryLockService(this.log)
 
         if (context.connectionService) {

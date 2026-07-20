@@ -177,7 +177,7 @@ export class FormService {
     }
 
     private resetFormDataState(): void {
-        this.run.fusionIdentityDecisions = []
+        this.run.clearDecisions()
         this.fusionAssignmentDecisionMap = new Map()
         this.run.pendingReviewUrlsByReviewerId = new Map()
         this._pendingReviewContextByAccountId = new Map()
@@ -288,7 +288,7 @@ export class FormService {
             // fetchFormData (which populates pendingCandidateIdentityIds) already ran.
             for (const candidate of candidates) {
                 if (candidate.id) {
-                    this.run.pendingCandidateIdentityIds.add(candidate.id)
+                    this.run.addPendingCandidateId(candidate.id)
                 }
             }
             return { formDefinitionReady: true, newReviewInstancesQueued }
@@ -563,9 +563,7 @@ export class FormService {
             if (url) {
                 for (const c of candidates) {
                     if (!c.id) continue
-                    const list = this.run.pendingReviewUrlsByCandidateId.get(c.id) ?? []
-                    list.push(url)
-                    this.run.pendingReviewUrlsByCandidateId.set(c.id, list)
+                    this.run.addReviewUrlForCandidate(c.id, url)
                 }
             }
 
@@ -654,7 +652,7 @@ export class FormService {
         this._finishedFusionDecisions.push(decision)
         if (!includeInProcessingQueue) return
         assert(this.run.fusionIdentityDecisions, 'Fusion identity decisions not fetched')
-        this.run.fusionIdentityDecisions.push(decision)
+        this.run.addDecision(decision)
     }
 
     /**
@@ -865,9 +863,7 @@ export class FormService {
             for (const recipient of instance.recipients) {
                 if (!recipient.id) continue
                 if (instance.standAloneFormUrl) {
-                    const list = this.run.pendingReviewUrlsByReviewerId.get(recipient.id) ?? []
-                    list.push(instance.standAloneFormUrl)
-                    this.run.pendingReviewUrlsByReviewerId.set(recipient.id, list)
+                    this.run.addReviewUrlForReviewer(recipient.id, instance.standAloneFormUrl)
                 }
                 accountContext?.reviewerIds.add(recipient.id)
             }
@@ -876,12 +872,10 @@ export class FormService {
             // The 'candidates' field is a comma-separated list of identity IDs
             // stored during form creation (see buildFormInput in formBuilder.ts).
             for (const candidateId of candidateIds) {
-                this.run.pendingCandidateIdentityIds.add(candidateId)
+                this.run.addPendingCandidateId(candidateId)
                 accountContext?.candidateIds.add(candidateId)
                 if (instance.standAloneFormUrl) {
-                    const candList = this.run.pendingReviewUrlsByCandidateId.get(candidateId) ?? []
-                    candList.push(instance.standAloneFormUrl)
-                    this.run.pendingReviewUrlsByCandidateId.set(candidateId, candList)
+                    this.run.addReviewUrlForCandidate(candidateId, instance.standAloneFormUrl)
                 }
             }
 

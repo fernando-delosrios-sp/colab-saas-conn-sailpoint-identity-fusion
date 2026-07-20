@@ -2,7 +2,7 @@
 
 ## Purpose
 
-FusionRun (`src/model/fusionRun.ts`) is the centralized state container for a single operation run. It holds all mutable data loaded during the run and serves as the single source of truth that stateless services read from and write to. It is NOT a service — it is a pure data container with no business logic or service dependencies.
+FusionRun (`src/model/fusionRun.ts`) is the centralized state container for a single operation run. It holds all mutable data loaded during the run and serves as the single source of truth that stateless services read from and write to. It is a domain object with encapsulated collection-management methods and state-integrity validation — it is NOT a service orchestrator.
 
 ## Requirements
 
@@ -67,17 +67,62 @@ FusionRun SHALL expose a `snapshot()` method that returns a complete serializabl
 - **THEN** all maps, sets, and scalar values SHALL match the captured state
 - **AND** services operating on the restored run SHALL see the same data
 
-### Requirement: FusionRun is not a service
+### Requirement: FusionRun encapsulates collection management
 
-FusionRun SHALL NOT contain business logic, service dependencies, or side-effecting operations. It SHALL be a pure data container with accessor methods. The only transformations it performs SHALL be snapshot serialization and restore deserialization.
+FusionRun SHALL expose domain methods for all collection mutations. External code SHALL NOT directly mutate FusionRun's internal Maps, Sets, or Arrays. FusionRun SHALL own the knowledge of its internal storage topology.
 
-#### Scenario: FusionRun has no service dependencies
-- **WHEN** FusionRun is instantiated
-- **THEN** it SHALL NOT require LogService, LockService, ClientService, or any other service
+#### Scenario: Registering a fusion account
+- **WHEN** a processor needs to register a FusionAccount
+- **THEN** it SHALL call run.registerFusionAccount(fa) rather than directly setting run.fusionAccountMap or run.fusionIdentityMap
+- **AND** FusionRun SHALL determine the correct internal map based on the account's identityId and type
 
-#### Scenario: FusionRun has no business logic
-- **WHEN** a service calls any FusionRun method
-- **THEN** the method SHALL only read or write data, never coordinate between services or trigger side effects
+#### Scenario: Removing a fusion account
+- **WHEN** a processor needs to remove a FusionAccount
+- **THEN** it SHALL call run.removeFusionAccount(fa) rather than directly deleting from internal maps
+- **AND** FusionRun SHALL locate and remove the account from whichever internal collection holds it
+
+#### Scenario: Finding a fusion account for an identity
+- **WHEN** a processor needs to check if an existing FusionAccount matches a newly-observed identity
+- **THEN** it SHALL call run.findFusionAccountForIdentity(identity, sourceNames) rather than iterating internal maps directly
+- **AND** FusionRun SHALL search both correlated and uncorrelated accounts internally
+
+### Requirement: FusionRun is not a service orchestrator
+
+FusionRun SHALL NOT orchestrate between services, trigger side effects in external systems, or coordinate multi-phase operations. It MAY perform collection-management validation (e.g., conflict detection, duplicate warnings) and MAY use LogService for state-integrity warnings.
+
+#### Scenario: FusionRun may use LogService for validation
+- **WHEN** registerFusionAccount detects a conflicting identity registration
+- **THEN** it SHALL log a warning via LogService
+- **AND** it SHALL NOT trigger side effects in other services
+
+#### Scenario: FusionRun does not orchestrate services
+- **WHEN** a FusionRun method is called
+- **THEN** it SHALL NOT call methods on IdentityService, FormService, MatchService, or other services
+- **AND** it SHALL NOT initiate API calls or modify external system state
+
+### Requirement: FusionRun encapsulates identity cache operations
+
+FusionRun SHALL expose methods for identity cache mutations: addIdentity, removeIdentity, clearIdentities, getIdentity, and hasIdentity. External code SHALL NOT directly mutate the identityMap.
+
+#### Scenario: Adding an identity to the cache
+- **WHEN** IdentityService fetches identities
+- **THEN** it SHALL call run.addIdentity(id, document) rather than run.identityMap.set(id, document)
+
+#### Scenario: Clearing the identity cache
+- **WHEN** the identity cache needs to be reset
+- **THEN** the caller SHALL call run.clearIdentities() rather than run.identityMap.clear()
+
+### Requirement: FusionRun encapsulates scoring state
+
+FusionRun SHALL expose methods for scoring state mutations: markAutoAssigned, isAutoAssigned, and resetScoringState. External code SHALL NOT directly mutate autoAssignedIdentityIds or matchScoringMs.
+
+#### Scenario: Recording an auto-assignment
+- **WHEN** the match engine auto-assigns an identity
+- **THEN** it SHALL call run.markAutoAssigned(identityId) rather than run.autoAssignedIdentityIds.add(identityId)
+
+#### Scenario: Resetting scoring state for a new run
+- **WHEN** a new managed account processing phase starts
+- **THEN** the orchestrator SHALL call run.resetScoringState() rather than manually clearing autoAssignedIdentityIds and resetting matchScoringMs
 
 ### Requirement: RecordingService snapshots FusionRun directly
 

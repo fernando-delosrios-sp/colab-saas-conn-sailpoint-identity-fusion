@@ -62,6 +62,7 @@ describe('FusionService', () => {
 
         // Reset mocks
         mockLog = new LogService({ spConnDebugLoggingEnabled: false }) as Mocked<LogService>
+        run.log = mockLog
         const mockClient = {} as any
         mockSources = new SourceService(mockConfig, mockLog, mockClient, run) as Mocked<SourceService>
         ;(mockSources as any)._fusionSourceId = FUSION_SOURCE_ID

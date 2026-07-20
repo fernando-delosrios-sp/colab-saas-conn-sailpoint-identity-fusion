@@ -90,7 +90,7 @@ export class ManagedAccountOutcomeHandler {
         this.log.debug(
             `Account ${account.name} [${fusionAccount.sourceName}] meets the automatic assignment threshold, auto-assigning to identity ${identityId}`
         )
-        this.run.autoAssignedIdentityIds.add(identityId)
+            this.run.markAutoAssigned(identityId)
         const syntheticDecision = createAutomaticAssignmentDecision(fusionAccount, account, identityId)
         this.deps.forms.registerFinishedDecision(syntheticDecision)
         return this.deps.processFusionIdentityDecision(syntheticDecision)
