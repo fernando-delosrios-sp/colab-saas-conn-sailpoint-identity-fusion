@@ -1,4 +1,4 @@
-import { IdentityDocument } from 'sailpoint-api-client'
+import { IdentityDocument, AccountV2025 as Account } from 'sailpoint-api-client'
 import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
 import { FusionConfig } from '../../model/config'
@@ -9,15 +9,36 @@ import { StatusEntitlement } from '../../model/statusEntitlement'
 import { trimStr } from '../../utils/safeRead'
 import { compact } from './collections'
 import { batchProcess } from './collections'
-import { FusionService } from './fusionService'
 import { FusionRun } from '../../model/fusionRun'
+import type { FormService } from '../formService'
+import type { SourceService } from '../sourceService'
+import type { IdentityService } from '../identityService'
+import type { CorrelationManager } from './correlationManager'
+
+export interface DecisionProcessorDeps {
+    forms: FormService
+    sources: SourceService
+    identities: IdentityService
+    correlationManager: CorrelationManager
+    shouldPruneDeletedManagedAccounts(): boolean
+    registerFusionBlend(fusionAccount: FusionAccount, account: Account): void
+    applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void>
+    isAggregationAccountListMode(): boolean
+    handleNonAuthoritativeNoMatch(
+        fusionAccount: FusionAccount,
+        sourceType: SourceType,
+        sourceInfo: import('../sourceService').SourceInfo | undefined,
+        account?: Account
+    ): Promise<boolean>
+    setFusionAccount(fusionAccount: FusionAccount): void
+}
 
 export class DecisionProcessor {
     constructor(
         private config: FusionConfig,
         private log: LogService,
         private run: FusionRun,
-        private fusionService: FusionService
+        private deps: DecisionProcessorDeps
     ) {}
 
     /**
@@ -87,8 +108,8 @@ export class DecisionProcessor {
      *    so the serialized output only references the account being returned.
      */
     public async normalizePendingFormStateForOutput(): Promise<void> {
-        this.fusionService.log.info('Normalizing pending form state for output (candidates + reviewer links)')
-        await this.fusionService.forms.fetchFormData()
+        this.log.info('Normalizing pending form state for output (candidates + reviewer links)')
+        await this.deps.forms.fetchFormData()
         this.reconcilePendingFormState()
     }
 
@@ -101,14 +122,14 @@ export class DecisionProcessor {
      */
     public async processFusionIdentityDecisions(): Promise<FusionAccount[]> {
         const fusionIdentityDecisions = this.run.fusionIdentityDecisions
-        this.fusionService.log.info(
+        this.log.info(
             `Processing fusion identity decisions: applying ${fusionIdentityDecisions.length} reviewer form decision(s) (new identity or merge into existing)`
         )
 
         const results = await batchProcess(fusionIdentityDecisions, 'Fusion identity decisions', (x) =>
             this.processFusionIdentityDecision(x), this.config, this.log
         )
-        this.fusionService.log.info(`Fusion identity decisions phase finished: ${fusionIdentityDecisions.length} decision(s) applied`)
+        this.log.info(`Fusion identity decisions phase finished: ${fusionIdentityDecisions.length} decision(s) applied`)
         return compact(results)
     }
 
@@ -133,7 +154,7 @@ export class DecisionProcessor {
                 ? this.run.fusionIdentityMap.get(fusionDecision.identityId)
                 : undefined
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
-        this.fusionService.log.debug(
+        this.log.debug(
             `${existingIdentityAccount ? 'Reusing' : 'Created'} fusion account from decision: ` +
                 `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
                 `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
@@ -158,40 +179,40 @@ export class DecisionProcessor {
             : undefined
 
         fusionAccount.addManagedAccountLayer(
-            this.fusionService.run,
-            this.fusionService.sources.managedAccountsAllById,
+            this.run,
+            this.deps.sources.managedAccountsAllById,
             {
-                pruneDeleted: this.fusionService.shouldPruneDeletedManagedAccounts(),
+                pruneDeleted: this.deps.shouldPruneDeletedManagedAccounts(),
                 skipBlendHistoryForManagedKeys,
-                onBlend: (account) => this.fusionService.registerFusionBlend(fusionAccount, account),
+                onBlend: (account) => this.deps.registerFusionBlend(fusionAccount, account),
             }
         )
-        await this.fusionService.applyAttributeProcessing(fusionAccount)
+        await this.deps.applyAttributeProcessing(fusionAccount)
 
         if (isAuthorizedDecision) {
-            await this.fusionService.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, fusionDecision)
+            await this.deps.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, fusionDecision)
             fusionAccount.updateCorrelationStatus()
-            this.fusionService.setFusionAccount(fusionAccount)
+            this.deps.setFusionAccount(fusionAccount)
         }
 
         if (fusionDecision.newIdentity) {
             const sourceInfo = this.run.sourcesByName.get(fusionDecision.account.sourceName)
             const decisionManagedKey = trimStr(fusionDecision.account.id) ?? ''
             const managedAccount = decisionManagedKey
-                ? this.fusionService.run.managedAccountsById.get(decisionManagedKey)
+                ? this.run.managedAccountsById.get(decisionManagedKey)
                 : undefined
-            if (await this.fusionService.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccount)) {
+            if (await this.deps.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccount)) {
                 if (sourceType === SourceType.Record) {
-                    this.fusionService.log.debug(
+                    this.log.debug(
                         `Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`
                     )
                 } else if (sourceType === SourceType.Orphan) {
-                    this.fusionService.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
+                    this.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
                 }
                 return undefined
             }
-            this.fusionService.setFusionAccount(fusionAccount)
-            this.fusionService.log.debug(
+            this.deps.setFusionAccount(fusionAccount)
+            this.log.debug(
                 `Registered decision account as fusion account: ${fusionDecision.account.name} ` +
                     `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`
             )
@@ -228,7 +249,7 @@ export class DecisionProcessor {
         if (!decision.identityId || decision.identityName) return undefined
 
         try {
-            const identity = this.fusionService.identities.getIdentityById(decision.identityId)
+            const identity = this.deps.identities.getIdentityById(decision.identityId)
             const label = identity?.displayName || identity?.name
             if (label) {
                 decision.identityName = label
@@ -245,9 +266,9 @@ export class DecisionProcessor {
      */
     private async resolveIdentityBestEffort(identityId: string): Promise<IdentityDocument | undefined> {
         try {
-            const cached = this.fusionService.identities.getIdentityById(identityId)
+            const cached = this.deps.identities.getIdentityById(identityId)
             if (cached) return cached
-            return this.fusionService.isAggregationAccountListMode() ? this.fusionService.identities.fetchIdentityById(identityId) : undefined
+            return this.deps.isAggregationAccountListMode() ? this.deps.identities.fetchIdentityById(identityId) : undefined
         } catch {
             return undefined
         }

@@ -74,7 +74,7 @@ export class ChainRunner {
             identities: (this.scenario.initialState.identities as any[]) ?? [],
             managedAccounts: (this.scenario.initialState.managedAccounts as Record<string, any[]>) ?? {},
             fusionAccounts: (this.scenario.initialState.fusionAccounts as any[]) ?? [],
-            forms: (this.scenario.initialState.formDecisions as any[]) ?? [],
+            forms: (this.scenario.initialState.fusionIdentityDecisions as any[]) ?? [],
         })
     }
 

@@ -183,13 +183,13 @@ export class RecordingService {
                   identities: firstState.identities,
                   managedAccounts: firstState.managedAccounts,
                   fusionAccounts: firstState.fusionAccounts,
-                  formDecisions: firstState.formDecisions,
+                  fusionIdentityDecisions: firstState.fusionIdentityDecisions,
               }
             : {
                   identities: [],
                   managedAccounts: [],
                   fusionAccounts: [],
-                  formDecisions: [],
+                  fusionIdentityDecisions: [],
               }
 
         const scenarioSteps = this.steps.map((step) => ({
@@ -211,7 +211,7 @@ export class RecordingService {
                 managedAccountsCount: step.stateAfter.managedAccounts.length,
                 fusionAccountsCount: step.stateAfter.fusionAccounts.length,
                 identitiesCount: step.stateAfter.identities.length,
-                formDecisionsCount: step.stateAfter.formDecisions.length,
+                fusionIdentityDecisionsCount: step.stateAfter.fusionIdentityDecisions.length,
             }
         }
 

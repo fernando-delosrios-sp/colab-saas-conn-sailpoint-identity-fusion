@@ -136,7 +136,18 @@ export class FusionService {
             this.identities,
             () => this.isAggregationAccountListMode()
         )
-        this.decisionProcessor = new DecisionProcessor(config, log, this.run, this)
+        this.decisionProcessor = new DecisionProcessor(config, log, this.run, {
+            forms: this.forms,
+            sources: this.sources,
+            identities: this.identities,
+            correlationManager: this.correlationManager,
+            shouldPruneDeletedManagedAccounts: () => this.shouldPruneDeletedManagedAccounts(),
+            registerFusionBlend: (fa, account) => this.registerFusionBlend(fa, account),
+            applyAttributeProcessing: (fa) => this.applyAttributeProcessing(fa),
+            isAggregationAccountListMode: () => this.isAggregationAccountListMode(),
+            handleNonAuthoritativeNoMatch: (fa, st, si, a) => this.handleNonAuthoritativeNoMatch(fa, st, si, a),
+            setFusionAccount: (fa) => this.setFusionAccount(fa),
+        })
         this.managedAccountAnalyzer = new ManagedAccountAnalyzer(this)
         this.candidateRegistry = new CandidateRegistry({
             fusionAccountMap: this.run.fusionAccountMap,
