@@ -13,20 +13,7 @@ import { Attributes } from '@sailpoint/connector-sdk'
 import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
 import { trimStr } from '../../utils/safeRead'
-import { buildManagedAccountKey } from '../../model/managedAccountKey'
-import {
-    velocitySnapshotSchemaId,
-    velocitySnapshotSourceId,
-} from '../../utils/velocityAccountSnapshot'
-
-function getManagedAccountSnapshotKey(account: Record<string, any> | undefined): string {
-    if (!account) return ''
-    const key = buildManagedAccountKey({
-        sourceId: velocitySnapshotSourceId(account),
-        nativeIdentity: velocitySnapshotSchemaId(account),
-    })
-    return trimStr(key ?? '') ?? ''
-}
+import { getManagedAccountSnapshotKey } from '../../utils/velocityAccountSnapshot'
 
 export class MappingService {
     private cachedAttributeMappingConfig?: Map<string, AttributeMappingConfig>

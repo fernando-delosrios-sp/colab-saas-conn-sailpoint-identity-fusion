@@ -1,4 +1,5 @@
 import { trimStr } from './safeRead'
+import { buildManagedAccountKey } from '../model/managedAccountKey'
 
 /**
  * Velocity account snapshots (`$accounts[]`, `$sources`, `$account`) expose nested
@@ -31,4 +32,14 @@ export function velocitySnapshotSchemaName(account: Record<string, any> | undefi
 
 export function velocitySnapshotSchemaId(account: Record<string, any> | undefined | null): string {
     return readVelocitySnapshotValue(account, 'schema', 'id')
+}
+
+export function getManagedAccountSnapshotKey(account: Record<string, any> | undefined | null): string {
+    if (!account) return ''
+    const sourceId = velocitySnapshotSourceId(account) || velocitySnapshotSourceName(account) || ''
+    let nativeIdentity = velocitySnapshotSchemaId(account)
+    if (!nativeIdentity) {
+        nativeIdentity = trimStr(account.id) || trimStr(account.nativeIdentity) || ''
+    }
+    return buildManagedAccountKey({ sourceId, nativeIdentity }) ?? ''
 }
