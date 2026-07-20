@@ -3,7 +3,6 @@ import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceType } from '../../model/config'
 import { LogService } from '../logService'
 import { FormService } from '../formService'
-import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { IdentityService } from '../identityService'
 import { SourceInfo, SourceService } from '../sourceService'
 import { FusionAccount } from '../../model/account'
@@ -16,7 +15,6 @@ import { mapValuesToArray, forEachBatched, compact } from './collections'
 import { FusionDecision } from '../../model/form'
 import { SchemaService } from '../schemaService'
 import { FusionMatch, MatchCandidateType } from '../matchingService/types'
-import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchingService/matchingService'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats, OperationContext } from './types'
 import {
     batchProcess,
@@ -30,7 +28,6 @@ import { resolveReportAccountId as resolveReportAccountIdFn, resolveReportAccoun
 import { ManagedAccountAnalysisRecorder } from './managedAccountAnalysisRecorder'
 import { AggregationTracker } from './aggregationTracker'
 import {
-    createAutomaticAssignmentDecision,
     formatFusionMatchDiscoveryLog,
     hasIdentityCandidateMatches as checkHasIdentityCandidateMatches,
     hasDeferredCandidateMatches as checkHasDeferredCandidateMatches,
@@ -46,6 +43,7 @@ import { DecisionProcessor } from './decisionProcessor'
 import { ManagedAccountAnalyzer } from '../matchingService/managedAccountAnalyzer'
 import { CandidateRegistry } from '../matchingService/candidateRegistry'
 import { ManagedAccountMatchingRunner } from '../matchingService/managedAccountMatchingRunner'
+import { ManagedAccountOutcomeHandler } from '../matchingService/managedAccountOutcomeHandler'
 import { FusionRun } from '../../model/fusionRun'
 
 // ============================================================================
@@ -65,6 +63,7 @@ export class FusionService {
     private managedAccountAnalyzer: ManagedAccountAnalyzer
     private candidateRegistry: CandidateRegistry
     private matchingRunner: ManagedAccountMatchingRunner
+    private outcomeHandler: ManagedAccountOutcomeHandler
 
     public get autoAssignedIdentityIds(): ReadonlySet<string> {
         return this.run.autoAssignedIdentityIds
@@ -128,7 +127,9 @@ export class FusionService {
         operationContext?: OperationContext
     ) {
         this._repository = new FusionAccountRepository(log, this.run)
-        this.identityProcessor = new IdentityProcessor(config, log, this.run, this)
+        FusionAccount.configure(config)
+        this.configSourceNames = new Set(config.sources.map((s) => s.name))
+        this.identityProcessor = new IdentityProcessor(config, log, this.run, { identities: this.identities, tracker: () => this.tracker, sources: this.sources, configSourceNames: this.configSourceNames, initializeSourceReviewers: () => this.initializeSourceReviewers(), shouldPruneDeletedManagedAccounts: () => this.shouldPruneDeletedManagedAccounts(), registerFusionBlend: (fa, a) => this.registerFusionBlend(fa, a), applyAttributeProcessing: (fa) => this.applyAttributeProcessing(fa), setFusionAccount: (fa) => this.setFusionAccount(fa) })
         this.correlationManager = new CorrelationManager(
             config,
             log,
@@ -161,8 +162,29 @@ export class FusionService {
             candidateRegistry: this.candidateRegistry,
             processAccount: (account: Account) => this.processManagedAccount(account),
         })
-        FusionAccount.configure(config)
-        this.configSourceNames = new Set(config.sources.map((s) => s.name))
+        this.outcomeHandler = new ManagedAccountOutcomeHandler({
+            config: this.config,
+            log: this.log,
+            run: this.run,
+            forms: this.forms,
+            definitionService: this.definitionService,
+            matchingService: this.matchingService,
+            correlationManager: this.correlationManager,
+            candidateRegistry: this.candidateRegistry,
+            reviewersBySourceId: this._reviewersBySourceId,
+            sourcesWithoutReviewers: this._sourcesWithoutReviewers,
+            preProcessManagedAccount: (account) => this.preProcessManagedAccount(account),
+            processFusionIdentityDecision: (d) => this.processFusionIdentityDecision(d),
+            removeMatchAccount: (id) => this.removeMatchAccount(id),
+            queueDisableOperation: (account) => this.queueDisableOperation(account),
+            isAggregationAccountListMode: () => this.isAggregationAccountListMode(),
+            shouldPruneDeletedManagedAccounts: () => this.shouldPruneDeletedManagedAccounts(),
+            registerFusionBlend: (fa, account) => this.registerFusionBlend(fa, account),
+            applyAttributeProcessing: (fa) => this.applyAttributeProcessing(fa),
+            setFusionAccount: (fa) => this.setFusionAccount(fa),
+            addMatchScoringTimeMs: (ms) => this.addMatchScoringTimeMs(ms),
+            isDeferredMatchingEnabledForSource: (name) => this.isDeferredMatchingEnabledForSource(name),
+        })
         this.reset = config.reset
         this.fusionOwnerIsGlobalReviewer = config.fusionOwnerIsGlobalReviewer ?? false
         this.fusionReportOnAggregation = config.fusionReportOnAggregation ?? false
@@ -847,21 +869,7 @@ export class FusionService {
      * Finds the match with the highest combined score that meets or exceeds the automatic assignment threshold.
      */
     private getBestAutoAssignMatch(matches: FusionMatch[]): FusionMatch | undefined {
-        if (this.config.fusionAutoAssignmentScore === undefined) return undefined
-
-        let bestMatch: FusionMatch | undefined
-        let highestScore = -1
-
-        for (const m of matches) {
-            const combinedReport = m.scores.find((s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE)
-            const score = combinedReport?.score ?? 0
-
-            if (score >= this.config.fusionAutoAssignmentScore && score > highestScore) {
-                highestScore = score
-                bestMatch = m
-            }
-        }
-        return bestMatch
+        return this.outcomeHandler['getBestAutoAssignMatch'](matches)
     }
 
     /**
@@ -875,17 +883,7 @@ export class FusionService {
         sourceInfo: SourceInfo | undefined,
         account?: Account
     ): Promise<boolean> {
-        if (sourceType === SourceType.Record) {
-            await this.definitionService.registerUniqueAttributes(fusionAccount)
-            return true
-        }
-        if (sourceType === SourceType.Orphan) {
-            if (sourceInfo?.config?.disableNonMatchingAccounts && account) {
-                this.queueDisableOperation(account)
-            }
-            return true
-        }
-        return false
+        return this.outcomeHandler.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, account)
     }
 
     private async handleNoReviewerAccount(
@@ -893,14 +891,7 @@ export class FusionService {
         sourceType: SourceType,
         sourceInfo: SourceInfo | undefined
     ): Promise<FusionAccount | undefined> {
-        const fusionAccount = await this.preProcessManagedAccount(account)
-        if (await this.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, account)) {
-            this.log.debug(
-                `Account ${account.name} [${fusionAccount.sourceName}] has no reviewers and sourceType=${sourceType}, skipping`
-            )
-            return undefined
-        }
-        return this.finalizeAuthoritativeNonMatch(fusionAccount)
+        return this.outcomeHandler.handleNoReviewerAccount(account, sourceType, sourceInfo)
     }
 
     private async handleExactMatch(
@@ -908,77 +899,26 @@ export class FusionService {
         account: Account,
         identityId: string
     ): Promise<FusionAccount | undefined> {
-        this.removeMatchAccount(fusionAccount.managedAccountId)
-        this.log.debug(
-            `Account ${account.name} [${fusionAccount.sourceName}] meets the automatic assignment threshold, auto-assigning to identity ${identityId}`
-        )
-        // Prevent subsequent managed accounts from scoring against this identity
-        this.run.autoAssignedIdentityIds.add(identityId)
-        const syntheticDecision = createAutomaticAssignmentDecision(fusionAccount, account, identityId)
-        this.forms.registerFinishedDecision(syntheticDecision)
-        return this.processFusionIdentityDecision(syntheticDecision)
+        return this.outcomeHandler.handleExactMatch(fusionAccount, account, identityId)
     }
 
-    /**
-     * Dispatches an identity match to either exact-match (auto-assign) or
-     * partial-match (review form) handling. In analysis-only / dry-run modes it
-     * clears identity references and returns undefined so the match report keeps
-     * its data but no fusion state is mutated.
-     */
     private async handleIdentityMatch(
         fusionAccount: FusionAccount,
         account: Account,
         sourceInfo: SourceInfo | undefined
     ): Promise<FusionAccount | undefined> {
-        if (!this.isAggregationAccountListMode()) {
-            fusionAccount.clearFusionIdentityReferences()
-            return undefined
-        }
-        const bestMatch = this.getBestAutoAssignMatch(fusionAccount.fusionMatches)
-        if (this.config.fusionEnableAutoAssignment && bestMatch?.identityId) {
-            return this.handleExactMatch(fusionAccount, account, bestMatch.identityId)
-        }
-        return this.handlePartialMatch(fusionAccount, sourceInfo)
+        return this.outcomeHandler.handleIdentityMatch(fusionAccount, account, sourceInfo)
     }
 
     private async handlePartialMatch(
         fusionAccount: FusionAccount,
         sourceInfo: SourceInfo | undefined
     ): Promise<undefined> {
-        assert(sourceInfo, 'Source info not found')
-        const reviewers = this._reviewersBySourceId.get(sourceInfo.id!)
-        try {
-            const outcome = await this.forms.createFusionForm(fusionAccount, reviewers)
-            if (!outcome.formDefinitionReady) {
-                const matchCount = fusionAccount.fusionMatches.length
-                const maxForm = this.config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
-                const message =
-                    !reviewers || reviewers.size === 0
-                        ? 'Match review form was not created: no reviewers available for this source'
-                        : `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
-                this.run.analysisRecorder!.trackFailed(fusionAccount, message)
-            } else {
-                const eligibleReviewerCount = [...(reviewers ?? [])].filter((r) => r.identityId).length
-                if (eligibleReviewerCount > 0 && outcome.newReviewInstancesQueued === 0) {
-                    // No new review work was queued (e.g. every eligible reviewer already had an open instance).
-                    // matchAccounts was populated before form creation; drop so aggregation report/email counts stay accurate.
-                    this.removeMatchAccount(fusionAccount.managedAccountId)
-                }
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
-            this.run.analysisRecorder!.trackFailed(fusionAccount, `Form creation failed: ${message}`)
-        }
-        fusionAccount.clearFusionIdentityReferences()
-        return undefined
+        return this.outcomeHandler.handlePartialMatch(fusionAccount, sourceInfo)
     }
 
     private handleDeferredMatch(fusionAccount: FusionAccount, account: Account): undefined {
-        const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'deferred')
-        const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
-        this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}; skipping account for now`)
-        this.run.claimAccount(getManagedAccountKeyFromAccount(account)!, account.identityId)
-        return undefined
+        return this.outcomeHandler.handleDeferredMatch(fusionAccount, account)
     }
 
     private async handleNonMatch(
@@ -987,15 +927,7 @@ export class FusionService {
         sourceType: SourceType,
         sourceInfo: SourceInfo | undefined
     ): Promise<FusionAccount | undefined> {
-        if (await this.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, account)) {
-            return undefined
-        }
-        await this.finalizeAuthoritativeNonMatch(fusionAccount)
-        const mk = getManagedAccountKeyFromAccount(account)
-        this.log.debug(
-            `Registered managed account as fusion account: ${account.name} [${account.sourceName}] (${mk ?? 'no-key'})`
-        )
-        return fusionAccount
+        return this.outcomeHandler.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
     }
 
     /**
@@ -1302,13 +1234,7 @@ export class FusionService {
     }
 
     private async finalizeAuthoritativeNonMatch(fusionAccount: FusionAccount): Promise<FusionAccount> {
-        fusionAccount.setNonMatched()
-        await this.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount)
-        this.setFusionAccount(fusionAccount)
-        if (this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
-            this.candidateRegistry.register(fusionAccount)
-        }
-        return fusionAccount
+        return this.outcomeHandler.finalizeAuthoritativeNonMatch(fusionAccount)
     }
 
     /**
