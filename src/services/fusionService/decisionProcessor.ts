@@ -31,9 +31,9 @@ export class DecisionProcessor {
      * (some can be created from Identity documents), and those would otherwise retain stale values.
      */
     public reconcilePendingFormState(): void {
-        const pendingCandidateIds = this.fusionService.forms.pendingCandidateIdentityIds
-        const { pendingReviewUrlsByReviewerId } = this.fusionService.forms
-        const pendingReviewUrlsByCandidateId = this.fusionService.forms.pendingReviewUrlsByCandidateId ?? new Map<string, string[]>()
+        const pendingCandidateIds = this.run.pendingCandidateIdentityIds
+        const pendingReviewUrlsByReviewerId = this.run.pendingReviewUrlsByReviewerId
+        const pendingReviewUrlsByCandidateId = this.run.pendingReviewUrlsByCandidateId
         const candidateIdsNeedingStatus = new Set<string>(pendingCandidateIds)
         for (const id of pendingReviewUrlsByCandidateId.keys()) {
             candidateIdsNeedingStatus.add(id)
@@ -100,7 +100,7 @@ export class DecisionProcessor {
      * @returns The fusion accounts produced by the new identity decisions
      */
     public async processFusionIdentityDecisions(): Promise<FusionAccount[]> {
-        const { fusionIdentityDecisions } = this.fusionService.forms
+        const fusionIdentityDecisions = this.run.fusionIdentityDecisions
         this.fusionService.log.info(
             `Processing fusion identity decisions: applying ${fusionIdentityDecisions.length} reviewer form decision(s) (new identity or merge into existing)`
         )

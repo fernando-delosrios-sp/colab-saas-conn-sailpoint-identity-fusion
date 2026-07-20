@@ -1229,14 +1229,14 @@ export class FusionService {
             return
         }
 
-        const pendingCandidates = this.forms.pendingCandidateIdentityIds ?? new Set<string>()
+        const pendingCandidates = this.run.pendingCandidateIdentityIds
         const needsCandidate = pendingCandidates.has(identityId)
         if (needsCandidate) {
             fusionAccount.addStatus(StatusEntitlement.Candidate)
         }
 
         if (fusionAccount.listReviewerSources().length > 0) {
-            const reviewerUrls = this.forms.pendingReviewUrlsByReviewerId.get(identityId)
+            const reviewerUrls = this.run.pendingReviewUrlsByReviewerId.get(identityId)
             if (reviewerUrls?.length) {
                 for (const u of reviewerUrls) {
                     fusionAccount.addFusionReview(u)
@@ -1354,7 +1354,7 @@ export class FusionService {
         reviewer.clearFusionReviews()
         const identityId = reviewer.identityId
         if (!identityId) return
-        const urls = this.forms.pendingReviewUrlsByReviewerId.get(identityId)
+        const urls = this.run.pendingReviewUrlsByReviewerId.get(identityId)
         if (!urls?.length) return
         for (const url of urls) {
             reviewer.addFusionReview(url)

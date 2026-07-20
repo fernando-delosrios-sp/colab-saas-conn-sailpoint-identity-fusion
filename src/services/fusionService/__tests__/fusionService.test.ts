@@ -81,7 +81,9 @@ describe('FusionService', () => {
             mockLog,
             mockClient,
             mockSources,
-            mockIdentities
+            mockIdentities,
+            undefined,
+            run
         ) as Mocked<FormService>
         const mockLocks = {} as any
         mockSchemas = new SchemaService(mockConfig, mockLog, mockSources, mockClient) as Mocked<SchemaService>
@@ -220,18 +222,9 @@ describe('FusionService', () => {
             mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
             mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
-            Object.defineProperty(mockForms, 'pendingCandidateIdentityIds', {
-                get: vi.fn(() => new Set([identityId])),
-                configurable: true,
-            })
-            Object.defineProperty(mockForms, 'pendingReviewUrlsByCandidateId', {
-                get: vi.fn(() => new Map([[identityId, [reviewUrl]]])),
-                configurable: true,
-            })
-            Object.defineProperty(mockForms, 'pendingReviewUrlsByReviewerId', {
-                get: vi.fn(() => new Map()),
-                configurable: true,
-            })
+            run.pendingCandidateIdentityIds = new Set([identityId])
+            run.pendingReviewUrlsByCandidateId = new Map([[identityId, [reviewUrl]]])
+            run.pendingReviewUrlsByReviewerId = new Map()
 
             const output = await fusionService.getISCAccount(fusionAccount)
 
@@ -254,18 +247,9 @@ describe('FusionService', () => {
             mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
             mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
-            Object.defineProperty(mockForms, 'pendingCandidateIdentityIds', {
-                get: vi.fn(() => new Set()),
-                configurable: true,
-            })
-            Object.defineProperty(mockForms, 'pendingReviewUrlsByCandidateId', {
-                get: vi.fn(() => new Map()),
-                configurable: true,
-            })
-            Object.defineProperty(mockForms, 'pendingReviewUrlsByReviewerId', {
-                get: vi.fn(() => new Map([[identityId, [reviewUrl]]])),
-                configurable: true,
-            })
+            run.pendingCandidateIdentityIds = new Set()
+            run.pendingReviewUrlsByCandidateId = new Map()
+            run.pendingReviewUrlsByReviewerId = new Map([[identityId, [reviewUrl]]])
 
             const output = await fusionService.getISCAccount(fusionAccount)
 

@@ -41,6 +41,17 @@ FusionRun SHALL contain maps and sets for all data loaded and processed during a
 - **AND** run.analysisRecorder SHALL capture per-account analysis results
 - **AND** run.fusionBlends SHALL track blending events
 
+### Requirement: FusionRun holds form processing state
+
+FusionRun SHALL contain the following form-related per-run state: fusion identity decisions, pending candidate identity IDs, and pending review URL mappings.
+
+#### Scenario: FusionRun contains form decision state
+- **WHEN** form decisions are processed during an operation run
+- **THEN** run.fusionIdentityDecisions SHALL contain the processed fusion identity decisions
+- **AND** run.pendingCandidateIdentityIds SHALL contain candidate identity IDs with pending form instances
+- **AND** run.pendingReviewUrlsByReviewerId SHALL map reviewer identity IDs to pending form instance URLs
+- **AND** run.pendingReviewUrlsByCandidateId SHALL map candidate identity IDs to pending form instance URLs
+
 ### Requirement: FusionRun provides snapshot and restore for recording
 
 FusionRun SHALL expose a `snapshot()` method that returns a complete serializable representation of the current state. It SHALL expose a `restore(snapshot)` method that reconstructs the state from a previously captured snapshot, enabling deterministic replay.

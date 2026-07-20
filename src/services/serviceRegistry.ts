@@ -97,7 +97,7 @@ export class ServiceRegistry {
             new MessagingService(this.config, this.log, this.client, this.sources, this.identities)
         this.forms =
             context.formService ??
-            new FormService(this.config, this.log, this.client, this.sources, this.identities, this.messaging)
+            new FormService(this.config, this.log, this.client, this.sources, this.identities, this.messaging, this.run)
 
         // Initialize services that depend on others (in dependency order)
         this.schemas = context.schemaService ?? new SchemaService(this.config, this.log, this.sources, this.identities)
