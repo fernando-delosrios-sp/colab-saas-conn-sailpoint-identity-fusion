@@ -2,7 +2,7 @@
 
 ### Requirement: FusionRun is not a service
 
-FusionRun (`src/model/fusionRun.ts`) is the centralized state container for a single operation run. It holds all mutable data loaded during the run and serves as the single source of truth that stateless services read from and write to. It is a domain object with encapsulated collection-management methods and state-integrity validation — it is NOT a service orchestrator.
+FusionRun (`src/model/fusionRun.ts`) SHALL be the centralized state container for a single operation run. It MUST hold all mutable data loaded during the run and serve as the single source of truth that stateless services read from and write to. It SHALL be a domain object with encapsulated collection-management methods and state-integrity validation — it MUST NOT be a service orchestrator.
 
 #### Scenario: FusionRun encapsulates collection mutations
 - **WHEN** any external code needs to modify FusionRun's internal collections

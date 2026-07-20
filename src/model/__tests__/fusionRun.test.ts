@@ -32,17 +32,17 @@ describe('FusionRun', () => {
 
     it('tracks auto-assigned identity IDs', () => {
         const run = new FusionRun()
-        run.autoAssignedIdentityIds.add('id-1')
-        run.autoAssignedIdentityIds.add('id-2')
-        expect(run.autoAssignedIdentityIds.has('id-1')).toBe(true)
-        expect(run.autoAssignedIdentityIds.has('id-2')).toBe(true)
-        expect(run.autoAssignedIdentityIds.has('id-3')).toBe(false)
+        run.markAutoAssigned('id-1')
+        run.markAutoAssigned('id-2')
+        expect(run.isAutoAssigned('id-1')).toBe(true)
+        expect(run.isAutoAssigned('id-2')).toBe(true)
+        expect(run.isAutoAssigned('id-3')).toBe(false)
     })
 
     it('snapshot returns serializable state', () => {
         const run = new FusionRun()
         run.managedAccountsById.set('k1', { name: 'a1' } as any)
-        run.fusionAccountMap.set('k2', { name: 'fa1' } as any)
+        ;(run as any)._fusionAccountMap.set('k2', { name: 'fa1' } as any)
         run.matchScoringMs = 1500
 
         const snap = run.snapshot()
@@ -55,8 +55,8 @@ describe('FusionRun', () => {
 
     it('snapshot captures auto-assigned IDs', () => {
         const run = new FusionRun()
-        run.autoAssignedIdentityIds.add('id-a')
-        run.autoAssignedIdentityIds.add('id-b')
+        run.markAutoAssigned('id-a')
+        run.markAutoAssigned('id-b')
 
         const snap = run.snapshot()
         expect(snap.autoAssignedIds).toEqual(expect.arrayContaining(['id-a', 'id-b']))
@@ -64,9 +64,9 @@ describe('FusionRun', () => {
 
     it('snapshot captures form processing state', () => {
         const run = new FusionRun()
-        run.fusionIdentityDecisions = [{ account: { id: 'a1', name: 'test', sourceName: 's1' } } as any]
-        run.pendingCandidateIdentityIds = new Set(['candidate-1'])
-        run.pendingReviewUrlsByReviewerId = new Map([['r1', ['url1']]])
+        ;(run as any)._fusionIdentityDecisions = [{ account: { id: 'a1', name: 'test', sourceName: 's1' } } as any]
+        ;(run as any)._pendingCandidateIdentityIds = new Set(['candidate-1'])
+        ;(run as any)._pendingReviewUrlsByReviewerId = new Map([['r1', ['url1']]])
 
         const snap = run.snapshot()
         expect(snap.fusionIdentityDecisions.length).toBe(1)

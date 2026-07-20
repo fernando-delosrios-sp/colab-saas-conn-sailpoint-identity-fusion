@@ -4,7 +4,6 @@ import { FusionConfig } from '../model/config'
 import { ClientService, QueuePriority } from './clientService'
 import { promiseAllBatched } from './fusionService/collections'
 import { LogService } from './logService'
-import { assert } from '../utils/assert'
 import { wrapConnectorError } from '../utils/error'
 import { FusionAccount } from '../model/account'
 import { SourceService } from './sourceService'
@@ -77,15 +76,14 @@ export class IdentityService {
      * and identityValues() for iteration when no array is needed.
      */
     public get identities(): IdentityDocument[] {
-        assert(this.run.identityMap, 'Identities not fetched')
-        return Array.from(this.run.identityMap.values())
+        return this.run.allIdentities
     }
 
     /**
      * Get the number of cached identities without creating an intermediate array.
      */
     public get identityCount(): number {
-        return this.run.identityMap.size
+        return this.run.identityCount
     }
 
     /**
@@ -93,7 +91,7 @@ export class IdentityService {
      * Avoids creating a temporary array when only iteration is needed.
      */
     public identityValues(): IterableIterator<IdentityDocument> {
-        return this.run.identityMap.values()
+        return this.run.identityValues()
     }
 
     // ------------------------------------------------------------------------
@@ -374,7 +372,7 @@ export class IdentityService {
      * Clear the identity cache
      */
     public clear(): void {
-        this.run.identityMap.clear()
+        this.run.clearIdentities()
         this.identityIdsInScope.clear()
     }
 

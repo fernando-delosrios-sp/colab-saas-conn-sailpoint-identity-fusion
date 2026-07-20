@@ -11,7 +11,7 @@ import { DefinitionService } from '../definitionService'
 import { MatchingService } from '../matchingService'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
-import { mapValuesToArray, forEachBatched, compact } from './collections'
+import { forEachBatched, compact } from './collections'
 import { FusionDecision } from '../../model/form'
 import { SchemaService } from '../schemaService'
 import { FusionMatch, MatchCandidateType } from '../matchingService/types'
@@ -148,7 +148,7 @@ export class FusionService {
         })
         this.managedAccountAnalyzer = new ManagedAccountAnalyzer(this)
         this.candidateRegistry = new CandidateRegistry({
-            fusionAccountMap: this.run.fusionAccountMap,
+            getFusionAccount: (key: string) => this.run.getFusionAccountByManagedKey(key),
             sourcesByName:         this.run.sourcesByName,
             log: this.log,
         })
@@ -713,13 +713,13 @@ export class FusionService {
         // isCorrelatedManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
         // of scanning fusionAccountMap + identity-linked Fusion account map (O(A+I)) for every correlated account.
         this.run.initLinkedAccountIndex()
-        for (const fa of this.run.fusionAccountMap.values()) {
-            for (const key of fa.accountIdsSet) this.run.linkedAccountKeyIndex!.add(key)
-            for (const key of fa.missingAccountIdsSet) this.run.linkedAccountKeyIndex!.add(key)
+        for (const fa of this.run.allFusionAccounts) {
+            for (const key of fa.accountIdsSet) this.run.addToLinkedAccountIndex(key)
+            for (const key of fa.missingAccountIdsSet) this.run.addToLinkedAccountIndex(key)
         }
-        for (const fa of this.run.fusionIdentityMap.values()) {
-            for (const key of fa.accountIdsSet) this.run.linkedAccountKeyIndex!.add(key)
-            for (const key of fa.missingAccountIdsSet) this.run.linkedAccountKeyIndex!.add(key)
+        for (const fa of this.run.allFusionIdentities) {
+            for (const key of fa.accountIdsSet) this.run.addToLinkedAccountIndex(key)
+            for (const key of fa.missingAccountIdsSet) this.run.addToLinkedAccountIndex(key)
         }
     }
 
@@ -1033,7 +1033,7 @@ export class FusionService {
      * @returns Array of formatted account outputs ready for the platform
      */
     public async listISCAccounts(): Promise<StdAccountListOutput[]> {
-        const allAccounts = [...this.run.fusionAccountMap.values(), ...this.run.fusionIdentityMap.values()]
+        const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
         const eligible = this.deleteEmpty ? allAccounts.filter((account) => !account.isOrphan()) : allAccounts
 
         const results = await batchProcess(eligible, 'ISC accounts', (x) => this.getISCAccount(x), this.config, this.log)
@@ -1054,7 +1054,7 @@ export class FusionService {
         const batchSize = getFusionParallelBatchSize(this.config)
         let count = 0
 
-        const allAccounts = [...this.run.fusionAccountMap.values(), ...this.run.fusionIdentityMap.values()]
+        const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
         const eligibleAccounts = this.deleteEmpty ? allAccounts.filter((account) => !account.isOrphan()) : allAccounts
 
         const totalEligible = eligibleAccounts.length
@@ -1200,7 +1200,7 @@ export class FusionService {
             if (index) {
                 if (index.has(key)) return true
             } else {
-                const isLinked = [...this.run.fusionAccountMap.values(), ...this.run.fusionIdentityMap.values()].some(
+                const isLinked = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities].some(
                     (fa) => fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)
                 )
                 if (isLinked) return true
@@ -1350,7 +1350,7 @@ export class FusionService {
      * Used to filter already auto-assigned identities during managed account scoring.
      */
     public *fusionIdentitiesExcluding(excludeIds: ReadonlySet<string>): Iterable<FusionAccount> {
-        for (const identity of this.run.fusionIdentityMap.values()) {
+        for (const identity of this.run.allFusionIdentities) {
             if (!identity.identityId || !excludeIds.has(identity.identityId)) {
                 yield identity
             }
@@ -1366,12 +1366,12 @@ export class FusionService {
      * Note: Creates a new array on each access.
      */
     public get fusionAccounts(): FusionAccount[] {
-        return mapValuesToArray(this.run.fusionAccountMap)
+        return this.run.allFusionAccounts
     }
 
     /** Total number of fusion accounts (correlated identities + uncorrelated accounts) */
     public get totalFusionAccountCount(): number {
-        return this.run.fusionIdentityMap.size + this.run.fusionAccountMap.size
+        return this.run.totalFusionAccountCount
     }
 
     /** Get reviewers by source ID map */

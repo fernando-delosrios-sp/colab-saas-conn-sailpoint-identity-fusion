@@ -1,13 +1,16 @@
 import { describe, it, expect, vi } from 'vitest'
 import { CandidateRegistry, CandidateRegistryDeps } from '../../matchingService/candidateRegistry'
 import { SourceType } from '../../../model/config'
+import { FusionAccount } from '../../../model/account'
 
-function makeRegistry(overrides: Partial<CandidateRegistryDeps> = {}): CandidateRegistry {
+function makeRegistry(overrides: Partial<CandidateRegistryDeps> & { fusionMap?: Map<string, FusionAccount> } = {}): CandidateRegistry {
+    const fusionMap = overrides.fusionMap ?? new Map()
+    const { fusionMap: _, ...rest } = overrides
     const deps: CandidateRegistryDeps = {
-        fusionAccountMap: new Map(),
+        getFusionAccount: (key: string) => fusionMap.get(key),
         sourcesByName: new Map(),
         log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
-        ...overrides,
+        ...rest,
     }
     return new CandidateRegistry(deps)
 }
@@ -17,7 +20,7 @@ describe('CandidateRegistry', () => {
         const sources = new Map()
         sources.set('Source A', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
         const fusionMap = new Map()
-        const registry = makeRegistry({ sourcesByName: sources, fusionAccountMap: fusionMap })
+        const registry = makeRegistry({ sourcesByName: sources, fusionMap })
         const account = { managedKey: 'src-a::nat-1', sourceName: 'Source A', sourceType: SourceType.Authoritative } as any
         fusionMap.set('src-a::nat-1', account)
         registry.register(account)
@@ -58,7 +61,7 @@ describe('CandidateRegistry', () => {
         sources.set('A', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
         sources.set('B', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
         const fusionMap = new Map()
-        const registry = makeRegistry({ sourcesByName: sources, fusionAccountMap: fusionMap })
+        const registry = makeRegistry({ sourcesByName: sources, fusionMap })
         const accountA = { managedKey: 'src-a::nat-1', sourceName: 'A' } as any
         const accountB = { managedKey: 'src-b::nat-1', sourceName: 'B' } as any
         fusionMap.set('src-a::nat-1', accountA)
@@ -81,7 +84,7 @@ describe('CandidateRegistry', () => {
         const fusionMap = new Map()
         const account = { managedKey: 'src-a::nat-1', sourceName: 'A' } as any
         fusionMap.set('src-a::nat-1', account)
-        const registry = makeRegistry({ sourcesByName: sources, fusionAccountMap: fusionMap })
+        const registry = makeRegistry({ sourcesByName: sources, fusionMap })
         registry.register(account)
         registry.clear()
         expect([...registry.queryForSource('A')]).toHaveLength(0)
