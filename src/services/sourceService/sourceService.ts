@@ -42,10 +42,7 @@ import {
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 
 type ReverseCorrelationArtifact =
-    | 'fusion_schema_attribute'
-    | 'identity_attribute'
-    | 'identity_profile_mapping'
-    | 'managed_source_correlation'
+    'fusion_schema_attribute' | 'identity_attribute' | 'identity_profile_mapping' | 'managed_source_correlation'
 
 interface ReverseCorrelationSetupStatus {
     isConsistent: boolean
@@ -492,7 +489,8 @@ export class SourceService {
 
                 if (!response.ok) {
                     const responseBody = await response.text()
-                    const safeBodyPreview = responseBody.length > 100 ? responseBody.substring(0, 100) + '...' : responseBody
+                    const safeBodyPreview =
+                        responseBody.length > 100 ? responseBody.substring(0, 100) + '...' : responseBody
                     throw new Error(`HTTP ${response.status} ${response.statusText} - ${safeBodyPreview}`)
                 }
             },
@@ -924,7 +922,7 @@ export class SourceService {
             const search: Search = {
                 indices: ['events'],
                 query: {
-                    query: `operation:AGGREGATE AND status:PASSED AND objects:ACCOUNT AND target.name.exact:"${sourceName} [source]"`,
+                    query: `operation:AGGREGATE AND status:PASSED AND objects:ACCOUNT AND target.name.exact:/${sourceName} \\[source.*\\]/`,
                 },
                 sort: ['-created'],
             }
