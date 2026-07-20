@@ -3,9 +3,7 @@
 ## Purpose
 
 The define service (`src/services/definitionService/`) evaluates Apache Velocity templates for Normal attribute definitions and generates persistent unique attribute values. It operates as a stateless service that receives FusionRun for accessing shared state.
-
 ## Requirements
-
 ### Requirement: DefinitionService evaluates Velocity templates for normal attributes
 
 DefinitionService SHALL evaluate Apache Velocity templates for Normal attribute definitions, rendering values from the Velocity context built from the FusionAccount's attribute bag, managed account snapshots, identity data, and helper objects.
@@ -90,3 +88,12 @@ DefinitionService SHALL receive FusionRun as a parameter for accessing shared st
 #### Scenario: DefinitionService can be shared across concurrent operations
 - **WHEN** two concurrent operations call DefinitionService methods with different FusionRun instances
 - **THEN** there SHALL be no cross-contamination of unique registries or counter state
+
+### Requirement: DefinitionService utilizes shared snapshot key generator
+
+DefinitionService SHALL utilize a centrally exported shared utility (`getManagedAccountSnapshotKey`) for generating snapshot keys from account attributes to avoid logic duplication across services.
+
+#### Scenario: Definition checks use the shared snapshot key utility
+- **WHEN** DefinitionService requires a snapshot key for a managed account snapshot
+- **THEN** it invokes the exported utility rather than a local implementation
+

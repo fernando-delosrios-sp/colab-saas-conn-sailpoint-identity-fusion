@@ -3,9 +3,7 @@
 ## Purpose
 
 The map service (`src/services/mappingService/`) merges attributes from managed source accounts into the Fusion account schema using configurable merge strategies. It operates as a stateless service that receives all its input data from FusionRun.
-
 ## Requirements
-
 ### Requirement: MappingService merges managed source attributes into Fusion accounts
 
 The MappingService SHALL provide attribute consolidation from managed source accounts into the Fusion account schema. It SHALL apply configurable merge strategies (first-found, source-specific, concatenate, distinct-list) in the ordered sequence defined by the source configuration.
@@ -49,3 +47,12 @@ MappingService SHALL NOT hold mutable state between invocations. All configurati
 #### Scenario: MappingService can be shared across concurrent operations
 - **WHEN** two concurrent operations call MappingService.mapAttributes with different FusionRun instances
 - **THEN** there SHALL be no cross-contamination of state between operations
+
+### Requirement: MappingService utilizes shared snapshot key generator
+
+MappingService SHALL utilize a centrally exported shared utility (`getManagedAccountSnapshotKey`) for generating snapshot keys from account attributes to avoid logic duplication across services.
+
+#### Scenario: Mapping uses the shared snapshot key utility
+- **WHEN** MappingService requires a snapshot key for a managed account
+- **THEN** it invokes the exported utility rather than implementing a local fallback
+
