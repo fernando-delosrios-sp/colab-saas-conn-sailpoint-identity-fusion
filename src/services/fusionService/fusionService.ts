@@ -9,12 +9,12 @@ import { FusionAccount } from '../../model/account'
 import { MappingService } from '../mappingService'
 import { DefinitionService } from '../definitionService'
 import { MatchingService } from '../matchingService'
+import { MatchCandidateType } from '../matchingService/types'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
 import { forEachBatched, compact } from './collections'
 import { FusionDecision } from '../../model/form'
 import { SchemaService } from '../schemaService'
-import { FusionMatch, MatchCandidateType } from '../matchingService/types'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportBlend, FusionReportStats, OperationContext } from './types'
 import {
     batchProcess,
@@ -28,9 +28,9 @@ import { resolveReportAccountId as resolveReportAccountIdFn, resolveReportAccoun
 import { ManagedAccountAnalysisRecorder } from './managedAccountAnalysisRecorder'
 import { AggregationTracker } from './aggregationTracker'
 import {
-    formatFusionMatchDiscoveryLog,
     hasIdentityCandidateMatches as checkHasIdentityCandidateMatches,
     hasDeferredCandidateMatches as checkHasDeferredCandidateMatches,
+    formatFusionMatchDiscoveryLog,
 } from './helpers'
 import { AttributeOperations } from '../definitionService/types'
 import { getManagedAccountKeyFromAccount, normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
@@ -136,7 +136,7 @@ export class FusionService {
         this.managedAccountAnalyzer = new ManagedAccountAnalyzer(this)
         this.candidateRegistry = new CandidateRegistry({
             getFusionAccount: (key: string) => this.run.getFusionAccountByManagedKey(key),
-            sourcesByName:         this.run.sourcesByName,
+            sourcesByName: this.run.sourcesByName,
             log: this.log,
         })
         this.outcomeHandler = new ManagedAccountOutcomeHandler(
@@ -213,7 +213,7 @@ export class FusionService {
             tracker: () => this.tracker,
             urlContext: this.urlContext,
             reportAttributes: this.reportAttributes,
-            sourcesByName:         this.run.sourcesByName,
+            sourcesByName: this.run.sourcesByName,
             config: this.config,
             analyzer: this.managedAccountAnalyzer,
             sources: this.sources,
@@ -789,13 +789,13 @@ export class FusionService {
             const { fusionAccount, account, sourceInfo, sourceType } = result.analysis
             switch (result.resolution) {
                 case 'identity-match':
-                    await this.handleIdentityMatch(fusionAccount, account, sourceInfo)
+                    await this.outcomeHandler.handleIdentityMatch(fusionAccount, account, sourceInfo)
                     break
                 case 'deferred-match':
-                    await this.handleDeferredMatch(fusionAccount, account)
+                    this.outcomeHandler.handleDeferredMatch(fusionAccount, account)
                     break
                 case 'non-match':
-                    await this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
+                    await this.outcomeHandler.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
                     break
             }
         }
@@ -851,7 +851,7 @@ export class FusionService {
         const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
 
         if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
-            return this.handleNoReviewerAccount(account, sourceType, sourceInfo)
+            return this.outcomeHandler.handleNoReviewerAccount(account, sourceType, sourceInfo)
         }
 
         // Correlated on the source but not linked to any loaded Fusion row — treat as non-match.
@@ -861,7 +861,7 @@ export class FusionService {
             )
             const fusionAccount = await this.preProcessManagedAccount(account)
             this.run.claimAccount(getManagedAccountKeyFromAccount(account)!, account.identityId)
-            return this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
+            return this.outcomeHandler.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
         }
 
         const results = await this.matchingRunner.execute(
@@ -875,80 +875,18 @@ export class FusionService {
         const { fusionAccount, sourceInfo: analysisSourceInfo, sourceType: analysisSourceType } = result.analysis
         switch (result.resolution) {
             case 'identity-match':
-                return this.handleIdentityMatch(fusionAccount, account, analysisSourceInfo)
+                return this.outcomeHandler.handleIdentityMatch(fusionAccount, account, analysisSourceInfo)
             case 'deferred-match':
-                return this.handleDeferredMatch(fusionAccount, account)
+                return this.outcomeHandler.handleDeferredMatch(fusionAccount, account)
             case 'non-match':
-                return this.handleNonMatch(fusionAccount, account, analysisSourceType, analysisSourceInfo)
+                return this.outcomeHandler.handleNonMatch(fusionAccount, account, analysisSourceType, analysisSourceInfo)
             default:
                 return undefined
         }
     }
 
-    /**
-     * Finds the match with the highest combined score that meets or exceeds the automatic assignment threshold.
-     */
-    private getBestAutoAssignMatch(matches: FusionMatch[]): FusionMatch | undefined {
-        return this.outcomeHandler['getBestAutoAssignMatch'](matches)
-    }
 
-    /**
-     * Applies the no-match source-type policy for Record and Orphan sources.
-     * Returns true when the account was handled (caller should return undefined),
-     * false when the source is Authoritative and the caller should proceed.
-     */
-    public async handleNonAuthoritativeNoMatch(
-        fusionAccount: FusionAccount,
-        sourceType: SourceType,
-        sourceInfo: SourceInfo | undefined,
-        account?: Account
-    ): Promise<boolean> {
-        return this.outcomeHandler.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, account)
-    }
 
-    private async handleNoReviewerAccount(
-        account: Account,
-        sourceType: SourceType,
-        sourceInfo: SourceInfo | undefined
-    ): Promise<FusionAccount | undefined> {
-        return this.outcomeHandler.handleNoReviewerAccount(account, sourceType, sourceInfo)
-    }
-
-    private async handleExactMatch(
-        fusionAccount: FusionAccount,
-        account: Account,
-        identityId: string
-    ): Promise<FusionAccount | undefined> {
-        return this.outcomeHandler.handleExactMatch(fusionAccount, account, identityId)
-    }
-
-    private async handleIdentityMatch(
-        fusionAccount: FusionAccount,
-        account: Account,
-        sourceInfo: SourceInfo | undefined
-    ): Promise<FusionAccount | undefined> {
-        return this.outcomeHandler.handleIdentityMatch(fusionAccount, account, sourceInfo)
-    }
-
-    private async handlePartialMatch(
-        fusionAccount: FusionAccount,
-        sourceInfo: SourceInfo | undefined
-    ): Promise<undefined> {
-        return this.outcomeHandler.handlePartialMatch(fusionAccount, sourceInfo)
-    }
-
-    private handleDeferredMatch(fusionAccount: FusionAccount, account: Account): undefined {
-        return this.outcomeHandler.handleDeferredMatch(fusionAccount, account)
-    }
-
-    private async handleNonMatch(
-        fusionAccount: FusionAccount,
-        account: Account,
-        sourceType: SourceType,
-        sourceInfo: SourceInfo | undefined
-    ): Promise<FusionAccount | undefined> {
-        return this.outcomeHandler.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
-    }
 
     /**
      * Full sequential scan of every loaded managed account, returning a FusionAccount per entry.
@@ -1035,10 +973,6 @@ export class FusionService {
     private resolveReportAccountIdValue(accountId?: string): string | undefined {
         return resolveReportAccountIdValueFn(accountId, this.sources)
     }
-
-    // ------------------------------------------------------------------------
-    // Public Cleanup Methods
-    // ------------------------------------------------------------------------
 
     // ------------------------------------------------------------------------
     // Public Output/Listing Methods
@@ -1526,7 +1460,7 @@ export class FusionService {
                 analyzedNonMatchReportData: tracker.analyzedNonMatchReportData,
                 newManagedAccountsCount: tracker.newManagedAccountsCount,
                 urlContext: this.urlContext,
-                sourcesByName:         this.run.sourcesByName,
+                sourcesByName: this.run.sourcesByName,
                 reportAttributes: this.reportAttributes,
                 fusionIdentityComparisonsByAccount: tracker.fusionIdentityComparisonsByAccount,
                 sources: this.sources,
