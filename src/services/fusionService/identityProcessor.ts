@@ -1,21 +1,35 @@
-import { IdentityDocument } from 'sailpoint-api-client'
+import { IdentityDocument, AccountV2025 as Account } from 'sailpoint-api-client'
 import { FusionAccount } from '../../model/account'
 import { FusionConfig } from '../../model/config'
 import { LogService } from '../logService'
-import { FusionService } from './fusionService'
 import { FusionRun } from '../../model/fusionRun'
 import { compact } from './collections'
 import { batchProcess } from './collections'
 import { buildManagedAccountKey } from '../../model/managedAccountKey'
 import { readString } from '../../utils/safeRead'
 import { assert } from '../../utils/assert'
+import type { IdentityService } from '../identityService'
+import type { SourceService } from '../sourceService'
+import type { AggregationTracker } from './aggregationTracker'
+
+export interface IdentityProcessorDeps {
+    identities: IdentityService
+    tracker: () => AggregationTracker
+    sources: SourceService
+    configSourceNames: Set<string>
+    initializeSourceReviewers(): Promise<void>
+    shouldPruneDeletedManagedAccounts(): boolean
+    registerFusionBlend(fa: FusionAccount, account: Account): void
+    applyAttributeProcessing(fa: FusionAccount): Promise<void>
+    setFusionAccount(fa: FusionAccount): void
+}
 
 export class IdentityProcessor {
     constructor(
         private config: FusionConfig,
         private log: LogService,
         private run: FusionRun,
-        private fusionService: FusionService
+        private deps: IdentityProcessorDeps
     ) {}
 
     /**
@@ -34,14 +48,14 @@ export class IdentityProcessor {
      * @returns Fusion accounts for identities that did not already have one
      */
     public async processIdentities(): Promise<FusionAccount[]> {
-        const { identities } = this.fusionService.identities
-        this.fusionService.tracker.identitiesProcessedCount = identities.length
-        this.fusionService.log.info(
+        const { identities } = this.deps.identities
+        this.deps.tracker().identitiesProcessedCount = identities.length
+        this.log.info(
             `Processing identity documents: creating or merging fusion accounts for ${identities.length} ISC identity document(s)`
         )
         const results = await batchProcess(identities, 'Identity documents', (x) => this.processIdentity(x), this.config, this.log)
-        await this.fusionService.initializeSourceReviewers()
-        this.fusionService.log.info(
+        await this.deps.initializeSourceReviewers()
+        this.log.info(
             `Identity documents phase finished: ${identities.length} identity document(s) processed (fusion accounts created or updated from identities)`
         )
         return compact(results)
@@ -73,7 +87,7 @@ export class IdentityProcessor {
         if (!this.run.fusionIdentityMap.has(identityId)) {
             const existingAccount = this.findFusionAccountByIdentityManagedAccounts(identity)
             if (existingAccount) {
-                this.fusionService.log.debug(
+                this.log.debug(
                     `Reusing existing Fusion account ${existingAccount.managedKey} for identity ` +
                         `${identity.name} (${identityId}) - prevents duplicate baseline creation`
                 )
@@ -94,32 +108,32 @@ export class IdentityProcessor {
                 existingAccount.setNeedsRefresh(true)
                 // Register under the new identity ID so callers (e.g. getFusionIdentity) can find it
                 this.run.fusionIdentityMap.set(identityId, existingAccount)
-                this.fusionService.log.debug(
+                this.log.debug(
                     `Re-registered existing Fusion account under new identity: ${identity.name} (${identityId})`
                 )
                 return existingAccount
             }
 
             const fusionAccount = FusionAccount.fromIdentity(identity)
-            this.fusionService.log.debug(`Processing new identity: ${identity.name} (${identityId})`)
+            this.log.debug(`Processing new identity: ${identity.name} (${identityId})`)
             fusionAccount.addIdentityLayer(identity)
             fusionAccount.setNeedsReset(true)
             fusionAccount.setOriginIdentityInScope(true)
 
-            assert(this.fusionService.run.managedAccountsById, 'Managed accounts have not been loaded')
+            assert(this.run.managedAccountsById, 'Managed accounts have not been loaded')
             fusionAccount.addManagedAccountLayer(
-                this.fusionService.run,
-                this.fusionService.sources.managedAccountsAllById,
+                this.run,
+                this.deps.sources.managedAccountsAllById,
                 {
-                    pruneDeleted: this.fusionService.shouldPruneDeletedManagedAccounts(),
-                    onBlend: (account) => this.fusionService.registerFusionBlend(fusionAccount, account),
+                    pruneDeleted: this.deps.shouldPruneDeletedManagedAccounts(),
+                    onBlend: (account) => this.deps.registerFusionBlend(fusionAccount, account),
                 }
             )
 
-            await this.fusionService.applyAttributeProcessing(fusionAccount)
+            await this.deps.applyAttributeProcessing(fusionAccount)
 
-            this.fusionService.setFusionAccount(fusionAccount)
-            this.fusionService.log.debug(`Registered identity as fusion account: ${identity.name} (${identityId})`)
+            this.deps.setFusionAccount(fusionAccount)
+            this.log.debug(`Registered identity as fusion account: ${identity.name} (${identityId})`)
             return fusionAccount
         }
         return undefined
@@ -136,7 +150,7 @@ export class IdentityProcessor {
     }
 
     private findFusionAccountByIdentityManagedAccounts(identity: IdentityDocument): FusionAccount | undefined {
-        const sourceNames = this.fusionService.configSourceNames
+        const sourceNames = this.deps.configSourceNames
         const identityAccountIds = new Set<string>(
             (identity.accounts ?? [])
                 .filter((a) => sourceNames.has(a.source?.name ?? ''))
