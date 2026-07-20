@@ -8,10 +8,6 @@
 .cursor/
 .history/
 .idea/
-.cline/
-.claude/
-.agent/
-.agents/
 *.iml
 cursor_settings_backup.json
 

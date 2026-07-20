@@ -70,6 +70,10 @@ export class FusionService {
         return this.run.autoAssignedIdentityIds
     }
 
+    public get sourcesByName(): Map<string, SourceInfo> {
+        return this.run.sourcesByName
+    }
+
     public get _reviewersBySourceId(): Map<string, Set<FusionAccount>> {
         return this._repository.reviewersBySourceId
     }
@@ -79,7 +83,6 @@ export class FusionService {
 
     private _tracker?: AggregationTracker
 
-    public sourcesByName: Map<string, SourceInfo> = new Map()
     private readonly reset: boolean
     private readonly reportAttributes: string[]
     public readonly urlContext: UrlContext
@@ -126,12 +129,18 @@ export class FusionService {
     ) {
         this._repository = new FusionAccountRepository(log, this.run)
         this.identityProcessor = new IdentityProcessor(config, log, this.run, this)
-        this.correlationManager = new CorrelationManager(config, log, this)
+        this.correlationManager = new CorrelationManager(
+            config,
+            log,
+            this.sources,
+            this.identities,
+            () => this.isAggregationAccountListMode()
+        )
         this.decisionProcessor = new DecisionProcessor(config, log, this.run, this)
         this.managedAccountAnalyzer = new ManagedAccountAnalyzer(this)
         this.candidateRegistry = new CandidateRegistry({
             fusionAccountMap: this.run.fusionAccountMap,
-            sourcesByName: this.sourcesByName,
+            sourcesByName:         this.run.sourcesByName,
             log: this.log,
         })
         this.matchingRunner = new ManagedAccountMatchingRunner({
@@ -153,7 +162,7 @@ export class FusionService {
             tracker: () => this.tracker,
             urlContext: this.urlContext,
             reportAttributes: this.reportAttributes,
-            sourcesByName: this.sourcesByName,
+            sourcesByName:         this.run.sourcesByName,
             config: this.config,
             analyzer: this.managedAccountAnalyzer,
             sources: this.sources,
@@ -785,7 +794,7 @@ export class FusionService {
         }
 
         // Resolve source context once — shared by all downstream paths.
-        const sourceInfo = account.sourceName ? this.sourcesByName.get(account.sourceName) : undefined
+        const sourceInfo = account.sourceName ?         this.run.sourcesByName.get(account.sourceName) : undefined
         const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
 
         if (account.sourceName && this._sourcesWithoutReviewers.has(account.sourceName)) {
@@ -1357,7 +1366,10 @@ export class FusionService {
      * register every managed source as a reviewer source and populate pending reviews.
      */
     public async initializeSourceReviewers(): Promise<void> {
-        this.sourcesByName = new Map(this.sources.managedSources.map((source) => [source.name, source]))
+                this.run.sourcesByName.clear()
+        for (const source of this.sources.managedSources) {
+            this.run.sourcesByName.set(source.name, source)
+        }
 
         if (!this.fusionOwnerIsGlobalReviewer) {
             return
@@ -1560,7 +1572,7 @@ export class FusionService {
                 analyzedNonMatchReportData: tracker.analyzedNonMatchReportData,
                 newManagedAccountsCount: tracker.newManagedAccountsCount,
                 urlContext: this.urlContext,
-                sourcesByName: this.sourcesByName,
+                sourcesByName:         this.run.sourcesByName,
                 reportAttributes: this.reportAttributes,
                 fusionIdentityComparisonsByAccount: tracker.fusionIdentityComparisonsByAccount,
                 sources: this.sources,
