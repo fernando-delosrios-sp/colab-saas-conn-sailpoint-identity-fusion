@@ -120,18 +120,19 @@ export class IdentityService {
                     QueuePriority.HIGH,
                     'IdentityService>fetchIdentities searchPost'
                 )
-                this.run.identityMap.clear()
+                this.run.clearIdentities()
                 for (const identity of identities) {
-                    this.run.identityMap.set(identity.protected ? '-' : identity.id, identity)
+                    if (!identity.protected) {
+                        this.run.addIdentity(identity.id, identity)
+                    }
                 }
-                this.run.identityMap.delete('-')
                 this.identityIdsInScope = new Set(
                     identities.filter((identity) => !identity.protected).map((identity) => identity.id)
                 )
             }, `Failed to fetch identities using scope query "${this.identityScopeQuery}"`)
         } else if (this.includeIdentities) {
             this.log.info('No identity scope query defined, skipping global identity fetch.')
-            this.run.identityMap.clear()
+            this.run.clearIdentities()
             this.identityIdsInScope = new Set()
         }
 
@@ -139,7 +140,7 @@ export class IdentityService {
             await this.hydrateMissingIdentitiesById(additionalIdentityIds)
             for (const id of additionalIdentityIds) {
                 if (!id) continue
-                const identity = this.run.identityMap.get(id)
+                const identity = this.run.getIdentity(id)
                 if (identity && !identity.protected) {
                     this.identityIdsInScope.add(id)
                 }
@@ -198,7 +199,7 @@ export class IdentityService {
                 QueuePriority.HIGH,
                 'IdentityService>fetchIdentityById searchPost'
             )
-            identities.forEach((identity) => this.run.identityMap.set(identity.id, identity))
+            identities.forEach((identity) => this.run.addIdentity(identity.id, identity))
             return identities[0]
         }, `Failed to fetch identity by ID "${id}"`)
     }
@@ -220,7 +221,7 @@ export class IdentityService {
                 QueuePriority.HIGH,
                 'IdentityService>fetchIdentityByName searchPost'
             )
-            identities.forEach((identity) => this.run.identityMap.set(identity.id, identity))
+            identities.forEach((identity) => this.run.addIdentity(identity.id, identity))
             return identities[0]
         }, `Failed to fetch identity by name "${name}"`)
     }
@@ -237,7 +238,7 @@ export class IdentityService {
      */
     public getIdentityById(id?: string): IdentityDocument | undefined {
         if (!id) return undefined
-        return this.run.identityMap.get(id)
+        return this.run.getIdentity(id)
     }
 
     /**
@@ -345,7 +346,7 @@ export class IdentityService {
      * @param id - The identity ID to remove from the cache
      */
     public deleteIdentity(id: string): void {
-        this.run.identityMap.delete(id)
+        this.run.removeIdentity(id)
     }
 
     /**

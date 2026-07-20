@@ -151,7 +151,7 @@ export class DecisionProcessor {
         const isAuthorizedDecision = !fusionDecision.newIdentity
         const existingIdentityAccount =
             isAuthorizedDecision && fusionDecision.identityId
-                ? this.run.fusionIdentityMap.get(fusionDecision.identityId)
+                ? this.run.getFusionIdentity(fusionDecision.identityId)
                 : undefined
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
