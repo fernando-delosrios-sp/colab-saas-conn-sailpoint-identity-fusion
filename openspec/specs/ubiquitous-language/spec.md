@@ -410,6 +410,76 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 | **Incremental counter** | A persistent, always-incrementing counter that survives across aggregations. Controlled by **Use incremental counter?** and **Counter start value**. When off, collision-based disambiguation is used instead. |
 | **Collision-based disambiguation** | The default unique-value strategy: the expression is re-evaluated with an incrementing `$counter` suffix until a value is found that is not already in use, up to **Maximum attempts**. |
 
+### Configuration vocabulary
+
+Configuration is organized into menus and sections in the connector source in ISC.
+
+| Term | Definition |
+|---|---|
+| **Connection Settings** | The top-level configuration menu for authentication and connectivity to ISC APIs. Contains the ISC API URL and PAT credentials. |
+| **Source Settings** | The top-level configuration menu controlling which identities and sources are in scope and how processing is managed. Contains Scope, Sources, and Processing Control sections. |
+| **Scope** | The section defining which ISC identities participate in Fusion processing. Controls **Include identities in the scope?** and **Identity Scope Query**. |
+| **Identity Scope Query** | An ISC search-syntax filter that narrows which identities are included in processing. Use `*` for all identities or filters like `attributes.cloudLifecycleState:active`. |
+| **Sources** | The section listing configured managed sources that feed account data into Fusion. Each source has its own type, aggregation mode, correlation mode, and filters. |
+| **Processing Control** | The section managing account maintenance: history retention, empty account deletion, and missing-identifier behavior. |
+| **Attribute Mapping Settings** | The top-level configuration menu for the Map step. Contains Attribute Mapping Definitions. |
+| **Attribute Mapping Definitions** | The section configuring how source attributes are mapped and merged into the Fusion account schema. Controls the default merge strategy and per-attribute mapping rules. |
+| **Attribute Definition Settings** | The top-level configuration menu for the Define step. Contains Normal Attribute Definitions and Unique Attribute Definitions. |
+| **Normal Attribute Definitions** | The section defining Velocity expressions that compute Fusion account attributes. Runs on every aggregation; supports static (one-time) or refreshable evaluation. |
+| **Unique Attribute Definitions** | The section defining Velocity expressions that generate values guaranteed unique across all Fusion accounts. Uses collision-based disambiguation or incremental counters. |
+| **Attribute Matching Settings** | The top-level configuration menu for the Match step. Contains Matching Settings and Review Settings. |
+| **Matching Settings** | The section configuring per-attribute matching rules (algorithm, threshold, weight, mandatory, skip flags), the manual review score threshold, and automatic assignment. |
+| **Review Settings** | The section configuring the manual review workflow: form attributes, form expiration, maximum candidates per form, and global reviewer behavior. |
+| **Advanced Settings** | The top-level configuration menu for developer and integration settings. Contains Developer Settings, Advanced Connection Settings, and Proxy Settings. |
+| **Developer Settings** | The section for operation tuning: provisioning timeout, batch size, processing wait, priority processing, concurrency checks, forced refresh, and account reset. |
+| **Advanced Connection Settings** | The section for API communication tuning: request rate limiting, retry behavior, and external logging configuration. |
+| **Proxy Settings** | The section configuring proxy mode for running connector logic on an external server. |
+
+### Source and aggregation modes
+
+| Term | Definition |
+|---|---|
+| **Aggregation mode** | Per-source setting controlling when managed source accounts are refreshed. Options: **Do not aggregate** (use existing account data), **Aggregate before processing** (refresh accounts first), or **Delayed aggregation** (refresh after processing completes). |
+| **Aggregate before processing** | Aggregation mode where the managed source is refreshed before the connector processes its accounts. The connector polls the aggregation task status every 30 seconds until completion or the configured timeout. |
+| **Delayed aggregation** | Aggregation mode where the managed source is refreshed after the connector finishes processing. A workflow waits the configured delay, then triggers the source aggregation. |
+| **Optimized aggregation** | When enabled, only accounts that have changed since the last run are processed. Improves performance for large sources. Must be disabled when using reverse correlation. |
+| **Aggregation batch size** | The maximum number of accounts processed per aggregation run for a source. Limits load when onboarding large datasets. |
+| **Aggregation wait timeout** | The maximum time (in minutes) to wait for a managed source aggregation to complete when using **Aggregate before processing**. |
+| **Aggregation delay** | The number of minutes to wait after processing before triggering a delayed aggregation. |
+| **Correlation mode** | Per-source setting controlling how uncorrelated managed source accounts are linked to identities. Options: **Do not correlate** (leave unlinked), **Correlate missing accounts on aggregation** (link via API during processing), or **Reverse correlation from managed source** (push Fusion identity data back to the source for ISC correlation). |
+| **Correlate missing accounts on aggregation** | Correlation mode where the connector directly links uncorrelated managed source accounts to their Fusion identity via the ISC API during processing. |
+| **Reverse correlation** | Correlation mode where the connector creates a dedicated attribute on the managed source containing the Fusion identity ID, then ISC's correlation rule matches accounts to identities. Requires a correlation attribute name and display name. |
+| **Correlation attribute** | The attribute name used for reverse correlation on the managed source schema. Must be unique and not overlap with mapped or defined attributes. |
+| **Deferred candidate matching** | Per-source toggle that controls whether a managed source account is compared to other provisional Fusion accounts from the same source in the same run. When enabled, if the only strong match is a deferred candidate, identity creation is deferred. Disable when one person may appear as multiple accounts in a single aggregation. |
+| **Include record accounts in Match** | Per-source toggle for Record-type sources. When enabled, record accounts participate in Match scoring against identities and deferred candidates. When disabled, they only run Map and Define and register unique attributes. |
+| **Disable non-matching accounts** | Per-source toggle for Orphan-type sources. When enabled, orphan accounts that no longer match any identity are automatically disabled after aggregation. |
+| **Account filter** | A server-side ISC filter expression applied to the Accounts API to reduce records returned. Uses ISC search syntax. |
+| **JMESPath filter** | A client-side filter expression applied page-wise to account results. Uses JMESPath syntax to return a filtered array of account objects. |
+
+### Deployment and integration
+
+| Term | Definition |
+|---|---|
+| **Proxy mode** | A deployment option where connector logic runs on an external server and communicates with ISC via a lightweight proxy connector. Offloads processing from ISC infrastructure. |
+| **External logging** | Sending connector log output to an external endpoint (e.g., Splunk, Datadog) for centralized monitoring. Controlled by the external logging URL and level settings. |
+| **External logging level** | The minimum severity for logs sent to the external endpoint. Options: Error, Warn, Info, Debug. |
+| **Concurrency check** | A safeguard that prevents overlapping connector aggregations from running simultaneously. Controlled by **Enable concurrency check?** in Developer Settings. |
+| **Priority processing** | When enabled, the connector expedites its processing queue. Controlled by **Enable priority processing?** in Developer Settings. |
+| **Cascade aggregation** | When enabled, single-account operations (e.g., accountRead) trigger aggregation of managed sources before fetching account data. Ensures up-to-date source data. |
+| **Provisioning timeout** | The maximum time (in seconds) to wait for a provisioning operation (create, update, enable, disable) to complete. |
+| **Localized user communications** | When enabled, review forms and emails use the reviewer's preferred language. Requires an identity attribute specifying the language code. |
+| **Governance group** | An ISC group assigned to source governance. Members of this group are eligible as global reviewers when **Owners are global reviewers?** is enabled. |
+| **Identity profile** | The ISC identity profile used for identities created by the Fusion source. Replaces the identity profiles of managed sources when Fusion is authoritative. |
+
+### Testing
+
+| Term | Definition |
+|---|---|
+| **Scenario** | A self-contained test case with input data, configuration, and expected outputs. Each scenario has a unique ID and manifest file. |
+| **Golden artifact** | A pre-validated expected output file (e.g., `output.sweep1.expected.json`) used as the reference for automated test comparison. Generated artifacts are compared against golden artifacts to detect regressions. |
+| **Sweep** (testing) | A single aggregation run within a test scenario. Multi-sweep scenarios (sweep 1, sweep 2) validate stateful behavior across sequential aggregations. |
+| **Side effects** | Non-account changes produced during an aggregation run (e.g., form creation, correlation API calls). Captured in side-effect files for test validation. |
+
 ## Retired Terms
 
 The following terms are retired and SHALL NOT be used in new code, configuration, or documentation:
