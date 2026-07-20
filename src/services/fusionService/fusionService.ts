@@ -15,7 +15,7 @@ import { forEachBatched, compact } from './collections'
 import { FusionDecision } from '../../model/form'
 import { SchemaService } from '../schemaService'
 import { FusionMatch, MatchCandidateType } from '../matchingService/types'
-import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats, OperationContext } from './types'
+import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportBlend, FusionReportStats, OperationContext } from './types'
 import {
     batchProcess,
     getManagedAccountsBatchSize,
@@ -126,7 +126,6 @@ export class FusionService {
     ) {
         FusionAccount.configure(config)
         this.configSourceNames = new Set(config.sources.map((s) => s.name))
-        this.identityProcessor = new IdentityProcessor(config, log, this.run, { identities: this.identities, tracker: () => this.tracker, sources: this.sources, configSourceNames: this.configSourceNames, initializeSourceReviewers: () => this.initializeSourceReviewers(), shouldPruneDeletedManagedAccounts: () => this.shouldPruneDeletedManagedAccounts(), registerFusionBlend: (fa, a) => this.registerFusionBlend(fa, a), applyAttributeProcessing: (fa) => this.applyAttributeProcessing(fa), setFusionAccount: (fa) => this.setFusionAccount(fa) })
         this.correlationManager = new CorrelationManager(
             config,
             log,
@@ -134,24 +133,35 @@ export class FusionService {
             this.identities,
             () => this.isAggregationAccountListMode()
         )
-        this.decisionProcessor = new DecisionProcessor(config, log, this.run, {
-            forms: this.forms,
-            sources: this.sources,
-            identities: this.identities,
-            correlationManager: this.correlationManager,
-            shouldPruneDeletedManagedAccounts: () => this.shouldPruneDeletedManagedAccounts(),
-            registerFusionBlend: (fa, account) => this.registerFusionBlend(fa, account),
-            applyAttributeProcessing: (fa) => this.applyAttributeProcessing(fa),
-            isAggregationAccountListMode: () => this.isAggregationAccountListMode(),
-            handleNonAuthoritativeNoMatch: (fa, st, si, a) => this.handleNonAuthoritativeNoMatch(fa, st, si, a),
-            setFusionAccount: (fa) => this.setFusionAccount(fa),
-        })
         this.managedAccountAnalyzer = new ManagedAccountAnalyzer(this)
         this.candidateRegistry = new CandidateRegistry({
             getFusionAccount: (key: string) => this.run.getFusionAccountByManagedKey(key),
             sourcesByName:         this.run.sourcesByName,
             log: this.log,
         })
+        this.outcomeHandler = new ManagedAccountOutcomeHandler(
+            {
+                config: this.config,
+                log: this.log,
+                run: this.run,
+                forms: this.forms,
+                definitionService: this.definitionService,
+                matchingService: this.matchingService,
+                correlationManager: this.correlationManager,
+                candidateRegistry: this.candidateRegistry,
+                reviewersBySourceId: this._reviewersBySourceId,
+                sourcesWithoutReviewers: this._sourcesWithoutReviewers,
+                getTracker: () => this._tracker,
+                preProcessManagedAccount: (account) => this.preProcessManagedAccount(account),
+                processFusionIdentityDecision: (d) => this.processFusionIdentityDecision(d),
+                removeMatchAccount: (id) => this.removeMatchAccount(id),
+                queueDisableOperation: (account) => this.queueDisableOperation(account),
+                isDeferredMatchingEnabledForSource: (name) => this.isDeferredMatchingEnabledForSource(name),
+                buildFusionBlend: (fa, account) => this.buildFusionBlend(fa, account),
+            },
+            commandType,
+            operationContext
+        )
         this.matchingRunner = new ManagedAccountMatchingRunner({
             config: this.config,
             log: this.log,
@@ -159,29 +169,40 @@ export class FusionService {
             candidateRegistry: this.candidateRegistry,
             processAccount: (account: Account) => this.processManagedAccount(account),
         })
-        this.outcomeHandler = new ManagedAccountOutcomeHandler({
-            config: this.config,
-            log: this.log,
-            run: this.run,
-            forms: this.forms,
-            definitionService: this.definitionService,
-            matchingService: this.matchingService,
-            correlationManager: this.correlationManager,
-            candidateRegistry: this.candidateRegistry,
-            reviewersBySourceId: this._reviewersBySourceId,
-            sourcesWithoutReviewers: this._sourcesWithoutReviewers,
-            preProcessManagedAccount: (account) => this.preProcessManagedAccount(account),
-            processFusionIdentityDecision: (d) => this.processFusionIdentityDecision(d),
-            removeMatchAccount: (id) => this.removeMatchAccount(id),
-            queueDisableOperation: (account) => this.queueDisableOperation(account),
-            isAggregationAccountListMode: () => this.isAggregationAccountListMode(),
-            shouldPruneDeletedManagedAccounts: () => this.shouldPruneDeletedManagedAccounts(),
-            registerFusionBlend: (fa, account) => this.registerFusionBlend(fa, account),
-            applyAttributeProcessing: (fa) => this.applyAttributeProcessing(fa),
-            setFusionAccount: (fa) => this.setFusionAccount(fa),
-            addMatchScoringTimeMs: (ms) => this.addMatchScoringTimeMs(ms),
-            isDeferredMatchingEnabledForSource: (name) => this.isDeferredMatchingEnabledForSource(name),
-        })
+        this.identityProcessor = new IdentityProcessor(
+            config,
+            log,
+            this.run,
+            {
+                identities: this.identities,
+                getTracker: () => this._tracker,
+                sources: this.sources,
+                configSourceNames: this.configSourceNames,
+                mappingService: this.mappingService,
+                definitionService: this.definitionService,
+                buildFusionBlend: (fa, account) => this.buildFusionBlend(fa, account),
+            },
+            commandType,
+            operationContext
+        )
+        this.decisionProcessor = new DecisionProcessor(
+            config,
+            log,
+            this.run,
+            {
+                forms: this.forms,
+                sources: this.sources,
+                identities: this.identities,
+                correlationManager: this.correlationManager,
+                outcomeHandler: this.outcomeHandler,
+                mappingService: this.mappingService,
+                definitionService: this.definitionService,
+                getTracker: () => this._tracker,
+                buildFusionBlend: (fa, account) => this.buildFusionBlend(fa, account),
+            },
+            commandType,
+            operationContext
+        )
         this.reset = config.reset
         this.fusionOwnerIsGlobalReviewer = config.fusionOwnerIsGlobalReviewer ?? false
         this.fusionReportOnAggregation = config.fusionReportOnAggregation ?? false
@@ -548,7 +569,7 @@ export class FusionService {
                 pruneDeleted: this.shouldPruneDeletedManagedAccounts(),
                 addBlendHistory: true,
                 skipBlendHistoryForManagedKeys,
-                onBlend: (account) => this.registerFusionBlend(fusionAccount, account),
+                onBlend: (account) => this.run.recordFusionBlend(this.buildFusionBlend(fusionAccount, account), this._tracker),
             }
         )
         this.log.debug(
@@ -617,7 +638,9 @@ export class FusionService {
      * Delegates to IdentityProcessor.
      */
     public async processIdentities(): Promise<FusionAccount[]> {
-        return this.identityProcessor.processIdentities()
+        const results = await this.identityProcessor.processIdentities()
+        await this.initializeSourceReviewers()
+        return results
     }
 
     /**
@@ -1456,17 +1479,15 @@ export class FusionService {
         this.run.registerFusionAccount(fusionAccount, this._tracker)
     }
 
-    public registerFusionBlend(fusionAccount: FusionAccount, account: Account): void {
-        if (this._tracker) {
-            const sourceName = account.sourceName ?? ''
-            const nativeIdentity = trimStr(account.nativeIdentity) ?? ''
-            const blendedAccountName = trimStr(account.name) || nativeIdentity || account.id || ''
-            this._tracker.fusionBlends.push({
-                accountName: fusionAccount.name ?? fusionAccount.identityId ?? 'Unknown',
-                accountUrl: fusionAccount.identityId ? this.urlContext.identity(fusionAccount.identityId) : undefined,
-                blendedAccountName,
-                blendedSource: sourceName,
-            })
+    public buildFusionBlend(fusionAccount: FusionAccount, account: Account): FusionReportBlend {
+        const sourceName = account.sourceName ?? ''
+        const nativeIdentity = trimStr(account.nativeIdentity) ?? ''
+        const blendedAccountName = trimStr(account.name) || nativeIdentity || account.id || ''
+        return {
+            accountName: fusionAccount.name ?? fusionAccount.identityId ?? 'Unknown',
+            accountUrl: fusionAccount.identityId ? this.urlContext.identity(fusionAccount.identityId) : undefined,
+            blendedAccountName,
+            blendedSource: sourceName,
         }
     }
 

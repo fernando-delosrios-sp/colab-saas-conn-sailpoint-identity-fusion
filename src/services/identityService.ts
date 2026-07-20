@@ -339,7 +339,7 @@ export class IdentityService {
      * Removes a single identity from the cache by ID.
      * Called by FusionService.processFusionAccount after claiming a fusion account
      * for a given identity, so that processIdentities skips it rather than
-     * relying solely on the fusionIdentityMap.has() lazy guard.
+     * relying solely on the hasFusionIdentity() lazy guard.
      *
      * @param id - The identity ID to remove from the cache
      */

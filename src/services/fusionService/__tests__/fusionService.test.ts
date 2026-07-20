@@ -2926,7 +2926,7 @@ describe('FusionService', () => {
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            const setFusionAccountSpy = vi.spyOn(fusionService, 'setFusionAccount')
+            const setFusionAccountSpy = vi.spyOn(fusionService.run, 'registerFusionAccount')
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
                 account: {

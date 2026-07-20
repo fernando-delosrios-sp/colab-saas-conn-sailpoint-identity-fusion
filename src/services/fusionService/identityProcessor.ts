@@ -1,4 +1,5 @@
 import { IdentityDocument, AccountV2025 as Account } from 'sailpoint-api-client'
+import { StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { FusionConfig } from '../../model/config'
 import { LogService } from '../logService'
@@ -9,17 +10,19 @@ import { assert } from '../../utils/assert'
 import type { IdentityService } from '../identityService'
 import type { SourceService } from '../sourceService'
 import type { AggregationTracker } from './aggregationTracker'
+import type { MappingService } from '../mappingService'
+import type { DefinitionService } from '../definitionService'
+import type { FusionReportBlend } from './types'
+import { OperationContext } from './types'
 
 export interface IdentityProcessorDeps {
     identities: IdentityService
-    tracker: () => AggregationTracker
+    getTracker(): AggregationTracker | undefined
     sources: SourceService
     configSourceNames: Set<string>
-    initializeSourceReviewers(): Promise<void>
-    shouldPruneDeletedManagedAccounts(): boolean
-    registerFusionBlend(fa: FusionAccount, account: Account): void
-    applyAttributeProcessing(fa: FusionAccount): Promise<void>
-    setFusionAccount(fa: FusionAccount): void
+    mappingService: MappingService
+    definitionService: DefinitionService
+    buildFusionBlend(fa: FusionAccount, account: Account): FusionReportBlend
 }
 
 export class IdentityProcessor {
@@ -27,8 +30,37 @@ export class IdentityProcessor {
         private config: FusionConfig,
         private log: LogService,
         private run: FusionRun,
-        private deps: IdentityProcessorDeps
+        private deps: IdentityProcessorDeps,
+        private commandType?: StandardCommand,
+        private operationContext?: OperationContext
     ) {}
+
+    private isAggregationAccountListMode(): boolean {
+        return (
+            this.commandType === StandardCommand.StdAccountList ||
+            this.operationContext === OperationContext.AccountList
+        )
+    }
+
+    private shouldPruneDeletedManagedAccounts(): boolean {
+        return (
+            this.isAggregationAccountListMode() ||
+            this.commandType === StandardCommand.StdAccountRead ||
+            this.commandType === StandardCommand.StdAccountUpdate ||
+            this.commandType === StandardCommand.StdAccountEnable ||
+            this.commandType === StandardCommand.StdAccountDisable
+        )
+    }
+
+    private async applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void> {
+        this.deps.mappingService.mapAttributes(fusionAccount, this.run)
+        await this.deps.definitionService.refreshNormalAttributes(fusionAccount)
+        this.deps.definitionService.refreshReverseCorrelationAttributes(fusionAccount)
+    }
+
+    private setFusionAccount(fusionAccount: FusionAccount): void {
+        this.run.registerFusionAccount(fusionAccount, this.deps.getTracker())
+    }
 
     /**
      * Process all identities.
@@ -47,12 +79,12 @@ export class IdentityProcessor {
      */
     public async processIdentities(): Promise<FusionAccount[]> {
         const { identities } = this.deps.identities
-        this.deps.tracker().identitiesProcessedCount = identities.length
+        const tracker = this.deps.getTracker()
+        if (tracker) tracker.identitiesProcessedCount = identities.length
         this.log.info(
             `Processing identity documents: creating or merging fusion accounts for ${identities.length} ISC identity document(s)`
         )
         const results = await batchProcess(identities, 'Identity documents', (x) => this.processIdentity(x), this.config, this.log)
-        await this.deps.initializeSourceReviewers()
         this.log.info(
             `Identity documents phase finished: ${identities.length} identity document(s) processed (fusion accounts created or updated from identities)`
         )
@@ -114,14 +146,14 @@ export class IdentityProcessor {
                 this.run,
                 this.deps.sources.managedAccountsAllById,
                 {
-                    pruneDeleted: this.deps.shouldPruneDeletedManagedAccounts(),
-                    onBlend: (account) => this.deps.registerFusionBlend(fusionAccount, account),
+                    pruneDeleted: this.shouldPruneDeletedManagedAccounts(),
+                    onBlend: (account) => this.run.recordFusionBlend(this.deps.buildFusionBlend(fusionAccount, account), this.deps.getTracker()),
                 }
             )
 
-            await this.deps.applyAttributeProcessing(fusionAccount)
+            await this.applyAttributeProcessing(fusionAccount)
 
-            this.deps.setFusionAccount(fusionAccount)
+            this.setFusionAccount(fusionAccount)
             this.log.debug(`Registered identity as fusion account: ${identity.name} (${identityId})`)
             return fusionAccount
         }
