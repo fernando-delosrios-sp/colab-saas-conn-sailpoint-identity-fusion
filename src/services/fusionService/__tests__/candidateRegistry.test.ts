@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { CandidateRegistry, CandidateRegistryDeps } from '../candidateRegistry'
+import { CandidateRegistry, CandidateRegistryDeps } from '../../matchingService/candidateRegistry'
 import { SourceType } from '../../../model/config'
 
 function makeRegistry(overrides: Partial<CandidateRegistryDeps> = {}): CandidateRegistry {
