@@ -196,7 +196,7 @@ export class MatchingService {
      * Only mandatory attributes are indexed: non-mandatory attributes cannot be used to safely eliminate
      * candidates, since a missing or non-matching non-mandatory attribute does not disqualify a pair.
      *
-     * @param identities - All fusion identities to index (pass `fusionIdentityMap.values()` — collected
+     * @param identities - All fusion identities to index (pass `allFusionIdentities` — collected
      *   internally into an array so generators can be reused across multiple attribute sweeps)
      */
     public buildTrigramIndex(identities: Iterable<FusionAccount>): void {

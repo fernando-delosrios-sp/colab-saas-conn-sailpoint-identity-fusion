@@ -1,9 +1,9 @@
 import { IdentityDocument, AccountV2025 as Account } from 'sailpoint-api-client'
+import { StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
-import { FusionConfig } from '../../model/config'
+import { FusionConfig, SourceType } from '../../model/config'
 import { LogService } from '../logService'
-import { SourceType } from '../../model/config'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 import { trimStr } from '../../utils/safeRead'
@@ -14,23 +14,23 @@ import type { FormService } from '../formService'
 import type { SourceService } from '../sourceService'
 import type { IdentityService } from '../identityService'
 import type { CorrelationManager } from './correlationManager'
+import type { ManagedAccountOutcomeHandler } from '../matchingService/managedAccountOutcomeHandler'
+import type { MappingService } from '../mappingService'
+import type { DefinitionService } from '../definitionService'
+import type { AggregationTracker } from './aggregationTracker'
+import type { FusionReportBlend } from './types'
+import { OperationContext } from './types'
 
 export interface DecisionProcessorDeps {
     forms: FormService
     sources: SourceService
     identities: IdentityService
     correlationManager: CorrelationManager
-    shouldPruneDeletedManagedAccounts(): boolean
-    registerFusionBlend(fusionAccount: FusionAccount, account: Account): void
-    applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void>
-    isAggregationAccountListMode(): boolean
-    handleNonAuthoritativeNoMatch(
-        fusionAccount: FusionAccount,
-        sourceType: SourceType,
-        sourceInfo: import('../sourceService').SourceInfo | undefined,
-        account?: Account
-    ): Promise<boolean>
-    setFusionAccount(fusionAccount: FusionAccount): void
+    outcomeHandler: ManagedAccountOutcomeHandler
+    mappingService: MappingService
+    definitionService: DefinitionService
+    getTracker(): AggregationTracker | undefined
+    buildFusionBlend(fa: FusionAccount, account: Account): FusionReportBlend
 }
 
 export class DecisionProcessor {
@@ -38,8 +38,37 @@ export class DecisionProcessor {
         private config: FusionConfig,
         private log: LogService,
         private run: FusionRun,
-        private deps: DecisionProcessorDeps
+        private deps: DecisionProcessorDeps,
+        private commandType?: StandardCommand,
+        private operationContext?: OperationContext
     ) {}
+
+    private isAggregationAccountListMode(): boolean {
+        return (
+            this.commandType === StandardCommand.StdAccountList ||
+            this.operationContext === OperationContext.AccountList
+        )
+    }
+
+    private shouldPruneDeletedManagedAccounts(): boolean {
+        return (
+            this.isAggregationAccountListMode() ||
+            this.commandType === StandardCommand.StdAccountRead ||
+            this.commandType === StandardCommand.StdAccountUpdate ||
+            this.commandType === StandardCommand.StdAccountEnable ||
+            this.commandType === StandardCommand.StdAccountDisable
+        )
+    }
+
+    private async applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void> {
+        this.deps.mappingService.mapAttributes(fusionAccount, this.run)
+        await this.deps.definitionService.refreshNormalAttributes(fusionAccount)
+        this.deps.definitionService.refreshReverseCorrelationAttributes(fusionAccount)
+    }
+
+    private setFusionAccount(fusionAccount: FusionAccount): void {
+        this.run.registerFusionAccount(fusionAccount, this.deps.getTracker())
+    }
 
     /**
      * Reconcile transient entitlements derived from pending form instances.
@@ -185,17 +214,17 @@ export class DecisionProcessor {
             this.run,
             this.deps.sources.managedAccountsAllById,
             {
-                pruneDeleted: this.deps.shouldPruneDeletedManagedAccounts(),
+                pruneDeleted: this.shouldPruneDeletedManagedAccounts(),
                 skipBlendHistoryForManagedKeys,
-                onBlend: (account) => this.deps.registerFusionBlend(fusionAccount, account),
+                onBlend: (account) => this.run.recordFusionBlend(this.deps.buildFusionBlend(fusionAccount, account), this.deps.getTracker()),
             }
         )
-        await this.deps.applyAttributeProcessing(fusionAccount)
+        await this.applyAttributeProcessing(fusionAccount)
 
         if (isAuthorizedDecision) {
             await this.deps.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, fusionDecision)
             fusionAccount.updateCorrelationStatus()
-            this.deps.setFusionAccount(fusionAccount)
+            this.setFusionAccount(fusionAccount)
         }
 
         if (fusionDecision.newIdentity) {
@@ -204,7 +233,7 @@ export class DecisionProcessor {
             const managedAccount = decisionManagedKey
                 ? this.run.managedAccountsById.get(decisionManagedKey)
                 : undefined
-            if (await this.deps.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccount)) {
+            if (await this.deps.outcomeHandler.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccount)) {
                 if (sourceType === SourceType.Record) {
                     this.log.debug(
                         `Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`
@@ -214,7 +243,7 @@ export class DecisionProcessor {
                 }
                 return undefined
             }
-            this.deps.setFusionAccount(fusionAccount)
+            this.setFusionAccount(fusionAccount)
             this.log.debug(
                 `Registered decision account as fusion account: ${fusionDecision.account.name} ` +
                     `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`
@@ -271,7 +300,7 @@ export class DecisionProcessor {
         try {
             const cached = this.deps.identities.getIdentityById(identityId)
             if (cached) return cached
-            return this.deps.isAggregationAccountListMode() ? this.deps.identities.fetchIdentityById(identityId) : undefined
+            return this.isAggregationAccountListMode() ? this.deps.identities.fetchIdentityById(identityId) : undefined
         } catch {
             return undefined
         }

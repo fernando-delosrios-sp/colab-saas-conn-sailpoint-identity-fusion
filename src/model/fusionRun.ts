@@ -353,6 +353,11 @@ export class FusionRun implements WorkQueue {
         this._pendingCandidateIdentityIds.add(candidateId)
     }
 
+    recordFusionBlend(blend: FusionReportBlend, tracker?: AggregationTracker): void {
+        if (!tracker) return
+        tracker.fusionBlends.push(blend)
+    }
+
     getReviewerUrls(reviewerId: string): string[] | undefined {
         return this._pendingReviewUrlsByReviewerId.get(reviewerId)
     }

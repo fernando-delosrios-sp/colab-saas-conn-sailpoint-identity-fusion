@@ -1,4 +1,5 @@
 import { AccountV2025 as Account } from 'sailpoint-api-client'
+import { StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
 import { FusionConfig, SourceType } from '../../model/config'
@@ -15,6 +16,9 @@ import { assert } from '../../utils/assert'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { createAutomaticAssignmentDecision, formatFusionMatchDiscoveryLog } from '../fusionService/helpers'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
+import type { AggregationTracker } from '../fusionService/aggregationTracker'
+import { OperationContext } from '../fusionService/types'
+import type { FusionReportBlend } from '../fusionService/types'
 
 export interface ManagedAccountOutcomeHandlerDeps {
     readonly config: FusionConfig
@@ -27,25 +31,32 @@ export interface ManagedAccountOutcomeHandlerDeps {
     readonly candidateRegistry: CandidateRegistry
     readonly reviewersBySourceId: Map<string, Set<FusionAccount>>
     readonly sourcesWithoutReviewers: Set<string>
-    preProcessManagedAccount(account: Account): Promise<FusionAccount>
-    processFusionIdentityDecision(decision: FusionDecision): Promise<FusionAccount | undefined>
-    removeMatchAccount(managedAccountId: string | undefined): void
-    queueDisableOperation(account: Account): void
-    isAggregationAccountListMode(): boolean
-    shouldPruneDeletedManagedAccounts(): boolean
-    registerFusionBlend(fa: FusionAccount, account: Account): void
-    applyAttributeProcessing(fa: FusionAccount): Promise<void>
-    setFusionAccount(fa: FusionAccount): void
-    addMatchScoringTimeMs(ms: number): void
-    isDeferredMatchingEnabledForSource(sourceName: string | undefined): boolean
+    readonly getTracker: () => AggregationTracker | undefined
+    readonly preProcessManagedAccount: (account: Account) => Promise<FusionAccount>
+    readonly processFusionIdentityDecision: (decision: FusionDecision) => Promise<FusionAccount | undefined>
+    readonly removeMatchAccount: (managedAccountId: string | undefined) => void
+    readonly queueDisableOperation: (account: Account) => void
+    readonly isDeferredMatchingEnabledForSource: (sourceName: string | undefined) => boolean
+    readonly buildFusionBlend: (fa: FusionAccount, account: Account) => FusionReportBlend
 }
 
 export class ManagedAccountOutcomeHandler {
-    constructor(private readonly deps: ManagedAccountOutcomeHandlerDeps) {}
+    constructor(
+        private readonly deps: ManagedAccountOutcomeHandlerDeps,
+        private readonly commandType?: StandardCommand,
+        private readonly operationContext?: OperationContext
+    ) {}
 
     get run(): FusionRun { return this.deps.run }
     get log(): LogService { return this.deps.log }
     get config(): FusionConfig { return this.deps.config }
+
+    private isAggregationAccountListMode(): boolean {
+        return (
+            this.commandType === StandardCommand.StdAccountList ||
+            this.operationContext === OperationContext.AccountList
+        )
+    }
 
     public async handleNonAuthoritativeNoMatch(
         fusionAccount: FusionAccount,
@@ -101,7 +112,7 @@ export class ManagedAccountOutcomeHandler {
         account: Account,
         sourceInfo: SourceInfo | undefined
     ): Promise<FusionAccount | undefined> {
-        if (!this.deps.isAggregationAccountListMode()) {
+        if (!this.isAggregationAccountListMode()) {
             fusionAccount.clearFusionIdentityReferences()
             return Promise.resolve(undefined)
         }
@@ -170,7 +181,7 @@ export class ManagedAccountOutcomeHandler {
     public async finalizeAuthoritativeNonMatch(fusionAccount: FusionAccount): Promise<FusionAccount> {
         fusionAccount.setNonMatched()
         await this.deps.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount)
-        this.deps.setFusionAccount(fusionAccount)
+        this.run.registerFusionAccount(fusionAccount, this.deps.getTracker())
         if (this.deps.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
             this.deps.candidateRegistry.register(fusionAccount)
         }
