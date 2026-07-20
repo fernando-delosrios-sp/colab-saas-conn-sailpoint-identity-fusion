@@ -10,7 +10,6 @@ export interface RunStateSnapshot {
     managedAccounts: Record<string, any>[]
     fusionAccounts: Record<string, any>[]
     identities: Record<string, any>[]
-    formDecisions: Record<string, any>[]
     fusionIdentityDecisions: Record<string, any>[]
     pendingCandidateIdentityIds: string[]
     pendingReviewUrlsByReviewerId: Record<string, string[]>
@@ -47,7 +46,6 @@ export class FusionRun implements WorkQueue {
     readonly autoAssignedIdentityIds = new Set<string>()
     readonly currentRunNonMatchedKeysBySource = new Map<string, Set<string>>()
     linkedAccountKeyIndex: Set<string> | undefined
-    formDecisions: FusionDecision[] = []
     fusionIdentityDecisions: FusionDecision[] = []
     pendingCandidateIdentityIds: Set<string> = new Set()
     pendingReviewUrlsByReviewerId: Map<string, string[]> = new Map()
@@ -121,7 +119,6 @@ export class FusionRun implements WorkQueue {
             managedAccounts: Array.from(this.managedAccountsById.values()),
             fusionAccounts: Array.from(this.fusionAccountMap.values()),
             identities: Array.from(this.identityMap.values()),
-            formDecisions: this.formDecisions,
             fusionIdentityDecisions: this.fusionIdentityDecisions.map((d) => ({ ...d })),
             pendingCandidateIdentityIds: Array.from(this.pendingCandidateIdentityIds),
             pendingReviewUrlsByReviewerId: Object.fromEntries(this.pendingReviewUrlsByReviewerId),
@@ -150,7 +147,6 @@ export class FusionRun implements WorkQueue {
         for (const identity of snapshot.identities) {
             this.identityMap.set((identity as any).id, identity as IdentityDocument)
         }
-        this.formDecisions = snapshot.formDecisions as FusionDecision[]
         this.fusionIdentityDecisions = snapshot.fusionIdentityDecisions as FusionDecision[]
         this.pendingCandidateIdentityIds = new Set(snapshot.pendingCandidateIdentityIds)
         this.pendingReviewUrlsByReviewerId = new Map(Object.entries(snapshot.pendingReviewUrlsByReviewerId))

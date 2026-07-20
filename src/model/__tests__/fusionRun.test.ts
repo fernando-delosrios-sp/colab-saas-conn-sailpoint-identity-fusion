@@ -18,7 +18,7 @@ describe('FusionRun', () => {
         expect(run.sourcesByName.size).toBe(0)
         expect(run.autoAssignedIdentityIds).toBeInstanceOf(Set)
         expect(run.autoAssignedIdentityIds.size).toBe(0)
-        expect(run.formDecisions).toEqual([])
+        expect(run.fusionIdentityDecisions.length).toBe(0)
         expect(run.fusionBlends).toEqual([])
         expect(run.matchScoringMs).toBe(0)
     })
@@ -79,7 +79,6 @@ describe('FusionRun', () => {
             managedAccounts: [{ name: 'a1' }],
             fusionAccounts: [{ name: 'fa1' }],
             identities: [{ id: 'id1', name: 'Identity One' }],
-            formDecisions: [],
             fusionIdentityDecisions: [],
             pendingCandidateIdentityIds: [],
             pendingReviewUrlsByReviewerId: {},

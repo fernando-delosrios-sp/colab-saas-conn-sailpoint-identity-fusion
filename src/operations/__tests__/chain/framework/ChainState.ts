@@ -221,8 +221,8 @@ export class ChainState {
                 }
             }
         }
-        if ('formDecisions' in delta) {
-            const forms = delta.formDecisions as Array<Record<string, unknown>>
+        if ('fusionIdentityDecisions' in delta) {
+            const forms = delta.fusionIdentityDecisions as Array<Record<string, unknown>>
             if (Array.isArray(forms)) {
                 for (const form of forms) {
                     const existingIndex = this.state.forms.findIndex((f) => f.id === form.id)
