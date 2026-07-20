@@ -43,9 +43,9 @@ import { FusionAccountRepository } from './fusionAccountRepository'
 import { IdentityProcessor } from './identityProcessor'
 import { CorrelationManager } from './correlationManager'
 import { DecisionProcessor } from './decisionProcessor'
-import { ManagedAccountAnalyzer } from './managedAccountAnalyzer'
-import { CandidateRegistry } from './candidateRegistry'
-import { ManagedAccountMatchingRunner } from './managedAccountMatchingRunner'
+import { ManagedAccountAnalyzer } from '../matchingService/managedAccountAnalyzer'
+import { CandidateRegistry } from '../matchingService/candidateRegistry'
+import { ManagedAccountMatchingRunner } from '../matchingService/managedAccountMatchingRunner'
 import { FusionRun } from '../../model/fusionRun'
 
 // ============================================================================

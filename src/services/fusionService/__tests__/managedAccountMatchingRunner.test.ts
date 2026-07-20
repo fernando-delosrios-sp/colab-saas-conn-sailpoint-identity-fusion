@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { ManagedAccountMatchingRunner, ManagedAccountMatchingRunnerState } from '../managedAccountMatchingRunner'
-import { CandidateRegistry } from '../candidateRegistry'
+import { ManagedAccountMatchingRunner, ManagedAccountMatchingRunnerState } from '../../matchingService/managedAccountMatchingRunner'
+import { CandidateRegistry } from '../../matchingService/candidateRegistry'
 import { SourceType } from '../../../model/config'
 
 function makeRunner(overrides: Partial<ManagedAccountMatchingRunnerState> = {}): {

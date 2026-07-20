@@ -3,7 +3,7 @@ import { FusionConfig, SourceType } from '../../model/config'
 import { LogService } from '../logService'
 import { SourceInfo, SourceService } from '../sourceService'
 import { UrlContext } from '../../utils/url'
-import { ManagedAccountAnalyzer, ManagedAccountAnalysisContext } from './managedAccountAnalyzer'
+import { ManagedAccountAnalyzer, ManagedAccountAnalysisContext } from '../matchingService/managedAccountAnalyzer'
 import { AggregationTracker } from './aggregationTracker'
 import {
     buildMinimalFusionReportAccount,
