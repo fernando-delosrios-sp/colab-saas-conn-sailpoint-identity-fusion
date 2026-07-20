@@ -23,9 +23,9 @@ describe('accountEnable', () => {
 
         await accountEnable(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)
 
-        expect(registry.define.initializeCounters).toHaveBeenCalledTimes(1)
+        expect(registry.definition.initializeCounters).toHaveBeenCalledTimes(1)
         expect(registry.sources.fetchFusionAccounts).toHaveBeenCalledTimes(1)
-        expect(registry.define.registerUniqueValuesFromManagedSourceAccounts).toHaveBeenCalledWith(
+        expect(registry.definition.registerUniqueValuesFromManagedSourceAccounts).toHaveBeenCalledWith(
             registry.sources.fusionAccounts
         )
         expect(registry.fusion.preProcessFusionAccounts).toHaveBeenCalledTimes(1)
@@ -39,7 +39,7 @@ describe('accountEnable', () => {
                 log: expect.any(Object),
             })
         )
-        expect(registry.define.refreshUniqueAttributes).toHaveBeenCalledWith(fusionAccount)
+        expect(registry.definition.refreshUniqueAttributes).toHaveBeenCalledWith(fusionAccount)
         expect(fusionAccount.enable).toHaveBeenCalledTimes(1)
         expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-enabled' })

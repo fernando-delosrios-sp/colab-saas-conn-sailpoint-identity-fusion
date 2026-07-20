@@ -3,7 +3,7 @@ import { MatchingConfig, effectiveSkipMatchIfMissing } from '../../model/config'
 import { ScoreReport } from './types'
 import { jaroWinkler, diceCoefficient } from './stringComparison'
 import { match as nameMatch, matchNormalized as nameMatchNormalized } from './nameMatching'
-import { evaluateVelocityTemplate } from '../defineService/formatting'
+import { evaluateVelocityTemplate } from '../definitionService/formatting'
 type RenderContext = Record<string, any>
 import { missing, trimStr } from '../../utils/safeRead'
 

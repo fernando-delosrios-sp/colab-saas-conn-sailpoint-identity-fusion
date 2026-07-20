@@ -4,7 +4,7 @@ import type { FusionConfig } from '../../model/config'
 import type { LogService } from '../logService'
 import type { ManagedAccountAnalyzer, ManagedAccountAnalysisContext } from './managedAccountAnalyzer'
 import type { CandidateRegistry } from './candidateRegistry'
-import { yieldToEventLoop } from './batching'
+import { yieldToEventLoop } from './collections'
 import { hasDeferredCandidateMatches as checkHasDeferredCandidateMatches } from './helpers'
 
 export interface ManagedAccountMatchingRunnerState {

@@ -28,7 +28,7 @@ function getManagedAccountSnapshotKey(account: Record<string, any> | undefined):
     return trimStr(key ?? '') ?? ''
 }
 
-export class MapService {
+export class MappingService {
     private cachedAttributeMappingConfig?: Map<string, AttributeMappingConfig>
     private readonly attributeMaps?: AttributeMap[]
     private readonly attributeMerge: DefaultAttributeMergeMode

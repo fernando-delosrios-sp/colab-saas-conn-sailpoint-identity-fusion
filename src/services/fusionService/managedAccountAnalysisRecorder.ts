@@ -11,8 +11,8 @@ import {
     fusionReportMatchCandidateAccountFields,
     mapScoreReportsForFusionReport,
 } from './helpers'
-import { isExactAttributeMatchScores } from '../matchService/exactMatch'
-import { MatchCandidateType } from '../matchService/types'
+import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
+import { MatchCandidateType } from '../matchingService/types'
 import { resolveReportAccountId, resolveReportAccountIdValue } from './reportAccountResolver'
 
 export interface ManagedAccountAnalysisRecorderDeps {

@@ -179,19 +179,19 @@ Each rule module (`constructionRules`, `layerRules`, `statusRules`, `actionRules
 - **WHEN** `fusionAccount.email` is accessed after `state.email` is set to `"test@example.com"`
 - **THEN** the getter returns `"test@example.com"`
 
-### Requirement: FusionService delegates matching to MatchService
+### Requirement: FusionService delegates matching to MatchingService
 
-FusionService SHALL delegate all managed account matching to MatchService. FusionService SHALL NOT directly call scoring methods, manage candidate registries, or orchestrate matching sweeps.
+FusionService SHALL delegate all managed account matching to MatchingService. FusionService SHALL NOT directly call scoring methods, manage candidate registries, or orchestrate matching sweeps.
 
-#### Scenario: Uncorrelated managed accounts delegated to MatchService
+#### Scenario: Uncorrelated managed accounts delegated to MatchingService
 - **WHEN** processUncorrelatedManagedAccounts is called
-- **THEN** MatchService.processUncorrelatedManagedAccounts SHALL be invoked with FusionRun
+- **THEN** MatchingService.processUncorrelatedManagedAccounts SHALL be invoked with FusionRun
 - **AND** FusionService SHALL NOT call ManagedAccountMatchingRunner directly
 
 #### Scenario: Process phase delegates matching
 - **WHEN** the process phase runs in the pipeline
-- **THEN** MatchService SHALL handle all match sweep orchestration
-- **AND** FusionService SHALL only call MatchService entry points
+- **THEN** MatchingService SHALL handle all match sweep orchestration
+- **AND** FusionService SHALL only call MatchingService entry points
 
 ### Requirement: FusionService receives state via FusionRun
 
@@ -208,5 +208,5 @@ FusionService SHALL retain responsibility for pipeline phase coordination (setup
 #### Scenario: Pipeline phases still orchestrated by FusionService
 - **WHEN** the aggregation pipeline runs
 - **THEN** phase transitions SHALL be coordinated by FusionService
-- **AND** MapService, DefineService, and MatchService SHALL be invoked at the appropriate phase boundaries
+- **AND** MappingService, DefinitionService, and MatchingService SHALL be invoked at the appropriate phase boundaries
 

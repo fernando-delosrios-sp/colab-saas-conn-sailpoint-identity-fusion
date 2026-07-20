@@ -81,9 +81,8 @@ export class SourceService {
      * deleted during processing, but this ensures any remaining references are cleared.
      */
     public clearManagedAccounts(): void {
-        this.run.managedAccountsById.clear()
+        this.run.clearWorkQueue()
         this.managedAccountsAllById.clear()
-        this.managedAccountsByIdentityId.clear()
         this.log.debug('Managed accounts cache cleared from memory')
     }
 
@@ -707,16 +706,8 @@ export class SourceService {
                             if (!accountKey) {
                                 continue
                             }
-                            this.run.managedAccountsById.set(accountKey, account)
+                            this.run.setManagedAccount(accountKey, account)
                             this.managedAccountsAllById.set(accountKey, account)
-                            if (account.identityId) {
-                                let idSet = this.managedAccountsByIdentityId.get(account.identityId)
-                                if (!idSet) {
-                                    idSet = new Set()
-                                    this.managedAccountsByIdentityId.set(account.identityId, idSet)
-                                }
-                                idSet.add(accountKey)
-                            }
                             collectedCount++
                         }
                         if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) {
@@ -796,16 +787,8 @@ export class SourceService {
             )
             return
         }
-        this.run.managedAccountsById.set(accountKey, managedAccount)
+        this.run.setManagedAccount(accountKey, managedAccount)
         this.managedAccountsAllById.set(accountKey, managedAccount)
-        if (managedAccount.identityId) {
-            let idSet = this.managedAccountsByIdentityId.get(managedAccount.identityId)
-            if (!idSet) {
-                idSet = new Set()
-                this.managedAccountsByIdentityId.set(managedAccount.identityId, idSet)
-            }
-            idSet.add(accountKey)
-        }
     }
 
     /**

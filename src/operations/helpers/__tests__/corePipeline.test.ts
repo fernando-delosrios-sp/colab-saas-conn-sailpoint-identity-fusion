@@ -234,7 +234,7 @@ describe('corePipeline setupPhase', () => {
         registry.schemas.loadFusionAccountSchemaFromSource = vi.fn().mockResolvedValue(undefined)
         registry.sources.aggregateManagedSources = vi.fn().mockResolvedValue(undefined)
         registry.sources.clearReverseCorrelationReadinessCache = vi.fn()
-        registry.define.initializeCounters = vi.fn().mockResolvedValue(undefined)
+        registry.definition.initializeCounters = vi.fn().mockResolvedValue(undefined)
 
         const result = await setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })
 
@@ -252,7 +252,7 @@ describe('corePipeline setupPhase', () => {
         registry.config = { forceAttributeRefresh: false, sources: [] }
         registry.schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
         registry.schemas.loadFusionAccountSchemaFromSource = vi.fn().mockResolvedValue(undefined)
-        registry.define.initializeCounters = vi.fn().mockResolvedValue(undefined)
+        registry.definition.initializeCounters = vi.fn().mockResolvedValue(undefined)
 
         const dummySchema = { attributes: [] }
         const result = await setupPhase(registry as any, dummySchema, { mode: { kind: 'dry-run' } })
@@ -279,7 +279,7 @@ describe('corePipeline setupPhase', () => {
         registry.schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
         registry.sources.setupReverseCorrelationSources = vi.fn().mockResolvedValue(1)
         registry.sources.aggregateManagedSources = vi.fn().mockResolvedValue(undefined)
-        registry.define.initializeCounters = vi.fn().mockResolvedValue(undefined)
+        registry.definition.initializeCounters = vi.fn().mockResolvedValue(undefined)
 
         const result = await setupPhase(registry as any, undefined, { mode: { kind: 'aggregation' } })
 

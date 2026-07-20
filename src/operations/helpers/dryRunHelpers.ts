@@ -6,7 +6,7 @@ import { StdAccountListInput, StdAccountListOutput } from '@sailpoint/connector-
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { AggregationStats, FusionReport, FusionReportAccount, FusionReportStats } from '../../services/fusionService/types'
 import { AggregationTracker } from '../../services/fusionService/aggregationTracker'
-import { isExactAttributeMatchScores } from '../../services/matchService/exactMatch'
+import { isExactAttributeMatchScores } from '../../services/matchingService/exactMatch'
 import { FusionAccount } from '../../model/account'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 import { FusionAttribute } from '../../data/schema'
@@ -82,7 +82,7 @@ export type DryRunHelpersContext = {
         refreshUniqueAttributes: () => Promise<number>
     }
     schemas: { fusionIdentityAttribute?: string }
-    define: { refreshUniqueAttributes: (account: FusionAccount) => Promise<void> }
+    definition: { refreshUniqueAttributes: (account: FusionAccount) => Promise<void> }
 }
 
 const buildDryRunRuntimeOptions = (input: StdAccountListInput): DryRunRuntimeOptions => {
@@ -328,7 +328,7 @@ export const streamDryRunRows = async (
 }
 
 export const prepareDryRunOutputData = async (
-    context: Pick<DryRunHelpersContext, 'define' | 'config' | 'fusion' | 'log'>,
+    context: Pick<DryRunHelpersContext, 'definition' | 'config' | 'fusion' | 'log'>,
     runtimeOptions: DryRunRuntimeOptions
 ): Promise<PreparedDryRunOutputData> => {
     // Do not run a second managed-account analysis sweep during dry-run output prep.
@@ -698,11 +698,11 @@ const getEmissionKey = (account: any): string => {
 }
 
 const refreshUniqueAttributesForDryRun = async (
-    context: Pick<DryRunHelpersContext, 'define' | 'config' | 'fusion' | 'log'>,
+    context: Pick<DryRunHelpersContext, 'definition' | 'config' | 'fusion' | 'log'>,
     analyzedUncorrelatedAccounts: FusionAccount[],
     runtimeOptions: DryRunRuntimeOptions
 ): Promise<void> => {
-    const { fusion, define, log } = context
+    const { fusion, definition, log } = context
 
     // Refresh unique attributes only for the account types we may emit.
     // Otherwise, incremental counter-based IDs can be consumed by rows that are never sent
@@ -718,7 +718,7 @@ const refreshUniqueAttributesForDryRun = async (
         const refreshTargets = shouldIncludeIdentities ? [...fusionAccounts, ...fusionIdentities] : [...fusionAccounts]
         for (let i = 0; i < refreshTargets.length; i += batchSize) {
             const batch = refreshTargets.slice(i, i + batchSize)
-            await Promise.all(batch.map((account) => define.refreshUniqueAttributes(account)))
+            await Promise.all(batch.map((account) => definition.refreshUniqueAttributes(account)))
         }
     } else {
         await fusion.refreshUniqueAttributes()
@@ -747,7 +747,7 @@ const refreshUniqueAttributesForDryRun = async (
     })
     for (let i = 0; i < stableAnalyzed.length; i += batchSize) {
         const batch = stableAnalyzed.slice(i, i + batchSize)
-        await Promise.all(batch.map((account) => define.refreshUniqueAttributes(account)))
+        await Promise.all(batch.map((account) => definition.refreshUniqueAttributes(account)))
     }
 
     log.info(`Unique attributes refreshed for ${analyzedUncorrelatedAccounts.length} analyzed uncorrelated account(s)`)

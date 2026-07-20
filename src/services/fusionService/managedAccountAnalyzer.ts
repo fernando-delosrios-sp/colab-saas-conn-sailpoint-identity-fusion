@@ -3,10 +3,10 @@ import { SourceType } from '../../model/config'
 import { SourceInfo } from '../sourceService'
 import { coerceBoolean } from '../../utils/safeRead'
 import { FusionAccount } from '../../model/account'
-import { MatchCandidateType } from '../matchService/types'
+import { MatchCandidateType } from '../matchingService/types'
 import { hasIdentityCandidateMatches as checkHasIdentityCandidateMatches } from './helpers'
 import type { FusionConfig } from '../../model/config'
-import type { MatchService } from '../matchService'
+import type { MatchingService } from '../matchingService'
 import type { LogService } from '../logService'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 
@@ -21,7 +21,7 @@ export type ManagedAccountAnalysisContext = {
 
 export interface ManagedAccountAnalyzerState {
     readonly config: FusionConfig
-    readonly matchService: MatchService
+    readonly matchingService: MatchingService
     readonly log: LogService
     readonly autoAssignedIdentityIds: ReadonlySet<string>
     readonly sourcesByName: Map<string, SourceInfo>
@@ -50,12 +50,12 @@ export class ManagedAccountAnalyzer {
                     ? this.state.autoAssignedIdentityIds
                     : undefined
             
-            const candidateSet = this.state.matchService.getCandidates(fusionAccount, excludeIds)
+            const candidateSet = this.state.matchingService.getCandidates(fusionAccount, excludeIds)
             const identityPool: Iterable<FusionAccount> =
                 candidateSet ?? (excludeIds ? this.state.fusionIdentitiesExcluding(excludeIds) : this.state.fusionIdentities)
             
             const identityScoringStarted = Date.now()
-            fusionIdentityComparisons = await this.state.matchService.scoreFusionAccount(
+            fusionIdentityComparisons = await this.state.matchingService.scoreFusionAccount(
                 fusionAccount,
                 identityPool,
                 MatchCandidateType.Identity,
@@ -89,7 +89,7 @@ export class ManagedAccountAnalyzer {
         }
         
         const deferredScoringStarted = Date.now()
-        analysis.fusionIdentityComparisons += await this.state.matchService.scoreFusionAccount(
+        analysis.fusionIdentityComparisons += await this.state.matchingService.scoreFusionAccount(
             analysis.fusionAccount,
             this.state.currentRunDeferredCandidatesForSource(analysis.account.sourceName),
             MatchCandidateType.Deferred
