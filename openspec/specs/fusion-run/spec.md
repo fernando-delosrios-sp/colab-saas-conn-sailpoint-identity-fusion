@@ -58,7 +58,7 @@ FusionRun SHALL expose a `snapshot()` method that returns a complete serializabl
 
 #### Scenario: Snapshot captures complete state
 - **WHEN** run.snapshot() is called during a run
-- **THEN** the returned snapshot SHALL contain: managedAccounts, fusionAccounts, identities, formDecisions, autoAssignedIds, matchScoringMs, phaseTimings
+- **THEN** the returned snapshot SHALL contain: managedAccounts, fusionAccounts, identities, formDecisions, fusionIdentityDecisions, pendingCandidateIdentityIds, pendingReviewUrlsByReviewerId, pendingReviewUrlsByCandidateId, sourcesByName, currentRunNonMatchedKeysBySource, fusionBlends, autoAssignedIds, matchScoringMs, phaseTimings
 - **AND** the snapshot SHALL be JSON-serializable
 
 #### Scenario: Restore reconstructs identical state

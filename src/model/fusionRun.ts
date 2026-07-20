@@ -11,6 +11,13 @@ export interface RunStateSnapshot {
     fusionAccounts: Record<string, any>[]
     identities: Record<string, any>[]
     formDecisions: Record<string, any>[]
+    fusionIdentityDecisions: Record<string, any>[]
+    pendingCandidateIdentityIds: string[]
+    pendingReviewUrlsByReviewerId: Record<string, string[]>
+    pendingReviewUrlsByCandidateId: Record<string, string[]>
+    sourcesByName: Record<string, any>
+    currentRunNonMatchedKeysBySource: Record<string, string[]>
+    fusionBlends: Record<string, any>[]
     autoAssignedIds: string[]
     matchScoringMs: number
     phaseTimings: { phase: string; elapsed: string }[]
@@ -115,6 +122,15 @@ export class FusionRun implements WorkQueue {
             fusionAccounts: Array.from(this.fusionAccountMap.values()),
             identities: Array.from(this.identityMap.values()),
             formDecisions: this.formDecisions,
+            fusionIdentityDecisions: this.fusionIdentityDecisions.map((d) => ({ ...d })),
+            pendingCandidateIdentityIds: Array.from(this.pendingCandidateIdentityIds),
+            pendingReviewUrlsByReviewerId: Object.fromEntries(this.pendingReviewUrlsByReviewerId),
+            pendingReviewUrlsByCandidateId: Object.fromEntries(this.pendingReviewUrlsByCandidateId),
+            sourcesByName: Object.fromEntries(this.sourcesByName),
+            currentRunNonMatchedKeysBySource: Object.fromEntries(
+                Array.from(this.currentRunNonMatchedKeysBySource).map(([k, v]) => [k, Array.from(v)])
+            ),
+            fusionBlends: this.fusionBlends,
             autoAssignedIds: Array.from(this.autoAssignedIdentityIds),
             matchScoringMs: this.matchScoringMs,
             phaseTimings: this.phaseTimings,
@@ -135,6 +151,19 @@ export class FusionRun implements WorkQueue {
             this.identityMap.set((identity as any).id, identity as IdentityDocument)
         }
         this.formDecisions = snapshot.formDecisions as FusionDecision[]
+        this.fusionIdentityDecisions = snapshot.fusionIdentityDecisions as FusionDecision[]
+        this.pendingCandidateIdentityIds = new Set(snapshot.pendingCandidateIdentityIds)
+        this.pendingReviewUrlsByReviewerId = new Map(Object.entries(snapshot.pendingReviewUrlsByReviewerId))
+        this.pendingReviewUrlsByCandidateId = new Map(Object.entries(snapshot.pendingReviewUrlsByCandidateId))
+        this.sourcesByName.clear()
+        for (const [k, v] of Object.entries(snapshot.sourcesByName)) {
+            this.sourcesByName.set(k, v as SourceInfo)
+        }
+        this.currentRunNonMatchedKeysBySource.clear()
+        for (const [k, v] of Object.entries(snapshot.currentRunNonMatchedKeysBySource)) {
+            this.currentRunNonMatchedKeysBySource.set(k, new Set(v))
+        }
+        this.fusionBlends = snapshot.fusionBlends as FusionReportBlend[]
         this.autoAssignedIdentityIds.clear()
         for (const id of snapshot.autoAssignedIds) {
             this.autoAssignedIdentityIds.add(id)

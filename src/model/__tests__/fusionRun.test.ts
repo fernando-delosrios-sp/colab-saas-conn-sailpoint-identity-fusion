@@ -62,12 +62,31 @@ describe('FusionRun', () => {
         expect(snap.autoAssignedIds).toEqual(expect.arrayContaining(['id-a', 'id-b']))
     })
 
+    it('snapshot captures form processing state', () => {
+        const run = new FusionRun()
+        run.fusionIdentityDecisions = [{ account: { id: 'a1', name: 'test', sourceName: 's1' } } as any]
+        run.pendingCandidateIdentityIds = new Set(['candidate-1'])
+        run.pendingReviewUrlsByReviewerId = new Map([['r1', ['url1']]])
+
+        const snap = run.snapshot()
+        expect(snap.fusionIdentityDecisions.length).toBe(1)
+        expect(snap.pendingCandidateIdentityIds).toEqual(['candidate-1'])
+        expect(snap.pendingReviewUrlsByReviewerId).toEqual({ r1: ['url1'] })
+    })
+
     it('restore reconstructs state from snapshot', () => {
         const snapshot: RunStateSnapshot = {
             managedAccounts: [{ name: 'a1' }],
             fusionAccounts: [{ name: 'fa1' }],
             identities: [{ id: 'id1', name: 'Identity One' }],
             formDecisions: [],
+            fusionIdentityDecisions: [],
+            pendingCandidateIdentityIds: [],
+            pendingReviewUrlsByReviewerId: {},
+            pendingReviewUrlsByCandidateId: {},
+            sourcesByName: {},
+            currentRunNonMatchedKeysBySource: {},
+            fusionBlends: [],
             autoAssignedIds: ['id-a'],
             matchScoringMs: 2500,
             phaseTimings: [{ phase: 'Setup', elapsed: '1.2s' }],
