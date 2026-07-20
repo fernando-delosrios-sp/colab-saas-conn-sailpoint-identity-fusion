@@ -1,22 +1,6 @@
-import { mapValuesToArray, compact, yieldToEventLoop, promiseAllBatched, forEachBatched } from '../collections'
+import { compact, yieldToEventLoop, promiseAllBatched, forEachBatched } from '../collections'
 
 describe('collections utilities', () => {
-    describe('mapValuesToArray', () => {
-        it('should return an empty array for an empty map', () => {
-            const map = new Map<string, number>()
-            expect(mapValuesToArray(map)).toEqual([])
-        })
-
-        it('should return an array of values for a populated map', () => {
-            const map = new Map<string, number>([
-                ['a', 1],
-                ['b', 2],
-                ['c', 3],
-            ])
-            expect(mapValuesToArray(map)).toEqual([1, 2, 3])
-        })
-    })
-
     describe('compact', () => {
         it('should filter out null and undefined values', () => {
             const array = [1, null, 2, undefined, 3, null]

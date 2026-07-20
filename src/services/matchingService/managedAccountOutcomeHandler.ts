@@ -6,7 +6,7 @@ import { FusionConfig, SourceType } from '../../model/config'
 import { LogService } from '../logService'
 import { FormService } from '../formService'
 import { DefinitionService } from '../definitionService'
-import { MatchingService } from './matchingService'
+import { MatchingService, COMBINED_SCORE_ROW_ATTRIBUTE } from './matchingService'
 import { CorrelationManager } from '../fusionService/correlationManager'
 import { CandidateRegistry } from './candidateRegistry'
 import { FusionRun } from '../../model/fusionRun'
@@ -101,7 +101,7 @@ export class ManagedAccountOutcomeHandler {
         this.log.debug(
             `Account ${account.name} [${fusionAccount.sourceName}] meets the automatic assignment threshold, auto-assigning to identity ${identityId}`
         )
-            this.run.markAutoAssigned(identityId)
+        this.run.markAutoAssigned(identityId)
         const syntheticDecision = createAutomaticAssignmentDecision(fusionAccount, account, identityId)
         this.deps.forms.registerFinishedDecision(syntheticDecision)
         return this.deps.processFusionIdentityDecision(syntheticDecision)
@@ -193,7 +193,7 @@ export class ManagedAccountOutcomeHandler {
         let bestMatch: FusionMatch | undefined
         let highestScore = -1
         for (const m of matches) {
-            const combinedReport = m.scores.find((s) => (s as any).attribute === 'Combined score')
+            const combinedReport = m.scores.find((s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE)
             const score = combinedReport?.score ?? 0
             if (score >= this.config.fusionAutoAssignmentScore && score > highestScore) {
                 highestScore = score

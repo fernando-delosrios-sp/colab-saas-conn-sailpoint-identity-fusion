@@ -9,7 +9,6 @@ import { LogService } from '../services/logService'
 import { hasValue, readString, trimStr } from '../utils/safeRead'
 import { assert } from '../utils/assert'
 import { buildManagedAccountKey } from './managedAccountKey'
-import { mapValuesToArray } from '../services/fusionService/collections'
 
 export interface RunStateSnapshot {
     managedAccounts: Record<string, any>[]
@@ -27,11 +26,6 @@ export interface RunStateSnapshot {
     phaseTimings: { phase: string; elapsed: string }[]
 }
 
-export interface ManagedAccountEntry {
-    readonly accountKey: string
-    readonly account: Account
-    readonly identityId?: string
-}
 
 export interface WorkQueue {
     get(key: string): Account | undefined
@@ -42,6 +36,7 @@ export interface WorkQueue {
 }
 
 export class FusionRun implements WorkQueue {
+    public readonly isRecordMode: boolean
     readonly managedAccountsById = new Map<string, Account>()
     readonly managedAccountsByIdentityId = new Map<string, Set<string>>()
     private readonly _fusionAccountMap = new Map<string, FusionAccount>()
@@ -135,7 +130,9 @@ export class FusionRun implements WorkQueue {
         return this._identityMap
     }
 
-    constructor(public log?: LogService) {}
+    constructor(public log?: LogService) {
+        this.isRecordMode = process.env.RECORD_MODE === 'true'
+    }
 
     setManagedAccount(accountKey: string, account: Account): void {
         this.managedAccountsById.set(accountKey, account)
@@ -240,7 +237,7 @@ export class FusionRun implements WorkQueue {
     }
 
     get allFusionAccounts(): FusionAccount[] {
-        return mapValuesToArray(this._fusionAccountMap)
+        return Array.from(this._fusionAccountMap.values())
     }
 
     get allFusionIdentities(): Iterable<FusionAccount> {

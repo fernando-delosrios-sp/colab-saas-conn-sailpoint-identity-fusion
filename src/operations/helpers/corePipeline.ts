@@ -210,7 +210,7 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
     const decisions = await fusion.processFusionIdentityDecisions()
     decisionsOp.done({ count: decisions.length })
 
-    if (process.env.RECORD_MODE !== 'true') {
+    if (!sources.run.isRecordMode) {
         identities.clear()
         log.info('Identities cache cleared from memory')
     } else {
@@ -326,14 +326,14 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     const { log, fusion, forms, sources, definition, messaging, res } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
 
-    if (process.env.RECORD_MODE !== 'true') {
+    if (!sources.run.isRecordMode) {
         sources.clearManagedAccounts()
     } else {
         log.info('Managed accounts cache retained for recording')
     }
 
     if (!isPersistent) {
-        if (process.env.RECORD_MODE !== 'true') {
+        if (!sources.run.isRecordMode) {
             sources.clearFusionAccounts()
         } else {
             log.info('Fusion accounts cache retained for recording')
@@ -444,7 +444,7 @@ export class PipelineRunner {
 
             // Fusion accounts are released after the report is built so the report's
             // `fusionAccountsFound` metric can still read `sources.fusionAccountCount`.
-            if (process.env.RECORD_MODE !== 'true') {
+            if (!sources.run.isRecordMode) {
                 sources.clearFusionAccounts()
             } else {
                 log.info('Fusion accounts cache retained for recording')
