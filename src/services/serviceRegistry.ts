@@ -143,7 +143,7 @@ export class ServiceRegistry {
 
         this.proxy = context.proxyService ?? new ProxyService(this.config, this.log, this.res, commandType)
 
-        if (process.env.RECORD_MODE === 'true') {
+        if (this.run.isRecordMode) {
             const recordingService = (context as any).recordingService as RecordingService | undefined
             this.recording = recordingService ?? RecordingService.init(this.log, this.config)
             this.log.info(`RecordingService enabled — chain: ${this.recording.getName()}`)

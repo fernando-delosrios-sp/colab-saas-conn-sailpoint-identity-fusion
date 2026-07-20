@@ -6,16 +6,6 @@ import type { FusionConfig } from '../../model/config'
 import { runtimeDefaults } from '../../data/config'
 import type { LogService } from '../logService'
 
-// ============================================================================
-// Map Operations
-// ============================================================================
-
-/**
- * Converts a Map to an Array of its values
- */
-export function mapValuesToArray<K, V>(map: Map<K, V>): V[] {
-    return Array.from(map.values())
-}
 
 // ============================================================================
 // Type Guards
@@ -81,7 +71,7 @@ export async function promiseAllBatched<T, R>(
  * @param opts.maxLogBuckets - Maximum number of progress log lines to emit (default: 20)
  * @returns Callback suitable for passing to promiseAllBatched's onBatchComplete
  */
-export function createBatchProgressLogger(
+function createBatchProgressLogger(
     log: { info: (msg: string) => void },
     label: string,
     totalItems: number,

@@ -42,7 +42,7 @@ function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreRepo
 }
 
 /** Algorithm id for the synthetic combined score row (excluded from exact-match checks). */
-export const WEIGHTED_MEAN_ALGORITHM = 'weighted-mean'
+const WEIGHTED_MEAN_ALGORITHM = 'weighted-mean'
 
 /**
  * How many identity comparisons to run before yielding to the event loop.
@@ -360,12 +360,22 @@ export class MatchingService {
             fusionIdentity.managedAccountId,
             fusionIdentity.managedKeyOrUndefined,
             fusionIdentity.originAccountId,
-            ...(fusionIdentity.accountIdsSet ?? []),
-            ...(fusionIdentity.missingAccountIdsSet ?? []),
         ]
-        return candidates.some(
-            (candidate) => candidate && MatchingService.sameManagedAccountKey(managedAccountId, candidate)
-        )
+        for (const candidate of candidates) {
+            if (candidate && MatchingService.sameManagedAccountKey(managedAccountId, candidate)) return true
+        }
+
+        if (fusionIdentity.accountIdsSet) {
+            for (const candidate of fusionIdentity.accountIdsSet) {
+                if (candidate && MatchingService.sameManagedAccountKey(managedAccountId, candidate)) return true
+            }
+        }
+        if (fusionIdentity.missingAccountIdsSet) {
+            for (const candidate of fusionIdentity.missingAccountIdsSet) {
+                if (candidate && MatchingService.sameManagedAccountKey(managedAccountId, candidate)) return true
+            }
+        }
+        return false
     }
 
     private static sameManagedAccountKey(a: string | undefined, b: string | undefined): boolean {
@@ -374,17 +384,6 @@ export class MatchingService {
         const normalizedA = normalizeCompositeManagedAccountKey(a)
         const normalizedB = normalizeCompositeManagedAccountKey(b)
         return normalizedA !== undefined && normalizedA === normalizedB
-    }
-
-    private static hasEquivalentManagedAccountId(values: ReadonlySet<string> | undefined, key: string): boolean {
-        if (!values) return false
-        if (values.has(key)) return true
-        const normalizedKey = normalizeCompositeManagedAccountKey(key)
-        if (!normalizedKey) return false
-        for (const value of values) {
-            if (normalizeCompositeManagedAccountKey(value) === normalizedKey) return true
-        }
-        return false
     }
 
     /**

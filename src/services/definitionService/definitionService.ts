@@ -6,6 +6,7 @@ import {
 } from '../../model/config'
 import { LogService } from '../logService'
 import { FusionAccount } from '../../model/account'
+import { getManagedAccountSnapshotKey } from '../../utils/velocityAccountSnapshot'
 import { FusionAccountKind } from '../../model/fusionAccountTypes'
 import { SchemaService } from '../schemaService'
 import { LockService } from '../lockService'
@@ -923,16 +924,4 @@ export class DefinitionService {
             name === FusionAttribute.OriginSource
         )
     }
-}
-
-function getManagedAccountSnapshotKey(
-    account: Record<string, any> | undefined
-): string {
-    if (!account) return ''
-    const sourceId =
-        account.source?.name ?? account.source?.id ?? ''
-    const nativeIdentity =
-        account.schema?.id ?? account.nativeIdentity ?? account._id ?? ''
-    const key = `${sourceId}::${nativeIdentity}`
-    return trimStr(key) ?? ''
 }
