@@ -10,11 +10,13 @@ import { trimStr } from '../../utils/safeRead'
 import { compact } from './collections'
 import { batchProcess } from './collections'
 import { FusionService } from './fusionService'
+import { FusionRun } from '../../model/fusionRun'
 
 export class DecisionProcessor {
     constructor(
         private config: FusionConfig,
         private log: LogService,
+        private run: FusionRun,
         private fusionService: FusionService
     ) {}
 
@@ -38,7 +40,7 @@ export class DecisionProcessor {
         }
 
         // Clear stale transient state, re-apply candidate statuses, and sync attributes.
-        for (const account of this.fusionService.fusionAccountMap.values()) {
+        for (const account of this.run.fusionAccountMap.values()) {
             account.removeStatus(StatusEntitlement.Candidate)
             account.clearFusionReviews()
 
@@ -50,7 +52,7 @@ export class DecisionProcessor {
             account.syncCollectionAttributesToBag()
         }
 
-        for (const [identityId, identity] of this.fusionService.fusionIdentityMap.entries()) {
+        for (const [identityId, identity] of this.run.fusionIdentityMap.entries()) {
             identity.removeStatus(StatusEntitlement.Candidate)
             identity.clearFusionReviews()
 
@@ -128,7 +130,7 @@ export class DecisionProcessor {
         const isAuthorizedDecision = !fusionDecision.newIdentity
         const existingIdentityAccount =
             isAuthorizedDecision && fusionDecision.identityId
-                ? this.fusionService.fusionIdentityMap.get(fusionDecision.identityId)
+                ? this.run.fusionIdentityMap.get(fusionDecision.identityId)
                 : undefined
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
         this.fusionService.log.debug(

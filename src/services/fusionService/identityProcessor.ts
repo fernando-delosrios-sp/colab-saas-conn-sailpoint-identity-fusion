@@ -3,6 +3,7 @@ import { FusionAccount } from '../../model/account'
 import { FusionConfig } from '../../model/config'
 import { LogService } from '../logService'
 import { FusionService } from './fusionService'
+import { FusionRun } from '../../model/fusionRun'
 import { compact } from './collections'
 import { batchProcess } from './collections'
 import { buildManagedAccountKey } from '../../model/managedAccountKey'
@@ -13,6 +14,7 @@ export class IdentityProcessor {
     constructor(
         private config: FusionConfig,
         private log: LogService,
+        private run: FusionRun,
         private fusionService: FusionService
     ) {}
 
@@ -68,7 +70,7 @@ export class IdentityProcessor {
     public async processIdentity(identity: IdentityDocument): Promise<FusionAccount | undefined> {
         const identityId = identity.id
 
-        if (!this.fusionService.fusionIdentityMap.has(identityId)) {
+        if (!this.run.fusionIdentityMap.has(identityId)) {
             const existingAccount = this.findFusionAccountByIdentityManagedAccounts(identity)
             if (existingAccount) {
                 this.fusionService.log.debug(
@@ -76,12 +78,12 @@ export class IdentityProcessor {
                         `${identity.name} (${identityId}) - prevents duplicate baseline creation`
                 )
                 // Remove from whichever map currently holds it
-                if (this.fusionService.fusionAccountMap.get(existingAccount.managedKey) === existingAccount) {
-                    this.fusionService.fusionAccountMap.delete(existingAccount.managedKey)
+                if (this.run.fusionAccountMap.get(existingAccount.managedKey) === existingAccount) {
+                    this.run.fusionAccountMap.delete(existingAccount.managedKey)
                 } else {
-                    for (const [staleId, fa] of this.fusionService.fusionIdentityMap.entries()) {
+                    for (const [staleId, fa] of this.run.fusionIdentityMap.entries()) {
                         if (fa === existingAccount) {
-                            this.fusionService.fusionIdentityMap.delete(staleId)
+                            this.run.fusionIdentityMap.delete(staleId)
                             break
                         }
                     }
@@ -91,7 +93,7 @@ export class IdentityProcessor {
                 existingAccount.setIdentityIdAttribute(identityId)
                 existingAccount.setNeedsRefresh(true)
                 // Register under the new identity ID so callers (e.g. getFusionIdentity) can find it
-                this.fusionService.fusionIdentityMap.set(identityId, existingAccount)
+                this.run.fusionIdentityMap.set(identityId, existingAccount)
                 this.fusionService.log.debug(
                     `Re-registered existing Fusion account under new identity: ${identity.name} (${identityId})`
                 )
@@ -149,14 +151,14 @@ export class IdentityProcessor {
         if (identityAccountIds.size === 0) return undefined
 
         // Check uncorrelated accounts first
-        for (const account of this.fusionService.fusionAccountMap.values()) {
+        for (const account of this.run.fusionAccountMap.values()) {
             if (this.hasIntersectingManagedAccounts(account, identityAccountIds)) {
                 return account
             }
         }
 
         // Check for accounts from stale identity IDs
-        for (const [existingIdentityId, account] of this.fusionService.fusionIdentityMap.entries()) {
+        for (const [existingIdentityId, account] of this.run.fusionIdentityMap.entries()) {
             if (existingIdentityId === identity.id) continue
             if (this.hasIntersectingManagedAccounts(account, identityAccountIds)) {
                 return account
