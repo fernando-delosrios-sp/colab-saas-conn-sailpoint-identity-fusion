@@ -3,9 +3,7 @@
 ## Purpose
 
 The match service (`src/services/matchingService/`) is the stateless service responsible for the Match step — comparing Fusion accounts against existing identities using weighted scoring rules and dispatching match outcomes (exact match, partial match, deferred match, non-match). It owns the CandidateRegistry and ManagedAccountMatchingRunner, and orchestrates the two-sweep matching lifecycle. All scoring algorithms from the former ScoringService remain in effect under the new name.
-
 ## Requirements
-
 ### Requirement: MatchingService dispatches exact match → automatic assignment
 
 When scoring produces an exact match (all evaluated rules score 100, none skipped) and automatic assignment is enabled, MatchingService SHALL create a synthetic decision and assign the managed account to the matching identity without creating a review form.
@@ -221,3 +219,12 @@ The connector's exact-match automatic assignment logic SHALL consider only non-s
 - **AND** a second rule has `skipMatchIfThresholdNotMet: true` and scores below its threshold
 - **WHEN** the exact-match determination runs
 - **THEN** the candidate may still be treated as an exact match based on the non-skipped rule
+
+### Requirement: Matching iterations SHALL avoid array allocations
+
+When iterating over multiple Set collections of account IDs during the identity matching evaluation, MatchingService SHALL iterate them sequentially using direct `for...of` loops rather than combining them via array spread syntax (`[...setA, ...setB]`), to avoid O(N) memory allocations per invocation on hot paths.
+
+#### Scenario: Identity matching iterates candidate sets directly
+- **WHEN** MatchingService evaluates identity candidates for a managed account
+- **THEN** the matching loop iterates directly over `accountIdsSet` and `missingAccountIdsSet` without allocating an intermediate array
+

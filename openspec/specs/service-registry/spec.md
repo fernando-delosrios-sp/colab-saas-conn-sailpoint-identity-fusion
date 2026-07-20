@@ -3,9 +3,7 @@
 ## Purpose
 
 The service registry (`src/services/serviceRegistry.ts`) is the connector's request-scoped service container. It uses Node's `AsyncLocalStorage` to make the long-lived service instances (config, log, lock, client, etc.) available to the operations layer without threading them through every call site, and resolves the right `Context` and `StandardCommand` for the current request. This spec defines the contract for what is available where, how scoped vs. unscoped services are distinguished, and what an operation can rely on by the time it starts executing.
-
 ## Requirements
-
 ### Requirement: Request-Scoped Dependency Injection
 The `ServiceRegistry` MUST use `AsyncLocalStorage` to store the active context for each concurrent operation instead of a static property, ensuring that concurrently executing operations do not overwrite each other's registry.
 
@@ -26,9 +24,6 @@ The connector MUST NOT mutate the global `velocityjs.Compile.prototype`.
 #### Scenario: Velocity Attribute Patch
 - **WHEN** an attribute is compiled via Velocity
 - **THEN** the compiler uses a subclass (`SafeCompile`) that patches dangerous property access without affecting other consumers in the process.
-
-
-
 
 ### Requirement: ServiceRegistry creates FusionRun first
 
@@ -74,4 +69,12 @@ The connector operation handler SHALL guarantee that any custom or default opera
 #### Scenario: Operation crashes before responding
 - **WHEN** a custom operation handler throws an unhandled exception before calling `res.send()` or `res.error()`
 - **THEN** the system catches the original exception and throws a ConnectorError wrapping the original failure, without being masked by the missing response check
+
+### Requirement: ServiceRegistry configures services using state containers
+
+ServiceRegistry SHALL retrieve global environment flags from centralized state containers (e.g. `FusionRun`) when configuring services, rather than querying `process.env` directly.
+
+#### Scenario: Services are configured with central RECORD_MODE flag
+- **WHEN** ServiceRegistry instantiates services dependent on record mode
+- **THEN** it accesses the `isRecordMode` boolean from the execution context/run instead of `process.env.RECORD_MODE`
 

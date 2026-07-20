@@ -3,9 +3,7 @@
 ## Purpose
 
 FusionRun (`src/model/fusionRun.ts`) is the centralized state container for a single operation run. It holds all mutable data loaded during the run and serves as the single source of truth that stateless services read from and write to. It is a domain object with encapsulated collection-management methods and state-integrity validation — it is NOT a service orchestrator.
-
 ## Requirements
-
 ### Requirement: FusionRun is the single source of truth for operation run state
 
 FusionRun SHALL be the centralized state container for a single operation run. All services SHALL read from and write to FusionRun rather than holding internal mutable state. No mutable state relevant to the operation run SHALL exist outside FusionRun.
@@ -133,3 +131,12 @@ RecordingService SHALL call run.snapshot() to capture operation state, replacing
 - **THEN** it SHALL receive FusionRun as a parameter
 - **AND** it SHALL call run.snapshot() to capture the initial state
 - **AND** it SHALL not access individual service internals
+
+### Requirement: FusionRun holds operation execution mode state
+
+FusionRun SHALL contain boolean properties denoting the global execution mode of the run, specifically whether the run is executing in record mode (`isRecordMode`). This centralizes process environment variable access.
+
+#### Scenario: FusionRun evaluates environment variables on initialization
+- **WHEN** `FusionRun` is constructed
+- **THEN** it reads `process.env.RECORD_MODE` exactly once and stores it in `isRecordMode`
+
