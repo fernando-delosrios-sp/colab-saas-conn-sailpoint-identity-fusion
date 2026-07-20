@@ -41,6 +41,10 @@ export class FusionRun implements WorkQueue {
     readonly currentRunNonMatchedKeysBySource = new Map<string, Set<string>>()
     linkedAccountKeyIndex: Set<string> | undefined
     formDecisions: FusionDecision[] = []
+    fusionIdentityDecisions: FusionDecision[] = []
+    pendingCandidateIdentityIds: Set<string> = new Set()
+    pendingReviewUrlsByReviewerId: Map<string, string[]> = new Map()
+    pendingReviewUrlsByCandidateId: Map<string, string[]> = new Map()
     fusionBlends: FusionReportBlend[] = []
     matchScoringMs = 0
     analysisRecorder?: ManagedAccountAnalysisRecorder

@@ -6,6 +6,7 @@ import { LogService } from '../logService'
 import { IdentityService } from '../identityService'
 import { MessagingService } from '../messagingService'
 import { SourceService } from '../sourceService'
+import { FusionRun } from '../../model/fusionRun'
 import { assert, softAssert } from '../../utils/assert'
 import { readString, readUnknown, trimStr } from '../../utils/safeRead'
 import { FusionDecision } from '../../model/form'
@@ -81,7 +82,8 @@ export class FormService {
         private client: ClientService,
         private sources: SourceService,
         private identities?: IdentityService,
-        private messaging?: MessagingService
+        private messaging?: MessagingService,
+        private run: FusionRun = new FusionRun()
     ) {
         this.fusionFormNamePattern = config.fusionFormNamePattern
         this.fusionFormExpirationDays = config.fusionFormExpirationDays
@@ -170,17 +172,17 @@ export class FormService {
         }
         this._fetchedFormInstances = []
 
-        const fusionDecisionsCount = this._fusionIdentityDecisions?.length ?? 0
+        const fusionDecisionsCount = this.run.fusionIdentityDecisions?.length ?? 0
         this.log.debug(`Form data fetch completed - ${fusionDecisionsCount} fusion decision(s)`)
     }
 
     private resetFormDataState(): void {
-        this._fusionIdentityDecisions = []
+        this.run.fusionIdentityDecisions = []
         this.fusionAssignmentDecisionMap = new Map()
-        this._pendingReviewUrlsByReviewerId = new Map()
+        this.run.pendingReviewUrlsByReviewerId = new Map()
         this._pendingReviewContextByAccountId = new Map()
-        this._pendingCandidateIdentityIds = new Set()
-        this._pendingReviewUrlsByCandidateId = new Map()
+        this.run.pendingCandidateIdentityIds = new Set()
+        this.run.pendingReviewUrlsByCandidateId = new Map()
         this._finishedFusionDecisions = []
         this._formsFound = 0
         this._formInstancesFound = 0
@@ -286,7 +288,7 @@ export class FormService {
             // fetchFormData (which populates pendingCandidateIdentityIds) already ran.
             for (const candidate of candidates) {
                 if (candidate.id) {
-                    this._pendingCandidateIdentityIds.add(candidate.id)
+                    this.run.pendingCandidateIdentityIds.add(candidate.id)
                 }
             }
             return { formDefinitionReady: true, newReviewInstancesQueued }
@@ -561,9 +563,9 @@ export class FormService {
             if (url) {
                 for (const c of candidates) {
                     if (!c.id) continue
-                    const list = this._pendingReviewUrlsByCandidateId.get(c.id) ?? []
+                    const list = this.run.pendingReviewUrlsByCandidateId.get(c.id) ?? []
                     list.push(url)
-                    this._pendingReviewUrlsByCandidateId.set(c.id, list)
+                    this.run.pendingReviewUrlsByCandidateId.set(c.id, list)
                 }
             }
 
@@ -651,26 +653,18 @@ export class FormService {
     public registerFinishedDecision(decision: FusionDecision, includeInProcessingQueue: boolean = false): void {
         this._finishedFusionDecisions.push(decision)
         if (!includeInProcessingQueue) return
-        assert(this._fusionIdentityDecisions, 'Fusion identity decisions not fetched')
-        this._fusionIdentityDecisions.push(decision)
+        assert(this.run.fusionIdentityDecisions, 'Fusion identity decisions not fetched')
+        this.run.fusionIdentityDecisions.push(decision)
     }
 
     /**
      * Get all fusion identity decisions
      */
-    public get fusionIdentityDecisions(): FusionDecision[] {
-        assert(this._fusionIdentityDecisions, 'Fusion identity decisions not fetched')
-        return this._fusionIdentityDecisions
-    }
-
-    /**
-     * Get fusion decision for a specific identity UID
-     */
     public getFusionIdentityDecision(identityUid: string): FusionDecision | undefined {
-        if (!this._fusionIdentityDecisions) {
+        if (!this.run.fusionIdentityDecisions) {
             return undefined
         }
-        return this._fusionIdentityDecisions.find((decision) => decision.account.id === identityUid)
+        return this.run.fusionIdentityDecisions.find((decision) => decision.account.id === identityUid)
     }
 
     /**
@@ -757,31 +751,6 @@ export class FormService {
             requestParameters,
             `FormService>setFormInstanceState id=${formInstanceID} state=${state}`
         )
-    }
-
-    /**
-     * Pending (unanswered) form instance URLs by reviewer identityId.
-     * Populated during fetchFormData so reviewers can be updated when we process them.
-     */
-    public get pendingReviewUrlsByReviewerId(): Map<string, string[]> {
-        return this._pendingReviewUrlsByReviewerId
-    }
-
-    /**
-     * Candidate identity IDs from pending (unanswered) form instances.
-     * Populated during fetchFormData so candidate identities can be flagged
-     * with the 'candidate' status during processFusionIdentityDecisions.
-     */
-    public get pendingCandidateIdentityIds(): Set<string> {
-        return this._pendingCandidateIdentityIds
-    }
-
-    /**
-     * Pending (unanswered) form instance URLs by candidate identityId.
-     * Populated during fetchFormData and when new instances are created (URLs added as async creation completes).
-     */
-    public get pendingReviewUrlsByCandidateId(): Map<string, string[]> {
-        return this._pendingReviewUrlsByCandidateId
     }
 
     /**
@@ -896,9 +865,9 @@ export class FormService {
             for (const recipient of instance.recipients) {
                 if (!recipient.id) continue
                 if (instance.standAloneFormUrl) {
-                    const list = this._pendingReviewUrlsByReviewerId.get(recipient.id) ?? []
+                    const list = this.run.pendingReviewUrlsByReviewerId.get(recipient.id) ?? []
                     list.push(instance.standAloneFormUrl)
-                    this._pendingReviewUrlsByReviewerId.set(recipient.id, list)
+                    this.run.pendingReviewUrlsByReviewerId.set(recipient.id, list)
                 }
                 accountContext?.reviewerIds.add(recipient.id)
             }
@@ -907,12 +876,12 @@ export class FormService {
             // The 'candidates' field is a comma-separated list of identity IDs
             // stored during form creation (see buildFormInput in formBuilder.ts).
             for (const candidateId of candidateIds) {
-                this._pendingCandidateIdentityIds.add(candidateId)
+                this.run.pendingCandidateIdentityIds.add(candidateId)
                 accountContext?.candidateIds.add(candidateId)
                 if (instance.standAloneFormUrl) {
-                    const candList = this._pendingReviewUrlsByCandidateId.get(candidateId) ?? []
+                    const candList = this.run.pendingReviewUrlsByCandidateId.get(candidateId) ?? []
                     candList.push(instance.standAloneFormUrl)
-                    this._pendingReviewUrlsByCandidateId.set(candidateId, candList)
+                    this.run.pendingReviewUrlsByCandidateId.set(candidateId, candList)
                 }
             }
 
@@ -946,7 +915,7 @@ export class FormService {
      * Process fusion form instances and extract decisions
      */
     private async processFusionFormInstances(formInstances: FormInstanceResponseV2025[]): Promise<void> {
-        assert(this._fusionIdentityDecisions, 'Fusion identity decisions array is not initialized')
+        assert(this.run.fusionIdentityDecisions, 'Fusion identity decisions array is not initialized')
         assert(this.fusionAssignmentDecisionMap, 'Fusion assignment decision map is not initialized')
         assert(formInstances, 'Form instances array is required')
 
