@@ -58,7 +58,7 @@ export const COMBINED_SCORE_ROW_ATTRIBUTE = 'Combined score'
  * Service for calculating and managing similarity scores for identity matching.
  * Handles score calculation, threshold checking, and score formatting.
  */
-export class MatchService {
+export class MatchingService {
     private readonly matchingConfigs: MatchingConfig[]
     private readonly fusionManualReviewScore: number
     private readonly fusionEnableAutoAssignment: boolean
@@ -178,7 +178,7 @@ export class MatchService {
     ): number {
         let wRem = 0
         for (let j = fromIndex; j < configs.length; j++) {
-            wRem += MatchService.blendWeight(configs[j].fusionScore)
+            wRem += MatchingService.blendWeight(configs[j].fusionScore)
         }
         const denom = weightTotalSoFar + wRem
         if (denom <= 0) return 0
@@ -364,7 +364,7 @@ export class MatchService {
             ...(fusionIdentity.missingAccountIdsSet ?? []),
         ]
         return candidates.some(
-            (candidate) => candidate && MatchService.sameManagedAccountKey(managedAccountId, candidate)
+            (candidate) => candidate && MatchingService.sameManagedAccountKey(managedAccountId, candidate)
         )
     }
 
@@ -431,7 +431,7 @@ export class MatchService {
                     matching.attribute,
                     (identityAttribute ?? '').toString()
                 )
-                if (MatchService.lig3UpperBound(normAccount, normIdentity) < (matching.fusionScore ?? 0)) {
+                if (MatchingService.lig3UpperBound(normAccount, normIdentity) < (matching.fusionScore ?? 0)) {
                     // Score is mathematically unreachable — skip as if the rule failed.
                     scoreReport = makeSkippedReport(matching, 'Length ratio upper bound below threshold')
                     scores.push(scoreReport)
@@ -475,7 +475,7 @@ export class MatchService {
             }
             scores.push(scoreReport)
             if (!scoreReport.skipped) {
-                const w = MatchService.blendWeight(scoreReport.fusionScore)
+                const w = MatchingService.blendWeight(scoreReport.fusionScore)
                 weightedSum += w * scoreReport.score
                 weightTotal += w
             }
@@ -491,7 +491,7 @@ export class MatchService {
             if (
                 !hasFailedMandatory &&
                 i + 1 < this.matchingConfigs.length &&
-                MatchService.maxAchievableCombinedScore(weightedSum, weightTotal, i + 1, this.matchingConfigs) <
+                MatchingService.maxAchievableCombinedScore(weightedSum, weightTotal, i + 1, this.matchingConfigs) <
                     this.fusionManualReviewScore
             ) {
                 for (let r = i + 1; r < this.matchingConfigs.length; r++) {
@@ -513,7 +513,7 @@ export class MatchService {
         if (weightTotal > 0) {
             for (const s of scores) {
                 if (s.skipped) continue
-                const w = MatchService.blendWeight(s.fusionScore)
+                const w = MatchingService.blendWeight(s.fusionScore)
                 s.weightedScore = Math.round((w / weightTotal) * s.score * 100) / 100
             }
         }

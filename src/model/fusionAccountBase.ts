@@ -2,17 +2,19 @@ import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionDecision } from './form'
 import { FusionConfig } from './config'
 import { Attributes, ConnectorError, ConnectorErrorType, SimpleKeyType } from '@sailpoint/connector-sdk'
-import { FusionMatch } from '../services/matchService'
+import { FusionMatch } from '../services/matchingService'
 import { FusionAccountState } from './fusionAccountState'
 import type { FusionManagedAccountInfo, IdentityInfo } from './fusionAccountTypes'
 import { buildIdentityInfo } from './fusionAccountUtils'
 import { setIdentityIdAttribute } from './fusionAccountRules/constructionRules'
+import type { WorkQueue } from './fusionRun'
 import {
     addFusionDecisionLayer,
     addFusionMatch,
     addIdentityLayer,
     addManagedAccountLayer,
     clearFusionIdentityReferences,
+    type AddManagedAccountOptions,
 } from './fusionAccountRules/layerRules'
 import {
     addAction,
@@ -462,39 +464,30 @@ export class FusionAccountBase {
      * Claims accounts from the shared work queue that belong to this fusion account.
      *
      * Two-phase matching:
-     * 1. **Identity match** (indexed): Uses `accountsByIdentityId` to find correlated
+     * 1. **Identity match** (indexed): Uses the identity index to find correlated
      *    accounts in O(1) instead of scanning the full map.
      * 2. **Previous-run match** (scan): Iterates remaining accounts to find those
      *    previously associated with this fusion account (`previousAccountIds`).
      *
-     * Claimed accounts are deleted from both maps so subsequent processing
-     * phases (fusion → identity → managed) only see unprocessed accounts.
+     * Claimed accounts are removed from the work queue via {@link WorkQueue.claim}
+     * so subsequent processing phases only see unprocessed accounts.
      *
-     * @param accountsById - Shared work queue of managed accounts
-     * @param accountsByIdentityId - Secondary index: identityId → Set of account IDs
-     * @param skipBlendHistoryForManagedKeys - Optional managed keys that must not get the generic
-     *   "Blended managed account …" line (e.g. replay of a link-to-existing form decision in processFusionAccount).
+     * @param workQueue - The managed-account work queue
+     * @param allAccountsById - Full snapshot of managed accounts for missing-account context
+     * @param options - Matching and history options
      */
     public addManagedAccountLayer(
-        accountsById: Map<string, Account>,
-        accountsByIdentityId: Map<string, Set<string>>,
+        workQueue: WorkQueue,
         allAccountsById?: Map<string, Account>,
-        pruneDeletedManagedAccountsFlag = false,
-        addBlendHistory = true,
-        skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
-        onBlend?: (account: Account) => void
+        options: AddManagedAccountOptions = {}
     ): void {
         addManagedAccountLayer(
             this.state,
-            accountsById,
-            accountsByIdentityId,
+            workQueue,
             allAccountsById,
-            pruneDeletedManagedAccountsFlag,
-            addBlendHistory,
-            skipBlendHistoryForManagedKeys,
-            onBlend
-        )
-    }
+            options
+         )
+     }
 
     /**
      * Applies a reviewer's fusion decision to this account, setting it as either

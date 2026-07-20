@@ -26,7 +26,7 @@ import {
     extractCandidateIdsFromFormInput,
     getReviewerInfo,
 } from './formProcessor'
-import { FusionMatch } from '../matchService/types'
+import { FusionMatch } from '../matchingService/types'
 
 export type { PendingReviewFormContext,  PendingReviewAccountContext } from './types'
 
@@ -1146,19 +1146,7 @@ export class FormService {
         }
 
         if (shouldRemoveAccountFromMap) {
-            // Form is still pending (no response and not all cancelled), so remove
-            // the managed account from this run's work queue to avoid duplicate processing.
-            workQueue.delete(accountId)
-            const identityId = account.identityId
-            if (identityId) {
-                const accountIdsForIdentity = this.sources.run.managedAccountsByIdentityId.get(identityId)
-                if (accountIdsForIdentity) {
-                    accountIdsForIdentity.delete(accountId)
-                    if (accountIdsForIdentity.size === 0) {
-                        this.sources.run.managedAccountsByIdentityId.delete(identityId)
-                    }
-                }
-            }
+            this.sources.run.claimAccount(accountId, account.identityId)
         }
 
         return {

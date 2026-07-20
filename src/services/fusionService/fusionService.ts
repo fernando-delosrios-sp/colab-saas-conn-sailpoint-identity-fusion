@@ -7,24 +7,24 @@ import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { IdentityService } from '../identityService'
 import { SourceInfo, SourceService } from '../sourceService'
 import { FusionAccount } from '../../model/account'
-import { MapService } from '../mapService'
-import { DefineService } from '../defineService'
-import { MatchService } from '../matchService'
+import { MappingService } from '../mappingService'
+import { DefinitionService } from '../definitionService'
+import { MatchingService } from '../matchingService'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
 import { mapValuesToArray, forEachBatched, compact } from './collections'
 import { FusionDecision } from '../../model/form'
 import { SchemaService } from '../schemaService'
-import { FusionMatch, MatchCandidateType } from '../matchService/types'
-import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchService/matchService'
+import { FusionMatch, MatchCandidateType } from '../matchingService/types'
+import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchingService/matchingService'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats, OperationContext } from './types'
 import {
-    batchProcess as batchProcessWithConfig,
+    batchProcess,
     getManagedAccountsBatchSize,
     getManagedAccountEventLoopYieldEvery,
     getFusionParallelBatchSize,
     yieldToEventLoop,
-} from './batching'
+} from './collections'
 import { buildFusionReport } from './fusionReportBuilder'
 import { resolveReportAccountId as resolveReportAccountIdFn, resolveReportAccountIdValue as resolveReportAccountIdValueFn } from './reportAccountResolver'
 import { ManagedAccountAnalysisRecorder } from './managedAccountAnalysisRecorder'
@@ -35,7 +35,7 @@ import {
     hasIdentityCandidateMatches as checkHasIdentityCandidateMatches,
     hasDeferredCandidateMatches as checkHasDeferredCandidateMatches,
 } from './helpers'
-import { AttributeOperations } from '../defineService/types'
+import { AttributeOperations } from '../definitionService/types'
 import { getManagedAccountKeyFromAccount, normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 import { hasValue, trimStr } from '../../utils/safeRead'
@@ -117,9 +117,9 @@ export class FusionService {
      * @param identities - Identity service for identity lookups and correlation
      * @param sources - Source service for accessing source accounts and config
      * @param forms - Form service for creating and managing review forms
-     * @param mapService - Map service for attribute mapping from source accounts
-     * @param defineService - Define service for attribute definition and generation
-     * @param matchService - Match service for identity matching and scoring
+     * @param mappingService - Map service for attribute mapping from source accounts
+     * @param definitionService - Define service for attribute definition and generation
+     * @param matchingService - Match service for identity matching and scoring
      * @param schemas - Schema service for attribute schema lookups
      * @param commandType - The current SDK command type (e.g. StdAccountList)
      * @param operationContext - Handler operation name from the connector (e.g. {@link OperationContext.CustomDryRun})
@@ -130,18 +130,18 @@ export class FusionService {
         public identities: IdentityService,
         public sources: SourceService,
         public forms: FormService,
-        private mapService: MapService,
-        private defineService: DefineService,
-        public matchService: MatchService,
+        private mappingService: MappingService,
+        private definitionService: DefinitionService,
+        public matchingService: MatchingService,
         public schemas: SchemaService,
         public run: FusionRun,
         commandType?: StandardCommand,
         operationContext?: OperationContext
     ) {
         this._repository = new FusionAccountRepository(log, this.run)
-        this.identityProcessor = new IdentityProcessor(this)
-        this.correlationManager = new CorrelationManager(this)
-        this.decisionProcessor = new DecisionProcessor(this)
+        this.identityProcessor = new IdentityProcessor(config, log, this)
+        this.correlationManager = new CorrelationManager(config, log, this)
+        this.decisionProcessor = new DecisionProcessor(config, log, this)
         this.managedAccountAnalyzer = new ManagedAccountAnalyzer(this)
         this.candidateRegistry = new CandidateRegistry({
             fusionAccountMap: this.run.fusionAccountMap,
@@ -183,14 +183,6 @@ export class FusionService {
      * Kept on FusionService so external callers (e.g. DecisionProcessor) do not need to
      * import batching utilities directly.
      */
-    public async batchProcess<T, R>(
-        items: T[],
-        label: string,
-        fn: (item: T) => Promise<R>,
-        batchSize?: number
-    ): Promise<R[]> {
-        return batchProcessWithConfig(items, label, fn, this.config, this.log, batchSize)
-    }
 
     /**
      * Runtime commandType is not always populated by host environments.
@@ -220,9 +212,9 @@ export class FusionService {
      * map source attributes, refresh normal attributes, then refresh reverse correlation attributes.
      */
     public async applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void> {
-        this.mapService.mapAttributes(fusionAccount, this.run)
-        await this.defineService.refreshNormalAttributes(fusionAccount)
-        this.defineService.refreshReverseCorrelationAttributes(fusionAccount)
+        this.mappingService.mapAttributes(fusionAccount, this.run)
+        await this.definitionService.refreshNormalAttributes(fusionAccount)
+        this.definitionService.refreshReverseCorrelationAttributes(fusionAccount)
     }
 
     // ------------------------------------------------------------------------
@@ -365,9 +357,9 @@ export class FusionService {
         this.log.info(
             `Processing fusion accounts: for each of ${fusionAccounts.length} fusion account(s), match managed accounts from the work queue and build fusion layers`
         )
-        const results = await this.batchProcess(fusionAccounts, 'Fusion accounts', async (x: Account) => {
+        const results = await batchProcess(fusionAccounts, 'Fusion accounts', async (x: Account) => {
             return await this.processFusionAccount(x)
-        })
+        }, this.config, this.log)
         this.log.info(
             `Fusion accounts phase finished: ${results.length} fusion account(s) processed (managed accounts matched and layered)`
         )
@@ -412,10 +404,12 @@ export class FusionService {
      */
     public async refreshUniqueAttributes(): Promise<number> {
         const allAccounts = [...this.fusionAccounts, ...this.fusionIdentities]
-        await this.batchProcess(
+        await batchProcess(
             allAccounts,
             'Unique-attribute generation',
-            (account) => this.defineService.refreshUniqueAttributes(account),
+            (account) => this.definitionService.refreshUniqueAttributes(account),
+            this.config,
+            this.log,
             getManagedAccountsBatchSize(this.config)
         )
         return allAccounts.length
@@ -523,13 +517,14 @@ export class FusionService {
         // Pass direct reference to work queue - deletions will remove processed accounts
         // No snapshot or copy needed: JavaScript's event loop ensures atomic operations
         fusionAccount.addManagedAccountLayer(
-            this.run.managedAccountsById,
-            this.run.managedAccountsByIdentityId,
+            this.run,
             this.sources.managedAccountsAllById,
-            this.shouldPruneDeletedManagedAccounts(),
-            true,
-            skipBlendHistoryForManagedKeys,
-            (account) => this.registerFusionBlend(fusionAccount, account)
+            {
+                pruneDeleted: this.shouldPruneDeletedManagedAccounts(),
+                addBlendHistory: true,
+                skipBlendHistoryForManagedKeys,
+                onBlend: (account) => this.registerFusionBlend(fusionAccount, account),
+            }
         )
         this.log.debug(
             `Applied managed account layer for ${fusionAccount.name}: ` +
@@ -539,7 +534,7 @@ export class FusionService {
         await yieldToEventLoop()
 
         if (!resetDefinition) {
-            await this.defineService.registerUniqueAttributes(fusionAccount)
+            await this.definitionService.registerUniqueAttributes(fusionAccount)
         }
 
         fusionAccount.setNeedsRefresh(
@@ -716,10 +711,12 @@ export class FusionService {
         this.log.info(
             `Correlated account sweep: resolving ${correlatedAccounts.length} correlated managed account(s) before uncorrelated scoring`
         )
-        await this.batchProcess(
+        await batchProcess(
             correlatedAccounts,
             'Correlated managed accounts',
             (account) => this.processManagedAccount(account),
+            this.config,
+            this.log,
             this._managedAccountProcessingBatchSize
         )
         this.log.info(`Correlated account sweep complete: ${map.size} uncorrelated account(s) queued for scoring`)
@@ -797,7 +794,7 @@ export class FusionService {
             this.log.info(
                 `Dropping managed account already linked in Fusion from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
             )
-            this.removeManagedAccountFromWorkQueue(account)
+            this.run.claimAccount(getManagedAccountKeyFromAccount(account)!, account.identityId)
             return undefined
         }
 
@@ -815,7 +812,7 @@ export class FusionService {
                 `Correlated managed account not linked to Fusion; treating as non-match: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
             )
             const fusionAccount = await this.preProcessManagedAccount(account)
-            this.removeManagedAccountFromWorkQueue(account)
+            this.run.claimAccount(getManagedAccountKeyFromAccount(account)!, account.identityId)
             return this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
         }
 
@@ -873,7 +870,7 @@ export class FusionService {
         account?: Account
     ): Promise<boolean> {
         if (sourceType === SourceType.Record) {
-            await this.defineService.registerUniqueAttributes(fusionAccount)
+            await this.definitionService.registerUniqueAttributes(fusionAccount)
             return true
         }
         if (sourceType === SourceType.Orphan) {
@@ -974,7 +971,7 @@ export class FusionService {
         const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'deferred')
         const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
         this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}; skipping account for now`)
-        this.removeManagedAccountFromWorkQueue(account)
+        this.run.claimAccount(getManagedAccountKeyFromAccount(account)!, account.identityId)
         return undefined
     }
 
@@ -1104,7 +1101,7 @@ export class FusionService {
         const allAccounts = [...this.fusionAccountMap.values(), ...this.fusionIdentityMap.values()]
         const eligible = this.deleteEmpty ? allAccounts.filter((account) => !account.isOrphan()) : allAccounts
 
-        const results = await this.batchProcess(eligible, 'ISC accounts', (x) => this.getISCAccount(x))
+        const results = await batchProcess(eligible, 'ISC accounts', (x) => this.getISCAccount(x), this.config, this.log)
         return compact(results)
     }
 
@@ -1214,10 +1211,10 @@ export class FusionService {
      */
     private setCoreSchemaAttributes(fusionAccount: FusionAccount): boolean {
         // Enforce hosting identity name display override if correlated
-        this.defineService.applyDisplayAttributeOverride(fusionAccount)
+        this.definitionService.applyDisplayAttributeOverride(fusionAccount)
 
         // Generate and assign key for interim accounts (key postponed from processIdentity/processFusionIdentityDecision)
-        const key = fusionAccount.key ?? this.defineService.getSimpleKey(fusionAccount)
+        const key = fusionAccount.key ?? this.definitionService.getSimpleKey(fusionAccount)
         if (!key) {
             return false
         }
@@ -1248,29 +1245,6 @@ export class FusionService {
             if (reviewerUrls?.length) {
                 for (const u of reviewerUrls) {
                     fusionAccount.addFusionReview(u)
-                }
-            }
-        }
-    }
-
-    /**
-     * Drops a managed account from the work queue for this run so deferred accounts are not
-     * counted as unprocessed or touched again until the next aggregation reloads them from sources.
-     */
-    private removeManagedAccountFromWorkQueue(account: Account): void {
-        const id = getManagedAccountKeyFromAccount(account)
-        const byId = this.run.managedAccountsById
-        if (!id || !byId?.has(id)) {
-            return
-        }
-        byId.delete(id)
-        const identityId = account.identityId
-        if (identityId) {
-            const idSet = this.run.managedAccountsByIdentityId.get(identityId)
-            if (idSet) {
-                idSet.delete(id)
-                if (idSet.size === 0) {
-                    this.run.managedAccountsByIdentityId.delete(identityId)
                 }
             }
         }
@@ -1508,7 +1482,7 @@ export class FusionService {
         // Build the trigram blocking index over all currently-loaded fusion identities so that
         // each managed account can skip the vast majority of identity comparisons.
         // The index is rebuilt each run (identity pool may change between runs).
-        this.matchService.buildTrigramIndex(this.fusionIdentities)
+        this.matchingService.buildTrigramIndex(this.fusionIdentities)
 
         this.buildLinkedAccountKeyIndex()
 

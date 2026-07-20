@@ -4,6 +4,7 @@ import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionDecision } from '../form'
 import { FusionAccountKind, FusionAccountState } from '../fusionAccountTypes'
 import { StatusEntitlement } from '../statusEntitlement'
+import { FusionRun } from '../fusionRun'
 
 describe('FusionAccount', () => {
     const minimalConfig = {
@@ -80,14 +81,13 @@ describe('FusionAccount', () => {
 
         it('addManagedAccountLayer merges managed account', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            const accountsById = new Map<string, Account>([
-                ['src-a::native-1', { id: 'isc-acc-1', sourceId: 'src-a', nativeIdentity: 'native-1', sourceName: 'Source A', attributes: {} } as any]
-            ])
-            const accountsByIdentityId = new Map([['id-1', new Set(['src-a::native-1'])]])
+            const run = new FusionRun()
+            run.managedAccountsById.set('src-a::native-1', { id: 'isc-acc-1', sourceId: 'src-a', nativeIdentity: 'native-1', sourceName: 'Source A', attributes: {} } as any)
+            run.managedAccountsByIdentityId.set('id-1', new Set(['src-a::native-1']))
             
-            acc.addManagedAccountLayer(accountsById, accountsByIdentityId)
+            acc.addManagedAccountLayer(run)
             expect(acc.accountIds).toContain('src-a::native-1')
-            expect(accountsById.size).toBe(0)
+            expect(run.managedAccountsById.size).toBe(0)
         })
 
         it('addFusionDecisionLayer merges decision layer', () => {
@@ -478,15 +478,16 @@ describe('FusionAccount', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any
-            const accountsById = new Map<string, Account>([['src-a::native-1', account]])
-            const accountsByIdentityId = new Map<string, Set<string>>([['id-1', new Set(['src-a::native-1'])]])
+            const run = new FusionRun()
+            run.managedAccountsById.set('src-a::native-1', account)
+            run.managedAccountsByIdentityId.set('id-1', new Set(['src-a::native-1']))
 
-            acc.addManagedAccountLayer(accountsById, accountsByIdentityId)
+            acc.addManagedAccountLayer(run)
 
             expect(acc.accountIds).toContain('src-a::native-1')
             expect(acc.missingAccountIds).not.toContain('src-a::native-1')
-            expect(accountsById.size).toBe(0)
-            expect(accountsByIdentityId.has('id-1')).toBe(false)
+            expect(run.managedAccountsById.size).toBe(0)
+            expect(run.managedAccountsByIdentityId.has('id-1')).toBe(false)
         })
 
         it('claims accounts from previous run via previousAccountIds', () => {
@@ -507,14 +508,14 @@ describe('FusionAccount', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any
-            const accountsById = new Map<string, Account>([['src-a::native-1', account]])
-            const accountsByIdentityId = new Map<string, Set<string>>()
+            const run = new FusionRun()
+            run.managedAccountsById.set('src-a::native-1', account)
 
-            acc.addManagedAccountLayer(accountsById, accountsByIdentityId)
+            acc.addManagedAccountLayer(run)
 
             expect(acc.accountIds).toContain('src-a::native-1')
             expect(acc.missingAccountIds).toContain('src-a::native-1')
-            expect(accountsById.size).toBe(0)
+            expect(run.managedAccountsById.size).toBe(0)
         })
 
         it('sets orphan status when identity-origin account loses all managed accounts and identity is out of scope', () => {
@@ -522,11 +523,10 @@ describe('FusionAccount', () => {
             const acc = FusionAccount.fromIdentity(identity)
             acc.setOriginIdentityInScope(false)
 
-            const accountsById = new Map<string, Account>()
-            const accountsByIdentityId = new Map<string, Set<string>>()
+            const run = new FusionRun()
             const allAccountsById = new Map<string, Account>()
 
-            acc.addManagedAccountLayer(accountsById, accountsByIdentityId, allAccountsById, true)
+            acc.addManagedAccountLayer(run, allAccountsById, { pruneDeleted: true })
 
             expect(acc.isOrphan()).toBe(true)
             expect(acc.statuses).toContain('orphan')
@@ -549,11 +549,10 @@ describe('FusionAccount', () => {
             // Ensure previousAccountIds is hydrated from persisted accounts
             expect((acc as any).previousAccountIds).toContain('src-a::old-1')
 
-            const accountsById = new Map<string, Account>()
-            const accountsByIdentityId = new Map<string, Set<string>>()
+            const run = new FusionRun()
             const allAccountsById = new Map<string, Account>()
 
-            acc.addManagedAccountLayer(accountsById, accountsByIdentityId, allAccountsById, true)
+            acc.addManagedAccountLayer(run, allAccountsById, { pruneDeleted: true })
 
             expect(acc.accountIds).not.toContain('src-a::old-1')
             expect(acc.missingAccountIds).not.toContain('src-a::old-2')
@@ -571,11 +570,10 @@ describe('FusionAccount', () => {
                 },
             } as unknown as Account)
 
-            const accountsById = new Map<string, Account>()
-            const accountsByIdentityId = new Map<string, Set<string>>()
+            const run = new FusionRun()
             const allAccountsById = new Map<string, Account>()
 
-            acc.addManagedAccountLayer(accountsById, accountsByIdentityId, allAccountsById, true)
+            acc.addManagedAccountLayer(run, allAccountsById, { pruneDeleted: true })
 
             expect(acc.isOrphan()).toBe(true)
             expect(acc.needsRefresh).toBe(false)

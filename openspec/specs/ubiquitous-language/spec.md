@@ -38,28 +38,28 @@ All new domain terms, states, or classifications SHALL be defined in this spec b
 
 ### Requirement: Code uses canonical terms
 
-Source code SHALL use the canonical terms from this spec for variable names, function names, type names, class names, file names, and comments. The retired term **AttributeService** SHALL be replaced with **MapService** or **DefineService** as appropriate. The retired term **ScoringService** SHALL be replaced with **MatchService**.
+Source code SHALL use the canonical terms from this spec for variable names, function names, type names, class names, file names, and comments. The retired term **AttributeService** SHALL be replaced with **MappingService** or **DefinitionService** as appropriate. The retired term **ScoringService** SHALL be replaced with **MatchingService**.
 
 #### Scenario: Variable naming follows ubiquitous language (updated)
 
 - **WHEN** a developer declares a variable representing the map service
-- **THEN** the variable SHALL be named `mapService`, not `attributeService`
+- **THEN** the variable SHALL be named `mappingService`, not `attributeService`
 - **WHEN** a developer declares a variable representing the match service
-- **THEN** the variable SHALL be named `matchService`, not `scoringService`
+- **THEN** the variable SHALL be named `matchingService`, not `scoringService`
 - **WHEN** a developer declares a variable representing a domain concept
 - **THEN** the variable name SHALL match the canonical term (e.g., `fusionAccount`, not `consolidatedAccount`; `managedSourceAccount`, not `rawAccount`)
 
 #### Scenario: Function naming follows ubiquitous language (updated)
 
 - **WHEN** a developer creates a function that calls the map service
-- **THEN** the function SHALL reference `mapService.mapAttributes`, not `attributeService.mapAttributes`
+- **THEN** the function SHALL reference `mappingService.mapAttributes`, not `attributeService.mapAttributes`
 - **WHEN** a developer creates a function that operates on domain concepts
 - **THEN** the function name SHALL use canonical terms (e.g., `scoreIdentityCandidates`, not `analyzeIdentityPhase`; `hasDeferredCandidateMatches`, not `hasNewUnmatchedPeerMatches`)
 
 #### Scenario: Type naming follows ubiquitous language (updated)
 
 - **WHEN** a developer defines a type, enum, or class for match outcomes
-- **THEN** the type SHALL reference `MatchService`, not `ScoringService`
+- **THEN** the type SHALL reference `MatchingService`, not `ScoringService`
 - **WHEN** a developer defines a type, enum, or class for a domain concept
 - **THEN** the type name SHALL use canonical terms (e.g., `MatchCandidateType.Deferred`, not `NewUnmatched`; `ManagedAccountMatchingRunner`, not `ManagedAccountPassRunner`)
 
@@ -223,12 +223,12 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 #### Scenario: Code review discovers AttributeService reference
 
 - **WHEN** a code review finds `AttributeService` in identifiers or imports
-- **THEN** the contributor SHALL rename to `MapService` or `DefineService` based on the phase being referenced
+- **THEN** the contributor SHALL rename to `MappingService` or `DefinitionService` based on the phase being referenced
 
 #### Scenario: Code review discovers ScoringService reference
 
 - **WHEN** a code review finds `ScoringService` in identifiers or imports
-- **THEN** the contributor SHALL rename to `MatchService`
+- **THEN** the contributor SHALL rename to `MatchingService`
 
 #### Scenario: Code review discovers a retired term
 
@@ -277,9 +277,9 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 
 | Term | Definition |
 |------|------------|
-| **MapService** | The stateless service responsible for the **Map** step — merging attributes from managed source accounts into the Fusion account schema using configurable merge strategies. Located at `src/services/mapService/`. |
-| **DefineService** | The stateless service responsible for the **Define** step — computing normal attributes via Velocity templates and generating persistent unique attributes (UUIDs, counters, disambiguated values). Located at `src/services/defineService/`. |
-| **MatchService** | The stateless service responsible for the **Match** step — comparing Fusion accounts against existing identities using weighted scoring rules and dispatching match outcomes (exact match, partial match, deferred match, non-match). Located at `src/services/matchService/`. |
+| **MappingService** | The stateless service responsible for the **Map** step — merging attributes from managed source accounts into the Fusion account schema using configurable merge strategies. Located at `src/services/mappingService/`. |
+| **DefinitionService** | The stateless service responsible for the **Define** step — computing normal attributes via Velocity templates and generating persistent unique attributes (UUIDs, counters, disambiguated values). Located at `src/services/definitionService/`. |
+| **MatchingService** | The stateless service responsible for the **Match** step — comparing Fusion accounts against existing identities using weighted scoring rules and dispatching match outcomes (exact match, partial match, deferred match, non-match). Located at `src/services/matchingService/`. |
 | **FusionRun** | The centralized state container for a single operation run. Holds all mutable data loaded during the run (managed accounts, identities, Fusion accounts, form decisions, matching state) and serves as the single source of truth that stateless services read from and write to. Exposes `snapshot()` and `restore()` for recording and replay. Located at `src/model/fusionRun.ts`. |
 
 ### Matching and scoring
@@ -317,6 +317,99 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 | **Orphan** | A Fusion account that no longer has any contributing managed source accounts. Depending on configuration, orphan accounts may be removed or disabled. |
 | **Deferred** | A match result where the best candidate is a deferred candidate from the same source in the same operation run. The connector defers creating a new identity until a later aggregation can compare against the established baseline. |
 
+### Entitlement system
+
+Fusion accounts carry two kinds of entitlements in their schema, distinguished by how they are assigned and what they represent:
+
+| Entitlement type | Schema flag | Assignment | Purpose |
+|---|---|---|---|
+| **Action** | `managed: true` | Assigned by ISC (via roles, access profiles, or direct assignment) | Trigger connector processing when assigned or removed |
+| **Status** | `managed: false` | Calculated by the connector — never assigned externally | Describe the account's current processing state |
+
+**Action entitlements** drive behavior. Assigning a `report` action to a Fusion account triggers report generation. Removing a `reviewer:<sourceId>` action revokes a reviewer's scope.
+
+**Status entitlements** are read-only signals. They let users search, filter, and understand where each account is in the Fusion lifecycle without external assignment being possible.
+
+#### Action entitlements
+
+| Term | Wire value | Definition |
+|---|---|---|
+| **FusionReport** | `report` | Assign to trigger generation of a Fusion report for this account. |
+| **Fusion** | `fusion` | Assign to mark this as a Fusion account. |
+| **Correlated** | `correlated` | Set by the connector when all managed source accounts for this Fusion account have been correlated. Triggers correlation of missing source accounts when assigned externally. |
+| **Reviewer** | `reviewer:<sourceId>` | Assign to designate an identity as a reviewer for a specific managed source. The suffix identifies the source. The `reviewer` status entitlement is also set on the reviewer's Fusion account to mark their role. |
+
+#### Status entitlements
+
+| Term | Wire value | Definition |
+|---|---|---|
+| **Uncorrelated** | `uncorrelated` | The Fusion account has managed source accounts that are not yet linked to a known identity. |
+| **Baseline** | `baseline` | The identity existed before this Fusion source aggregation and is included as a comparison point during Match. |
+| **Non-matched** | `nonMatched` | A managed source account completed the Match step without finding any acceptable identity candidate. |
+| **Orphan** | `orphan` | A Fusion account that no longer has any contributing managed source accounts. |
+| **Authorized** | `authorized` | A managed source account was manually correlated to an identity by a reviewer. |
+| **Auto** | `auto` | A managed source account was automatically assigned to an identity after an exact attribute match (all rules scored 100). |
+| **Manual** | `manual` | A new Fusion account was manually approved by a reviewer. |
+| **Reviewer** | `reviewer` | The identity is a Match reviewer for one or more managed sources. Set alongside the `reviewer:<sourceId>` action entitlement. |
+| **Requested** | `requested` | The account was requested (created via provisioning). |
+| **ActiveReviews** | `activeReviews` | The account has one or more pending Fusion review forms awaiting reviewer decision. |
+| **Candidate** | `candidate` | The identity is part of a pending Fusion review as a potential match candidate. |
+
+### Review and decision domain
+
+| Term | Definition |
+|---|---|
+| **Reviewer** | A person who reviews identity candidates presented in a Fusion review form and decides whether a Fusion account should link to an existing identity or create a new one. A reviewer's Fusion identity carries the `reviewer` status entitlement and one or more `reviewer:<sourceId>` action entitlements. |
+| **Review form** | An ISC form instance presented to reviewers showing identity candidates and their attribute values, with options to link to an existing identity or create a new one. |
+| **FusionDecision** | A reviewer's decision on a review form. Contains the chosen outcome (link to existing identity or create new identity), the submitter, comments, and whether the decision is finished. |
+| **Manual review workflow** | The process flow: potential matches are identified → review forms are created with top candidates → reviewers evaluate and decide → decisions are applied by the connector on the next account aggregation. |
+| **Global reviewer** | A reviewer automatically added to all review forms regardless of source. Controlled by **Owners are global reviewers?** in Review Settings. When enabled, Fusion source owners and members of the source governance group are added as reviewers on every form. |
+| **Form attributes** | The Fusion account attributes displayed on the review form to help reviewers compare candidates. Configured in **Review Settings → List of Fusion account attributes to include in form**. |
+| **Form expiration** | The number of days a reviewer has to respond before a review form expires. Configured in **Review Settings → Manual review expiration days**. |
+
+### Matching nuances
+
+| Term | Definition |
+|---|---|
+| **Matching rule** | A per-attribute comparison configuration within the Match step. Each rule specifies the attribute to compare, the similarity algorithm, a minimum similarity threshold, and a relative weight toward the combined match score. |
+| **Mandatory match** | A matching rule that must pass (meet its threshold) for a candidate to be considered a potential match. If a mandatory rule fails, the candidate is rejected regardless of the combined match score. |
+| **Skip match if missing** | When enabled on a matching rule, the rule is excluded from the combined score if the attribute is absent from either side of the comparison. |
+| **Skip match if threshold not met** | When enabled on a matching rule, the rule contributes a zero-weighted score but does not disqualify the candidate if its individual threshold is not met. |
+| **Manual review match score** | The minimum combined match score (0–100) required for a candidate to enter manual review. Candidates scoring below this threshold but above any lower cutoff are non-matched. |
+| **Automatic assignment match score** | The minimum combined match score (0–100) above which a candidate is automatically linked to an identity without manual review. Requires **Enable automatic assignment** to be on. |
+| **Maximum candidates per review form** | The maximum number of identity candidates displayed on a single review form. Configured in Review Settings. |
+
+### Matching algorithms
+
+| Term | Definition |
+|---|---|
+| **Enhanced Name Matcher** | A name-specialized algorithm that tokenizes name components (first, middle, last, titles, suffixes), handles cultural naming patterns and nicknames, and compares using bigrams. The recommended algorithm for name attributes. |
+| **Jaro-Winkler** | A string-similarity algorithm based on Jaro distance with a prefix-weighting bonus. Favors strings that share a common prefix. |
+| **LIG3** | A phonetic and string-similarity hybrid algorithm. |
+| **Dice** | The Sorensen-Dice coefficient — measures similarity as twice the intersection of bigrams divided by the sum of bigram counts. |
+| **Double Metaphone** | A phonetic algorithm that produces two pronunciation codes per string (primary and alternate), useful for comparing names that sound similar but are spelled differently. |
+| **Binary** | Exact-match comparison. Returns 100 when attribute values are identical, 0 otherwise. |
+| **Custom Algorithm** | A user-defined Apache Velocity expression that computes a similarity score from the two attribute values. |
+
+### Velocity and Define context
+
+| Term | Definition |
+|---|---|
+| **Normal attribute definition** | A Define-step rule that computes a Fusion account attribute value using an Apache Velocity template. Runs during every aggregation; may be configured as **Static** (never recalculated) or **Refresh on each aggregation** (always recalculated). |
+| **Unique attribute definition** | A Define-step rule that generates a value guaranteed to be unique across all Fusion accounts. Uses collision-based disambiguation or an incremental counter. Runs after normal definitions. |
+| **Static attribute** | A normal attribute evaluated only once — when the attribute has no value. Existing values are never recalculated. Overrides **Refresh on each aggregation**. |
+| **$account** | The origin account snapshot available in Velocity templates — the managed source account that triggered creation, or the identity-origin row when the origin is the Identities source. |
+| **$accounts** | An ordered list of all managed source account snapshots contributing to the Fusion account. Ordered by configured sources, then insertion order. |
+| **$sources** | A Map keyed by source name containing per-source account snapshots. Accessible via dot notation (`$sources.Workday`). |
+| **$identity** | The correlated ISC identity object, available when the Fusion account is linked to an identity. |
+| **$previous** | The Fusion account's attributes from the previous aggregation. Used for change detection. |
+| **$counter** | In unique attribute definitions: renders empty on the first attempt and a zero-padded digit suffix on subsequent collision-retry attempts. Controlled by **Minimum counter digits** and **Maximum attempts**. |
+| **$UUID** | Generates a fresh random v4 UUID. Referencing it in the expression triggers a new UUID per attempt. |
+| **$isUnique(value)** | Returns `true` when the given value (after applying the definition's case, trim, spaces, normalize, and maxLength transformations) is not already registered as in use. Allows branching between candidate formats before falling back to `$counter`. |
+| **$originSource** | Resolves to the name of the source that originally created this Fusion account. |
+| **Incremental counter** | A persistent, always-incrementing counter that survives across aggregations. Controlled by **Use incremental counter?** and **Counter start value**. When off, collision-based disambiguation is used instead. |
+| **Collision-based disambiguation** | The default unique-value strategy: the expression is re-evaluated with an incrementing `$counter` suffix until a value is found that is not already in use, up to **Maximum attempts**. |
+
 ## Retired Terms
 
 The following terms are retired and SHALL NOT be used in new code, configuration, or documentation:
@@ -334,7 +427,7 @@ The following terms are retired and SHALL NOT be used in new code, configuration
 | `hasNewUnmatchedPeerMatches` | `hasDeferredCandidateMatches` |
 | `ManagedAccountPassRunner` | `ManagedAccountMatchingRunner` |
 | `processing run` | operation run, or the specific operation name when referring to the command definition |
-| `AttributeService` | `MapService` (for attribute mapping/merging) + `DefineService` (for attribute computation and unique value generation) |
-| `ScoringService` | `MatchService` (scoring remains as the computation technique within matching) |
-| `attribute-service` (spec) | `map-service` + `define-service` |
-| `scoring-service` (spec) | `match-service` |
+| `AttributeService` | `MappingService` (for attribute mapping/merging) + `DefinitionService` (for attribute computation and unique value generation) |
+| `ScoringService` | `MatchingService` (scoring remains as the computation technique within matching) |
+| `attribute-service` (spec) | `mapping-service` + `definition-service` |
+| `scoring-service` (spec) | `matching-service` |

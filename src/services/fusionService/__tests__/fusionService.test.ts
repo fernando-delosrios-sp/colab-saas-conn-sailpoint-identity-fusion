@@ -6,9 +6,9 @@ import { LogService } from '../../logService'
 import { IdentityService } from '../../identityService'
 import { SourceService } from '../../sourceService'
 import { FormService } from '../../formService'
-import { MapService } from '../../mapService'
-import { DefineService } from '../../defineService'
-import { MatchService } from '../../matchService'
+import { MappingService } from '../../mappingService'
+import { DefinitionService } from '../../definitionService'
+import { MatchingService } from '../../matchingService'
 import { SchemaService } from '../../schemaService'
 import { ServiceRegistry } from '../../serviceRegistry'
 import { FusionConfig, SourceType } from '../../../model/config'
@@ -24,9 +24,9 @@ vi.mock('../../logService')
 vi.mock('../../identityService')
 vi.mock('../../sourceService')
 vi.mock('../../formService')
-vi.mock('../../mapService')
-vi.mock('../../defineService')
-vi.mock('../../matchService')
+vi.mock('../../mappingService')
+vi.mock('../../definitionService')
+vi.mock('../../matchingService')
 vi.mock('../../schemaService')
 
 describe('FusionService', () => {
@@ -38,9 +38,9 @@ describe('FusionService', () => {
     let mockIdentities: Mocked<IdentityService>
     let mockSources: Mocked<SourceService>
     let mockForms: Mocked<FormService>
-    let mockMapService: Mocked<MapService>
-    let mockDefineService: Mocked<DefineService>
-    let mockMatchService: Mocked<MatchService>
+    let mockMappingService: Mocked<MappingService>
+    let mockDefinitionService: Mocked<DefinitionService>
+    let mockMatchingService: Mocked<MatchingService>
     let mockSchemas: Mocked<SchemaService>
     let mockConfig: FusionConfig
 
@@ -63,7 +63,7 @@ describe('FusionService', () => {
         // Reset mocks
         mockLog = new LogService({ spConnDebugLoggingEnabled: false }) as Mocked<LogService>
         const mockClient = {} as any
-        mockSources = new SourceService(mockConfig, mockLog, mockClient) as Mocked<SourceService>
+        mockSources = new SourceService(mockConfig, mockLog, mockClient, run) as Mocked<SourceService>
         ;(mockSources as any)._fusionSourceId = FUSION_SOURCE_ID
         Object.defineProperty(mockSources, 'fusionSourceId', {
             get: vi.fn(() => FUSION_SOURCE_ID),
@@ -73,7 +73,8 @@ describe('FusionService', () => {
             mockConfig,
             mockLog,
             mockClient,
-            mockSources
+            mockSources,
+            run
         ) as Mocked<IdentityService>
         mockForms = new FormService(
             mockConfig,
@@ -84,20 +85,20 @@ describe('FusionService', () => {
         ) as Mocked<FormService>
         const mockLocks = {} as any
         mockSchemas = new SchemaService(mockConfig, mockLog, mockSources, mockClient) as Mocked<SchemaService>
-        mockMapService = new MapService(
+        mockMappingService = new MappingService(
             mockConfig,
             mockLog
-        ) as Mocked<MapService>
-        mockDefineService = new DefineService(
+        ) as Mocked<MappingService>
+        mockDefinitionService = new DefinitionService(
             mockConfig,
             mockSchemas,
             mockLog,
             mockLocks
-        ) as Mocked<DefineService>
-        mockMatchService = new MatchService(
+        ) as Mocked<DefinitionService>
+        mockMatchingService = new MatchingService(
             mockConfig,
             mockLog
-        ) as Mocked<MatchService>
+        ) as Mocked<MatchingService>
 
         // Mock specific properties/methods needed for initialization
         Object.defineProperty(mockSources, 'managedAccountsById', {
@@ -160,9 +161,9 @@ describe('FusionService', () => {
             mockIdentities,
             mockSources,
             mockForms,
-            mockMapService,
-            mockDefineService,
-            mockMatchService,
+            mockMappingService,
+            mockDefinitionService,
+            mockMatchingService,
             mockSchemas,
             run,
             StandardCommand.StdAccountList
@@ -176,9 +177,9 @@ describe('FusionService', () => {
             identities: mockIdentities,
             schemas: mockSchemas,
             forms: mockForms,
-            map: mockMapService,
-            define: mockDefineService,
-            match: mockMatchService,
+            mapping: mockMappingService,
+            definition: mockDefinitionService,
+            matching: mockMatchingService,
             log: mockLog,
         } as unknown as ServiceRegistry)
     })
@@ -195,7 +196,7 @@ describe('FusionService', () => {
             const key = { simple: { id: 'NG000025' } }
             const fusionAccount = FusionAccount.fromIdentity({ id: 'NG000025', name: 'Ada Wong' } as IdentityDocument)
 
-            mockDefineService.getSimpleKey.mockReturnValue(key)
+            mockDefinitionService.getSimpleKey.mockReturnValue(key)
             mockSchemas.getFusionAttributeSubset.mockReturnValue({ id: 'NG000025', name: 'Ada Wong' })
             mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses'])
 
@@ -215,7 +216,7 @@ describe('FusionService', () => {
                 name: 'Candidate Only',
             } as IdentityDocument)
 
-            mockDefineService.getSimpleKey.mockReturnValue(key)
+            mockDefinitionService.getSimpleKey.mockReturnValue(key)
             mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
             mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
@@ -249,7 +250,7 @@ describe('FusionService', () => {
             } as IdentityDocument)
             fusionAccount.setSourceReviewer('src-1')
 
-            mockDefineService.getSimpleKey.mockReturnValue(key)
+            mockDefinitionService.getSimpleKey.mockReturnValue(key)
             mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
             mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
@@ -315,9 +316,9 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
             mockIdentities.getIdentityById.mockReturnValue(undefined)
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.registerUniqueAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             // deleteIdentity must exist on the mock (it's a new method)
             mockIdentities.deleteIdentity = vi.fn()
@@ -341,9 +342,9 @@ describe('FusionService', () => {
             } as unknown as Account
 
             vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.registerUniqueAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             mockIdentities.deleteIdentity = vi.fn()
 
@@ -369,9 +370,9 @@ describe('FusionService', () => {
             const mockIdentityDoc = { id: identityId, name: 'Dedup Identity' } as IdentityDocument
 
             vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockFusionAccount])
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.registerUniqueAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             // deleteIdentity removes identity from the service cache; simulate this by tracking calls
             const deletedIds = new Set<string>()
@@ -444,9 +445,9 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.registerUniqueAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             vi.spyOn(mockForms, 'getFusionAssignmentDecision').mockReturnValue({
                 submitter: { id: 'reviewer-1', email: 'r@example.com', name: 'fernando.delosrios' },
@@ -566,8 +567,8 @@ describe('FusionService', () => {
             vi.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
 
             // Mock mapAttributes since it's called in processIdentity
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const result = await fusionService.processIdentities()
 
@@ -583,8 +584,8 @@ describe('FusionService', () => {
                 name: 'Reset Identity',
             } as IdentityDocument
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const result = await fusionService.processIdentity(mockIdentity)
 
@@ -601,8 +602,8 @@ describe('FusionService', () => {
                 },
             } as unknown as IdentityDocument
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const result = await fusionService.processIdentity(mockIdentity)
 
@@ -624,16 +625,16 @@ describe('FusionService', () => {
                 },
             } as unknown as IdentityDocument
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.applyDisplayAttributeOverride.mockImplementation((account) => {
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.applyDisplayAttributeOverride.mockImplementation((account) => {
                 account.attributes.displayName = account.identityName ?? null
             })
 
             const result = await fusionService.processIdentity(mockIdentity)
 
             expect(result).toBeDefined()
-            mockDefineService.applyDisplayAttributeOverride(result!)
+            mockDefinitionService.applyDisplayAttributeOverride(result!)
             expect(result?.attributes.displayName).toBe('Jane Doe')
         })
 
@@ -653,7 +654,7 @@ describe('FusionService', () => {
 
     describe('processManagedAccounts', () => {
         beforeEach(() => {
-            mockDefineService.refreshReverseCorrelationAttributes.mockImplementation((fusionAccount) => {
+            mockDefinitionService.refreshReverseCorrelationAttributes.mockImplementation((fusionAccount) => {
                 const configs = (mockConfig as any).sources ?? []
                 for (const sc of configs) {
                     if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
@@ -721,8 +722,8 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
             mockIdentities.getIdentityById.mockReturnValue(undefined)
             mockIdentities.fetchIdentityById.mockResolvedValue({ id: 'identity-exact', name: 'Exact Identity' } as any)
-            mockMapService.mapAttributes.mockImplementation((fusionAccount) => fusionAccount)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((fusionAccount) => fusionAccount)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const analyzed = FusionAccount.fromManagedAccount(account as any)
             analyzed.addFusionMatch({
@@ -782,10 +783,10 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
                 if (candidateType !== 'deferred') return candidateList.length
                 if (candidateList.length > 0) {
@@ -839,10 +840,10 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 if (candidateType === 'identity' && account.managedAccountId === 'source-a-id::native-batch-def-1') {
                     await new Promise((resolve) => setTimeout(resolve, 5))
                 }
@@ -930,8 +931,8 @@ describe('FusionService', () => {
                 sourceType: 'authoritative',
                 config: { deferredMatching: true },
             })
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             let inFlightIdentityA = 0
             let maxInFlightIdentityA = 0
@@ -939,7 +940,7 @@ describe('FusionService', () => {
             let maxInFlightIdentityB = 0
             let inFlightDeferredB = 0
             let maxInFlightDeferredB = 0
-            mockMatchService.scoreFusionAccount.mockImplementation(async (fusionAccount, candidates, candidateType) => {
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (fusionAccount, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
                 if (candidateType === 'identity') {
                     if (fusionAccount.sourceName === 'Source A') {
@@ -1011,11 +1012,11 @@ describe('FusionService', () => {
                 sourceType: 'authoritative',
                 config: { deferredMatching: true },
             })
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const sourceBDeferredCandidateSizes: number[] = []
-            mockMatchService.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
                 const n = Array.from(candidates).length
                 if (candidateType === 'deferred') sourceBDeferredCandidateSizes.push(n)
                 return n
@@ -1104,10 +1105,10 @@ describe('FusionService', () => {
             } as any)
             fusionService.setFusionAccount(existingIdentity)
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
                 if (candidateType === 'identity') {
                     account.addFusionMatch({
@@ -1122,8 +1123,8 @@ describe('FusionService', () => {
 
             await (fusionService as any).matchingRunner.execute([mockManagedAccount], 1, Date.now())
 
-            expect(mockMatchService.scoreFusionAccount).toHaveBeenCalledTimes(1)
-            expect(mockMatchService.scoreFusionAccount).toHaveBeenCalledWith(
+            expect(mockMatchingService.scoreFusionAccount).toHaveBeenCalledTimes(1)
+            expect(mockMatchingService.scoreFusionAccount).toHaveBeenCalledWith(
                 expect.any(FusionAccount),
                 expect.anything(),
                 'identity',
@@ -1148,12 +1149,12 @@ describe('FusionService', () => {
                 config: { includeRecordAccountsForMatching: false },
             })
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             await (fusionService as any).matchingRunner.execute([mockManagedAccount], 1, Date.now())
 
-            expect(mockMatchService.scoreFusionAccount).not.toHaveBeenCalled()
+            expect(mockMatchingService.scoreFusionAccount).not.toHaveBeenCalled()
         })
 
         it('runs Match scoring for record sources when includeRecordAccountsForMatching is omitted (default)', async () => {
@@ -1173,13 +1174,13 @@ describe('FusionService', () => {
                 config: {},
             })
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockMatchService.scoreFusionAccount.mockResolvedValue(0)
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
 
             await (fusionService as any).matchingRunner.execute([mockManagedAccount], 1, Date.now())
 
-            expect(mockMatchService.scoreFusionAccount).toHaveBeenCalled()
+            expect(mockMatchingService.scoreFusionAccount).toHaveBeenCalled()
         })
 
         it('logs deferred matches and suppresses output for deferred candidate matches', async () => {
@@ -1217,10 +1218,10 @@ describe('FusionService', () => {
                 }
             }
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
@@ -1278,10 +1279,10 @@ describe('FusionService', () => {
                 }
             }
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
@@ -1313,9 +1314,9 @@ describe('FusionService', () => {
                 mockIdentities,
                 mockSources,
                 mockForms,
-                mockMapService,
-                mockDefineService,
-                mockMatchService,
+                mockMappingService,
+                mockDefinitionService,
+                mockMatchingService,
                 mockSchemas,
                 run,
                 StandardCommand.StdAccountList,
@@ -1359,10 +1360,10 @@ describe('FusionService', () => {
                 }
             }
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
@@ -1525,9 +1526,9 @@ describe('FusionService', () => {
                 mockIdentities,
                 mockSources,
                 mockForms,
-                mockMapService,
-                mockDefineService,
-                mockMatchService,
+                mockMappingService,
+                mockDefinitionService,
+                mockMatchingService,
                 mockSchemas,
                 run,
                 undefined,
@@ -1635,9 +1636,9 @@ describe('FusionService', () => {
                 mockIdentities,
                 mockSources,
                 mockForms,
-                mockMapService,
-                mockDefineService,
-                mockMatchService,
+                mockMappingService,
+                mockDefinitionService,
+                mockMatchingService,
                 mockSchemas,
                 run,
                 undefined
@@ -1695,9 +1696,9 @@ describe('FusionService', () => {
                 mockIdentities,
                 mockSources,
                 mockForms,
-                mockMapService,
-                mockDefineService,
-                mockMatchService,
+                mockMappingService,
+                mockDefinitionService,
+                mockMatchingService,
                 mockSchemas,
                 run,
                 undefined
@@ -1756,9 +1757,9 @@ describe('FusionService', () => {
                 mockIdentities,
                 mockSources,
                 mockForms,
-                mockMapService,
-                mockDefineService,
-                mockMatchService,
+                mockMappingService,
+                mockDefinitionService,
+                mockMatchingService,
                 mockSchemas,
                 run,
                 undefined
@@ -1818,7 +1819,7 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedAccountsMap)
 
             // Mock scoring
-            mockMatchService.scoreFusionAccount.mockImplementation(
+            mockMatchingService.scoreFusionAccount.mockImplementation(
                 async (_account, candidates) => Array.from(candidates).length
             )
 
@@ -1881,8 +1882,8 @@ describe('FusionService', () => {
                 config: {},
             })
 
-            mockMapService.mapAttributes.mockImplementation((a) => a)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((a) => a)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const spyFinalize = vi.spyOn(fusionService as any, 'finalizeAuthoritativeNonMatch')
 
@@ -1964,9 +1965,9 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.registerUniqueAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             const result = await fusionService.processFusionAccount(historicalAccount)
 
@@ -1996,9 +1997,9 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.registerUniqueAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             const result = await fusionService.processFusionAccount(historicalAccount)
 
@@ -2053,9 +2054,9 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.registerUniqueAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             const result = await fusionService.processFusionAccount(historicalAccount)
 
@@ -2111,9 +2112,9 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.registerUniqueAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             const result = await fusionService.processFusionAccount(historicalAccount)
 
@@ -2145,9 +2146,9 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.registerUniqueAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             const result = await fusionService.processFusionAccount(historicalAccount)
 
@@ -2282,10 +2283,10 @@ describe('FusionService', () => {
                 sourceType: 'authoritative',
                 config: {},
             })
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
                 if (candidateType !== 'deferred') return candidateList.length
                 if (candidateList.length > 0) {
@@ -2335,8 +2336,8 @@ describe('FusionService', () => {
                 config: { deferredMatching: true },
             })
 
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const workQueue = new Map() as Map<string, Account>
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
@@ -2355,7 +2356,7 @@ describe('FusionService', () => {
             } as Account
 
             let deferredCandidatesFound = 0
-            mockMatchService.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
                 const n = Array.from(candidates).length
                 if (candidateType === 'deferred') {
                     deferredCandidatesFound = n
@@ -2596,8 +2597,8 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[managedKey, managedAccount]])
             )
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
             mockIdentities.correlateAccounts.mockResolvedValue(true)
             vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
@@ -2661,8 +2662,8 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[managedKeyAuto, managedAccount]])
             )
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
             mockIdentities.correlateAccounts.mockResolvedValue(true)
             vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
@@ -2724,8 +2725,8 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[managedKeyAutoCorr, managedAccount]])
             )
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
             mockIdentities.correlateAccounts.mockResolvedValue(true)
             vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
@@ -2774,8 +2775,8 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[managedKeyNoId, managedAccount]])
             )
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
@@ -2815,8 +2816,8 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[managedKeyAuthz, managedAccount]])
             )
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(undefined as any)
             mockIdentities.fetchIdentityById.mockResolvedValue({
                 id: 'identity-1',
@@ -2858,9 +2859,9 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
-            mockDefineService.registerUniqueAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
@@ -2881,7 +2882,7 @@ describe('FusionService', () => {
             const result = await fusionService.processFusionIdentityDecision(decision)
 
             expect(result).toBeUndefined()
-            expect(mockDefineService.registerUniqueAttributes).toHaveBeenCalledTimes(1)
+            expect(mockDefinitionService.registerUniqueAttributes).toHaveBeenCalledTimes(1)
         })
 
         it('safely skips orphan disable queue when account is no longer in managed map', async () => {
@@ -2899,8 +2900,8 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             ;(fusionService as any).sourcesByName.set('Orphan Source', {
                 id: 'src-orphan-1',
                 name: 'Orphan Source',
@@ -2937,8 +2938,8 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const setFusionAccountSpy = vi.spyOn(fusionService, 'setFusionAccount')
             const decision = {
@@ -3014,8 +3015,8 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
                 new Map([[histKey, managedAccount]])
             )
-            mockMapService.mapAttributes.mockImplementation((account) => account)
-            mockDefineService.refreshNormalAttributes.mockResolvedValue()
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const decision = {
                 submitter: { id: 'reviewer-1', email: ' ', name: ' ' },

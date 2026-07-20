@@ -18,15 +18,22 @@ import { IDENTITIES_SOURCE_NAME } from './constructionRules'
 import { addAccountId, removeMissingAccountId } from './collectionRules'
 import { setManual, setAuthorized, setUncorrelatedAccount } from './statusRules'
 import { addHistory, formatHistoryAccountInfo } from './historyRules'
-import { FusionMatch } from '../../services/matchService'
+import { FusionMatch } from '../../services/matchingService'
 import type { FusionAccount } from '../fusionAccount'
 import {
     preserveMissingAccountContext,
     processIdentityMatchedAccounts,
     processPreviousRunMatchedAccounts,
     pruneDeletedManagedAccounts,
-    type MatchContext,
 } from '../fusionAccountMatcher'
+import type { WorkQueue } from '../fusionRun'
+
+export interface AddManagedAccountOptions {
+    pruneDeleted?: boolean
+    addBlendHistory?: boolean
+    skipBlendHistoryForManagedKeys?: ReadonlySet<string>
+    onBlend?: (account: Account) => void
+}
 
 // ============================================================================
 // Internal helpers
@@ -161,14 +168,16 @@ export function setManagedAccount(
  */
 export function addManagedAccountLayer(
     state: FusionAccountState,
-    accountsById: Map<string, Account>,
-    accountsByIdentityId: Map<string, Set<string>>,
+    workQueue: WorkQueue,
     allAccountsById?: Map<string, Account>,
-    pruneDeletedManagedAccountsFlag = false,
-    addBlendHistory = true,
-    skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
-    onBlend?: (account: Account) => void
+    options: AddManagedAccountOptions = {}
 ): void {
+    const {
+        pruneDeleted = false,
+        addBlendHistory = true,
+        skipBlendHistoryForManagedKeys,
+        onBlend,
+    } = options
     const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> => {
         // Iterate Set directly to prevent Array.from heap allocation
         const result = new Set<string>()
@@ -185,54 +194,27 @@ export function addManagedAccountLayer(
     state.missingAccountIds = normalizeManagedAccountKeySet(state.missingAccountIds)
     state.accountIds = normalizeManagedAccountKeySet(state.accountIds)
 
-    const ctx: MatchContext = {
-        identityId: state.identityInfo?.id,
-        previousAccountIds: state.previousAccountIds,
-        missingAccountIdsSet: state.missingAccountIds,
-        accountIdsSet: state.accountIds,
-        setCorrelatedAccount: (id: string) => setCorrelatedAccount(state, id),
-        setUncorrelatedAccount: (id: string) => setUncorrelatedAccount(state, id),
-        setManagedAccount: (account: Account, addHistory: boolean, skipKeys?: ReadonlySet<string>) =>
-            setManagedAccount(state, account, addHistory, skipKeys),
-        hasManagedAccountInfo: (accountId: string) => state.managedAccountInfo.has(accountId),
-        setManagedAccountInfo: (accountId: string, sourceName: string, nativeIdentity: string) =>
-            state.managedAccountInfo.set(accountId, {
-                source: { name: sourceName },
-                schema: { id: nativeIdentity },
-            }),
-        deleteManagedAccountInfo: (accountId: string) => state.managedAccountInfo.delete(accountId),
-        addHistory: (message: string) => addHistory(state, message),
-        setNeedsRefresh: (refresh: boolean) => {
-            state.needsRefresh = refresh
-        },
-        deleteAccountId: (id: string) => state.accountIds.delete(id),
-        deleteMissingAccountId: (id: string) => state.missingAccountIds.delete(id),
-    }
-
     processIdentityMatchedAccounts(
-        ctx,
-        accountsById,
-        accountsByIdentityId,
+        state,
+        workQueue,
         addBlendHistory,
         skipBlendHistoryForManagedKeys,
         onBlend
     )
     processPreviousRunMatchedAccounts(
-        ctx,
-        accountsById,
-        accountsByIdentityId,
+        state,
+        workQueue,
         addBlendHistory,
         skipBlendHistoryForManagedKeys,
         onBlend
     )
 
-    // Prune account references that no longer exist in the managed-account inventory.
-    if (pruneDeletedManagedAccountsFlag && allAccountsById) {
-        pruneDeletedManagedAccounts(ctx, allAccountsById)
+    if (pruneDeleted && allAccountsById) {
+        pruneDeletedManagedAccounts(state, allAccountsById)
     }
 
     if (allAccountsById) {
-        preserveMissingAccountContext(ctx, allAccountsById)
+        preserveMissingAccountContext(state, allAccountsById)
     }
 
     // Update orphan status based on final account state

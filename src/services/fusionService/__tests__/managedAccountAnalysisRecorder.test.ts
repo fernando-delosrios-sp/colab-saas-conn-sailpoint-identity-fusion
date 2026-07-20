@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { AggregationTracker } from '../aggregationTracker'
 import { ManagedAccountAnalysisRecorder } from '../managedAccountAnalysisRecorder'
 import { SourceType } from '../../../model/config'
-import { MatchCandidateType } from '../../matchService/types'
+import { MatchCandidateType } from '../../matchingService/types'
 
 function makeRecorder(overrides: Record<string, any> = {}) {
     const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any

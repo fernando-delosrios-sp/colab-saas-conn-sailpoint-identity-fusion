@@ -16,7 +16,21 @@ export interface RunStateSnapshot {
     phaseTimings: { phase: string; elapsed: string }[]
 }
 
-export class FusionRun {
+export interface ManagedAccountEntry {
+    readonly accountKey: string
+    readonly account: Account
+    readonly identityId?: string
+}
+
+export interface WorkQueue {
+    get(key: string): Account | undefined
+    getKeysForIdentity(identityId: string): ReadonlySet<string> | undefined
+    claimAccount(key: string, identityId?: string): boolean
+    claimAccountsForIdentity(identityId: string): number
+    entries(): IterableIterator<[string, Account]>
+}
+
+export class FusionRun implements WorkQueue {
     readonly managedAccountsById = new Map<string, Account>()
     readonly managedAccountsByIdentityId = new Map<string, Set<string>>()
     readonly fusionAccountMap = new Map<string, FusionAccount>()
@@ -34,6 +48,62 @@ export class FusionRun {
     phaseTimings: { phase: string; elapsed: string }[] = []
     managedSources: SourceInfo[] = []
     managedAccountsAllById?: Map<string, Account>
+
+    setManagedAccount(accountKey: string, account: Account): void {
+        this.managedAccountsById.set(accountKey, account)
+        if (account.identityId) {
+            let idSet = this.managedAccountsByIdentityId.get(account.identityId)
+            if (!idSet) {
+                idSet = new Set()
+                this.managedAccountsByIdentityId.set(account.identityId, idSet)
+            }
+            idSet.add(accountKey)
+        }
+    }
+
+    claimAccount(accountKey: string, identityId?: string): boolean {
+        const deleted = this.managedAccountsById.delete(accountKey)
+        if (identityId) {
+            const idSet = this.managedAccountsByIdentityId.get(identityId)
+            if (idSet) {
+                idSet.delete(accountKey)
+                if (idSet.size === 0) {
+                    this.managedAccountsByIdentityId.delete(identityId)
+                }
+            }
+        }
+        return deleted
+    }
+
+    claimAccountsForIdentity(identityId: string): number {
+        const idSet = this.managedAccountsByIdentityId.get(identityId)
+        if (!idSet) return 0
+        let deleted = 0
+        for (const key of idSet) {
+            if (this.managedAccountsById.delete(key)) {
+                deleted++
+            }
+        }
+        this.managedAccountsByIdentityId.delete(identityId)
+        return deleted
+    }
+
+    get(key: string): Account | undefined {
+        return this.managedAccountsById.get(key)
+    }
+
+    getKeysForIdentity(identityId: string): ReadonlySet<string> | undefined {
+        return this.managedAccountsByIdentityId.get(identityId)
+    }
+
+    entries(): IterableIterator<[string, Account]> {
+        return this.managedAccountsById.entries()
+    }
+
+    clearWorkQueue(): void {
+        this.managedAccountsById.clear()
+        this.managedAccountsByIdentityId.clear()
+    }
 
     snapshot(): RunStateSnapshot {
         return {

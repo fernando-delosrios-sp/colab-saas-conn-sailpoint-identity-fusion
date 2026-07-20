@@ -160,6 +160,19 @@ describe('FormService managed work queue synchronization', () => {
             run: {
                 managedAccountsById,
                 managedAccountsByIdentityId,
+                claimAccount: vi.fn((key: string, identityId?: string) => {
+                    const deleted = managedAccountsById.delete(key)
+                    if (identityId) {
+                        const idSet = managedAccountsByIdentityId.get(identityId)
+                        if (idSet) {
+                            idSet.delete(key)
+                            if (idSet.size === 0) {
+                                managedAccountsByIdentityId.delete(identityId)
+                            }
+                        }
+                    }
+                    return deleted
+                }),
             },
             managedAccountsAllById,
         } as any

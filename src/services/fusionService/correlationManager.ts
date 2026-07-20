@@ -1,9 +1,15 @@
 import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
+import { FusionConfig } from '../../model/config'
+import { LogService } from '../logService'
 import { FusionService } from './fusionService'
 
 export class CorrelationManager {
-    constructor(private fusionService: FusionService) {}
+    constructor(
+        private config: FusionConfig,
+        private log: LogService,
+        private fusionService: FusionService
+    ) {}
 
     /**
      * Apply per-source correlation logic for missing accounts on a fusion account.

@@ -2,6 +2,10 @@
  * Collection utility functions and async batch processing helpers.
  */
 
+import type { FusionConfig } from '../../model/config'
+import { runtimeDefaults } from '../../data/config'
+import type { LogService } from '../logService'
+
 // ============================================================================
 // Map Operations
 // ============================================================================
@@ -117,4 +121,40 @@ export async function forEachBatched<T>(
         await Promise.all(batch.map(fn))
         await yieldToEventLoop()
     }
+}
+
+// ============================================================================
+// Batch Processing Helpers
+// ============================================================================
+
+/**
+ * Batch processing with config-driven batch sizing and progress logging.
+ * Wraps promiseAllBatched with the configured batch size and an
+ * automatically created progress logger.
+ */
+export async function batchProcess<T, R>(
+    items: T[],
+    label: string,
+    fn: (item: T) => Promise<R>,
+    config: FusionConfig,
+    log: LogService,
+    batchSize?: number
+): Promise<R[]> {
+    const size = batchSize ?? getFusionParallelBatchSize(config)
+    return promiseAllBatched(items, fn, size, createBatchProgressLogger(log, label, items.length, size))
+}
+
+/** Configured batch size for managed-account processing. */
+export function getManagedAccountsBatchSize(config: FusionConfig): number {
+    return config.managedAccountsBatchSize ?? runtimeDefaults.managedAccountsBatchSize
+}
+
+/** Fusion/identity phases use Promise.all batches with capped concurrency. */
+export function getFusionParallelBatchSize(config: FusionConfig): number {
+    return Math.max(1, Math.min(getManagedAccountsBatchSize(config), 12))
+}
+
+/** Yield at most this often while draining the managed-account queue. */
+export function getManagedAccountEventLoopYieldEvery(config: FusionConfig): number {
+    return Math.max(1, Math.min(getManagedAccountsBatchSize(config), 25))
 }

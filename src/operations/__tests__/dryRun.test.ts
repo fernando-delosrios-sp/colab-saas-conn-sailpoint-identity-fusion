@@ -152,7 +152,7 @@ function createRegistry() {
             pendingReviewContextByAccountId: new Map<string, any>(),
             cleanUpForms: vi.fn(),
         },
-        define: {
+        definition: {
             initializeCounters: vi.fn().mockResolvedValue(undefined),
             saveState: vi.fn(),
             refreshUniqueAttributes: vi.fn().mockResolvedValue(0),
@@ -628,7 +628,7 @@ describe('dryRun', () => {
         expect(registry.forms.processFetchedFormData).toHaveBeenCalled()
         expect(registry.fusion.refreshUniqueAttributes).toHaveBeenCalled()
         expect(registry.forms.cleanUpForms).not.toHaveBeenCalled()
-        expect(registry.define.saveState).not.toHaveBeenCalled()
+        expect(registry.definition.saveState).not.toHaveBeenCalled()
         expect(registry.fusion.initializeManagedAccountProcessing).toHaveBeenCalled()
         expect(registry.fusion.processCorrelatedManagedAccounts).toHaveBeenCalled()
         expect(registry.fusion.processUncorrelatedManagedAccounts).toHaveBeenCalled()

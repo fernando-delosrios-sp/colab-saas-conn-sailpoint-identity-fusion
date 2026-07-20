@@ -128,7 +128,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         scheduleDelayedAggregation: vi.fn().mockResolvedValue(undefined),
     }
 
-    const define = {
+    const definition = {
         initializeCounters: vi.fn().mockResolvedValue(undefined),
         registerUniqueValuesFromManagedSourceAccounts: vi.fn(),
         refreshUniqueAttributes: vi.fn().mockResolvedValue(undefined),
@@ -155,7 +155,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         forms,
         fusion,
         messaging,
-        define,
+        definition,
         client,
     } as any
 

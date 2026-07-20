@@ -6,7 +6,7 @@ import { LockService } from '../lockService'
 import { StateWrapper } from './stateWrapper'
 import { SimpleKeyType } from '@sailpoint/connector-sdk'
 
-export class DefineService {
+export class DefinitionService {
     private normalDefinitions: any[] = []
     private uniqueDefinitions: any[] = []
     private stateWrapper?: StateWrapper
@@ -27,43 +27,43 @@ export class DefineService {
     }
 
     public async refreshAllAttributes(fusionAccount: FusionAccount): Promise<void> {
-        this.log.debug(`DefineService.refreshAllAttributes for account: ${fusionAccount.name}`)
+        this.log.debug(`DefinitionService.refreshAllAttributes for account: ${fusionAccount.name}`)
     }
 
     public async refreshNormalAttributes(fusionAccount: FusionAccount): Promise<void> {
-        this.log.debug(`DefineService.refreshNormalAttributes for account: ${fusionAccount.name}`)
+        this.log.debug(`DefinitionService.refreshNormalAttributes for account: ${fusionAccount.name}`)
     }
 
     public async refreshUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
-        this.log.debug(`DefineService.refreshUniqueAttributes for account: ${fusionAccount.name}`)
+        this.log.debug(`DefinitionService.refreshUniqueAttributes for account: ${fusionAccount.name}`)
     }
 
     public refreshReverseCorrelationAttributes(fusionAccount: FusionAccount): void {
-        this.log.debug(`DefineService.refreshReverseCorrelationAttributes for account: ${fusionAccount.name}`)
+        this.log.debug(`DefinitionService.refreshReverseCorrelationAttributes for account: ${fusionAccount.name}`)
     }
 
     public applyDisplayAttributeOverride(fusionAccount: FusionAccount): void {
-        this.log.debug(`DefineService.applyDisplayAttributeOverride for account: ${fusionAccount.name}`)
+        this.log.debug(`DefinitionService.applyDisplayAttributeOverride for account: ${fusionAccount.name}`)
     }
 
     public async registerUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
-        this.log.debug(`DefineService.registerUniqueAttributes for account: ${fusionAccount.name}`)
+        this.log.debug(`DefinitionService.registerUniqueAttributes for account: ${fusionAccount.name}`)
     }
 
     public getSimpleKey(fusionAccount: FusionAccount): SimpleKeyType | undefined {
-        this.log.debug(`DefineService.getSimpleKey for account: ${fusionAccount.name}`)
+        this.log.debug(`DefinitionService.getSimpleKey for account: ${fusionAccount.name}`)
         return undefined
     }
 
     public async initializeCounters(): Promise<void> {
-        this.log.debug('DefineService.initializeCounters')
+        this.log.debug('DefinitionService.initializeCounters')
     }
 
     public registerUniqueValuesFromManagedSourceAccounts(_fusionAccounts: Iterable<any>): void {
-        this.log.debug('DefineService.registerUniqueValuesFromManagedSourceAccounts')
+        this.log.debug('DefinitionService.registerUniqueValuesFromManagedSourceAccounts')
     }
 
     public async saveState(): Promise<void> {
-        this.log.debug('DefineService.saveState')
+        this.log.debug('DefinitionService.saveState')
     }
 }

@@ -6,9 +6,9 @@ import { buildManagedAccountKey } from '../../../../model/managedAccountKey'
 import {
     processAttributeMapping as _processAttributeMapping,
     buildAttributeMappingConfig as _buildAttributeMappingConfig,
-} from '../../../../services/mapService/helpers'
-import { MapService } from '../../../../services/mapService/mapService'
-import { DefineService } from '../../../../services/defineService/defineService'
+} from '../../../../services/mappingService/helpers'
+import { MappingService } from '../../../../services/mappingService/mappingService'
+import { DefinitionService } from '../../../../services/definitionService/definitionService'
 import { SchemaService } from '../../../../services/schemaService/schemaService'
 import type { Mock } from 'vitest'
 
@@ -447,11 +447,11 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
 
     // Mock the fusion service behavior specifically for replay runs
     const activeFusionIdentities = new Map<string, any>()
-    const mapService = new MapService(
+    const mappingService = new MappingService(
         context.config as any,
         registry.log,
     )
-    const defineService = new DefineService(
+    const definitionService = new DefinitionService(
         context.config as any,
         registry.schemas as any,
         registry.log,
@@ -463,11 +463,11 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         const state = new EntityState(context)
         const faList = state.getFusionAccounts()
         for (const fusionAccount of faList) {
-            // Evaluate and map attributes using real MapService/DefineService logic
-            mapService.mapAttributes(fusionAccount, registry.fusion as any)
-            await defineService.refreshNormalAttributes(fusionAccount)
-            await defineService.refreshUniqueAttributes(fusionAccount)
-            defineService.refreshReverseCorrelationAttributes(fusionAccount)
+            // Evaluate and map attributes using real MappingService/DefinitionService logic
+            mappingService.mapAttributes(fusionAccount, registry.fusion as any)
+            await definitionService.refreshNormalAttributes(fusionAccount)
+            await definitionService.refreshUniqueAttributes(fusionAccount)
+            definitionService.refreshReverseCorrelationAttributes(fusionAccount)
             processed.push(fusionAccount)
         }
         return processed
@@ -507,21 +507,19 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         const fusionAccount = FusionAccount.fromIdentity(identity)
         fusionAccount.addIdentityLayer(identity)
         fusionAccount.addManagedAccountLayer(
-            registry.sources.run.managedAccountsById,
-            registry.sources.run.managedAccountsByIdentityId,
+            registry.sources.run,
             registry.sources.managedAccountsAllById,
-            true,
-            true
+            { pruneDeleted: true, addBlendHistory: true }
         )
 
         // Force refresh to ensure attributes evaluate
         fusionAccount.setNeedsRefresh(true)
 
-        // Evaluate and map attributes using real MapService/DefineService logic
-        mapService.mapAttributes(fusionAccount, registry.fusion as any)
-        await defineService.refreshNormalAttributes(fusionAccount)
-        await defineService.refreshUniqueAttributes(fusionAccount)
-        defineService.refreshReverseCorrelationAttributes(fusionAccount)
+        // Evaluate and map attributes using real MappingService/DefinitionService logic
+        mappingService.mapAttributes(fusionAccount, registry.fusion as any)
+        await definitionService.refreshNormalAttributes(fusionAccount)
+        await definitionService.refreshUniqueAttributes(fusionAccount)
+        definitionService.refreshReverseCorrelationAttributes(fusionAccount)
 
         activeFusionIdentities.set(identity.id, fusionAccount)
 

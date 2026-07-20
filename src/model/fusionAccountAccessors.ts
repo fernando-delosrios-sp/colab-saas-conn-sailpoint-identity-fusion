@@ -1,6 +1,6 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { Attributes, SimpleKeyType } from '@sailpoint/connector-sdk'
-import type { FusionMatch } from '../services/matchService'
+import type { FusionMatch } from '../services/matchingService'
 import { FusionDecision } from './form'
 import { FusionAccountBase } from './fusionAccountBase'
 import { FusionAccountKind } from './fusionAccountTypes'

@@ -43,7 +43,7 @@
   <mxGeometry x="960" y="200" width="240" height="120" as="geometry"/>
 </mxCell>
 <mxCell id="container_attribute"
-  value="&lt;b&gt;MapService\nDefineService&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:11px&quot;&gt;[Container: TypeScript]&lt;/font&gt;&lt;br/&gt;&lt;br/&gt;&lt;font style=&quot;font-size:11px&quot;&gt;Generates and refreshes unique/mapped attributes.&lt;/font&gt;"
+  value="&lt;b&gt;MappingService\nDefinitionService&lt;/b&gt;&lt;br/&gt;&lt;font style=&quot;font-size:11px&quot;&gt;[Container: TypeScript]&lt;/font&gt;&lt;br/&gt;&lt;br/&gt;&lt;font style=&quot;font-size:11px&quot;&gt;Generates and refreshes unique/mapped attributes.&lt;/font&gt;"
   style="rounded=1;whiteSpace=wrap;html=1;container=0;fillColor=#438DD5;fontColor=#ffffff;strokeColor=none;fontSize=14;align=center;"
   vertex="1" parent="1">
   <mxGeometry x="260" y="440" width="240" height="120" as="geometry"/>

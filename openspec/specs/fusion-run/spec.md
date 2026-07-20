@@ -15,8 +15,8 @@ FusionRun SHALL be the centralized state container for a single operation run. A
 - **THEN** it SHALL read from run.managedAccountsById, not from a service-local field
 
 #### Scenario: Match scoring updates FusionRun directly
-- **WHEN** MatchService computes match scoring duration
-- **THEN** the duration SHALL be written to run.matchScoringMs, not accumulated in MatchService
+- **WHEN** MatchingService computes match scoring duration
+- **THEN** the duration SHALL be written to run.matchScoringMs, not accumulated in MatchingService
 
 ### Requirement: FusionRun holds all run-scoped data
 

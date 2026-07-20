@@ -10,9 +10,9 @@ import { FusionService } from './fusionService'
 import { IdentityService } from './identityService'
 import { SchemaService } from './schemaService'
 import { FormService } from './formService'
-import { MapService } from './mapService'
-import { DefineService } from './defineService'
-import { MatchService } from './matchService'
+import { MappingService } from './mappingService'
+import { DefinitionService } from './definitionService'
+import { MatchingService } from './matchingService'
 import { EntitlementService } from './entitlementService'
 import { MessagingService } from './messagingService'
 import { ProxyService } from './proxyService'
@@ -40,9 +40,9 @@ export class ServiceRegistry {
     public schemas: SchemaService
     public forms: FormService
     public entitlements: EntitlementService
-    public map: MapService
-    public define: DefineService
-    public match: MatchService
+    public mapping: MappingService
+    public definition: DefinitionService
+    public matching: MatchingService
     public messaging: MessagingService
     public reports: ReportService
     public proxy: ProxyService
@@ -104,13 +104,13 @@ export class ServiceRegistry {
         const commandType = context.commandType as StandardCommand | undefined
 
         // Initialize new services (Tasks 6-8)
-        this.map = context.mapService ?? new MapService(this.config, this.log)
-        this.define =
-            context.defineService ??
-            new DefineService(this.config, this.schemas, this.log, this.locks)
-        this.match =
-            context.matchService ??
-            new MatchService(this.config, this.log)
+        this.mapping = context.mappingService ?? new MappingService(this.config, this.log)
+        this.definition =
+            context.definitionService ??
+            new DefinitionService(this.config, this.schemas, this.log, this.locks)
+        this.matching =
+            context.matchingService ??
+            new MatchingService(this.config, this.log)
 
         // Initialize FusionService last (depends on multiple services)
         this.fusion =
@@ -121,9 +121,9 @@ export class ServiceRegistry {
                 this.identities,
                 this.sources,
                 this.forms,
-                this.map,
-                this.define,
-                this.match,
+                this.mapping,
+                this.definition,
+                this.matching,
                 this.schemas,
                 this.run,
                 commandType,

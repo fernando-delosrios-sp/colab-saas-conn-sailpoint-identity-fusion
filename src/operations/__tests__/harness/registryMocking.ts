@@ -76,7 +76,7 @@ export function createRegistry() {
             processManagedAccounts: vi.fn().mockResolvedValue(undefined),
             generateReport: vi.fn(),
         },
-        define: {
+        definition: {
             initializeCounters: vi.fn().mockResolvedValue(undefined),
             registerUniqueValuesFromManagedSourceAccounts: vi.fn(),
             refreshUniqueAttributes: vi.fn().mockResolvedValue(undefined),

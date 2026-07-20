@@ -2,7 +2,7 @@ import { ConnectorError, StdAccountDisableInput } from '@sailpoint/connector-sdk
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
-import { ATTR_OPS_REFRESH } from '../services/defineService/types'
+import { ATTR_OPS_REFRESH } from '../services/definitionService/types'
 
 /**
  * Account disable operation - Disables a fusion account.

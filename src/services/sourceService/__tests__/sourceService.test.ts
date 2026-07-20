@@ -221,7 +221,7 @@ describe('SourceService fetchManagedAccount (sourceId + nativeIdentity)', () => 
         )
         expect((service as any).run.managedAccountsById.size).toBe(1)
         expect((service as any).run.managedAccountsById.get('managed-source-id::user-1')).toBeDefined()
-        expect(service.managedAccountsByIdentityId.get('id-1')?.has('managed-source-id::user-1')).toBe(true)
+        expect(service.run.managedAccountsByIdentityId.get('id-1')?.has('managed-source-id::user-1')).toBe(true)
     })
 
     it('leaves inventory empty when listAccounts returns no rows (e.g. accountFilter mismatch)', async () => {

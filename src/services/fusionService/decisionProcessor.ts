@@ -1,15 +1,22 @@
 import { IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
+import { FusionConfig } from '../../model/config'
+import { LogService } from '../logService'
 import { SourceType } from '../../model/config'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 import { trimStr } from '../../utils/safeRead'
 import { compact } from './collections'
+import { batchProcess } from './collections'
 import { FusionService } from './fusionService'
 
 export class DecisionProcessor {
-    constructor(private fusionService: FusionService) {}
+    constructor(
+        private config: FusionConfig,
+        private log: LogService,
+        private fusionService: FusionService
+    ) {}
 
     /**
      * Reconcile transient entitlements derived from pending form instances.
@@ -96,8 +103,8 @@ export class DecisionProcessor {
             `Processing fusion identity decisions: applying ${fusionIdentityDecisions.length} reviewer form decision(s) (new identity or merge into existing)`
         )
 
-        const results = await this.fusionService.batchProcess(fusionIdentityDecisions, 'Fusion identity decisions', (x) =>
-            this.processFusionIdentityDecision(x)
+        const results = await batchProcess(fusionIdentityDecisions, 'Fusion identity decisions', (x) =>
+            this.processFusionIdentityDecision(x), this.config, this.log
         )
         this.fusionService.log.info(`Fusion identity decisions phase finished: ${fusionIdentityDecisions.length} decision(s) applied`)
         return compact(results)
@@ -149,13 +156,13 @@ export class DecisionProcessor {
             : undefined
 
         fusionAccount.addManagedAccountLayer(
-            this.fusionService.run.managedAccountsById,
-            this.fusionService.run.managedAccountsByIdentityId,
+            this.fusionService.run,
             this.fusionService.sources.managedAccountsAllById,
-            this.fusionService.shouldPruneDeletedManagedAccounts(),
-            false,
-            skipBlendHistoryForManagedKeys,
-            (account) => this.fusionService.registerFusionBlend(fusionAccount, account)
+            {
+                pruneDeleted: this.fusionService.shouldPruneDeletedManagedAccounts(),
+                skipBlendHistoryForManagedKeys,
+                onBlend: (account) => this.fusionService.registerFusionBlend(fusionAccount, account),
+            }
         )
         await this.fusionService.applyAttributeProcessing(fusionAccount)
 
