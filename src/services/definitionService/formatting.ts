@@ -2,7 +2,7 @@
 const velocityjs = require('velocityjs') as typeof import('velocityjs').default
 import { SafeCompile } from '../../utils/safeVelocityCompile'
 import { transliterate } from 'transliteration'
-import { v4 as uuidv4 } from 'uuid'
+import crypto from 'crypto'
 type RenderContext = Record<string, any>
 import { logger } from '@sailpoint/connector-sdk'
 import { contextHelpers } from './contextHelpers'
@@ -103,7 +103,7 @@ export const truncateResultToMaxLength = (
 
         const velocity = templateCache.get(expression)
         if (velocity) {
-            const marker = `<<COUNTER_${uuidv4()}>>`
+            const marker = `<<COUNTER_${crypto.randomUUID()}>>`
             const testContext = Object.assign(Object.create(null), { ...context, counter: marker })
             const testResult = velocity.render(testContext)
 
