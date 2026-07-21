@@ -1,4 +1,3 @@
-import FormData from 'form-data'
 import https from 'https'
 import { Configuration, AccountsV2025Api, IdentitiesV2025Api, SearchApi, SourcesV2025Api, CustomFormsV2025Api, WorkflowsV2025Api, EntitlementsV2025Api, TransformsApi, GovernanceGroupsV2025Api, TaskManagementV2025Api, IdentityProfilesV2025Api, IdentityAttributesV2025Api } from 'sailpoint-api-client'
 import { IscApiAdapter } from './iscApiAdapter'
@@ -43,14 +42,7 @@ export class SdkApiAdapter implements IscApiAdapter {
 
         this.config = new Configuration({ ...fusionConfig, tokenUrl, baseOptions: { httpsAgent: agent } } as any)
         this.config.retriesConfig = retriesConfig
-        // form-data extends EventEmitter; with axios-retry, retries add error listeners to the same
-        // FormData instance. Set formDataCtor so multipart API calls create instances with higher limit.
-        this.config.formDataCtor = class extends FormData {
-            constructor() {
-                super()
-                if (typeof this.setMaxListeners === 'function') this.setMaxListeners(25)
-            }
-        }
+
     }
 
     public get accountsApi(): AccountsV2025Api {
