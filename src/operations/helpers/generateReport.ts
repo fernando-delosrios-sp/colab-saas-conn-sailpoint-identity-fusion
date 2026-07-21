@@ -14,7 +14,7 @@ import { PipelineRunner } from './corePipeline'
 export async function fetchAndProcessForReport(serviceRegistry: ServiceRegistry): Promise<AggregationStats> {
     const result = await PipelineRunner.run(serviceRegistry, {
         mode: { kind: 'dry-run' },
-        targetPhase: 'uniqueAttributes',
+        targetPhase: 'process',
     })
 
     if (!result.shouldContinue || !result.fetchResult) {

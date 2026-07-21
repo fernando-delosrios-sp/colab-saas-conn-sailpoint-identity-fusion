@@ -260,7 +260,7 @@ export class IdentityService {
                 )
                 identities.forEach((identity) => {
                     this.run.addIdentity(identity.id, identity)
-                    this.run.addIdentityIdInScope(identity.id)
+                    this.identityIdsInScope.add(identity.id)
                 })
             } catch (err) {
                 const detail = err instanceof Error ? err.message : String(err)
