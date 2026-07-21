@@ -7,7 +7,7 @@ import { FusionAccountState } from './fusionAccountState'
 import type { FusionManagedAccountInfo, IdentityInfo } from './fusionAccountTypes'
 import { buildIdentityInfo } from './fusionAccountUtils'
 import { setIdentityIdAttribute } from './fusionAccountRules/constructionRules'
-import type { WorkQueue } from './fusionRun'
+import type { FusionRun } from './fusionRun'
 import {
     addFusionDecisionLayer,
     addFusionMatch,
@@ -469,7 +469,7 @@ export class FusionAccountBase {
      * 2. **Previous-run match** (scan): Iterates remaining accounts to find those
      *    previously associated with this fusion account (`previousAccountIds`).
      *
-     * Claimed accounts are removed from the work queue via {@link WorkQueue.claim}
+     * Claimed accounts are removed from the work queue via {@link FusionRun.claimAccount}
      * so subsequent processing phases only see unprocessed accounts.
      *
      * @param workQueue - The managed-account work queue
@@ -477,7 +477,7 @@ export class FusionAccountBase {
      * @param options - Matching and history options
      */
     public addManagedAccountLayer(
-        workQueue: WorkQueue,
+        workQueue: FusionRun,
         allAccountsById?: Map<string, Account>,
         options: AddManagedAccountOptions = {}
     ): void {
