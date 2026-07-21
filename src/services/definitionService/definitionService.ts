@@ -9,7 +9,7 @@ import { FusionAccount } from '../../model/account'
 import { getManagedAccountSnapshotKey } from '../../utils/velocityAccountSnapshot'
 import { FusionAccountKind } from '../../model/fusionAccountTypes'
 import { SchemaService } from '../schemaService'
-import { LockService } from '../lockService'
+import { InMemoryLockService } from '../lockService'
 import { StateWrapper } from './stateWrapper'
 import { SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { evaluateAttributeTemplate } from './templateEvaluator'
@@ -38,7 +38,7 @@ export class DefinitionService {
         private config: FusionConfig,
         private schemas: SchemaService,
         private log: LogService,
-        private locks: LockService
+        private locks: InMemoryLockService
     ) {
         this.normalDefinitions = config.normalAttributeDefinitions ?? []
         this.uniqueDefinitions = config.uniqueAttributeDefinitions ?? []

@@ -1,5 +1,5 @@
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
-import { LockService } from '../lockService'
+import { InMemoryLockService } from '../lockService'
 
 // ============================================================================
 // StateWrapper Class
@@ -10,9 +10,9 @@ import { LockService } from '../lockService'
  */
 export class StateWrapper {
     private state: Map<string, number> = new Map()
-    private locks?: LockService
+    private locks?: InMemoryLockService
 
-    constructor(state?: any, locks?: LockService) {
+    constructor(state?: any, locks?: InMemoryLockService) {
         this.locks = locks
         logger.info(`Initializing StateWrapper with state: ${JSON.stringify(state)}`)
         try {

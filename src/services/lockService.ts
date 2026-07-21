@@ -1,15 +1,8 @@
 import { LogService } from './logService'
 
-export interface LockService {
-    withLock<T>(key: string, fn: () => Promise<T>): Promise<T>
-    /**
-     * Wait for all pending operations to complete for all lock keys
-     * This ensures the state is fully synchronized before reading it
-     */
-    waitForAllPendingOperations?(): Promise<void>
-}
 
-export class InMemoryLockService implements LockService {
+
+export class InMemoryLockService {
     // Map from lock key to the last promise in the queue
     // Each promise represents a task waiting to acquire the lock
     // When a task completes, it resolves its promise, allowing the next task to proceed

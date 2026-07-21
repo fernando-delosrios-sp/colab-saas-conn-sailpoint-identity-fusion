@@ -3,7 +3,7 @@ import { Context, ConnectorError, ConnectorErrorType, Response, StandardCommand 
 import { FusionConfig } from '../model/config'
 import { OperationContext } from './fusionService/types'
 import { LogService } from './logService'
-import { InMemoryLockService, LockService } from './lockService'
+import { InMemoryLockService } from './lockService'
 import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
 import { SourceService } from './sourceService'
 import { FusionService } from './fusionService'
@@ -32,7 +32,7 @@ import { FusionRun } from '../model/fusionRun'
 export class ServiceRegistry {
     private static readonly storage = new AsyncLocalStorage<ServiceRegistry>()
     public log: LogService
-    public locks: LockService
+    public locks: InMemoryLockService
     public client: ClientService
     public sources: SourceService
     public fusion: FusionService
