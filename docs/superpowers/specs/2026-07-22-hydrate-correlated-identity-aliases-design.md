@@ -69,15 +69,17 @@ End result: for a managed account correlated to an identity whose `displayName` 
 
 ### D4: Pipeline integration order
 
-- **Choice:** in `corePipeline.ts` `fetchPhase` (or whichever phase function runs the managed-source aggregation), after `run.allManagedAccounts` is populated and before the display-attribute evaluation pass:
+- **Choice:** in `corePipeline.ts` `fetchPhase` (or whichever phase function runs the managed-source aggregation), after `run.allManagedAccounts` is populated and before any `getISCAccount` serialization:
   1. Collect distinct `identityId` values from the managed accounts.
   2. Call `identities.hydrateMissingIdentitiesById(identityIds)`.
   3. For each `FusionAccount` whose `state.originAccount` is a managed account whose `identityId` is now in `run.allIdentities` and whose `state.identityInfo` is undefined, call `fusionAccount.addIdentityLayer(identity)`.
-  4. Call `definitionService.applyDisplayAttributeOverride(fusionAccount)` for those Fusion accounts.
-- **Reason:** explicit pass after hydration makes the data flow auditable. The two-phase pattern (collect → hydrate → apply layer → re-evaluate override) is the same shape as the existing correlation sweep.
+
+  No explicit re-evaluation call to `applyDisplayAttributeOverride` is required: the existing `FusionService.getISCAccount` already calls `setCoreSchemaAttributes` → `applyDisplayAttributeOverride` immediately before serialization. Once the identity layer is applied, the next `getISCAccount` call writes the alias automatically.
+
+- **Reason:** the existing lazy-evaluation pattern at `getISCAccount` (`src/services/fusionService/fusionService.ts:946`) means we only need to ensure `identityInfo` is populated before serialization, not re-run the override. This minimizes the surface area of the change.
 - **Alternatives considered:**
-  - Lazy resolution at write time — rejected (see D2).
-  - Single re-evaluation pass without explicit `addIdentityLayer` — rejected; the override needs `identityInfo` populated to read the alias, and `addIdentityLayer` is the canonical place that populates it.
+  - Explicit re-evaluation pass after `addIdentityLayer` — rejected; redundant given the lazy evaluation in `getISCAccount`.
+  - Lazy resolution at write time without hydration — rejected (see D2).
 
 ## Data flow
 
@@ -102,8 +104,8 @@ managed source aggregation
   → identities.hydrateMissingIdentitiesById(ids) — 50-ID chunks, paginated search
   → for each FusionAccount with a now-loaded correlated identity:
       fusionAccount.addIdentityLayer(identity)        // populates identityInfo
-  → applyDisplayAttributeOverride writes identityAlias
-      (= identityInfo.displayName = top-level SDK displayName)
+  → getISCAccount (lazy) → setCoreSchemaAttributes → applyDisplayAttributeOverride
+      writes identityAlias (= identityInfo.displayName = top-level SDK displayName)
   → display attribute = authoritative identity alias
 ```
 
@@ -115,7 +117,7 @@ managed source aggregation
 
 - `hydrateMissingIdentitiesById` already isolates per-batch failures at debug level. Failed batches leave the affected identities unloaded; the existing pre-fix behavior (display attribute keeps persisted value) applies for those accounts.
 - `addIdentityLayer` failures on a single FusionAccount SHALL be logged and skipped; the run continues.
-- The re-evaluation `applyDisplayAttributeOverride` pass is a single batched call; failures surface as a connector error (existing behavior).
+- The lazy `applyDisplayAttributeOverride` call inside `getISCAccount` is unchanged; failures surface as a connector error (existing behavior).
 - If a correlated identity becomes protected between aggregation and hydration, `hydrateMissingIdentitiesById` may add it to `run.allIdentities` (the existing method does not filter protected). The pipeline's `addIdentityLayer` call SHALL skip protected identities to match the existing `fetchIdentities` semantics.
 
 ## Testing
@@ -130,7 +132,6 @@ managed source aggregation
 - **Unit: pipeline integration in `corePipeline.ts`**
   - Given N managed accounts correlated to M distinct identities, the pipeline calls `hydrateMissingIdentitiesById` once with M IDs.
   - Given the hydration succeeds, the pipeline calls `addIdentityLayer` for each correlated FusionAccount.
-  - Given the hydration succeeds, the pipeline calls `applyDisplayAttributeOverride` for each correlated FusionAccount.
   - Protected identities are skipped during `addIdentityLayer`.
 - **Unit: `hydrateMissingIdentitiesById` chunking** (already covered, no change)
   - 200 IDs → 4 chunks of 50.
@@ -149,7 +150,7 @@ managed source aggregation
 
 - **Hydration cost on large sources.** For a source with 50k correlated identities, hydration is `ceil(50000/50) = 1000` batches, each paginated at 250 results. Real-world: bounded by per-source identity footprint. Mitigation: the per-batch error isolation and the existing `BATCH_SIZE = 50` constant are already tuned.
 - **Race with new in-run correlations.** A managed account that becomes correlated during this run (via the correlation sweep) is not in `run.allManagedAccounts` at hydration time. Mitigation: the correlation sweep already calls `addIdentityLayer` and the display-attribute override is re-evaluated as part of the correlation flow.
-- **Order of pipeline phases.** If the display-attribute evaluation pass runs before the hydration, the alias is empty. Mitigation: the pipeline ordering is explicit; the integration test pins the order.
+- **Order of pipeline phases.** If `addIdentityLayer` is called after any `getISCAccount` serialization for the affected accounts, the alias is empty. Mitigation: the pipeline ordering is explicit; the integration test pins the order (hydration + layer-application before any output serialization).
 
 ## Open Questions
 
