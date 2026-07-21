@@ -235,48 +235,7 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
     log.info(`Process phase complete - ${sources.run.managedAccountsById.size} unprocessed account(s) remaining`)
 }
 
-/** Phase 5: Unique attribute refresh. */
-export async function uniqueAttributesPhase(
-    serviceRegistry: ServiceRegistry,
-    options: CorePipelineOptions
-): Promise<number> {
-    const { log, fusion, sources, res } = serviceRegistry
-    const isPersistent = options.mode.kind === 'aggregation'
-
-    let earlySentCount = 0
-    if (isPersistent) {
-        log.info('Early-returning fusion accounts that do not require unique attribute refresh')
-        const earlyStreamOp = log.track('uniqueAttributesPhase.streamAndClearEligibleAccounts')
-        const { sent } = await fusion.streamAndClearEligibleAccounts(
-            (account) => res.send(account),
-            (fa) => !fa.needsRefresh && !fa.needsReset
-        )
-        earlySentCount = sent
-        earlyStreamOp.done({ sent })
-    }
-
-    const refreshOp = log.track('FusionService.refreshUniqueAttributes')
-    const count = await fusion.refreshUniqueAttributes()
-    refreshOp.done({ count })
-
-    log.info(`Work queue processing complete - ${sources.run.managedAccountsById.size} unprocessed account(s) remaining`)
-    
-    return earlySentCount
-}
-
-/**
- * Phase 5: Output preparation.
- * - Aggregation mode: default unique-attribute refresh.
- * - Dry-run mode: allows command-specific preparation while keeping a shared phase boundary.
- */
-export async function outputPreparationPhase(
-    serviceRegistry: ServiceRegistry,
-    options: CorePipelineOptions
-): Promise<void> {
-    await uniqueAttributesPhase(serviceRegistry, options)
-}
-
-/** Phase 7: Generate fusion report (conditional). */
+/** Phase 6: Generate fusion report (conditional). */
 async function reportPhase(
     serviceRegistry: ServiceRegistry,
     fetchResult: FetchResult,
@@ -308,9 +267,10 @@ async function reportPhase(
 
 async function sendAccountsToPlatform(
     fusion: ServiceRegistry['fusion'],
-    res: ServiceRegistry['res']
+    res: ServiceRegistry['res'],
+    refreshUniqueAttributes: boolean
 ): Promise<{ sent: number; eligible: number }> {
-    return fusion.forEachISCAccount((account) => res.send(account))
+    return fusion.forEachISCAccount((account) => res.send(account), refreshUniqueAttributes)
 }
 
 async function savePersistentState(
@@ -336,7 +296,7 @@ async function finalizeFormOperations(forms: ServiceRegistry['forms']): Promise<
     await forms.awaitPendingDeleteOperations()
 }
 
-/** Phase 6: Cleanup, send accounts to platform, save state. Only mostly used by accountList. */
+/** Phase 5: Cleanup, send accounts to platform, save state. Only mostly used by accountList. */
 export async function outputPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<number> {
     const { log, fusion, forms, sources, definition, messaging, res } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
@@ -364,7 +324,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
 
     log.info('Sending accounts to platform')
     const sendAccountsOp = log.track('outputPhase.sendAccounts')
-    const { sent, eligible } = await sendAccountsToPlatform(fusion, res)
+    const { sent, eligible } = await sendAccountsToPlatform(fusion, res, isPersistent)
     log.info(`Sent ${sent} account(s) to platform`)
     sendAccountsOp.done({ sent, eligible })
 
@@ -384,7 +344,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     return sent
 }
 
-type PipelinePhase = 'setup' | 'fetch' | 'refresh' | 'process' | 'uniqueAttributes' | 'output' | 'report'
+type PipelinePhase = 'setup' | 'fetch' | 'refresh' | 'process' | 'output' | 'report'
 
 export interface PipelineRunOptions {
     mode: PipelineMode
@@ -441,25 +401,16 @@ export class PipelineRunner {
             timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
             if (targetPhase === 'process') return { shouldContinue: true, fetchResult, timer }
 
-            // Phase 5: Unique Attributes
-            const earlyOutputCount = await uniqueAttributesPhase(serviceRegistry, pipelineOptions)
-            timer.phase('PHASE 5: Unique attributes', 'info', 'Unique attributes')
-            if (targetPhase === 'uniqueAttributes') {
-                outputCount = earlyOutputCount
-                return { shouldContinue: true, fetchResult, outputCount, timer }
-            }
-
-            // Phase 6: Output
-            const lateOutputCount = await outputPhase(serviceRegistry, pipelineOptions)
-            outputCount = earlyOutputCount + lateOutputCount
-            timer.phase('PHASE 6: Output (send accounts, persist state)', 'info', 'Output')
+            // Phase 5: Output
+            outputCount = await outputPhase(serviceRegistry, pipelineOptions)
+            timer.phase('PHASE 5: Output (JIT attributes, serialize & clean up memory)', 'info', 'Output')
             if (targetPhase === 'output') return { shouldContinue: true, fetchResult, outputCount, timer }
 
-            // Phase 7: Report
+            // Phase 6: Report
             if (fetchResult) {
                 await reportPhase(serviceRegistry, fetchResult, timer, pipelineOptions)
             }
-            timer.phase('PHASE 7: Report (fusion report)', 'info', 'Report')
+            timer.phase('PHASE 6: Report generation', 'info', 'Report')
 
             // Fusion accounts are released after the report is built so the report's
             // `fusionAccountsFound` metric can still read `sources.fusionAccountCount`.

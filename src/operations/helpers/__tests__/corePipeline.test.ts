@@ -1,11 +1,9 @@
 import {
     fetchPhase,
     outputPhase,
-    outputPreparationPhase,
     refreshPhase,
     processPhase,
     setupPhase,
-    uniqueAttributesPhase,
     PipelineRunner,
 } from '../corePipeline'
 
@@ -72,14 +70,6 @@ describe('corePipeline phase split', () => {
             reconcilePendingFormState: vi.fn(() => {
                 callOrder.push('reconcilePendingFormState')
             }),
-            refreshUniqueAttributes: vi.fn(async () => {
-                callOrder.push('refreshUniqueAttributes')
-                return 0
-            }),
-            streamAndClearEligibleAccounts: vi.fn(async () => {
-                callOrder.push('streamAndClearEligibleAccounts')
-                return { sent: 0, eligible: 0 }
-            }),
         }
         const identities = { clear: vi.fn(() => callOrder.push('identities.clear')), identityCount: 0 }
         const sources = { run: { managedAccountsById: new Map() } }
@@ -90,7 +80,6 @@ describe('corePipeline phase split', () => {
 
         await refreshPhase(registry, { mode: { kind: 'aggregation' } })
         await processPhase(registry, { mode: { kind: 'aggregation' } })
-        await uniqueAttributesPhase(registry, { mode: { kind: 'aggregation' } })
 
         expect(callOrder).toEqual([
             'processFusionAccounts',
@@ -102,8 +91,6 @@ describe('corePipeline phase split', () => {
             'processUncorrelatedManagedAccounts',
             'awaitPendingDisableOperations',
             'reconcilePendingFormState',
-            'streamAndClearEligibleAccounts',
-            'refreshUniqueAttributes',
         ])
 
         expect(log.track).toHaveBeenCalledWith('refreshPhase.processFusionAccounts')
@@ -112,14 +99,6 @@ describe('corePipeline phase split', () => {
 })
 
 describe('corePipeline outputPhase', () => {
-    it('delegates output preparation to unique attributes phase', async () => {
-        const { registry, fusion } = createRegistry()
-
-        await outputPreparationPhase(registry, { mode: { kind: 'dry-run' } })
-
-        expect(fusion.refreshUniqueAttributes).toHaveBeenCalledTimes(1)
-    })
-
     it('drains queued form deletions before persistent pipeline exit', async () => {
         const { registry, forms } = createRegistry()
 
@@ -135,7 +114,6 @@ describe('corePipeline outputPhase', () => {
     it('skips form cleanup for non-persistent mode', async () => {
         const { registry, forms, fusion } = createRegistry()
         fusion.forEachISCAccount.mockResolvedValue({ sent: 0, eligible: 0 })
-        fusion.streamAndClearEligibleAccounts = vi.fn().mockResolvedValue({ sent: 0, eligible: 0 })
 
         await outputPhase(registry, { mode: { kind: 'dry-run' } })
 
@@ -369,8 +347,8 @@ describe('PipelineRunner.run', () => {
         })
 
         expect(result.shouldContinue).toBe(true)
-        expect(mockTimer.phase).toHaveBeenCalledTimes(7) // setup, fetch, refresh, process, uniqueAttributes, output, report
-        expect(mockServiceRegistry.sources.releaseProcessLock).toHaveBeenCalled()
+        expect(mockTimer.phase).toHaveBeenCalledTimes(6) // setup, fetch, refresh, process, output, report
+        expect(mockServiceRegistry.sources.releaseProcessLock).toHaveBeenCalledTimes(1)
     })
 
     it('aborts execution early if setupPhase returns shouldContinue = false (reset flag)', async () => {
