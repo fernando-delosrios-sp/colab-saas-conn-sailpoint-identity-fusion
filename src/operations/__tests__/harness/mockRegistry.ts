@@ -119,6 +119,7 @@ export function createBaseOperationRegistry(sourceConfigs: SourceConfigLike[]) {
         refreshUniqueAttributes: vi.fn().mockResolvedValue(0),
         reconcilePendingFormState: vi.fn(),
         forEachISCAccount: vi.fn().mockResolvedValue({ sent: 0, eligible: 0 }),
+        streamAndClearEligibleAccounts: vi.fn().mockResolvedValue({ sent: 0, eligible: 0 }),
         fusionReportOnAggregation: false,
     }
 

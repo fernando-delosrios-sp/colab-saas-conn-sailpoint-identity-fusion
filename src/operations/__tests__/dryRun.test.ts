@@ -130,6 +130,9 @@ function createRegistry() {
                 })
                 return { sent: 2, eligible: 2 }
             }),
+            streamAndClearEligibleAccounts: vi.fn(async () => {
+                return { sent: 0, eligible: 0 }
+            }),
             getISCAccount: vi.fn(async (account: any) => ({
                 key: account.key,
                 disabled: false,

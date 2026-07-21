@@ -76,6 +76,10 @@ describe('corePipeline phase split', () => {
                 callOrder.push('refreshUniqueAttributes')
                 return 0
             }),
+            streamAndClearEligibleAccounts: vi.fn(async () => {
+                callOrder.push('streamAndClearEligibleAccounts')
+                return { sent: 0, eligible: 0 }
+            }),
         }
         const identities = { clear: vi.fn(() => callOrder.push('identities.clear')), identityCount: 0 }
         const sources = { run: { managedAccountsById: new Map() } }
@@ -98,6 +102,7 @@ describe('corePipeline phase split', () => {
             'processUncorrelatedManagedAccounts',
             'awaitPendingDisableOperations',
             'reconcilePendingFormState',
+            'streamAndClearEligibleAccounts',
             'refreshUniqueAttributes',
         ])
 
@@ -130,6 +135,7 @@ describe('corePipeline outputPhase', () => {
     it('skips form cleanup for non-persistent mode', async () => {
         const { registry, forms, fusion } = createRegistry()
         fusion.forEachISCAccount.mockResolvedValue({ sent: 0, eligible: 0 })
+        fusion.streamAndClearEligibleAccounts = vi.fn().mockResolvedValue({ sent: 0, eligible: 0 })
 
         await outputPhase(registry, { mode: { kind: 'dry-run' } })
 

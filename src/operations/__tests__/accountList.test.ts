@@ -48,7 +48,11 @@ function createTwoSweepRegistry(scenario: AggregationScenario) {
         for (const account of output) {
             sendFn(account)
         }
-        return output.length
+        return { sent: output.length, eligible: output.length }
+    })
+
+    fusion.streamAndClearEligibleAccounts.mockImplementation(async () => {
+        return { sent: 0, eligible: 0 }
     })
 
     return {

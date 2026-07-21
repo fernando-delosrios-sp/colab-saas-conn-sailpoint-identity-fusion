@@ -637,6 +637,21 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         return { sent, eligible: faList.length }
     })
 
+    registry.fusion.streamAndClearEligibleAccounts = vi.fn().mockImplementation(async (send: (account: any) => void, predicate: any) => {
+        let sent = 0
+        const faList = state.getFusionAccounts()
+        const eligibleList = faList.filter(predicate)
+        console.log('streamAndClearEligibleAccounts mock: eligible count:', eligibleList.length)
+        for (const account of eligibleList) {
+            const iscAccount = await registry.fusion.getISCAccount(account)
+            if (iscAccount) {
+                send(iscAccount)
+                sent++
+            }
+        }
+        return { sent, eligible: eligibleList.length }
+    })
+
     registry.res.send = vi.fn()
 
     context.registry = registry as unknown as MockRegistry
