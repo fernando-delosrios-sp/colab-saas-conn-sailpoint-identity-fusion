@@ -848,7 +848,8 @@ export class FusionService {
             await this.attributes.refreshNormalAttributes(fusionAccount)
             this.attributes.refreshReverseCorrelationAttributes(fusionAccount)
 
-            fusionAccount.attributes[fusionDisplayAttribute] = identity.attributes?.[fusionDisplayAttribute] ?? identity.name
+            fusionAccount.attributes[fusionDisplayAttribute] =
+                identity.attributes?.[fusionDisplayAttribute] ?? identity.name
             fusionAccount.attributes[fusionIdentityAttribute] = identityId
 
             // Key generation deferred until getISCAccount
@@ -1131,6 +1132,17 @@ export class FusionService {
     public async processManagedAccounts(): Promise<void> {
         const map = this.sources.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
+
+        // Hydrate all missing correlated identity documents. The account object only contains
+        // a shallow reference, but we need the full IdentityDocument for addIdentityLayer.
+        const missingIdentityIds = [...map.values()]
+            .filter((account) => account.uncorrelated === false && (account as any).identity?.id)
+            .map((account) => (account as any).identity.id)
+
+        if (missingIdentityIds.length > 0) {
+            await this.identities.hydrateMissingIdentitiesById(missingIdentityIds)
+        }
+
         const { processManagedAccountsStartedAt, batchSize } = this.initializeManagedAccountPhase(map)
         await this.runCorrelatedManagedAccountPrePass(map, batchSize)
         this._linkedAccountKeyIndex = undefined
@@ -1235,8 +1247,7 @@ export class FusionService {
         const logProgressEvery = Math.max(1, Math.min(this.managedAccountsBatchSize, initialQueueSize))
         let processed = 0
 
-        const parallelAccounts: Account[] =
-         []
+        const parallelAccounts: Account[] = []
         const deferredGroups = new Map<string, Account[]>()
         for (const account of queuedAccounts) {
             if (this.isDeferredMatchingEnabledForSource(account.sourceName ?? undefined)) {
@@ -1793,7 +1804,10 @@ export class FusionService {
             return
         }
         this.log.debug(`No match found for managed account: ${name} [${sourceName}]`)
-        if (sourceType === SourceType.Authoritative && this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)) {
+        if (
+            sourceType === SourceType.Authoritative &&
+            this.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)
+        ) {
             this.setFusionAccount(fusionAccount)
             this.registerCurrentRunUnmatchedCandidate(fusionAccount)
         }
@@ -2299,7 +2313,20 @@ export class FusionService {
      * @returns FusionAccount with basic attributes mapped and non-unique attributes refreshed
      */
     private async preProcessManagedAccount(account: Account): Promise<FusionAccount> {
+        let identity = undefined
+        if ((account as any).identity?.id) {
+            identity = this.identities.getIdentityById((account as any).identity.id)
+            if (identity && identity.name) {
+                ;(account as any).identity.name = identity.name
+            }
+        }
+
         const fusionAccount = FusionAccount.fromManagedAccount(account)
+        if (identity) {
+            fusionAccount.addIdentityLayer(identity)
+            fusionAccount.setName(identity.displayName)
+        }
+
         this.log.debug(`Pre-processing managed account: ${account.name} [${account.sourceName}]`)
 
         this.attributes.mapAttributes(fusionAccount)

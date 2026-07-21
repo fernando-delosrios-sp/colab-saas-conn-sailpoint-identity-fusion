@@ -272,7 +272,37 @@ export class IdentityService {
      */
     public async hydrateMissingIdentitiesById(ids: string[]): Promise<void> {
         const missing = [...new Set(ids.filter((id) => id && !this.getIdentityById(id)))]
-        await Promise.all(missing.map((id) => this.fetchIdentityById(id).catch(() => {})))
+        if (missing.length === 0) return
+
+        const chunkSize = 50
+        for (let i = 0; i < missing.length; i += chunkSize) {
+            const chunk = missing.slice(i, i + chunkSize)
+            const filterStr = chunk.map((id) => `id eq "${id}"`).join(' or ')
+
+            try {
+                const response = await this.client.identitiesApi.listIdentities({
+                    filters: filterStr,
+                })
+                
+                const identities = response.data || []
+                for (const identity of identities) {
+                    if (identity.id) {
+                        // Create a partial IdentityDocument from the Identity object
+                        const doc: Partial<IdentityDocument> = {
+                            id: identity.id,
+                            name: identity.name,
+                            displayName: identity.alias || identity.name, // alias might not map exactly, but good enough for preProcess
+                            email: identity.emailAddress || undefined,
+                            disabled: (identity.identityStatus as string | undefined)?.toUpperCase() === 'INACTIVE',
+                            attributes: identity.attributes as { [key: string]: any },
+                        }
+                        this.identitiesById.set(identity.id, doc as IdentityDocument)
+                    }
+                }
+            } catch (err) {
+                this.log.debug(`Failed to hydrate batch of identities using listIdentities filter`, err)
+            }
+        }
     }
 
     // ------------------------------------------------------------------------

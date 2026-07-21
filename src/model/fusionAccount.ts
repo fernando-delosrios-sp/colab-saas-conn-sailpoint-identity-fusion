@@ -138,8 +138,7 @@ export class FusionAccount {
     /** Identity-side label: attributes.displayName || displayName || name || id. */
     private static identityLabelFromIdentity(identity: IdentityDocument): string | undefined {
         const fromAttrs = (identity.attributes as Record<string, unknown> | undefined)?.displayName as
-            | string
-            | undefined
+            string | undefined
         const top = (identity as { displayName?: string }).displayName
         return fromAttrs || top || identity.name || identity.id || undefined
     }
@@ -355,7 +354,7 @@ export class FusionAccount {
         const sourcesAttr = account.attributes?.sources
         const sourceSet = sourcesAttr ? new Set(attrSplit(String(sourcesAttr))) : new Set<string>()
         const { identityDisplayName, accountName } = FusionAccount.labelsFromAccount(account)
-        const accountDisplayName = accountName || identityDisplayName || undefined
+        const accountDisplayName = identityDisplayName || accountName || undefined
 
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
         if (!managedAccountKey) {
