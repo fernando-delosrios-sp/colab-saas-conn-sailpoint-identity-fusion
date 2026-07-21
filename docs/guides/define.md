@@ -89,7 +89,8 @@ $Math.floor($Datefns.differenceInDays($Datefns.now(), $hireDate) / 365)
 **Counter format:** `{base value}{counter}` (e.g. `jsmith1`, `jsmith2`)
 **Zero-padding:** Use **Minimum counter digits** to pad counter (e.g. digits=3 → `jsmith001`)
 
-> **Note:** If a **Maximum length** is configured, the connector intelligently truncates the surrounding text to ensure the `$counter` is perfectly preserved without being chopped off, even if the counter is injected in the middle of a string.
+!!! note
+    If a **Maximum length** is configured, the connector intelligently truncates the surrounding text to ensure the `$counter` is perfectly preserved without being chopped off, even if the counter is injected in the middle of a string.
 
 **`$isUnique(value)` helper:** Unique definitions can call `$isUnique(...)` inside the Velocity expression to test whether a candidate value is currently free after the same trim/case/spaces/normalize/maxLength rules are applied. Use this to choose between candidate formats before the connector falls back to automatic `$counter` disambiguation.
 
@@ -227,7 +228,8 @@ $AddressParse.getStateCode("Greater London", "GB")    ## "LND"
 $AddressParse.getStateCode("Atlantis", "US")          ## "" (unknown)
 ```
 
-> **Note:** `$AddressParse.getCityState` and `$AddressParse.getCityStateCode` are deprecated because city names alone can collide across states (for example, there are Springfields in many US states). Prefer the explicit state/region lookups above for unambiguous results.
+!!! warning "Deprecated"
+    `$AddressParse.getCityState` and `$AddressParse.getCityStateCode` are deprecated because city names alone can collide across states (for example, there are Springfields in many US states). Prefer the explicit state/region lookups above for unambiguous results.
 
 #### $Normalize (data normalization)
 
