@@ -2,6 +2,8 @@
 
 ## 2.2.0
 
+- (2026-07-21) **Architecture:** Removed over-engineered `LockService` and `WorkQueue` interfaces in favor of using concrete classes directly to simplify internals and update specifications.
+- (2026-07-21) **Performance:** Replaced external dependencies (`uuid` and `form-data`) with native Node.js APIs (`crypto.randomUUID()` and `FormData`) to reduce package footprint.
 - (2026-07-21) **Performance:** Streamlined memory management by removing `streamAndClearEligibleAccounts` and `uniqueAttributesPhase`, integrating JIT unique attribute generation directly into the final aggregation output stream to reduce pipeline complexity while retaining strict OOM protections.
 - (2026-07-21) **Performance:** Implemented early return architecture for Fusion Accounts to mitigate OOM risks by streaming and clearing eligible accounts directly within the pipeline. Refactored `IdentityService` to batch missing identity requests using Lucene OR queries, resolving N+1 latency bottlenecks.
 - (2026-07-20) **Architecture:** Introduced `FusionRun`, a centralized state container that encapsulates all per-run state (`identityMap`, `managedAccountsById`, matching states, maps, and form decisions), completely managing state mutations.
