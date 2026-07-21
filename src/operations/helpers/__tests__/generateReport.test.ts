@@ -48,7 +48,7 @@ describe('generateReport helpers', () => {
 
             expect(corePipeline.PipelineRunner.run).toHaveBeenCalledWith(mockServiceRegistry, {
                 mode: { kind: 'dry-run' },
-                targetPhase: 'uniqueAttributes',
+                targetPhase: 'process',
             })
             expect(result).toEqual({
                 identitiesFound: 0,
@@ -74,7 +74,7 @@ describe('generateReport helpers', () => {
 
             expect(corePipeline.PipelineRunner.run).toHaveBeenCalledWith(mockServiceRegistry, {
                 mode: { kind: 'dry-run' },
-                targetPhase: 'uniqueAttributes',
+                targetPhase: 'process',
             })
 
             expect(result).toEqual({

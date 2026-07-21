@@ -3,12 +3,13 @@ import { FusionAccount, FusionAccountKind } from './account'
 import { SourceInfo } from '../services/sourceService'
 import { FusionDecision } from './form'
 import { ManagedAccountAnalysisRecorder } from '../services/fusionService/managedAccountAnalysisRecorder'
-import { AggregationTracker } from '../services/fusionService/aggregationTracker'
-import { FusionReportBlend } from '../services/fusionService/types'
+import { AggregationTracker } from './aggregationTracker'
+import { FusionReportBlend } from './fusionReportBlend'
 import { LogService } from '../services/logService'
 import { hasValue, readString, trimStr } from '../utils/safeRead'
 import { assert } from '../utils/assert'
 import { buildManagedAccountKey } from './managedAccountKey'
+import { CandidateRegistry } from '../services/matchingService/candidateRegistry'
 
 export interface RunStateSnapshot {
     managedAccounts: Record<string, any>[]
@@ -48,13 +49,18 @@ export class FusionRun {
     fusionBlends: FusionReportBlend[] = []
     matchScoringMs = 0
     analysisRecorder?: ManagedAccountAnalysisRecorder
-    tracker?: AggregationTracker
     phaseTimings: { phase: string; elapsed: string }[] = []
-    managedSources: SourceInfo[] = []
+    private _pendingDisableOperations = new Set<Promise<void>>()
+    private _disableOperationFactory?: (account: Account) => Promise<void>
+    private readonly _candidateRegistry: CandidateRegistry
     managedAccountsAllById?: Map<string, Account>
 
     get autoAssignedCount(): number {
         return this._autoAssignedIdentityIds.size
+    }
+
+    get pendingDisableOperationsCount(): number {
+        return this._pendingDisableOperations.size
     }
 
     get autoAssignedIdentityIds(): ReadonlySet<string> {
@@ -125,6 +131,11 @@ export class FusionRun {
 
     constructor(public log?: LogService) {
         this.isRecordMode = process.env.RECORD_MODE === 'true'
+        this._candidateRegistry = new CandidateRegistry({
+            getFusionAccount: (key: string) => this.getFusionAccountByManagedKey(key),
+            sourcesByName: this.sourcesByName,
+            log: this.log,
+        })
     }
 
     setManagedAccount(accountKey: string, account: Account): void {
@@ -183,6 +194,65 @@ export class FusionRun {
         this.managedAccountsByIdentityId.clear()
     }
 
+    /**
+     * Register the factory used to fire a disable operation for a managed account.
+     * When no factory is registered, {@link queueDisableOperation} is a no-op.
+     */
+    setDisableOperationFactory(factory: (account: Account) => Promise<void>): void {
+        this._disableOperationFactory = factory
+    }
+
+    /**
+     * Queue a pending asynchronous disable operation for a managed account.
+     * The operation is tracked run-locally so it can be awaited before the run completes.
+     */
+    queueDisableOperation(account: Account): void {
+        if (!this._disableOperationFactory) {
+            return
+        }
+        const op = this._disableOperationFactory(account).finally(() => {
+            this._pendingDisableOperations.delete(op)
+        })
+        this._pendingDisableOperations.add(op)
+    }
+
+    /**
+     * Wait for all pending asynchronous disable operations to complete.
+     * Safe to call multiple times; it drains the current pending set.
+     */
+    async awaitPendingDisableOperations(): Promise<void> {
+        if (this._pendingDisableOperations.size === 0) {
+            return
+        }
+
+        while (this._pendingDisableOperations.size > 0) {
+            const pending = Array.from(this._pendingDisableOperations)
+            await Promise.allSettled(pending)
+        }
+    }
+
+    /**
+     * Remove a managed account from the match-reporting work queue.
+     * No-op when the id is undefined or not present.
+     */
+    removeMatchAccount(managedAccountId: string | undefined): void {
+        if (!managedAccountId) return
+        const tracker = this.analysisRecorder?.tracker
+        if (!tracker) return
+        const idx = tracker.matchAccounts.findIndex((x) => x.managedAccountId === managedAccountId)
+        if (idx !== -1) {
+            tracker.matchAccounts.splice(idx, 1)
+        }
+    }
+
+    /**
+     * Record a failed match/form outcome through the run's analysis recorder.
+     * No-op when no recorder is attached.
+     */
+    trackFailed(fusionAccount: FusionAccount, message: string): void {
+        this.analysisRecorder?.trackFailed(fusionAccount, message)
+    }
+
     registerFusionAccount(fusionAccount: FusionAccount, tracker?: AggregationTracker): void {
         const identityId = fusionAccount.identityId
         if (hasValue(identityId) && fusionAccount.type !== FusionAccountKind.Managed) {
@@ -219,6 +289,28 @@ export class FusionRun {
 
     getFusionAccountByManagedKey(managedKey: string): FusionAccount | undefined {
         return this._fusionAccountMap.get(managedKey)
+    }
+
+    /**
+     * Register a provisional Fusion account as a deferred-match candidate for its source.
+     * State is kept run-local so the Match module remains stateless.
+     */
+    registerDeferredCandidate(fusionAccount: FusionAccount): void {
+        this._candidateRegistry.register(fusionAccount)
+    }
+
+    /**
+     * Clear all run-local deferred-match candidates. Called at the start of each managed-account sweep.
+     */
+    clearDeferredCandidates(): void {
+        this._candidateRegistry.clear()
+    }
+
+    /**
+     * Iterate over the current-run deferred-match candidates for a source.
+     */
+    currentRunDeferredCandidatesForSource(sourceName: string | null | undefined): Iterable<FusionAccount> {
+        return this._candidateRegistry.queryForSource(sourceName)
     }
 
     hasFusionIdentity(identityId: string): boolean {

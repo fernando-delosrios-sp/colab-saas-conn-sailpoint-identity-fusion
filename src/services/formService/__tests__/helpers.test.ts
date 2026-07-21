@@ -2,10 +2,10 @@ import {
     buildCandidateList,
     buildFormName,
     calculateExpirationDate,
-    countIdentityCandidateFusionMatches,
     getFormOwner,
     resolveIdentitiesSelectLabel,
 } from '../helpers'
+import { countIdentityCandidateFusionMatches } from '../../matchingService/matchingHelpers'
 import { MatchCandidateType } from '../../matchingService/types'
 
 describe('formService helpers', () => {

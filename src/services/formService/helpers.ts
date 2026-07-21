@@ -1,16 +1,51 @@
 import { FusionAccount } from '../../model/account'
-import { IdentityDocument, OwnerDto } from 'sailpoint-api-client'
+import { FusionDecision } from '../../model/form'
+import { AccountV2025 as Account, IdentityDocument, OwnerDto } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
-import { FusionMatch, MatchCandidateType } from '../matchingService/types'
+import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { FusionMatch } from '../matchingService/types'
 import { Candidate } from './types'
 import { internalConfig } from '../../data/config'
-import { trimStr } from '../../utils/safeRead'
+import { readString, trimStr } from '../../utils/safeRead'
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Builds a synthetic fusion decision when all attribute scores are 100 (exact match),
+ * skipping manual review (automatic assignment to the selected identity).
+ *
+ * @param fusionAccount - The fusion account being assigned
+ * @param account - The managed account
+ * @param identityId - The target identity ID
+ * @returns Synthetic FusionDecision for automatic assignment
+ */
+export function createAutomaticAssignmentDecision(
+    fusionAccount: FusionAccount,
+    account: Account,
+    identityId: string
+): FusionDecision {
+    const accountKey = getManagedAccountKeyFromAccount(account)
+    assert(accountKey, 'Managed account missing composite key for automatic assignment decision')
+    return {
+        submitter: { id: 'system', email: '', name: 'System (automatic assignment)' },
+        account: {
+            id: accountKey,
+            name: fusionAccount.name ?? account.name ?? '',
+            sourceName: fusionAccount.sourceName,
+            sourceId: readString(account, 'sourceId'),
+            nativeIdentity: account.nativeIdentity ?? undefined,
+        },
+        newIdentity: false,
+        identityId,
+        comments: 'Automatically assigned: combined score met or exceeded threshold',
+        finished: true,
+        automaticAssignment: true,
+    }
+}
 
 /**
  * Primary line of the identities SEARCH_V2 SELECT (`label: 'attributes.displayName'` in formBuilder).
@@ -66,18 +101,6 @@ const compareMatchesForForm = (a: FusionMatch, b: FusionMatch): number => {
     const ida = String(a.fusionIdentity?.identityId ?? a.identityId ?? '')
     const idb = String(b.fusionIdentity?.identityId ?? b.identityId ?? '')
     return ida.localeCompare(idb)
-}
-
-/** Matches counted toward the review-form cap (excludes same-operation deferred candidates). */
-export const countIdentityCandidateFusionMatches = (matches: readonly FusionMatch[] | undefined): number => {
-    if (!matches) return 0
-    let n = 0
-    for (const m of matches) {
-        if ((m.candidateType ?? MatchCandidateType.Identity) === MatchCandidateType.Identity) {
-            n += 1
-        }
-    }
-    return n
 }
 
 /**

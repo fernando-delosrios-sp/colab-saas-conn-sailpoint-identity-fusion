@@ -1,4 +1,4 @@
-import { IdentityDocument, AccountV2025 as Account } from 'sailpoint-api-client'
+import { IdentityDocument } from 'sailpoint-api-client'
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
@@ -11,26 +11,19 @@ import { compact } from './collections'
 import { batchProcess } from './collections'
 import { FusionRun } from '../../model/fusionRun'
 import type { FormService } from '../formService'
-import type { SourceService } from '../sourceService'
 import type { IdentityService } from '../identityService'
-import type { CorrelationManager } from './correlationManager'
-import type { ManagedAccountOutcomeHandler } from '../matchingService/managedAccountOutcomeHandler'
-import type { MappingService } from '../mappingService'
+import type { CorrelationManager } from '../correlationManager'
 import type { DefinitionService } from '../definitionService'
-import type { AggregationTracker } from './aggregationTracker'
-import type { FusionReportBlend } from './types'
-import { OperationContext } from './types'
+import { applyNonAuthoritativeNoMatch } from '../matchingService/matchOutcomeDispatcher'
+import { AccountAssembly } from '../accountAssembly'
+import { OperationContext } from '../../model/operationContext'
 
 export interface DecisionProcessorDeps {
     forms: FormService
-    sources: SourceService
     identities: IdentityService
     correlationManager: CorrelationManager
-    outcomeHandler: ManagedAccountOutcomeHandler
-    mappingService: MappingService
     definitionService: DefinitionService
-    getTracker(): AggregationTracker | undefined
-    buildFusionBlend(fa: FusionAccount, account: Account): FusionReportBlend
+    accountAssembly: AccountAssembly
 }
 
 export class DecisionProcessor {
@@ -48,26 +41,6 @@ export class DecisionProcessor {
             this.commandType === StandardCommand.StdAccountList ||
             this.operationContext === OperationContext.AccountList
         )
-    }
-
-    private shouldPruneDeletedManagedAccounts(): boolean {
-        return (
-            this.isAggregationAccountListMode() ||
-            this.commandType === StandardCommand.StdAccountRead ||
-            this.commandType === StandardCommand.StdAccountUpdate ||
-            this.commandType === StandardCommand.StdAccountEnable ||
-            this.commandType === StandardCommand.StdAccountDisable
-        )
-    }
-
-    private async applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void> {
-        this.deps.mappingService.mapAttributes(fusionAccount, this.run)
-        await this.deps.definitionService.refreshNormalAttributes(fusionAccount)
-        this.deps.definitionService.refreshReverseCorrelationAttributes(fusionAccount)
-    }
-
-    private setFusionAccount(fusionAccount: FusionAccount): void {
-        this.run.registerFusionAccount(fusionAccount, this.deps.getTracker())
     }
 
     /**
@@ -210,21 +183,12 @@ export class DecisionProcessor {
             ? new Set([normalizedDecisionKey])
             : undefined
 
-        fusionAccount.addManagedAccountLayer(
-            this.run,
-            this.deps.sources.managedAccountsAllById,
-            {
-                pruneDeleted: this.shouldPruneDeletedManagedAccounts(),
-                skipBlendHistoryForManagedKeys,
-                onBlend: (account) => this.run.recordFusionBlend(this.deps.buildFusionBlend(fusionAccount, account), this.deps.getTracker()),
-            }
-        )
-        await this.applyAttributeProcessing(fusionAccount)
+        await this.deps.accountAssembly.assembleAccount(fusionAccount, { skipBlendHistoryForManagedKeys })
 
         if (isAuthorizedDecision) {
             await this.deps.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, fusionDecision)
             fusionAccount.updateCorrelationStatus()
-            this.setFusionAccount(fusionAccount)
+            this.deps.accountAssembly.registerFusionAccount(fusionAccount)
         }
 
         if (fusionDecision.newIdentity) {
@@ -233,7 +197,7 @@ export class DecisionProcessor {
             const managedAccount = decisionManagedKey
                 ? this.run.managedAccountsById.get(decisionManagedKey)
                 : undefined
-            if (await this.deps.outcomeHandler.handleNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccount)) {
+            if (await applyNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccount, { definitionService: this.deps.definitionService, run: this.run })) {
                 if (sourceType === SourceType.Record) {
                     this.log.debug(
                         `Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`
@@ -243,7 +207,7 @@ export class DecisionProcessor {
                 }
                 return undefined
             }
-            this.setFusionAccount(fusionAccount)
+            this.deps.accountAssembly.registerFusionAccount(fusionAccount)
             this.log.debug(
                 `Registered decision account as fusion account: ${fusionDecision.account.name} ` +
                     `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`

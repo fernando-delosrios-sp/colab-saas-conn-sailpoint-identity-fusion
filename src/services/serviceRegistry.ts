@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Context, ConnectorError, ConnectorErrorType, Response, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
-import { OperationContext } from './fusionService/types'
+import { OperationContext } from '../model/operationContext'
 import { LogService } from './logService'
 import { InMemoryLockService } from './lockService'
 import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
@@ -13,6 +13,7 @@ import { FormService } from './formService'
 import { MappingService } from './mappingService'
 import { DefinitionService } from './definitionService'
 import { MatchingService } from './matchingService'
+import { MatchOutcomeDispatcher } from './matchingService/matchOutcomeDispatcher'
 import { EntitlementService } from './entitlementService'
 import { MessagingService } from './messagingService'
 import { ProxyService } from './proxyService'
@@ -47,6 +48,7 @@ export class ServiceRegistry {
     public reports: ReportService
     public proxy: ProxyService
     public recording?: RecordingService
+    public matchOutcomeDispatcher: MatchOutcomeDispatcher
     public run: FusionRun
 
     /**
@@ -130,6 +132,23 @@ export class ServiceRegistry {
                 commandType,
                 operationContext as OperationContext | undefined
             )
+
+        // Wire the MatchOutcomeDispatcher through the registry using real collaborators already
+        // owned by FusionService. This keeps the dispatcher free of closures over FusionService.
+        this.matchOutcomeDispatcher = new MatchOutcomeDispatcher({
+            config: this.config,
+            log: this.log,
+            run: this.run,
+            matchingService: this.matching,
+            correlationManager: this.fusion.correlationManager,
+            definitionService: this.definition,
+            accountAssembly: this.fusion.accountAssembly,
+            forms: this.forms,
+            decisionProcessor: this.fusion.decisionProcessor,
+            commandType,
+            operationContext: operationContext as OperationContext | undefined,
+        })
+        this.fusion.matchOutcomeDispatcher = this.matchOutcomeDispatcher
 
         this.reports = new ReportService(
             this.config.baseurl,

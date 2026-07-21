@@ -1,9 +1,9 @@
-import { FusionAccount } from '../../model/account'
-import { FusionDecision } from '../../model/form'
-import { FusionConfig } from '../../model/config'
-import { LogService } from '../logService'
-import { IdentityService } from '../identityService'
-import { SourceService } from '../sourceService'
+import { FusionAccount } from '../model/account'
+import { FusionDecision } from '../model/form'
+import { FusionConfig } from '../model/config'
+import { LogService } from './logService'
+import { IdentityService } from './identityService'
+import { SourceService } from './sourceService'
 
 export class CorrelationManager {
     constructor(

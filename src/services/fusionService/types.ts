@@ -1,14 +1,8 @@
 import { SourceType } from '../../model/config'
+import type { FusionReportBlend } from '../../model/fusionReportBlend'
+export { OperationContext } from '../../model/operationContext'
 
 // ============================================================================
-// Operation Context
-
-/** Known connector handler names used for log attribution and operation-mode checks. */
-export enum OperationContext {
-    AccountList = 'accountList',
-    CustomDryRun = 'custom:dryrun',
-}
-
 // Type Definitions — Fusion Report
 // ============================================================================
 
@@ -229,14 +223,6 @@ export type FusionReportWarnings = {
         affectedIdentities: number
         occurrences: FusionReportIdentityConflictOccurrence[]
     }
-}
-
-/** Details about a managed account blended into a Fusion account. */
-export type FusionReportBlend = {
-    accountName: string
-    accountUrl?: string
-    blendedAccountName: string
-    blendedSource: string
 }
 
 /**

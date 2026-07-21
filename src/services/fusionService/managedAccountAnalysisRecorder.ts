@@ -3,16 +3,15 @@ import { FusionConfig, SourceType } from '../../model/config'
 import { LogService } from '../logService'
 import { SourceInfo, SourceService } from '../sourceService'
 import { UrlContext } from '../../utils/url'
-import { ManagedAccountAnalyzer, ManagedAccountAnalysisContext } from '../matchingService/managedAccountAnalyzer'
-import { AggregationTracker } from './aggregationTracker'
+import { AggregationTracker } from '../../model/aggregationTracker'
 import {
     buildMinimalFusionReportAccount,
-    formatFusionMatchDiscoveryLog,
     fusionReportMatchCandidateAccountFields,
     mapScoreReportsForFusionReport,
 } from './helpers'
+import { formatFusionMatchDiscoveryLog, isDeferredMatchingEnabledForSource } from '../matchingService/matchingHelpers'
 import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
-import { MatchCandidateType } from '../matchingService/types'
+import { ManagedAccountAnalysisContext, MatchCandidateType } from '../matchingService/types'
 import { resolveReportAccountId, resolveReportAccountIdValue } from './reportAccountResolver'
 
 export interface ManagedAccountAnalysisRecorderDeps {
@@ -22,7 +21,6 @@ export interface ManagedAccountAnalysisRecorderDeps {
     reportAttributes: string[]
     sourcesByName: Map<string, SourceInfo>
     config: FusionConfig
-    analyzer: ManagedAccountAnalyzer
     sources: SourceService
     shouldCaptureReportData: () => boolean
 }
@@ -30,10 +28,18 @@ export interface ManagedAccountAnalysisRecorderDeps {
 export class ManagedAccountAnalysisRecorder {
     constructor(private readonly deps: ManagedAccountAnalysisRecorderDeps) {}
 
+    get tracker(): AggregationTracker | undefined {
+        try {
+            return this.deps.tracker()
+        } catch {
+            return undefined
+        }
+    }
+
     recordAnalysis(analysis: ManagedAccountAnalysisContext): void {
         const { account, fusionAccount, sourceType, hasIdentityCandidateMatches, fusionIdentityComparisons } = analysis
         const { name, sourceName } = account
-        const { log, tracker, urlContext, reportAttributes, sourcesByName, analyzer, sources, shouldCaptureReportData } =
+        const { log, tracker, urlContext, reportAttributes, sourcesByName, sources, shouldCaptureReportData } =
             this.deps
         const trackerInstance = tracker()
 
@@ -94,7 +100,7 @@ export class ManagedAccountAnalysisRecorder {
         log.debug(`No match found for managed account: ${name} [${sourceName}]`)
         if (
             sourceType === SourceType.Authoritative &&
-            analyzer.isDeferredMatchingEnabledForSource(fusionAccount.sourceName)
+            isDeferredMatchingEnabledForSource(fusionAccount.sourceName, sourcesByName)
         ) {
             return
         }

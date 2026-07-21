@@ -167,6 +167,22 @@ The terms **matching** and **scoring** SHALL be used as defined in this spec. Ma
 - **WHEN** referring to the Map/Define/Match step in user-facing documentation
 - **THEN** the term "Match" (capitalized) SHALL be used
 
+### Requirement: Match outcome dispatch is owned by MatchingService
+
+The **Match outcome dispatch** (routing a scored managed source account to exact match, partial match, deferred match, or non-match and applying the resulting action) SHALL be implemented inside `src/services/matchingService/`. `FusionService` SHALL orchestrate the operation run but SHALL NOT implement Match resolution logic.
+
+#### Scenario: Code references Match outcome dispatch
+
+- **WHEN** code routes a scored managed source account to one of the four Match outcomes
+- **THEN** it SHALL reside in `MatchOutcomeDispatcher` within `src/services/matchingService/`
+- **AND** it SHALL use the canonical term "Match outcome dispatch" in identifiers and comments
+
+#### Scenario: Distinguishing orchestration from Match logic
+
+- **WHEN** a module coordinates an operation run
+- **THEN** it SHALL be considered operation-run orchestration and live in `FusionService`
+- **AND** the Match step's scoring and outcome dispatch SHALL remain in `MatchingService`
+
 ### Requirement: Candidate types are identity or deferred
 
 Candidate types SHALL be **identity** or **deferred**. The retired term `new-unmatched` and its wire value `new-unmatched` SHALL NOT be used.
@@ -279,7 +295,7 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 |------|------------|
 | **MappingService** | The stateless service responsible for the **Map** step — merging attributes from managed source accounts into the Fusion account schema using configurable merge strategies. Located at `src/services/mappingService/`. |
 | **DefinitionService** | The stateless service responsible for the **Define** step — computing normal attributes via Velocity templates and generating persistent unique attributes (UUIDs, counters, disambiguated values). Located at `src/services/definitionService/`. |
-| **MatchingService** | The stateless service responsible for the **Match** step — comparing Fusion accounts against existing identities using weighted scoring rules and dispatching match outcomes (exact match, partial match, deferred match, non-match). Located at `src/services/matchingService/`. |
+| **MatchingService** | The stateless service responsible for the **Match** step — comparing Fusion accounts against existing identities using weighted scoring rules and routing each scored account to its **Match outcome dispatch** (exact match, partial match, deferred match, non-match). Located at `src/services/matchingService/`. |
 | **FusionRun** | The centralized state container for a single operation run. Holds all mutable data loaded during the run (managed accounts, identities, Fusion accounts, form decisions, matching state) and serves as the single source of truth that stateless services read from and write to. Exposes `snapshot()` and `restore()` for recording and replay. Located at `src/model/fusionRun.ts`. |
 
 ### Matching and scoring
@@ -291,6 +307,7 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 | **Combined match score** | The weighted mean of evaluated rule similarities used to decide whether a candidate is a potential match. |
 | **Potential match** | A candidate whose combined match score meets or exceeds the configured threshold and whose mandatory rules pass. |
 | **Automatic assignment** | The decision to link a matched Fusion account to a specific identity without manual review when the combined score meets the automatic assignment threshold. |
+| **Match outcome dispatch** | The routing of a scored managed source account to one of four outcomes — exact match, partial match, deferred match, or non-match — and the application of the resulting action (automatic assignment, review-form creation, deferred claim, or non-match registration). Implemented by `MatchOutcomeDispatcher` inside `src/services/matchingService/`. |
 
 ### Candidate types
 

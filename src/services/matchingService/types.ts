@@ -1,5 +1,7 @@
+import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { FusionAccount } from '../../model/account'
-import { MatchingConfig } from '../../model/config'
+import { MatchingConfig, SourceType } from '../../model/config'
+import { SourceInfo } from '../sourceService'
 
 // ============================================================================
 // Type Definitions — Scoring
@@ -47,4 +49,22 @@ export type FusionMatch = {
     candidateType?: MatchCandidateType
     /** Score reports for each matching rule evaluated */
     scores: ScoreReport[]
+}
+
+/**
+ * Context captured while scoring a managed account against identity and deferred candidates.
+ * Carried through the Match outcome dispatch pipeline.
+ */
+export type ManagedAccountAnalysisContext = {
+    account: Account
+    fusionAccount: FusionAccount
+    sourceInfo: SourceInfo | undefined
+    sourceType: SourceType
+    fusionIdentityComparisons: number
+    hasIdentityCandidateMatches: boolean
+}
+
+export interface ManagedAccountMatchingResult {
+    analysis: ManagedAccountAnalysisContext
+    resolution: 'identity-match' | 'deferred-match' | 'non-match'
 }

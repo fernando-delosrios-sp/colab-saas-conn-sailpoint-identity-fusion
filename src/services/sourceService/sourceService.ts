@@ -51,7 +51,6 @@ function requiresFullReverseCorrelationArtifacts(sourceConfig: SourceConfig): bo
 export class SourceService {
     // Unified source storage - both managed and fusion sources
     private sourcesById: Map<string, SourceInfo> = new Map()
-    private sourcesByName: Map<string, SourceInfo> = new Map()
     private aggregationDateCache: Map<string, Promise<Date>> = new Map()
     private _allSources?: SourceInfo[]
     private _fusionSourceId?: string
@@ -381,7 +380,10 @@ export class SourceService {
 
         this._allSources = resolvedSources
         this.sourcesById = new Map(resolvedSources.map((x) => [x.id, x]))
-        this.sourcesByName = new Map(resolvedSources.map((x) => [x.name, x]))
+        this.run.sourcesByName.clear()
+        for (const source of resolvedSources) {
+            this.run.sourcesByName.set(source.name, source)
+        }
 
         const managedCount = resolvedSources.filter((s) => s.isManaged).length
         if (fusionSource) {
@@ -459,7 +461,7 @@ export class SourceService {
      * Get source info by exact name.
      */
     public getSourceByName(name: string): SourceInfo | undefined {
-        return this.sourcesByName.get(name)
+        return this.run.sourcesByName.get(name)
     }
 
     /**
@@ -479,7 +481,7 @@ export class SourceService {
      * Get source configuration by source name (only for managed sources)
      */
     public getSourceConfig(sourceName: string): SourceConfig | undefined {
-        const sourceInfo = this.sourcesByName.get(sourceName)
+        const sourceInfo = this.run.sourcesByName.get(sourceName)
         return sourceInfo?.config ?? this.sources.find((sc) => sc.name === sourceName)
     }
 
@@ -1245,7 +1247,7 @@ export class SourceService {
 
         this.validateNoAttributeOverlap(correlationAttribute, schemaAttributeNames)
 
-        const sourceInfo = this.sourcesByName.get(sourceName)
+        const sourceInfo = this.run.sourcesByName.get(sourceName)
         assert(sourceInfo, `Source "${sourceName}" not found`)
 
         const scope = requiresFullReverseCorrelationArtifacts(sourceConfig) ? 'full' : 'minimal'
@@ -1337,7 +1339,7 @@ export class SourceService {
         if (this.reverseCorrelationReadinessBySourceName.has(sourceName)) {
             return
         }
-        const sourceInfo = this.sourcesByName.get(sourceName)
+        const sourceInfo = this.run.sourcesByName.get(sourceName)
         assert(sourceInfo, `Source "${sourceName}" not found`)
         const status = await this.getReverseCorrelationSetupStatus(correlationAttribute, sourceInfo.id, sourceConfig)
         if (!status.isConsistent) {

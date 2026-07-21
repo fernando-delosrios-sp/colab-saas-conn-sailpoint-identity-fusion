@@ -1,28 +1,19 @@
-import { IdentityDocument, AccountV2025 as Account } from 'sailpoint-api-client'
-import { StandardCommand } from '@sailpoint/connector-sdk'
+import { IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount } from '../../model/account'
 import { FusionConfig } from '../../model/config'
 import { LogService } from '../logService'
 import { FusionRun } from '../../model/fusionRun'
 import { compact } from './collections'
 import { batchProcess } from './collections'
-import { assert } from '../../utils/assert'
 import type { IdentityService } from '../identityService'
-import type { SourceService } from '../sourceService'
 import type { AggregationTracker } from './aggregationTracker'
-import type { MappingService } from '../mappingService'
-import type { DefinitionService } from '../definitionService'
-import type { FusionReportBlend } from './types'
-import { OperationContext } from './types'
+import { AccountAssembly } from '../accountAssembly'
 
 export interface IdentityProcessorDeps {
     identities: IdentityService
-    getTracker(): AggregationTracker | undefined
-    sources: SourceService
     configSourceNames: Set<string>
-    mappingService: MappingService
-    definitionService: DefinitionService
-    buildFusionBlend(fa: FusionAccount, account: Account): FusionReportBlend
+    accountAssembly: AccountAssembly
+    getTracker(): AggregationTracker | undefined
 }
 
 export class IdentityProcessor {
@@ -30,37 +21,8 @@ export class IdentityProcessor {
         private config: FusionConfig,
         private log: LogService,
         private run: FusionRun,
-        private deps: IdentityProcessorDeps,
-        private commandType?: StandardCommand,
-        private operationContext?: OperationContext
+        private deps: IdentityProcessorDeps
     ) {}
-
-    private isAggregationAccountListMode(): boolean {
-        return (
-            this.commandType === StandardCommand.StdAccountList ||
-            this.operationContext === OperationContext.AccountList
-        )
-    }
-
-    private shouldPruneDeletedManagedAccounts(): boolean {
-        return (
-            this.isAggregationAccountListMode() ||
-            this.commandType === StandardCommand.StdAccountRead ||
-            this.commandType === StandardCommand.StdAccountUpdate ||
-            this.commandType === StandardCommand.StdAccountEnable ||
-            this.commandType === StandardCommand.StdAccountDisable
-        )
-    }
-
-    private async applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void> {
-        this.deps.mappingService.mapAttributes(fusionAccount, this.run)
-        await this.deps.definitionService.refreshNormalAttributes(fusionAccount)
-        this.deps.definitionService.refreshReverseCorrelationAttributes(fusionAccount)
-    }
-
-    private setFusionAccount(fusionAccount: FusionAccount): void {
-        this.run.registerFusionAccount(fusionAccount, this.deps.getTracker())
-    }
 
     /**
      * Process all identities.
@@ -141,19 +103,8 @@ export class IdentityProcessor {
             fusionAccount.setNeedsReset(true)
             fusionAccount.setOriginIdentityInScope(true)
 
-            assert(this.run.managedAccountsById, 'Managed accounts have not been loaded')
-            fusionAccount.addManagedAccountLayer(
-                this.run,
-                this.deps.sources.managedAccountsAllById,
-                {
-                    pruneDeleted: this.shouldPruneDeletedManagedAccounts(),
-                    onBlend: (account) => this.run.recordFusionBlend(this.deps.buildFusionBlend(fusionAccount, account), this.deps.getTracker()),
-                }
-            )
-
-            await this.applyAttributeProcessing(fusionAccount)
-
-            this.setFusionAccount(fusionAccount)
+            await this.deps.accountAssembly.assembleAccount(fusionAccount)
+            this.deps.accountAssembly.registerFusionAccount(fusionAccount)
             this.log.debug(`Registered identity as fusion account: ${identity.name} (${identityId})`)
             return fusionAccount
         }

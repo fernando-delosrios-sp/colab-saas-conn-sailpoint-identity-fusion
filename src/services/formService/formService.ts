@@ -11,6 +11,7 @@ import { assert, softAssert } from '../../utils/assert'
 import { readString, readUnknown, trimStr } from '../../utils/safeRead'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
+import { AccountV2025 as Account } from 'sailpoint-api-client'
 import {
     Candidate,
     CreateFusionFormOutcome,
@@ -19,7 +20,7 @@ import {
     PendingReviewAccountContext,
 } from './types'
 import { defaultFusionMaxCandidatesForForm, internalConfig } from '../../data/config'
-import { resolveIdentitiesSelectLabel } from './helpers'
+import { createAutomaticAssignmentDecision, resolveIdentitiesSelectLabel } from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 import {
     createFusionDecision,
@@ -651,6 +652,19 @@ export class FormService {
         if (!includeInProcessingQueue) return
         assert(this.run.fusionIdentityDecisions, 'Fusion identity decisions not fetched')
         this.run.addDecision(decision)
+    }
+
+    /**
+     * Builds a synthetic fusion decision for automatic assignment (exact match).
+     * This is the FormService-owned entry point so callers depend on the service,
+     * not on the helper function directly.
+     */
+    public createAutomaticAssignmentDecision(
+        fusionAccount: FusionAccount,
+        account: Account,
+        identityId: string
+    ): FusionDecision {
+        return createAutomaticAssignmentDecision(fusionAccount, account, identityId)
     }
 
     /**
