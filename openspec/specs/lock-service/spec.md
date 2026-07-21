@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The lock service (`src/services/lockService.ts`) is the connector's in-process synchronization primitive. It exposes a single `withLock<T>(key, fn)` API (and an in-memory implementation `InMemoryLockService`) that serializes async work across operations that share a key — for example, two concurrent updates against the same account. The service is intentionally lightweight: it does not cross process boundaries and is scoped to a single connector instance. This spec defines the contract for lock acquisition, queueing, and the optional `waitForAllPendingOperations()` drain used in tests and shutdown paths.
+The lock service (`src/services/lockService.ts`) is the connector's in-process synchronization primitive. It exposes `InMemoryLockService` with a single `withLock<T>(key, fn)` API that serializes async work across operations that share a key — for example, two concurrent updates against the same account. The service is intentionally lightweight: it does not cross process boundaries and is scoped to a single connector instance. This spec defines the contract for lock acquisition, queueing, and the optional `waitForAllPendingOperations()` drain used in tests and shutdown paths.
 
 ## Requirements
 

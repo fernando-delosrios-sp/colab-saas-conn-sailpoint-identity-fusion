@@ -77,6 +77,17 @@ The linter SHALL warn on any usage of explicit `any` and error on `case` block d
 - **WHEN** a developer writes `case 'foo': const bar = 1; break;`
 - **THEN** the linter will emit an error
 
+### Requirement: Use Native APIs for UUID and FormData
+The system MUST use native Node.js APIs (`crypto.randomUUID()` and `FormData`) instead of external dependencies (`uuid` and `form-data`) to reduce package footprint.
+
+#### Scenario: Generating UUIDs
+- **WHEN** a unique identifier is required for a correlation or fusion process
+- **THEN** the system uses `crypto.randomUUID()` to generate it
+
+#### Scenario: Processing multipart forms
+- **WHEN** the system communicates with the API using multipart payloads
+- **THEN** it uses native `FormData`
+
 ### Requirement: Detect a version bump in package.json
 
 The release-prep agent MUST detect a version bump in `package.json` and
