@@ -1,4 +1,5 @@
-import { compact, yieldToEventLoop, promiseAllBatched, forEachBatched } from '../collections'
+import { compact, promiseAllBatched, forEachBatched } from '../collections'
+import { yieldToEventLoop } from '../../../utils/yieldToEventLoop'
 
 describe('collections utilities', () => {
     describe('compact', () => {

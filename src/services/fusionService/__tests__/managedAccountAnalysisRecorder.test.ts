@@ -11,10 +11,6 @@ function makeRecorder(overrides: Record<string, any> = {}) {
         identity: vi.fn(() => 'identity-url'),
         humanAccount: vi.fn(() => 'human-url'),
     } as any
-    const analyzer = {
-        isDeferredMatchingEnabledForSource: vi.fn(() => false),
-        isRecordMatchingEnabledForSource: vi.fn(() => true),
-    } as any
     const sources = { resolveIscAccountIdForManagedKey: vi.fn(() => 'isc-123') } as any
     return {
         recorder: new ManagedAccountAnalysisRecorder({
@@ -24,7 +20,6 @@ function makeRecorder(overrides: Record<string, any> = {}) {
             reportAttributes: [],
             sourcesByName: new Map(),
             config: { fusionReportOnAggregation: true } as any,
-            analyzer,
             sources,
             shouldCaptureReportData: () => true,
             ...overrides,
@@ -32,7 +27,6 @@ function makeRecorder(overrides: Record<string, any> = {}) {
         log,
         tracker,
         urlContext,
-        analyzer,
         sources,
     }
 }
@@ -81,8 +75,10 @@ describe('ManagedAccountAnalysisRecorder', () => {
     })
 
     it('skips non-match data for authoritative deferred sources', () => {
-        const { recorder, tracker, analyzer } = makeRecorder()
-        analyzer.isDeferredMatchingEnabledForSource.mockReturnValue(true)
+        const sourcesByName = new Map([
+            ['HR', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } }],
+        ])
+        const { recorder, tracker } = makeRecorder({ sourcesByName })
         const fusionAccount = { name: 'acct', sourceName: 'HR', isMatch: false } as any
         recorder.recordAnalysis({
             account: { name: 'acct', sourceName: 'HR' } as any,

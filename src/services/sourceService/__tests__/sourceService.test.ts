@@ -52,7 +52,7 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
     }
     ;(service as any)._allSources = [sourceInfo]
     ;(service as any).sourcesById = new Map([[sourceInfo.id, sourceInfo]])
-    ;(service as any).sourcesByName = new Map([[sourceInfo.name, sourceInfo]])
+    ;(service.run as any).sourcesByName = new Map([[sourceInfo.name, sourceInfo]])
 
     return { service, client, sourceInfo, log }
 }
@@ -311,14 +311,14 @@ describe('SourceService reverse correlation setup hardening', () => {
         })
 
         ;(service as any)._fusionSourceId = 'fusion-source-id'
-        ;(service as any).sourcesByName.set('Fusion Source', {
+        ;service.run.sourcesByName.set('Fusion Source', {
             id: 'fusion-source-id',
             name: 'Fusion Source',
             isManaged: false,
             sourceType: SourceType.Authoritative,
             config: undefined,
         })
-        ;(service as any).sourcesByName.set('HR Source', {
+        ;service.run.sourcesByName.set('HR Source', {
             id: 'managed-source-id',
             name: 'HR Source',
             isManaged: true,
@@ -367,7 +367,7 @@ describe('SourceService reverse correlation setup hardening', () => {
             correlationDisplayName: 'Reverse Native Identity',
         })
 
-        ;(service as any).sourcesByName.set('HR Source', {
+        ;service.run.sourcesByName.set('HR Source', {
             id: 'managed-source-id',
             name: 'HR Source',
             isManaged: true,
@@ -411,7 +411,7 @@ describe('SourceService reverse correlation setup hardening', () => {
             })
 
             ;(service as any)._fusionSourceId = 'fusion-source-id'
-            ;(service as any).sourcesByName.set('Fusion Source', {
+            ;service.run.sourcesByName.set('Fusion Source', {
                 id: 'fusion-source-id',
                 name: 'Fusion Source',
                 isManaged: false,
@@ -425,7 +425,7 @@ describe('SourceService reverse correlation setup hardening', () => {
                 correlationAttribute: 'reverseNativeIdentity',
                 correlationDisplayName: 'Reverse Native Identity',
             }
-            ;(service as any).sourcesByName.set('HR Source', {
+            ;service.run.sourcesByName.set('HR Source', {
                 id: 'managed-source-id',
                 name: 'HR Source',
                 isManaged: true,
@@ -467,7 +467,7 @@ describe('SourceService authoritative reverse correlation identity profile mappi
             sourceType: SourceType.Authoritative,
             config: undefined,
         }
-        const managedSource = (service as any).sourcesByName.get('HR Source')
+        const managedSource = service.run.sourcesByName.get('HR Source')
         ;(service as any)._fusionSourceId = 'fusion-source-id'
         ;(service as any).sourcesById = new Map([
             [fusionSource.id, fusionSource],
@@ -516,7 +516,7 @@ describe('SourceService authoritative reverse correlation identity profile mappi
             sourceType: SourceType.Authoritative,
             config: undefined,
         }
-        const managedSource = (service as any).sourcesByName.get('HR Source')
+        const managedSource = service.run.sourcesByName.get('HR Source')
         ;(service as any)._fusionSourceId = 'fusion-source-id'
         ;(service as any).sourcesById = new Map([
             [fusionSource.id, fusionSource],

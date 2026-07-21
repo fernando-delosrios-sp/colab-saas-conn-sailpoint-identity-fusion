@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest'
-import { FusionRun } from '../fusionRun'
+import { describe, it, expect, vi } from 'vitest'
+import { AccountV2025 as Account } from 'sailpoint-api-client'
+import { FusionRun, RunStateSnapshot } from '../fusionRun'
+import { AggregationTracker } from '../aggregationTracker'
+import { ManagedAccountAnalysisRecorder } from '../../services/fusionService/managedAccountAnalysisRecorder'
+import { SourceInfo } from '../../services/sourceService'
+import { SourceType } from '../config'
+import { FusionAccount } from '../account'
 
 describe('FusionRun', () => {
     it('initializes with empty maps and sets', () => {
@@ -21,6 +27,7 @@ describe('FusionRun', () => {
         expect(run.fusionIdentityDecisions.length).toBe(0)
         expect(run.fusionBlends).toEqual([])
         expect(run.matchScoringMs).toBe(0)
+        expect(run.pendingDisableOperationsCount).toBe(0)
     })
 
     it('allows reading and writing managed accounts', () => {
@@ -37,6 +44,95 @@ describe('FusionRun', () => {
         expect(run.isAutoAssigned('id-1')).toBe(true)
         expect(run.isAutoAssigned('id-2')).toBe(true)
         expect(run.isAutoAssigned('id-3')).toBe(false)
+    })
+
+    describe('disable operations', () => {
+        it('queues and awaits pending disable operations', async () => {
+            const run = new FusionRun()
+            let fired = false
+            const account = { name: 'acct', sourceName: 'src' } as Account
+            run.setDisableOperationFactory(async () => {
+                await new Promise<void>((resolve) => setTimeout(resolve, 10))
+                fired = true
+            })
+            run.queueDisableOperation(account)
+            expect(run.pendingDisableOperationsCount).toBe(1)
+            await run.awaitPendingDisableOperations()
+            expect(fired).toBe(true)
+            expect(run.pendingDisableOperationsCount).toBe(0)
+        })
+
+        it('removes completed disable operations from the pending set', async () => {
+            const run = new FusionRun()
+            const account = { name: 'acct', sourceName: 'src' } as Account
+            run.setDisableOperationFactory(async () => {})
+            run.queueDisableOperation(account)
+            await run.awaitPendingDisableOperations()
+            expect(run.pendingDisableOperationsCount).toBe(0)
+        })
+
+        it('awaitPendingDisableOperations is safe when empty', async () => {
+            const run = new FusionRun()
+            await expect(run.awaitPendingDisableOperations()).resolves.toBeUndefined()
+        })
+
+        it('is a no-op when no factory is registered', () => {
+            const run = new FusionRun()
+            const account = { name: 'acct', sourceName: 'src' } as Account
+            expect(() => run.queueDisableOperation(account)).not.toThrow()
+            expect(run.pendingDisableOperationsCount).toBe(0)
+        })
+    })
+
+    describe('removeMatchAccount', () => {
+        it('removes a managed account from the analysis recorder tracker', () => {
+            const run = new FusionRun()
+            const tracker = new AggregationTracker()
+            const fusionAccount = { managedAccountId: 'managed-1' } as FusionAccount
+            tracker.matchAccounts.push(fusionAccount)
+            run.analysisRecorder = makeMockRecorder({ tracker })
+
+            run.removeMatchAccount('managed-1')
+            expect(tracker.matchAccounts).toHaveLength(0)
+        })
+
+        it('is a no-op when no recorder is attached', () => {
+            const run = new FusionRun()
+            expect(() => run.removeMatchAccount('managed-1')).not.toThrow()
+        })
+
+        it('is a no-op for undefined ids', () => {
+            const run = new FusionRun()
+            run.analysisRecorder = makeMockRecorder({ tracker: new AggregationTracker() })
+            expect(() => run.removeMatchAccount(undefined)).not.toThrow()
+        })
+
+        it('is a no-op when the id is not found', () => {
+            const run = new FusionRun()
+            const tracker = new AggregationTracker()
+            tracker.matchAccounts.push({ managedAccountId: 'managed-1' } as FusionAccount)
+            run.analysisRecorder = makeMockRecorder({ tracker })
+
+            run.removeMatchAccount('managed-2')
+            expect(tracker.matchAccounts).toHaveLength(1)
+        })
+    })
+
+    describe('trackFailed', () => {
+        it('delegates to the analysis recorder', () => {
+            const run = new FusionRun()
+            const recorder = makeMockRecorder({ tracker: new AggregationTracker() })
+            run.analysisRecorder = recorder
+            const fusionAccount = { name: 'fa', sourceName: 's' } as FusionAccount
+
+            run.trackFailed(fusionAccount, 'something went wrong')
+            expect(recorder.trackFailedCalls).toEqual([[fusionAccount, 'something went wrong']])
+        })
+
+        it('is a no-op when no recorder is attached', () => {
+            const run = new FusionRun()
+            expect(() => run.trackFailed({} as FusionAccount, 'oops')).not.toThrow()
+        })
     })
 
     it('snapshot returns serializable state', () => {
@@ -101,4 +197,58 @@ describe('FusionRun', () => {
         expect(run.autoAssignedIdentityIds.has('id-a')).toBe(true)
         expect(run.phaseTimings).toEqual([{ phase: 'Setup', elapsed: '1.2s' }])
     })
+
+    it('restore populates sourcesByName', () => {
+        const sourceInfo: SourceInfo = {
+            id: 'src-1',
+            name: 'Source A',
+            isManaged: true,
+            sourceType: SourceType.Authoritative,
+        }
+        const snapshot: RunStateSnapshot = {
+            managedAccounts: [],
+            fusionAccounts: [],
+            identities: [],
+            fusionIdentityDecisions: [],
+            pendingCandidateIdentityIds: [],
+            pendingReviewUrlsByReviewerId: {},
+            pendingReviewUrlsByCandidateId: {},
+            sourcesByName: { 'Source A': sourceInfo as any },
+            currentRunNonMatchedKeysBySource: {},
+            fusionBlends: [],
+            autoAssignedIds: [],
+            matchScoringMs: 0,
+            phaseTimings: [],
+        }
+
+        const run = new FusionRun()
+        run.restore(snapshot)
+
+        expect(run.sourcesByName.get('Source A')).toEqual(sourceInfo)
+    })
 })
+
+function makeMockRecorder(options: { tracker: AggregationTracker }) {
+    const urlContext = {
+        humanAccount: vi.fn().mockReturnValue(''),
+        identity: vi.fn().mockReturnValue(''),
+    }
+    const recorder = new ManagedAccountAnalysisRecorder({
+        log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn(), assert: vi.fn(), crash: vi.fn() } as any,
+        tracker: () => options.tracker,
+        urlContext: urlContext as any,
+        reportAttributes: [],
+        sourcesByName: new Map(),
+        config: {} as any,
+        analyzer: {} as any,
+        sources: { managedAccountsAllById: new Map() } as any,
+        shouldCaptureReportData: () => true,
+    })
+    ;(recorder as any).trackFailedCalls = []
+    const originalTrackFailed = recorder.trackFailed.bind(recorder)
+    recorder.trackFailed = (fusionAccount: FusionAccount, error: string) => {
+        ;(recorder as any).trackFailedCalls.push([fusionAccount, error])
+        originalTrackFailed(fusionAccount, error)
+    }
+    return recorder
+}

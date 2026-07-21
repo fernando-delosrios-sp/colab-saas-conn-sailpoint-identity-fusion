@@ -7,7 +7,7 @@ import type { LogService } from '../logService'
 export interface CandidateRegistryDeps {
     readonly getFusionAccount: (key: string) => FusionAccount | undefined
     readonly sourcesByName: Map<string, SourceInfo>
-    readonly log: LogService
+    readonly log?: LogService
 }
 
 export class CandidateRegistry {

@@ -5,6 +5,7 @@
 import type { FusionConfig } from '../../model/config'
 import { runtimeDefaults } from '../../data/config'
 import type { LogService } from '../logService'
+import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 
 
 // ============================================================================
@@ -21,15 +22,6 @@ export function compact<T>(array: (T | null | undefined)[]): T[] {
 // ============================================================================
 // Async / Promise Operations
 // ============================================================================
-
-/**
- * Yields to the event loop so buffered I/O (e.g. pino logger writes to stdout) can drain.
- * The SailPoint SDK logger uses pino with async buffering; during intensive batch processing
- * the event loop stays busy and logs accumulate. A single setImmediate tick allows flushing.
- */
-export function yieldToEventLoop(): Promise<void> {
-    return new Promise((resolve) => setImmediate(resolve))
-}
 
 /**
  * Processes items in batches with a concurrency limit, avoiding unbounded Promise.all.

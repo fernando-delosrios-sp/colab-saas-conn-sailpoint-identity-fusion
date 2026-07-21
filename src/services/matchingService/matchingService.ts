@@ -3,7 +3,7 @@ import { FusionAccount } from '../../model/account'
 import { assert } from '../../utils/assert'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing, effectiveSkipMatchIfThresholdNotMet } from '../../model/config'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
-import { countIdentityCandidateFusionMatches } from '../formService/helpers'
+import { countIdentityCandidateFusionMatches } from './matchingHelpers'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
 import {
     normalizeLIG3,

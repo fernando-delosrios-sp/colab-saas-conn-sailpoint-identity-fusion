@@ -2,6 +2,11 @@
 
 ## 2.2.0
 
+- (2026-07-21) **Architecture:** Deepened the Match step into a single `MatchOutcomeDispatcher` module in `src/services/matchingService/`, absorbing the old `ManagedAccountAnalyzer`, `ManagedAccountMatchingRunner`, and `ManagedAccountOutcomeHandler`; removed duplicated resolution switches from `FusionService`; added `runMatchSweep(accounts, batchSize): MatchSweepResult` as the single public seam.
+- (2026-07-21) **Architecture:** Extracted the shared account-assembly recipe into `src/services/accountAssembly/AccountAssembly`, removing duplicated mode-gate / layer-application / Map/Define / registration code across `FusionService`, `IdentityProcessor`, and `DecisionProcessor`.
+- (2026-07-21) **Architecture:** Tightened `FusionRun` as the single source of truth for Match state by adding `queueDisableOperation`, `removeMatchAccount`, `trackFailed`, and deferred-candidate registry verbs; deduplicated `sourcesByName` between `SourceService` and `FusionRun`; moved `AggregationTracker` to `src/model/`.
+- (2026-07-21) **Architecture:** Broke the `matchingService ⇄ fusionService ⇄ formService` import cycles by moving match predicates, the deferred-match log formatter, and event-loop yield into their correct homes (`matchingService/`, `utils/`); moved shared run/report types (`OperationContext`, `FusionReportBlend`) to `src/model/`.
+- (2026-07-21) **Terminology:** Added **Match outcome dispatch** to the ubiquitous-language spec and glossary, clarifying that `MatchingService` owns the Match step while `FusionService` owns operation-run orchestration.
 - (2026-07-21) **Architecture:** Removed over-engineered `LockService` and `WorkQueue` interfaces in favor of using concrete classes directly to simplify internals and update specifications.
 - (2026-07-21) **Performance:** Replaced external dependencies (`uuid` and `form-data`) with native Node.js APIs (`crypto.randomUUID()` and `FormData`) to reduce package footprint.
 - (2026-07-21) **Performance:** Streamlined memory management by removing `streamAndClearEligibleAccounts` and `uniqueAttributesPhase`, integrating JIT unique attribute generation directly into the final aggregation output stream to reduce pipeline complexity while retaining strict OOM protections.

@@ -90,6 +90,7 @@ Fusion accounts carry two kinds of entitlements, distinguished by how they are a
 | **Combined match score** | The weighted mean of evaluated rule similarities used to decide whether a candidate is a potential match. |
 | **Potential match** | A candidate whose combined match score meets or exceeds the configured threshold and whose mandatory rules pass. |
 | **Automatic assignment** | The decision to link a matched Fusion account to a specific identity without manual review when the combined score meets the automatic assignment threshold. |
+| **Match outcome dispatch** | The routing of a scored managed source account to one of four outcomes (exact match, partial match, deferred match, or non-match) and the application of the resulting action. Implemented by `MatchOutcomeDispatcher` in `src/services/matchingService/`. |
 
 ### Matching nuances
 

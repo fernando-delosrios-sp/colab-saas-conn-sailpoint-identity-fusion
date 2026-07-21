@@ -4,13 +4,8 @@ import { pickAttributes } from '../../utils/attributes'
 import { trimStr } from '../../utils/safeRead'
 import { roundMetric2 } from '../../utils/numbers'
 import { UrlContext } from '../../utils/url'
-import type { FusionMatch, ScoreReport } from '../matchingService/types'
-import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
-import { AccountV2025 as Account } from 'sailpoint-api-client'
-import { FusionDecision } from '../../model/form'
-import { getManagedAccountKeyFromAccount, isCompositeManagedAccountKey } from '../../model/managedAccountKey'
-import { assert } from '../../utils/assert'
-import { readString } from '../../utils/safeRead'
+import type { ScoreReport } from '../matchingService/types'
+import { isCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import {
     FusionReportAccount,
     FusionReportIdentityConflictOccurrence,
@@ -18,6 +13,8 @@ import {
     FusionReportScore,
     FusionReportWarnings,
 } from './types'
+import type { FusionMatch } from '../matchingService/types'
+
 
 /**
  * Turn in-memory {@link ScoreReport} rows into the slim payload used by fusion report / email templates.
@@ -145,72 +142,3 @@ export function buildIdentityConflictWarningsFromMap(
     }
 }
 
-/**
- * Builds info-log headline and "- N candidate(s), M partial(s)" suffix from match scores.
- * "candidate(s)" counts exact (all rules 100, none skipped); "partial(s)" are other matches in the set.
- */
-export function formatFusionMatchDiscoveryLog(
-    matches: ReadonlyArray<FusionMatch>,
-    deferred: boolean
-): { headline: string; summary: string } {
-    let exact = 0
-    for (const m of matches) {
-        if (isExactAttributeMatchScores(m.scores)) exact++
-    }
-    const partial = matches.length - exact
-    const segments: string[] = []
-    if (exact > 0) segments.push(`${exact} candidate(s)`)
-    if (partial > 0) segments.push(`${partial} partial(s)`)
-    const summary = segments.length > 0 ? segments.join(', ') : '0 candidate(s)'
-    if (deferred) {
-        return {
-            headline: exact > 0 ? 'DEFERRED EXACT MATCH FOUND' : 'DEFERRED MATCH FOUND',
-            summary,
-        }
-    }
-    return {
-        headline: exact > 0 ? 'EXACT MATCH FOUND' : 'MATCH FOUND',
-        summary,
-    }
-}
-
-/**
- * Builds a synthetic fusion decision when all attribute scores are 100 (exact match),
- * skipping manual review (automatic assignment to the selected identity).
- *
- * @param fusionAccount - The fusion account being assigned
- * @param account - The managed account
- * @param identityId - The target identity ID
- * @returns Synthetic FusionDecision for automatic assignment
- */
-export function createAutomaticAssignmentDecision(
-    fusionAccount: FusionAccount,
-    account: Account,
-    identityId: string
-): FusionDecision {
-    const accountKey = getManagedAccountKeyFromAccount(account)
-    assert(accountKey, 'Managed account missing composite key for automatic assignment decision')
-    return {
-        submitter: { id: 'system', email: '', name: 'System (automatic assignment)' },
-        account: {
-            id: accountKey,
-            name: fusionAccount.name ?? account.name ?? '',
-            sourceName: fusionAccount.sourceName,
-            sourceId: readString(account, 'sourceId'),
-            nativeIdentity: account.nativeIdentity ?? undefined,
-        },
-        newIdentity: false,
-        identityId,
-        comments: 'Automatically assigned: combined score met or exceeded threshold',
-        finished: true,
-        automaticAssignment: true,
-    }
-}
-
-export function hasIdentityCandidateMatches(fusionAccount: FusionAccount): boolean {
-    return fusionAccount.fusionMatches.some((match) => (match.candidateType ?? 'identity') === 'identity')
-}
-
-export function hasDeferredCandidateMatches(fusionAccount: FusionAccount): boolean {
-    return fusionAccount.fusionMatches.some((match) => match.candidateType === 'deferred')
-}
