@@ -12,7 +12,14 @@ import { FusionAccountKind } from '../../model/fusionAccountTypes'
 import { SchemaService } from '../schemaService'
 import { Account } from 'sailpoint-api-client'
 import { CompoundKey, CompoundKeyType, SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
-import { evaluateVelocityTemplate, normalize, padNumber, removeSpaces, switchCase, truncateResultToMaxLength } from './formatting'
+import {
+    evaluateVelocityTemplate,
+    normalize,
+    padNumber,
+    removeSpaces,
+    switchCase,
+    truncateResultToMaxLength,
+} from './formatting'
 import { LockService } from '../lockService'
 type RenderContext = Record<string, any>
 import { v4 as uuidv4 } from 'uuid'
@@ -165,9 +172,7 @@ export class AttributeService {
      */
     public async initializeCounters(): Promise<void> {
         const stateWrapper = this.getStateWrapper()
-        const counterDefinitions = this.uniqueDefinitions.filter(
-            (definition) => definition.useIncrementalCounter
-        )
+        const counterDefinitions = this.uniqueDefinitions.filter((definition) => definition.useIncrementalCounter)
         if (counterDefinitions.length === 0) return
 
         this.log.debug(`Initializing ${counterDefinitions.length} incremental counter attributes`)
@@ -226,9 +231,14 @@ export class AttributeService {
         }
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
-            const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some(
-                (accounts) => accounts.length > 0
-            )
+            // ⚡ Bolt: Iterate Map directly to prevent Array.from heap allocation
+            let hasManagedAccountContext = false
+            for (const accounts of sourceAttributeMap.values()) {
+                if (accounts.length > 0) {
+                    hasManagedAccountContext = true
+                    break
+                }
+            }
             const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sourceConfig) => sourceConfig.name)
             let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
@@ -411,7 +421,7 @@ export class AttributeService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -436,10 +446,7 @@ export class AttributeService {
      * override the value with the identity name and return true to signal that
      * further template evaluation for this attribute should be skipped.
      */
-    private applyDisplayAttributeOverrideIfApplicable(
-        fusionAccount: FusionAccount,
-        attributeName: string
-    ): boolean {
+    private applyDisplayAttributeOverrideIfApplicable(fusionAccount: FusionAccount, attributeName: string): boolean {
         const { fusionDisplayAttribute } = this.schemas
         if (attributeName !== fusionDisplayAttribute) return false
         // Identity decisions are treated as uncorrelated managed accounts; they must not
@@ -449,9 +456,7 @@ export class AttributeService {
 
         const label = fusionAccount.identityName
         if (label) {
-            this.log.info(
-                `Setting identity name for attribute: ${attributeName} for account: ${fusionAccount.name}`
-            )
+            this.log.info(`Setting identity name for attribute: ${attributeName} for account: ${fusionAccount.name}`)
             fusionAccount.attributes[attributeName] = label
         }
         return true
@@ -729,7 +734,7 @@ export class AttributeService {
      */
     private buildVelocityContext(fusionAccount: FusionAccount): Record<string, any> {
         const context: Record<string, any> = { ...fusionAccount.attributeBag.current }
-        
+
         // $name falls back to identity name if not mapped
         if (fusionAccount.identityName && context.name === undefined) {
             context.name = fusionAccount.identityName
@@ -745,7 +750,7 @@ export class AttributeService {
                 name: fusionAccount.identityName,
             }
         }
-        
+
         context.accounts = orderedAccounts
         context.previous = fusionAccount.attributeBag.previous
         context.sources = fusionAccount.attributeBag.sources
@@ -810,8 +815,6 @@ export class AttributeService {
         return trimStr(fusionAccount.attributes[attributeName])
     }
 
-
-
     /**
      * Build a deterministic accounts array for attribute-definition context.
      *
@@ -849,10 +852,7 @@ export class AttributeService {
         return ordered
     }
 
-    private prioritizeMainAccount(
-        ordered: Record<string, any>[],
-        fusionAccount: FusionAccount
-    ): Record<string, any>[] {
+    private prioritizeMainAccount(ordered: Record<string, any>[], fusionAccount: FusionAccount): Record<string, any>[] {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
@@ -957,7 +957,9 @@ export class AttributeService {
             // Keep as string if parsing fails
         }
 
-        this.log.debug(`[${accountName}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`)
+        this.log.debug(
+            `[${accountName}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
+        )
 
         return value
     }
