@@ -26,7 +26,7 @@ import {
     processPreviousRunMatchedAccounts,
     pruneDeletedManagedAccounts,
 } from '../fusionAccountMatcher'
-import type { WorkQueue } from '../fusionRun'
+import type { FusionRun } from '../fusionRun'
 
 export interface AddManagedAccountOptions {
     pruneDeleted?: boolean
@@ -168,7 +168,7 @@ export function setManagedAccount(
  */
 export function addManagedAccountLayer(
     state: FusionAccountState,
-    workQueue: WorkQueue,
+    workQueue: FusionRun,
     allAccountsById?: Map<string, Account>,
     options: AddManagedAccountOptions = {}
 ): void {

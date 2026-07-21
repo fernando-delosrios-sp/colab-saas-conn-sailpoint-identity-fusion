@@ -27,15 +27,8 @@ export interface RunStateSnapshot {
 }
 
 
-export interface WorkQueue {
-    get(key: string): Account | undefined
-    getKeysForIdentity(identityId: string): ReadonlySet<string> | undefined
-    claimAccount(key: string, identityId?: string): boolean
-    claimAccountsForIdentity(identityId: string): number
-    entries(): IterableIterator<[string, Account]>
-}
 
-export class FusionRun implements WorkQueue {
+export class FusionRun {
     public readonly isRecordMode: boolean
     readonly managedAccountsById = new Map<string, Account>()
     readonly managedAccountsByIdentityId = new Map<string, Set<string>>()

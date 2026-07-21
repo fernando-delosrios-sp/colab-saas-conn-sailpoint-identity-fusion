@@ -1,6 +1,6 @@
 import { AccountV2025 as Account } from 'sailpoint-api-client'
 import type { FusionAccountState } from './fusionAccountState'
-import type { WorkQueue } from './fusionRun'
+import type { FusionRun } from './fusionRun'
 import { addAccountId, removeMissingAccountId } from './fusionAccountRules/collectionRules'
 import { setUncorrelatedAccount } from './fusionAccountRules/statusRules'
 import { addHistory } from './fusionAccountRules/historyRules'
@@ -13,7 +13,7 @@ import { trimStr } from '../utils/safeRead'
  */
 export function processIdentityMatchedAccounts(
     state: FusionAccountState,
-    queue: WorkQueue,
+    queue: FusionRun,
     addBlendHistory: boolean,
     skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
     onBlend?: (account: Account) => void
@@ -42,7 +42,7 @@ export function processIdentityMatchedAccounts(
  */
 export function processPreviousRunMatchedAccounts(
     state: FusionAccountState,
-    queue: WorkQueue,
+    queue: FusionRun,
     addBlendHistory: boolean,
     skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
     onBlend?: (account: Account) => void
