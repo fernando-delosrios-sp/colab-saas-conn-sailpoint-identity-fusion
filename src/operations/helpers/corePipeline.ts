@@ -238,15 +238,30 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
 /** Phase 5: Unique attribute refresh. */
 export async function uniqueAttributesPhase(
     serviceRegistry: ServiceRegistry,
-    _options: CorePipelineOptions
-): Promise<void> {
-    const { log, fusion, sources } = serviceRegistry
+    options: CorePipelineOptions
+): Promise<number> {
+    const { log, fusion, sources, res } = serviceRegistry
+    const isPersistent = options.mode.kind === 'aggregation'
+
+    let earlySentCount = 0
+    if (isPersistent) {
+        log.info('Early-returning fusion accounts that do not require unique attribute refresh')
+        const earlyStreamOp = log.track('uniqueAttributesPhase.streamAndClearEligibleAccounts')
+        const { sent } = await fusion.streamAndClearEligibleAccounts(
+            (account) => res.send(account),
+            (fa) => !fa.needsRefresh && !fa.needsReset
+        )
+        earlySentCount = sent
+        earlyStreamOp.done({ sent })
+    }
 
     const refreshOp = log.track('FusionService.refreshUniqueAttributes')
     const count = await fusion.refreshUniqueAttributes()
     refreshOp.done({ count })
 
     log.info(`Work queue processing complete - ${sources.run.managedAccountsById.size} unprocessed account(s) remaining`)
+    
+    return earlySentCount
 }
 
 /**
@@ -427,12 +442,16 @@ export class PipelineRunner {
             if (targetPhase === 'process') return { shouldContinue: true, fetchResult, timer }
 
             // Phase 5: Unique Attributes
-            await uniqueAttributesPhase(serviceRegistry, pipelineOptions)
+            const earlyOutputCount = await uniqueAttributesPhase(serviceRegistry, pipelineOptions)
             timer.phase('PHASE 5: Unique attributes', 'info', 'Unique attributes')
-            if (targetPhase === 'uniqueAttributes') return { shouldContinue: true, fetchResult, timer }
+            if (targetPhase === 'uniqueAttributes') {
+                outputCount = earlyOutputCount
+                return { shouldContinue: true, fetchResult, outputCount, timer }
+            }
 
             // Phase 6: Output
-            outputCount = await outputPhase(serviceRegistry, pipelineOptions)
+            const lateOutputCount = await outputPhase(serviceRegistry, pipelineOptions)
+            outputCount = earlyOutputCount + lateOutputCount
             timer.phase('PHASE 6: Output (send accounts, persist state)', 'info', 'Output')
             if (targetPhase === 'output') return { shouldContinue: true, fetchResult, outputCount, timer }
 

@@ -75,6 +75,10 @@ export type DryRunHelpersContext = {
     fusion: {
         generateReport: (tracker: AggregationTracker, includeNonMatches?: boolean, stats?: FusionReportStats) => FusionReport
         forEachISCAccount: (callback: (account: StdAccountListOutput) => void) => Promise<{ sent: number; eligible: number }>
+        streamAndClearEligibleAccounts: (
+            callback: (account: StdAccountListOutput) => void,
+            predicate: (account: FusionAccount) => boolean
+        ) => Promise<{ sent: number; eligible: number }>
         getISCAccount: (
             account: FusionAccount,
             includeUncorrelated: boolean

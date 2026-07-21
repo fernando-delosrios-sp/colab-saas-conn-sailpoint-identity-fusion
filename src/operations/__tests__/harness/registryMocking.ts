@@ -69,6 +69,7 @@ export function createRegistry() {
             getISCAccount: vi.fn().mockResolvedValue({ id: 'isc-created' }),
             analyzeUncorrelatedAccounts: vi.fn(),
             forEachISCAccount: vi.fn().mockResolvedValue({ sent: 0, eligible: 0 }),
+            streamAndClearEligibleAccounts: vi.fn().mockResolvedValue({ sent: 0, eligible: 0 }),
             refreshUniqueAttributes: vi.fn().mockResolvedValue(0),
             initializeManagedAccountProcessing: vi.fn().mockResolvedValue(undefined),
             processCorrelatedManagedAccounts: vi.fn().mockResolvedValue(undefined),

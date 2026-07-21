@@ -2,6 +2,7 @@
 
 ## 2.2.0
 
+- (2026-07-21) **Performance:** Implemented early return architecture for Fusion Accounts to mitigate OOM risks by streaming and clearing eligible accounts directly within the pipeline. Refactored `IdentityService` to batch missing identity requests using Lucene OR queries, resolving N+1 latency bottlenecks.
 - (2026-07-20) **Architecture:** Introduced `FusionRun`, a centralized state container that encapsulates all per-run state (`identityMap`, `managedAccountsById`, matching states, maps, and form decisions), completely managing state mutations.
 - (2026-07-20) **Architecture:** Extracted `MapService`, `DefineService`, and `MatchService` from the legacy `AttributeService` and `ScoringService`, separating concerns and improving testability.
 - (2026-07-20) **Architecture:** Rationalized dependency interfaces for fusion processors and handlers by injecting the `FusionRun` container directly instead of passing scattered service instances.

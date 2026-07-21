@@ -1040,6 +1040,66 @@ export class FusionService {
             }
             await yieldToEventLoop()
         }
+
+        return { sent: count, eligible: totalEligible }
+    }
+
+    /**
+     * Streams eligible ISC accounts directly to the output callback and IMMEDIATELY removes
+     * them from memory. This acts as an "early return" mid-pipeline for accounts that don't
+     * require unique attribute generation or further processing, drastically lowering the
+     * memory footprint (OOM risk) during large aggregations.
+     *
+     * @param send - Callback invoked with each account output (e.g. res.send)
+     * @param predicate - If true, the account is streamed and cleared
+     * @returns Number of accounts sent and number of eligible accounts processed
+     */
+    public async streamAndClearEligibleAccounts(
+        send: (account: StdAccountListOutput) => void,
+        predicate: (account: FusionAccount) => boolean
+    ): Promise<{ sent: number; eligible: number }> {
+        const batchSize = getFusionParallelBatchSize(this.config)
+        let count = 0
+
+        const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
+        const accountsToProcess = allAccounts.filter(predicate)
+        const eligibleAccounts = this.deleteEmpty ? accountsToProcess.filter((account) => !account.isOrphan()) : accountsToProcess
+
+        const totalEligible = eligibleAccounts.length
+        const totalBatches = Math.ceil(totalEligible / batchSize)
+        const logProgressEveryBatch = Math.max(1, Math.min(50, Math.ceil(totalBatches / 20) || 1))
+
+        if (totalEligible === 0) return { sent: 0, eligible: 0 }
+        
+        this.log.info(`Early-returning ${totalEligible} fusion account(s) that do not require unique attribute refresh`)
+
+        for (let i = 0; i < eligibleAccounts.length; i += batchSize) {
+            const batch = eligibleAccounts.slice(i, i + batchSize)
+            const outputBatch = await Promise.all(batch.map((account) => this.getISCAccount(account, false)))
+            for (let j = 0; j < outputBatch.length; j++) {
+                const output = outputBatch[j]
+                if (output) {
+                    send(output)
+                    count++
+                }
+                // Clear memory instantly
+                this.run.removeFusionAccount(batch[j])
+            }
+            const processedInLoop = Math.min(i + batch.length, totalEligible)
+            const currentBatch = Math.floor(i / batchSize) + 1
+            if (
+                currentBatch === 1 ||
+                currentBatch % logProgressEveryBatch === 0 ||
+                currentBatch === totalBatches ||
+                processedInLoop === totalEligible
+            ) {
+                this.log.info(
+                    `Early-streaming progress: batches ${currentBatch}/${totalBatches} | processed ${processedInLoop}/${totalEligible} | sent ${count}`
+                )
+            }
+            await yieldToEventLoop()
+        }
+
         return { sent: count, eligible: totalEligible }
     }
 

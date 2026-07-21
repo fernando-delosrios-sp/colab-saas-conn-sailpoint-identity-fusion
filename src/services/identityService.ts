@@ -239,13 +239,34 @@ export class IdentityService {
         return this.run.getIdentity(id)
     }
 
-    /**
-     * Best-effort cache hydration for identity IDs not already present.
-     * Failed fetches are ignored so reporting can proceed with partial display data.
-     */
     public async hydrateMissingIdentitiesById(identityIds: string[]): Promise<void> {
         const missing = [...new Set(identityIds.filter((id) => id && !this.getIdentityById(id)))]
-        await promiseAllBatched(missing, (id) => this.fetchIdentityById(id).catch(() => {}))
+        if (missing.length === 0) return
+
+        const BATCH_SIZE = 50
+        const batches: string[][] = []
+        for (let i = 0; i < missing.length; i += BATCH_SIZE) {
+            batches.push(missing.slice(i, i + BATCH_SIZE))
+        }
+
+        await promiseAllBatched(batches, async (batch) => {
+            const queryStr = `id:("${batch.join('" OR "')}")`
+            const query = buildIdentityQuery(queryStr)
+            try {
+                const identities = await this.client.paginateSearchApi<IdentityDocument>(
+                    query,
+                    QueuePriority.HIGH,
+                    'IdentityService>hydrateMissingIdentitiesById searchPost'
+                )
+                identities.forEach((identity) => {
+                    this.run.addIdentity(identity.id, identity)
+                    this.run.addIdentityIdInScope(identity.id)
+                })
+            } catch (err) {
+                const detail = err instanceof Error ? err.message : String(err)
+                this.log.debug(`Failed to hydrate batch of missing identities: ${detail}`)
+            }
+        })
     }
 
     // ------------------------------------------------------------------------
