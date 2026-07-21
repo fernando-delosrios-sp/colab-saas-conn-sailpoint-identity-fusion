@@ -14,7 +14,7 @@ import { StateWrapper } from './stateWrapper'
 import { SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { evaluateAttributeTemplate } from './templateEvaluator'
 import { padNumber } from './formatting'
-import { v4 as uuidv4 } from 'uuid'
+import crypto from 'crypto'
 import { assert } from '../../utils/assert'
 import { FUSION_STATE_CONFIG_PATH } from './constants'
 import { isValidAttributeValue } from '../../utils/attributes'
@@ -841,7 +841,7 @@ export class DefinitionService {
             (definition.expression.includes('$UUID') ||
                 definition.expression.includes('${UUID}'))
         ) {
-            context.UUID = uuidv4()
+            context.UUID = crypto.randomUUID()
         }
     }
 
@@ -863,7 +863,7 @@ export class DefinitionService {
             if (isValidAttributeValue(prevId)) {
                 fusionAccount.attributes[fusionIdentityAttribute] = prevId
             } else {
-                fusionAccount.attributes[fusionIdentityAttribute] = uuidv4()
+                fusionAccount.attributes[fusionIdentityAttribute] = crypto.randomUUID()
                 this.log.debug(
                     `Generated fallback UUID for missing identity attribute: ${fusionAccount.name}`
                 )
@@ -910,7 +910,7 @@ export class DefinitionService {
             if (this.skipAccountsWithMissingId) {
                 return undefined
             }
-            return uuidv4()
+            return crypto.randomUUID()
         }
         if (attributeName === fusionDisplayAttribute) {
             return trimStr(fusionAccount.name)
