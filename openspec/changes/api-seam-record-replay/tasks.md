@@ -71,4 +71,4 @@
 - [x] 9.5 `record-chain.js` syntactically valid (env vars with deprecation note)
 - [x] 9.6 scenario.json apiLogPath field verified in buildScenario return value
 - [ ] 9.7 Record/Replay integration test (requires ISC connectivity — deferred)
-- [ ] 9.8 Drift detection test (requires ReplayApiAdapter with corrupted log — deferred)
+- [x] 9.8 Drift detection test — ReplayApiAdapter with empty/corrupted log throws ConnectorError (9 unit tests pass)
