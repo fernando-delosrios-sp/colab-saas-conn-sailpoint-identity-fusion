@@ -68,12 +68,10 @@ export class ServiceRegistry {
         public res: Response<any>,
         operationContext?: string
     ) {
-        this.run = new FusionRun()
-
         // Initialize core services first
         const logConfig = operationContext ? { ...config, operationContext } : config
         this.log = context.logService ?? new LogService(logConfig)
-        this.run.log = this.log
+        this.run = new FusionRun(this.log, this.config)
         this.locks = context.lockService ?? new InMemoryLockService(this.log)
 
         if (context.connectionService) {

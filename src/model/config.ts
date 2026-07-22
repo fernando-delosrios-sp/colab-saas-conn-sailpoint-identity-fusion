@@ -476,6 +476,17 @@ interface InternalConfig {
 }
 
 // ============================================================================
+// Recording Configuration
+// ============================================================================
+
+/** Centralized recording flags, replacing scattered env vars (RECORD_MODE, RECORD_CHAIN_NAME, VERBOSE_RECORDING). */
+export interface RecordingConfig {
+    mode: 'off' | 'record' | 'replay'
+    chainName?: string
+    verbose?: boolean
+}
+
+// ============================================================================
 // Source Config - Combination of all menus
 // ============================================================================
 
@@ -493,4 +504,6 @@ export interface FusionConfig
         UniqueAttributeDefinitionSettingsMenu,
         AttributeMatchingSettingsMenu,
         AdvancedSettingsMenu,
-        InternalConfig {}
+        InternalConfig {
+    recording?: RecordingConfig
+}

@@ -6,6 +6,7 @@ import { ManagedAccountAnalysisRecorder } from '../services/fusionService/manage
 import { AggregationTracker } from './aggregationTracker'
 import { FusionReportBlend } from './fusionReportBlend'
 import { LogService } from '../services/logService'
+import { FusionConfig } from './config'
 import { hasValue, readString, trimStr } from '../utils/safeRead'
 import { assert } from '../utils/assert'
 import { buildManagedAccountKey } from './managedAccountKey'
@@ -166,8 +167,14 @@ export class FusionRun {
         return this._identityMap
     }
 
-    constructor(public log?: LogService) {
-        this.isRecordMode = process.env.RECORD_MODE === 'true'
+    constructor(public log?: LogService, config?: FusionConfig) {
+        if (config?.recording?.mode) {
+            this.isRecordMode = config.recording.mode === 'record'
+        } else if (process.env.RECORD_MODE === 'true') {
+            this.isRecordMode = true
+        } else {
+            this.isRecordMode = false
+        }
         this._candidateRegistry = new CandidateRegistry({
             getFusionAccount: (key: string) => this.getFusionAccountByManagedKey(key),
             sourcesByName: this.sourcesByName,
