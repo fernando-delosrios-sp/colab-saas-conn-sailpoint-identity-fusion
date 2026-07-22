@@ -38,7 +38,7 @@ All new domain terms, states, or classifications SHALL be defined in this spec b
 
 ### Requirement: Code uses canonical terms
 
-Source code SHALL use the canonical terms from this spec for variable names, function names, type names, class names, file names, and comments. The retired term **AttributeService** SHALL be replaced with **MappingService** or **DefinitionService** as appropriate. The retired term **ScoringService** SHALL be replaced with **MatchingService**.
+Source code SHALL use the canonical terms from this spec for variable names, function names, type names, class names, file names, and comments. The retired term **AttributeService** SHALL be replaced with **MappingService** or **DefinitionService** as appropriate. The retired term **ScoringService** SHALL be replaced with **MatchingService**. The retired term **identity display name** (and the `identityDisplayName` property) SHALL be replaced with **identity name**.
 
 #### Scenario: Variable naming follows ubiquitous language (updated)
 
@@ -123,6 +123,58 @@ Code, configuration, and documentation SHALL use the account taxonomy defined in
 
 - **WHEN** describing a Fusion account created from an existing ISC identity rather than a managed source account
 - **THEN** the term "identity-origin Fusion account" SHALL be used, not "identity-based Fusion account"
+
+### Requirement: Identity reference terms are defined precisely
+
+The connector SHALL distinguish between the authoritative identity alias, the human-friendly identity name, and the internal Fusion account name.
+
+#### Scenario: Identifying the authoritative identity alias
+
+- **WHEN** code needs the value used for the Fusion display attribute override or for identity lookup
+- **THEN** it SHALL use the **identity alias**, defined as the top-level `displayName` field of the `IdentityDocument` as reported by the SailPoint SDK
+- **AND** it SHALL NOT use `IdentityDocument.name` for that purpose
+
+#### Scenario: Identifying the human-friendly identity name
+
+- **WHEN** code needs a readable label for reports, review form candidates, emails, logs, or other user-facing references
+- **THEN** it SHALL use the **identity name**, computed as `IdentityDocument.attributes.displayName`, falling back to `IdentityDocument.name`, then to `FusionAccount.name`
+
+#### Scenario: Identifying the Fusion account name
+
+- **WHEN** code refers to the `name` property of a `FusionAccount` (`state.name`)
+- **THEN** it SHALL use the term **Fusion account name**
+- **AND** it SHALL use that value only for internal logging, history entries, and conflict tracking unless the display attribute override is explicitly configured to consume it
+
+### Requirement: Fusion display attribute override uses the identity alias
+
+When a Fusion account is linked to an identity, the display attribute (`fusionDisplayAttribute`) SHALL be set from the identity alias.
+
+#### Scenario: Identity-linked Fusion account output
+
+- **WHEN** `getISCAccount` serializes a Fusion account that has an identity linkage
+- **THEN** `attributes[fusionDisplayAttribute]` SHALL equal the identity alias
+- **AND** it SHALL NOT equal the managed source account name or a stale persisted value
+
+### Requirement: User-facing identity references use the identity name
+
+Reports, review form candidates, emails, logs, and other user-facing references to a correlated identity SHALL use the identity name.
+
+#### Scenario: Match candidate label in a review form
+
+- **WHEN** the connector renders an identity candidate for a Fusion review form
+- **THEN** the candidate label SHALL be the identity name
+- **AND** it SHALL fall back through `IdentityDocument.name` and `FusionAccount.name` only when `IdentityDocument.attributes.displayName` is unavailable
+
+### Requirement: Velocity identity context exposes alias, name, and id
+
+The Velocity `$identity` object SHALL expose `alias`, `name`, and `id` properties.
+
+#### Scenario: Velocity template references identity metadata
+
+- **WHEN** a normal attribute definition template uses `$identity.alias`, `$identity.name`, or `$identity.id`
+- **THEN** `$identity.alias` SHALL resolve to the identity alias
+- **AND** `$identity.name` SHALL resolve to the identity name
+- **AND** `$identity.id` SHALL resolve to the identity ID
 
 ### Requirement: Operation, phase, and sweep vocabulary is used consistently
 
@@ -234,7 +286,7 @@ The term **aggregation** SHALL refer to the ISC source-refresh operation. When a
 
 ### Requirement: Retired terms are not reintroduced
 
-Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or documentation. The retired term list SHALL include `AttributeService` and `ScoringService` in addition to the previously retired terms. Retired terms include, but are not limited to: `consolidated account`, `raw account`, `identity-based Fusion account`, `pass`, `round`, `new-unmatched`, `NewUnmatched`, `analyzeIdentityPhase`, `analyzeDeferredPhase`, `hasNewUnmatchedPeerMatches`, `ManagedAccountPassRunner`, `AttributeService`, and `ScoringService`.
+Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or documentation. The retired term list SHALL include `AttributeService`, `ScoringService`, and `identity display name` in addition to the previously retired terms. Retired terms include, but are not limited to: `consolidated account`, `raw account`, `identity-based Fusion account`, `pass`, `round`, `new-unmatched`, `NewUnmatched`, `analyzeIdentityPhase`, `analyzeDeferredPhase`, `hasNewUnmatchedPeerMatches`, `ManagedAccountPassRunner`, `AttributeService`, `ScoringService`, and `identity display name`.
 
 #### Scenario: Code review discovers AttributeService reference
 
@@ -256,6 +308,11 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 - **WHEN** a documentation review finds a retired term
 - **THEN** the contributor SHALL replace it with the canonical term
 
+#### Scenario: Code or docs use the retired term "identity display name"
+
+- **WHEN** code or documentation uses the term `identity display name` or a property named `identityDisplayName` to mean the human-friendly identity label
+- **THEN** the contributor SHALL replace it with **identity name**
+
 ## Canonical Terms
 
 ### Account taxonomy
@@ -269,6 +326,16 @@ Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or
 | **Fusion identity** | A Fusion account that has been correlated to an ISC identity and is treated as that identity's authoritative account. |
 | **Identity-origin Fusion account** | A Fusion account seeded from an existing ISC identity during aggregation (for example when **Include identities in the scope?** is enabled), rather than from a managed source account. |
 | **Provisional Fusion account** | A Fusion account created from a managed source account before its match fate has been decided. |
+
+### Identity reference and Fusion account naming
+
+The connector refers to an ISC identity and to the Fusion account itself through three distinct names. They are separated so the authoritative value used for the Fusion display attribute is not confused with the user-friendly report label.
+
+| Term | Definition |
+|------|------------|
+| **Identity alias** | The authoritative account name of the correlated ISC identity, taken from the top-level `displayName` field of the `IdentityDocument` as reported by the SailPoint SDK. This is the only value used for the Fusion account display attribute override (`fusionDisplayAttribute`). |
+| **Identity name** | A human-friendly reference label for the correlated identity. Computed as `IdentityDocument.attributes.displayName`, falling back to `IdentityDocument.name`, then to `FusionAccount.name`. Used in reports, review form candidates, emails, logs, and other user-facing references where a readable label is required. Replaces the former **identity display name** concept. |
+| **Fusion account name** | The `name` property of a `FusionAccount` (`state.name`). It mirrors the ISC `Account.name` / `Identity.name` field of the persisted account and is used for internal logging, history entries, and conflict tracking. It is not the output display attribute unless the display attribute override is configured to consume it. |
 
 ### Operations, phases, and sweeps
 
@@ -516,5 +583,6 @@ The following terms are retired and SHALL NOT be used in new code, configuration
 | `processing run` | operation run, or the specific operation name when referring to the command definition |
 | `AttributeService` | `MappingService` (for attribute mapping/merging) + `DefinitionService` (for attribute computation and unique value generation) |
 | `ScoringService` | `MatchingService` (scoring remains as the computation technique within matching) |
+| `identity display name` / `identityDisplayName` | identity name (for the human-friendly reference label) |
 | `attribute-service` (spec) | `mapping-service` + `definition-service` |
 | `scoring-service` (spec) | `matching-service` |
