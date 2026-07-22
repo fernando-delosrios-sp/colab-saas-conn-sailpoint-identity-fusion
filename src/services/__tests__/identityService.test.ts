@@ -1,7 +1,7 @@
 import { IdentityDocument } from 'sailpoint-api-client'
 import { FusionConfig } from '../../model/config'
 import { FusionRun } from '../../model/fusionRun'
-import { ClientService, QueuePriority } from '../clientService'
+import { ClientService } from '../clientService'
 import { LogService } from '../logService'
 import { SourceService } from '../sourceService'
 import { IdentityService } from '../identityService'
