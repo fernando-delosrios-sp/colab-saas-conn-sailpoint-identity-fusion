@@ -5,7 +5,7 @@ import { ApiLogEntry } from './recordingApiAdapter'
 import { ConnectorError } from '@sailpoint/connector-sdk'
 
 function stableKey(apiName: string, method: string, args: unknown[]): string {
-    return `${apiName}.${method}:${JSON.stringify(args, Object.keys(args as object).sort())}`
+    return `${apiName}.${method}:${JSON.stringify(args)}`
 }
 
 const WRITE_METHODS = new Set([
@@ -111,7 +111,7 @@ export class ReplayApiAdapter implements IscApiAdapter {
     get identityAttributesApi() { return this.createApiProxy('identityAttributes') as any }
 }
 
-export async function loadApiLog(filePath: string): Promise<ApiLogEntry[]> {
+export function loadApiLog(filePath: string): ApiLogEntry[] {
     if (!fs.existsSync(filePath)) return []
     const content = fs.readFileSync(filePath, 'utf-8').trim()
     if (!content) return []
