@@ -626,4 +626,17 @@ describe('FusionAccount', () => {
             expect(state.missingAccountIds.has('src-a::native-1')).toBe(false)
         })
     })
+
+    describe('identityAlias accessor', () => {
+        it('returns identityInfo.displayName when set', () => {
+            const acc = new FusionAccount()
+            acc.state.identityInfo = { id: 'id-1', name: 'login', displayName: 'Display Name' }
+            expect(acc.identityAlias).toBe('Display Name')
+        })
+
+        it('returns undefined when identityInfo is not set', () => {
+            const acc = new FusionAccount()
+            expect(acc.identityAlias).toBeUndefined()
+        })
+    })
 })
