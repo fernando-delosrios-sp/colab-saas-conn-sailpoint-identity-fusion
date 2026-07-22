@@ -45,13 +45,13 @@ All recording configuration SHALL flow through a `RecordingConfig` object on `Fu
 
 RecordingService SHALL capture operation state by calling `run.snapshot()` on the FusionRun instance and SHALL capture ISC API data through `RecordingApiAdapter`. State snapshots remain for assertion; API data is the replay data source.
 
-#### Scenario: startOperation receives FusionRun and api-log callback
+#### Scenario: startOperation receives FusionRun
 - **WHEN** RecordingService.startOperation is called
 - **THEN** it SHALL receive FusionRun as a parameter
 - **AND** it SHALL call run.snapshot() to capture the initial state
 - **AND** api-log recording SHALL be active via the RecordingApiAdapter callback
 
-#### Scenario: endOperation snapshots FusionRun and flushes api-log
+#### Scenario: endOperation snapshots FusionRun
 - **WHEN** RecordingService.endOperation is called
 - **THEN** it SHALL call run.snapshot() to capture the final state
 - **AND** it SHALL NOT access individual service internals
