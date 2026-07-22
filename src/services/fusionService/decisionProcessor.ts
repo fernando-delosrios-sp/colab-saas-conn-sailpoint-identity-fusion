@@ -1,5 +1,4 @@
 import { IdentityDocument } from 'sailpoint-api-client'
-import { StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
 import { FusionConfig, SourceType } from '../../model/config'
@@ -16,7 +15,6 @@ import type { CorrelationManager } from '../correlationManager'
 import type { DefinitionService } from '../definitionService'
 import { applyNonAuthoritativeNoMatch } from '../matchingService/matchOutcomeDispatcher'
 import { AccountAssembly } from '../accountAssembly'
-import { OperationContext } from '../../model/operationContext'
 
 export interface DecisionProcessorDeps {
     forms: FormService
@@ -32,16 +30,7 @@ export class DecisionProcessor {
         private log: LogService,
         private run: FusionRun,
         private deps: DecisionProcessorDeps,
-        private commandType?: StandardCommand,
-        private operationContext?: OperationContext
     ) {}
-
-    private isAggregationAccountListMode(): boolean {
-        return (
-            this.commandType === StandardCommand.StdAccountList ||
-            this.operationContext === OperationContext.AccountList
-        )
-    }
 
     /**
      * Reconcile transient entitlements derived from pending form instances.
@@ -264,7 +253,7 @@ export class DecisionProcessor {
         try {
             const cached = this.deps.identities.getIdentityById(identityId)
             if (cached) return cached
-            return this.isAggregationAccountListMode() ? this.deps.identities.fetchIdentityById(identityId) : undefined
+            return this.deps.accountAssembly.isAggregationAccountListMode() ? this.deps.identities.fetchIdentityById(identityId) : undefined
         } catch {
             return undefined
         }
