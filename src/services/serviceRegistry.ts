@@ -5,6 +5,9 @@ import { OperationContext } from '../model/operationContext'
 import { LogService } from './logService'
 import { InMemoryLockService } from './lockService'
 import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
+import { IscApiAdapter } from './clientService/iscApiAdapter'
+import { RecordingApiAdapter, ApiLogEntry } from './clientService/recordingApiAdapter'
+import { ReplayApiAdapter, loadApiLog } from './clientService/replayApiAdapter'
 import { SourceService } from './sourceService'
 import { FusionService } from './fusionService'
 import { IdentityService } from './identityService'
@@ -78,7 +81,26 @@ export class ServiceRegistry {
             this.client = context.connectionService
             this.log.setQueue(this.client.getQueue())
         } else {
-            const adapter = new SdkApiAdapter(this.config, this.log)
+            const recMode = this.config.recording?.mode ?? 'off'
+            let adapter: IscApiAdapter = new SdkApiAdapter(this.config, this.log)
+
+            if (recMode === 'record') {
+                this.recording =
+                    (context as any).recordingService ?? RecordingService.init(this.log, this.config)
+                adapter = new RecordingApiAdapter(adapter, (entry: ApiLogEntry) => {
+                    this.recording?.onApiCall(entry)
+                })
+                if (this.recording) {
+                    this.log.info(`RecordingService enabled — chain: ${this.recording.getName()}`)
+                }
+            } else if (recMode === 'replay') {
+                const logPath = this.config.recording?.chainName
+                    ? `test-data/recordings/${this.config.recording.chainName}/api-log.ndjson`
+                    : undefined
+                const entries = logPath ? loadApiLog(logPath) : []
+                adapter = new ReplayApiAdapter(entries, adapter.config)
+            }
+
             const queueConfig = {
                 requestsPerSecond: this.config.requestsPerSecond ?? this.config.requestsPerSecondConstant,
                 maxConcurrentRequests: this.config.maxConcurrentRequests ?? Math.max(10, (this.config.requestsPerSecond ?? this.config.requestsPerSecondConstant) * 2),
@@ -164,12 +186,6 @@ export class ServiceRegistry {
         )
 
         this.proxy = context.proxyService ?? new ProxyService(this.config, this.log, this.res, commandType)
-
-        if (this.run.isRecordMode) {
-            const recordingService = (context as any).recordingService as RecordingService | undefined
-            this.recording = recordingService ?? RecordingService.init(this.log, this.config)
-            this.log.info(`RecordingService enabled — chain: ${this.recording.getName()}`)
-        }
     }
 
     /**
