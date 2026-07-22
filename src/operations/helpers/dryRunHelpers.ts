@@ -22,7 +22,7 @@ import {
     PendingReviewContextByAccountId,
 } from './buildDryRunPayload'
 import { runtimeDefaults } from '../../data/config'
-import { sanitizeRecipients } from '../../services/messagingService/email'
+import { sanitizeRecipients } from '../../services/emailService/email'
 
 /** Record managed source account ids present on a streamed fusion ISC row (drives report join coverage). */
 const addCoveredManagedAccountIds = (account: StdAccountListOutput, into: Set<string>): void => {

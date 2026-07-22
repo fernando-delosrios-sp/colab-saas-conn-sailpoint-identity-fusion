@@ -11,12 +11,12 @@ import type { AggregationStats, FusionReport, FusionReportDecision, FusionReport
 import type { FormService } from './formService'
 import type { IdentityService } from './identityService'
 import type { LogService } from './logService'
-import type { MessagingService } from './messagingService'
+import type { EmailService } from './emailService'
 import type { SourceService } from './sourceService'
 import { FusionRun } from '../model/fusionRun'
-import { compileEmailTemplates, renderFusionReport, FusionReportEmailData } from './messagingService/helpers'
-import { registerHandlebarsHelpers } from './messagingService/messagingHandlebarsRegistration'
-import { sanitizeRecipients } from './messagingService/email'
+import { compileEmailTemplates, renderFusionReport, FusionReportEmailData } from './emailService/helpers'
+import { registerHandlebarsHelpers } from './emailService/messagingHandlebarsRegistration'
+import { sanitizeRecipients } from './emailService/email'
 
 type DryRunRuntimeOptions = { writeToDisk?: boolean; sendReportTo?: string[] }
 
@@ -48,7 +48,7 @@ const toReportDecision = (
               ? 'Created new identity'
               : 'Confirmed no match'
 
-    const managedAccountKey = account.id || account.managedAccountKey
+    const managedAccountKey = account.id
     const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
     const submitter = decision.submitter || ({} as any)
     const reviewerName =
@@ -68,7 +68,6 @@ const toReportDecision = (
     const reviewerUrl = reviewerId && reviewerId !== 'system' ? resolveReviewerUrl?.(reviewerId) : undefined
 
     return {
-        id: decision.id,
         reviewerId,
         reviewerName,
         reviewerUrl,
@@ -103,7 +102,7 @@ export class ReportService {
         private identities: IdentityService,
         private forms: FormService,
         private fusion: FusionService,
-        private messaging: MessagingService,
+        private email: EmailService,
         private run: FusionRun
     ) {}
 
@@ -147,10 +146,6 @@ export class ReportService {
         report: FusionReport,
         args: { recipients: string[]; reportType: 'aggregation' | 'fusion'; reportTitle?: string }
     ): Promise<void> {
-        if (typeof (this.messaging as any)?.sendReportTo === 'function') {
-            await (this.messaging as any).sendReportTo(report, args)
-            return
-        }
         await this.deliverReportToRecipients(report, args)
     }
 
@@ -165,8 +160,8 @@ export class ReportService {
         const body = this.renderFusionReportHtml(report, args.reportType, reportTitle)
         const validRecipients = sanitizeRecipients(args.recipients)
 
-        if (validRecipients.length > 0 && typeof this.messaging?.sendEmail === 'function') {
-            await this.messaging.sendEmail(validRecipients, subject, body)
+        if (validRecipients.length > 0 && typeof this.email?.sendEmail === 'function') {
+            await this.email.sendEmail(validRecipients, subject, body)
             const sentRecipientCount = validRecipients.length
             this.log?.info?.(`Sent fusion report email to ${sentRecipientCount} recipient(s)`)
         }
@@ -181,8 +176,8 @@ export class ReportService {
 
         if (this.identities && this.sources) {
             const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
-            if (globalOwnerIds.length > 0 && this.messaging?.getRecipientEmails) {
-                const ownerEmails = await this.messaging.getRecipientEmails(globalOwnerIds)
+            if (globalOwnerIds.length > 0 && this.email?.getRecipientEmails) {
+                const ownerEmails = await this.email.getRecipientEmails(globalOwnerIds)
                 for (const e of ownerEmails) recipientEmails.add(e)
             }
         }
@@ -299,7 +294,10 @@ export class ReportService {
      * Build aggregated statistics payload for dry-run report output.
      */
     public buildDryRunStats(aggregationStats: AggregationStats): DryRunStats {
-        return this.buildFusionReportStats(aggregationStats)
+        return {
+            ...aggregationStats,
+            ...this.buildFusionReportStats(aggregationStats),
+        }
     }
 
     /** Build email-renderable report payload from internal FusionReport. */
@@ -352,28 +350,52 @@ export class ReportService {
         }
 
         if (shouldSendReportEmail) {
-            if (typeof (this.messaging as any)?.deliverReportToRecipients === 'function') {
-                await (this.messaging as any).deliverReportToRecipients(emailReport, {
-                    recipients: runtimeOptions.sendReportTo ?? [],
-                    reportType: ReportService.DRY_RUN_REPORT_TYPE,
-                    reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
-                })
-            } else if (typeof (this.messaging as any)?.sendReportTo === 'function') {
-                await (this.messaging as any).sendReportTo(emailReport, {
-                    recipients: runtimeOptions.sendReportTo ?? [],
-                    reportType: ReportService.DRY_RUN_REPORT_TYPE,
-                    reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
-                })
-            } else {
-                await this.deliverReportToRecipients(emailReport, {
-                    recipients: runtimeOptions.sendReportTo ?? [],
-                    reportType: ReportService.DRY_RUN_REPORT_TYPE,
-                    reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
-                })
-            }
+            await this.deliverReportToRecipients(emailReport, {
+                recipients: runtimeOptions.sendReportTo ?? [],
+                reportType: ReportService.DRY_RUN_REPORT_TYPE,
+                reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
+            })
         }
 
         return { reportHtmlOutputPath, statsWithPhaseTiming: statsForRender }
+    }
+
+    /** Initialize report for dry-run row streaming. */
+    public initializeDryRunReport(args: {
+        fetchResult?: any
+        totalProcessingTime?: string
+        phaseTiming?: any
+        includeNonMatches?: boolean
+    }): { report: FusionReport; stats: AggregationStats } {
+        const stats: AggregationStats = {
+            identitiesFound: args.fetchResult?.stats?.identitiesFound ?? 0,
+            managedAccountsFound: args.fetchResult?.stats?.totalManagedAccountsProcessed ?? 0,
+            totalProcessingTime: args.totalProcessingTime ?? '0s',
+            phaseTiming: args.phaseTiming,
+        }
+        const tracker = this.fusion.tracker
+        const report = this.fusion.generateReport(tracker, args.includeNonMatches ?? true, stats)
+        return { report, stats }
+    }
+
+    /** Finalize and output dry-run report. */
+    public async finalizeDryRunReport(args: {
+        report: FusionReport
+        fetchResult?: any
+        totalProcessingTime?: string
+        phaseBreakdownThroughOutput?: any
+    }): Promise<{ reportHtmlOutputPath?: string }> {
+        const finalDryRunStats: AggregationStats = {
+            identitiesFound: args.fetchResult?.stats?.identitiesFound ?? 0,
+            managedAccountsFound: args.fetchResult?.stats?.totalManagedAccountsProcessed ?? 0,
+            totalProcessingTime: args.totalProcessingTime ?? '0s',
+            phaseTiming: args.phaseBreakdownThroughOutput,
+        }
+        const { reportHtmlOutputPath } = await this.writeAndSendDryRunReport({
+            report: args.report,
+            finalDryRunStats
+        })
+        return { reportHtmlOutputPath }
     }
 
     /**
@@ -429,25 +451,11 @@ export class ReportService {
         }
 
         if (shouldSendReportEmail) {
-            if (typeof (this.messaging as any)?.sendReportTo === 'function') {
-                await (this.messaging as any).sendReportTo(emailReport, {
-                    recipients: runtimeOptions.sendReportTo ?? [],
-                    reportType: ReportService.DRY_RUN_REPORT_TYPE,
-                    reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
-                })
-            } else if (typeof (this.messaging as any)?.deliverReportToRecipients === 'function') {
-                await (this.messaging as any).deliverReportToRecipients(emailReport, {
-                    recipients: runtimeOptions.sendReportTo ?? [],
-                    reportType: ReportService.DRY_RUN_REPORT_TYPE,
-                    reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
-                })
-            } else {
-                await this.deliverReportToRecipients(emailReport, {
-                    recipients: runtimeOptions.sendReportTo ?? [],
-                    reportType: ReportService.DRY_RUN_REPORT_TYPE,
-                    reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
-                })
-            }
+            await this.deliverReportToRecipients(emailReport, {
+                recipients: runtimeOptions.sendReportTo ?? [],
+                reportType: ReportService.DRY_RUN_REPORT_TYPE,
+                reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
+            })
         }
 
         return { reportHtmlOutputPath, statsWithPhaseTiming: statsForRender }
@@ -506,21 +514,20 @@ export class ReportService {
             }
         }
 
-        const managedAccountsFoundAuthoritative = aggregationStats.authoritativeAccountsFound ?? 0
-        const managedAccountsFoundRecord = aggregationStats.recordAccountsFound ?? 0
-        const managedAccountsFoundOrphan = aggregationStats.orphanAccountsFound ?? 0
+        const managedAccountsFoundAuthoritative = aggregationStats.managedAccountsFoundAuthoritative ?? 0
+        const managedAccountsFoundRecord = aggregationStats.managedAccountsFoundRecord ?? 0
+        const managedAccountsFoundOrphan = aggregationStats.managedAccountsFoundOrphan ?? 0
         const managedAccountsFound =
             managedAccountsFoundAuthoritative + managedAccountsFoundRecord + managedAccountsFoundOrphan
 
-        const totalFusionAccounts =
-            aggregationStats.fusionAccountsFound ?? this.fusion?.totalFusionAccountCount ?? 0
+        const totalFusionAccounts = this.run?.totalFusionAccountCount ?? 0
 
-        const warningSamples = (aggregationStats.warningSamples ?? []).slice(0, 10)
-        const errorSamples = (aggregationStats.errorSamples ?? []).slice(0, 10)
+        const warningSamples: string[] = []
+        const errorSamples: string[] = []
 
         return {
             totalFusionAccounts,
-            fusionAccountsFound: aggregationStats.fusionAccountsFound ?? this.sources?.fusionAccountCount ?? 0,
+            fusionAccountsFound: this.sources?.fusionAccountCount ?? 0,
             fusionReviewsCreated: this.forms?.formsCreated ?? 0,
             fusionReviewAssignments: this.forms?.formInstancesCreated ?? 0,
             fusionReviewsFound: this.forms?.formsFound ?? 0,
@@ -534,18 +541,18 @@ export class ReportService {
             fusionReviewNewIdentitiesAuthoritative: authoritativeNewIdentities,
             fusionReviewNoMatchesRecord: recordNoMatches,
             fusionReviewNoMatchesOrphan: orphanNoMatches,
-            aggregationWarnings: aggregationStats.aggregationWarnings ?? warningSamples.length,
-            aggregationErrors: aggregationStats.aggregationErrors ?? errorSamples.length,
+            aggregationWarnings: warningSamples.length,
+            aggregationErrors: errorSamples.length,
             warningSamples,
             errorSamples,
             usedMemory: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
             identitiesFound: aggregationStats.identitiesFound ?? 0,
-            managedAccountsFound: managedAccountsFound || (aggregationStats.totalManagedAccountsProcessed ?? 0),
+            managedAccountsFound: managedAccountsFound || (aggregationStats.managedAccountsFound ?? 0),
             managedAccountsFoundAuthoritative,
             managedAccountsFoundRecord,
             managedAccountsFoundOrphan,
             phaseTiming: aggregationStats.phaseTiming,
-            ...aggregationStats,
+            totalProcessingTime: aggregationStats.totalProcessingTime,
         }
     }
 

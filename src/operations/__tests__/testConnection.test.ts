@@ -51,7 +51,7 @@ describe('testConnection', () => {
         await testConnection(registry, {})
 
         expect(sources.fetchAllSources).toHaveBeenCalledTimes(1)
-        expect(registry.messaging.fetchDelayedAggregationSender).toHaveBeenCalledTimes(1)
+        expect(registry.workflows.fetchDelayedAggregationSender).toHaveBeenCalledTimes(1)
     })
 
     it('skips delayed aggregation workflow validation when no delayed sources are configured', async () => {
@@ -59,7 +59,7 @@ describe('testConnection', () => {
 
         await testConnection(registry, {})
 
-        expect(registry.messaging.fetchDelayedAggregationSender).not.toHaveBeenCalled()
+        expect(registry.workflows.fetchDelayedAggregationSender).not.toHaveBeenCalled()
     })
 
     it('fails test connection when Accounts JMESPath filter validation fails', async () => {
@@ -80,6 +80,6 @@ describe('testConnection', () => {
 
         await testConnection(registry, {})
 
-        expect(registry.messaging.fetchSender).toHaveBeenCalledTimes(1)
+        expect(registry.workflows.fetchSender).toHaveBeenCalledTimes(1)
     })
 })

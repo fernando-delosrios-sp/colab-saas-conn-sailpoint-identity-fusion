@@ -15,7 +15,7 @@ import { DefinitionService } from './definitionService'
 import { MatchingService } from './matchingService'
 import { MatchOutcomeDispatcher } from './matchingService/matchOutcomeDispatcher'
 import { EntitlementService } from './entitlementService'
-import { MessagingService } from './messagingService'
+import { EmailService } from './emailService'
 import { WorkflowService } from './workflowService'
 import { ProxyService } from './proxyService'
 import { ReportService } from './reportService'
@@ -45,7 +45,7 @@ export class ServiceRegistry {
     public mapping: MappingService
     public definition: DefinitionService
     public matching: MatchingService
-    public messaging: MessagingService
+    public email: EmailService
     public workflows: WorkflowService
     public reports: ReportService
     public proxy: ProxyService
@@ -99,12 +99,12 @@ export class ServiceRegistry {
             context.identityService ?? new IdentityService(this.config, this.log, this.client, this.sources, this.run)
         this.workflows =
             (context as any).workflowService ?? new WorkflowService(this.config, this.log, this.client, this.sources)
-        this.messaging =
-            context.messagingService ??
-            new MessagingService(this.config, this.log, this.client, this.sources, this.identities, this.workflows)
+        this.email =
+            (context as any).emailService ??
+            new EmailService(this.config, this.log, this.client, this.sources, this.identities, this.workflows)
         this.forms =
             context.formService ??
-            new FormService(this.config, this.log, this.client, this.sources, this.identities, this.messaging, this.run)
+            new FormService(this.config, this.log, this.client, this.sources, this.identities, this.email, this.run)
 
         // Initialize services that depend on others (in dependency order)
         this.schemas = context.schemaService ?? new SchemaService(this.config, this.log, this.sources, this.identities)
@@ -161,7 +161,7 @@ export class ServiceRegistry {
             this.identities,
             this.forms,
             this.fusion,
-            this.messaging,
+            this.email,
             this.run
         )
 

@@ -29,7 +29,7 @@ export interface FusionEmailContext {
     }>
 }
 
-export class EmailRenderer {
+export class EmailService {
     public static readonly WORKFLOW_COMBINED_LIMIT_BYTES = 1_500_000
     public static readonly WORKFLOW_COMBINED_SAFETY_MARGIN_BYTES = 200_000
     public static readonly FALLBACK_MAX_TEST_INPUT_BYTES = 120_000
@@ -49,17 +49,18 @@ export class EmailRenderer {
         protected identities?: IdentityService,
         protected workflows?: WorkflowService
     ) {
+        this.workflows = workflows ?? new WorkflowService(config, log, client, sources)
         registerHandlebarsHelpers()
         this.templates = compileEmailTemplates()
-        this.urlContext = createUrlContext(config)
-        this.isDevelopmentMode = Boolean(config.developerSettings?.enableDevelopmentMode)
+        this.urlContext = createUrlContext(config.baseurl)
+        this.isDevelopmentMode = false
     }
 
     /**
      * Build the standard email header subtitle.
      */
     public buildEmailHeaderSubtitle(): string | undefined {
-        const configured = this.config.emailHeaderSubtitle
+        const configured = (this.config as any).emailHeaderSubtitle
         if (configured) return configured
 
         if (!this.config.baseurl || typeof this.config.baseurl !== 'string') return undefined
@@ -99,7 +100,7 @@ export class EmailRenderer {
         const workflow = await this.getWorkflow()
         assert(workflow, 'Email workflow is required')
 
-        const recipientIds = formInstance.recipients.map((r) => r.id).filter(Boolean) as string[]
+        const recipientIds = formInstance.recipients?.map((r) => r.id).filter(Boolean) as string[] ?? []
         assert(recipientIds.length > 0, 'Recipient IDs are required')
 
         const recipients = await this.getRecipientEmails(recipientIds)
@@ -122,8 +123,8 @@ export class EmailRenderer {
 
         const candidates = context?.candidates || []
         const accountId = context?.accountId
-        const accountUrl = accountId ? this.urlContext.account(accountSource, accountId) : undefined
-        const accountEmail = normalizeEmailValue(context?.accountEmail)
+        const accountUrl = accountId ? this.urlContext.humanAccount(accountId) : undefined
+        const accountEmail = normalizeEmailValue(context?.accountEmail)[0]
 
         const sourceTypeInput = context?.sourceType
         const sourceType =
@@ -132,6 +133,9 @@ export class EmailRenderer {
                 : (sourceTypeInput === SourceType.Orphan ? (sourceTypeInput as SourceType) : undefined)
 
         const emailData: FusionReviewEmailData = {
+            totalAccounts: 1,
+            matches: candidates.length,
+            reportDate: new Date(),
             headerSubtitle: this.buildEmailHeaderSubtitle(),
             accounts: [
                 {
@@ -185,7 +189,7 @@ export class EmailRenderer {
                     const resp = await (api.workflows as any)?.getWorkflow?.({ id: workflow.id })
                     return (resp as any)?.data ?? resp
                 },
-                { context: `EmailRenderer>getWorkflow id=${workflow.id}` }
+                { context: `EmailService>getWorkflow id=${workflow.id}` }
             )
             if (definition) {
                 this.emailSenderWorkflowDefinitionBytes = Buffer.byteLength(JSON.stringify(definition), 'utf8')
@@ -268,12 +272,12 @@ export class EmailRenderer {
     public getMaxTestWorkflowInputBytes(): number {
         if (typeof this.emailSenderWorkflowDefinitionBytes === 'number') {
             const allowed =
-                EmailRenderer.WORKFLOW_COMBINED_LIMIT_BYTES -
+                EmailService.WORKFLOW_COMBINED_LIMIT_BYTES -
                 this.emailSenderWorkflowDefinitionBytes -
-                EmailRenderer.WORKFLOW_COMBINED_SAFETY_MARGIN_BYTES
+                EmailService.WORKFLOW_COMBINED_SAFETY_MARGIN_BYTES
             return Math.max(1024, allowed)
         }
-        return (this.config as any).maxTestWorkflowInputBytes ?? EmailRenderer.FALLBACK_MAX_TEST_INPUT_BYTES
+        return (this.config as any).maxTestWorkflowInputBytes ?? EmailService.FALLBACK_MAX_TEST_INPUT_BYTES
     }
 
     public fitEmailBodyToWorkflowLimit(
@@ -296,7 +300,7 @@ export class EmailRenderer {
 
         const truncatedBuf = bodyBuf.subarray(0, allowedBodyBytes)
         const text = truncatedBuf.toString('utf8')
-        const notice = EmailRenderer.TRUNCATION_NOTICE_HTML
+        const notice = EmailService.TRUNCATION_NOTICE_HTML
         return text + notice
     }
 
@@ -304,7 +308,7 @@ export class EmailRenderer {
         if (!recipientId || !this.identities) return undefined
 
         try {
-            const identity = await this.identities.getIdentity(recipientId)
+            const identity = this.identities.getIdentityById(recipientId)
             const attributes = (identity as any)?.attributes || {}
             const rawLang =
                 attributes.preferredLanguage ||
@@ -327,10 +331,10 @@ export class EmailRenderer {
 
         for (const id of validIds) {
             try {
-                const identity = await this.identities.getIdentity(id)
+                const identity = this.identities.getIdentityById(id)
                 const attributes = (identity as any)?.attributes || {}
-                const email = identity.email || attributes.email || attributes.workEmail
-                const normalized = normalizeEmailValue(email)
+                const email = identity?.email || attributes.email || attributes.workEmail
+                const normalized = normalizeEmailValue(email)[0]
                 if (normalized) {
                     emails.add(normalized)
                 }
@@ -368,7 +372,7 @@ export class EmailRenderer {
         }
         return this.client.call<any>(
             (api: any) => api.workflows.testWorkflow(params),
-            { context: `EmailRenderer>testWorkflow id=${params.id}` }
+            { context: `EmailService>testWorkflow id=${params.id}` }
         )
     }
 }

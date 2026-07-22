@@ -381,7 +381,7 @@ describe('PipelineRunner.run', () => {
         mockServiceRegistry.identities.clear = vi.fn()
         Object.defineProperty(mockServiceRegistry.identities, 'identityCount', { value: 0, writable: true, configurable: true })
 
-        mockServiceRegistry.messaging.fetchDelayedAggregationSender = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.workflows.fetchDelayedAggregationSender = vi.fn().mockResolvedValue(undefined)
     })
 
     it('runs up to the specified targetPhase', async () => {

@@ -4,7 +4,7 @@ import { FusionConfig, SourceType } from '../../model/config'
 import { ClientService } from '../clientService'
 import { LogService } from '../logService'
 import { IdentityService } from '../identityService'
-import { MessagingService } from '../messagingService'
+import { EmailService } from '../emailService'
 import { SourceService } from '../sourceService'
 import { FusionRun } from '../../model/fusionRun'
 import { assert, softAssert } from '../../utils/assert'
@@ -66,7 +66,7 @@ export class FormService {
         private client: ClientService,
         private sources: SourceService,
         private identities?: IdentityService,
-        private messaging?: MessagingService,
+        private email?: EmailService,
         private run: FusionRun = new FusionRun()
     ) {
         this.fusionFormNamePattern = config.fusionFormNamePattern
@@ -563,7 +563,7 @@ export class FormService {
         reviewerId: string,
         hasPreviousInstance: boolean
     ): Promise<void> {
-        if (!this.messaging) {
+        if (!this.email) {
             return
         }
 
@@ -575,7 +575,7 @@ export class FormService {
 
         try {
             const reportAccountId = fusionAccount.iscAccountId
-            await this.messaging.sendFusionEmail(formInstance, {
+            await this.email.sendFusionEmail(formInstance, {
                 accountName: fusionAccount.name || fusionAccount.displayName || 'Unknown',
                 accountSource: fusionAccount.sourceName,
                 sourceType: this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType,

@@ -1,6 +1,6 @@
-import { MessagingService } from '../messagingService'
+import { EmailService } from '../emailService'
 
-const createMessagingService = (workflowPayload?: { padding?: string }) => {
+const createEmailService = (workflowPayload?: { padding?: string }) => {
     const workflowsApi = {
         listWorkflows: vi.fn().mockResolvedValue({
             data: [{ id: 'wf-email-1', name: 'Fusion Email Sender (Test Tenant)', enabled: false }],
@@ -39,41 +39,16 @@ const createMessagingService = (workflowPayload?: { padding?: string }) => {
         fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
         getFusionSource: vi.fn(() => ({ name: 'Fusion Source' })),
     } as any
-    const service = new MessagingService(config, log, client, sources)
+    const service = new EmailService(config, log, client, sources)
     return { service, workflowsApi }
 }
 
-describe('MessagingService report size limits', () => {
-    it('delivers explicit-recipient reports through messaging-owned sender readiness', async () => {
-        const { service, workflowsApi } = createMessagingService()
-        const report = {
-            accounts: [
-                { accountName: 'Alice', accountSource: 'HR', matches: [{ identityName: 'Alice', isMatch: true }] },
-            ],
-            totalAccounts: 1,
-            matches: 1,
-        } as any
-
-        await service.deliverReportToRecipients(report, {
-            recipients: ['reviewer@example.com'],
-            reportType: 'aggregation',
-            reportTitle: 'Dry Run Report',
-        })
-
-        expect(workflowsApi.getWorkflow).toHaveBeenCalledTimes(1)
-        expect(workflowsApi.testWorkflow).toHaveBeenCalledTimes(1)
-    })
-
+describe('EmailService report size limits', () => {
     it('trims oversized report body to fit workflow payload limit', async () => {
-        const { service, workflowsApi } = createMessagingService()
+        const { service, workflowsApi } = createEmailService()
         const hugeText = 'A'.repeat(2_000_000)
-        const report = {
-            accounts: [{ accountName: hugeText, accountSource: 'HR', matches: [{ identityName: 'x', isMatch: true }] }],
-            totalAccounts: 1,
-            matches: 1,
-        } as any
 
-        await service.sendReportTo(report, { recipients: ['reviewer@example.com'], reportType: 'aggregation' })
+        await service.sendEmail(['reviewer@example.com'], 'Test Report', hugeText)
 
         expect(workflowsApi.getWorkflow).toHaveBeenCalled()
         expect(workflowsApi.testWorkflow).toHaveBeenCalledTimes(1)
@@ -93,16 +68,9 @@ describe('MessagingService report size limits', () => {
     })
 
     it('keeps regular report body unchanged when under limit', async () => {
-        const { service, workflowsApi } = createMessagingService()
-        const report = {
-            accounts: [
-                { accountName: 'Alice', accountSource: 'HR', matches: [{ identityName: 'Alice', isMatch: true }] },
-            ],
-            totalAccounts: 1,
-            matches: 1,
-        } as any
+        const { service, workflowsApi } = createEmailService()
 
-        await service.sendReportTo(report, { recipients: ['reviewer@example.com'], reportType: 'aggregation' })
+        await service.sendEmail(['reviewer@example.com'], 'Test Report', '<html><body>Alice</body></html>')
 
         const sentInput = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input
         expect(sentInput.body).not.toContain('Report content was truncated to fit ISC workflow input size limits')
@@ -110,15 +78,10 @@ describe('MessagingService report size limits', () => {
 
     it('shrinks report body when workflow definition already consumes most of the combined budget', async () => {
         const largeDefinition = 'D'.repeat(1_250_000)
-        const { service, workflowsApi } = createMessagingService({ padding: largeDefinition })
+        const { service, workflowsApi } = createEmailService({ padding: largeDefinition })
         const hugeText = 'Z'.repeat(800_000)
-        const report = {
-            accounts: [{ accountName: hugeText, accountSource: 'HR', matches: [{ identityName: 'x', isMatch: true }] }],
-            totalAccounts: 1,
-            matches: 1,
-        } as any
 
-        await service.sendReportTo(report, { recipients: ['reviewer@example.com'], reportType: 'aggregation' })
+        await service.sendEmail(['reviewer@example.com'], 'Test Report', hugeText)
 
         const fullWorkflow = {
             id: 'wf-email-1',
@@ -140,17 +103,10 @@ describe('MessagingService report size limits', () => {
 
     it('accounts for JSON escaping when trimming report body', async () => {
         const largeDefinition = 'D'.repeat(1_150_000)
-        const { service, workflowsApi } = createMessagingService({ padding: largeDefinition })
+        const { service, workflowsApi } = createEmailService({ padding: largeDefinition })
         const escapeHeavyText = '\\"\\n'.repeat(350_000)
-        const report = {
-            accounts: [
-                { accountName: escapeHeavyText, accountSource: 'HR', matches: [{ identityName: 'x', isMatch: true }] },
-            ],
-            totalAccounts: 1,
-            matches: 1,
-        } as any
 
-        await service.sendReportTo(report, { recipients: ['reviewer@example.com'], reportType: 'aggregation' })
+        await service.sendEmail(['reviewer@example.com'], 'Test Report', escapeHeavyText)
 
         const fullWorkflow = {
             id: 'wf-email-1',

@@ -110,12 +110,12 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
     definition.refreshUniqueAttributes = vi.fn().mockResolvedValue(undefined)
     definition.saveState = vi.fn().mockResolvedValue(undefined)
 
-    const messaging = registry.messaging as any
-    messaging.fetchSender = vi.fn().mockResolvedValue(undefined)
-    messaging.fetchDelayedAggregationSender = vi.fn().mockResolvedValue(undefined)
-    messaging.scheduleDelayedAggregation = vi.fn().mockResolvedValue(undefined)
-    messaging.sendReportTo = vi.fn().mockResolvedValue(undefined)
-    messaging.deliverReportToRecipients = vi.fn().mockResolvedValue(undefined)
+    const email = registry.email as any
+    if (email) {
+        email.sendEmail = vi.fn().mockResolvedValue(undefined)
+        email.sendFusionEmail = vi.fn().mockResolvedValue(undefined)
+        email.getRecipientEmails = vi.fn().mockResolvedValue([])
+    }
 
     const workflows = registry.workflows as any
     if (workflows) {
@@ -128,8 +128,12 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
     }
 
     const reports = registry.reports as any
-    reports.generateAndSendFusionReport = vi.fn().mockResolvedValue(undefined)
-    reports.writeAndSendDryRunReport = vi.fn().mockResolvedValue(undefined)
+    if (reports) {
+        reports.generateAndSendFusionReport = vi.fn().mockResolvedValue(undefined)
+        reports.writeAndSendDryRunReport = vi.fn().mockResolvedValue(undefined)
+        reports.sendReportTo = vi.fn().mockResolvedValue(undefined)
+        reports.deliverReportToRecipients = vi.fn().mockResolvedValue(undefined)
+    }
 
     return registry
 }
