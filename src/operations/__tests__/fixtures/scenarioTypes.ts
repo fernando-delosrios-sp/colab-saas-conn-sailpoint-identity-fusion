@@ -1,4 +1,4 @@
-import { SourceConfigLike } from '../harness/mockRegistry'
+import { SourceConfigLike } from '../harness/testRegistry'
 
 type AggregationSweepData = {
     identitiesFound: number

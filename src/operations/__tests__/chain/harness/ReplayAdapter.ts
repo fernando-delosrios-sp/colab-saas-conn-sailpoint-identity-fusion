@@ -1,6 +1,6 @@
 import { StepDefinition } from '../framework/ChainRunner'
 import { ChainContext, MockRegistry } from '../framework/ChainContext'
-import { createBaseOperationRegistry, SourceConfigLike } from '../../harness/mockRegistry'
+import { createOperationTestRegistry, SourceConfigLike } from '../../harness/operationTestRegistry'
 import { FusionAccount } from '../../../../model/fusionAccount'
 import { buildManagedAccountKey } from '../../../../model/managedAccountKey'
 import {
@@ -173,7 +173,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         sourceType: (s.sourceType as SourceConfigLike['sourceType']) ?? 'authoritative',
     }))
 
-    const { registry } = createBaseOperationRegistry(sourceConfigs)
+    const registry = createOperationTestRegistry({ sourceConfigs: sourceConfigs as any })
     registry.log.error = vi.fn().mockImplementation((...args) => {
         console.error('LOG.ERROR:', ...args)
     })

@@ -6,7 +6,43 @@ vi.mock('../actions', () => ({
     executeActions: vi.fn(),
 }))
 
-import { createRegistry } from './harness/registryMocking'
+import { createTestRegistry } from './harness/testRegistry'
+
+function createRegistry() {
+    const registry = createTestRegistry({
+        sourceConfigs: [{ name: 'fusion', correlationMode: 'none' }],
+    })
+
+    const sources = registry.sources as any
+    sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
+    sources.fetchFusionAccounts = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(sources, 'fusionAccounts', { value: [], writable: true, configurable: true })
+
+    const schemas = registry.schemas as any
+    schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(schemas, 'fusionDisplayAttribute', { value: 'name', writable: true, configurable: true })
+
+    const definition = registry.definition as any
+    definition.initializeCounters = vi.fn().mockResolvedValue(undefined)
+    definition.registerUniqueValuesFromManagedSourceAccounts = vi.fn()
+    definition.refreshUniqueAttributes = vi.fn().mockResolvedValue(undefined)
+
+    const fusion = registry.fusion as any
+    fusion.preProcessFusionAccounts = vi.fn().mockResolvedValue([])
+    fusion.processIdentity = vi.fn().mockResolvedValue(undefined)
+    fusion.getFusionIdentity = vi.fn().mockReturnValue({ managedKey: 'fusion-id-1', addStatus: vi.fn() })
+    fusion.normalizePendingFormStateForOutput = vi.fn().mockResolvedValue(undefined)
+    fusion.getISCAccount = vi.fn().mockResolvedValue({ id: 'isc-created' })
+
+    const identities = registry.identities as any
+    identities.fetchIdentityByName = vi.fn().mockResolvedValue({ id: 'id-1', name: 'Alice Doe' })
+
+    const log = registry.log as any
+    log.crash = vi.fn()
+    log.metric = vi.fn()
+
+    return registry
+}
 
 describe('accountCreate', () => {
     afterEach(() => {

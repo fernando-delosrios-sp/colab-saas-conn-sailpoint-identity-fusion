@@ -1,11 +1,17 @@
 import { accountList } from '../accountList'
 import { aggregationScenarios } from './fixtures/aggregationScenarios'
 import { AggregationScenario } from './fixtures/scenarioTypes'
-import { createBaseOperationRegistry, SourceConfigLike } from './harness/mockRegistry'
+import { createOperationTestRegistry } from './harness/operationTestRegistry'
 import type { Mock } from 'vitest'
 
-function createMockRegistry(sourceConfigs: SourceConfigLike[]) {
-    const { registry, schemas, sources, identities, fusion } = createBaseOperationRegistry(sourceConfigs)
+function createMockRegistry(sourceConfigs: any[]) {
+    const registry = createOperationTestRegistry({
+        sourceConfigs,
+    })
+    const sources = registry.sources as any
+    const schemas = registry.schemas as any
+    const identities = registry.identities as any
+    const fusion = registry.fusion as any
     return { registry, schemas, sources, identities, fusion }
 }
 
