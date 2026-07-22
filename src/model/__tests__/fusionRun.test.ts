@@ -30,6 +30,35 @@ describe('FusionRun', () => {
         expect(run.pendingDisableOperationsCount).toBe(0)
     })
 
+    describe('isRecordMode from config', () => {
+        it('reads isRecordMode from config.recording.mode = "record"', () => {
+            const run = new FusionRun(undefined, { recording: { mode: 'record' } } as any)
+            expect(run.isRecordMode).toBe(true)
+        })
+
+        it('is false for config.recording.mode = "off"', () => {
+            const run = new FusionRun(undefined, { recording: { mode: 'off' } } as any)
+            expect(run.isRecordMode).toBe(false)
+        })
+
+        it('is false for config.recording.mode = "replay"', () => {
+            const run = new FusionRun(undefined, { recording: { mode: 'replay' } } as any)
+            expect(run.isRecordMode).toBe(false)
+        })
+
+        it('is false when config has no recording field', () => {
+            const run = new FusionRun(undefined, {} as any)
+            expect(run.isRecordMode).toBe(false)
+        })
+
+        it('falls back to RECORD_MODE env var when config has no recording.mode', () => {
+            process.env.RECORD_MODE = 'true'
+            const run = new FusionRun(undefined, {} as any)
+            expect(run.isRecordMode).toBe(true)
+            delete process.env.RECORD_MODE
+        })
+    })
+
     it('allows reading and writing managed accounts', () => {
         const run = new FusionRun()
         const account = { name: 'test', sourceName: 'SourceA', nativeIdentity: 'ni-1' }
