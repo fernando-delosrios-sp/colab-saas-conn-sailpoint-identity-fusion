@@ -3,9 +3,7 @@
 ## Purpose
 
 This spec defines the contract for the project's automated test infrastructure: the test runner, configuration, and environment that all test files execute under.
-
 ## Requirements
-
 ### Requirement: automated tests MUST run under Vitest
 
 The project's automated test suite MUST execute under Vitest, not Jest. All files matching `src/**/*.test.ts` MUST be discoverable by `npm test` and the command MUST exit with a non-zero status if any test fails. Jest, `ts-jest`, `babel-jest`, and `@types/jest` MUST NOT be present in `devDependencies` once this change is applied.
@@ -77,12 +75,12 @@ The test harness MUST NOT contain multiple mock registry implementations with ov
 
 ### Requirement: ReplayAdapter SHALL delegate to the real pipeline
 
-The `ReplayAdapter` MUST execute operations through the real `ServiceRegistry` and `PipelineRunner` instead of re-implementing pipeline phase logic. The adapter SHALL configure `FakeApiAdapter` with prerecorded API responses and capture `res.send()` outputs for comparison against recorded goldens.
+The `ReplayAdapter` MUST execute operations through the real `ServiceRegistry` and `PipelineRunner` instead of re-implementing pipeline phase logic. The adapter SHALL configure `ReplayApiAdapter` with prerecorded API responses and capture `res.send()` outputs for comparison against recorded goldens.
 
 #### Scenario: ReplayAdapter uses real pipeline
 - **WHEN** `buildReplayContext` constructs a replay context for a step
 - **THEN** it instantiates a `ServiceRegistry` via `createTestRegistry()`
-- **AND** it configures `FakeApiAdapter` API mocks from prerecorded data
+- **AND** it configures `ReplayApiAdapter` with api-log entries loaded from the scenario's recorded data
 - **AND** it delegates to `PipelineRunner.run()` to execute the operation
 - **AND** it captures `res.send()` calls instead of manually simulating pipeline phases
 
@@ -90,3 +88,4 @@ The `ReplayAdapter` MUST execute operations through the real `ServiceRegistry` a
 - **WHEN** the real pipeline phase order changes in `corePipeline.ts`
 - **THEN** replay tests continue to pass without coordinated edits to `ReplayAdapter`
 - **AND** `ReplayAdapter` contains no code that re-implements phase ordering, Map/Define evaluation, or service wiring
+
