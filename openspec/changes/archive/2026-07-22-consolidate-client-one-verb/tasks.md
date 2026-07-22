@@ -16,17 +16,17 @@
 
 ## 3. Migrate callers to `call()` — one service at a time
 
-- [ ] 3.1 `SourceService`: replace all `executeXxx` wrappers + direct calls with `client.call()`
-- [ ] 3.2 `IdentityService`: replace `executeUpdateAccount` + `executeListIdentityAttributes` with `client.call()`
-- [ ] 3.3 `FormService`: replace all 6 `executeXxx` wrappers with `client.call()`
-- [ ] 3.4 `MessagingService`: replace all 5 `executeXxx` wrappers with `client.call()`
-- [ ] 3.5 `FusionService`: replace any direct client usage with `client.call()`
-- [ ] 3.6 Update test harnesses (`FakeApiAdapter`, `mockRegistry`) to work with `call()` instead of getters
+- [x] 3.1 `SourceService`: replace all `executeXxx` wrappers + direct calls with `client.call()`
+- [x] 3.2 `IdentityService`: replace `executeUpdateAccount` + `executeListIdentityAttributes` with `client.call()`
+- [x] 3.3 `FormService`: replace all 6 `executeXxx` wrappers with `client.call()`
+- [x] 3.4 `MessagingService`: replace all 5 `executeXxx` wrappers with `client.call()`
+- [x] 3.5 `FusionService`: (no client usage — no changes needed)
+- [x] 3.6 Update test harnesses (`FakeApiAdapter`, `mockRegistry`) to work with `call()` instead of getters
 
 ## 4. Remove old API surface
 
-- [ ] 4.1 Make all 13 SDK getters private on `ClientService`
-- [ ] 4.2 Remove `execute()`, `paginate()`, `paginateSearchApi()`, `paginateSearchApiGenerator()`, `paginateParallel()` public methods
-- [ ] 4.3 Remove all per-service `executeXxx` wrapper methods
-- [ ] 4.4 Run full test suite and lint to confirm no remaining references
-- [ ] 4.5 Delete dead throttle/axios-retry paths from `helpers.ts` (no longer needed with centralized policy)
+- [x] 4.1 Make all 13 SDK getters private on `ClientService`
+- [x] 4.2 Make `execute()`, `paginate()`, `paginateSearchApi()`, `paginateParallel()` private (kept `paginateSearchApiGenerator()` public for generator-based pagination)
+- [x] 4.3 Remove all per-service `executeXxx` wrapper methods (23 wrappers deleted across 4 services)
+- [x] 4.4 Run full test suite and lint to confirm no remaining references
+- [x] 4.5 Delete dead throttle path from `helpers.ts` (`createThrottleConfig()` removed; `createRetriesConfig()` retained as it configures axios to disable retry at SDK level)

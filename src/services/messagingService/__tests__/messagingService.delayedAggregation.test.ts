@@ -17,6 +17,7 @@ const createMessagingService = (accessToken: any) => {
 
     const client = {
         config: { accessToken },
+        accessToken,
         workflowsApi,
         call: vi.fn(async (fn: (api: any) => Promise<any>, _options?: any) => {
             return await fn({ workflows: workflowsApi })

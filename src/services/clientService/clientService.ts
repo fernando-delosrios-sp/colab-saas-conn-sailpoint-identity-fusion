@@ -69,55 +69,59 @@ export class ClientService {
     // API Instance Getters (Lazy Initialization)
     // -------------------------------------------------------------------------
 
-    public get config(): Configuration {
+    private get config(): Configuration {
         return this.adapter.config
     }
 
-    public get accountsApi(): AccountsV2025Api {
+    public get accessToken(): any {
+        return this.adapter.config.accessToken
+    }
+
+    private get accountsApi(): AccountsV2025Api {
         return this.adapter.accountsApi
     }
 
-    public get identitiesApi(): IdentitiesV2025Api {
+    private get identitiesApi(): IdentitiesV2025Api {
         return this.adapter.identitiesApi
     }
 
-    public get searchApi(): SearchApi {
+    private get searchApi(): SearchApi {
         return this.adapter.searchApi
     }
 
-    public get sourcesApi(): SourcesV2025Api {
+    private get sourcesApi(): SourcesV2025Api {
         return this.adapter.sourcesApi
     }
 
-    public get customFormsApi(): CustomFormsV2025Api {
+    private get customFormsApi(): CustomFormsV2025Api {
         return this.adapter.customFormsApi
     }
 
-    public get workflowsApi(): WorkflowsV2025Api {
+    private get workflowsApi(): WorkflowsV2025Api {
         return this.adapter.workflowsApi
     }
 
-    public get entitlementsApi(): EntitlementsV2025Api {
+    private get entitlementsApi(): EntitlementsV2025Api {
         return this.adapter.entitlementsApi
     }
 
-    public get transformsApi(): TransformsApi {
+    private get transformsApi(): TransformsApi {
         return this.adapter.transformsApi
     }
 
-    public get governanceGroupsApi(): GovernanceGroupsV2025Api {
+    private get governanceGroupsApi(): GovernanceGroupsV2025Api {
         return this.adapter.governanceGroupsApi
     }
 
-    public get taskManagementApi(): TaskManagementV2025Api {
+    private get taskManagementApi(): TaskManagementV2025Api {
         return this.adapter.taskManagementApi
     }
 
-    public get identityProfilesApi(): IdentityProfilesV2025Api {
+    private get identityProfilesApi(): IdentityProfilesV2025Api {
         return this.adapter.identityProfilesApi
     }
 
-    public get identityAttributesApi(): IdentityAttributesV2025Api {
+    private get identityAttributesApi(): IdentityAttributesV2025Api {
         return this.adapter.identityAttributesApi
     }
 
@@ -295,7 +299,7 @@ export class ClientService {
      * @param throwOnError - Whether to rethrow on failure instead of returning undefined
      * @param noRetry - When true, the request is never retried on failure
      */
-    public async execute<TResponse>(
+    private async execute<TResponse>(
         apiFunction: () => Promise<TResponse>,
         priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string,
@@ -378,7 +382,7 @@ export class ClientService {
      * )
      * ```
      */
-    public async paginate<T, TRequestParams = any>(
+    private async paginate<T, TRequestParams = any>(
         callFunction: (requestParameters: TRequestParams) => Promise<{ data: T[] }>,
         baseParameters: Partial<TRequestParams> = {},
         priority: QueuePriority = QueuePriority.MEDIUM,
@@ -510,7 +514,7 @@ export class ClientService {
      * const identities = await client.paginateSearchApi<IdentityDocument>(search)
      * ```
      */
-    public async paginateSearchApi<T>(
+    private async paginateSearchApi<T>(
         search: Search,
         priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string
@@ -673,7 +677,7 @@ export class ClientService {
      *               to reach this count are requested, avoiding unnecessary API calls.
      * @yields Arrays of items (pages) as they are fetched
      */
-    public async *paginateParallel<T, TRequestParams = any>(
+    private async *paginateParallel<T, TRequestParams = any>(
         callFunction: (requestParameters: TRequestParams) => Promise<{ data: T[]; headers?: any }>,
         baseParameters: Partial<TRequestParams> = {},
         priority: QueuePriority = QueuePriority.MEDIUM,

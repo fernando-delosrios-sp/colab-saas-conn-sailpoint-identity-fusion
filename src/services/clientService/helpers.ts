@@ -4,7 +4,6 @@ import axiosRetry from 'axios-retry'
 import {
     BASE_RETRY_DELAY_MS,
     DEFAULT_RETRIES,
-    DEFAULT_REQUESTS_PER_SECOND,
     MAX_RETRY_DELAY_MS,
     RATE_LIMIT_JITTER_FACTOR,
     RETRY_JITTER_FACTOR,
@@ -32,21 +31,6 @@ export function createRetriesConfig(retries?: number): IAxiosRetryConfig {
                 logger.debug(`Error details: ${error.message || error}`)
             }
         },
-    }
-}
-
-/**
- * Creates an axios throttle configuration from the provided parameters
- * @param requestsPerSecond - Maximum number of requests per second (defaults to connector default requestsPerSecond)
- * @returns Throttle configuration object
- */
-export function createThrottleConfig(requestsPerSecond?: number) {
-    const rps = requestsPerSecond ?? DEFAULT_REQUESTS_PER_SECOND
-    return {
-        requestsPerSecond: rps,
-        // Additional throttle options for better control
-        maxConcurrentRequests: Math.max(10, rps * 2), // Allow some concurrency
-        burstSize: Math.max(5, Math.floor(rps / 2)), // Allow small bursts
     }
 }
 

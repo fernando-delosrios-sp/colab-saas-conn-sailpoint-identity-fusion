@@ -28,16 +28,26 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
     }
     const client: any = {
         execute: async (fn: () => Promise<any>) => fn(),
-        call: async (fn: any) => fn({
-            accounts: client.accountsApi,
-            sources: client.sourcesApi,
-            taskManagement: client.taskManagementApi,
-            governanceGroups: client.governanceGroupsApi,
-            identityProfiles: client.identityProfilesApi,
-            search: client.searchApi,
-            identities: client.identitiesApi,
-            customForms: client.customFormsApi,
-            workflows: client.workflowsApi,
+        call: vi.fn((fn: any, policy?: any) => {
+            const api = {
+                accounts: client.accountsApi,
+                sources: client.sourcesApi,
+                taskManagement: client.taskManagementApi,
+                governanceGroups: client.governanceGroupsApi,
+                identityProfiles: client.identityProfilesApi,
+                identityAttributes: client.identityAttributesApi,
+                search: client.searchApi,
+                identities: client.identitiesApi,
+                customForms: client.customFormsApi,
+                workflows: client.workflowsApi,
+            }
+            if (policy?.paginate) {
+                if (policy.paginate.mode === 'parallel') {
+                    return client.paginateParallel((params: any) => fn(api, params), policy.paginate.baseParams ?? {}, policy.priority, policy.context, policy.abortSignal, policy.paginate.limit)
+                }
+                return client.paginate((params: any) => fn(api, params), policy.paginate.baseParams ?? {}, policy.priority, policy.context)
+            }
+            return fn(api)
         }),
         paginate: vi.fn(),
         paginateParallel: vi.fn(),
@@ -45,6 +55,7 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         sourcesApi: { importAccounts: vi.fn() },
         taskManagementApi: { getTaskStatus: vi.fn() },
         identityProfilesApi: {},
+        identityAttributesApi: {},
     }
 
     const run = new FusionRun()
@@ -297,13 +308,13 @@ describe('SourceService account pagination sorter stability', () => {
             // consume generator
         }
 
-        expect(client.paginateParallel).toHaveBeenCalledWith(
+        expect(client.call).toHaveBeenCalledWith(
             expect.any(Function),
-            expect.objectContaining({ sorters: 'id' }),
-            expect.anything(),
-            expect.any(String),
-            undefined,
-            undefined
+            expect.objectContaining({
+                paginate: expect.objectContaining({ mode: 'parallel' }),
+                priority: expect.anything(),
+                context: expect.any(String),
+            })
         )
     })
 })

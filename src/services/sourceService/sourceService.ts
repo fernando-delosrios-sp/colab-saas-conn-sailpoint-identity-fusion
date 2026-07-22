@@ -1,4 +1,4 @@
-import { Search, AccountV2025 as Account, AccountsApiListAccountsRequest, SearchApiSearchPostRequest, SourcesV2025ApiImportAccountsRequest, TaskManagementV2025ApiGetTaskStatusRequest, Source, SchemaV2025, SourcesV2025ApiGetSourceSchemasRequest, SourcesV2025ApiPutSourceSchemaRequest, SourcesV2025ApiGetCorrelationConfigRequest, SourcesV2025ApiPutCorrelationConfigRequest, SourcesV2025ApiUpdateSourceRequest, IdentityProfilesV2025ApiListIdentityProfilesRequest, IdentityProfilesV2025ApiUpdateIdentityProfileRequest, OwnerDto, SourcesV2025ApiListSourcesRequest, JsonPatchOperationV2025OpV2025, CorrelationConfigV2025, AttributeDefinitionV2025, AttributeDefinitionTypeV2025 } from 'sailpoint-api-client'
+import { Search, AccountV2025 as Account, AccountsApiListAccountsRequest, SearchApiSearchPostRequest, SourcesV2025ApiImportAccountsRequest, TaskManagementV2025ApiGetTaskStatusRequest, Source, SchemaV2025, SourcesV2025ApiGetSourceSchemasRequest, SourcesV2025ApiPutSourceSchemaRequest, SourcesV2025ApiGetCorrelationConfigRequest, SourcesV2025ApiPutCorrelationConfigRequest, SourcesV2025ApiUpdateSourceRequest, IdentityProfilesV2025ApiUpdateIdentityProfileRequest, OwnerDto, SourcesV2025ApiListSourcesRequest, JsonPatchOperationV2025OpV2025, CorrelationConfigV2025, AttributeDefinitionV2025, AttributeDefinitionTypeV2025 } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { BaseConfig, FusionConfig, SourceConfig, SourceType } from '../../model/config'
 import { ClientService, QueuePriority } from '../clientService'
@@ -214,45 +214,6 @@ export class SourceService {
         return Array.from(this.fusionAccountsByNativeIdentity.values())
     }
 
-    public async executeFetchMembers(workgroupId: string) {
-        return this.client.call(
-            (api) => api.governanceGroups.listWorkgroupMembers({ workgroupId, limit: 250 }).then((r) => r.data),
-            { priority: QueuePriority.HIGH, context: 'SourceService>executeFetchMembers' }
-        )
-    }
-
-    public async executeListAccounts(params: AccountsApiListAccountsRequest) {
-        const result = await this.client.call(
-            (api) => api.accounts.listAccounts(params),
-            { priority: QueuePriority.MEDIUM, context: 'SourceService>executeListAccounts', throwOnError: true }
-        )
-        return result!
-    }
-
-    public async executeUpdateSource(requestParameters: SourcesV2025ApiUpdateSourceRequest, context: string) {
-        return await this.client.call(
-            (api) => api.sources.updateSource(requestParameters).then((r) => r.data),
-            { priority: QueuePriority.HIGH, context }
-        )
-    }
-
-    public async executeUpdateIdentityProfile(
-        requestParameters: IdentityProfilesV2025ApiUpdateIdentityProfileRequest,
-        context: string
-    ) {
-        return await this.client.call(
-            (api) => api.identityProfiles.updateIdentityProfile(requestParameters).then((r) => r.data),
-            { priority: QueuePriority.HIGH, context, throwOnError: true }
-        )
-    }
-
-    public async executeGetSource(requestParameters: any, context: string) {
-        return await this.client.call(
-            (api) => api.sources.getSource(requestParameters).then((r) => r.data),
-            { priority: QueuePriority.HIGH, context }
-        )
-    }
-
     /**
      * How many fusion accounts are loaded for this run.
      */
@@ -278,14 +239,6 @@ export class SourceService {
     // Public Source Fetch Methods
     // ------------------------------------------------------------------------
 
-    public async executeListSources(requestParameters?: SourcesV2025ApiListSourcesRequest) {
-        const result = await this.client.call(
-            (api) => api.sources.listSources(requestParameters),
-            { priority: QueuePriority.MEDIUM, context: 'SourceService>executeListSources', throwOnError: true }
-        )
-        return result!
-    }
-
     /**
      * Fetch all sources (managed and fusion) and cache them
      */
@@ -294,11 +247,9 @@ export class SourceService {
 
         const apiSources = await wrapConnectorError(
             () =>
-                this.client.paginate(
-                    (params) => this.executeListSources(params),
-                    {},
-                    QueuePriority.HIGH,
-                    'SourceService>fetchAllSources executeListSources'
+                this.client.call<any>(
+                    (api: any, params: any) => api.sources.listSources(params),
+                    { paginate: { mode: 'sequential', baseParams: {} }, priority: QueuePriority.HIGH, context: 'SourceService>fetchAllSources listSources' }
                 ),
             'Failed to fetch sources from ISC. Please verify your connector configuration and API credentials'
         )
@@ -428,14 +379,13 @@ export class SourceService {
         const workgroupId = this._fusionSourceManagementWorkgroupId
         if (workgroupId) {
             if (this._fusionSourceWorkgroupMemberIds === undefined) {
-                const members = await this.client.execute(
-                    () => this.executeFetchMembers(workgroupId),
-                    QueuePriority.HIGH,
-                    'SourceService>fetchGlobalOwnerIdentityIds'
+                const members = await this.client.call<any[]>(
+                    (api: any) => api.governanceGroups.listWorkgroupMembers({ workgroupId, limit: 250 }).then((r: any) => r.data),
+                    { priority: QueuePriority.HIGH, context: 'SourceService>fetchGlobalOwnerIdentityIds' }
                 )
                 this._fusionSourceWorkgroupMemberIds = (members ?? []).filter((m: any) => m.id).map((m: any) => m.id!)
             }
-            for (const id of this._fusionSourceWorkgroupMemberIds) ownerIdSet.add(id)
+            for (const id of this._fusionSourceWorkgroupMemberIds!) ownerIdSet.add(id)
         }
 
         return Array.from(ownerIdSet)
@@ -518,8 +468,8 @@ export class SourceService {
         const url = `${apiBaseUrl}/accounts/${encodeURIComponent(accountId)}/disable`
 
         this.log.info(`Disabling account ${accountId} with low priority`)
-        await this.client.execute(
-            async () => {
+        await this.client.call(
+            async (_api: any) => {
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: {
@@ -536,13 +486,12 @@ export class SourceService {
                     throw new Error(`HTTP ${response.status} ${response.statusText} - ${safeBodyPreview}`)
                 }
             },
-            QueuePriority.LOW,
-            'SourceService>fireDisableAccount'
+            { priority: QueuePriority.LOW, context: 'SourceService>fireDisableAccount' }
         )
     }
 
     private async resolveApiAccessToken(): Promise<string> {
-        const accessTokenResolver = this.client.config.accessToken
+        const accessTokenResolver = this.client.accessToken
         assert(accessTokenResolver, 'Client access token resolver is not configured')
 
         if (typeof accessTokenResolver === 'string') {
@@ -583,11 +532,9 @@ export class SourceService {
         }
 
         const ctx = `SourceService>fetchAccountsBySourceId ${sourceInfo.name}`
-        const accounts = await this.client.paginate(
-            (params) => this.executeListAccounts(params),
-            requestParameters,
-            QueuePriority.HIGH,
-            ctx
+        const accounts = await this.client.call<any>(
+            (api: any, params: any) => api.accounts.listAccounts(params),
+            { paginate: { mode: 'sequential', baseParams: requestParameters as any }, priority: QueuePriority.HIGH, context: ctx }
         )
         if (!sourceInfo.isManaged) {
             return accounts
@@ -624,13 +571,9 @@ export class SourceService {
         }
 
         const ctx = `SourceService>fetchAccountsBySourceIdGenerator ${sourceInfo.name}`
-        yield* this.client.paginateParallel(
-            (params) => this.executeListAccounts(params),
-            requestParameters,
-            QueuePriority.HIGH,
-            ctx,
-            abortSignal,
-            limit
+        yield* this.client.call<any>(
+            (api: any, params: any) => api.accounts.listAccounts(params),
+            { paginate: { mode: 'parallel', baseParams: requestParameters as any, limit }, priority: QueuePriority.HIGH, context: ctx, abortSignal }
         )
     }
 
@@ -812,10 +755,9 @@ export class SourceService {
             limit: 1,
         }
 
-        const accounts = await this.client.execute(
-            () => this.executeListAccounts(requestParameters).then((r) => r.data ?? []),
-            QueuePriority.HIGH,
-            'SourceService>fetchSourceAccountByNativeIdentity'
+        const accounts = await this.client.call<any[]>(
+            (api: any) => api.accounts.listAccounts(requestParameters).then((r: any) => r.data ?? []),
+            { priority: QueuePriority.HIGH, context: 'SourceService>fetchSourceAccountByNativeIdentity' }
         )
         const candidate = accounts?.[0]
         if (sourceInfo.isManaged && candidate && !this.matchesManagedJmespathFilter(sourceInfo, candidate)) {
@@ -922,13 +864,6 @@ export class SourceService {
         )
     }
 
-    public async executeSearchPost(requestParameters: SearchApiSearchPostRequest, context: string) {
-        return this.client.call(
-            (api) => api.search.searchPost(requestParameters).then((r) => r.data ?? []),
-            { priority: QueuePriority.HIGH, context }
-        )
-    }
-
     /**
      * Get latest aggregation date for a source (only for managed sources)
      */
@@ -952,9 +887,9 @@ export class SourceService {
             }
 
             const requestParameters: SearchApiSearchPostRequest = { search, limit: 1 }
-            const aggregations = await this.executeSearchPost(
-                requestParameters,
-                'SourceService>getLatestAggregationDate'
+            const aggregations = await this.client.call(
+                (api) => api.search.searchPost(requestParameters).then((r) => r.data ?? []),
+                { priority: QueuePriority.HIGH, context: 'SourceService>getLatestAggregationDate' }
             )
 
             return getDateFromISOString(aggregations?.[0]?.created)
@@ -972,13 +907,6 @@ export class SourceService {
     // Public Schema Methods
     // ------------------------------------------------------------------------
 
-    public async executeGetSourceSchemas(requestParameters: SourcesV2025ApiGetSourceSchemasRequest, context: string) {
-        return this.client.call(
-            (api) => api.sources.getSourceSchemas(requestParameters).then((r) => r.data ?? []),
-            { priority: QueuePriority.HIGH, context }
-        )
-    }
-
     /**
      * List schemas for a source
      */
@@ -991,9 +919,9 @@ export class SourceService {
         const requestParameters: SourcesV2025ApiGetSourceSchemasRequest = {
             sourceId,
         }
-        const schemas = await this.executeGetSourceSchemas(
-            requestParameters,
-            'SourceService>listSourceSchemas'
+        const schemas = await this.client.call(
+            (api) => api.sources.getSourceSchemas(requestParameters).then((r) => r.data ?? []),
+            { priority: QueuePriority.HIGH, context: 'SourceService>listSourceSchemas' }
         )
         if (!schemas) {
             throw new ConnectorError(
@@ -1025,7 +953,10 @@ export class SourceService {
     ): Promise<Source | undefined> {
         const requestParameters = buildSourceConfigPatch(sourceId, path, value)
         const ctx = context ?? 'SourceService>patchSourceConfig'
-        return await this.executeUpdateSource(requestParameters, ctx)
+        return await this.client.call(
+            (api) => api.sources.updateSource(requestParameters).then((r) => r.data),
+            { priority: QueuePriority.HIGH, context: ctx }
+        )
     }
 
     // ------------------------------------------------------------------------
@@ -1059,9 +990,9 @@ export class SourceService {
 
         const fusionSourceId = this.fusionSourceId
 
-        const currentSource = await this.executeGetSource(
-            { id: fusionSourceId },
-            'SourceService>setProcessLock executeGetSource'
+        const currentSource = await this.client.call(
+            (api) => api.sources.getSource({ id: fusionSourceId }).then((r) => r.data),
+            { priority: QueuePriority.HIGH, context: 'SourceService>setProcessLock executeGetSource' }
         )
         assert(currentSource, 'Failed to fetch fusion source to check processing lock. The API call returned no data.')
 
@@ -1456,11 +1387,9 @@ export class SourceService {
             schemaV2025: updatedSchema,
         }
 
-        const { sourcesApi } = this.client
-        const updated = await this.client.execute(
-            () => sourcesApi.putSourceSchema(requestParameters).then((r) => r.data),
-            QueuePriority.HIGH,
-            `SourceService>ensureFusionSchemaAttribute ${attributeName}`
+        const updated = await this.client.call(
+            (api: any) => api.sources.putSourceSchema(requestParameters).then((r: any) => r.data),
+            { priority: QueuePriority.HIGH, context: `SourceService>ensureFusionSchemaAttribute ${attributeName}` }
         )
         if (!updated) {
             throw new ConnectorError(
@@ -1493,12 +1422,9 @@ export class SourceService {
      * Ensure the ISC identity attribute exists and is searchable.
      */
     private async ensureIdentityAttribute(attributeName: string, displayName: string): Promise<void> {
-        const { identityAttributesApi } = this.client
-
-        const existing = await this.client.execute(
-            () => identityAttributesApi.getIdentityAttribute({ name: attributeName }).then((r) => r.data),
-            QueuePriority.HIGH,
-            `SourceService>ensureIdentityAttribute get ${attributeName}`
+        const existing = await this.client.call<any>(
+            (api: any) => api.identityAttributes.getIdentityAttribute({ name: attributeName }).then((r: any) => r.data),
+            { priority: QueuePriority.HIGH, context: `SourceService>ensureIdentityAttribute get ${attributeName}` }
         )
 
         if (existing) {
@@ -1506,16 +1432,15 @@ export class SourceService {
                 this.log.debug(`Identity attribute "${attributeName}" already exists and is searchable`)
                 return
             }
-            const updated = await this.client.execute(
-                () =>
-                    identityAttributesApi
+            const updated = await this.client.call(
+                (api: any) =>
+                    api.identityAttributes
                         .putIdentityAttribute({
                             name: attributeName,
                             identityAttributeV2025: this.buildSearchableIdentityAttributePayload(attributeName, displayName),
                         })
-                        .then((r) => r.data),
-                QueuePriority.HIGH,
-                `SourceService>ensureIdentityAttribute update ${attributeName}`
+                        .then((r: any) => r.data),
+                { priority: QueuePriority.HIGH, context: `SourceService>ensureIdentityAttribute update ${attributeName}` }
             )
             if (!updated) {
                 throw new ConnectorError(
@@ -1532,28 +1457,24 @@ export class SourceService {
         }
         let created: any
         try {
-            created = await this.client.execute(
-                () => identityAttributesApi.createIdentityAttribute(createPayload).then((r) => r.data),
-                QueuePriority.HIGH,
-                `SourceService>ensureIdentityAttribute create ${attributeName}`,
-                undefined,
-                true
+            created = await this.client.call(
+                (api: any) => api.identityAttributes.createIdentityAttribute(createPayload).then((r: any) => r.data),
+                { priority: QueuePriority.HIGH, context: `SourceService>ensureIdentityAttribute create ${attributeName}`, throwOnError: true }
             )
         } catch (error: any) {
             if (this.isIdentityAttributeAlreadyExistsError(error)) {
                 this.log.warn(
                     `Create reported existing identity attribute "${attributeName}". Retrying as idempotent update to searchable=true.`
                 )
-                const updated = await this.client.execute(
-                    () =>
-                        identityAttributesApi
+                const updated = await this.client.call(
+                    (api: any) =>
+                        api.identityAttributes
                             .putIdentityAttribute({
                                 name: attributeName,
                                 identityAttributeV2025: this.buildSearchableIdentityAttributePayload(attributeName, displayName),
                             })
-                            .then((r) => r.data),
-                    QueuePriority.HIGH,
-                    `SourceService>ensureIdentityAttribute update-after-conflict ${attributeName}`
+                            .then((r: any) => r.data),
+                    { priority: QueuePriority.HIGH, context: `SourceService>ensureIdentityAttribute update-after-conflict ${attributeName}` }
                 )
                 if (updated) {
                     this.log.info(
@@ -1622,13 +1543,9 @@ export class SourceService {
     }
 
     private async getMatchingIdentityProfiles(fusionSourceId: string): Promise<any[]> {
-        const { identityProfilesApi } = this.client
-        const profiles = await this.client.paginate(
-            (params: IdentityProfilesV2025ApiListIdentityProfilesRequest) =>
-                identityProfilesApi.listIdentityProfiles(params),
-            {},
-            QueuePriority.HIGH,
-            'SourceService>ensureIdentityProfileMapping listProfiles'
+        const profiles = await this.client.call(
+            (api: any, params: any) => api.identityProfiles.listIdentityProfiles(params),
+            { priority: QueuePriority.HIGH, context: 'SourceService>ensureIdentityProfileMapping listProfiles', paginate: { mode: 'sequential' } }
         )
 
         return profiles.filter(
@@ -1694,12 +1611,12 @@ export class SourceService {
 
         let updatedProfile: any
         try {
-            updatedProfile = await this.executeUpdateIdentityProfile(
-                {
+            updatedProfile = await this.client.call(
+                (api) => api.identityProfiles.updateIdentityProfile({
                     identityProfileId: profile.id!,
                     jsonPatchOperationV2025,
-                },
-                `SourceService>ensureIdentityProfileMapping upsert ${attributeName} profile=${profile.id}`
+                }).then((r) => r.data),
+                { priority: QueuePriority.HIGH, context: `SourceService>ensureIdentityProfileMapping upsert ${attributeName} profile=${profile.id}`, throwOnError: true }
             )
         } catch (error: any) {
             throw new ConnectorError(
@@ -1737,8 +1654,6 @@ export class SourceService {
      * account's identity attribute (schema ID) to the reverse correlation identity attribute.
      */
     private async ensureManagedSourceCorrelation(attributeName: string, managedSourceId: string): Promise<void> {
-        const { sourcesApi } = this.client
-
         const schemas = await this.listSourceSchemas(managedSourceId)
         const accountSchema = schemas.find((s) => s.name === 'account')
         assert(accountSchema, `Managed source ${managedSourceId} account schema not found`)
@@ -1748,19 +1663,18 @@ export class SourceService {
             `Managed source ${managedSourceId} account schema has no identity attribute (ID) defined`
         )
 
-        const correlationConfig = await this.client.execute(
-            () =>
-                sourcesApi
+        const correlationConfig = await this.client.call<CorrelationConfigV2025>(
+            (api: any) =>
+                api.sources
                     .getCorrelationConfig({
                         id: managedSourceId,
                     } as SourcesV2025ApiGetCorrelationConfigRequest)
-                    .then((r) => r.data),
-            QueuePriority.HIGH,
-            `SourceService>ensureManagedSourceCorrelation get ${managedSourceId}`
+                    .then((r: any) => r.data),
+            { priority: QueuePriority.HIGH, context: `SourceService>ensureManagedSourceCorrelation get ${managedSourceId}` }
         )
 
         const assignments = correlationConfig?.attributeAssignments ?? []
-        const alreadyExists = assignments.some((a) => a.property === attributeName && a.value === accountIdAttribute)
+        const alreadyExists = assignments.some((a: any) => a.property === attributeName && a.value === accountIdAttribute)
         if (alreadyExists) {
             this.log.debug(
                 `Managed source ${managedSourceId} already has correlation rule for "${attributeName}" -> "${accountIdAttribute}"`
@@ -1784,16 +1698,15 @@ export class SourceService {
             ],
         }
 
-        const updated = await this.client.execute(
-            () =>
-                sourcesApi
+        const updated = await this.client.call(
+            (api: any) =>
+                api.sources
                     .putCorrelationConfig({
                         id: managedSourceId,
                         correlationConfigV2025: updatedConfig,
                     } as SourcesV2025ApiPutCorrelationConfigRequest)
-                    .then((r) => r.data),
-            QueuePriority.HIGH,
-            `SourceService>ensureManagedSourceCorrelation put ${managedSourceId}`
+                    .then((r: any) => r.data),
+            { priority: QueuePriority.HIGH, context: `SourceService>ensureManagedSourceCorrelation put ${managedSourceId}` }
         )
         if (!updated) {
             throw new ConnectorError(
@@ -1814,11 +1727,9 @@ export class SourceService {
     }
 
     private async hasSearchableIdentityAttribute(attributeName: string): Promise<boolean> {
-        const { identityAttributesApi } = this.client
-        const existing = await this.client.execute(
-            () => identityAttributesApi.getIdentityAttribute({ name: attributeName }).then((r) => r.data),
-            QueuePriority.HIGH,
-            `SourceService>hasSearchableIdentityAttribute get ${attributeName}`
+        const existing = await this.client.call<any>(
+            (api: any) => api.identityAttributes.getIdentityAttribute({ name: attributeName }).then((r: any) => r.data),
+            { priority: QueuePriority.HIGH, context: `SourceService>hasSearchableIdentityAttribute get ${attributeName}` }
         )
         return !!existing?.searchable
     }
@@ -1831,13 +1742,9 @@ export class SourceService {
         const fusionSource = this.getFusionSource()
         const fusionSourceId = this.fusionSourceId
         assert(fusionSource, 'Fusion source not found')
-        const { identityProfilesApi } = this.client
-        const profiles = await this.client.paginate(
-            (params: IdentityProfilesV2025ApiListIdentityProfilesRequest) =>
-                identityProfilesApi.listIdentityProfiles(params),
-            {},
-            QueuePriority.HIGH,
-            `SourceService>hasIdentityProfileMapping listProfiles ${attributeName}`
+        const profiles = await this.client.call(
+            (api: any, params: any) => api.identityProfiles.listIdentityProfiles(params),
+            { priority: QueuePriority.HIGH, context: `SourceService>hasIdentityProfileMapping listProfiles ${attributeName}`, paginate: { mode: 'sequential' } }
         )
         const matchingProfiles = profiles.filter(
             (p: any) => p.authoritativeSource?.id === fusionSourceId || p.source?.id === fusionSourceId
@@ -1878,13 +1785,9 @@ export class SourceService {
     }
 
     private async fetchIdentityProfiles(context: string): Promise<any[]> {
-        const { identityProfilesApi } = this.client
-        return this.client.paginate(
-            (params: IdentityProfilesV2025ApiListIdentityProfilesRequest) =>
-                identityProfilesApi.listIdentityProfiles(params),
-            {},
-            QueuePriority.HIGH,
-            context
+        return this.client.call(
+            (api: any, params: any) => api.identityProfiles.listIdentityProfiles(params),
+            { priority: QueuePriority.HIGH, context, paginate: { mode: 'sequential' } }
         )
     }
 
@@ -1917,7 +1820,6 @@ export class SourceService {
     }
 
     private async hasManagedSourceCorrelation(attributeName: string, managedSourceId: string): Promise<boolean> {
-        const { sourcesApi } = this.client
         const schemas = await this.listSourceSchemas(managedSourceId)
         const accountSchema = schemas.find((s) => s.name === 'account')
         assert(accountSchema, `Managed source ${managedSourceId} account schema not found`)
@@ -1926,18 +1828,17 @@ export class SourceService {
             return false
         }
 
-        const correlationConfig = await this.client.execute(
-            () =>
-                sourcesApi
+        const correlationConfig = await this.client.call<CorrelationConfigV2025>(
+            (api: any) =>
+                api.sources
                     .getCorrelationConfig({
                         id: managedSourceId,
                     } as SourcesV2025ApiGetCorrelationConfigRequest)
-                    .then((r) => r.data),
-            QueuePriority.HIGH,
-            `SourceService>hasManagedSourceCorrelation get ${managedSourceId}`
+                    .then((r: any) => r.data),
+            { priority: QueuePriority.HIGH, context: `SourceService>hasManagedSourceCorrelation get ${managedSourceId}` }
         )
         const assignments = correlationConfig?.attributeAssignments ?? []
-        return assignments.some((a) => a.property === attributeName && a.value === accountIdAttribute)
+        return assignments.some((a: any) => a.property === attributeName && a.value === accountIdAttribute)
     }
 
     // ------------------------------------------------------------------------
@@ -2030,20 +1931,6 @@ export class SourceService {
         return fusionLatestAggregationDate > latestSourceDate
     }
 
-    public async executeGetTaskStatus(requestParameters: TaskManagementV2025ApiGetTaskStatusRequest, context: string) {
-        return this.client.call(
-            (api) => api.taskManagement.getTaskStatus(requestParameters).then((r) => r.data),
-            { priority: QueuePriority.HIGH, context }
-        )
-    }
-
-    public async executeImportAccounts(requestParameters: SourcesV2025ApiImportAccountsRequest, context: string) {
-        return this.client.call(
-            (api) => api.sources.importAccounts(requestParameters).then((r) => r.data),
-            { priority: QueuePriority.HIGH, context }
-        )
-    }
-
     /**
      * Aggregate managed source
      */
@@ -2059,9 +1946,9 @@ export class SourceService {
             id,
             disableOptimization: disableOptimization ? 'true' : undefined,
         }
-        const loadAccountsTask = await this.executeImportAccounts(
-            requestParameters,
-            'SourceService>aggregateManagedSource executeImportAccounts'
+        const loadAccountsTask = await this.client.call(
+            (api) => api.sources.importAccounts(requestParameters).then((r) => r.data),
+            { priority: QueuePriority.HIGH, context: 'SourceService>aggregateManagedSource executeImportAccounts' }
         )
         if (!loadAccountsTask) {
             this.log.warn(
@@ -2095,9 +1982,9 @@ export class SourceService {
             const requestParameters: TaskManagementV2025ApiGetTaskStatusRequest = {
                 id: taskId,
             }
-            const taskStatus = await this.executeGetTaskStatus(
-                requestParameters,
-                'SourceService>aggregateManagedSource executeGetTaskStatus'
+            const taskStatus = await this.client.call(
+                (api) => api.taskManagement.getTaskStatus(requestParameters).then((r) => r.data),
+                { priority: QueuePriority.HIGH, context: 'SourceService>aggregateManagedSource executeGetTaskStatus' }
             )
             pollsExecuted++
             lastTaskStatus = taskStatus

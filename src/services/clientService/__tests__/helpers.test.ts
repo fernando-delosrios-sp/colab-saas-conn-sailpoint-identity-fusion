@@ -1,4 +1,4 @@
-import { createRetriesConfig, createThrottleConfig, shouldRetry, calculateRetryDelay } from '../helpers'
+import { createRetriesConfig, shouldRetry, calculateRetryDelay } from '../helpers'
 import {
     BASE_RETRY_DELAY_MS,
     MAX_RETRY_DELAY_MS,
@@ -56,19 +56,6 @@ describe('clientService helpers', () => {
             const config = createRetriesConfig()
             expect(config.retryCondition!({ response: { status: 500 } } as any)).toBe(true)
             expect(config.retryCondition!({ response: { status: 503 } } as any)).toBe(true)
-        })
-    })
-
-    describe('createThrottleConfig', () => {
-        it('should return throttle config with requestsPerSecond', () => {
-            const config = createThrottleConfig(10)
-            expect(config.requestsPerSecond).toBe(10)
-            expect(config.maxConcurrentRequests).toBeGreaterThanOrEqual(10)
-        })
-
-        it('should use default when not provided', () => {
-            const config = createThrottleConfig()
-            expect(config.requestsPerSecond).toBeDefined()
         })
     })
 
