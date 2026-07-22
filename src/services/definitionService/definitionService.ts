@@ -223,18 +223,16 @@ export class DefinitionService {
         const { fusionDisplayAttribute } = this.schemas
         if (attributeName !== fusionDisplayAttribute) return false
         if (!fusionAccount.isIdentity) return false
-
         const hasExistingValue = isValidAttributeValue(fusionAccount.attributes[attributeName])
         const canResetDisplay = fusionAccount.needsReset
         const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
-
         if (hasExistingValue && !canResetDisplay && isExistingFusionAccount) {
             return true
         }
 
-        const label = fusionAccount.identityName
+        const label = fusionAccount.identityAlias
         if (label) {
-            this.log.info(`Setting identity name for attribute: ${attributeName} for account: ${fusionAccount.name}`)
+            this.log.info(`Setting identity alias for attr: ${attributeName} for account: ${fusionAccount.name}`)
             fusionAccount.attributes[attributeName] = label
         }
         return true

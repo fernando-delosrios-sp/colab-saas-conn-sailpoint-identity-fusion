@@ -63,7 +63,7 @@ export function fusionReportMatchCandidateAccountFields(
 }
 
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {
-    const displayLabel = trimStr(fusionAccount.identityDisplayName) ?? ''
+    const displayLabel = trimStr(fusionAccount.identityAlias) ?? ''
     if (displayLabel) return displayLabel
 
     const aliasLabel = trimStr(fusionAccount.identityName) ?? ''

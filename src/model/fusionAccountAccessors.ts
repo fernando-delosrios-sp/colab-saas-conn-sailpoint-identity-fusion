@@ -147,9 +147,9 @@ export class FusionAccount extends FusionAccountBase {
         return this.state.name
     }
 
-    /** Display label for the correlated identity behind this fusion account. */
+    /** Authoritative display label for the correlated identity behind this fusion account (alias to identityAlias). */
     public get identityDisplayName(): string | undefined {
-        return this.state.identityInfo?.displayName
+        return this.identityAlias
     }
 
     /** The fusion info of the correlated identity behind this fusion account. */
@@ -160,6 +160,11 @@ export class FusionAccount extends FusionAccountBase {
     /** The identity name of the correlated identity behind this fusion account. */
     public get identityName(): string | undefined {
         return this.state.identityInfo?.name
+    }
+
+    /** Authoritative account name of the correlated identity (the identity alias from the SDK top-level `displayName`). */
+    public get identityAlias(): string | undefined {
+        return this.state.identityInfo?.displayName
     }
 
     /** The fusion source name this account belongs to. */

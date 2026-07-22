@@ -3,6 +3,7 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
 import { AggregationTracker } from '../../services/fusionService'
+import { FusionAccount } from '../../model/account'
 
 type PipelineMode =
     | { kind: 'aggregation' } // full persistent run — accountList (includes optional aggregation report)
@@ -19,6 +20,46 @@ export interface FetchResult {
     managedAccountsFoundAuthoritative: number
     managedAccountsFoundRecord: number
     managedAccountsFoundOrphan: number
+}
+
+/**
+ * Hydrate identities correlated to fetched managed accounts, then apply the
+ * identity layer to the corresponding Fusion accounts. The display-attribute
+ * override is re-evaluated lazily inside getISCAccount, so we only need to
+ * ensure identityInfo is populated before serialization.
+ *
+ * Exported for unit testing.
+ */
+export async function hydrateCorrelatedManagedAccountIdentities(deps: {
+    managedAccounts: Iterable<{ identityId?: string }>
+    fusionAccounts: Iterable<FusionAccount>
+    managedAccountsByKey: Map<string, { identityId?: string }>
+    getIdentity: (id: string) => { protected?: boolean } | undefined
+    hydrateMissingIdentitiesById: (ids: string[]) => Promise<void>
+}): Promise<{ hydrated: number; applied: number }> {
+    const distinctIds = new Set<string>()
+    for (const managed of deps.managedAccounts) {
+        const id = managed.identityId
+        if (id) distinctIds.add(id)
+    }
+    if (distinctIds.size === 0) return { hydrated: 0, applied: 0 }
+
+    await deps.hydrateMissingIdentitiesById(Array.from(distinctIds))
+
+    let applied = 0
+    for (const fusionAccount of deps.fusionAccounts) {
+        if (fusionAccount.identityInfo) continue
+        const originKey = fusionAccount.originAccountId
+        if (!originKey) continue
+        const managed = deps.managedAccountsByKey.get(originKey)
+        const identityId = managed?.identityId
+        if (!identityId) continue
+        const identity = deps.getIdentity(identityId)
+        if (!identity || identity.protected) continue
+        fusionAccount.addIdentityLayer(identity as Parameters<typeof fusionAccount.addIdentityLayer>[0])
+        applied++
+    }
+    return { hydrated: distinctIds.size, applied }
 }
 
 async function applyPersistentFusionReset(serviceRegistry: ServiceRegistry): Promise<void> {
@@ -162,6 +203,20 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
     const processFormDataOp = log.track('fetchPhase.processFormData')
     await forms.processFetchedFormData()
     processFormDataOp.done()
+
+    // Hydrate identities correlated to managed accounts so the identity layer
+    // is applied before any Fusion account is serialized.
+    log.info('Hydrating correlated identities for managed accounts')
+    const hydrationResult = await hydrateCorrelatedManagedAccountIdentities({
+        managedAccounts: sources.run.managedAccountsById.values(),
+        fusionAccounts: sources.run.allFusionAccounts,
+        managedAccountsByKey: sources.run.managedAccountsById as Map<string, { identityId?: string }>,
+        getIdentity: (id) => sources.run.getIdentity(id),
+        hydrateMissingIdentitiesById: (ids) => identities.hydrateMissingIdentitiesById(ids),
+    })
+    log.info(
+        `Hydrated ${hydrationResult.hydrated} correlated identity/identities; applied identity layer to ${hydrationResult.applied} fusion account(s)`
+    )
 
     const {
         managedAccountsFound,
