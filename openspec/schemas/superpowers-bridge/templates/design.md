@@ -2,8 +2,8 @@
 
 <!--
 Background, current state, constraints, stakeholders.
-brainstorm.md 記錄了探索過程（替代方案 + 選定方向）；
-本檔承接選定方向，展開完整技術設計。
+brainstorm.md records the exploration process (alternatives + chosen direction);
+This document follows the chosen direction and expands it into a complete technical design.
 -->
 
 ## Goals / Non-Goals
@@ -17,31 +17,31 @@ brainstorm.md 記錄了探索過程（替代方案 + 選定方向）；
 ## Decisions
 
 <!--
-所有技術決策的唯一來源（single source of truth）。
-brainstorm.md 的 Agreed Approach 記錄了「選了哪條路」，
-本段記錄「那條路上的每個岔口怎麼選的」。
+Single source of truth for all technical decisions.
+The Agreed Approach in brainstorm.md records "which path was chosen",
+This section records "how each crossroad on that path was chosen".
 
-每個決策建議結構：
-### D1：<決策標題>
-- **選擇**：<採用的做法>
-- **理由**：<為何這樣選>
-- **已考慮 alternative**：<被拒方案 + 拒絕原因>
+Recommended structure for each decision:
+### D1: <Decision Title>
+- **Choice**: <The approach adopted>
+- **Reason**: <Why this was chosen>
+- **Considered alternatives**: <Rejected options + reasons for rejection>
 -->
 
 ## Risks / Trade-offs
 
 <!--
 Known risks and trade-offs.
-Format: [Risk] <描述> → Mitigation: <緩解措施>
-[Trade-off] <取捨描述> → 接受理由
+Format: [Risk] <description> -> Mitigation: <mitigation plan>
+[Trade-off] <trade-off description> -> Reason for acceptance
 -->
 
 ## Migration Plan
 
 <!--
-部署順序、rollback 策略、驗收條件。
-若本 change 不涉及部署變更（純加套件、無 endpoint / DB 變更），
-可寫「N/A — 本 change 不涉及部署變更」。
+Deployment sequence, rollback strategy, acceptance criteria.
+If this change does not involve deployment changes (e.g., purely adding packages, no endpoint / DB changes),
+you can write "N/A — This change does not involve deployment changes".
 -->
 
 ## Open Questions

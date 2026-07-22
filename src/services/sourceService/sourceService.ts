@@ -215,22 +215,24 @@ export class SourceService {
     }
 
     public async executeFetchMembers(workgroupId: string) {
-        const response = await this.client.governanceGroupsApi.listWorkgroupMembers({ workgroupId, limit: 250 })
-        return response.data
+        return this.client.call(
+            (api) => api.governanceGroups.listWorkgroupMembers({ workgroupId, limit: 250 }).then((r) => r.data),
+            { priority: QueuePriority.HIGH, context: 'SourceService>executeFetchMembers' }
+        )
     }
 
     public async executeListAccounts(params: AccountsApiListAccountsRequest) {
-        return await this.client.accountsApi.listAccounts(params)
+        const result = await this.client.call(
+            (api) => api.accounts.listAccounts(params),
+            { priority: QueuePriority.MEDIUM, context: 'SourceService>executeListAccounts', throwOnError: true }
+        )
+        return result!
     }
 
     public async executeUpdateSource(requestParameters: SourcesV2025ApiUpdateSourceRequest, context: string) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.sourcesApi.updateSource(requestParameters)
-                return response.data
-            },
-            QueuePriority.HIGH,
-            context
+        return await this.client.call(
+            (api) => api.sources.updateSource(requestParameters).then((r) => r.data),
+            { priority: QueuePriority.HIGH, context }
         )
     }
 
@@ -238,26 +240,16 @@ export class SourceService {
         requestParameters: IdentityProfilesV2025ApiUpdateIdentityProfileRequest,
         context: string
     ) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.identityProfilesApi.updateIdentityProfile(requestParameters)
-                return response.data
-            },
-            QueuePriority.HIGH,
-            context,
-            undefined,
-            true
+        return await this.client.call(
+            (api) => api.identityProfiles.updateIdentityProfile(requestParameters).then((r) => r.data),
+            { priority: QueuePriority.HIGH, context, throwOnError: true }
         )
     }
 
     public async executeGetSource(requestParameters: any, context: string) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.sourcesApi.getSource(requestParameters)
-                return response.data
-            },
-            QueuePriority.HIGH,
-            context
+        return await this.client.call(
+            (api) => api.sources.getSource(requestParameters).then((r) => r.data),
+            { priority: QueuePriority.HIGH, context }
         )
     }
 
@@ -287,7 +279,11 @@ export class SourceService {
     // ------------------------------------------------------------------------
 
     public async executeListSources(requestParameters?: SourcesV2025ApiListSourcesRequest) {
-        return await this.client.sourcesApi.listSources(requestParameters)
+        const result = await this.client.call(
+            (api) => api.sources.listSources(requestParameters),
+            { priority: QueuePriority.MEDIUM, context: 'SourceService>executeListSources', throwOnError: true }
+        )
+        return result!
     }
 
     /**
@@ -437,7 +433,7 @@ export class SourceService {
                     QueuePriority.HIGH,
                     'SourceService>fetchGlobalOwnerIdentityIds'
                 )
-                this._fusionSourceWorkgroupMemberIds = (members ?? []).filter((m) => m.id).map((m) => m.id!)
+                this._fusionSourceWorkgroupMemberIds = (members ?? []).filter((m: any) => m.id).map((m: any) => m.id!)
             }
             for (const id of this._fusionSourceWorkgroupMemberIds) ownerIdSet.add(id)
         }
@@ -927,13 +923,9 @@ export class SourceService {
     }
 
     public async executeSearchPost(requestParameters: SearchApiSearchPostRequest, context: string) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.searchApi.searchPost(requestParameters)
-                return response.data ?? []
-            },
-            QueuePriority.HIGH,
-            context
+        return this.client.call(
+            (api) => api.search.searchPost(requestParameters).then((r) => r.data ?? []),
+            { priority: QueuePriority.HIGH, context }
         )
     }
 
@@ -981,13 +973,9 @@ export class SourceService {
     // ------------------------------------------------------------------------
 
     public async executeGetSourceSchemas(requestParameters: SourcesV2025ApiGetSourceSchemasRequest, context: string) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.sourcesApi.getSourceSchemas(requestParameters)
-                return response.data ?? []
-            },
-            QueuePriority.HIGH,
-            context
+        return this.client.call(
+            (api) => api.sources.getSourceSchemas(requestParameters).then((r) => r.data ?? []),
+            { priority: QueuePriority.HIGH, context }
         )
     }
 
@@ -2043,24 +2031,16 @@ export class SourceService {
     }
 
     public async executeGetTaskStatus(requestParameters: TaskManagementV2025ApiGetTaskStatusRequest, context: string) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.taskManagementApi.getTaskStatus(requestParameters)
-                return response.data
-            },
-            QueuePriority.HIGH,
-            context
+        return this.client.call(
+            (api) => api.taskManagement.getTaskStatus(requestParameters).then((r) => r.data),
+            { priority: QueuePriority.HIGH, context }
         )
     }
 
     public async executeImportAccounts(requestParameters: SourcesV2025ApiImportAccountsRequest, context: string) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.sourcesApi.importAccounts(requestParameters)
-                return response.data
-            },
-            QueuePriority.HIGH,
-            context
+        return this.client.call(
+            (api) => api.sources.importAccounts(requestParameters).then((r) => r.data),
+            { priority: QueuePriority.HIGH, context }
         )
     }
 

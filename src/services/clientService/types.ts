@@ -62,3 +62,35 @@ export interface QueueConfig {
     maxRetries: number
     enablePriority: boolean
 }
+
+/** Base policy for `client.call()`. */
+export interface CallPolicy {
+    context?: string
+    priority?: QueuePriority
+    throwOnError?: boolean
+    noRetry?: boolean
+    abortSignal?: AbortSignal
+}
+
+export interface OffsetPaginate {
+    mode: 'sequential' | 'parallel'
+    baseParams?: Record<string, unknown>
+    limit?: number
+    batchSize?: number
+}
+
+export interface SearchAfterPaginate {
+    mode: 'searchAfter'
+    search: Record<string, unknown> & { indices: string[]; query: Record<string, unknown> }
+}
+
+export interface PaginatePolicy extends CallPolicy {
+    paginate: OffsetPaginate | SearchAfterPaginate
+}
+
+export class PaginationError extends Error {
+    constructor(message: string, public readonly itemsCollected: number) {
+        super(message)
+        this.name = 'PaginationError'
+    }
+}
