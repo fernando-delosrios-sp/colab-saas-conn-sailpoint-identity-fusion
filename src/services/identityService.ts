@@ -113,10 +113,9 @@ export class IdentityService {
             const query = buildIdentityQuery(this.identityScopeQuery)
 
             await wrapConnectorError(async () => {
-                const identities = await this.client.paginateSearchApi<IdentityDocument>(
-                    query,
-                    QueuePriority.HIGH,
-                    'IdentityService>fetchIdentities searchPost'
+                const identities = await this.client.call<IdentityDocument>(
+                    (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
+                    { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentities searchPost' }
                 )
                 this.run.clearIdentities()
                 for (const identity of identities) {
@@ -192,10 +191,9 @@ export class IdentityService {
         const query = buildIdentityQuery(`id:"${id}"`)
 
         return wrapConnectorError(async () => {
-            const identities = await this.client.paginateSearchApi<IdentityDocument>(
-                query,
-                QueuePriority.HIGH,
-                'IdentityService>fetchIdentityById searchPost'
+            const identities = await this.client.call<IdentityDocument>(
+                (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
+                { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentityById searchPost' }
             )
             identities.forEach((identity) => this.run.addIdentity(identity.id, identity))
             return identities[0]
@@ -214,10 +212,9 @@ export class IdentityService {
         const query = buildIdentityQuery(`name.exact:"${name}"`)
 
         return wrapConnectorError(async () => {
-            const identities = await this.client.paginateSearchApi<IdentityDocument>(
-                query,
-                QueuePriority.HIGH,
-                'IdentityService>fetchIdentityByName searchPost'
+            const identities = await this.client.call<IdentityDocument>(
+                (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
+                { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentityByName searchPost' }
             )
             identities.forEach((identity) => this.run.addIdentity(identity.id, identity))
             return identities[0]
@@ -253,10 +250,9 @@ export class IdentityService {
             const queryStr = `id:("${batch.join('" OR "')}")`
             const query = buildIdentityQuery(queryStr)
             try {
-                const identities = await this.client.paginateSearchApi<IdentityDocument>(
-                    query,
-                    QueuePriority.HIGH,
-                    'IdentityService>hydrateMissingIdentitiesById searchPost'
+                const identities = await this.client.call<IdentityDocument>(
+                    (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
+                    { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>hydrateMissingIdentitiesById searchPost' }
                 )
                 identities.forEach((identity) => {
                     this.run.addIdentity(identity.id, identity)
@@ -397,24 +393,16 @@ export class IdentityService {
     }
 
     public async executeUpdateAccount(requestParameters: AccountsApiUpdateAccountRequest, context: string) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.accountsApi.updateAccount(requestParameters)
-                return response.data
-            },
-            QueuePriority.LOW,
-            context
+        return this.client.call(
+            (api: any) => api.accounts.updateAccount(requestParameters).then((r: any) => r.data),
+            { priority: QueuePriority.LOW, context }
         )
     }
 
     public async executeListIdentityAttributes(context: string) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.identityAttributesApi.listIdentityAttributes()
-                return response.data ?? []
-            },
-            QueuePriority.HIGH,
-            context
+        return this.client.call(
+            (api: any) => api.identityAttributes.listIdentityAttributes().then((r: any) => r.data ?? []),
+            { priority: QueuePriority.HIGH, context }
         )
     }
 
@@ -424,7 +412,7 @@ export class IdentityService {
     public async fetchIdentitySchemaAttributes(): Promise<any[]> {
         const identityAttrs = (await this.executeListIdentityAttributes(
             'IdentityService>fetchIdentitySchemaAttributes'
-        )) ?? []
+        ) as any[]) ?? []
 
         const allowedTypes = ['string', 'boolean', 'int', 'long']
 

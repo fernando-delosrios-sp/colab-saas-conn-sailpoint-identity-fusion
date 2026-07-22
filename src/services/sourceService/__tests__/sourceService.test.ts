@@ -28,17 +28,23 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
     }
     const client: any = {
         execute: async (fn: () => Promise<any>) => fn(),
+        call: async (fn: any) => fn({
+            accounts: client.accountsApi,
+            sources: client.sourcesApi,
+            taskManagement: client.taskManagementApi,
+            governanceGroups: client.governanceGroupsApi,
+            identityProfiles: client.identityProfilesApi,
+            search: client.searchApi,
+            identities: client.identitiesApi,
+            customForms: client.customFormsApi,
+            workflows: client.workflowsApi,
+        }),
         paginate: vi.fn(),
         paginateParallel: vi.fn(),
-        accountsApi: {
-            listAccounts: vi.fn(),
-        },
-        sourcesApi: {
-            importAccounts: vi.fn(),
-        },
-        taskManagementApi: {
-            getTaskStatus: vi.fn(),
-        },
+        accountsApi: { listAccounts: vi.fn() },
+        sourcesApi: { importAccounts: vi.fn() },
+        taskManagementApi: { getTaskStatus: vi.fn() },
+        identityProfilesApi: {},
     }
 
     const run = new FusionRun()

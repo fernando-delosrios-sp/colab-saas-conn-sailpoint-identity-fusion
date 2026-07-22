@@ -672,11 +672,9 @@ export class FormService {
         requestParameters: CustomFormsV2025ApiSearchFormInstancesByTenantRequest,
         formDefinitionId?: string
     ): Promise<FormInstanceResponseV2025[]> {
-        const { customFormsApi } = this.client
-        const allInstances = await this.client.execute(
-            () => customFormsApi.searchFormInstancesByTenant(requestParameters).then((r) => r.data ?? []),
-            undefined,
-            `FormService>searchFormInstancesByTenant formDef=${formDefinitionId ?? 'all'}`
+        const allInstances = await this.client.call<FormInstanceResponseV2025[]>(
+            (api: any) => api.customForms.searchFormInstancesByTenant(requestParameters).then((r: any) => r.data ?? []),
+            { context: `FormService>searchFormInstancesByTenant formDef=${formDefinitionId ?? 'all'}` }
         )
         if (!allInstances) return []
 
@@ -713,11 +711,9 @@ export class FormService {
         requestParameters: CustomFormsV2025ApiPatchFormInstanceRequest,
         context: string
     ): Promise<FormInstanceResponseV2025 | undefined> {
-        const { customFormsApi } = this.client
-        return await this.client.execute(
-            () => customFormsApi.patchFormInstance(requestParameters).then((r) => r.data),
-            undefined,
-            context
+        return this.client.call<FormInstanceResponseV2025>(
+            (api: any) => api.customForms.patchFormInstance(requestParameters).then((r: any) => r.data),
+            { context }
         )
     }
 
@@ -1292,13 +1288,9 @@ export class FormService {
         params: CustomFormsV2025ApiSearchFormDefinitionsByTenantRequest,
         context: string
     ) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.customFormsApi.searchFormDefinitionsByTenant(params)
-                return { data: response.data?.results ?? [] }
-            },
-            undefined,
-            context
+        return this.client.call<{ data: FormDefinitionResponseV2025[] }>(
+            (api: any) => api.customForms.searchFormDefinitionsByTenant(params).then((r: any) => ({ data: r.data?.results ?? [] })),
+            { context }
         )
     }
 
@@ -1315,11 +1307,9 @@ export class FormService {
 
         this.log.debug(`Fetching forms with name pattern: ${namePattern}`)
 
-        const forms = await this.client.paginate<FormDefinitionResponseV2025>(
-            async (params) => (await this.executeSearchFormDefinitions(params, 'FormService>findFormDefinitionsByName executeSearchFormDefinitions')) ?? { data: [] },
-            requestParameters,
-            undefined,
-            'FormService>findFormDefinitionsByName searchFormDefinitionsByTenant'
+        const forms = await this.client.call<FormDefinitionResponseV2025>(
+            (api: any, params: any) => api.customForms.searchFormDefinitionsByTenant(params).then((r: any) => ({ data: r.data?.results ?? [] })),
+            { paginate: { mode: 'sequential', baseParams: requestParameters as any }, context: 'FormService>findFormDefinitionsByName searchFormDefinitionsByTenant' }
         )
         this.log.debug(`Found ${forms.length} form(s) matching pattern: ${namePattern}`)
         return forms
@@ -1338,11 +1328,9 @@ export class FormService {
 
         this.log.debug(`Searching for form definition with exact name: ${formName}`)
 
-        const forms = await this.client.paginate<FormDefinitionResponseV2025>(
-            async (params) => (await this.executeSearchFormDefinitions(params, 'FormService>getFormDefinitionByName executeSearchFormDefinitions')) ?? { data: [] },
-            requestParameters,
-            undefined,
-            'FormService>getFormDefinitionByName searchFormDefinitionsByTenant'
+        const forms = await this.client.call<FormDefinitionResponseV2025>(
+            (api: any, params: any) => api.customForms.searchFormDefinitionsByTenant(params).then((r: any) => ({ data: r.data?.results ?? [] })),
+            { paginate: { mode: 'sequential', baseParams: requestParameters as any }, context: 'FormService>getFormDefinitionByName searchFormDefinitionsByTenant' }
         )
         const form = forms.find((f) => f.name === formName)
         if (form) {
@@ -1357,12 +1345,11 @@ export class FormService {
         form: CustomFormsV2025ApiCreateFormDefinitionRequest,
         context: string
     ): Promise<FormDefinitionResponseV2025 | undefined> {
-        const { customFormsApi } = this.client
-        return await this.client.execute(
-            async () => {
+        return this.client.call<FormDefinitionResponseV2025>(
+            async (api: any) => {
                 try {
                     this.log.debug(`Calling customFormsApi.createFormDefinition...`)
-                    const response = await customFormsApi.createFormDefinition(form)
+                    const response = await api.customForms.createFormDefinition(form)
                     this.log.debug(`API call completed, processing response...`)
                     return response.data
                 } catch (error: any) {
@@ -1376,8 +1363,7 @@ export class FormService {
                     throw error
                 }
             },
-            undefined,
-            context
+            { context }
         )
     }
 
@@ -1414,11 +1400,9 @@ export class FormService {
         requestParameters: CustomFormsV2025ApiCreateFormInstanceRequest,
         context: string
     ): Promise<FormInstanceResponseV2025 | undefined> {
-        const { customFormsApi } = this.client
-        return await this.client.execute(
-            () => customFormsApi.createFormInstance(requestParameters).then((r) => r.data),
-            undefined,
-            context
+        return this.client.call<FormInstanceResponseV2025>(
+            (api: any) => api.customForms.createFormInstance(requestParameters).then((r: any) => r.data),
+            { context }
         )
     }
 
@@ -1473,11 +1457,9 @@ export class FormService {
     }
 
     public async executeDeleteFormDefinition(formDefinitionID: string, context: string): Promise<void> {
-        const { customFormsApi } = this.client
-        await this.client.execute(
-            () => customFormsApi.deleteFormDefinition({ formDefinitionID }),
-            undefined,
-            context
+        await this.client.call<void>(
+            (api: any) => api.customForms.deleteFormDefinition({ formDefinitionID }),
+            { context }
         )
     }
 

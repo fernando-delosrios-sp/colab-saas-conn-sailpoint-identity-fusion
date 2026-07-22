@@ -1,7 +1,5 @@
 # superpowers-bridge Schema
 
-[English](./README.md) · [繁體中文](./README.zh-TW.md)
-
 [![Schema Structure](https://github.com/JiangWay/openspec-schemas/actions/workflows/validate-schemas.yml/badge.svg?branch=main)](https://github.com/JiangWay/openspec-schemas/actions/workflows/validate-schemas.yml)
 [![Upstream Drift](https://img.shields.io/github/issues-search/JiangWay/openspec-schemas?query=is%3Aopen%20label%3Aupstream-version-check&label=Upstream%20Drift&color=yellow)](https://github.com/JiangWay/openspec-schemas/issues?q=is%3Aopen+label%3Aupstream-version-check)
 [![OpenSpec baseline](https://img.shields.io/badge/OpenSpec_baseline-1.4.1-0277bd)](#compatibility)
@@ -537,7 +535,6 @@ If a Superpowers skill is unavailable:
 
 - [schema.yaml](./schema.yaml) — machine-readable schema definition
 - [templates/](./templates/) — markdown templates per artifact
-- [README.zh-TW.md](./README.zh-TW.md) — 繁體中文版
 - [obra/superpowers](https://github.com/obra/superpowers) — Superpowers skill source
 - [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) — OpenSpec
 - [OpenSpec PR #970](https://github.com/Fission-AI/OpenSpec/pull/970) — original review thread that drove this design

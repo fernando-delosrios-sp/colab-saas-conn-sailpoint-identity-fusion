@@ -1,10 +1,11 @@
 import { ApiQueue } from './queue'
-import { QueuePriority, QueueStats, QueuedItemInfo } from './types'
+import { QueuePriority, QueueStats, QueuedItemInfo, CallPolicy, PaginatePolicy, PaginationError } from './types'
 import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
-import { Configuration, Search, AccountsV2025Api, IdentitiesV2025Api, IdentityAttributesV2025Api, IdentityProfilesV2025Api, CustomFormsV2025Api, EntitlementsV2025Api, GovernanceGroupsV2025Api, TaskManagementV2025Api, SearchApi, TransformsApi, SourcesV2025Api, WorkflowsV2025Api } from 'sailpoint-api-client'
 import { readNumber } from '../../utils/safeRead'
 import { IscApiAdapter } from './iscApiAdapter'
+import { IscApiSurface } from './iscApiSurface'
+import type { Search, AccountsV2025Api, IdentitiesV2025Api, IdentityAttributesV2025Api, IdentityProfilesV2025Api, CustomFormsV2025Api, EntitlementsV2025Api, GovernanceGroupsV2025Api, TaskManagementV2025Api, SearchApi, TransformsApi, SourcesV2025Api, WorkflowsV2025Api, Configuration } from 'sailpoint-api-client'
 /**
  * ClientService provides a lean, centralized client for API operations.
  *
@@ -125,6 +126,157 @@ export class ClientService {
      */
     public getQueue(): ApiQueue | null {
         return this.queue
+    }
+
+    // -------------------------------------------------------------------------
+    // call() — single public entry point for all ISC API invocations
+    // -------------------------------------------------------------------------
+
+    public async call<T>(fn: (api: IscApiSurface) => Promise<T>, policy?: CallPolicy): Promise<T | undefined>
+
+    public async call<T>(
+        fn: (api: IscApiSurface, params: any) => Promise<{ data: T[] }>,
+        policy: PaginatePolicy & { paginate: { mode: 'sequential' } }
+    ): Promise<T[]>
+
+    public call<T>(
+        fn: (api: IscApiSurface, params: any) => Promise<{ data: T[]; headers?: any }>,
+        policy: PaginatePolicy & { paginate: { mode: 'parallel' } }
+    ): AsyncGenerator<T[], void, unknown>
+
+    public async call<T>(
+        fn: (api: IscApiSurface, params: { search: any; limit: number; count?: boolean }) => Promise<{ data: unknown[] }>,
+        policy: PaginatePolicy & { paginate: { mode: 'searchAfter' } }
+    ): Promise<T[]>
+
+    public call<T>(fn: (api: IscApiSurface, ...args: any[]) => Promise<any>, policy?: CallPolicy): any {
+        const paginate = (policy as PaginatePolicy)?.paginate
+        if (!paginate) {
+            return this.execute<T>(() => fn(this._apiSurface), policy?.priority, policy?.context, policy?.abortSignal, policy?.throwOnError, policy?.noRetry)
+        }
+        switch (paginate.mode) {
+            case 'sequential': return this._paginateSequential<T>(fn as any, paginate, policy!)
+            case 'parallel': return this._paginateParallel<T>(fn as any, paginate, policy!)
+            case 'searchAfter': return this._paginateSearchAfter<T>(fn as any, paginate, policy!)
+        }
+    }
+
+    private get _apiSurface(): IscApiSurface {
+        const a = this.adapter
+        return {
+            get accounts() { return a.accountsApi },
+            get identities() { return a.identitiesApi },
+            get search() { return a.searchApi },
+            get sources() { return a.sourcesApi },
+            get customForms() { return a.customFormsApi },
+            get workflows() { return a.workflowsApi },
+            get entitlements() { return a.entitlementsApi },
+            get transforms() { return a.transformsApi },
+            get governanceGroups() { return a.governanceGroupsApi },
+            get taskManagement() { return a.taskManagementApi },
+            get identityProfiles() { return a.identityProfilesApi },
+            get identityAttributes() { return a.identityAttributesApi },
+        }
+    }
+
+    private async _paginateSequential<T>(
+        fn: (api: IscApiSurface, params: any) => Promise<{ data: T[] }>,
+        paginate: { baseParams?: Record<string, unknown>; limit?: number },
+        policy: CallPolicy
+    ): Promise<T[]> {
+        const api = this._apiSurface
+        const eps = Math.min(this.pageSize, this.sailPointListMax)
+        const bp = paginate.baseParams ?? {}
+        const bl = readNumber(bp, 'limit')
+        const hel = bl != null
+        const il = hel && bl < eps ? bl : eps
+        const ol = paginate.limit
+        const ctx = (s: string) => policy.context ? `${policy.context} ${s}` : s
+        const all: T[] = []
+
+        const r1 = await this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit: il, offset: 0 }), policy.priority, ctx('[page 1, offset 0]'), policy.abortSignal)
+        if (!r1) throw new PaginationError(`Pagination failed on initial page (${policy.context ?? 'paginate'}).`, 0)
+        const p1 = r1.data || []
+        all.push(...p1)
+
+        const effL = ol ?? (hel ? bl : undefined)
+        if (p1.length < il || (effL != null && all.length >= effL)) {
+            return effL != null && all.length > effL ? all.slice(0, effL) : all
+        }
+
+        let offset = p1.length
+        while (true) {
+            if (effL != null && all.length >= effL) { if (all.length > effL) all.splice(effL); break }
+            const rl = effL != null ? effL - all.length : undefined
+            const rq = rl != null && rl < eps ? rl : eps
+            const rp = await this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit: rq, offset }), policy.priority, ctx(`[page, offset ${offset}]`), policy.abortSignal)
+            if (!rp) throw new PaginationError(`Pagination failed at offset ${offset} (${policy.context ?? 'paginate'}). ${all.length} item(s) collected before failure.`, all.length)
+            const pd = rp.data || []
+            if (!pd.length) break
+            all.push(...pd)
+            if (pd.length < rq) break
+            offset += rq
+        }
+        if (effL != null && all.length > effL) all.splice(effL)
+        return all
+    }
+
+    private async *_paginateParallel<T>(
+        fn: (api: IscApiSurface, params: any) => Promise<{ data: T[]; headers?: any }>,
+        paginate: { baseParams?: Record<string, unknown>; limit?: number; batchSize?: number },
+        policy: CallPolicy
+    ): AsyncGenerator<T[], void, unknown> {
+        const api = this._apiSurface
+        const eps = Math.min(this.pageSize, this.sailPointListMax)
+        const bs = paginate.batchSize ?? this.parallelBatchSize
+        const bp = paginate.baseParams ?? {}
+        const limit = paginate.limit
+        const ctx = (s: string) => policy.context ? `${policy.context} ${s}` : s
+
+        const r1 = await this.execute<{ data: T[]; headers?: any }>(() => fn(api, { ...bp, limit: eps, offset: 0, count: true }), policy.priority, ctx('[parallel-init]'), policy.abortSignal)
+        if (!r1) throw new PaginationError(`Pagination failed on initial page (${policy.context ?? 'paginate'}).`, 0)
+        const i1 = r1.data || []
+        yield i1
+        if (limit != null && i1.length >= limit) return
+        const tc = parseInt(r1.headers?.['x-total-count'] || '0', 10)
+        if (!tc || tc <= i1.length) return
+        const fc = limit != null ? Math.min(tc, limit) : tc
+        const offs: number[] = []
+        for (let o = i1.length; o < fc; o += eps) offs.push(o)
+        let coll = i1.length
+        for (let i = 0; i < offs.length; i += bs) {
+            if (policy.abortSignal?.aborted) return
+            const bo = offs.slice(i, i + bs)
+            const ps = bo.map((o) => this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit: eps, offset: o }), policy.priority, ctx(`[offset ${o}]`), policy.abortSignal))
+            const rs = await Promise.all(ps)
+            for (let j = 0; j < rs.length; j++) {
+                if (!rs[j]) throw new PaginationError(`Pagination failed at batch offset ${bo[j]} (${policy.context ?? 'paginate'}). ${coll} item(s) collected before failure.`, coll)
+                if (rs[j]!.data?.length) { coll += rs[j]!.data.length; yield rs[j]!.data }
+            }
+        }
+    }
+
+    private async _paginateSearchAfter<T>(
+        fn: (api: IscApiSurface, params: { search: any; limit: number; count?: boolean }) => Promise<{ data: unknown[] }>,
+        paginate: { search: any },
+        policy: CallPolicy
+    ): Promise<T[]> {
+        const api = this._apiSurface
+        const ps = this.pageSize
+        const bs = { ...paginate.search, sort: ['id'] }
+        let sa: string[] | undefined, first = true, more = true, pn = 1
+        const all: T[] = []
+        while (more) {
+            if (policy.abortSignal?.aborted) break
+            const pc = policy.context ? `${policy.context} [page ${pn}]` : `search [page ${pn}]`
+            const r = await this.execute<{ data: unknown[] }>(() => fn(api, { search: sa ? { ...bs, searchAfter: sa } : bs, limit: ps, count: first ? true : undefined }), policy.priority, pc, policy.abortSignal)
+            if (!r) throw new PaginationError(`Search pagination failed at page ${pn} (${policy.context ?? 'search'}). ${all.length} item(s) collected before failure.`, all.length)
+            const items = (r.data ?? []) as T[]
+            if (items.length) all.push(...items)
+            if (items.length < ps) { more = false } else { const li = (items[items.length - 1] as { id?: string }).id; if (!li) { more = false } else { sa = [li] } }
+            first = false; pn++
+        }
+        return all
     }
 
     // -------------------------------------------------------------------------

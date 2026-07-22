@@ -10,14 +10,16 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
             { id: '3', formDefinitionId: 'fd-1' },
         ]
 
+        const customFormsMock = {
+            searchFormInstancesByTenant: vi.fn().mockResolvedValue({ data: fakeInstances }),
+        }
+
         const service = new FormService(
             {} as any,
             { warn, debug } as any,
             {
-                customFormsApi: {
-                    searchFormInstancesByTenant: vi.fn().mockResolvedValue({ data: fakeInstances }),
-                },
-                execute: async (fn: () => Promise<any>) => fn(),
+                customFormsApi: customFormsMock,
+                call: async (fn: (api: any) => Promise<any>) => fn({ customForms: customFormsMock }),
             } as any,
             {} as any
         )
@@ -38,14 +40,16 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
             formDefinitionId: 'fd-1',
         }))
 
+        const customFormsMock = {
+            searchFormInstancesByTenant: vi.fn().mockResolvedValue({ data: instances }),
+        }
+
         const service = new FormService(
             {} as any,
             { warn, debug: vi.fn() } as any,
             {
-                customFormsApi: {
-                    searchFormInstancesByTenant: vi.fn().mockResolvedValue({ data: instances }),
-                },
-                execute: async (fn: () => Promise<any>) => fn(),
+                customFormsApi: customFormsMock,
+                call: async (fn: (api: any) => Promise<any>) => fn({ customForms: customFormsMock }),
             } as any,
             {} as any
         )
@@ -64,6 +68,11 @@ describe('FormService stale-form cleanup queue', () => {
         const searchFormInstancesByTenant = vi.fn().mockResolvedValue({ data: [] })
         const deleteFormDefinition = vi.fn().mockResolvedValue(undefined)
 
+        const customFormsMock = {
+            searchFormInstancesByTenant,
+            deleteFormDefinition,
+        }
+
         const service = new FormService(
             {
                 fusionFormNamePattern: 'Fusion',
@@ -71,11 +80,8 @@ describe('FormService stale-form cleanup queue', () => {
             } as any,
             { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
             {
-                customFormsApi: {
-                    searchFormInstancesByTenant,
-                    deleteFormDefinition,
-                },
-                execute: async (fn: () => Promise<any>) => fn(),
+                customFormsApi: customFormsMock,
+                call: async (fn: (api: any) => Promise<any>) => fn({ customForms: customFormsMock }),
                 paginate: vi.fn().mockResolvedValue([
                     { id: 'form-stale', name: 'Fusion stale', created: staleDate },
                     { id: 'form-fresh', name: 'Fusion fresh', created: freshDate },
@@ -105,6 +111,11 @@ describe('FormService stale-form cleanup queue', () => {
                 })
         )
 
+        const customFormsMock = {
+            deleteFormDefinition,
+            searchFormInstancesByTenant: vi.fn().mockResolvedValue({ data: [] }),
+        }
+
         const service = new FormService(
             {
                 fusionFormNamePattern: 'Fusion',
@@ -112,11 +123,8 @@ describe('FormService stale-form cleanup queue', () => {
             } as any,
             { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
             {
-                customFormsApi: {
-                    deleteFormDefinition,
-                    searchFormInstancesByTenant: vi.fn().mockResolvedValue({ data: [] }),
-                },
-                execute: async (fn: () => Promise<any>) => fn(),
+                customFormsApi: customFormsMock,
+                call: async (fn: (api: any) => Promise<any>) => fn({ customForms: customFormsMock }),
             } as any,
             {} as any
         )

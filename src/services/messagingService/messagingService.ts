@@ -618,11 +618,7 @@ export class MessagingService {
             return
         }
         const workflowId = this.workflow.id
-        const full = await this.client.execute(
-            () => this.executeGetWorkflow(workflowId),
-            undefined,
-            'MessagingService>refreshEmailWorkflowDefinitionBytes'
-        )
+        const full = await this.executeGetWorkflow(workflowId)
         if (full !== undefined && full !== null) {
             const workflowData = (full as any).data || full
             this.emailSenderWorkflowDefinitionBytes = Buffer.byteLength(JSON.stringify(workflowData), 'utf8')
@@ -738,13 +734,12 @@ export class MessagingService {
             requestParameters: any,
             context: string
     ) {
-        return await this.client.execute(
-            async () => {
-                const resp = await patchFnAny.call(this.client.workflowsApi, requestParameters)
+        return this.client.call<any>(
+            async (api: any) => {
+                const resp = await (api.workflows as any).patchWorkflow(requestParameters)
                 return (resp as any)?.data ?? resp
             },
-            undefined,
-            context
+            { context }
         )
     }
 
@@ -811,15 +806,9 @@ export class MessagingService {
     // ------------------------------------------------------------------------
 
     public async executeListWorkflows(context: string) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.workflowsApi.listWorkflows()
-                return {
-                    data: response.data || [],
-                }
-            },
-            undefined,
-            context
+        return this.client.call<{ data: WorkflowV2025[] }>(
+            (api: any) => api.workflows.listWorkflows().then((r: any) => ({ data: r.data || [] })),
+            { context }
         )
     }
 
@@ -842,13 +831,9 @@ export class MessagingService {
     }
 
     public async executeCreateWorkflow(createWorkflowRequestV2025: CreateWorkflowRequestV2025, context: string) {
-        return await this.client.execute(
-            async () => {
-                const response = await this.client.workflowsApi.createWorkflow({ createWorkflowRequestV2025 })
-                return response.data
-            },
-            undefined,
-            context
+        return this.client.call<WorkflowV2025>(
+            (api: any) => api.workflows.createWorkflow({ createWorkflowRequestV2025 }).then((r: any) => r.data),
+            { context }
         )
     }
 
@@ -871,18 +856,16 @@ export class MessagingService {
     }
 
     public async executeGetWorkflow(workflowId: string) {
-        return await this.client.execute(
-            () => this.client.workflowsApi.getWorkflow({ id: workflowId }),
-            undefined,
-            `MessagingService>getWorkflow id=${workflowId}`
+        return this.client.call<any>(
+            (api: any) => api.workflows.getWorkflow({ id: workflowId }),
+            { context: `MessagingService>getWorkflow id=${workflowId}` }
         )
     }
 
     public async executeTestWorkflow(requestParameters: WorkflowsV2025ApiTestWorkflowRequest, context: string) {
-        return await this.client.execute(
-            () => this.client.workflowsApi.testWorkflow(requestParameters),
-            undefined,
-            context
+        return this.client.call<any>(
+            (api: any) => api.workflows.testWorkflow(requestParameters),
+            { context }
         )
     }
 
