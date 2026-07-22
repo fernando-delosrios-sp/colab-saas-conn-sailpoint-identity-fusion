@@ -226,9 +226,14 @@ export class AttributeService {
         }
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
-            const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some(
-                (accounts) => accounts.length > 0
-            )
+            // ⚡ Bolt: Iterate Map directly to prevent Array.from heap allocation
+            let hasManagedAccountContext = false
+            for (const accounts of sourceAttributeMap.values()) {
+                if (accounts.length > 0) {
+                    hasManagedAccountContext = true
+                    break
+                }
+            }
             const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sourceConfig) => sourceConfig.name)
             let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
