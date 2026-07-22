@@ -23,3 +23,17 @@ The source service MUST resolve accounts from a managed source by applying the s
 - **WHEN** the operation handles the failure
 - **THEN** the error is one of the typed entries from `sourceReverseCorrelationErrors.ts`
 - **AND** the error is distinguishable from generic upstream `ConnectorError`s
+
+### Requirement: SourceService writes account data to FusionRun
+
+SourceService SHALL write all account inventory data to FusionRun rather than maintaining service-local copies. SourceService SHALL NOT hold its own `managedAccountsAllById` or `managedAccountsByIdentityId` fields.
+
+#### Scenario: Fetching managed accounts writes to FusionRun
+- **WHEN** SourceService.fetchManagedAccounts is called for a managed source
+- **THEN** all fetched accounts SHALL be written to run.managedAccountsAllById
+- **AND** there SHALL be no service-local managedAccountsAllById field on SourceService
+
+#### Scenario: SourceService has no dead inventory fields
+- **WHEN** code review inspects SourceService's class body
+- **THEN** there SHALL be no `managedAccountsByIdentityId` or `managedAccountsAllById` fields declared on SourceService
+- **AND** any reference to `this.managedAccountsByIdentityId` SHALL be replaced with `run.managedAccountsByIdentityId`

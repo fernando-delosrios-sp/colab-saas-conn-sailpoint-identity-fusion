@@ -41,32 +41,15 @@ export type { PendingReviewFormContext,  PendingReviewAccountContext } from './t
  * Handles creation, processing, and cleanup of fusion forms for Match review.
  */
 export class FormService {
-    private formsToDelete: Set<string> = new Set()
     private readonly formDeleteQueueConcurrency = 1
-    private readonly pendingFormDeleteTasks: Set<Promise<void>> = new Set()
-    private readonly queuedFormDeleteIds: Set<string> = new Set()
-    private readonly formDeleteQueue: string[] = []
-    private activeFormDeleteWorkers = 0
-    private _fusionIdentityDecisions?: FusionDecision[]
     private fusionAssignmentDecisionMap: Map<string, FusionDecision> = new Map()
     /** Pending (unanswered) form instance URLs by recipient identityId, populated during fetchFormData. */
-    private _pendingReviewUrlsByReviewerId: Map<string, string[]> = new Map()
-    /** Pending review context keyed by form input account reference (managed account id). */
     private _pendingReviewContextByAccountId: Map<
         string,
         { forms: Map<string, PendingReviewFormContext>; reviewerIds: Set<string>; candidateIds: Set<string> }
     > = new Map()
-    /** Candidate identity IDs from pending (unanswered) form instances, populated during fetchFormData. */
-    private _pendingCandidateIdentityIds: Set<string> = new Set()
-    /** Pending form instance URLs keyed by candidate identityId (same URLs reviewers use for that instance). */
-    private _pendingReviewUrlsByCandidateId: Map<string, string[]> = new Map()
     /** Finished decisions processed from answered form instances (assignment + newIdentity/no-match). */
     private _finishedFusionDecisions: FusionDecision[] = []
-    private _formsCreated: number = 0
-    private _formInstancesCreated: number = 0
-    private _formsFound: number = 0
-    private _formInstancesFound: number = 0
-    private _answeredFormInstancesProcessed: number = 0
     private _fetchedFormInstances: FormInstanceResponseV2025[][] = []
     private readonly fusionFormNamePattern: string
     private readonly fusionFormExpirationDays: number
@@ -142,7 +125,7 @@ export class FormService {
                     '(stale cleanup disabled for this run)'
             )
         }
-        this._formsFound = activeForms.length
+        this.run.formsFound = activeForms.length
 
         // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
         // to prevent API rate limiting issues when iterating over a large number of forms
@@ -166,7 +149,7 @@ export class FormService {
         // - queue resolved/orphaned forms for deletion
         // (fetching was done in parallel above, processing is fast so sequential is fine)
         for (const instances of formInstancesResults) {
-            this._formInstancesFound += instances.length
+            this.run.formInstancesFound += instances.length
             if (instances.length > 0) {
                 await this.processFusionFormInstances(instances)
             }
@@ -183,9 +166,9 @@ export class FormService {
         this.run.clearReviewUrls()
         this._pendingReviewContextByAccountId = new Map()
         this._finishedFusionDecisions = []
-        this._formsFound = 0
-        this._formInstancesFound = 0
-        this._answeredFormInstancesProcessed = 0
+        this.run.formsFound = 0
+        this.run.formInstancesFound = 0
+        this.run.answeredFormInstancesProcessed = 0
         this._fetchedFormInstances = []
     }
 
@@ -198,23 +181,23 @@ export class FormService {
      * Clean up completed and cancelled forms
      */
     public async cleanUpForms(): Promise<void> {
-        if (this.formsToDelete.size === 0) {
+        if (this.run.formsToDelete.size === 0) {
             this.log.debug('No forms to clean up')
             return
         }
 
         // Snapshot and clear the transient list up front so producers can keep enqueueing
         // while this cleanup pass deduplicates and schedules the current batch.
-        const formIdsToQueue = Array.from(this.formsToDelete)
-        this.formsToDelete = new Set()
+        const formIdsToQueue = Array.from(this.run.formsToDelete)
+        this.run.formsToDelete = new Set()
 
         let queuedCount = 0
         for (const formId of formIdsToQueue) {
-            if (this.queuedFormDeleteIds.has(formId)) {
+            if (this.run.queuedFormDeleteIds.has(formId)) {
                 continue
             }
-            this.queuedFormDeleteIds.add(formId)
-            this.formDeleteQueue.push(formId)
+            this.run.queuedFormDeleteIds.add(formId)
+            this.run.formDeleteQueue.push(formId)
             queuedCount++
         }
 
@@ -232,16 +215,16 @@ export class FormService {
      * Called at the end of the pipeline so process flow remains non-blocking mid-run.
      */
     public async awaitPendingDeleteOperations(): Promise<void> {
-        if (this.pendingFormDeleteTasks.size === 0 && this.formDeleteQueue.length === 0) {
+        if (this.run.pendingFormDeleteTasks.size === 0 && this.run.formDeleteQueue.length === 0) {
             this.log.debug('No pending form deletions to await')
             return
         }
 
         this.log.info('Waiting for queued form deletions to complete')
-        while (this.pendingFormDeleteTasks.size > 0 || this.formDeleteQueue.length > 0) {
+        while (this.run.pendingFormDeleteTasks.size > 0 || this.run.formDeleteQueue.length > 0) {
             this.kickoffFormDeleteWorkers()
-            if (this.pendingFormDeleteTasks.size > 0) {
-                await Promise.all(Array.from(this.pendingFormDeleteTasks))
+            if (this.run.pendingFormDeleteTasks.size > 0) {
+                await Promise.all(Array.from(this.run.pendingFormDeleteTasks))
             }
         }
         this.log.debug('All queued form deletions completed')
@@ -614,27 +597,27 @@ export class FormService {
 
     /** Number of form definitions created during this run */
     public get formsCreated(): number {
-        return this._formsCreated
+        return this.run.formsCreated
     }
 
     /** Number of form definitions found during fetchFormData for this run */
     public get formsFound(): number {
-        return this._formsFound
+        return this.run.formsFound
     }
 
     /** Number of form instances (review assignments) created during this run */
     public get formInstancesCreated(): number {
-        return this._formInstancesCreated
+        return this.run.formInstancesCreated
     }
 
     /** Number of form instances found during fetchFormData for this run */
     public get formInstancesFound(): number {
-        return this._formInstancesFound
+        return this.run.formInstancesFound
     }
 
     /** Number of answered form instances processed in this run */
     public get answeredFormInstancesProcessed(): number {
-        return this._answeredFormInstancesProcessed
+        return this.run.answeredFormInstancesProcessed
     }
 
     /** All finished decisions processed from answered form instances in this run */
@@ -936,7 +919,7 @@ export class FormService {
             processingResult.instancesToProcess,
             accountInfoOverride
         )
-        this._answeredFormInstancesProcessed += processingResult.instancesToProcess.length
+        this.run.answeredFormInstancesProcessed += processingResult.instancesToProcess.length
 
         // Only active (non-deleted) forms should contribute pending review URLs and candidate IDs.
         // A resolved/orphaned form may still have "pending" instances for other reviewers, but those
@@ -1083,7 +1066,7 @@ export class FormService {
      * because the queue is depleted during fetchFormData when completed forms remove entries.
      */
     private managedAccountExists(accountId: string): boolean {
-        const allById = this.sources.managedAccountsAllById
+        const allById = this.run.managedAccountsAllById
         if (!allById) {
             return false
         }
@@ -1108,8 +1091,8 @@ export class FormService {
             return undefined
         }
 
-        const workQueue = this.sources.run.managedAccountsById
-        const allById = this.sources.managedAccountsAllById
+        const workQueue = this.run.managedAccountsById
+        const allById = this.run.managedAccountsAllById
         assert(workQueue, 'Managed accounts have not been loaded')
 
         // Prefer work queue, then full snapshot — another form processed earlier in this
@@ -1236,38 +1219,38 @@ export class FormService {
     private addFormToDelete(formDefinitionId: string): void {
         // Avoid double-queueing the same definition id (processFusionFormInstances can hit multiple paths)
 
-        this.formsToDelete.add(formDefinitionId)
+        this.run.formsToDelete.add(formDefinitionId)
     }
 
     private kickoffFormDeleteWorkers(): void {
-        while (this.activeFormDeleteWorkers < this.formDeleteQueueConcurrency && this.formDeleteQueue.length > 0) {
-            this.activeFormDeleteWorkers++
+        while (this.run.activeFormDeleteWorkers < this.formDeleteQueueConcurrency && this.run.formDeleteQueue.length > 0) {
+            this.run.activeFormDeleteWorkers++
             const workerPromise = this.runFormDeleteWorker()
 
             // eslint-disable-next-line prefer-const
             let trackedPromise: Promise<void> = workerPromise.finally(() => {
                 // Keep worker accounting + task tracking in one finally block so awaitPendingDeleteOperations
                 // always observes a consistent view, even when deletion throws.
-                this.activeFormDeleteWorkers--
-                this.pendingFormDeleteTasks.delete(trackedPromise)
-                if (this.formDeleteQueue.length > 0) {
+                this.run.activeFormDeleteWorkers--
+                this.run.pendingFormDeleteTasks.delete(trackedPromise)
+                if (this.run.formDeleteQueue.length > 0) {
                     this.kickoffFormDeleteWorkers()
                 }
             })
-            this.pendingFormDeleteTasks.add(trackedPromise)
+            this.run.pendingFormDeleteTasks.add(trackedPromise)
         }
     }
 
     private async runFormDeleteWorker(): Promise<void> {
-        while (this.formDeleteQueue.length > 0) {
-            const formId = this.formDeleteQueue.shift()
+        while (this.run.formDeleteQueue.length > 0) {
+            const formId = this.run.formDeleteQueue.shift()
             if (!formId) {
                 continue
             }
             try {
                 await this.deleteFormDefinition(formId)
             } finally {
-                this.queuedFormDeleteIds.delete(formId)
+                this.run.queuedFormDeleteIds.delete(formId)
             }
         }
     }
@@ -1423,7 +1406,7 @@ export class FormService {
         assert(formInstance.id, 'Form definition ID is missing')
 
         this.log.debug(`Form definition created successfully: ${formInstance.id}`)
-        this._formsCreated++
+        this.run.formsCreated++
         return formInstance
     }
 
@@ -1485,7 +1468,7 @@ export class FormService {
         )
         assert(response, 'Failed to create form instance')
         this.log.debug(`Form instance created successfully: ${response.id || 'unknown'}`)
-        this._formInstancesCreated++
+        this.run.formInstancesCreated++
         return response
     }
 

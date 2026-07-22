@@ -25,6 +25,24 @@ export interface RunStateSnapshot {
     autoAssignedIds: string[]
     matchScoringMs: number
     phaseTimings: { phase: string; elapsed: string }[]
+    managedAccountsAllById: Record<string, any>
+    formCounters: {
+        formsCreated: number
+        formInstancesCreated: number
+        formsFound: number
+        formInstancesFound: number
+        answeredFormInstancesProcessed: number
+    }
+    formDeleteQueue: {
+        formsToDelete: string[]
+        queuedFormDeleteIds: string[]
+    }
+    managedAccountProcessing: {
+        state: 'idle' | 'initialized'
+        startedAt: number
+        batchSize: number
+    }
+    trigramIndexBuilt: boolean
 }
 
 
@@ -53,7 +71,26 @@ export class FusionRun {
     private _pendingDisableOperations = new Set<Promise<void>>()
     private _disableOperationFactory?: (account: Account) => Promise<void>
     private readonly _candidateRegistry: CandidateRegistry
-    managedAccountsAllById?: Map<string, Account>
+    managedAccountsAllById: Map<string, Account> = new Map()
+    private _tracker?: AggregationTracker
+    private _managedAccountProcessingState: 'idle' | 'initialized' = 'idle'
+    private _managedAccountProcessingStartedAt: number = 0
+    private _managedAccountProcessingBatchSize: number = 0
+    trigramIndexByAttribute: Map<string, Map<string, Set<FusionAccount>>> = new Map()
+    normalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
+    nameNormalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
+    indexedMandatoryAttributes: string[] = []
+    trigramIndexBuilt: boolean = false
+    formsCreated: number = 0
+    formInstancesCreated: number = 0
+    formsFound: number = 0
+    formInstancesFound: number = 0
+    answeredFormInstancesProcessed: number = 0
+    formsToDelete: Set<string> = new Set()
+    formDeleteQueue: string[] = []
+    queuedFormDeleteIds: Set<string> = new Set()
+    activeFormDeleteWorkers: number = 0
+    pendingFormDeleteTasks: Set<Promise<void>> = new Set()
 
     get autoAssignedCount(): number {
         return this._autoAssignedIdentityIds.size
@@ -505,6 +542,100 @@ export class FusionRun {
         return `name:${name}`
     }
 
+    setTracker(tracker: AggregationTracker): void {
+        this._tracker = tracker
+    }
+
+    getTracker(): AggregationTracker | undefined {
+        return this._tracker
+    }
+
+    get managedAccountProcessingState(): 'idle' | 'initialized' {
+        return this._managedAccountProcessingState
+    }
+
+    get managedAccountProcessingBatchSize(): number {
+        return this._managedAccountProcessingBatchSize
+    }
+
+    startManagedAccountProcessing(batchSize: number): void {
+        this._managedAccountProcessingBatchSize = batchSize
+        this._managedAccountProcessingStartedAt = Date.now()
+        this._managedAccountProcessingState = 'initialized'
+    }
+
+    resetManagedAccountProcessing(): void {
+        this._managedAccountProcessingState = 'idle'
+        this._managedAccountProcessingStartedAt = 0
+        this._managedAccountProcessingBatchSize = 0
+    }
+
+    incrementFormsCreated(): void {
+        this.formsCreated++
+    }
+
+    incrementFormInstancesCreated(): void {
+        this.formInstancesCreated++
+    }
+
+    incrementFormsFound(): void {
+        this.formsFound++
+    }
+
+    incrementFormInstancesFound(): void {
+        this.formInstancesFound++
+    }
+
+    incrementAnsweredFormInstancesProcessed(): void {
+        this.answeredFormInstancesProcessed++
+    }
+
+    resetFormCounters(): void {
+        this.formsCreated = 0
+        this.formInstancesCreated = 0
+        this.formsFound = 0
+        this.formInstancesFound = 0
+        this.answeredFormInstancesProcessed = 0
+    }
+
+    queueFormForDeletion(formDefId: string): void {
+        if (this.queuedFormDeleteIds.has(formDefId)) return
+        this.queuedFormDeleteIds.add(formDefId)
+        this.formsToDelete.add(formDefId)
+        this.formDeleteQueue.push(formDefId)
+    }
+
+    isFormQueuedForDeletion(formDefId: string): boolean {
+        return this.queuedFormDeleteIds.has(formDefId)
+    }
+
+    getNextFormToDelete(): string | undefined {
+        return this.formDeleteQueue.shift()
+    }
+
+    markFormDeletionComplete(formDefId: string): void {
+        this.formsToDelete.delete(formDefId)
+        this.queuedFormDeleteIds.delete(formDefId)
+        this.activeFormDeleteWorkers--
+    }
+
+    async awaitPendingFormDeleteTasks(): Promise<void> {
+        await Promise.all(this.pendingFormDeleteTasks)
+    }
+
+    resetFormDeletionQueue(): void {
+        this.formsToDelete.clear()
+        this.formDeleteQueue = []
+        this.pendingFormDeleteTasks.clear()
+        this.queuedFormDeleteIds.clear()
+        this.activeFormDeleteWorkers = 0
+    }
+
+    resetFormState(): void {
+        this.resetFormCounters()
+        this.resetFormDeletionQueue()
+    }
+
     snapshot(): RunStateSnapshot {
         return {
             managedAccounts: Array.from(this.managedAccountsById.values()),
@@ -522,6 +653,24 @@ export class FusionRun {
             autoAssignedIds: Array.from(this._autoAssignedIdentityIds),
             matchScoringMs: this.matchScoringMs,
             phaseTimings: this.phaseTimings,
+            managedAccountsAllById: Object.fromEntries(this.managedAccountsAllById),
+            formCounters: {
+                formsCreated: this.formsCreated,
+                formInstancesCreated: this.formInstancesCreated,
+                formsFound: this.formsFound,
+                formInstancesFound: this.formInstancesFound,
+                answeredFormInstancesProcessed: this.answeredFormInstancesProcessed,
+            },
+            formDeleteQueue: {
+                formsToDelete: Array.from(this.formsToDelete),
+                queuedFormDeleteIds: Array.from(this.queuedFormDeleteIds),
+            },
+            managedAccountProcessing: {
+                state: this._managedAccountProcessingState,
+                startedAt: this._managedAccountProcessingStartedAt,
+                batchSize: this._managedAccountProcessingBatchSize,
+            },
+            trigramIndexBuilt: this.trigramIndexBuilt,
         }
     }
 
@@ -557,5 +706,20 @@ export class FusionRun {
         }
         this.matchScoringMs = snapshot.matchScoringMs
         this.phaseTimings = snapshot.phaseTimings
+        this.managedAccountsAllById = new Map(Object.entries(snapshot.managedAccountsAllById ?? {})) as Map<string, Account>
+        this.formsCreated = snapshot.formCounters?.formsCreated ?? 0
+        this.formInstancesCreated = snapshot.formCounters?.formInstancesCreated ?? 0
+        this.formsFound = snapshot.formCounters?.formsFound ?? 0
+        this.formInstancesFound = snapshot.formCounters?.formInstancesFound ?? 0
+        this.answeredFormInstancesProcessed = snapshot.formCounters?.answeredFormInstancesProcessed ?? 0
+        this.formsToDelete = new Set(snapshot.formDeleteQueue?.formsToDelete ?? [])
+        this.queuedFormDeleteIds = new Set(snapshot.formDeleteQueue?.queuedFormDeleteIds ?? [])
+        this.formDeleteQueue = snapshot.formDeleteQueue?.formsToDelete ?? []
+        this.pendingFormDeleteTasks.clear()
+        this.activeFormDeleteWorkers = 0
+        this._managedAccountProcessingState = snapshot.managedAccountProcessing?.state ?? 'idle'
+        this._managedAccountProcessingStartedAt = snapshot.managedAccountProcessing?.startedAt ?? 0
+        this._managedAccountProcessingBatchSize = snapshot.managedAccountProcessing?.batchSize ?? 0
+        this.trigramIndexBuilt = snapshot.trigramIndexBuilt ?? false
     }
 }

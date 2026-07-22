@@ -63,11 +63,6 @@ export class SourceService {
     /** Per-run cache: managed source names that passed reverse-correlation setup/assert this session. */
     private reverseCorrelationReadinessBySourceName = new Set<string>()
 
-    // Snapshot of managed accounts loaded for this run (never depleted by work-queue processing)
-    public managedAccountsAllById: Map<string, Account> = new Map()
-    // Secondary index: identityId → Set of account IDs for O(1) identity-origin lookups
-    // in addManagedAccountLayer. Kept in sync with managedAccountsById.
-    public managedAccountsByIdentityId: Map<string, Set<string>> = new Map()
     public fusionAccountsByNativeIdentity?: Map<string, Account>
 
     /**
@@ -81,7 +76,7 @@ export class SourceService {
      */
     public clearManagedAccounts(): void {
         this.run.clearWorkQueue()
-        this.managedAccountsAllById.clear()
+        this.run.managedAccountsAllById.clear()
         this.log.debug('Managed accounts cache cleared from memory')
     }
 
@@ -709,7 +704,7 @@ export class SourceService {
                                 continue
                             }
                             this.run.setManagedAccount(accountKey, account)
-                            this.managedAccountsAllById.set(accountKey, account)
+                            this.run.managedAccountsAllById.set(accountKey, account)
                             collectedCount++
                         }
                         if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) {
@@ -790,7 +785,7 @@ export class SourceService {
             return
         }
         this.run.setManagedAccount(accountKey, managedAccount)
-        this.managedAccountsAllById.set(accountKey, managedAccount)
+                    this.run.managedAccountsAllById.set(accountKey, managedAccount)
     }
 
     /**
@@ -800,7 +795,7 @@ export class SourceService {
     public resolveIscAccountIdForManagedKey(managedKey: string): string | undefined {
         const key = trimStr(managedKey)
         if (key === undefined) return undefined
-        const account = this.managedAccountsAllById.get(key) ?? this.run.managedAccountsById.get(key)
+        const account = this.run.managedAccountsAllById.get(key) ?? this.run.managedAccountsById.get(key)
         return trimStr(account?.id)
     }
 
