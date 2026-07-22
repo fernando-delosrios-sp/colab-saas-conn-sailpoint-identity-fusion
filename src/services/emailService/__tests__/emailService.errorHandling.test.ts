@@ -1,6 +1,6 @@
-import { MessagingService } from '../messagingService'
+import { EmailService } from '../emailService'
 
-const createMessagingService = (workflowPayload?: { padding?: string }) => {
+const createEmailService = (workflowPayload?: { padding?: string }) => {
     const workflowsApi = {
         listWorkflows: vi.fn().mockResolvedValue({
             data: [
@@ -46,30 +46,20 @@ const createMessagingService = (workflowPayload?: { padding?: string }) => {
         fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
         getFusionSource: vi.fn(() => ({ name: 'Fusion Source' })),
     } as any
-    const service = new MessagingService(config, log, client, sources)
+    const service = new EmailService(config, log, client, sources)
     return { service, workflowsApi, log }
 }
 
-describe('MessagingService error handling', () => {
+describe('EmailService error handling', () => {
     it('catches and logs errors during sendEmail without crashing', async () => {
-        const { service, workflowsApi, log } = createMessagingService()
+        const { service, workflowsApi, log } = createEmailService()
 
         // Mock testWorkflow to reject with an error
         const mockError = new Error('Simulated workflow failure')
         workflowsApi.testWorkflow.mockRejectedValue(mockError)
 
-        const report = {
-            accounts: [],
-            totalAccounts: 0,
-            matches: 0,
-        } as any
-
         await expect(
-            service.deliverReportToRecipients(report, {
-                recipients: ['reviewer@example.com'],
-                reportType: 'aggregation',
-                reportTitle: 'Test Report',
-            })
+            service.sendEmail(['reviewer@example.com'], 'Test Report', '<html><body>Report</body></html>')
         ).resolves.not.toThrow()
 
         expect(log.error).toHaveBeenCalledWith(

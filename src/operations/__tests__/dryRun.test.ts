@@ -6,7 +6,7 @@ import {
     compileEmailTemplates,
     registerHandlebarsHelpers,
     renderFusionReport,
-} from '../../services/messagingService/helpers'
+} from '../../services/emailService/helpers'
 
 function createRegistry() {
     const logForTimer = new LogService({ spConnDebugLoggingEnabled: false })

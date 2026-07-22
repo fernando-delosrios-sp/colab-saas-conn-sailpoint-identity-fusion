@@ -11,7 +11,7 @@ import { ServiceRegistry } from '../services/serviceRegistry'
  * @param _input - Unused input parameter (required by SDK interface)
  */
 export const testConnection = async (serviceRegistry: ServiceRegistry, _input: any) => {
-    const { log, sources, schemas, messaging, res } = serviceRegistry
+    const { log, sources, schemas, workflows, res } = serviceRegistry
 
     try {
         log.info('Testing connection')
@@ -25,14 +25,14 @@ export const testConnection = async (serviceRegistry: ServiceRegistry, _input: a
         timer.phase('Validated Accounts JMESPath filters')
 
         if (sources.isEmailWorkflowConfigured()) {
-            await messaging.fetchSender()
+            await workflows.fetchSender()
             log.info('Email workflow verified')
             timer.phase('Validated email sender workflow')
         }
 
         const delayedAggregationSources = sources.delayedAggregationSources
         if (delayedAggregationSources.length > 0) {
-            await messaging.fetchDelayedAggregationSender()
+            await workflows.fetchDelayedAggregationSender()
             log.info(`Delayed aggregation workflow validated for ${delayedAggregationSources.length} source(s)`)
             timer.phase('Validated delayed aggregation workflow')
         }

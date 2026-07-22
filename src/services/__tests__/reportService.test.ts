@@ -41,12 +41,9 @@ describe('ReportService', () => {
             fusionIdentities: [],
             run: fusionRun,
         }
-        const messaging = {
-            fetchSender: vi.fn(async () => undefined),
-            sendReport: vi.fn(async () => undefined),
-            sendReportTo: vi.fn(async () => undefined),
-            deliverReportToRecipients: vi.fn(async () => undefined),
-            renderFusionReportHtml: vi.fn(() => '<html/>'),
+        const email = {
+            sendEmail: vi.fn(async () => undefined),
+            getRecipientEmails: vi.fn(async () => ['owner@example.com']),
         }
         const run = {
             ...{
@@ -63,360 +60,246 @@ describe('ReportService', () => {
                 { ...identities, ...(overrides.identities ?? {}) } as any,
                 { ...forms, ...(overrides.forms ?? {}) } as any,
                 { ...fusion, ...(overrides.fusion ?? {}) } as any,
-                { ...messaging, ...(overrides.messaging ?? {}) } as any,
+                { ...email, ...(overrides.email ?? {}) } as any,
                 run as any
             ),
-            deps: { log, sources, identities, forms, fusion, messaging },
+            deps: { log, sources, identities, forms, fusion, email },
         }
     }
 
-    it('hydrates missing identity ids from report decisions', async () => {
-        const idsSeen: string[][] = []
+    it('builds fusion review decision DTOs with reviewer metadata and account resolution', () => {
         const { service } = createService({
             forms: {
                 finishedFusionDecisions: [
-                    { submitter: { id: 'rev-1' }, identityId: 'id-1' },
-                    { submitter: { id: 'rev-1' }, identityId: 'id-2' },
+                    {
+                        id: 'd1',
+                        identityId: 'id-100',
+                        identityName: 'Target Identity',
+                        newIdentity: false,
+                        submitter: { id: 'rev-1', name: 'Reviewer Name' },
+                        account: {
+                            id: 'acc-1',
+                            name: 'Target Account',
+                            sourceName: 'Source Alpha',
+                        },
+                    },
                 ],
             },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions).toHaveLength(1)
+        expect(decisions[0]).toEqual({
+            reviewerId: 'rev-1',
+            reviewerName: 'Reviewer Name',
+            reviewerUrl: 'https://example.identitynow.com/ui/a/admin/identities/rev-1/details/attributes',
+            reviewerEmail: undefined,
+            managedAccountKey: 'acc-1',
+            accountName: 'Target Account',
+            accountUrl: 'https://example.identitynow.com/ui/a/admin/accounts-management/human-accounts/acc-1',
+            accountSource: 'Source Alpha',
+            sourceType: SourceType.Authoritative,
+            decision: 'assign-existing-identity',
+            decisionLabel: 'Assigned to existing identity',
+            selectedIdentityId: 'id-100',
+            selectedIdentityName: 'Target Identity',
+            selectedIdentityUrl: 'https://example.identitynow.com/ui/a/admin/identities/id-100/details/attributes',
+            comments: undefined,
+            formUrl: undefined,
+            automaticAssignment: undefined,
+        })
+    })
+
+    it('prefers managed account display name over raw managed account key when building review decisions', () => {
+        const managedAccountsAllById = new Map<string, any>([
+            ['key-1', { id: 'key-1', name: 'Human Account Display Name' }],
+        ])
+
+        const { service } = createService({
+            sources: {
+                managedAccountsAllById,
+            },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-200',
+                        identityName: 'Correlated Identity',
+                        newIdentity: false,
+                        submitter: { id: 'rev-2', name: 'Reviewer Two' },
+                        account: {
+                            id: 'key-1',
+                            name: 'key-1',
+                            sourceName: 'Source Beta',
+                        },
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions).toHaveLength(1)
+        expect(decisions[0].accountName).toBe('Human Account Display Name')
+    })
+
+    it('prefers correlated identity display name over managed account name fallback for assign-existing decisions', () => {
+        const managedAccountsAllById = new Map<string, any>([
+            ['key-1', { id: 'key-1', name: 'Raw Managed Name' }],
+        ])
+
+        const { service } = createService({
+            sources: {
+                managedAccountsAllById,
+            },
             identities: {
-                hydrateMissingIdentitiesById: vi.fn(async (ids: string[]) => idsSeen.push(ids)),
+                getIdentityById: vi.fn((id?: string) => (id ? { id, displayName: 'Correlated Identity Name' } : undefined)),
+            },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-300',
+                        correlatedIdentityId: 'id-300',
+                        identityName: 'Correlated Identity Name',
+                        newIdentity: false,
+                        submitter: { id: 'rev-3', name: 'Reviewer Three' },
+                        account: {
+                            id: 'key-1',
+                            name: 'Raw Managed Name',
+                            sourceName: 'Source Gamma',
+                        },
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions).toHaveLength(1)
+        expect(decisions[0].accountName).toBe('Correlated Identity Name')
+    })
+
+    it('uses fallback managed account key when account name matches managed account key exactly', () => {
+        const { service } = createService({
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-400',
+                        newIdentity: true,
+                        submitter: { id: 'rev-4', name: 'Reviewer Four' },
+                        account: {
+                            id: 'key-only',
+                            name: 'key-only',
+                            sourceName: 'Source Delta',
+                        },
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions).toHaveLength(1)
+        expect(decisions[0].accountName).toBe('key-only')
+    })
+
+    it('builds dry-run report stats correctly mapping authoritative, record, and orphan decisions', () => {
+        const { service } = createService({
+            forms: {
+                finishedFusionDecisions: [
+                    { newIdentity: false, sourceType: SourceType.Authoritative },
+                    { newIdentity: true, sourceType: SourceType.Authoritative },
+                    { newIdentity: true, sourceType: SourceType.Record },
+                    { newIdentity: true, sourceType: SourceType.Orphan },
+                ],
+                formsCreated: 4,
+                formInstancesCreated: 8,
+                formsFound: 4,
+                formInstancesFound: 8,
+                answeredFormInstancesProcessed: 4,
+            },
+        })
+
+        const aggregationStats: any = {
+            managedAccountsFound: 10,
+            totalProcessingTime: '5s',
+            managedAccountsFoundAuthoritative: 5,
+            managedAccountsFoundRecord: 3,
+            managedAccountsFoundOrphan: 2,
+            warningSamples: [],
+            errorSamples: [],
+        }
+
+        const stats = service.buildDryRunStats(aggregationStats)
+
+        expect(stats.fusionReviewNewIdentitiesAuthoritative).toBe(1)
+        expect(stats.fusionReviewNoMatchesRecord).toBe(1)
+        expect(stats.fusionReviewNoMatchesOrphan).toBe(1)
+        expect(stats.fusionReviewDecisionsAuthoritative).toBe(2)
+        expect(stats.fusionReviewDecisionsRecord).toBe(1)
+        expect(stats.fusionReviewDecisionsOrphan).toBe(1)
+        expect(stats.managedAccountsFound).toBe(10)
+        expect(stats.managedAccountsFoundAuthoritative).toBe(5)
+        expect(stats.managedAccountsFoundRecord).toBe(3)
+        expect(stats.managedAccountsFoundOrphan).toBe(2)
+    })
+
+    it('preloads reviewer and selected identity objects before rendering decisions', async () => {
+        const { service, deps } = createService({
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        id: 'd-preload',
+                        identityId: 'id-target',
+                        submitter: { id: 'id-reviewer' },
+                        account: { id: 'acc-1', sourceName: 'S' },
+                    },
+                ],
             },
         })
 
         await service.hydrateIdentitiesForReportDecisions()
 
-        expect(idsSeen).toHaveLength(1)
-        expect(new Set(idsSeen[0])).toEqual(new Set(['rev-1', 'id-1', 'id-2']))
+        expect(deps.identities.hydrateMissingIdentitiesById).toHaveBeenCalledWith(
+            expect.arrayContaining(['id-reviewer', 'id-target'])
+        )
     })
 
-    it('builds review decisions with resolved account and identity links', () => {
-        const { service } = createService({
-            forms: {
-                finishedFusionDecisions: [
-                    {
-                        sourceType: SourceType.Authoritative,
-                        account: { id: 'acc-1', name: 'Account 1', sourceName: 'source-a' },
-                        submitter: { id: 'rev-1', name: '' },
-                        identityId: 'id-1',
-                        newIdentity: false,
-                    },
-                ],
-            },
-        })
-
-        const decisions = service.buildFusionReviewDecisions()
-        expect(decisions).toHaveLength(1)
-        expect(decisions[0].reviewerName).toBe('Name rev-1')
-        expect(decisions[0].selectedIdentityName).toBe('Name id-1')
-        expect(decisions[0].managedAccountKey).toBe('acc-1')
-        expect(decisions[0].accountUrl).toContain('/human-accounts/')
-        expect(decisions[0].decision).toBe('assign-existing-identity')
-    })
-
-    it('resolves account name from managed account when decision account name is the composite key', () => {
-        const managedAccountsAllById = new Map<string, any>([
-            ['source-1::native-1', { id: 'isc-acc-1', name: 'John Smith', sourceId: 'source-1' }],
-        ])
-        const { service } = createService({
-            run: { managedAccountsAllById },
-            forms: {
-                finishedFusionDecisions: [
-                    {
-                        sourceType: SourceType.Authoritative,
-                        account: {
-                            id: 'source-1::native-1',
-                            name: 'source-1::native-1',
-                            sourceName: 'HR',
-                            sourceId: 'source-1',
-                            nativeIdentity: 'native-1',
-                        },
-                        submitter: { id: 'rev-1', name: 'Reviewer One' },
-                        identityId: 'id-new',
-                        newIdentity: true,
-                    },
-                ],
-            },
-        })
-
-        const decisions = service.buildFusionReviewDecisions()
-        expect(decisions[0].accountName).toBe('John Smith')
-        expect(decisions[0].accountUrl).toContain('/human-accounts/')
-        expect(decisions[0].decision).toBe('create-new-identity')
-    })
-
-    it('resolves accountUrl from managed account id when resolveIscAccountIdForManagedKey returns undefined', () => {
-        // Production behavior: the account has a distinct ISC id but resolveIscAccountIdForManagedKey
-        // returns undefined (e.g. account not loaded in its internal lookup). The second pass
-        // must read the id directly from managedAccountsAllById so the link is preserved.
-        const managedAccountsAllById = new Map<string, any>([
-            [
-                'source-1::native-1',
-                { id: 'isc-acc-distinct', name: 'John Smith', sourceId: 'source-1', nativeIdentity: 'native-1' },
-            ],
-        ])
-        const { service } = createService({
-            sources: {
-                managedAccountsAllById,
-                resolveIscAccountIdForManagedKey: vi.fn(() => undefined),
-            },
-            forms: {
-                finishedFusionDecisions: [
-                    {
-                        sourceType: SourceType.Authoritative,
-                        account: {
-                            id: 'source-1::native-1',
-                            name: 'source-1::native-1',
-                            sourceName: 'HR',
-                            sourceId: 'source-1',
-                            nativeIdentity: 'native-1',
-                        },
-                        submitter: { id: 'rev-1', name: 'Reviewer One' },
-                        identityId: 'id-new',
-                        newIdentity: true,
-                    },
-                ],
-            },
-        })
-
-        const decisions = service.buildFusionReviewDecisions()
-        expect(decisions[0].accountUrl).toBeDefined()
-        expect(decisions[0].accountUrl).toContain('/human-accounts/isc-acc-distinct')
-    })
-
-    it('resolves accountUrl from fusion identity iscAccountId when managed account lookup fails', () => {
-        // Production behavior: for a "Created new identity" decision, the managed account
-        // may not have a distinct ISC id in the map, but the processed FusionAccount
-        // (found via identityId) already has iscAccountId set by addManagedAccountLayer.
-        const { service } = createService({
-            sources: {
-                resolveIscAccountIdForManagedKey: vi.fn(() => undefined),
-            },
-            fusion: {
-                getFusionIdentity: vi.fn((id: string) =>
-                    id === 'id-new' ? { iscAccountId: 'isc-from-fusion' } : undefined
-                ),
-            },
-            forms: {
-                finishedFusionDecisions: [
-                    {
-                        sourceType: SourceType.Authoritative,
-                        account: {
-                            id: 'source-1::native-1',
-                            name: 'H. Unknown',
-                            sourceName: 'Umbrella Corporation',
-                            sourceId: 'source-1',
-                            nativeIdentity: 'native-1',
-                        },
-                        submitter: { id: 'rev-1', name: 'Reviewer One' },
-                        identityId: 'id-new',
-                        newIdentity: true,
-                    },
-                ],
-            },
-        })
-
-        const decisions = service.buildFusionReviewDecisions()
-        expect(decisions[0].accountUrl).toBeDefined()
-        expect(decisions[0].accountUrl).toContain('/human-accounts/isc-from-fusion')
-    })
-
-    it('resolves accountUrl from fusion account map when decision has no identityId', () => {
-        // Production behavior: "Created new identity" decisions may not have identityId
-        // populated on the decision object, so the FusionAccount must be found by its
-        // composite managed key in fusionAccountMap.
-        const { service } = createService({
-            sources: {
-                resolveIscAccountIdForManagedKey: vi.fn(() => undefined),
-            },
-            fusion: {
-                getFusionAccountByManagedKey: vi.fn((key: string) =>
-                    key === 'source-1::native-1' ? { iscAccountId: 'isc-from-fusion-map' } : undefined
-                ),
-            },
-            forms: {
-                finishedFusionDecisions: [
-                    {
-                        sourceType: SourceType.Authoritative,
-                        account: {
-                            id: 'source-1::native-1',
-                            name: 'H. Unknown',
-                            sourceName: 'Umbrella Corporation',
-                            sourceId: 'source-1',
-                            nativeIdentity: 'native-1',
-                        },
-                        submitter: { id: 'rev-1', name: 'Reviewer One' },
-                        newIdentity: true,
-                    },
-                ],
-            },
-        })
-
-        const decisions = service.buildFusionReviewDecisions()
-        expect(decisions[0].accountUrl).toBeDefined()
-        expect(decisions[0].accountUrl).toContain('/human-accounts/isc-from-fusion-map')
-    })
-
-    it('resolves accountUrl by scanning fusionIdentities when account is in identity map without identityId', () => {
-        // Production behavior: a "Created new identity" decision may result in a
-        // FusionAccount stored in fusionIdentityMap (if identityId was set during
-        // processing) even though the decision object itself has no identityId.
-        // The code must scan identity accounts by nativeIdentity to find iscAccountId.
-        const identityAccounts = [{ managedKey: 'source-1::native-1', iscAccountId: 'isc-from-identity-scan' }]
-        const { service } = createService({
-            sources: {
-                resolveIscAccountIdForManagedKey: vi.fn(() => undefined),
-            },
-            fusion: {
-                getFusionAccountByManagedKey: vi.fn(() => undefined),
-                get fusionIdentities() {
-                    return identityAccounts
-                },
-            },
-            forms: {
-                finishedFusionDecisions: [
-                    {
-                        sourceType: SourceType.Authoritative,
-                        account: {
-                            id: 'source-1::native-1',
-                            name: 'H. Unknown',
-                            sourceName: 'Umbrella Corporation',
-                            sourceId: 'source-1',
-                            nativeIdentity: 'native-1',
-                        },
-                        submitter: { id: 'rev-1', name: 'Reviewer One' },
-                        newIdentity: true,
-                    },
-                ],
-            },
-        })
-
-        const decisions = service.buildFusionReviewDecisions()
-        expect(decisions[0].accountUrl).toBeDefined()
-        expect(decisions[0].accountUrl).toContain('/human-accounts/isc-from-identity-scan')
-    })
-
-    it('falls back to composite key for accountUrl when no separate ISC id is available', () => {
-        // Regression: when the managed account has no ISC id (record/orphan sources, or
-        // accounts whose `id` equals the composite key), the link must still be present
-        // using the composite key as the URL segment so reviewers can navigate to the
-        // human-accounts page.
-        const managedAccountsAllById = new Map<string, any>([
-            [
-                'source-1::native-1',
-                { id: 'source-1::native-1', name: 'John Smith', sourceId: 'source-1', nativeIdentity: 'native-1' },
-            ],
-        ])
-        const { service } = createService({
-            sources: {
-                managedAccountsAllById,
-                resolveIscAccountIdForManagedKey: vi.fn(() => undefined),
-            },
-            forms: {
-                finishedFusionDecisions: [
-                    {
-                        sourceType: SourceType.Authoritative,
-                        account: {
-                            id: 'source-1::native-1',
-                            name: 'source-1::native-1',
-                            sourceName: 'HR',
-                            sourceId: 'source-1',
-                            nativeIdentity: 'native-1',
-                        },
-                        submitter: { id: 'rev-1', name: 'Reviewer One' },
-                        identityId: 'id-new',
-                        newIdentity: true,
-                    },
-                ],
-            },
-        })
-
-        const decisions = service.buildFusionReviewDecisions()
-        expect(decisions[0].accountUrl).toBeDefined()
-        expect(decisions[0].accountUrl).toContain('/human-accounts/')
-    })
-
-    it('falls back to composite key only when no managed account name is available', () => {
-        const { service } = createService({
-            forms: {
-                finishedFusionDecisions: [
-                    {
-                        sourceType: SourceType.Authoritative,
-                        account: { id: 'source-x::native-x', name: '', sourceName: 'HR' },
-                        submitter: { id: 'rev-1', name: 'Reviewer One' },
-                        identityId: 'id-1',
-                        newIdentity: true,
-                    },
-                ],
-            },
-        })
-
-        const decisions = service.buildFusionReviewDecisions()
-        expect(decisions[0].accountName).toBe('source-x::native-x')
-    })
-
-    it('does not use raw identityId as selectedIdentityName fallback', () => {
-        const { service } = createService({
-            identities: {
-                getIdentityById: vi.fn(() => undefined),
-            },
-            forms: {
-                finishedFusionDecisions: [
-                    {
-                        sourceType: SourceType.Authoritative,
-                        account: { id: 'acc-1', name: 'Account 1', sourceName: 'source-a' },
-                        submitter: { id: 'rev-1', name: 'Reviewer' },
-                        identityId: 'id-1',
-                        newIdentity: false,
-                    },
-                ],
-            },
-        })
-
-        const decisions = service.buildFusionReviewDecisions()
-        expect(decisions[0].selectedIdentityName).toBeUndefined()
-        expect(decisions[0].selectedIdentityId).toBe('id-1')
-    })
-
-    it('builds report stats from decisions and aggregation inputs', () => {
-        const { service } = createService({
-            forms: {
-                finishedFusionDecisions: [
-                    { sourceType: SourceType.Authoritative, newIdentity: true, automaticAssignment: false },
-                    { sourceType: SourceType.Record, newIdentity: true, automaticAssignment: true },
-                    { sourceType: SourceType.Orphan, newIdentity: false, automaticAssignment: false },
-                ],
-            },
-        })
-
-        const stats = service.buildFusionReportStats({
-            identitiesFound: 21,
-            managedAccountsFound: 34,
-            totalProcessingTime: '10s',
-        })
-
-        expect(stats.fusionReviewDecisionsAuthoritative).toBe(1)
-        expect(stats.fusionReviewDecisionsRecord).toBe(1)
-        expect(stats.fusionReviewDecisionsOrphan).toBe(1)
-        expect(stats.fusionReviewNoMatchesRecord).toBe(1)
-        expect(stats.identitiesFound).toBe(21)
-        expect(stats.managedAccountsFound).toBe(34)
-    })
-
-    it('delegates dry-run report delivery to messaging service without sender prefetch', async () => {
+    it('delegates dry-run report delivery to email service directly', async () => {
         const { service, deps } = createService()
-        const report = {
-            accounts: [{ matches: [{ identityName: 'Name', isMatch: true }] }],
-            totalAccounts: 1,
-            matches: 1,
-            fusionReviewDecisions: [],
-        } as any
-        const finalDryRunStats = {
+
+        const report: any = {
+            accounts: [],
+            matches: 0,
+            totalAccounts: 0,
+        }
+
+        const finalDryRunStats: any = {
+            totalFusionAccounts: 1,
+            fusionAccountsFound: 1,
+            fusionReviewsCreated: 0,
+            fusionReviewAssignments: 0,
+            fusionReviewsFound: 0,
+            fusionReviewInstancesFound: 0,
+            fusionReviewsProcessed: 0,
+            fusionReviewNewIdentities: 0,
+            fusionReviewNonMatches: 0,
+            fusionReviewDecisionsAuthoritative: 0,
+            fusionReviewDecisionsRecord: 0,
+            fusionReviewDecisionsOrphan: 0,
+            fusionReviewNewIdentitiesAuthoritative: 0,
+            fusionReviewNoMatchesRecord: 0,
+            fusionReviewNoMatchesOrphan: 0,
+            aggregationWarnings: 0,
+            aggregationErrors: 0,
+            warningSamples: [],
+            errorSamples: [],
+            usedMemory: '10 MB',
             identitiesFound: 1,
             managedAccountsFound: 1,
             totalProcessingTime: '1s',
             phaseTiming: [],
-        } as any
+        }
 
         service.setDryRunRuntimeOptions({ sendReportTo: ['reviewer@example.com'] })
         await service.writeAndSendDryRunReport({
@@ -424,7 +307,6 @@ describe('ReportService', () => {
             finalDryRunStats,
         })
 
-        expect(deps.messaging.deliverReportToRecipients).toHaveBeenCalledTimes(1)
-        expect(deps.messaging.fetchSender).not.toHaveBeenCalled()
+        expect(deps.email.sendEmail).toHaveBeenCalledTimes(1)
     })
 })

@@ -161,7 +161,7 @@ describe('accountList setup phase', () => {
             optimizedAggregation: false,
         }
         const { registry, sources } = createMockRegistry([delayedSource])
-        const messaging = registry.messaging
+        const workflows = registry.workflows
         const input = { schema: { attributes: [] } } as any
 
         sources.managedSources = [
@@ -186,8 +186,8 @@ describe('accountList setup phase', () => {
 
         await accountList(registry, input)
 
-        expect(messaging.fetchDelayedAggregationSender).toHaveBeenCalledTimes(1)
-        expect(messaging.scheduleDelayedAggregation).toHaveBeenCalledWith({
+        expect(workflows.fetchDelayedAggregationSender).toHaveBeenCalledTimes(1)
+        expect(workflows.scheduleDelayedAggregation).toHaveBeenCalledWith({
             sourceId: 'source-1',
             delayMinutes: 7,
             disableOptimization: true,

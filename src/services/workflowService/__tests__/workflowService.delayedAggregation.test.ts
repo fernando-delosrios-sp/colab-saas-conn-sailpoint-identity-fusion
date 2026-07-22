@@ -1,6 +1,6 @@
-import { MessagingService } from '../messagingService'
+import { WorkflowService } from '../workflowService'
 
-const createMessagingService = (accessToken: any) => {
+const createWorkflowService = (accessToken: any) => {
     const workflowsApi = {
         listWorkflows: vi.fn().mockResolvedValue({
             data: [
@@ -43,13 +43,13 @@ const createMessagingService = (accessToken: any) => {
         fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
     } as any
 
-    const service = new MessagingService(config, log, client, sources)
+    const service = new WorkflowService(config, log, client, sources)
     return { service, workflowsApi, client }
 }
 
-describe('MessagingService delayed aggregation workflow', () => {
+describe('WorkflowService delayed aggregation workflow', () => {
     it('builds delayed aggregation workflow payload with delay/source/disableOptimization/token fields', async () => {
-        const { service, workflowsApi } = createMessagingService('token-123')
+        const { service, workflowsApi } = createWorkflowService('token-123')
 
         await service.scheduleDelayedAggregation({
             sourceId: 'source-abc',
@@ -73,7 +73,7 @@ describe('MessagingService delayed aggregation workflow', () => {
 
     it('resolves access token from function provider', async () => {
         const tokenProvider = vi.fn(async () => 'token-from-provider')
-        const { service, workflowsApi } = createMessagingService(tokenProvider)
+        const { service, workflowsApi } = createWorkflowService(tokenProvider)
 
         await service.scheduleDelayedAggregation({
             sourceId: 'source-xyz',

@@ -175,7 +175,7 @@ function countManagedAccountsByType(sources: ServiceRegistry['sources']): {
 
 /** Phase 2: Fetch all data in parallel. */
 export async function fetchPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<FetchResult> {
-    const { log, identities, sources, forms, fusion, messaging } = serviceRegistry
+    const { log, identities, sources, forms, fusion, workflows } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
     const ownerIncluded = fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer
 
@@ -191,7 +191,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
     ]
 
     if (sources.delayedAggregationSources?.length) {
-        fetchTasks.push(messaging.fetchDelayedAggregationSender())
+        fetchTasks.push(workflows.fetchDelayedAggregationSender())
     }
 
     const fetchAllOp = log.track('fetchPhase.parallelFetch')
@@ -338,9 +338,9 @@ async function savePersistentState(
 
 async function scheduleDelayedAggregations(
     sources: ServiceRegistry['sources'],
-    messaging: ServiceRegistry['messaging']
+    workflows: ServiceRegistry['workflows']
 ): Promise<void> {
-    await sources.aggregateDelayedSources((params) => messaging.scheduleDelayedAggregation(params))
+    await sources.aggregateDelayedSources((params) => workflows.scheduleDelayedAggregation(params))
 }
 
 async function completeFormCleanup(forms: ServiceRegistry['forms']): Promise<void> {
@@ -353,7 +353,7 @@ async function finalizeFormOperations(forms: ServiceRegistry['forms']): Promise<
 
 /** Phase 5: Cleanup, send accounts to platform, save state. Only mostly used by accountList. */
 export async function outputPhase(serviceRegistry: ServiceRegistry, options: CorePipelineOptions): Promise<number> {
-    const { log, fusion, forms, sources, definition, messaging, res } = serviceRegistry
+    const { log, fusion, forms, sources, definition, workflows, res } = serviceRegistry
     const isPersistent = options.mode.kind === 'aggregation'
 
     if (!sources.run.isRecordMode) {
@@ -390,7 +390,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     saveStateOp.done()
 
     const scheduleAggregationOp = log.track('outputPhase.scheduleDelayedAggregations')
-    await scheduleDelayedAggregations(sources, messaging)
+    await scheduleDelayedAggregations(sources, workflows)
     scheduleAggregationOp.done()
 
     await finalizeFormOperations(forms)
