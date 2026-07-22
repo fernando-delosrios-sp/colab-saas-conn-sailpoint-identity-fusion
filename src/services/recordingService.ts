@@ -34,7 +34,8 @@ export class RecordingService {
         private readonly log: LogService,
         private readonly config: FusionConfig
     ) {
-        this.chainName = process.env.RECORD_CHAIN_NAME ?? `recording-${Date.now()}`
+        const recConfig = config.recording
+        this.chainName = recConfig?.chainName ?? `recording-${Date.now()}`
         this.recordingDir = path.resolve('test-data', 'recordings', this.chainName)
         this.log.info(`RecordingService initialized — chain "${this.chainName}"`)
 
@@ -127,7 +128,7 @@ export class RecordingService {
         }
 
         this.log.debug(`Recording step ${this.stepIndex}: ${operation}`)
-        if (process.env.VERBOSE_RECORDING === 'true') {
+        if (this.config.recording?.verbose === true) {
             const sweepInfo = this.currentStep.sweep ? ` (sweep ${this.currentStep.sweep})` : ''
             console.log(`[Recording] → ${operation}${sweepInfo} started`)
         }
@@ -144,7 +145,7 @@ export class RecordingService {
         this.log.debug(
             `Recorded step ${this.currentStep.stepId} — ${this.currentStep.output.length} output(s), ${this.currentStep.duration}ms`
         )
-        if (process.env.VERBOSE_RECORDING === 'true') {
+        if (this.config.recording?.verbose === true) {
             const sweepInfo = this.currentStep.sweep ? ` (sweep ${this.currentStep.sweep})` : ''
             console.log(`[Recording] ← ${this.currentStep.operation}${sweepInfo} completed — ${this.currentStep.duration}ms, ${this.currentStep.output.length} outputs`)
         }

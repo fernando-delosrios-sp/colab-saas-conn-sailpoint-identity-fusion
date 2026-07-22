@@ -38,6 +38,8 @@ rl.question('Enter chain name: ', (chainName) => {
     const child = spawn('npx', ['spcx', 'run', 'dist/index.js'], {
         env: {
             ...process.env,
+            // Deprecated: these env vars are kept for backward compat.
+            // Prefer setting FusionConfig.recording.{mode,chainName,verbose} via readConfig bridge.
             RECORD_MODE: 'true',
             RECORD_CHAIN_NAME: safeName,
             VERBOSE_RECORDING: 'true',
