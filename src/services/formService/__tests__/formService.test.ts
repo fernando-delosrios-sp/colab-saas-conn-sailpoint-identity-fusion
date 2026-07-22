@@ -65,11 +65,21 @@ describe('FormService stale-form cleanup queue', () => {
         const now = Date.now()
         const staleDate = new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString()
         const freshDate = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString()
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({
+            data: {
+                results: [
+                    { id: 'form-stale', name: 'Fusion stale', created: staleDate },
+                    { id: 'form-fresh', name: 'Fusion fresh', created: freshDate },
+                ],
+            },
+        })
+
         const searchFormInstancesByTenant = vi.fn().mockResolvedValue({ data: [] })
-        const deleteFormDefinition = vi.fn().mockResolvedValue(undefined)
+        const deleteFormDefinition = vi.fn().mockResolvedValue({})
 
         const customFormsMock = {
             searchFormInstancesByTenant,
+            searchFormDefinitionsByTenant,
             deleteFormDefinition,
         }
 
@@ -81,11 +91,14 @@ describe('FormService stale-form cleanup queue', () => {
             { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
             {
                 customFormsApi: customFormsMock,
-                call: async (fn: (api: any) => Promise<any>) => fn({ customForms: customFormsMock }),
-                paginate: vi.fn().mockResolvedValue([
-                    { id: 'form-stale', name: 'Fusion stale', created: staleDate },
-                    { id: 'form-fresh', name: 'Fusion fresh', created: freshDate },
-                ]),
+                call: async (fn: (api: any, ...args: any[]) => Promise<any>) => {
+                    const result = await fn({ customForms: customFormsMock })
+                    if (result && typeof result === 'object' && 'data' in result && Array.isArray(result.data)) {
+                        return result.data
+                    }
+                    return result
+                },
+                execute: async (fn: () => Promise<any>) => fn(),
             } as any,
             {} as any
         )

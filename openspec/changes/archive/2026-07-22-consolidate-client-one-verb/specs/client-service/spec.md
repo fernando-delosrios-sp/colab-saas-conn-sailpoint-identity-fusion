@@ -47,9 +47,28 @@ All pagination modes (sequential, parallel, searchAfter) MUST throw a `Paginatio
 
 The 13 SDK API instances (`accountsApi`, `identitiesApi`, `searchApi`, `sourcesApi`, `customFormsApi`, `workflowsApi`, `entitlementsApi`, `transformsApi`, `governanceGroupsApi`, `taskManagementApi`, `identityProfilesApi`, `identityAttributesApi`, and `config`) MUST be private members of `ClientService`. No external caller may obtain a reference to a raw SDK API instance.
 
+A public `accessToken` getter is provided for services that need to resolve API bearer tokens (previously accessed via `client.config.accessToken`).
+
 #### Scenario: External code cannot access raw SDK APIs
 
 - **GIVEN** a service has a reference to `ClientService`
 - **WHEN** the service attempts to access `client.accountsApi`
 - **THEN** TypeScript emits a compile error (property is private)
 - **AND** the only way to invoke an API call is through `client.call()`
+
+#### Scenario: Services can resolve API tokens without accessing raw config
+
+- **GIVEN** a service needs an API access token
+- **WHEN** the service accesses `client.accessToken`
+- **THEN** the access token value (string, function, or promise) is returned
+- **AND** no raw `Configuration` object is exposed
+
+## Known Exceptions
+
+### `paginateSearchApiGenerator()` remains public
+
+The `call()` method does not support a generator-based searchAfter overload. `identityService.fetchIdentitiesGenerator()` relies on this method for streaming identity pagination via `yield*`. Adding generator support to `call()` requires a new overload and a `_paginateSearchAfterGenerator` helper — deferred to a future iteration.
+
+### `createRetriesConfig()` retained in helpers.ts
+
+This function is used by `sdkApiAdapter.ts` to set `retriesConfig.retries = 0` at the axios SDK level. This disables axios-level retry so the `ApiQueue` is the sole retry authority, preventing double-retry. It is not dead code.

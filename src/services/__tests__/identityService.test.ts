@@ -8,6 +8,17 @@ import { IdentityService } from '../identityService'
 import type { Mock } from 'vitest'
 
 type ClientServiceStub = Pick<ClientService, 'call' | 'paginateSearchApiGenerator'>
+type SourceServiceStub = Pick<SourceService, 'resolveIscAccountIdForManagedKey'>
+
+function makeIdentity(id: string, overrides: Partial<IdentityDocument> = {}): IdentityDocument {
+    return {
+        id,
+        name: id,
+        attributes: {},
+        accounts: [],
+        ...overrides,
+    } as unknown as IdentityDocument
+}
 
 function makeClient(searchResultsByQuery: Record<string, IdentityDocument[]> = {}): ClientServiceStub {
     return {
@@ -164,11 +175,13 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
             },
         })
         ;(client.call as Mock).mockImplementation(
-            async (search: any, _priority: any, context: any) => {
+            async (_fn: any, policy: any) => {
+                const context = policy?.context ?? ''
+                const queryStr = policy?.paginate?.search?.query?.query ?? ''
                 if (context === 'IdentityService>fetchIdentityById searchPost' || context === 'IdentityService>hydrateMissingIdentitiesById searchPost') {
                     return [owner]
                 }
-                return search?.query?.query === 'source.name:Employees' ? [scoped] : []
+                return queryStr === 'source.name:Employees' ? [scoped] : []
             }
         )
 
@@ -183,6 +196,7 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
         const { service, client } = makeService()
         ;(client.call as Mock).mockImplementation(
             async (_fn: any, policy: any) => {
+                const context = policy?.context ?? ''
                 if (context === 'IdentityService>fetchIdentityById searchPost' || context === 'IdentityService>hydrateMissingIdentitiesById searchPost') {
                     return [owner]
                 }

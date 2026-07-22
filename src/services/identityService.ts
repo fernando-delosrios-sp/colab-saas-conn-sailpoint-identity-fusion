@@ -336,7 +336,10 @@ export class IdentityService {
             requestBody: [{ op: 'replace', path: '/identityId', value: identityId }],
         }
 
-        return this.executeUpdateAccount(requestParameters, `IdentityService>correlateAccounts ${accountId}`)
+        return this.client.call(
+            (api: any) => api.accounts.updateAccount(requestParameters).then((r: any) => r.data),
+            { priority: QueuePriority.LOW, context: `IdentityService>correlateAccounts ${accountId}` }
+        )
             .then(() => {
                 this.log.debug(
                     `Successfully correlated managed key ${accountId} (ISC id ${iscAccountId}) to identity ${identityId}`
@@ -392,26 +395,13 @@ export class IdentityService {
         this.identityIdsInScope.clear()
     }
 
-    public async executeUpdateAccount(requestParameters: AccountsApiUpdateAccountRequest, context: string) {
-        return this.client.call(
-            (api: any) => api.accounts.updateAccount(requestParameters).then((r: any) => r.data),
-            { priority: QueuePriority.LOW, context }
-        )
-    }
-
-    public async executeListIdentityAttributes(context: string) {
-        return this.client.call(
-            (api: any) => api.identityAttributes.listIdentityAttributes().then((r: any) => r.data ?? []),
-            { priority: QueuePriority.HIGH, context }
-        )
-    }
-
     /**
      * Fetches and converts identity attributes into SchemaAttributes.
      */
     public async fetchIdentitySchemaAttributes(): Promise<any[]> {
-        const identityAttrs = (await this.executeListIdentityAttributes(
-            'IdentityService>fetchIdentitySchemaAttributes'
+        const identityAttrs = (await this.client.call(
+            (api: any) => api.identityAttributes.listIdentityAttributes().then((r: any) => r.data ?? []),
+            { priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentitySchemaAttributes' }
         ) as any[]) ?? []
 
         const allowedTypes = ['string', 'boolean', 'int', 'long']

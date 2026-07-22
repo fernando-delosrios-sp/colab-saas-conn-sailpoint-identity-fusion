@@ -668,10 +668,13 @@ export class FormService {
         return this.fusionAssignmentDecisionMap.get(identityId)
     }
 
-    public async executeSearchFormInstances(
-        requestParameters: CustomFormsV2025ApiSearchFormInstancesByTenantRequest,
-        formDefinitionId?: string
-    ): Promise<FormInstanceResponseV2025[]> {
+    /**
+     * Fetch form instances by definition ID
+     */
+    public async fetchFormInstancesByDefinitionId(formDefinitionId?: string): Promise<FormInstanceResponseV2025[]> {
+        const requestParameters: CustomFormsV2025ApiSearchFormInstancesByTenantRequest = {
+            filters: `formDefinitionId eq "${formDefinitionId}"`,
+        }
         const allInstances = await this.client.call<FormInstanceResponseV2025[]>(
             (api: any) => api.customForms.searchFormInstancesByTenant(requestParameters).then((r: any) => r.data ?? []),
             { context: `FormService>searchFormInstancesByTenant formDef=${formDefinitionId ?? 'all'}` }
@@ -698,26 +701,6 @@ export class FormService {
     }
 
     /**
-     * Fetch form instances by definition ID
-     */
-    public async fetchFormInstancesByDefinitionId(formDefinitionId?: string): Promise<FormInstanceResponseV2025[]> {
-        const requestParameters: CustomFormsV2025ApiSearchFormInstancesByTenantRequest = {
-            filters: `formDefinitionId eq "${formDefinitionId}"`,
-        }
-        return await this.executeSearchFormInstances(requestParameters, formDefinitionId)
-    }
-
-    public async executePatchFormInstance(
-        requestParameters: CustomFormsV2025ApiPatchFormInstanceRequest,
-        context: string
-    ): Promise<FormInstanceResponseV2025 | undefined> {
-        return this.client.call<FormInstanceResponseV2025>(
-            (api: any) => api.customForms.patchFormInstance(requestParameters).then((r: any) => r.data),
-            { context }
-        )
-    }
-
-    /**
      * Set form instance state
      */
     public async setFormInstanceState(
@@ -737,9 +720,9 @@ export class FormService {
             body,
         }
 
-        return await this.executePatchFormInstance(
-            requestParameters,
-            `FormService>setFormInstanceState id=${formInstanceID} state=${state}`
+        return await this.client.call<FormInstanceResponseV2025>(
+            (api: any) => api.customForms.patchFormInstance(requestParameters).then((r: any) => r.data),
+            { context: `FormService>setFormInstanceState id=${formInstanceID} state=${state}` }
         )
     }
 
@@ -1284,16 +1267,6 @@ export class FormService {
     // Form API Operations
     // ------------------------------------------------------------------------
 
-    public async executeSearchFormDefinitions(
-        params: CustomFormsV2025ApiSearchFormDefinitionsByTenantRequest,
-        context: string
-    ) {
-        return this.client.call<{ data: FormDefinitionResponseV2025[] }>(
-            (api: any) => api.customForms.searchFormDefinitionsByTenant(params).then((r: any) => ({ data: r.data?.results ?? [] })),
-            { context }
-        )
-    }
-
     /**
      * Fetch forms by name pattern
      */
@@ -1341,32 +1314,6 @@ export class FormService {
         return form
     }
 
-    public async executeCreateFormDefinition(
-        form: CustomFormsV2025ApiCreateFormDefinitionRequest,
-        context: string
-    ): Promise<FormDefinitionResponseV2025 | undefined> {
-        return this.client.call<FormDefinitionResponseV2025>(
-            async (api: any) => {
-                try {
-                    this.log.debug(`Calling customFormsApi.createFormDefinition...`)
-                    const response = await api.customForms.createFormDefinition(form)
-                    this.log.debug(`API call completed, processing response...`)
-                    return response.data
-                } catch (error: any) {
-                    this.log.error(`Error creating form definition: ${error}`)
-                    if (error?.response?.data) {
-                        this.log.error(`API error response: ${JSON.stringify(error.response.data)}`)
-                    }
-                    if (error instanceof Error) {
-                        this.log.error(`Error message: ${error.message}`)
-                    }
-                    throw error
-                }
-            },
-            { context }
-        )
-    }
-
     /**
      * Create a form definition
      */
@@ -1384,9 +1331,25 @@ export class FormService {
         )
 
         this.log.debug(`Executing form creation through client...`)
-        const formInstance = await this.executeCreateFormDefinition(
-            form,
-            `FormService>createFormDefinition name=${form.body.name}`
+        const formInstance = await this.client.call<FormDefinitionResponseV2025>(
+            async (api: any) => {
+                try {
+                    this.log.debug(`Calling customFormsApi.createFormDefinition...`)
+                    const response = await api.customForms.createFormDefinition(form)
+                    this.log.debug(`API call completed, processing response...`)
+                    return response.data
+                } catch (error: any) {
+                    this.log.error(`Error creating form definition: ${error}`)
+                    if (error?.response?.data) {
+                        this.log.error(`API error response: ${JSON.stringify(error.response.data)}`)
+                    }
+                    if (error instanceof Error) {
+                        this.log.error(`Error message: ${error.message}`)
+                    }
+                    throw error
+                }
+            },
+            { context: `FormService>createFormDefinition name=${form.body.name}` }
         )
         assert(formInstance, 'Failed to create form definition')
         assert(formInstance.id, 'Form definition ID is missing')
@@ -1394,16 +1357,6 @@ export class FormService {
         this.log.debug(`Form definition created successfully: ${formInstance.id}`)
         this.run.formsCreated++
         return formInstance
-    }
-
-    public async executeCreateFormInstance(
-        requestParameters: CustomFormsV2025ApiCreateFormInstanceRequest,
-        context: string
-    ): Promise<FormInstanceResponseV2025 | undefined> {
-        return this.client.call<FormInstanceResponseV2025>(
-            (api: any) => api.customForms.createFormInstance(requestParameters).then((r: any) => r.data),
-            { context }
-        )
     }
 
     /**
@@ -1446,21 +1399,14 @@ export class FormService {
             body,
         }
 
-        const response = await this.executeCreateFormInstance(
-            requestParameters,
-            `FormService>createFormInstance formDef=${formDefinitionId}`
+        const response = await this.client.call<FormInstanceResponseV2025>(
+            (api: any) => api.customForms.createFormInstance(requestParameters).then((r: any) => r.data),
+            { context: `FormService>createFormInstance formDef=${formDefinitionId}` }
         )
         assert(response, 'Failed to create form instance')
         this.log.debug(`Form instance created successfully: ${response.id || 'unknown'}`)
         this.run.formInstancesCreated++
         return response
-    }
-
-    public async executeDeleteFormDefinition(formDefinitionID: string, context: string): Promise<void> {
-        await this.client.call<void>(
-            (api: any) => api.customForms.deleteFormDefinition({ formDefinitionID }),
-            { context }
-        )
     }
 
     /**
@@ -1471,9 +1417,9 @@ export class FormService {
         assert(this.client, 'Client service is required')
 
         this.log.debug(`Deleting form definition: ${formDefinitionId}`)
-        await this.executeDeleteFormDefinition(
-            formDefinitionId,
-            `FormService>deleteForm id=${formDefinitionId}`
+        await this.client.call<void>(
+            (api: any) => api.customForms.deleteFormDefinition({ formDefinitionID: formDefinitionId }),
+            { context: `FormService>deleteForm id=${formDefinitionId}` }
         )
         this.log.debug(`Form definition deleted successfully: ${formDefinitionId}`)
     }

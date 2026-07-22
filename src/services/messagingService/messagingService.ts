@@ -618,7 +618,10 @@ export class MessagingService {
             return
         }
         const workflowId = this.workflow.id
-        const full = await this.executeGetWorkflow(workflowId)
+        const full = await this.client.call<any>(
+            (api: any) => api.workflows.getWorkflow({ id: workflowId }),
+            { context: `MessagingService>getWorkflow id=${workflowId}` }
+        )
         if (full !== undefined && full !== null) {
             const workflowData = (full as any).data || full
             this.emailSenderWorkflowDefinitionBytes = Buffer.byteLength(JSON.stringify(workflowData), 'utf8')
@@ -729,20 +732,6 @@ export class MessagingService {
         return Array.from(emails)
     }
 
-    public async executePatchCall(
-            patchFnAny: any,
-            requestParameters: any,
-            context: string
-    ) {
-        return this.client.call<any>(
-            async (api: any) => {
-                const resp = await (api.workflows as any).patchWorkflow(requestParameters)
-                return (resp as any)?.data ?? resp
-            },
-            { context }
-        )
-    }
-
     /**
      * Disable workflow when enabled to allow testWorkflow execution.
      */
@@ -752,22 +741,17 @@ export class MessagingService {
             if (enabled === false) return
             if (!workflow.id) return
 
-            const { workflowsApi } = this.client
-            const patchFnAny: any = (workflowsApi as any)?.patchWorkflow
-            if (typeof patchFnAny !== 'function') {
-                this.log.debug(`patchWorkflow not available in SDK; cannot disable workflow ${workflow.id}`)
-                return
-            }
-
             const requestParameters: any = {
                 id: workflow.id,
                 jsonPatchOperationV2025: [{ op: 'replace', path: '/enabled', value: false }],
             }
 
-            await this.executePatchCall(
-                patchFnAny,
-                requestParameters,
-                `MessagingService>disableWorkflow id=${workflow.id}`
+            await this.client.call<any>(
+                async (api: any) => {
+                    const resp = await (api.workflows as any).patchWorkflow(requestParameters)
+                    return (resp as any)?.data ?? resp
+                },
+                { context: `MessagingService>disableWorkflow id=${workflow.id}` }
             )
             this.log.info(`Disabled workflow ${workflow.id} to allow test execution`)
         } catch (e) {
@@ -780,7 +764,7 @@ export class MessagingService {
      * Resolve the current bearer token used by the API client.
      */
     private async resolveAccessToken(): Promise<string> {
-        const accessToken = this.client.config.accessToken
+        const accessToken = this.client.accessToken
         assert(accessToken, 'Client access token provider is required')
 
         const normalize = (value: unknown): string => {
@@ -805,13 +789,6 @@ export class MessagingService {
     // Workflow API Operations
     // ------------------------------------------------------------------------
 
-    public async executeListWorkflows(context: string) {
-        return this.client.call<{ data: WorkflowV2025[] }>(
-            (api: any) => api.workflows.listWorkflows().then((r: any) => ({ data: r.data || [] })),
-            { context }
-        )
-    }
-
     /**
      * Find a workflow by name
      */
@@ -821,20 +798,16 @@ export class MessagingService {
 
         this.log.debug(`Searching for existing workflow: ${workflowName}`)
 
-        const workflows = await this.executeListWorkflows('MessagingService>findWorkflowByName listWorkflows')
+        const workflows = await this.client.call<{ data: WorkflowV2025[] }>(
+            (api: any) => api.workflows.listWorkflows().then((r: any) => ({ data: r.data || [] })),
+            { context: 'MessagingService>findWorkflowByName listWorkflows' }
+        )
 
         assert(workflows, `Failed to list workflows: ${workflowName}`)
 
         const workflow = workflows.data.find((w) => w.name === workflowName)
 
         return workflow
-    }
-
-    public async executeCreateWorkflow(createWorkflowRequestV2025: CreateWorkflowRequestV2025, context: string) {
-        return this.client.call<WorkflowV2025>(
-            (api: any) => api.workflows.createWorkflow({ createWorkflowRequestV2025 }).then((r: any) => r.data),
-            { context }
-        )
     }
 
     /**
@@ -845,28 +818,14 @@ export class MessagingService {
         assert(this.client, 'Client service is required')
 
         this.log.debug('Creating email workflow')
-        const workflowData = await this.executeCreateWorkflow(
-            createWorkflowRequestV2025,
-            `MessagingService>createWorkflow name=${createWorkflowRequestV2025.name}`
+        const workflowData = await this.client.call<WorkflowV2025>(
+            (api: any) => api.workflows.createWorkflow({ createWorkflowRequestV2025 }).then((r: any) => r.data),
+            { context: `MessagingService>createWorkflow name=${createWorkflowRequestV2025.name}` }
         )
         assert(workflowData, 'Failed to create workflow')
         assert(workflowData.id, 'Workflow ID is required')
 
         return workflowData
-    }
-
-    public async executeGetWorkflow(workflowId: string) {
-        return this.client.call<any>(
-            (api: any) => api.workflows.getWorkflow({ id: workflowId }),
-            { context: `MessagingService>getWorkflow id=${workflowId}` }
-        )
-    }
-
-    public async executeTestWorkflow(requestParameters: WorkflowsV2025ApiTestWorkflowRequest, context: string) {
-        return this.client.call<any>(
-            (api: any) => api.workflows.testWorkflow(requestParameters),
-            { context }
-        )
     }
 
     /**
@@ -879,9 +838,9 @@ export class MessagingService {
         assert(this.client, 'Client service is required')
 
         this.log.debug(`Executing workflow ${requestParameters.id}`)
-        const response = await this.executeTestWorkflow(
-            requestParameters,
-            `MessagingService>testWorkflow id=${requestParameters.id}`
+        const response = await this.client.call<any>(
+            (api: any) => api.workflows.testWorkflow(requestParameters),
+            { context: `MessagingService>testWorkflow id=${requestParameters.id}` }
         )
         assert(response, 'Workflow response is required')
         this.log.debug(`Workflow executed. Response code ${response.status}`)
