@@ -24,12 +24,14 @@ End result: for a managed account correlated to an identity whose `displayName` 
 ## Goals / Non-Goals
 
 **Goals**
+
 - For any managed account correlated to an identity, the Fusion display attribute value SHALL equal the **identity alias** (top-level `displayName` from the SDK's `IdentityDocument`).
 - Preserve the new ubiquitous-language separation: `state.name` (Fusion account name) stays internal, `identityAlias` is the authoritative value the display attribute consumes, `identityName` remains the human-friendly fallback label.
 - Hydration MUST be surgical: only correlated identities, not a widened global scope.
 - The hydrated identity-id filter strings SHALL stay below a safe query length.
 
 **Non-Goals**
+
 - No change to SDK/API query syntax.
 - No new schema field (no `fusionAliasAttribute`); the override keeps using `fusionDisplayAttribute`.
 - No change to the data flow for identity-origin Fusion accounts (already correct via `fromIdentity`).
@@ -86,17 +88,22 @@ End result: for a managed account correlated to an identity whose `displayName` 
 ### Correlated managed account path
 
 **Before (buggy)**
+
 ```
+
 managed source aggregation
   → FusionAccount built from managed account (state.name = account.name)
   → identityScopeQuery loaded, correlated identity NOT in scope
   → addIdentityLayer never called → identityInfo undefined
   → applyDisplayAttributeOverride writes identityName → undefined
   → display attribute keeps the persisted value (login or account name)
+
 ```
 
 **After (corrected)**
+
 ```
+
 managed source aggregation
   → FusionAccount built from managed account (state.name = account.name)
   → identityScopeQuery loaded (existing)
@@ -107,6 +114,7 @@ managed source aggregation
   → getISCAccount (lazy) → setCoreSchemaAttributes → applyDisplayAttributeOverride
       writes identityAlias (= identityInfo.displayName = top-level SDK displayName)
   → display attribute = authoritative identity alias
+
 ```
 
 ### Identity-origin Fusion account path (unchanged)
