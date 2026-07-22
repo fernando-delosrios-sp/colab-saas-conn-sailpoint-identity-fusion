@@ -13,6 +13,7 @@ import type { IdentityService } from './identityService'
 import type { LogService } from './logService'
 import type { MessagingService } from './messagingService'
 import type { SourceService } from './sourceService'
+import { FusionRun } from '../model/fusionRun'
 
 type DryRunRuntimeOptions = { writeToDisk?: boolean; sendReportTo?: string[] }
 
@@ -112,7 +113,8 @@ export class ReportService {
         private identities: IdentityService,
         private forms: FormService,
         private fusion: FusionService,
-        private messaging: MessagingService
+        private messaging: MessagingService,
+        private run: FusionRun
     ) {}
 
     /** Configure operation-scoped dry-run report output behavior. */
@@ -172,7 +174,7 @@ export class ReportService {
             reviewerId ? urlContext.identity(reviewerId) : undefined
         const resolveAccountName = (managedAccountKey?: string): string | undefined => {
             if (!managedAccountKey) return undefined
-            const managedAccount = this.sources.managedAccountsAllById.get(managedAccountKey)
+            const managedAccount = this.run.managedAccountsAllById.get(managedAccountKey)
             const name = trimStr(managedAccount?.name)
             return name && name !== managedAccountKey ? name : undefined
         }
@@ -180,7 +182,7 @@ export class ReportService {
             if (!managedAccountKey) return undefined
             const reportAccountId = this.sources.resolveIscAccountIdForManagedKey(managedAccountKey)
             if (reportAccountId) return urlContext.humanAccount(reportAccountId)
-            const managedAccount = this.sources.managedAccountsAllById.get(managedAccountKey)
+            const managedAccount = this.run.managedAccountsAllById.get(managedAccountKey)
             const directIscId = trimStr(managedAccount?.id)
             if (directIscId && directIscId !== managedAccountKey) {
                 return urlContext.humanAccount(directIscId)

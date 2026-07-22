@@ -18,10 +18,11 @@ import {
     scoreNameMatcherNormalized,
 } from './scoringHelpers'
 import { normalizeName as normalizeNameForMatcher } from './nameMatching'
-import { TrigramIndex, buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
+import { buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
 import { isExactAttributeMatchScores } from './exactMatch'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { LogService } from '../logService'
+import { FusionRun } from '../../model/fusionRun'
 
 import { missing, trimStr } from '../../utils/safeRead'
 
@@ -66,30 +67,11 @@ export class MatchingService {
     private readonly fusionScoreMap: Map<string, number>
 
     /**
-     * Per-account cache of LIG3-normalized attribute values.
-     * WeakMap keyed by FusionAccount so entries are GC'd when the account is released.
-     * Eliminates O(n×m) repeated normalization: each identity attribute is normalized once,
-     * each managed account attribute is normalized once — total O(n+m) normalizations.
-     */
-    private readonly normalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
-    private readonly nameNormalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
-
-    /**
-     * Trigram blocking index — built once per pipeline run over the full identity pool.
-     * Maps each mandatory attribute name to its inverted trigram index.
-     * Reduces O(n×m) identity comparisons to O(n×k) where k << m.
-     *
-     * Memory note: ~40 MB per indexed attribute for 50k identities with ~8-char average value length.
-     */
-    private trigramIndexByAttribute: Map<string, TrigramIndex> = new Map()
-    private indexedMandatoryAttributes: string[] = []
-    private trigramIndexBuilt = false
-
-    /**
      * @param config - Fusion configuration containing matching rules and score thresholds
      * @param log - Logger instance
+     * @param run - Per-run state container for trigram index and normalization caches
      */
-    constructor(config: FusionConfig, _log: LogService) {
+    constructor(config: FusionConfig, _log: LogService, private run?: FusionRun) {
         this.matchingConfigs = config.matchingConfigs ?? []
         this.fusionManualReviewScore = config.fusionManualReviewScore ?? 0
         this.fusionEnableAutoAssignment = config.fusionEnableAutoAssignment ?? false
@@ -124,10 +106,11 @@ export class MatchingService {
      * regardless of how many managed accounts are scored against it.
      */
     private getNormalized(account: FusionAccount, attrName: string, rawValue: string): string {
-        let byAttr = this.normalizedCache.get(account)
+        if (!this.run) return normalizeLIG3(rawValue)
+        let byAttr = this.run.normalizedCache.get(account)
         if (!byAttr) {
             byAttr = new Map()
-            this.normalizedCache.set(account, byAttr)
+            this.run.normalizedCache.set(account, byAttr)
         }
         let cached = byAttr.get(attrName)
         if (cached === undefined) {
@@ -139,10 +122,11 @@ export class MatchingService {
 
     /** Return the name-normalized form of `rawValue` for `account`, computing and caching on first access. */
     private getNameNormalized(account: FusionAccount, attrName: string, rawValue: string): string {
-        let byAttr = this.nameNormalizedCache.get(account)
+        if (!this.run) return normalizeNameForMatcher(rawValue)
+        let byAttr = this.run.nameNormalizedCache.get(account)
         if (!byAttr) {
             byAttr = new Map()
-            this.nameNormalizedCache.set(account, byAttr)
+            this.run.nameNormalizedCache.set(account, byAttr)
         }
         let cached = byAttr.get(attrName)
         if (cached === undefined) {
@@ -200,9 +184,10 @@ export class MatchingService {
      *   internally into an array so generators can be reused across multiple attribute sweeps)
      */
     public buildTrigramIndex(identities: Iterable<FusionAccount>): void {
-        this.trigramIndexByAttribute.clear()
-        this.indexedMandatoryAttributes = []
-        this.trigramIndexBuilt = false
+        if (!this.run) return
+        this.run.trigramIndexByAttribute.clear()
+        this.run.indexedMandatoryAttributes = []
+        this.run.trigramIndexBuilt = false
 
         const mandatoryConfigs = this.matchingConfigs.filter((c) => c.mandatory === true)
         if (mandatoryConfigs.length === 0) return
@@ -211,10 +196,10 @@ export class MatchingService {
         const identityArray = Array.from(identities)
         for (const config of mandatoryConfigs) {
             const idx = buildAttributeIndex(identityArray, config.attribute)
-            this.trigramIndexByAttribute.set(config.attribute, idx)
-            this.indexedMandatoryAttributes.push(config.attribute)
+            this.run.trigramIndexByAttribute.set(config.attribute, idx)
+            this.run.indexedMandatoryAttributes.push(config.attribute)
         }
-        this.trigramIndexBuilt = true
+        this.run.trigramIndexBuilt = true
     }
 
     /**
@@ -230,17 +215,17 @@ export class MatchingService {
      * @param excludeIds - Identity IDs to exclude from the candidate set (e.g. auto-assigned identities)
      */
     public getCandidates(account: FusionAccount, excludeIds?: ReadonlySet<string>): Set<FusionAccount> | undefined {
-        if (!this.trigramIndexBuilt || this.indexedMandatoryAttributes.length === 0) return undefined
+        if (!this.run || !this.run.trigramIndexBuilt || this.run.indexedMandatoryAttributes.length === 0) return undefined
 
         let resultSet: Set<FusionAccount> | undefined
 
-        for (const attrName of this.indexedMandatoryAttributes) {
+        for (const attrName of this.run.indexedMandatoryAttributes) {
             const raw = account.attributes[attrName]
             if (missing(raw)) {
                 // Account has no value for this mandatory attribute — cannot filter by it.
                 continue
             }
-            const idx = this.trigramIndexByAttribute.get(attrName)!
+            const idx = this.run.trigramIndexByAttribute.get(attrName)!
             const attrCandidates = queryAttributeIndex(idx, String(raw))
 
             if (resultSet === undefined) {

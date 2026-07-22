@@ -17,7 +17,6 @@ describe('ReportService', () => {
                 name ? { sourceType: SourceType.Authoritative } : undefined
             ),
             resolveIscAccountIdForManagedKey: vi.fn((id?: string) => id),
-            managedAccountsAllById: new Map<string, any>(),
         }
         const identities = {
             getIdentityById: vi.fn((id?: string) => (id ? { id, displayName: `Name ${id}` } : undefined)),
@@ -31,6 +30,8 @@ describe('ReportService', () => {
             formInstancesFound: 4,
             answeredFormInstancesProcessed: 5,
         }
+        const fusionRun = {
+        }
         const fusion = {
             totalFusionAccountCount: 11,
             newManagedAccountsCount: 13,
@@ -38,6 +39,7 @@ describe('ReportService', () => {
             getFusionIdentity: vi.fn(() => undefined),
             getFusionAccountByManagedKey: vi.fn(() => undefined),
             fusionIdentities: [],
+            run: fusionRun,
         }
         const messaging = {
             fetchSender: vi.fn(async () => undefined),
@@ -45,6 +47,13 @@ describe('ReportService', () => {
             sendReportTo: vi.fn(async () => undefined),
             deliverReportToRecipients: vi.fn(async () => undefined),
             renderFusionReportHtml: vi.fn(() => '<html/>'),
+        }
+        const run = {
+            ...{
+                managedAccountsAllById:
+                    (overrides.sources as any)?.managedAccountsAllById ?? new Map<string, any>(),
+            },
+            ...(overrides.run ?? {}),
         }
         return {
             service: new ReportService(
@@ -54,7 +63,8 @@ describe('ReportService', () => {
                 { ...identities, ...(overrides.identities ?? {}) } as any,
                 { ...forms, ...(overrides.forms ?? {}) } as any,
                 { ...fusion, ...(overrides.fusion ?? {}) } as any,
-                { ...messaging, ...(overrides.messaging ?? {}) } as any
+                { ...messaging, ...(overrides.messaging ?? {}) } as any,
+                run as any
             ),
             deps: { log, sources, identities, forms, fusion, messaging },
         }
@@ -109,7 +119,7 @@ describe('ReportService', () => {
             ['source-1::native-1', { id: 'isc-acc-1', name: 'John Smith', sourceId: 'source-1' }],
         ])
         const { service } = createService({
-            sources: { managedAccountsAllById },
+            run: { managedAccountsAllById },
             forms: {
                 finishedFusionDecisions: [
                     {

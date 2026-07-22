@@ -156,32 +156,38 @@ describe('FormService managed work queue synchronization', () => {
         const managedAccountsAllById = new Map([[managedKey, managedAccount]])
         const managedAccountsByIdentityId = new Map([[identityId, new Set([managedKey])]])
 
-        const sources = {
-            run: {
-                managedAccountsById,
-                managedAccountsByIdentityId,
-                claimAccount: vi.fn((key: string, identityId?: string) => {
-                    const deleted = managedAccountsById.delete(key)
-                    if (identityId) {
-                        const idSet = managedAccountsByIdentityId.get(identityId)
-                        if (idSet) {
-                            idSet.delete(key)
-                            if (idSet.size === 0) {
-                                managedAccountsByIdentityId.delete(identityId)
-                            }
+        const run = {
+            managedAccountsById,
+            managedAccountsAllById,
+            managedAccountsByIdentityId,
+            claimAccount: vi.fn((key: string, identityId?: string) => {
+                const deleted = managedAccountsById.delete(key)
+                if (identityId) {
+                    const idSet = managedAccountsByIdentityId.get(identityId)
+                    if (idSet) {
+                        idSet.delete(key)
+                        if (idSet.size === 0) {
+                            managedAccountsByIdentityId.delete(identityId)
                         }
                     }
-                    return deleted
-                }),
-            },
-            managedAccountsAllById,
+                }
+                return deleted
+            }),
+        } as any
+
+        const sources = {
+            run,
+            getSourceByNameSafe: vi.fn(() => undefined),
         } as any
 
         const service = new FormService(
             {} as any,
             { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
             {} as any,
-            sources
+            sources,
+            undefined,
+            undefined,
+            run
         )
 
         const accountInfo = (service as any).extractAccountInfoOverride(managedKey, true)

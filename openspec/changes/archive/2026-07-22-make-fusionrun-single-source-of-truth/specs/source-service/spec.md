@@ -1,10 +1,4 @@
-# source-service Spec
-
-## Purpose
-
-The source service (`src/services/sourceService/`) is the connector's read/write adapter for managed sources. It wraps the SailPoint API client's `AccountV2025` resource, provides jmespath-based account filtering, manages the source-specific reverse-correlation error vocabulary, and exposes the per-source type definitions. This spec defines the contract for how the connector resolves accounts from a source, applies the configured filters, and surfaces source-specific failure modes.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: The source service MUST resolve accounts using the source's configured filters
 
@@ -37,3 +31,7 @@ SourceService SHALL write all account inventory data to FusionRun rather than ma
 - **WHEN** code review inspects SourceService's class body
 - **THEN** there SHALL be no `managedAccountsByIdentityId` or `managedAccountsAllById` fields declared on SourceService
 - **AND** any reference to `this.managedAccountsByIdentityId` SHALL be replaced with `run.managedAccountsByIdentityId`
+
+## REMOVED Requirements
+
+None.

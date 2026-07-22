@@ -195,7 +195,7 @@ FusionService SHALL delegate all managed account matching to MatchingService. Fu
 
 ### Requirement: FusionService receives state via FusionRun
 
-FusionService SHALL access all shared run state through FusionRun at construction time. Internal maps previously held on FusionService (fusionAccountMap, fusionIdentityMap, autoAssignedIdentityIds, linkedAccountKeyIndex, sourcesByName, analysisRecorder) SHALL live on FusionRun.
+FusionService SHALL access all shared run state through FusionRun at construction time. Internal state previously held on FusionService (`_tracker`, `_managedAccountProcessingState`, `_managedAccountProcessingStartedAt`, `_managedAccountProcessingBatchSize`) SHALL live on FusionRun. Pass-through getters (`sourcesByName`, `_reviewersBySourceId`, `_sourcesWithoutReviewers`, `autoAssignedIdentityIds`) SHALL NOT exist — callers SHALL access FusionRun directly.
 
 #### Scenario: FusionService reads fusion accounts from FusionRun
 - **WHEN** FusionService needs to iterate fusion accounts
@@ -204,7 +204,17 @@ FusionService SHALL access all shared run state through FusionRun at constructio
 #### Scenario: FusionService reads sources by name from FusionRun
 - **WHEN** FusionService needs to resolve a source by name
 - **THEN** it SHALL read from run.sourcesByName
-- **AND** the sourcesByName property on FusionService SHALL be a delegation getter for ManagedAccountAnalyzerState compatibility, not an independently owned field
+- **AND** there SHALL be no `sourcesByName` getter on FusionService delegating to `run`
+
+#### Scenario: FusionService delegates tracker to FusionRun
+- **WHEN** FusionService initializes aggregation tracking
+- **THEN** it SHALL call `run.setTracker(tracker)` rather than storing `this._tracker`
+- **AND** sub-components SHALL access the tracker via `run.getTracker()`
+
+#### Scenario: FusionService delegates processing phase state to FusionRun
+- **WHEN** FusionService manages the managed account processing lifecycle
+- **THEN** it SHALL call `run.startManagedAccountProcessing()` and `run.resetManagedAccountProcessing()`
+- **AND** there SHALL be no `_managedAccountProcessingState` field on FusionService
 
 ### Requirement: Processors receive explicit state and service dependencies
 

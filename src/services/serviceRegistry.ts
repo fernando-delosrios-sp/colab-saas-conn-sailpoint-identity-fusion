@@ -113,7 +113,7 @@ export class ServiceRegistry {
             new DefinitionService(this.config, this.schemas, this.log, this.locks)
         this.matching =
             context.matchingService ??
-            new MatchingService(this.config, this.log)
+            new MatchingService(this.config, this.log, this.run)
 
         // Initialize FusionService last (depends on multiple services)
         this.fusion =
@@ -157,7 +157,8 @@ export class ServiceRegistry {
             this.identities,
             this.forms,
             this.fusion,
-            this.messaging
+            this.messaging,
+            this.run
         )
 
         this.proxy = context.proxyService ?? new ProxyService(this.config, this.log, this.res, commandType)

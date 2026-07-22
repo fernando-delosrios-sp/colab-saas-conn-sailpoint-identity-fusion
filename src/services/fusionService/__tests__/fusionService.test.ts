@@ -145,6 +145,10 @@ describe('FusionService', () => {
             get: vi.fn(() => new Map()),
             configurable: true,
         })
+        Object.defineProperty(run, 'managedAccountsAllById', {
+            get: () => mockSources.managedAccountsAllById,
+            configurable: true,
+        })
         Object.defineProperty(mockSources, 'fusionAccounts', {
             get: vi.fn(() => []),
             configurable: true,

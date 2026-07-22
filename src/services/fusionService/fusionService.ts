@@ -4,7 +4,7 @@ import { FusionConfig } from '../../model/config'
 import { LogService } from '../logService'
 import { FormService } from '../formService'
 import { IdentityService } from '../identityService'
-import { SourceInfo, SourceService } from '../sourceService'
+import { SourceService } from '../sourceService'
 import { FusionAccount } from '../../model/account'
 import { MappingService } from '../mappingService'
 import { DefinitionService } from '../definitionService'
@@ -67,23 +67,6 @@ export class FusionService {
         return this.matchOutcomeDispatcher
     }
 
-    public get autoAssignedIdentityIds(): ReadonlySet<string> {
-        return this.run.autoAssignedIdentityIds
-    }
-
-    public get sourcesByName(): Map<string, SourceInfo> {
-        return this.run.sourcesByName
-    }
-
-    public get _reviewersBySourceId(): Map<string, Set<FusionAccount>> {
-        return this.run.reviewersBySourceId
-    }
-    public get _sourcesWithoutReviewers(): Set<string> {
-        return this.run.sourcesWithoutReviewers
-    }
-
-    private _tracker?: AggregationTracker
-
     private readonly reset: boolean
     private readonly reportAttributes: string[]
     public readonly urlContext: UrlContext
@@ -139,7 +122,7 @@ export class FusionService {
             commandType,
             operationContext,
             buildFusionBlend: (fa, account) => this.buildFusionBlend(fa, account),
-            getTracker: () => this._tracker,
+            getTracker: () => this.run.getTracker(),
         })
         this.correlationManager = new CorrelationManager(
             config,
@@ -156,7 +139,7 @@ export class FusionService {
                 identities: this.identities,
                 configSourceNames: this.configSourceNames,
                 accountAssembly: this.accountAssembly,
-                getTracker: () => this._tracker,
+                getTracker: () => this.run.getTracker(),
             }
         )
         this.decisionProcessor = new DecisionProcessor(
@@ -263,27 +246,28 @@ export class FusionService {
      * Sets the AggregationTracker instance to record report state.
      */
     public setTracker(tracker: AggregationTracker): void {
-        this._tracker = tracker
+        this.run.setTracker(tracker)
     }
 
     /**
      * Retrieves the AggregationTracker instance.
      */
     public get tracker(): AggregationTracker {
-        this.log.assert(!!this._tracker, 'AggregationTracker has not been set on FusionService')
-        if (!this._tracker) {
-            this.log.crash('AggregationTracker has not been set on FusionService')
+        const t = this.run.getTracker()
+        this.log.assert(!!t, 'AggregationTracker has not been set on FusionRun')
+        if (!t) {
+            this.log.crash('AggregationTracker has not been set on FusionRun')
         }
-        return this._tracker!
+        return t!
     }
 
     /** Helper getters for stats that delegate to tracker if available */
     public get newManagedAccountsCount(): number {
-        return this._tracker?.newManagedAccountsCount ?? 0
+        return this.run.getTracker()?.newManagedAccountsCount ?? 0
     }
 
     public get identitiesProcessedCount(): number {
-        return this._tracker?.identitiesProcessedCount ?? 0
+        return this.run.getTracker()?.identitiesProcessedCount ?? 0
     }
 
     /**
@@ -680,11 +664,11 @@ export class FusionService {
     }
 
     private validateManagedSourceReviewers(): void {
-        this._sourcesWithoutReviewers.clear()
+        this.run.sourcesWithoutReviewers.clear()
         for (const source of this.sources.managedSources) {
-            const reviewers = this._reviewersBySourceId.get(source.id)
+            const reviewers = this.run.reviewersBySourceId.get(source.id)
             if (!reviewers || reviewers.size === 0) {
-                this._sourcesWithoutReviewers.add(source.name)
+                this.run.sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
                         `Managed accounts from this source will be treated as NonMatched.`
@@ -727,7 +711,7 @@ export class FusionService {
             (account) => this.processManagedAccount(account),
             this.config,
             this.log,
-            this._managedAccountProcessingBatchSize
+            this.run.managedAccountProcessingBatchSize
         )
         this.log.info(`Correlated account sweep complete: ${map.size} uncorrelated account(s) queued for scoring`)
     }
@@ -801,7 +785,7 @@ export class FusionService {
         const accounts = [...map.values()]
         const sweepResult = await this.dispatcher.runMatchSweep(
             accounts,
-            this._managedAccountProcessingBatchSize || 1,
+            this.run.managedAccountProcessingBatchSize || 1,
             { analysisOnly: true }
         )
 
@@ -1095,9 +1079,9 @@ export class FusionService {
     private setReviewerForSource(fusionAccount: FusionAccount, sourceId: string): void {
         this.log.debug(`Setting reviewer for ${fusionAccount.name} -> sourceId=${sourceId}`)
         fusionAccount.setSourceReviewer(sourceId)
-        const reviewers: Set<FusionAccount> = this._reviewersBySourceId.get(sourceId) ?? new Set()
+        const reviewers: Set<FusionAccount> = this.run.reviewersBySourceId.get(sourceId) ?? new Set()
         reviewers.add(fusionAccount)
-        this._reviewersBySourceId.set(sourceId, reviewers)
+        this.run.reviewersBySourceId.set(sourceId, reviewers)
     }
 
     /**
@@ -1187,29 +1171,24 @@ export class FusionService {
 
     /** Get reviewers by source ID map */
     public get reviewersBySourceId(): Map<string, Set<FusionAccount>> {
-        return this._reviewersBySourceId
+        return this.run.reviewersBySourceId
     }
 
-    private _managedAccountProcessingState: 'idle' | 'initialized' = 'idle'
-    private _managedAccountProcessingStartedAt = 0
-    private _managedAccountProcessingBatchSize = 0
-
     private ensureManagedAccountProcessingInitialized(): void {
-        if (this._managedAccountProcessingState !== 'initialized') {
+        if (this.run.managedAccountProcessingState !== 'initialized') {
             throw new Error('initializeManagedAccountProcessing must be called before managed account processing')
         }
     }
 
     /** Initialize managed account processing state: rebuilt trigram index, linked account key index, and reviewer validation. */
     public async initializeManagedAccountProcessing(): Promise<void> {
-        if (this._managedAccountProcessingState !== 'idle') {
+        if (this.run.managedAccountProcessingState !== 'idle') {
             throw new Error('Managed account processing already initialized')
         }
         const map = this.run.managedAccountsById
         assert(map, 'Managed accounts have not been loaded')
 
-        this._managedAccountProcessingBatchSize = Math.max(1, getManagedAccountsBatchSize(this.config))
-        this._managedAccountProcessingStartedAt = Date.now()
+        this.run.startManagedAccountProcessing(Math.max(1, getManagedAccountsBatchSize(this.config)))
 
         this.tracker.newManagedAccountsCount = map.size
         this.run.clearDeferredCandidates()
@@ -1227,8 +1206,6 @@ export class FusionService {
         this.matchingService.buildTrigramIndex(this.fusionIdentities)
 
         this.buildLinkedAccountKeyIndex()
-
-        this._managedAccountProcessingState = 'initialized'
     }
 
     /** Correlated account sweep: resolve linked/correlated managed accounts before uncorrelated scoring. */
@@ -1253,10 +1230,10 @@ export class FusionService {
         )
         const processed = await this.runUncorrelatedManagedAccountSweep(
             queuedAccounts,
-            this._managedAccountProcessingBatchSize,
-            this._managedAccountProcessingStartedAt
+            this.run.managedAccountProcessingBatchSize,
+            this.run.managedAccountProcessingBatchSize
         )
-        this._managedAccountProcessingState = 'idle'
+        this.run.resetManagedAccountProcessing()
         return { processed, matchScoringMs: this.run.matchScoringMs }
     }
 
