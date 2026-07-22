@@ -12,6 +12,9 @@ export type { SourceConfigLike }
 export function createOperationTestRegistry(options: TestRegistryOptions = {}): ServiceRegistry {
     const registry = createTestRegistry(options)
 
+    const log = registry.log as any
+    log.crash = vi.fn()
+
     const sources = registry.sources as any
     sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
     sources.fetchFusionAccounts = vi.fn().mockResolvedValue(undefined)
@@ -20,8 +23,16 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
     sources.fetchManagedAccount = vi.fn().mockResolvedValue(undefined)
     sources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([])
     sources.aggregateManagedSources = vi.fn().mockResolvedValue(undefined)
-    sources.aggregateDelayedSources = vi.fn().mockResolvedValue(undefined)
+    sources.aggregateDelayedSources = vi.fn().mockImplementation(async (callback?: (params: any) => Promise<void>) => {
+        const delayedSources = sources.delayedAggregationSources || []
+        for (const source of delayedSources) {
+            if (typeof callback === 'function') {
+                await callback({ sourceId: source.id, delayMinutes: source.delayMinutes || 5, disableOptimization: false })
+            }
+        }
+    })
     sources.validateAccountJmespathFilters = vi.fn()
+    sources.isEmailWorkflowConfigured = vi.fn().mockReturnValue(true)
     sources.setProcessLock = vi.fn().mockResolvedValue(undefined)
     sources.releaseProcessLock = vi.fn().mockResolvedValue(undefined)
     sources.resetBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
@@ -103,13 +114,22 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
     messaging.fetchSender = vi.fn().mockResolvedValue(undefined)
     messaging.fetchDelayedAggregationSender = vi.fn().mockResolvedValue(undefined)
     messaging.scheduleDelayedAggregation = vi.fn().mockResolvedValue(undefined)
+    messaging.sendReportTo = vi.fn().mockResolvedValue(undefined)
+    messaging.deliverReportToRecipients = vi.fn().mockResolvedValue(undefined)
+
+    const workflows = registry.workflows as any
+    if (workflows) {
+        workflows.fetchSender = vi.fn().mockResolvedValue(undefined)
+        workflows.fetchDelayedAggregationSender = vi.fn().mockResolvedValue(undefined)
+        workflows.scheduleDelayedAggregation = vi.fn().mockResolvedValue(undefined)
+        workflows.getWorkflow = vi.fn().mockResolvedValue({ id: 'wf-mock-1', name: 'Mock Workflow' })
+        workflows.getDelayedAggregationWorkflow = vi.fn().mockResolvedValue({ id: 'wf-mock-delayed-1', name: 'Mock Delayed Workflow' })
+        workflows.resolveAccessToken = vi.fn().mockResolvedValue('mock-token')
+    }
 
     const reports = registry.reports as any
     reports.generateAndSendFusionReport = vi.fn().mockResolvedValue(undefined)
-
-    const log = registry.log as any
-    log.crash = vi.fn()
-    log.metric = vi.fn()
+    reports.writeAndSendDryRunReport = vi.fn().mockResolvedValue(undefined)
 
     return registry
 }

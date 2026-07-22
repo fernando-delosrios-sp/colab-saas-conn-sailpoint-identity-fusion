@@ -1,10 +1,6 @@
 # report-service Spec
 
-## Purpose
-
-The report service resolves account identifiers for report links, mapping Fusion accounts and managed account keys to their canonical ISC account IDs, and provides a unified interface for report generation, rendering, directory management, and email delivery.
-
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Unified report building, rendering, and directory management
 The Report module MUST provide a consolidated interface for creating report payloads, rendering report outputs (HTML/PDF), managing output directories (`mkdir`), and delivering reports.
@@ -17,6 +13,8 @@ The Report module MUST provide a consolidated interface for creating report payl
 - **AND** delivery metadata is returned
 
 ---
+
+## MODIFIED Requirements
 
 ### Requirement: Resolve report account ID from a FusionAccount
 The `resolveReportAccountId` function SHALL return the ISC account ID to use in report links for a given `FusionAccount`, preferring the stored ISC id and falling back to resolving the managed account key via `SourceService`.

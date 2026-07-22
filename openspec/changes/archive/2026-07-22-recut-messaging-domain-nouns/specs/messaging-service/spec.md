@@ -1,10 +1,6 @@
 # messaging-service Spec
 
-## Purpose
-
-The messaging service (`src/services/messagingService/`) renders the email and report templates the connector sends when communicating changes to end users and operators. It owns the Handlebars helpers (`messagingHandlebarsRegistration.ts`), the cell-truncation logic for account-attribute cells (`accountAttributeValueDisplay.ts`), the locale and localization machinery, and the test fixtures. The truncation behavior in particular must stay in sync with the fixed ~270px left summary column in `fusion-*.hbs`. This spec defines the contract between the runtime values the template receives and the visible output.
-
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Email rendering MUST accept clean domain DTOs without coupling to form or match scoring internals
 The email rendering component (`EmailRenderer` / refactored `MessagingService`) MUST render email templates, Handlebars helpers, and localized strings using dedicated domain DTOs, without importing match-scoring internal types or form-building structures.
@@ -16,6 +12,8 @@ The email rendering component (`EmailRenderer` / refactored `MessagingService`) 
 - **AND** no dependencies on `FormService` structures or `MatchingService` scoring internals are required
 
 ---
+
+## MODIFIED Requirements
 
 ### Requirement: Account attribute cells MUST be truncated to fit the fixed ~270px summary column
 

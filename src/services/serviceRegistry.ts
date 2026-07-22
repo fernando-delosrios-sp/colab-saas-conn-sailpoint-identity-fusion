@@ -16,6 +16,7 @@ import { MatchingService } from './matchingService'
 import { MatchOutcomeDispatcher } from './matchingService/matchOutcomeDispatcher'
 import { EntitlementService } from './entitlementService'
 import { MessagingService } from './messagingService'
+import { WorkflowService } from './workflowService'
 import { ProxyService } from './proxyService'
 import { ReportService } from './reportService'
 import { RecordingService } from './recordingService'
@@ -45,6 +46,7 @@ export class ServiceRegistry {
     public definition: DefinitionService
     public matching: MatchingService
     public messaging: MessagingService
+    public workflows: WorkflowService
     public reports: ReportService
     public proxy: ProxyService
     public recording?: RecordingService
@@ -95,9 +97,11 @@ export class ServiceRegistry {
         this.entitlements = context.entitlementService ?? new EntitlementService(this.sources)
         this.identities =
             context.identityService ?? new IdentityService(this.config, this.log, this.client, this.sources, this.run)
+        this.workflows =
+            (context as any).workflowService ?? new WorkflowService(this.config, this.log, this.client, this.sources)
         this.messaging =
             context.messagingService ??
-            new MessagingService(this.config, this.log, this.client, this.sources, this.identities)
+            new MessagingService(this.config, this.log, this.client, this.sources, this.identities, this.workflows)
         this.forms =
             context.formService ??
             new FormService(this.config, this.log, this.client, this.sources, this.identities, this.messaging, this.run)
