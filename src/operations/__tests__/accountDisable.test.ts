@@ -6,7 +6,28 @@ vi.mock('../helpers/rebuildFusionAccount', () => ({
     rebuildFusionAccount: vi.fn(),
 }))
 
-import { createRegistry } from './harness/registryMocking'
+import { createTestRegistry } from './harness/testRegistry'
+
+function createRegistry() {
+    const registry = createTestRegistry({
+        sourceConfigs: [{ name: 'fusion', correlationMode: 'none' }],
+    })
+
+    const sources = registry.sources as any
+    sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
+
+    const schemas = registry.schemas as any
+    schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
+
+    const fusion = registry.fusion as any
+    fusion.getISCAccount = vi.fn().mockResolvedValue({ id: 'isc-disabled' })
+    fusion.normalizePendingFormStateForOutput = vi.fn().mockResolvedValue(undefined)
+
+    const log = registry.log as any
+    log.crash = vi.fn()
+
+    return registry
+}
 
 describe('accountDisable', () => {
     afterEach(() => {

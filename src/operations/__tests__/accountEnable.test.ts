@@ -7,7 +7,36 @@ vi.mock('../helpers/rebuildFusionAccount', () => ({
     rebuildFusionAccount: vi.fn(),
 }))
 
-import { createRegistry } from './harness/registryMocking'
+import { createTestRegistry } from './harness/testRegistry'
+
+function createRegistry() {
+    const registry = createTestRegistry({
+        sourceConfigs: [{ name: 'fusion', correlationMode: 'none' }],
+    })
+
+    const sources = registry.sources as any
+    sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
+    sources.fetchFusionAccounts = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(sources, 'fusionAccounts', { value: [], writable: true, configurable: true })
+
+    const schemas = registry.schemas as any
+    schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
+
+    const definition = registry.definition as any
+    definition.initializeCounters = vi.fn().mockResolvedValue(undefined)
+    definition.registerUniqueValuesFromManagedSourceAccounts = vi.fn()
+    definition.refreshUniqueAttributes = vi.fn().mockResolvedValue(undefined)
+
+    const fusion = registry.fusion as any
+    fusion.preProcessFusionAccounts = vi.fn().mockResolvedValue([])
+    fusion.getISCAccount = vi.fn().mockResolvedValue({ id: 'isc-enabled' })
+    fusion.normalizePendingFormStateForOutput = vi.fn().mockResolvedValue(undefined)
+
+    const log = registry.log as any
+    log.crash = vi.fn()
+
+    return registry
+}
 
 describe('accountEnable', () => {
     afterEach(() => {

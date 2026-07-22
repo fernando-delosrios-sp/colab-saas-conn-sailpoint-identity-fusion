@@ -1,8 +1,11 @@
 import { testConnection } from '../testConnection'
-import { createBaseOperationRegistry, SourceConfigLike } from './harness/mockRegistry'
+import { createOperationTestRegistry, SourceConfigLike } from './harness/operationTestRegistry'
 
 function createMockRegistry(sourceConfigs: SourceConfigLike[]) {
-    const { registry, sources, schemas, timer } = createBaseOperationRegistry(sourceConfigs)
+    const registry = createOperationTestRegistry({ sourceConfigs: sourceConfigs as any })
+    const sources = registry.sources as any
+    const schemas = registry.schemas as any
+    const timer = { phase: vi.fn(), end: vi.fn(), totalElapsed: vi.fn(() => 0), getPhaseBreakdown: vi.fn(() => ({})) }
     return { registry, sources, schemas, timer }
 }
 

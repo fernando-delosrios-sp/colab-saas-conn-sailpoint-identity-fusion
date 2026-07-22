@@ -12,11 +12,30 @@ vi.mock('../actions', () => ({
     executeActions: vi.fn(),
 }))
 
-import { createRegistry as createMockRegistry } from './harness/registryMocking'
+import { createTestRegistry } from './harness/testRegistry'
 
 function createRegistry() {
-    const registry = createMockRegistry()
-    Object.assign(registry.fusion, { getISCAccount: vi.fn().mockResolvedValue({ id: 'isc-updated' }) })
+    const registry = createTestRegistry({
+        sourceConfigs: [{ name: 'fusion', correlationMode: 'none' }],
+    })
+
+    const sources = registry.sources as any
+    sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
+    sources.fetchFusionAccount = vi.fn().mockResolvedValue(undefined)
+    sources.fetchFusionAccounts = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(sources, 'fusionAccounts', { value: [], writable: true, configurable: true })
+    sources.fusionAccountsByNativeIdentity = new Map()
+
+    const schemas = registry.schemas as any
+    schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
+
+    const fusion = registry.fusion as any
+    fusion.normalizePendingFormStateForOutput = vi.fn().mockResolvedValue(undefined)
+    fusion.getISCAccount = vi.fn().mockResolvedValue({ id: 'isc-updated' })
+
+    const log = registry.log as any
+    log.crash = vi.fn()
+
     return registry
 }
 

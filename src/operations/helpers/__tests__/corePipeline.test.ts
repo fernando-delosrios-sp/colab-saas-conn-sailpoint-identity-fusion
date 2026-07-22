@@ -7,7 +7,7 @@ import {
     PipelineRunner,
 } from '../corePipeline'
 
-import { createRegistry as createMockRegistry } from '../../__tests__/harness/registryMocking'
+import { createTestRegistry } from '../../__tests__/harness/testRegistry'
 import type { Mock } from 'vitest'
 
 function mockTrackedOperation(log: { metric: Mock }): { done: Mock; elapsedMs: Mock } {
@@ -21,15 +21,64 @@ function mockTrackedOperation(log: { metric: Mock }): { done: Mock; elapsedMs: M
 }
 
 function createRegistry() {
-    const registry = createMockRegistry()
-    registry.sources.run.managedAccountsById = new Map()
-    registry.sources.managedSources = []
-    registry.sources.clearManagedAccounts = vi.fn()
-    registry.sources.saveBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
-    registry.sources.clearFusionAccounts = vi.fn()
-    registry.sources.aggregateDelayedSources = vi.fn().mockResolvedValue(undefined)
-    registry.sources.setProcessLock = vi.fn().mockResolvedValue(undefined)
-    registry.sources.releaseProcessLock = vi.fn().mockResolvedValue(undefined)
+    const sourceConfigs = [{ name: 'fusion', correlationMode: 'none', sourceType: 'authoritative' }]
+    const registry = createTestRegistry({ sourceConfigs })
+
+    const sources = registry.sources as any
+    sources.run = {
+        managedAccountsById: new Map(),
+        managedAccountsAllById: new Map(),
+        managedAccountsByIdentityId: new Map(),
+        get managedAccountCount() { return sources.run.managedAccountsById.size },
+        get identityCount() { return 0 },
+    }
+    Object.defineProperty(sources, 'hasFusionSource', { value: true, writable: true, configurable: true })
+    Object.defineProperty(sources, 'managedSources', { value: [], writable: true, configurable: true })
+    Object.defineProperty(sources, 'fusionAccountCount', { value: 0, writable: true, configurable: true })
+    sources.fusionAccountsByNativeIdentity = new Map()
+    sources.clearManagedAccounts = vi.fn()
+    sources.clearFusionAccounts = vi.fn()
+    sources.saveBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
+    sources.aggregateDelayedSources = vi.fn().mockResolvedValue(undefined)
+    sources.setProcessLock = vi.fn().mockResolvedValue(undefined)
+    sources.releaseProcessLock = vi.fn().mockResolvedValue(undefined)
+    sources.fetchAllSources = vi.fn().mockResolvedValue(undefined)
+    sources.aggregateManagedSources = vi.fn().mockResolvedValue(undefined)
+    sources.getSourceByNameSafe = vi.fn()
+    sources.clearReverseCorrelationReadinessCache = vi.fn()
+    sources.ensureReverseCorrelationSetup = vi.fn().mockResolvedValue(undefined)
+    sources.setupReverseCorrelationSources = vi.fn().mockResolvedValue(0)
+
+    const forms = registry.forms as any
+    forms.fetchFormInstances = vi.fn().mockResolvedValue(undefined)
+    forms.cleanUpForms = vi.fn().mockResolvedValue(undefined)
+    forms.awaitPendingDeleteOperations = vi.fn().mockResolvedValue(undefined)
+    forms.fetchFormData = vi.fn().mockResolvedValue(undefined)
+    forms.processFetchedFormData = vi.fn().mockResolvedValue(undefined)
+    forms.deleteExistingForms = vi.fn().mockResolvedValue(undefined)
+
+    const fusion = registry.fusion as any
+    fusion.isReset = vi.fn().mockReturnValue(false)
+    fusion.disableReset = vi.fn().mockResolvedValue(undefined)
+    fusion.resetState = vi.fn().mockResolvedValue(undefined)
+    fusion.processFusionAccounts = vi.fn().mockResolvedValue([])
+    fusion.processIdentities = vi.fn().mockResolvedValue([])
+    fusion.processFusionIdentityDecisions = vi.fn().mockResolvedValue([])
+    fusion.awaitPendingDisableOperations = vi.fn().mockResolvedValue(undefined)
+    fusion.reconcilePendingFormState = vi.fn()
+    fusion.forEachISCAccount = vi.fn().mockResolvedValue({ sent: 0, eligible: 0 })
+    fusion.streamAndClearEligibleAccounts = vi.fn().mockResolvedValue({ sent: 0, eligible: 0 })
+    fusion.refreshUniqueAttributes = vi.fn().mockResolvedValue(0)
+
+    const schemas = registry.schemas as any
+    schemas.loadFusionAccountSchemaFromSource = vi.fn().mockResolvedValue(undefined)
+    schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
+    schemas.getManagedSourceSchemaAttributeNames = vi.fn().mockResolvedValue(new Set<string>())
+
+    const definition = registry.definition as any
+    definition.initializeCounters = vi.fn().mockResolvedValue(undefined)
+    definition.saveState = vi.fn().mockResolvedValue(undefined)
+
     return {
         registry,
         forms: registry.forms,
@@ -306,6 +355,7 @@ describe('PipelineRunner.run', () => {
         mockServiceRegistry.sources.releaseProcessLock = vi.fn().mockResolvedValue(undefined)
         mockServiceRegistry.sources.resetBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
         mockServiceRegistry.sources.fetchManagedAccounts = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.sources.fetchFusionAccounts = vi.fn().mockResolvedValue(undefined)
         mockServiceRegistry.sources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([])
         mockServiceRegistry.sources.saveBatchCumulativeCount = vi.fn().mockResolvedValue(undefined)
 
@@ -316,6 +366,10 @@ describe('PipelineRunner.run', () => {
         mockServiceRegistry.fusion.processFusionAccounts = vi.fn().mockResolvedValue([])
         mockServiceRegistry.fusion.processIdentities = vi.fn().mockResolvedValue([])
         mockServiceRegistry.fusion.processFusionIdentityDecisions = vi.fn().mockResolvedValue([])
+        mockServiceRegistry.fusion.initializeManagedAccountProcessing = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.fusion.processCorrelatedManagedAccounts = vi.fn().mockResolvedValue(undefined)
+        mockServiceRegistry.fusion.processUncorrelatedManagedAccounts = vi.fn().mockResolvedValue({ processed: 0, matchScoringMs: 0 })
+        mockServiceRegistry.fusion.processManagedAccounts = vi.fn().mockResolvedValue(undefined)
         mockServiceRegistry.fusion.awaitPendingDisableOperations = vi.fn().mockResolvedValue(undefined)
         mockServiceRegistry.fusion.reconcilePendingFormState = vi.fn()
 
@@ -325,7 +379,7 @@ describe('PipelineRunner.run', () => {
 
         mockServiceRegistry.identities.fetchIdentities = vi.fn().mockResolvedValue(undefined)
         mockServiceRegistry.identities.clear = vi.fn()
-        mockServiceRegistry.identities.identityCount = 0
+        Object.defineProperty(mockServiceRegistry.identities, 'identityCount', { value: 0, writable: true, configurable: true })
 
         mockServiceRegistry.messaging.fetchDelayedAggregationSender = vi.fn().mockResolvedValue(undefined)
     })
