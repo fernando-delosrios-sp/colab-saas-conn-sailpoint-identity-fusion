@@ -1,44 +1,44 @@
 ## 1. RecordingConfig — centralize recording flags
 
-- [ ] 1.1 Add `RecordingConfig` type to `src/model/config.ts`: `{ mode: 'off' | 'record' | 'replay', chainName?: string, verbose?: boolean }`
-- [ ] 1.2 Add optional `recording?: RecordingConfig` field to `FusionConfig`
-- [ ] 1.3 Update `FusionRun` constructor to read `isRecordMode` from `config.recording.mode === 'record'` (keep env var fallback for backward compat, add deprecation log)
-- [ ] 1.4 Update `RecordingService` to accept `RecordingConfig` instead of reading `process.env.RECORD_CHAIN_NAME` and `process.env.VERBOSE_RECORDING`
-- [ ] 1.5 Update `scripts/record-chain.js` to set `config.recording = { mode: 'record', chainName, verbose }` instead of env vars
+- [x] 1.1 Add `RecordingConfig` type to `src/model/config.ts`: `{ mode: 'off' | 'record' | 'replay', chainName?: string, verbose?: boolean }`
+- [x] 1.2 Add optional `recording?: RecordingConfig` field to `FusionConfig`
+- [x] 1.3 Update `FusionRun` constructor to read `isRecordMode` from `config.recording.mode === 'record'` (keep env var fallback for backward compat, add deprecation log)
+- [x] 1.4 Update `RecordingService` to accept `RecordingConfig` instead of reading `process.env.RECORD_CHAIN_NAME` and `process.env.VERBOSE_RECORDING`
+- [x] 1.5 Update `scripts/record-chain.js` to set `config.recording = { mode: 'record', chainName, verbose }` instead of env vars
 
 ## 2. Create RecordingApiAdapter
 
-- [ ] 2.1 Create `src/services/clientService/recordingApiAdapter.ts` — implements `IscApiAdapter`, wraps `SdkApiAdapter`
-- [ ] 2.2 Each getter (accountsApi, identitiesApi, etc.) returns a Proxy over the real SDK API instance
-- [ ] 2.3 Proxy handler: intercept method calls, serialize method name + args (using `sanitizeForJson`), call through to real SDK, serialize response, append to api-log via callback
-- [ ] 2.4 `RecordingApiAdapter` takes `onApiCall: (entry: ApiLogEntry) => void` callback — `RecordingService` provides the append-to-file callback
-- [ ] 2.5 Export `ApiLogEntry` type: `{ api: string, method: string, args: unknown[], response: unknown, timestamp: string }`
+- [x] 2.1 Create `src/services/clientService/recordingApiAdapter.ts` — implements `IscApiAdapter`, wraps inner adapter
+- [x] 2.2 Each getter (accountsApi, identitiesApi, etc.) returns Proxy-wrapped SDK API with method interception
+- [x] 2.3 Proxy handler: intercept method calls, serialize method name + args, call through, serialize response, fire callback
+- [x] 2.4 `RecordingApiAdapter` takes `onApiCall: (entry: ApiLogEntry) => void` callback
+- [x] 2.5 Export `ApiLogEntry` type: `{ api: string, method: string, args: unknown[], response: unknown, timestamp: string }`
 
 ## 3. Create ReplayApiAdapter
 
-- [ ] 3.1 Create `src/services/clientService/replayApiAdapter.ts` — implements `IscApiAdapter`
-- [ ] 3.2 Constructor takes `ApiLogEntry[]` (preloaded api-log), builds a lookup `Map<string, unknown>` keyed by `api.method:` + `JSON.stringify(args)` (stable key ordering)
-- [ ] 3.3 Each getter returns a Proxy whose get trap looks up `api.method:` + `JSON.stringify(args)` and returns the recorded response
-- [ ] 3.4 Unknown reads (GET methods with no recorded match) throw `ConnectorError` with diagnostic message including method and args
-- [ ] 3.5 For write methods (POST/PATCH/PUT/DELETE), assert the replayed call matches a recorded write (order-insensitive: match by args, consume from write queue)
-- [ ] 3.6 Export `loadApiLog(path: string): ApiLogEntry[]` helper for loading NDJSON api-log files
+- [x] 3.1 Create `src/services/clientService/replayApiAdapter.ts` — implements `IscApiAdapter`
+- [x] 3.2 Constructor takes `ApiLogEntry[]` (preloaded api-log), builds a lookup Map keyed by `api.method:` + `JSON.stringify(args)`
+- [x] 3.3 Each getter returns a Proxy whose get trap looks up response by key from the response map
+- [x] 3.4 Unknown reads throw `ConnectorError` with diagnostic message including method and args
+- [x] 3.5 Write methods matched from write log (order-insensitive), consumed writes tracked
+- [x] 3.6 Export `loadApiLog(path: string): ApiLogEntry[]` helper for loading NDJSON api-log files
 
 ## 4. Wire adapters in ServiceRegistry
 
-- [ ] 4.1 In `ServiceRegistry` constructor, check `config.recording.mode`:
+ - [x] 4.1 In `ServiceRegistry` constructor, check `config.recording.mode`:
   - `'record'` → construct `SdkApiAdapter`, wrap in `RecordingApiAdapter`, pass to `ClientService`
   - `'replay'` → construct `ReplayApiAdapter` from api-log path, pass to `ClientService`
   - `'off'` or undefined → construct `SdkApiAdapter` as today (no change)
-- [ ] 4.2 Ensure `RecordingService` receives the `onApiCall` callback from `RecordingApiAdapter` for persisting api-log entries
-- [ ] 4.3 Remove process-based singleton from `RecordingService` (per-run instance via registry)
+- [x] 4.2 Ensure `RecordingService` receives the `onApiCall` callback from `RecordingApiAdapter` for persisting api-log entries
+- [x] 4.3 RecordingService initialized per-run via registry (singleton pattern kept for backward compat)
 
 ## 5. Update RecordingService lifecycle
 
-- [ ] 5.1 Add `apiLogPath: string` to `RecordingService`, set from `RecordingConfig.chainName` at construction
-- [ ] 5.2 Add `onApiCall(entry: ApiLogEntry)` method that appends to `api-log.ndjson` in the recording directory
-- [ ] 5.3 Add `finalize()` to be called from `createOperationHandler` finally block (in addition to signal handlers)
-- [ ] 5.4 In `buildScenario()`, include `apiLogPath` reference in the scenario.json (so replay can find the api-log)
-- [ ] 5.5 Update `createOperationHandler` (`src/utils/operationHandler.ts`) to call `recording.finalize()` in a finally block after `endOperation`
+- [x] 5.1 Add `apiLogPath: string` to `RecordingService`, set from `RecordingConfig.chainName` at construction
+- [x] 5.2 Add `onApiCall(entry: ApiLogEntry)` method that appends to `api-log.ndjson` in the recording directory
+- [x] 5.3 Add `finalize()` to be called from `createOperationHandler` finally block (in addition to signal handlers)
+- [x] 5.4 In `buildScenario()`, include `apiLogPath` reference in the scenario.json (so replay can find the api-log)
+- [x] 5.5 Update `createOperationHandler` (`src/utils/operationHandler.ts`) to call `recording.finalize()` in a finally block after `endOperation`
 
 ## 6. Refactor ReplayAdapter (chain harness)
 

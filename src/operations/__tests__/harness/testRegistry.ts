@@ -1,6 +1,6 @@
 import { ServiceRegistry } from '../../../services/serviceRegistry'
 import { ClientService } from '../../../services/clientService'
-import { FakeApiAdapter } from '../chain/harness/fakeApiAdapter'
+import { ReplayApiAdapter } from '../../../services/clientService/replayApiAdapter'
 import { FusionConfig } from '../../../model/config'
 
 export interface SourceConfigLike {
@@ -21,7 +21,7 @@ export interface TestRegistryOptions {
 }
 
 /**
- * Creates a test ServiceRegistry wired with FakeApiAdapter as the only mocked boundary.
+ * Creates a test ServiceRegistry wired with ReplayApiAdapter as the only mocked boundary.
  * All services are real instances, constructed through the standard ServiceRegistry
  * dependency graph. Only the ISC API adapter (and optionally specific services via
  * overrides) are substituted.
@@ -38,7 +38,7 @@ export function createTestRegistry(options: TestRegistryOptions = {}): ServiceRe
         spConnectorInstanceId: 'test-instance',
     } as unknown as FusionConfig
 
-    const fakeAdapter = new FakeApiAdapter(config as any)
+    const fakeAdapter = new ReplayApiAdapter([], config as any)
 
     const clientLog = {
         info: vi.fn(),
