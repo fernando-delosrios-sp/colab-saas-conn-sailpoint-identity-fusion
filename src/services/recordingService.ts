@@ -3,6 +3,7 @@ import * as path from 'path'
 import { LogService } from './logService'
 import { FusionRun } from '../model/fusionRun'
 import { FusionConfig } from '../model/config'
+import { ApiLogEntry } from './clientService/recordingApiAdapter'
 
 function sanitizeForJson(value: unknown): unknown {
     if (value === undefined || value === null) return value
@@ -25,6 +26,7 @@ export class RecordingService {
 
     private readonly chainName: string
     private readonly recordingDir: string
+    private readonly apiLogPath: string
     private readonly steps: RecordedStep[] = []
     private currentStep: RecordedStep | null = null
     private stepIndex = 0
@@ -37,6 +39,7 @@ export class RecordingService {
         const recConfig = config.recording
         this.chainName = recConfig?.chainName ?? `recording-${Date.now()}`
         this.recordingDir = path.resolve('test-data', 'recordings', this.chainName)
+        this.apiLogPath = path.join(this.recordingDir, 'api-log.ndjson')
         this.log.info(`RecordingService initialized — chain "${this.chainName}"`)
 
         this.reloadSteps()
@@ -93,6 +96,20 @@ export class RecordingService {
 
     getName(): string {
         return this.chainName
+    }
+
+    onApiCall(entry: ApiLogEntry): void {
+        fs.mkdirSync(this.recordingDir, { recursive: true })
+        fs.appendFileSync(
+            this.apiLogPath,
+            JSON.stringify({
+                api: entry.api,
+                method: entry.method,
+                args: entry.args,
+                response: entry.response,
+                timestamp: entry.timestamp,
+            }) + '\n'
+        )
     }
 
     getStepCount(): number {
@@ -224,6 +241,7 @@ export class RecordingService {
             initialState,
             steps: scenarioSteps,
             referenceValues,
+            apiLogPath: path.relative(process.cwd(), this.apiLogPath),
         }
     }
 }
