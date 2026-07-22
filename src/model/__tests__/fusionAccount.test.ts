@@ -2,7 +2,7 @@ import { FusionAccount, IDENTITIES_SOURCE_NAME } from '../fusionAccount'
 import { FusionConfig, SourceType } from '../config'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionDecision } from '../form'
-import { FusionAccountKind, FusionAccountState } from '../fusionAccountTypes'
+import { FusionAccountKind } from '../fusionAccountTypes'
 import { StatusEntitlement } from '../statusEntitlement'
 import { FusionRun } from '../fusionRun'
 
@@ -608,34 +608,36 @@ describe('FusionAccount', () => {
         })
     })
 
-    describe('FusionAccount state facade', () => {
-        it('exposes the same mutable state through the facade as through the state object', () => {
+    describe('FusionAccount state encapsulation', () => {
+        it('collections sub-object reflects account mutations', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            const state = (acc as any).state as FusionAccountState
 
             acc.addAccountId('src-a::native-1')
-            expect(state.accountIds.has('src-a::native-1')).toBe(true)
+            expect(acc.collections.accountIds.has('src-a::native-1')).toBe(true)
             expect(acc.accountIds).toContain('src-a::native-1')
 
             acc.addStatus('test-status')
-            expect(state.statuses.has('test-status')).toBe(true)
+            expect(acc.collections.statusesSet.has('test-status')).toBe(true)
             expect(acc.statuses).toContain('test-status')
 
             acc.setCorrelatedAccount('src-a::native-1')
-            expect(state.accountIds.has('src-a::native-1')).toBe(true)
-            expect(state.missingAccountIds.has('src-a::native-1')).toBe(false)
+            expect(acc.collections.accountIds.has('src-a::native-1')).toBe(true)
+            expect(acc.collections.missingAccountIds.has('src-a::native-1')).toBe(false)
         })
     })
 
     describe('identityAlias accessor', () => {
         it('returns identityInfo.displayName when set', () => {
-            const acc = new FusionAccount()
-            acc.state.identityInfo = { id: 'id-1', name: 'login', displayName: 'Display Name' }
+            const acc = FusionAccount.fromIdentity({ id: 'id-1', name: 'login', attributes: { displayName: 'Display Name' } } as any)
             expect(acc.identityAlias).toBe('Display Name')
         })
 
         it('returns undefined when identityInfo is not set', () => {
-            const acc = new FusionAccount()
+            const acc = FusionAccount.fromFusionDecision({
+                account: { id: 'src-a::native-1', sourceId: 'src-a', nativeIdentity: 'native-1', sourceName: 'Source A' },
+                newIdentity: true,
+                submitter: { name: 'test' },
+            } as any)
             expect(acc.identityAlias).toBeUndefined()
         })
     })
