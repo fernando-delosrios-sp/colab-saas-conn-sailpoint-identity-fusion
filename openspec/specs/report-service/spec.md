@@ -2,9 +2,21 @@
 
 ## Purpose
 
-The report service resolves account identifiers for report links, mapping Fusion accounts and managed account keys to their canonical ISC account IDs.
+The report service resolves account identifiers for report links, mapping Fusion accounts and managed account keys to their canonical ISC account IDs, and provides a unified interface for report generation, rendering, directory management, and email delivery.
 
 ## Requirements
+
+### Requirement: Unified report building, rendering, and directory management
+The Report module MUST provide a consolidated interface for creating report payloads, rendering report outputs (HTML/PDF), managing output directories (`mkdir`), and delivering reports.
+
+#### Scenario: End-to-end report generation and directory creation
+- **GIVEN** report target parameters and payload data
+- **WHEN** `ReportService.generateReport` is called
+- **THEN** the required destination directory is created if missing
+- **AND** the report document is built and rendered to disk
+- **AND** delivery metadata is returned
+
+---
 
 ### Requirement: Resolve report account ID from a FusionAccount
 The `resolveReportAccountId` function SHALL return the ISC account ID to use in report links for a given `FusionAccount`, preferring the stored ISC id and falling back to resolving the managed account key via `SourceService`.
@@ -33,4 +45,3 @@ The `resolveReportAccountIdValue` function SHALL resolve an arbitrary account id
 #### Scenario: Raw value is empty
 - **WHEN** the input value is `undefined` or empty
 - **THEN** `resolveReportAccountIdValue` MUST return `undefined` without calling `SourceService`
-

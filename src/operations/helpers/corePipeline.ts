@@ -190,7 +190,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Core
         forms.fetchFormInstances(isPersistent),
     ]
 
-    if (isPersistent) {
+    if (sources.delayedAggregationSources?.length) {
         fetchTasks.push(messaging.fetchDelayedAggregationSender())
     }
 

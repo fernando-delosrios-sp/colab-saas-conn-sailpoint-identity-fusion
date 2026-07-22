@@ -6,6 +6,17 @@ The messaging service (`src/services/messagingService/`) renders the email and r
 
 ## Requirements
 
+### Requirement: Email rendering MUST accept clean domain DTOs without coupling to form or match scoring internals
+The email rendering component (`EmailRenderer` / refactored `MessagingService`) MUST render email templates, Handlebars helpers, and localized strings using dedicated domain DTOs, without importing match-scoring internal types or form-building structures.
+
+#### Scenario: Rendering an email with domain DTO
+- **GIVEN** an email rendering request with a standard email payload DTO
+- **WHEN** `EmailRenderer.renderEmail` is called
+- **THEN** HTML and text email contents are rendered successfully
+- **AND** no dependencies on `FormService` structures or `MatchingService` scoring internals are required
+
+---
+
 ### Requirement: Account attribute cells MUST be truncated to fit the fixed ~270px summary column
 
 The messaging service MUST truncate account attribute values rendered in email and report templates to fit the fixed-width ~270px left summary column in `fusion-*.hbs`. Truncation MUST be applied via the cell-display helper, not by inline string manipulation in templates, and MUST respect locale-aware break points so multibyte text is not split mid-glyph.

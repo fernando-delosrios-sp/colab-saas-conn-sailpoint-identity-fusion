@@ -354,6 +354,10 @@ export class SourceService {
         return this._fusionSourceOwner
     }
 
+    public isEmailWorkflowConfigured(): boolean {
+        return Boolean(this.config.workflowName)
+    }
+
     /**
      * Returns the deduplicated list of identity IDs that act as global owners for this fusion
      * source: the direct source owner plus all members of the assigned management workgroup

@@ -24,9 +24,11 @@ export const testConnection = async (serviceRegistry: ServiceRegistry, _input: a
         sources.validateAccountJmespathFilters()
         timer.phase('Validated Accounts JMESPath filters')
 
-        await messaging.fetchSender()
-        log.info('Email sender workflow validated')
-        timer.phase('Validated email sender workflow')
+        if (sources.isEmailWorkflowConfigured()) {
+            await messaging.fetchSender()
+            log.info('Email workflow verified')
+            timer.phase('Validated email sender workflow')
+        }
 
         const delayedAggregationSources = sources.delayedAggregationSources
         if (delayedAggregationSources.length > 0) {
@@ -55,7 +57,6 @@ export const testConnection = async (serviceRegistry: ServiceRegistry, _input: a
         }
 
         res.send({})
-        timer.end('✓ Test connection completed')
     } catch (error) {
         if (error instanceof ConnectorError) throw error
         log.crash('Failed to test connection', error)
