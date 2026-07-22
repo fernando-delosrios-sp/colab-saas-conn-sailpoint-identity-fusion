@@ -35,6 +35,7 @@
     },
     "private": true,
     "dependencies": {
+        "@fission-ai/openspec": "^1.6.0",
         "@sailpoint/connector-sdk": "1.2.4",
         "axios": "^1.15.2",
         "axios-retry": "^4.5.0",
