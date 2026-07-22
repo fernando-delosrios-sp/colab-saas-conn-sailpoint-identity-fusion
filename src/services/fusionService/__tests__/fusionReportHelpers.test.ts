@@ -133,8 +133,8 @@ describe('fusionReportHelpers', () => {
     })
 
     describe('getFusionReportAccountLabel', () => {
-        it('should return identityDisplayName if present', () => {
-            const acc = { name: '  My Name  ', identityDisplayName: 'IDN Name' } as any
+        it('should return identityAlias if present', () => {
+            const acc = { name: '  My Name  ', identityAlias: 'IDN Name' } as any
             expect(getFusionReportAccountLabel(acc)).toBe('IDN Name')
         })
 
