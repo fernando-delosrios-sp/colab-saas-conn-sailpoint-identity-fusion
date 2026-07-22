@@ -121,6 +121,9 @@ export function createOperationHandler(
             throw new ConnectorError(`${msg}: ${detail}`, ConnectorErrorType.Generic)
         } finally {
             if (interval) clearInterval(interval)
+            if (serviceRegistry.recording) {
+                await serviceRegistry.recording.finalize()
+            }
         }
     }
 }
