@@ -39,14 +39,14 @@ export interface AssembleAccountOptions {
 export class AccountAssembly {
     constructor(private readonly deps: AccountAssemblyDeps) {}
 
-    private isAggregationAccountListMode(): boolean {
+    public isAggregationAccountListMode(): boolean {
         return (
             this.deps.commandType === StandardCommand.StdAccountList ||
             this.deps.operationContext === OperationContext.AccountList
         )
     }
 
-    private shouldPruneDeletedManagedAccounts(): boolean {
+    public shouldPruneDeletedManagedAccounts(): boolean {
         return (
             this.isAggregationAccountListMode() ||
             this.deps.commandType === StandardCommand.StdAccountRead ||

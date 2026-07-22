@@ -235,13 +235,6 @@ export interface MatchOutcomeDispatcherDeps {
 export class MatchOutcomeDispatcher {
     constructor(private readonly deps: MatchOutcomeDispatcherDeps) {}
 
-    private isAggregationAccountListMode(): boolean {
-        return (
-            this.deps.commandType === StandardCommand.StdAccountList ||
-            this.deps.operationContext === OperationContext.AccountList
-        )
-    }
-
     private runScoring(accounts: Account[], batchSize: number): Promise<ManagedAccountMatchingResult[]> {
         return scoreManagedAccounts(accounts, batchSize, {
             config: this.deps.config,
@@ -459,7 +452,7 @@ export class MatchOutcomeDispatcher {
         const { fusionAccount, account, sourceInfo, sourceType } = analysis
 
         if (scored.resolution === 'identity-match') {
-            if (!this.isAggregationAccountListMode()) {
+            if (!this.deps.accountAssembly.isAggregationAccountListMode()) {
                 fusionAccount.clearFusionIdentityReferences()
                 return { account, fusionAccount, resolution: 'partial-match' }
             }

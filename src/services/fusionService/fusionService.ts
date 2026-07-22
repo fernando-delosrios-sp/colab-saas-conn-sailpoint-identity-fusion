@@ -129,7 +129,7 @@ export class FusionService {
             log,
             this.sources,
             this.identities,
-            () => this.isAggregationAccountListMode()
+            () => this.accountAssembly.isAggregationAccountListMode()
         )
         this.identityProcessor = new IdentityProcessor(
             config,
@@ -152,9 +152,7 @@ export class FusionService {
                 correlationManager: this.correlationManager,
                 definitionService: this.definitionService,
                 accountAssembly: this.accountAssembly,
-            },
-            commandType,
-            operationContext
+            }
         )
         this.reset = config.reset
         this.fusionOwnerIsGlobalReviewer = config.fusionOwnerIsGlobalReviewer ?? false
@@ -174,7 +172,7 @@ export class FusionService {
         this.commandType = commandType
         this.operationContext = operationContext
         this.run.setDisableOperationFactory(async (account) => {
-            if (!this.isAggregationAccountListMode()) {
+            if (!this.accountAssembly.isAggregationAccountListMode()) {
                 return
             }
             try {
@@ -196,24 +194,13 @@ export class FusionService {
      */
 
     /**
-     * Runtime commandType is not always populated by host environments.
-     * Treat the standard account-list operation context as aggregation mode.
-     */
-    public isAggregationAccountListMode(): boolean {
-        return (
-            this.commandType === StandardCommand.StdAccountList ||
-            this.operationContext === OperationContext.AccountList
-        )
-    }
-
-    /**
      * Populate match / deferred / non-match report slices during managed-account analysis.
      * SDKs may report `commandType` as account list for custom commands; `custom:dryrun` must still capture slices.
      */
     private shouldCaptureManagedAccountReportData(): boolean {
         return (
             this.fusionReportOnAggregation ||
-            !this.isAggregationAccountListMode() ||
+            !this.accountAssembly.isAggregationAccountListMode() ||
             this.operationContext === OperationContext.CustomDryRun
         )
     }
@@ -1053,21 +1040,6 @@ export class FusionService {
         }
         this.log.info(`Firing low-priority disable for account: ${account.name} [${account.sourceName}] (${accountId})`)
         await this.sources.fireDisableAccount(accountId)
-    }
-
-    /**
-     * Prune deleted managed-account references only when we have an account-complete view:
-     * - StdAccountList: full managed-source inventory
-     * - Single-account rebuild commands: targeted inventory for the account being rebuilt
-     */
-    public shouldPruneDeletedManagedAccounts(): boolean {
-        return (
-            this.isAggregationAccountListMode() ||
-            this.commandType === StandardCommand.StdAccountRead ||
-            this.commandType === StandardCommand.StdAccountUpdate ||
-            this.commandType === StandardCommand.StdAccountEnable ||
-            this.commandType === StandardCommand.StdAccountDisable
-        )
     }
 
     /**
