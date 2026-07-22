@@ -72,14 +72,14 @@ export interface CallPolicy {
     abortSignal?: AbortSignal
 }
 
-export interface OffsetPaginate {
+interface OffsetPaginate {
     mode: 'sequential' | 'parallel'
     baseParams?: Record<string, unknown>
     limit?: number
     batchSize?: number
 }
 
-export interface SearchAfterPaginate {
+interface SearchAfterPaginate {
     mode: 'searchAfter'
     search: Record<string, unknown> & { indices: string[]; query: Record<string, unknown> }
 }
