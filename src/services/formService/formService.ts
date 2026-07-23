@@ -1039,17 +1039,8 @@ export class FormService {
         return accountInfo?.id
     }
 
-    /**
-     * Check if a managed account is present in this run's source inventory.
-     * Uses managedAccountsAllById (full snapshot), not managedAccountsById (work queue),
-     * because the queue is depleted during fetchFormData when completed forms remove entries.
-     */
     private managedAccountExists(accountId: string): boolean {
-        const allById = this.run.managedAccountsAllById
-        if (!allById) {
-            return false
-        }
-        return allById.has(accountId)
+        return this.run.hasManagedAccount(accountId)
     }
 
     /**
@@ -1071,28 +1062,34 @@ export class FormService {
         }
 
         const workQueue = this.run.managedAccountsById
-        const allById = this.run.managedAccountsAllById
         assert(workQueue, 'Managed accounts have not been loaded')
 
-        // Prefer work queue, then full snapshot — another form processed earlier in this
-        // run may have already removed the account from the queue only.
-        const account = workQueue.get(accountId) ?? allById.get(accountId)
-        if (!account) {
-            // Account not in this run's managed inventory, return undefined.
-            // The form will be deleted due to missing account check in analyzeFormInstances.
+        const queueAccount = workQueue.get(accountId)
+        const info = queueAccount ? undefined : this.run.getManagedAccountInfo(accountId)
+        if (!queueAccount && !info) {
             return undefined
         }
 
-        if (shouldRemoveAccountFromMap) {
-            this.sources.run.claimAccount(accountId, account.identityId)
+        if (shouldRemoveAccountFromMap && queueAccount) {
+            this.sources.run.claimAccount(accountId, queueAccount.identityId)
+        }
+
+        if (queueAccount) {
+            return {
+                id: accountId,
+                name: trimStr(queueAccount.name) || '',
+                sourceName: queueAccount.sourceName || '',
+                sourceId: readString(queueAccount, 'sourceId'),
+                nativeIdentity: queueAccount.nativeIdentity ?? undefined,
+            }
         }
 
         return {
             id: accountId,
-            name: trimStr(account.name) || '',
-            sourceName: account.sourceName || '',
-            sourceId: readString(account, 'sourceId'),
-            nativeIdentity: account.nativeIdentity ?? undefined,
+            name: info!.name,
+            sourceName: info!.sourceName,
+            sourceId: info!.sourceId,
+            nativeIdentity: info!.nativeIdentity,
         }
     }
 

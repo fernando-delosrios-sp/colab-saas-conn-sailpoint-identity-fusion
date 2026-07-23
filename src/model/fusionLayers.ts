@@ -16,7 +16,7 @@ import {
 import { IDENTITIES_SOURCE_NAME } from './fusionAccount'
 import { FusionMatch } from '../services/matchingService'
 import type { FusionCollections } from './fusionCollections'
-import type { FusionRun } from './fusionRun'
+import type { FusionRun, ManagedAccountInfo } from './fusionRun'
 import type { IdentityInfo } from './fusionAccountTypes'
 
 export interface AddManagedAccountOptions {
@@ -154,7 +154,6 @@ export class FusionLayers {
         setIscAccountId?: (id: string) => void,
         setSourceName?: (name: string) => void,
         invalidateSourceCache?: () => void,
-        allAccountsById?: Map<string, Account>,
         options: AddManagedAccountOptions = {}
     ): void {
         const {
@@ -193,13 +192,13 @@ export class FusionLayers {
         this._processIdentityMatchedAccounts(workQueue, addBlendHistory, skipBlendHistoryForManagedKeys, onBlend, identityInfo?.id)
         this._processPreviousRunMatchedAccounts(workQueue, addBlendHistory, skipBlendHistoryForManagedKeys, onBlend)
 
-        if (pruneDeleted && allAccountsById) {
-            this._pruneDeletedManagedAccounts(allAccountsById)
+        const inventoryKeys = new Set(workQueue.managedAccountInventory.keys())
+
+        if (pruneDeleted) {
+            this._pruneDeletedManagedAccounts(inventoryKeys)
         }
 
-        if (allAccountsById) {
-            this._preserveMissingAccountContext(allAccountsById)
-        }
+        this._preserveMissingAccountContext(workQueue.managedAccountInventory)
 
         if (this.collections.accountIds.size === 0) {
             const originFromAttributes = attributeBag.current?.originSource
@@ -386,21 +385,21 @@ export class FusionLayers {
         }
     }
 
-    private _preserveMissingAccountContext(allAccountsById: Map<string, Account>): void {
+    private _preserveMissingAccountContext(inventory: ReadonlyMap<string, ManagedAccountInfo>): void {
         for (const accountId of this.collections.missingAccountIds) {
             if (this.collections.managedAccountInfo.has(accountId)) continue
-            const account = allAccountsById.get(accountId)
-            if (!account?.sourceName) continue
+            const info = inventory.get(accountId)
+            if (!info?.sourceName) continue
             const parsed = parseManagedAccountKey(accountId)
-            const nativeId = trimStr(account.nativeIdentity ?? parsed?.nativeIdentity) || accountId
+            const nativeId = trimStr(info.nativeIdentity ?? parsed?.nativeIdentity) || accountId
             this.collections._internal_managedAccountInfo.set(accountId, {
-                source: { name: account.sourceName },
+                source: { name: info.sourceName },
                 schema: { id: nativeId },
             })
         }
     }
 
-    private _pruneDeletedManagedAccounts(allAccountsById: Map<string, Account>): void {
+    private _pruneDeletedManagedAccounts(inventoryKeys: ReadonlySet<string>): void {
         const trackedIds = new Set<string>([
             ...this.collections.accountIds,
             ...this.collections.missingAccountIds,
@@ -409,7 +408,7 @@ export class FusionLayers {
         let removedAnyReference = false
 
         for (const accountId of trackedIds) {
-            if (allAccountsById.has(accountId)) continue
+            if (inventoryKeys.has(accountId)) continue
 
             const removedFromAccounts = this.collections._internal_accountIds.delete(accountId)
             const removedFromMissing = this.collections._internal_missingAccountIds.delete(accountId)

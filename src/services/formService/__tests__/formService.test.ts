@@ -174,13 +174,21 @@ describe('FormService managed work queue synchronization', () => {
         } as any
 
         const managedAccountsById = new Map([[managedKey, managedAccount]])
-        const managedAccountsAllById = new Map([[managedKey, managedAccount]])
+        const managedAccountInventory = new Map([[managedKey, {
+            id: managedAccount.id,
+            name: managedAccount.name,
+            sourceName: managedAccount.sourceName,
+            sourceId: managedAccount.sourceId,
+            nativeIdentity: managedAccount.nativeIdentity,
+        }]])
         const managedAccountsByIdentityId = new Map([[identityId, new Set([managedKey])]])
 
         const run = {
             managedAccountsById,
-            managedAccountsAllById,
+            managedAccountInventory,
             managedAccountsByIdentityId,
+            hasManagedAccount: (key: string) => managedAccountInventory.has(key),
+            getManagedAccountInfo: (key: string) => managedAccountInventory.get(key),
             claimAccount: vi.fn((key: string, identityId?: string) => {
                 const deleted = managedAccountsById.delete(key)
                 if (identityId) {

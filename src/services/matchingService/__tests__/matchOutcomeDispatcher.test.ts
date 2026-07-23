@@ -57,7 +57,7 @@ describe('MatchOutcomeDispatcher', () => {
             refreshReverseCorrelationAttributes: vi.fn(),
             registerUniqueAttributes: vi.fn().mockResolvedValue(undefined),
         } as any
-        const sources = { managedAccountsAllById: new Map() } as any
+        const sources = { managedAccountInventory: new Map() } as any
         const accountAssembly = new AccountAssembly({
             run,
             sources,

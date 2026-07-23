@@ -3,6 +3,7 @@ import { ChainContext, MockRegistry } from '../framework/ChainContext'
 import { createOperationTestRegistry, SourceConfigLike } from '../../harness/operationTestRegistry'
 import { FusionAccount } from '../../../../model/fusionAccount'
 import { buildManagedAccountKey } from '../../../../model/managedAccountKey'
+import { toManagedAccountInfo } from '../../../../model/fusionRun'
 import {
     processAttributeMapping as _processAttributeMapping,
     buildAttributeMappingConfig as _buildAttributeMappingConfig,
@@ -210,12 +211,18 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         }
     }
     registry.sources.run.managedAccountsById = map
-    registry.sources.managedAccountsAllById = new Map(map)
+    registry.sources.run.managedAccountInventory.clear()
+    for (const [key, account] of map.entries()) {
+        registry.sources.run.managedAccountInventory.set(key, toManagedAccountInfo(account as any))
+    }
     registry.sources.run.managedAccountsByIdentityId = byIdentity
 
     registry.sources.fetchManagedAccounts = vi.fn().mockImplementation(async () => {
         registry.sources.run.managedAccountsById = map
-        registry.sources.managedAccountsAllById = new Map(map)
+        registry.sources.run.managedAccountInventory.clear()
+        for (const [key, account] of map.entries()) {
+            registry.sources.run.managedAccountInventory.set(key, toManagedAccountInfo(account as any))
+        }
         registry.sources.run.managedAccountsByIdentityId = byIdentity
     })
 
@@ -229,8 +236,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             )
             if (account) {
                 const key = buildManagedAccountKey(account) || account.id
-                registry.sources.run.managedAccountsById.set(key, account)
-                registry.sources.managedAccountsAllById.set(key, account)
+                registry.sources.run.setManagedAccount(key, account)
                 const identityId = account.identityId || account.identity?.id
                 if (identityId) {
                     let set = registry.sources.run.managedAccountsByIdentityId.get(identityId)
@@ -508,7 +514,6 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         fusionAccount.addIdentityLayer(identity)
         fusionAccount.addManagedAccountLayer(
             registry.sources.run,
-            registry.sources.managedAccountsAllById,
             { pruneDeleted: true, addBlendHistory: true }
         )
 

@@ -17,7 +17,7 @@ describe('AccountAssembly', () => {
     beforeEach(() => {
         mockRun = {
             managedAccountsById: new Map(),
-            managedAccountsAllById: new Map(),
+            managedAccountInventory: new Map(),
             registerFusionAccount: vi.fn(),
             recordFusionBlend: vi.fn(),
         }

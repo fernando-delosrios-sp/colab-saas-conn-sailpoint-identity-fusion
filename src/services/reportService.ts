@@ -225,16 +225,16 @@ export class ReportService {
             reviewerId ? urlContext.identity(reviewerId) : undefined
         const resolveAccountName = (managedAccountKey?: string): string | undefined => {
             if (!managedAccountKey) return undefined
-            const managedAccount = this.run?.managedAccountsAllById?.get(managedAccountKey)
-            const name = trimStr(managedAccount?.name)
+            const info = this.run?.getManagedAccountInfo(managedAccountKey)
+            const name = trimStr(info?.name)
             return name && name !== managedAccountKey ? name : undefined
         }
         const resolveAccountUrl = (managedAccountKey?: string, identityId?: string): string | undefined => {
             if (!managedAccountKey) return undefined
             const reportAccountId = this.sources?.resolveIscAccountIdForManagedKey?.(managedAccountKey)
             if (reportAccountId) return urlContext.humanAccount(reportAccountId)
-            const managedAccount = this.run?.managedAccountsAllById?.get(managedAccountKey)
-            const directIscId = trimStr(managedAccount?.id)
+            const info = this.run?.getManagedAccountInfo(managedAccountKey)
+            const directIscId = trimStr(info?.id)
             if (directIscId && directIscId !== managedAccountKey) {
                 return urlContext.humanAccount(directIscId)
             }

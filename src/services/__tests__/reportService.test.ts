@@ -47,8 +47,18 @@ describe('ReportService', () => {
         }
         const run = {
             ...{
-                managedAccountsAllById:
-                    (overrides.sources as any)?.managedAccountsAllById ?? new Map<string, any>(),
+                managedAccountInventory:
+                    (overrides.run as any)?.managedAccountInventory ??
+                    (overrides.sources as any)?.managedAccountInventory ??
+                    new Map<string, any>(),
+                hasManagedAccount: (key: string) =>
+                    ((overrides.run as any)?.managedAccountInventory ??
+                        (overrides.sources as any)?.managedAccountInventory ??
+                        new Map<string, any>()).has(key),
+                getManagedAccountInfo: (key: string) =>
+                    ((overrides.run as any)?.managedAccountInventory ??
+                        (overrides.sources as any)?.managedAccountInventory ??
+                        new Map<string, any>()).get(key),
             },
             ...(overrides.run ?? {}),
         }
@@ -112,13 +122,13 @@ describe('ReportService', () => {
     })
 
     it('prefers managed account display name over raw managed account key when building review decisions', () => {
-        const managedAccountsAllById = new Map<string, any>([
+        const managedAccountInventory = new Map<string, any>([
             ['key-1', { id: 'key-1', name: 'Human Account Display Name' }],
         ])
 
         const { service } = createService({
             sources: {
-                managedAccountsAllById,
+                managedAccountInventory,
             },
             forms: {
                 finishedFusionDecisions: [
@@ -144,13 +154,13 @@ describe('ReportService', () => {
     })
 
     it('prefers correlated identity display name over managed account name fallback for assign-existing decisions', () => {
-        const managedAccountsAllById = new Map<string, any>([
+        const managedAccountInventory = new Map<string, any>([
             ['key-1', { id: 'key-1', name: 'Raw Managed Name' }],
         ])
 
         const { service } = createService({
             sources: {
-                managedAccountsAllById,
+                managedAccountInventory,
             },
             identities: {
                 getIdentityById: vi.fn((id?: string) => (id ? { id, displayName: 'Correlated Identity Name' } : undefined)),

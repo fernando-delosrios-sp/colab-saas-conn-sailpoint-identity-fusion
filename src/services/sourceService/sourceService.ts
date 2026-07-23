@@ -75,8 +75,7 @@ export class SourceService {
      * deleted during processing, but this ensures any remaining references are cleared.
      */
     public clearManagedAccounts(): void {
-        this.run.clearWorkQueue()
-        this.run.managedAccountsAllById.clear()
+        this.run.clearManagedAccountState()
         this.log.debug('Managed accounts cache cleared from memory')
     }
 
@@ -647,7 +646,6 @@ export class SourceService {
                                 continue
                             }
                             this.run.setManagedAccount(accountKey, account)
-                            this.run.managedAccountsAllById.set(accountKey, account)
                             collectedCount++
                         }
                         if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) {
@@ -728,7 +726,6 @@ export class SourceService {
             return
         }
         this.run.setManagedAccount(accountKey, managedAccount)
-                    this.run.managedAccountsAllById.set(accountKey, managedAccount)
     }
 
     /**
@@ -738,8 +735,11 @@ export class SourceService {
     public resolveIscAccountIdForManagedKey(managedKey: string): string | undefined {
         const key = trimStr(managedKey)
         if (key === undefined) return undefined
-        const account = this.run.managedAccountsAllById.get(key) ?? this.run.managedAccountsById.get(key)
-        return trimStr(account?.id)
+        const queueAccount = this.run.managedAccountsById.get(key)
+        if (queueAccount) {
+            return trimStr(queueAccount.id)
+        }
+        return trimStr(this.run.getManagedAccountInfo(key)?.id)
     }
 
     /**
