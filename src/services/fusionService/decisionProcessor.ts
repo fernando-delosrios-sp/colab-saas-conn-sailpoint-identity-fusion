@@ -52,7 +52,7 @@ export class DecisionProcessor {
         }
 
         // Clear stale transient state, re-apply candidate statuses, and sync attributes.
-        for (const account of this.run.allFusionAccounts) {
+        for (const account of this.run.fusionAccountsIterable()) {
             account.removeStatus(StatusEntitlement.Candidate)
             account.clearFusionReviews()
 
@@ -259,3 +259,4 @@ export class DecisionProcessor {
         }
     }
 }
+

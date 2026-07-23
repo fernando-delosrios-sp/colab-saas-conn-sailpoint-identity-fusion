@@ -680,7 +680,7 @@ export class FusionService {
         // isCorrelatedManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
         // of scanning fusionAccountMap + identity-linked Fusion account map (O(A+I)) for every correlated account.
         this.run.initLinkedAccountIndex()
-        for (const fa of this.run.allFusionAccounts) {
+        for (const fa of this.run.fusionAccountsIterable()) {
             for (const key of fa.accountIdsSet) this.run.addToLinkedAccountIndex(key)
             for (const key of fa.missingAccountIdsSet) this.run.addToLinkedAccountIndex(key)
         }

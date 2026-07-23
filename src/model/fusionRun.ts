@@ -91,6 +91,7 @@ export class FusionRun {
     private _pendingReviewUrlsByCandidateId: Map<string, string[]> = new Map()
     fusionBlends: FusionReportBlend[] = []
     matchScoringMs = 0
+    fullScanFallbackCount = 0
     analysisRecorder?: ManagedAccountAnalysisRecorder
     phaseTimings: { phase: string; elapsed: string }[] = []
     private _pendingDisableOperations = new Set<Promise<void>>()
