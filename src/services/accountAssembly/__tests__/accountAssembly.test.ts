@@ -3,7 +3,6 @@ import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { AccountAssembly, AccountAssemblyDeps } from '../accountAssembly'
 import { FusionAccount } from '../../../model/account'
-import { OperationContext } from '../../../model/operationContext'
 
 describe('AccountAssembly', () => {
     let mockRun: any
@@ -56,7 +55,7 @@ describe('AccountAssembly', () => {
         })
 
         it('returns true when operationContext is AccountList', () => {
-            const listDeps = { ...deps, commandType: undefined, operationContext: OperationContext.AccountList }
+            const listDeps = { ...deps, commandType: undefined, isAggregationMode: true }
             const listAssembly = new AccountAssembly(listDeps)
             expect(listAssembly.isAggregationAccountListMode()).toBe(true)
         })

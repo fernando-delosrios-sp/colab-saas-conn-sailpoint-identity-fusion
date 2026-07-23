@@ -4,7 +4,6 @@ import { FusionConfig, SourceType } from '../../model/config'
 import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
 import { FusionRun } from '../../model/fusionRun'
-import { OperationContext } from '../../model/operationContext'
 import { LogService, PhaseTimer } from '../logService'
 import { SourceInfo } from '../sourceService'
 import { FormService } from '../formService'
@@ -225,7 +224,6 @@ export interface MatchOutcomeDispatcherDeps {
     readonly forms: FormService
     readonly decisionProcessor: DecisionProcessor
     readonly commandType?: StandardCommand
-    readonly operationContext?: OperationContext
 }
 
 /**

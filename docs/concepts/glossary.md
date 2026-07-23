@@ -28,7 +28,7 @@ This page defines the canonical terms used throughout the connector, its configu
 
 | Term | Definition |
 |------|------------|
-| **Operation** | A connector entry point such as `std:account:list` (the **accountList operation**) or `custom:dryrun` (the **dryRun operation**). The operation is the command definition. |
+| **Operation** | A connector entry point such as `std:account:list` (the **accountList operation**). The operation is the command definition. The accountList operation supports an optional **dry-run mode** (`dryRun.enabled: true` on the input) for non-persistent analysis. |
 | **Operation run** | A single execution or instance of an operation. A run is the execution of an operation. |
 | **Phase** | A major stage of an operation pipeline (for example the identity documents phase, the Fusion accounts phase, the managed accounts phase, or the report phase). |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |

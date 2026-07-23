@@ -18,8 +18,6 @@ import { accountEnable } from './operations/accountEnable'
 import { accountDisable } from './operations/accountDisable'
 import { entitlementList } from './operations/entitlementList'
 import { accountDiscoverSchema } from './operations/accountDiscoverSchema'
-import { dryRun } from './operations/dryRun'
-
 import { resolveIdentityNameFromCreateInput } from './utils/identityName'
 
 /**
@@ -80,13 +78,5 @@ export const connector = async () => {
                 errorMessage: 'Failed to discover schema',
             })
         )
-        .command(
-            'custom:dryrun',
-            createOperationHandler('custom:dryrun', dryRun, config, {
-                errorMessage: 'Failed to run custom:dryrun',
-                // Long fetch/analyze phases send no row output; peers often idle-timeout (~60s) before the first NDJSON line.
-                keepAlive: 'simple',
-                keepAliveIntervalMs: 15_000,
-            })
-        )
+
 }

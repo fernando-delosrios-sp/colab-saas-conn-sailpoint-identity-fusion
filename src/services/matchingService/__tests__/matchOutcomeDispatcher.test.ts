@@ -4,7 +4,6 @@ import { FusionAccount } from '../../../model/account'
 import { FusionConfig, SourceType } from '../../../model/config'
 import { FusionRun } from '../../../model/fusionRun'
 import { AggregationTracker } from '../../../model/aggregationTracker'
-import { OperationContext } from '../../../model/operationContext'
 import { AccountAssembly } from '../../accountAssembly'
 import { MatchingService } from '../matchingService'
 import { MatchOutcomeDispatcher } from '../matchOutcomeDispatcher'
@@ -28,7 +27,7 @@ describe('MatchOutcomeDispatcher', () => {
 
     function createDispatcher(options: {
         commandType?: StandardCommand
-        operationContext?: OperationContext
+        isAggregationMode?: boolean
         configOverrides?: Partial<FusionConfig>
         tracker?: AggregationTracker
     } = {}) {
@@ -67,7 +66,7 @@ describe('MatchOutcomeDispatcher', () => {
             log,
             config,
             commandType: options.commandType,
-            operationContext: options.operationContext,
+            isAggregationMode: options.isAggregationMode,
         })
         const forms = {
             createFusionForm: vi.fn().mockResolvedValue({
@@ -91,7 +90,6 @@ describe('MatchOutcomeDispatcher', () => {
             forms,
             decisionProcessor,
             commandType: options.commandType,
-            operationContext: options.operationContext,
         })
 
         return {
@@ -370,7 +368,7 @@ describe('MatchOutcomeDispatcher', () => {
 
         it('uses operation context to qualify account-list mode for exact matches', async () => {
             const { dispatcher, matchingService, forms, decisionProcessor, run } = createDispatcher({
-                operationContext: OperationContext.AccountList,
+                isAggregationMode: true,
                 configOverrides: { fusionEnableAutoAssignment: true, fusionAutoAssignmentScore: 100 },
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())

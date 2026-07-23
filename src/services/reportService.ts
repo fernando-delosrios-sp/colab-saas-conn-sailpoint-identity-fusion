@@ -18,8 +18,6 @@ import { compileEmailTemplates, renderFusionReport, FusionReportEmailData } from
 import { registerHandlebarsHelpers } from './emailService/messagingHandlebarsRegistration'
 import { sanitizeRecipients } from './emailService/email'
 
-type DryRunRuntimeOptions = { writeToDisk?: boolean; sendReportTo?: string[] }
-
 type DryRunStats = AggregationStats & FusionReportStats
 
 const toReportDecision = (
@@ -93,7 +91,6 @@ export class ReportService {
     public static readonly DRY_RUN_REPORT_TYPE = 'aggregation' as const
     public static readonly DRY_RUN_REPORT_TITLE = 'Identity Fusion Dry Run Report'
     public static readonly FUSION_REPORT_EMAIL_TITLE = 'Identity Fusion Report'
-    private dryRunRuntimeOptions: DryRunRuntimeOptions = {}
 
     constructor(
         private baseurl: string,
@@ -105,11 +102,6 @@ export class ReportService {
         private email: EmailService,
         private run: FusionRun
     ) {}
-
-    /** Configure operation-scoped dry-run report output behavior. */
-    public setDryRunRuntimeOptions(runtimeOptions: DryRunRuntimeOptions): void {
-        this.dryRunRuntimeOptions = { ...runtimeOptions }
-    }
 
     /** Ensure the local report output directory exists and return its absolute path. */
     public async ensureReportOutputDirectoryExists(subdir: string = ReportService.REPORT_DISK_SUBDIR): Promise<string> {
@@ -315,11 +307,13 @@ export class ReportService {
         report: FusionReport
         finalDryRunStats: AggregationStats
         reportPhaseStartedAt?: number
+        saveFile?: boolean
+        sendEmail?: string | string[]
     }): Promise<{ reportHtmlOutputPath?: string; statsWithPhaseTiming: AggregationStats }> {
-        const { report, finalDryRunStats, reportPhaseStartedAt } = args
-        const runtimeOptions = this.dryRunRuntimeOptions
-        const shouldWriteHtmlReport = runtimeOptions.writeToDisk ?? true
-        const shouldSendReportEmail = Array.isArray(runtimeOptions.sendReportTo) && runtimeOptions.sendReportTo.length > 0
+        const { report, finalDryRunStats, reportPhaseStartedAt, saveFile, sendEmail } = args
+        const shouldWriteHtmlReport = saveFile ?? true
+        const recipients = Array.isArray(sendEmail) ? sendEmail : (sendEmail ? [sendEmail] : [])
+        const shouldSendReportEmail = recipients.length > 0
 
         const reportElapsedMs =
             typeof reportPhaseStartedAt === 'number' ? Math.max(0, Date.now() - reportPhaseStartedAt) : 0
@@ -351,7 +345,7 @@ export class ReportService {
 
         if (shouldSendReportEmail) {
             await this.deliverReportToRecipients(emailReport, {
-                recipients: runtimeOptions.sendReportTo ?? [],
+                recipients,
                 reportType: ReportService.DRY_RUN_REPORT_TYPE,
                 reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
             })
@@ -365,7 +359,6 @@ export class ReportService {
         fetchResult?: any
         totalProcessingTime?: string
         phaseTiming?: any
-        includeNonMatches?: boolean
     }): { report: FusionReport; stats: AggregationStats } {
         const stats: AggregationStats = {
             identitiesFound: args.fetchResult?.stats?.identitiesFound ?? 0,
@@ -374,7 +367,7 @@ export class ReportService {
             phaseTiming: args.phaseTiming,
         }
         const tracker = this.fusion.tracker
-        const report = this.fusion.generateReport(tracker, args.includeNonMatches ?? true, stats)
+        const report = this.fusion.generateReport(tracker, false, stats)
         return { report, stats }
     }
 
@@ -384,6 +377,8 @@ export class ReportService {
         fetchResult?: any
         totalProcessingTime?: string
         phaseBreakdownThroughOutput?: any
+        saveFile?: boolean
+        sendEmail?: string | string[]
     }): Promise<{ reportHtmlOutputPath?: string }> {
         const finalDryRunStats: AggregationStats = {
             identitiesFound: args.fetchResult?.stats?.identitiesFound ?? 0,
@@ -393,7 +388,9 @@ export class ReportService {
         }
         const { reportHtmlOutputPath } = await this.writeAndSendDryRunReport({
             report: args.report,
-            finalDryRunStats
+            finalDryRunStats,
+            saveFile: args.saveFile,
+            sendEmail: args.sendEmail,
         })
         return { reportHtmlOutputPath }
     }
@@ -404,12 +401,13 @@ export class ReportService {
     public async generateDryRunReport(args: {
         aggregationStats: AggregationStats
         reportPhaseStartedAt?: number
-        writeToDiskOverride?: boolean
+        saveFile?: boolean
+        sendEmail?: string | string[]
     }): Promise<{ reportHtmlOutputPath?: string; statsWithPhaseTiming: AggregationStats }> {
-        const { aggregationStats, reportPhaseStartedAt, writeToDiskOverride } = args
-        const runtimeOptions = this.dryRunRuntimeOptions
-        const shouldWriteHtmlReport = writeToDiskOverride ?? runtimeOptions.writeToDisk ?? true
-        const shouldSendReportEmail = Array.isArray(runtimeOptions.sendReportTo) && runtimeOptions.sendReportTo.length > 0
+        const { aggregationStats, reportPhaseStartedAt, saveFile, sendEmail } = args
+        const shouldWriteHtmlReport = saveFile ?? true
+        const recipients = Array.isArray(sendEmail) ? sendEmail : (sendEmail ? [sendEmail] : [])
+        const shouldSendReportEmail = recipients.length > 0
 
         const reportElapsedMs =
             typeof reportPhaseStartedAt === 'number' ? Math.max(0, Date.now() - reportPhaseStartedAt) : 0
@@ -452,7 +450,7 @@ export class ReportService {
 
         if (shouldSendReportEmail) {
             await this.deliverReportToRecipients(emailReport, {
-                recipients: runtimeOptions.sendReportTo ?? [],
+                recipients,
                 reportType: ReportService.DRY_RUN_REPORT_TYPE,
                 reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
             })

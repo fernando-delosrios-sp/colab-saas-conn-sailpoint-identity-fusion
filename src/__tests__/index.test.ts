@@ -11,7 +11,6 @@ import { accountEnable } from '../operations/accountEnable'
 import { accountDisable } from '../operations/accountDisable'
 import { entitlementList } from '../operations/entitlementList'
 import { accountDiscoverSchema } from '../operations/accountDiscoverSchema'
-import { dryRun } from '../operations/dryRun'
 import type { Mock } from 'vitest'
 
 vi.mock('@sailpoint/connector-sdk', () => ({ createConnector: vi.fn() }))
@@ -26,7 +25,6 @@ vi.mock('../operations/accountEnable', () => ({ accountEnable: vi.fn() }))
 vi.mock('../operations/accountDisable', () => ({ accountDisable: vi.fn() }))
 vi.mock('../operations/entitlementList', () => ({ entitlementList: vi.fn() }))
 vi.mock('../operations/accountDiscoverSchema', () => ({ accountDiscoverSchema: vi.fn() }))
-vi.mock('../operations/dryRun', () => ({ dryRun: vi.fn() }))
 
 describe('connector factory', () => {
     let mockConnector: any
@@ -110,17 +108,6 @@ describe('connector factory', () => {
                 errorMessage: 'Failed to discover schema',
             })
         )
-        expect(createOperationHandler).toHaveBeenCalledWith(
-            'custom:dryrun',
-            dryRun,
-            config,
-            expect.objectContaining({
-                errorMessage: 'Failed to run custom:dryrun',
-                keepAlive: 'simple',
-                keepAliveIntervalMs: 15000,
-            })
-        )
-
         // Verify operations were bound
         expect(mockConnector.stdTestConnection).toHaveBeenCalledWith('handler_testConnection')
         expect(mockConnector.stdAccountList).toHaveBeenCalledWith('handler_accountList')
@@ -131,7 +118,6 @@ describe('connector factory', () => {
         expect(mockConnector.stdAccountDisable).toHaveBeenCalledWith('handler_accountDisable')
         expect(mockConnector.stdEntitlementList).toHaveBeenCalledWith('handler_entitlementList')
         expect(mockConnector.stdAccountDiscoverSchema).toHaveBeenCalledWith('handler_accountDiscoverSchema')
-        expect(mockConnector.command).toHaveBeenCalledWith('custom:dryrun', 'handler_custom:dryrun')
     })
 
     it('should test errorMessage function callbacks correctly', async () => {

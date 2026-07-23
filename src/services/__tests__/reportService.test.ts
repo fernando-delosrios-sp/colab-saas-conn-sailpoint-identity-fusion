@@ -301,10 +301,10 @@ describe('ReportService', () => {
             phaseTiming: [],
         }
 
-        service.setDryRunRuntimeOptions({ sendReportTo: ['reviewer@example.com'] })
         await service.writeAndSendDryRunReport({
             report,
             finalDryRunStats,
+            sendEmail: ['reviewer@example.com'],
         })
 
         expect(deps.email.sendEmail).toHaveBeenCalledTimes(1)
