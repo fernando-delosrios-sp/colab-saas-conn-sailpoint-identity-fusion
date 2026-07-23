@@ -2,6 +2,9 @@
 
 ## 2.2.0
 
+- (2026-07-23) **Performance:** Replaced boolean match-flag arrays in `jaroSimilarity` with zero-initialized `Uint8Array` buffers — same Jaro-Winkler scores, less allocation overhead on hot string comparisons.
+- (2026-07-23) **Observability:** Added run-scoped `fullScanFallbackCount` on `FusionRun` when trigram candidate blocking falls back to a full identity scan (managed account missing all mandatory trigram attributes). `MatchingService.getCandidates` emits throttled warnings (first 5, then every 100th); `accountList` process phase logs a run summary when the count is non-zero.
+- (2026-07-23) **Performance:** Added `fusionAccountsIterable()` on `FusionRun` for zero-copy iteration over fusion accounts; linked-account index build and decision processing now iterate without `Array.from`/`allFusionAccounts` copies. Defensive-copy getter preserved for callers that mutate arrays.
 - (2026-07-23) **Resilience:** Hardened HTTPS connection pooling in `SdkApiAdapter` with explicit socket bounds (`maxSockets: 50`, `maxFreeSockets: 10`, `keepAliveMsecs: 30s`, `timeout: 60s`) so burst ISC API traffic reuses connections without unbounded socket growth. Client-service spec updated; `sdkApiAdapter.test.ts` covers agent options and shared `Configuration` wiring.
 - (2026-07-23) **Performance:** Replaced the dual full-Account snapshot (`managedAccountsAllById`) with a lightweight `managedAccountInventory` on `FusionRun`. Work queue depletion no longer requires retaining every `Account` object through output phase; form, report, and fusion-layer consumers use `hasManagedAccount` / `getManagedAccountInfo` accessors. Snapshot/restore serializes inventory metadata instead of full accounts.
 - (2026-07-23) **Performance:** Identity-sweep non-match comparisons no longer allocate `ScoreReport[]` breakdown arrays or skipped-report padding. Fast path uses combined-score totals only (`evaluateRuleTotals`); LIG3 upper-bound checks avoid skip `ScoreReport` allocation. Threshold-passing matches re-run once with full breakdown (matches are rare). Deferred candidates and report-capture runs unchanged. Wired via `MatchingService.setCaptureBreakdown()` from `FusionService.initializeManagedAccountProcessing`. LIG3 upper-bound helpers colocated in `scoringHelpers` (`lig3UpperBound`, `lig3UpperBoundSkipIfUnreachable`).
@@ -101,6 +104,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 

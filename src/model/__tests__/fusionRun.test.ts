@@ -27,6 +27,7 @@ describe('FusionRun', () => {
         expect(run.fusionIdentityDecisions.length).toBe(0)
         expect(run.fusionBlends).toEqual([])
         expect(run.matchScoringMs).toBe(0)
+        expect(run.fullScanFallbackCount).toBe(0)
         expect(run.pendingDisableOperationsCount).toBe(0)
     })
 
@@ -73,6 +74,20 @@ describe('FusionRun', () => {
         expect(run.isAutoAssigned('id-1')).toBe(true)
         expect(run.isAutoAssigned('id-2')).toBe(true)
         expect(run.isAutoAssigned('id-3')).toBe(false)
+    })
+
+    it('fusionAccountsIterable yields registered accounts without copying the map', () => {
+        const run = new FusionRun()
+        const fa1 = { name: 'fa1', managedKey: 'k1' } as FusionAccount
+        const fa2 = { name: 'fa2', managedKey: 'k2' } as FusionAccount
+        run.registerFusionAccount(fa1)
+        run.registerFusionAccount(fa2)
+
+        expect([...run.fusionAccountsIterable()]).toEqual([fa1, fa2])
+
+        const copied = run.allFusionAccounts
+        copied.pop()
+        expect(run.fusionAccountMap.size).toBe(2)
     })
 
     describe('disable operations', () => {
@@ -298,3 +313,4 @@ function makeMockRecorder(options: { tracker: AggregationTracker }) {
     }
     return recorder
 }
+

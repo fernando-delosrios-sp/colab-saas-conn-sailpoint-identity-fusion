@@ -220,9 +220,14 @@ export class MatchingService {
      * The returned Set already has `excludeIds` applied, so the caller can iterate it directly.
      *
      * @param account - The managed account being scored
+     * @param log - Optional logger; when provided, throttled warnings are emitted on full-scan fallback
      * @param excludeIds - Identity IDs to exclude from the candidate set (e.g. auto-assigned identities)
      */
-    public getCandidates(account: FusionAccount, excludeIds?: ReadonlySet<string>): Set<FusionAccount> | undefined {
+    public getCandidates(
+        account: FusionAccount,
+        log?: LogService,
+        excludeIds?: ReadonlySet<string>
+    ): Set<FusionAccount> | undefined {
         if (!this.run || !this.run.trigramIndexBuilt || this.run.indexedMandatoryAttributes.length === 0) return undefined
 
         let resultSet: Set<FusionAccount> | undefined
@@ -248,6 +253,15 @@ export class MatchingService {
 
         if (resultSet === undefined) {
             // All mandatory attributes were missing on this account — fall back to full scan.
+            if (this.run) {
+                this.run.fullScanFallbackCount = (this.run.fullScanFallbackCount ?? 0) + 1
+                const fallbackCount = this.run.fullScanFallbackCount
+                if (log && (fallbackCount <= 5 || fallbackCount % 100 === 0)) {
+                    log.warn(
+                        `Full identity scan fallback #${fallbackCount}: account has no value for any mandatory trigram attribute`
+                    )
+                }
+            }
             return undefined
         }
 

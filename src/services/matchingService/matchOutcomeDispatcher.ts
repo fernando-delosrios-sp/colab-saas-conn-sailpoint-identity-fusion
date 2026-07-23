@@ -100,7 +100,7 @@ async function scoreManagedAccounts(
                 config.fusionEnableAutoAssignment && run.autoAssignedIdentityIds.size > 0
                     ? run.autoAssignedIdentityIds
                     : undefined
-            const candidateSet = matchingService.getCandidates(fusionAccount, excludeIds)
+            const candidateSet = matchingService.getCandidates(fusionAccount, log, excludeIds)
             const identityPool: Iterable<FusionAccount> =
                 candidateSet ?? (excludeIds ? run.fusionIdentitiesExcluding(excludeIds) : run.allFusionIdentities)
             const scoringStarted = Date.now()
@@ -601,4 +601,5 @@ function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 
             return 'nonMatch'
     }
 }
+
 

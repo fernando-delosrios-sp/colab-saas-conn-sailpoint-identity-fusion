@@ -252,6 +252,12 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Ph
     const { processed, matchScoringMs } = await fusion.processUncorrelatedManagedAccounts()
     managedAccountsOp.done({ analyzed: processed, matchScoringMs })
 
+    if (sources.run.fullScanFallbackCount > 0) {
+        log.warn(
+            `Full identity scan fallback: ${sources.run.fullScanFallbackCount} account(s) — trigram blocking was ineffective`
+        )
+    }
+
     if (isPersistent) {
         log.info('Waiting for pending disable operations')
         await fusion.awaitPendingDisableOperations()
@@ -410,3 +416,4 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+

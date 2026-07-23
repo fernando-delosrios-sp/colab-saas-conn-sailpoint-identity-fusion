@@ -3,6 +3,7 @@ import { MatchingService, COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchingServic
 import { FusionAccount } from '../../../model/account'
 import { MatchCandidateType } from '../types'
 import { FusionConfig } from '../../../model/config'
+import { FusionRun } from '../../../model/fusionRun'
 
 describe('MatchingService', () => {
     const mockLog = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as any
@@ -174,6 +175,113 @@ describe('MatchingService', () => {
             expect(fastPathSpy).not.toHaveBeenCalled()
         })
     })
+
+    describe('getCandidates full-scan fallback', () => {
+        const mandatoryRule = {
+            attribute: 'email',
+            algorithm: 'binary' as const,
+            fusionScore: 100,
+            mandatory: true,
+        }
+
+        it('increments fullScanFallbackCount when mandatory attributes are missing', () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { email: 'foo@example.com' },
+            } as any)
+            service.buildTrigramIndex([identity])
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: {},
+            } as any)
+
+            expect(service.getCandidates(managed, mockLog)).toBeUndefined()
+            expect(run.fullScanFallbackCount).toBe(1)
+        })
+
+        it('does not increment fullScanFallbackCount when trigram index is not built', () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: {},
+            } as any)
+
+            expect(service.getCandidates(managed, mockLog)).toBeUndefined()
+            expect(run.fullScanFallbackCount).toBe(0)
+        })
+
+        it('accumulates fullScanFallbackCount across multiple accounts', () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { email: 'foo@example.com' },
+            } as any)
+            service.buildTrigramIndex([identity])
+
+            const managed1 = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: {},
+            } as any)
+            const managed2 = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-2',
+                attributes: {},
+            } as any)
+
+            service.getCandidates(managed1, mockLog)
+            service.getCandidates(managed2, mockLog)
+
+            expect(run.fullScanFallbackCount).toBe(2)
+        })
+
+        it('emits throttled warning log on first full-scan fallback', () => {
+            const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+            const run = new FusionRun(log)
+            const service = new MatchingService(
+                { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
+                log,
+                run
+            )
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { email: 'foo@example.com' },
+            } as any)
+            service.buildTrigramIndex([identity])
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: {},
+            } as any)
+
+            service.getCandidates(managed, log)
+
+            expect(log.warn).toHaveBeenCalledWith(
+                'Full identity scan fallback #1: account has no value for any mandatory trigram attribute'
+            )
+        })
+    })
 })
+
 
 

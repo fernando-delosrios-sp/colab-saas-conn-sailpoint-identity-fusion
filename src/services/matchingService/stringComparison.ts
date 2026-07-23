@@ -47,9 +47,9 @@ function jaroSimilarity(s1: string, s2: string): number {
     const matchWindow = Math.floor(Math.max(len1, len2) / 2) - 1
     if (matchWindow < 0) return 0.0
 
-    // Track matches
-    const s1Matches = new Array(len1).fill(false)
-    const s2Matches = new Array(len2).fill(false)
+    // Track matches (Uint8Array avoids Array.fill overhead on hot path)
+    const s1Matches = new Uint8Array(len1)
+    const s2Matches = new Uint8Array(len2)
 
     let matches = 0
     let transpositions = 0
@@ -61,8 +61,8 @@ function jaroSimilarity(s1: string, s2: string): number {
 
         for (let j = start; j < end; j++) {
             if (s2Matches[j] || s1[i] !== s2[j]) continue
-            s1Matches[i] = true
-            s2Matches[j] = true
+            s1Matches[i] = 1
+            s2Matches[j] = 1
             matches++
             break
         }
@@ -138,3 +138,4 @@ export const jaroWinkler = {
 export const diceCoefficient = {
     similarity: diceCoefficientSimilarity,
 }
+
