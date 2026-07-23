@@ -137,6 +137,20 @@ describe('MatchOutcomeDispatcher', () => {
         }
     }
 
+    function trackMaxConcurrentScoring(matchingService: MatchingService, candidateType: 'identity' | 'deferred') {
+        let inFlight = 0
+        let maxInFlight = 0
+        vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (_account, _pool, type) => {
+            if (type !== candidateType) return 0
+            inFlight += 1
+            maxInFlight = Math.max(maxInFlight, inFlight)
+            await new Promise<void>((resolve) => setImmediate(resolve))
+            inFlight -= 1
+            return 0
+        })
+        return () => maxInFlight
+    }
+
     describe('runMatchSweep', () => {
         it('dispatches an exact match to automatic assignment when the combined score meets the threshold', async () => {
             const { dispatcher, matchingService, forms, decisionProcessor, run } = createDispatcher({
@@ -387,6 +401,93 @@ describe('MatchOutcomeDispatcher', () => {
             expect(forms.registerFinishedDecision).toHaveBeenCalled()
         })
 
+        it('processes a large batch when scoring concurrency is capped', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { scoringMaxConcurrency: 5 },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: false } }))
+
+            const maxConcurrent = trackMaxConcurrentScoring(matchingService, 'identity')
+            const accounts = Array.from({ length: 50 }, (_, index) =>
+                managedAccount({
+                    id: `acct-${index}`,
+                    nativeIdentity: `native-${index}`,
+                    name: `Managed Account ${index}`,
+                })
+            )
+
+            const result = await dispatcher.runMatchSweep(accounts, 50)
+
+            expect(result.processed).toBe(50)
+            expect(result.nonMatch).toBe(50)
+            expect(maxConcurrent()).toBeLessThanOrEqual(5)
+        })
+
+        it('defaults identity scoring concurrency to 12 for large batches', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: false } }))
+
+            const maxConcurrent = trackMaxConcurrentScoring(matchingService, 'identity')
+            const accounts = Array.from({ length: 100 }, (_, index) =>
+                managedAccount({
+                    id: `acct-${index}`,
+                    nativeIdentity: `native-${index}`,
+                    name: `Managed Account ${index}`,
+                })
+            )
+
+            const result = await dispatcher.runMatchSweep(accounts, 100)
+
+            expect(result.processed).toBe(100)
+            expect(maxConcurrent()).toBeLessThanOrEqual(12)
+        })
+
+        it('does not exceed batch slice size when scoring concurrency is higher', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { scoringMaxConcurrency: 12 },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: false } }))
+
+            const maxConcurrent = trackMaxConcurrentScoring(matchingService, 'identity')
+            const accounts = Array.from({ length: 3 }, (_, index) =>
+                managedAccount({
+                    id: `acct-${index}`,
+                    nativeIdentity: `native-${index}`,
+                    name: `Managed Account ${index}`,
+                })
+            )
+
+            await dispatcher.runMatchSweep(accounts, 3)
+
+            expect(maxConcurrent()).toBeLessThanOrEqual(3)
+        })
+
+        it('caps deferred-phase scoring concurrency', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { scoringMaxConcurrency: 5 },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: true } }))
+
+            const maxDeferredConcurrent = trackMaxConcurrentScoring(matchingService, 'deferred')
+            const accounts = Array.from({ length: 20 }, (_, index) =>
+                managedAccount({
+                    id: `acct-${index}`,
+                    nativeIdentity: `native-${index}`,
+                    name: `Managed Account ${index}`,
+                })
+            )
+
+            const result = await dispatcher.runMatchSweep(accounts, 20)
+
+            expect(result.processed).toBe(20)
+            expect(maxDeferredConcurrent()).toBeLessThanOrEqual(5)
+        })
+
         it('only includes deferred candidates from the same source', async () => {
             const { dispatcher, matchingService, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
@@ -458,3 +559,4 @@ describe('MatchOutcomeDispatcher', () => {
         })
     })
 })
+

@@ -20,6 +20,7 @@
         "fusionManualReviewScore": 80,
         "provisioningTimeout": 300,
         "managedAccountsBatchSize": 100,
+        "scoringMaxConcurrency": 12,
         "fusionMaxCandidatesForForm": 3,
         "includeIdentities": true,
         "identityScopeQuery": "*",
@@ -1068,6 +1069,13 @@
                             "type": "number",
                             "required": false,
                             "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100."
+                        },
+                        {
+                            "key": "scoringMaxConcurrency",
+                            "label": "Scoring concurrency limit",
+                            "type": "number",
+                            "required": false,
+                            "helpKey": "Maximum concurrent identity-comparison scoring operations during managed-account analysis. Default 12. Higher values increase CPU and memory usage."
                         }
                     ]
                 },

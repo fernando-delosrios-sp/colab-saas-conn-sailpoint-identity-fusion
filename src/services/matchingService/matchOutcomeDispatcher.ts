@@ -23,6 +23,7 @@ import { hasValue } from '../../utils/safeRead'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
+import { promiseAllBatched, getScoringMaxConcurrency } from '../fusionService/collections'
 
 /**
  * Narrow seam for the service that applies a FusionDecision to an identity.
@@ -83,6 +84,7 @@ async function scoreManagedAccounts(
     const results: ManagedAccountMatchingResult[] = []
     const pendingDeferred: { analysis: ManagedAccountAnalysisContext; account: Account }[] = []
     const maxCandidatesForForm = config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
+    const scoringConcurrency = Math.max(1, Math.min(batchSize, getScoringMaxConcurrency(config)))
 
     const scoreIdentityCandidates = async (account: Account): Promise<ManagedAccountAnalysisContext> => {
         const { name, sourceName } = account
@@ -141,7 +143,11 @@ async function scoreManagedAccounts(
 
     for (let i = 0; i < accounts.length; i += batchSize) {
         const batch = accounts.slice(i, i + batchSize)
-        const identityResults = await Promise.all(batch.map((account) => scoreIdentityCandidates(account)))
+        const identityResults = await promiseAllBatched(
+            batch,
+            (account) => scoreIdentityCandidates(account),
+            scoringConcurrency
+        )
         for (let j = 0; j < identityResults.length; j++) {
             const analysis = identityResults[j]
             const account = batch[j]
@@ -159,15 +165,17 @@ async function scoreManagedAccounts(
 
     for (let i = 0; i < pendingDeferred.length; i += batchSize) {
         const batch = pendingDeferred.slice(i, i + batchSize)
-        await Promise.all(
-            batch.map(async (pending) => {
+        await promiseAllBatched(
+            batch,
+            async (pending) => {
                 await scoreDeferredCandidates(pending.analysis)
                 if (hasDeferredCandidateMatches(pending.analysis.fusionAccount)) {
                     results.push({ analysis: pending.analysis, resolution: 'deferred-match' })
                 } else {
                     results.push({ analysis: pending.analysis, resolution: 'non-match' })
                 }
-            })
+            },
+            scoringConcurrency
         )
         await yieldToEventLoop()
     }
@@ -593,3 +601,4 @@ function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 
             return 'nonMatch'
     }
 }
+

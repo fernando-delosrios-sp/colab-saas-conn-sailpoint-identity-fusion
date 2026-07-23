@@ -136,7 +136,17 @@ export function getFusionParallelBatchSize(config: FusionConfig): number {
     return Math.max(1, Math.min(getManagedAccountsBatchSize(config), 12))
 }
 
+/**
+ * Configured concurrency cap for managed-account identity and deferred scoring.
+ * Defaults to 12 (same as fusion parallel cap) but is independent of
+ * {@link getManagedAccountsBatchSize} batch grouping.
+ */
+export function getScoringMaxConcurrency(config: FusionConfig): number {
+    return Math.max(1, Math.min(config.scoringMaxConcurrency ?? runtimeDefaults.scoringMaxConcurrency, 50))
+}
+
 /** Yield at most this often while draining the managed-account queue. */
 export function getManagedAccountEventLoopYieldEvery(config: FusionConfig): number {
     return Math.max(1, Math.min(getManagedAccountsBatchSize(config), 25))
 }
+

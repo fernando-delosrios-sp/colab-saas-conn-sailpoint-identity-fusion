@@ -9,11 +9,13 @@ import type { DeveloperSettingsSection } from '../../../model/config'
 export const connectorSpecInitialValues = {
     externalLoggingLevel: 'info' as const,
     managedAccountsBatchSize: 100,
+    scoringMaxConcurrency: 12,
 } as const
 
 export const runtimeDefaults = {
     externalLoggingLevel: connectorSpecInitialValues.externalLoggingLevel,
     managedAccountsBatchSize: connectorSpecInitialValues.managedAccountsBatchSize,
+    scoringMaxConcurrency: connectorSpecInitialValues.scoringMaxConcurrency,
     reset: false,
     externalLoggingEnabled: false,
     concurrencyCheckEnabled: true,
@@ -43,6 +45,7 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
     return {
         reset: extractBoolean(raw, 'reset') ?? runtimeDefaults.reset,
         managedAccountsBatchSize: (raw.managedAccountsBatchSize as number | undefined) ?? runtimeDefaults.managedAccountsBatchSize,
+        scoringMaxConcurrency: (raw.scoringMaxConcurrency as number | undefined) ?? runtimeDefaults.scoringMaxConcurrency,
         concurrencyCheckEnabled: extractBoolean(raw, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled,
         forceAttributeRefresh: extractBoolean(raw, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh,
         externalLoggingEnabled,

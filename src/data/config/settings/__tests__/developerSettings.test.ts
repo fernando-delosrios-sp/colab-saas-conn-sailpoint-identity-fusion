@@ -25,6 +25,22 @@ describe('developerSettings readSettings', () => {
         expect(result.managedAccountsBatchSize).toBe(25)
     })
 
+    it('defaults scoringMaxConcurrency to 12 when omitted', () => {
+        const raw = {}
+
+        const result = readSettings(raw)
+
+        expect(result.scoringMaxConcurrency).toBe(connectorSpecInitialValues.scoringMaxConcurrency)
+    })
+
+    it('returns configured scoringMaxConcurrency when valid', () => {
+        const raw = { scoringMaxConcurrency: 5 }
+
+        const result = readSettings(raw)
+
+        expect(result.scoringMaxConcurrency).toBe(5)
+    })
+
     it('normalizes string "true" to boolean true for reset', () => {
         const raw = { reset: 'true' as unknown as boolean }
 
