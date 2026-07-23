@@ -12,6 +12,24 @@ import { assert } from '../utils/assert'
 import { buildManagedAccountKey } from './managedAccountKey'
 import { CandidateRegistry } from '../services/matchingService/candidateRegistry'
 
+export type ManagedAccountInfo = {
+    id: string
+    name: string
+    sourceName: string
+    sourceId?: string
+    nativeIdentity?: string
+}
+
+export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
+    return {
+        id: account.id ?? '',
+        name: account.name ?? '',
+        sourceName: account.sourceName ?? '',
+        sourceId: account.sourceId,
+        nativeIdentity: account.nativeIdentity,
+    }
+}
+
 export interface RunStateSnapshot {
     managedAccounts: Record<string, any>[]
     fusionAccounts: Record<string, any>[]
@@ -26,7 +44,7 @@ export interface RunStateSnapshot {
     autoAssignedIds: string[]
     matchScoringMs: number
     phaseTimings: { phase: string; elapsed: string }[]
-    managedAccountsAllById: Record<string, any>
+    managedAccountInventory: Record<string, ManagedAccountInfo>
     formCounters: {
         formsCreated: number
         formInstancesCreated: number
@@ -48,9 +66,15 @@ export interface RunStateSnapshot {
 
 
 
+/**
+ * Run-scoped managed account state:
+ * - `managedAccountsById`: mutable work queue; entries removed via `claimAccount()`
+ * - `managedAccountInventory`: lightweight metadata for every loaded key until output phase
+ */
 export class FusionRun {
     public readonly isRecordMode: boolean
     readonly managedAccountsById = new Map<string, Account>()
+    readonly managedAccountInventory = new Map<string, ManagedAccountInfo>()
     readonly managedAccountsByIdentityId = new Map<string, Set<string>>()
     private readonly _fusionAccountMap = new Map<string, FusionAccount>()
     private readonly _fusionIdentityMap = new Map<string, FusionAccount>()
@@ -72,7 +96,6 @@ export class FusionRun {
     private _pendingDisableOperations = new Set<Promise<void>>()
     private _disableOperationFactory?: (account: Account) => Promise<void>
     private readonly _candidateRegistry: CandidateRegistry
-    managedAccountsAllById: Map<string, Account> = new Map()
     private _tracker?: AggregationTracker
     private _managedAccountProcessingState: 'idle' | 'initialized' = 'idle'
     private _managedAccountProcessingStartedAt: number = 0
@@ -184,6 +207,7 @@ export class FusionRun {
 
     setManagedAccount(accountKey: string, account: Account): void {
         this.managedAccountsById.set(accountKey, account)
+        this.managedAccountInventory.set(accountKey, toManagedAccountInfo(account))
         if (account.identityId) {
             let idSet = this.managedAccountsByIdentityId.get(account.identityId)
             if (!idSet) {
@@ -233,9 +257,22 @@ export class FusionRun {
         return this.managedAccountsById.entries()
     }
 
+    hasManagedAccount(accountKey: string): boolean {
+        return this.managedAccountInventory.has(accountKey)
+    }
+
+    getManagedAccountInfo(accountKey: string): ManagedAccountInfo | undefined {
+        return this.managedAccountInventory.get(accountKey)
+    }
+
     clearWorkQueue(): void {
         this.managedAccountsById.clear()
         this.managedAccountsByIdentityId.clear()
+    }
+
+    clearManagedAccountState(): void {
+        this.clearWorkQueue()
+        this.managedAccountInventory.clear()
     }
 
     /**
@@ -367,6 +404,14 @@ export class FusionRun {
 
     get allFusionAccounts(): FusionAccount[] {
         return Array.from(this._fusionAccountMap.values())
+    }
+
+    /**
+     * Iterate fusion accounts without copying the map values into a new array.
+     * Use {@link allFusionAccounts} when a mutable array or spread composition is required.
+     */
+    *fusionAccountsIterable(): Iterable<FusionAccount> {
+        yield* this._fusionAccountMap.values()
     }
 
     get allFusionIdentities(): Iterable<FusionAccount> {
@@ -660,7 +705,7 @@ export class FusionRun {
             autoAssignedIds: Array.from(this._autoAssignedIdentityIds),
             matchScoringMs: this.matchScoringMs,
             phaseTimings: this.phaseTimings,
-            managedAccountsAllById: Object.fromEntries(this.managedAccountsAllById),
+            managedAccountInventory: Object.fromEntries(this.managedAccountInventory),
             formCounters: {
                 formsCreated: this.formsCreated,
                 formInstancesCreated: this.formInstancesCreated,
@@ -713,7 +758,17 @@ export class FusionRun {
         }
         this.matchScoringMs = snapshot.matchScoringMs
         this.phaseTimings = snapshot.phaseTimings
-        this.managedAccountsAllById = new Map(Object.entries(snapshot.managedAccountsAllById ?? {})) as Map<string, Account>
+        this.managedAccountInventory.clear()
+        const inventoryRecord =
+            snapshot.managedAccountInventory ??
+            Object.fromEntries(
+                Object.entries((snapshot as { managedAccountsAllById?: Record<string, Account> }).managedAccountsAllById ?? {}).map(
+                    ([key, account]) => [key, toManagedAccountInfo(account as Account)]
+                )
+            )
+        for (const [key, info] of Object.entries(inventoryRecord)) {
+            this.managedAccountInventory.set(key, info as ManagedAccountInfo)
+        }
         this.formsCreated = snapshot.formCounters?.formsCreated ?? 0
         this.formInstancesCreated = snapshot.formCounters?.formInstancesCreated ?? 0
         this.formsFound = snapshot.formCounters?.formsFound ?? 0
@@ -730,3 +785,4 @@ export class FusionRun {
         this.trigramIndexBuilt = snapshot.trigramIndexBuilt ?? false
     }
 }
+

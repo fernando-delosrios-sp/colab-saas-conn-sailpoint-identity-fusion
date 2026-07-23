@@ -559,7 +559,6 @@ export class FusionAccount {
 
     addManagedAccountLayer(
         workQueue: FusionRun,
-        allAccountsById?: Map<string, Account>,
         options: AddManagedAccountOptions = {}
     ): void {
         this.layers.addManagedAccountLayer(
@@ -577,7 +576,6 @@ export class FusionAccount {
             () => {
                 this._sourceAttributeMapCache = undefined
             },
-            allAccountsById,
             options
         )
     }

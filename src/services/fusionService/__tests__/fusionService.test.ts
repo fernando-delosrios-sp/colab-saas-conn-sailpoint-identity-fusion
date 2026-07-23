@@ -12,7 +12,7 @@ import { MatchingService } from '../../matchingService'
 import { SchemaService } from '../../schemaService'
 import { ServiceRegistry } from '../../serviceRegistry'
 import { FusionConfig } from '../../../model/config'
-import { FusionRun } from '../../../model/fusionRun'
+import { FusionRun, toManagedAccountInfo } from '../../../model/fusionRun'
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount } from '../../../model/account'
@@ -28,6 +28,14 @@ vi.mock('../../mappingService')
 vi.mock('../../definitionService')
 vi.mock('../../matchingService')
 vi.mock('../../schemaService')
+
+
+function seedRunInventory(run: FusionRun, accounts: Map<string, Account>): void {
+    run.managedAccountInventory.clear()
+    for (const [key, account] of accounts.entries()) {
+        run.managedAccountInventory.set(key, toManagedAccountInfo(account))
+    }
+}
 
 describe('FusionService', () => {
     const FUSION_SOURCE_ID = 'fusion-src'
@@ -139,14 +147,6 @@ describe('FusionService', () => {
             configurable: true,
         })
 
-        Object.defineProperty(mockSources, 'managedAccountsAllById', {
-            get: vi.fn(() => new Map()),
-            configurable: true,
-        })
-        Object.defineProperty(run, 'managedAccountsAllById', {
-            get: () => mockSources.managedAccountsAllById,
-            configurable: true,
-        })
         Object.defineProperty(mockSources, 'fusionAccounts', {
             get: vi.fn(() => []),
             configurable: true,
@@ -166,10 +166,11 @@ describe('FusionService', () => {
 
         mockSources.resolveIscAccountIdForManagedKey = vi.fn((managedKey: string) => {
             const work = mockSources.managedAccountsById as unknown as Map<string, Account> | undefined
-            const all = mockSources.managedAccountsAllById as unknown as Map<string, Account> | undefined
             const acc =
                 (work instanceof Map ? work.get(managedKey) : undefined) ??
-                (all instanceof Map ? all.get(managedKey) : undefined)
+                (run.getManagedAccountInfo(managedKey)
+                    ? { id: run.getManagedAccountInfo(managedKey)!.id }
+                    : undefined)
             const raw = acc?.id
             if (hasValue(raw)) return trimStr(raw) ?? ''
             // Tests without composite map entries: treat non-composite keys as ISC account ids
@@ -434,8 +435,7 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
                 new Map([['identity-1', new Set([managedKey])]])
             )
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([
+            seedRunInventory(run, new Map([
                     [
                         managedKey,
                         {
@@ -1559,8 +1559,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([
+            seedRunInventory(run, new Map([
                     [
                         'source-a-id::native-missing-1',
                         {
@@ -1604,7 +1603,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            seedRunInventory(run, new Map())
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
@@ -1646,8 +1645,7 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
                 new Map([['identity-1', new Set(['source-a-id::native-new-2'])]])
             )
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([
+            seedRunInventory(run, new Map([
                     [
                         'source-a-id::native-new-2',
                         {
@@ -1706,8 +1704,7 @@ describe('FusionService', () => {
                 ])
             )
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([
+            seedRunInventory(run, new Map([
                     [
                         'source-a-id::native-existing-1',
                         {
@@ -2197,8 +2194,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([[managedKey, managedAccount]])
+            seedRunInventory(run, new Map([[managedKey, managedAccount]])
             )
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
@@ -2262,8 +2258,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([[managedKeyAuto, managedAccount]])
+            seedRunInventory(run, new Map([[managedKeyAuto, managedAccount]])
             )
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
@@ -2325,8 +2320,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([[managedKeyAutoCorr, managedAccount]])
+            seedRunInventory(run, new Map([[managedKeyAutoCorr, managedAccount]])
             )
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
@@ -2375,8 +2369,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([[managedKeyNoId, managedAccount]])
+            seedRunInventory(run, new Map([[managedKeyNoId, managedAccount]])
             )
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
@@ -2416,8 +2409,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([[managedKeyAuthz, managedAccount]])
+            seedRunInventory(run, new Map([[managedKeyAuthz, managedAccount]])
             )
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
@@ -2461,7 +2453,7 @@ describe('FusionService', () => {
             const managedMap = new Map<string, Account>()
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            seedRunInventory(run, new Map())
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
@@ -2502,7 +2494,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            seedRunInventory(run, new Map())
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             ;(fusionService as any).run.sourcesByName.set('Orphan Source', {
@@ -2540,7 +2532,7 @@ describe('FusionService', () => {
         it('registers a new fusion account for authoritative new-identity decisions', async () => {
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(new Map())
+            seedRunInventory(run, new Map())
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
@@ -2615,8 +2607,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsAllById', 'get').mockReturnValue(
-                new Map([[histKey, managedAccount]])
+            seedRunInventory(run, new Map([[histKey, managedAccount]])
             )
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()

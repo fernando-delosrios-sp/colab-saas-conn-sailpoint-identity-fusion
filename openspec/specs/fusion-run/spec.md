@@ -22,9 +22,9 @@ FusionRun SHALL contain maps, sets, and state fields for all data loaded and pro
 
 #### Scenario: FusionRun contains managed account state
 - **WHEN** aggregation loads managed accounts
-- **THEN** run.managedAccountsById SHALL contain all loaded managed accounts
+- **THEN** run.managedAccountsById SHALL contain all loaded managed accounts initially
 - **AND** run.managedAccountsByIdentityId SHALL contain identity-grouped accounts
-- **AND** run.managedAccountsAllById SHALL be the canonical location for all accounts (populated by SourceService)
+- **AND** run.managedAccountInventory SHALL contain lightweight metadata for every loaded key (populated by `setManagedAccount`)
 
 #### Scenario: FusionRun contains fusion processing state
 - **WHEN** fusion accounts are processed
@@ -83,7 +83,7 @@ FusionRun SHALL expose a `snapshot()` method that returns a complete serializabl
 
 #### Scenario: Snapshot captures complete state
 - **WHEN** run.snapshot() is called during a run
-- **THEN** the returned snapshot SHALL contain: managedAccounts, managedAccountsAllById, fusionAccounts, identities, formDecisions, fusionIdentityDecisions, pendingCandidateIdentityIds, pendingReviewUrlsByReviewerId, pendingReviewUrlsByCandidateId, sourcesByName, currentRunNonMatchedKeysBySource, fusionBlends, autoAssignedIds, matchScoringMs, phaseTimings, formCounters, formDeleteQueue, managedAccountProcessing, trigramIndexBuilt
+- **THEN** the returned snapshot SHALL contain: managedAccounts, managedAccountInventory, fusionAccounts, identities, formDecisions, fusionIdentityDecisions, pendingCandidateIdentityIds, pendingReviewUrlsByReviewerId, pendingReviewUrlsByCandidateId, sourcesByName, currentRunNonMatchedKeysBySource, fusionBlends, autoAssignedIds, matchScoringMs, phaseTimings, formCounters, formDeleteQueue, managedAccountProcessing, trigramIndexBuilt
 - **AND** the snapshot SHALL be JSON-serializable
 
 #### Scenario: Restore reconstructs identical state
@@ -244,9 +244,46 @@ FusionRun SHALL own form processing counters and the form deletion queue state. 
 
 ---
 
+### Requirement: FusionRun maintains a lightweight managed account inventory
+
+FusionRun SHALL maintain `managedAccountInventory`, a map of managed account keys to `ManagedAccountInfo` records containing at minimum `id`, `name`, `sourceName`, and optionally `sourceId` and `nativeIdentity`. The inventory SHALL be populated when `setManagedAccount` is called and SHALL retain every key loaded during the run until explicitly cleared, independent of work-queue depletion via `claimAccount`.
+
+#### Scenario: Inventory retains keys after work queue claim
+- **GIVEN** a managed account key loaded via `setManagedAccount`
+- **WHEN** `claimAccount` removes the key from `managedAccountsById`
+- **THEN** `hasManagedAccount(key)` SHALL still return true
+- **AND** `getManagedAccountInfo(key)` SHALL return the cached metadata
+
+#### Scenario: Inventory is populated in setManagedAccount only
+- **WHEN** SourceService loads a managed account
+- **THEN** it SHALL call `run.setManagedAccount(key, account)` once
+- **AND** FusionRun SHALL update both the work queue and inventory in that method
+- **AND** no caller SHALL write to a separate full-account snapshot map
+
+### Requirement: FusionRun exposes managed account inventory accessors
+
+FusionRun SHALL expose `hasManagedAccount(key: string): boolean`, `getManagedAccountInfo(key: string): ManagedAccountInfo | undefined`, and `clearManagedAccountState(): void` for managed account lifecycle operations. External code SHALL use these accessors instead of reading a full-account snapshot map.
+
+#### Scenario: Form service checks account existence via accessor
+- **WHEN** FormService determines whether a managed account still exists in the run
+- **THEN** it SHALL call `run.hasManagedAccount(accountId)`
+- **AND** it SHALL NOT read from `managedAccountsAllById`
+
+#### Scenario: Report service resolves display metadata via accessor
+- **WHEN** ReportService resolves a managed account display name or ISC account id
+- **THEN** it SHALL call `run.getManagedAccountInfo(managedAccountKey)`
+- **AND** it SHALL NOT read from `managedAccountsAllById`
+
+#### Scenario: Output phase clears managed account state
+- **WHEN** SourceService clears managed accounts at output phase
+- **THEN** it SHALL call `run.clearManagedAccountState()`
+- **AND** both the work queue and inventory SHALL be empty afterward
+
+---
+
 ### Requirement: FusionRun is the only owner of managed source inventory maps
 
-FusionRun SHALL be the single source of truth for source inventory maps such as `sourcesByName`, managed account indexes, and `managedAccountsAllById`. Other services SHALL NOT maintain parallel copies of these maps that must be hand-synchronized.
+FusionRun SHALL be the single source of truth for source inventory maps such as `sourcesByName`, managed account indexes, and `managedAccountInventory`. Other services SHALL NOT maintain parallel copies of these maps that must be hand-synchronized.
 
 #### Scenario: Matching reads source info from FusionRun
 - **WHEN** `MatchOutcomeDispatcher` looks up source information for an account
@@ -255,12 +292,12 @@ FusionRun SHALL be the single source of truth for source inventory maps such as 
 #### Scenario: SourceService writes to FusionRun
 - **WHEN** `SourceService` loads managed source accounts and source metadata
 - **THEN** it SHALL write the source metadata into `run.sourcesByName` rather than storing it internally
-- **AND** it SHALL write all managed accounts into `run.managedAccountsAllById` rather than maintaining a service-local copy
+- **AND** it SHALL write each managed account via `run.setManagedAccount` rather than maintaining a service-local full-account snapshot
 
-#### Scenario: managedAccountsAllById has a single canonical location
-- **WHEN** any service needs access to all managed accounts by ID
-- **THEN** it SHALL read from `run.managedAccountsAllById`
-- **AND** no service-local `managedAccountsAllById` SHALL exist in any service
+#### Scenario: Managed account inventory has a single canonical location
+- **WHEN** any service needs managed account metadata after work-queue depletion
+- **THEN** it SHALL call `run.getManagedAccountInfo(key)` or `run.hasManagedAccount(key)`
+- **AND** no service-local full-account snapshot map SHALL exist in any service
 
 ### Requirement: Correlated identities are hydrated before the managed-account sweep
 
@@ -290,4 +327,5 @@ The connector SHALL ensure that the identity correlated to each fetched managed 
 - **WHEN** the connector hydrates correlated identities
 - **THEN** it SHALL split the identity-id set into chunks of no more than 50 ids per query
 - **AND** it SHALL execute the chunked queries in parallel with per-chunk error isolation
+
 

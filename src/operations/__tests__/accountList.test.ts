@@ -37,7 +37,9 @@ function createTwoSweepRegistry(scenario: AggregationScenario) {
             map.set(account.id, account)
         }
         sources.run.managedAccountsById = map
-        sources.managedAccountsAllById = new Map(map)
+        for (const [key, account] of map.entries()) {
+        sources.run.setManagedAccount(key, account)
+    }
     })
 
     sources.fusionAccountCount = 2

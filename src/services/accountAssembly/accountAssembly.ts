@@ -88,7 +88,6 @@ export class AccountAssembly {
         assert(this.deps.run.managedAccountsById, 'Managed accounts have not been loaded')
         fusionAccount.addManagedAccountLayer(
             this.deps.run,
-            this.deps.run.managedAccountsAllById,
             {
                 pruneDeleted: this.shouldPruneDeletedManagedAccounts(),
                 addBlendHistory: options.addBlendHistory ?? true,

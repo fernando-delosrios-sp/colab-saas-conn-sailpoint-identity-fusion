@@ -524,9 +524,7 @@ describe('FusionAccount', () => {
             acc.setOriginIdentityInScope(false)
 
             const run = new FusionRun()
-            const allAccountsById = new Map<string, Account>()
-
-            acc.addManagedAccountLayer(run, allAccountsById, { pruneDeleted: true })
+            acc.addManagedAccountLayer(run, { pruneDeleted: true })
 
             expect(acc.isOrphan()).toBe(true)
             expect(acc.statuses).toContain('orphan')
@@ -550,9 +548,7 @@ describe('FusionAccount', () => {
             expect((acc as any).previousAccountIds).toContain('src-a::old-1')
 
             const run = new FusionRun()
-            const allAccountsById = new Map<string, Account>()
-
-            acc.addManagedAccountLayer(run, allAccountsById, { pruneDeleted: true })
+            acc.addManagedAccountLayer(run, { pruneDeleted: true })
 
             expect(acc.accountIds).not.toContain('src-a::old-1')
             expect(acc.missingAccountIds).not.toContain('src-a::old-2')
@@ -571,9 +567,7 @@ describe('FusionAccount', () => {
             } as unknown as Account)
 
             const run = new FusionRun()
-            const allAccountsById = new Map<string, Account>()
-
-            acc.addManagedAccountLayer(run, allAccountsById, { pruneDeleted: true })
+            acc.addManagedAccountLayer(run, { pruneDeleted: true })
 
             expect(acc.isOrphan()).toBe(true)
             expect(acc.needsRefresh).toBe(false)
