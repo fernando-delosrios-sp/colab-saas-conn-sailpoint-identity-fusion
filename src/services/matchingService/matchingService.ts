@@ -7,6 +7,7 @@ import { countIdentityCandidateFusionMatches } from './matchingHelpers'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
 import {
     normalizeLIG3,
+    lig3UpperBoundSkipIfUnreachable,
     scoreBinary,
     scoreCustomVelocity,
     scoreDice,
@@ -65,6 +66,7 @@ export class MatchingService {
     private readonly fusionEnableAutoAssignment: boolean
     private readonly fusionMaxIdentityMatchCandidates: number
     private readonly fusionScoreMap: Map<string, number>
+    private _captureBreakdown = false
 
     /**
      * @param config - Fusion configuration containing matching rules and score thresholds
@@ -77,6 +79,15 @@ export class MatchingService {
         this.fusionEnableAutoAssignment = config.fusionEnableAutoAssignment ?? false
         this.fusionMaxIdentityMatchCandidates = config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
         this.fusionScoreMap = config.fusionScoreMap ?? new Map()
+    }
+
+    /**
+     * Run-scoped flag set once per aggregation run. When true, identity-sweep comparisons always
+     * build full score breakdowns (e.g. report capture). Deferred candidates always use full
+     * breakdown regardless of this flag (`candidateType !== Identity` in `scoreFusionAccount`).
+     */
+    public setCaptureBreakdown(value: boolean): void {
+        this._captureBreakdown = value
     }
 
     /**
@@ -134,18 +145,6 @@ export class MatchingService {
             byAttr.set(attrName, cached)
         }
         return cached
-    }
-
-    /**
-     * Conservative upper bound on the LIG3 similarity score for a pair of already-normalized strings.
-     * LIG3 gap penalties (0.8–0.9) mean the similarity can never exceed `min(len1,len2)/max(len1,len2)*100`.
-     * If this bound is below the required threshold, the full DP can be skipped entirely.
-     */
-    private static lig3UpperBound(normA: string, normB: string): number {
-        const lenA = normA.length
-        const lenB = normB.length
-        if (lenA === 0 || lenB === 0) return 0
-        return (Math.min(lenA, lenB) / Math.max(lenA, lenB)) * 100
     }
 
     /**
@@ -288,6 +287,8 @@ export class MatchingService {
                 ? (maxIdentityMatches ?? this.fusionMaxIdentityMatchCandidates)
                 : undefined
 
+        const captureBreakdown = this._captureBreakdown || candidateType !== MatchCandidateType.Identity
+
         let compared = 0
         // Counter-based yielding avoids modulo on every iteration; reset after each yield.
         let yieldCounter = 0
@@ -298,7 +299,7 @@ export class MatchingService {
             ) {
                 continue
             }
-            this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType)
+            this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType, captureBreakdown)
             compared += 1
             if (earlyExitOnExactMatch) {
                 const matches = fusionAccount.fusionMatchesRaw
@@ -375,14 +376,27 @@ export class MatchingService {
      * Compares two fusion accounts across all configured matching rules and records
      * a match if the weighted combined score and mandatory rules pass.
      *
+     * When `captureBreakdown` is false (identity sweep, no report capture), uses a fast path
+     * that avoids ScoreReport[] allocation on non-matches. Matches are re-scored with full
+     * breakdown since they are rare compared to non-matches.
+     *
      * @param fusionAccount - The candidate account being evaluated
      * @param fusionIdentity - The existing identity to compare against
      */
     private compareFusionAccounts(
         fusionAccount: FusionAccount,
         fusionIdentity: FusionAccount,
-        candidateType: MatchCandidateType
+        candidateType: MatchCandidateType,
+        captureBreakdown: boolean
     ): void {
+        if (!captureBreakdown) {
+            if (!this.evaluateCombinedScorePass(fusionAccount, fusionIdentity)) {
+                return
+            }
+            this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType, true)
+            return
+        }
+
         const scores: ScoreReport[] = []
         let hasFailedMandatory = false
         let weightedSum = 0
@@ -401,62 +415,34 @@ export class MatchingService {
                 continue
             }
 
-            // For LIG3 and name-matcher: use pre-normalized cached values to avoid repeated
-            // normalization in the hot loop. LIG3 also applies a length-ratio upper-bound check.
-            let scoreReport: ScoreReport
-            if (matching.algorithm === 'lig3') {
-                const normAccount = this.getNormalized(
-                    fusionAccount,
-                    matching.attribute,
-                    (accountAttribute ?? '').toString()
-                )
-                const normIdentity = this.getNormalized(
-                    fusionIdentity,
-                    matching.attribute,
-                    (identityAttribute ?? '').toString()
-                )
-                if (MatchingService.lig3UpperBound(normAccount, normIdentity) < (matching.fusionScore ?? 0)) {
-                    // Score is mathematically unreachable — skip as if the rule failed.
-                    scoreReport = makeSkippedReport(matching, 'Length ratio upper bound below threshold')
-                    scores.push(scoreReport)
-                    if (matching.mandatory) {
-                        hasFailedMandatory = true
-                        for (let r = i + 1; r < this.matchingConfigs.length; r++) {
-                            scores.push(
-                                makeSkippedReport(this.matchingConfigs[r], 'Rule skipped (mandatory attribute failed)')
-                            )
-                        }
-                        break
+            const lig3UpperBoundSkip = this.lig3UpperBoundSkipForPair(
+                fusionAccount,
+                fusionIdentity,
+                matching,
+                accountAttribute,
+                identityAttribute
+            )
+            if (lig3UpperBoundSkip) {
+                scores.push(lig3UpperBoundSkip)
+                if (matching.mandatory) {
+                    hasFailedMandatory = true
+                    for (let r = i + 1; r < this.matchingConfigs.length; r++) {
+                        scores.push(
+                            makeSkippedReport(this.matchingConfigs[r], 'Rule skipped (mandatory attribute failed)')
+                        )
                     }
-                    continue
+                    break
                 }
-                scoreReport = scoreLIG3Normalized(normAccount, normIdentity, matching)
-            } else if (matching.algorithm === 'name-matcher') {
-                const normAccount = this.getNameNormalized(
-                    fusionAccount,
-                    matching.attribute,
-                    (accountAttribute ?? '').toString()
-                )
-                const normIdentity = this.getNameNormalized(
-                    fusionIdentity,
-                    matching.attribute,
-                    (identityAttribute ?? '').toString()
-                )
-                scoreReport = scoreNameMatcherNormalized(normAccount, normIdentity, matching)
-            } else {
-                scoreReport = this.scoreAttribute(
-                    (accountAttribute ?? '').toString(),
-                    (identityAttribute ?? '').toString(),
-                    matching
-                )
+                continue
             }
-            if (
-                !scoreReport.skipped &&
-                effectiveSkipMatchIfThresholdNotMet(matching) &&
-                !scoreReport.isMatch
-            ) {
-                scoreReport = makeSkippedReport(matching, 'Rule skipped (score below threshold)')
-            }
+
+            const scoreReport = this.scoreRulePair(
+                fusionAccount,
+                fusionIdentity,
+                matching,
+                accountAttribute,
+                identityAttribute
+            )
             scores.push(scoreReport)
             if (!scoreReport.skipped) {
                 const w = MatchingService.blendWeight(scoreReport.fusionScore)
@@ -534,6 +520,139 @@ export class MatchingService {
     }
 
     /**
+     * Fast-path combined score evaluation without allocating score breakdown arrays.
+     */
+    private evaluateCombinedScorePass(fusionAccount: FusionAccount, fusionIdentity: FusionAccount): boolean {
+        let hasFailedMandatory = false
+        let weightedSum = 0
+        let weightTotal = 0
+
+        for (let i = 0; i < this.matchingConfigs.length; i++) {
+            const matching = this.matchingConfigs[i]
+            const accountAttribute = fusionAccount.attributes[matching.attribute]
+            const identityAttribute = fusionIdentity.attributes[matching.attribute]
+            const skipForMissing = effectiveSkipMatchIfMissing(matching)
+            const hasMissingValue =
+                this.isMissingMatchValue(accountAttribute) || this.isMissingMatchValue(identityAttribute)
+
+            if (skipForMissing && hasMissingValue) {
+                continue
+            }
+
+            const lig3UpperBoundSkip = this.lig3UpperBoundSkipForPair(
+                fusionAccount,
+                fusionIdentity,
+                matching,
+                accountAttribute,
+                identityAttribute
+            )
+            if (lig3UpperBoundSkip) {
+                if (matching.mandatory) {
+                    hasFailedMandatory = true
+                    break
+                }
+                continue
+            }
+
+            const scoreReport = this.scoreRulePair(
+                fusionAccount,
+                fusionIdentity,
+                matching,
+                accountAttribute,
+                identityAttribute
+            )
+            if (!scoreReport.skipped) {
+                const w = MatchingService.blendWeight(scoreReport.fusionScore)
+                weightedSum += w * scoreReport.score
+                weightTotal += w
+            }
+            if (matching.mandatory && !scoreReport.isMatch) {
+                hasFailedMandatory = true
+                break
+            }
+            if (
+                !hasFailedMandatory &&
+                i + 1 < this.matchingConfigs.length &&
+                MatchingService.maxAchievableCombinedScore(weightedSum, weightTotal, i + 1, this.matchingConfigs) <
+                    this.fusionManualReviewScore
+            ) {
+                break
+            }
+        }
+
+        const combinedScore = weightTotal > 0 ? weightedSum / weightTotal : 0
+        const hasContributing = weightTotal > 0
+        return hasContributing && combinedScore >= this.fusionManualReviewScore && !hasFailedMandatory
+    }
+
+    /**
+     * Score one matching rule for a fusion account pair (shared by fast and full comparison paths).
+     * LIG3 upper-bound short-circuit is handled separately via {@link lig3UpperBoundSkipForPair}.
+     */
+    private scoreRulePair(
+        fusionAccount: FusionAccount,
+        fusionIdentity: FusionAccount,
+        matching: MatchingConfig,
+        accountAttribute: unknown,
+        identityAttribute: unknown
+    ): ScoreReport {
+        let scoreReport: ScoreReport
+        if (matching.algorithm === 'lig3') {
+            const normAccount = this.getNormalized(
+                fusionAccount,
+                matching.attribute,
+                (accountAttribute ?? '').toString()
+            )
+            const normIdentity = this.getNormalized(
+                fusionIdentity,
+                matching.attribute,
+                (identityAttribute ?? '').toString()
+            )
+            scoreReport = scoreLIG3Normalized(normAccount, normIdentity, matching)
+        } else if (matching.algorithm === 'name-matcher') {
+            const normAccount = this.getNameNormalized(
+                fusionAccount,
+                matching.attribute,
+                (accountAttribute ?? '').toString()
+            )
+            const normIdentity = this.getNameNormalized(
+                fusionIdentity,
+                matching.attribute,
+                (identityAttribute ?? '').toString()
+            )
+            scoreReport = scoreNameMatcherNormalized(normAccount, normIdentity, matching)
+        } else {
+            scoreReport = this.scoreAttribute(
+                (accountAttribute ?? '').toString(),
+                (identityAttribute ?? '').toString(),
+                matching
+            )
+        }
+        if (!scoreReport.skipped && effectiveSkipMatchIfThresholdNotMet(matching) && !scoreReport.isMatch) {
+            return makeSkippedReport(matching, 'Rule skipped (score below threshold)')
+        }
+        return scoreReport
+    }
+
+    /** Normalization cache + delegate to {@link lig3UpperBoundSkipIfUnreachable}. */
+    private lig3UpperBoundSkipForPair(
+        fusionAccount: FusionAccount,
+        fusionIdentity: FusionAccount,
+        matching: MatchingConfig,
+        accountAttribute: unknown,
+        identityAttribute: unknown
+    ): ScoreReport | undefined {
+        if (matching.algorithm !== 'lig3') return undefined
+        const normAccount = this.getNormalized(fusionAccount, matching.attribute, (accountAttribute ?? '').toString())
+        const normIdentity = this.getNormalized(
+            fusionIdentity,
+            matching.attribute,
+            (identityAttribute ?? '').toString()
+        )
+        return lig3UpperBoundSkipIfUnreachable(matching, normAccount, normIdentity)
+    }
+
+    /**
      * Build a user-friendly label for report candidates.
      * Prefer displayName/name, then fall back to uid-like identifiers.
      */
@@ -590,3 +709,4 @@ export class MatchingService {
         return missing(value)
     }
 }
+
