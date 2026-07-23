@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { MatchingService, COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchingService'
 import { FusionAccount } from '../../../model/account'
 import { MatchCandidateType } from '../types'
@@ -81,6 +81,99 @@ describe('MatchingService', () => {
             expect(match.scores.length).toBeGreaterThan(0)
             expect(match.scores.some((row) => row.attribute === COMBINED_SCORE_ROW_ATTRIBUTE)).toBe(true)
         })
+
+        it('stores no matches when a mandatory rule fails on the fast path', async () => {
+            const mandatoryRule = { ...binaryRule, mandatory: true }
+            const service = new MatchingService(
+                { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
+                mockLog
+            )
+            service.setCaptureBreakdown(false)
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'A' },
+            } as any)
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { employeeId: 'B' },
+            } as any)
+
+            await service.scoreFusionAccount(managed, [identity])
+
+            expect(managed.fusionMatchesRaw).toHaveLength(0)
+        })
+
+        it('uses fast path for identity sweep when captureBreakdown is false', async () => {
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
+                mockLog
+            )
+            service.setCaptureBreakdown(false)
+            const fastPathSpy = vi.spyOn(service as any, 'evaluateCombinedScorePass')
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'A' },
+            } as any)
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { employeeId: 'B' },
+            } as any)
+
+            await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Identity)
+
+            expect(fastPathSpy).toHaveBeenCalledTimes(1)
+        })
+
+        it('skips fast path when captureBreakdown is true', async () => {
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
+                mockLog
+            )
+            service.setCaptureBreakdown(true)
+            const fastPathSpy = vi.spyOn(service as any, 'evaluateCombinedScorePass')
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'A' },
+            } as any)
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { employeeId: 'B' },
+            } as any)
+
+            await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Identity)
+
+            expect(fastPathSpy).not.toHaveBeenCalled()
+        })
+
+        it('skips fast path for deferred candidates even when captureBreakdown is false', async () => {
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
+                mockLog
+            )
+            service.setCaptureBreakdown(false)
+            const fastPathSpy = vi.spyOn(service as any, 'evaluateCombinedScorePass')
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'A' },
+            } as any)
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { employeeId: 'B' },
+            } as any)
+
+            await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Deferred)
+
+            expect(fastPathSpy).not.toHaveBeenCalled()
+        })
     })
 })
+
 

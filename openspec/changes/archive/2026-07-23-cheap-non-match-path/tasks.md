@@ -17,7 +17,7 @@
 
 ## 4. Tests and verification
 
-- [x] 4.1 Add test in `src/services/matchingService/__tests__/matchingService.test.ts`: `captureBreakdown = false`, non-matching account → zero matches stored (behavior unchanged)
+- [x] 4.1 Add test in `src/services/matchingService/__tests__/matchService.test.ts`: `captureBreakdown = false`, non-matching account → zero matches stored (behavior unchanged)
 - [x] 4.2 Add test: threshold-passing comparison with `captureBreakdown = false` → match stored with complete `scores` array
 - [x] 4.3 Run `npm run typecheck`, `npm test`, and `npm run lint`
 
@@ -25,3 +25,4 @@
 
 - [x] 5.1 Add JSDoc on `setCaptureBreakdown` explaining run-scoped flag and interaction with deferred candidate type
 - [x] 5.2 Add brief comment on fast-path re-run trade-off in `compareFusionAccounts`
+
