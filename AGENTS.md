@@ -114,6 +114,8 @@ Full detail: [superpowers-bridge README §Entry & exit gates](https://github.com
 
 ## Build & Dev Commands
 
+**Prerequisites:** Node.js 24 (see `.nvmrc` — run `nvm use` or `fnm use`).
+
 | Command | Purpose |
 |---------|---------|
 | `npm run build` | Clean + sync spec + bundle with ncc to `dist/` |

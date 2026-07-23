@@ -207,7 +207,7 @@ The proxy server is the Identity Fusion NG connector run in "server mode."
 | Requirement              | Details                                       |
 | ------------------------ | --------------------------------------------- | ------------------------------------- |
 | **Connector code**       | Same Identity Fusion NG connector codebase    | Download/deploy the connector package |
-| **Runtime environment**  | Node.js (version specified in connector docs) | Typically Node.js 18+                 |
+| **Runtime environment**  | Node.js (version specified in connector docs) | Node.js 24+ (Active LTS)              |
 | **Environment variable** | `PROXY_PASSWORD` set to same value as ISC     | Required for server mode detection    |
 | **HTTP server**          | Endpoint accepting POST requests              | Express, Fastify, or similar          |
 | **Network access**       | Access to ISC APIs and configured sources     | VPN, firewall rules as needed         |
@@ -303,7 +303,7 @@ app.listen(PORT, () => {
 **Example Dockerfile:**
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:24-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
@@ -625,3 +625,4 @@ spec:
 
 - For general troubleshooting, see [Troubleshooting](troubleshooting.md).
 - For connection settings and resilience, see [Advanced connection settings](advanced-connection-settings.md).
+

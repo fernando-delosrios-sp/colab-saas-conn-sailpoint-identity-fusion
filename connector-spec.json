@@ -20,7 +20,6 @@
         "fusionManualReviewScore": 80,
         "provisioningTimeout": 300,
         "managedAccountsBatchSize": 100,
-        "scoringMaxConcurrency": 12,
         "fusionMaxCandidatesForForm": 3,
         "includeIdentities": true,
         "identityScopeQuery": "*",
@@ -31,6 +30,7 @@
         "maxConcurrentRequests": 10,
         "processingWait": 60,
         "externalLoggingLevel": "info",
+        "scoringMaxConcurrency": 12,
         "proxyEnabled": false,
         "proxyUrl": "",
         "proxyPassword": "",
@@ -997,7 +997,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation), manage memory consumption during match detection by adjusting batch sizes, and configure external logging for centralized monitoring.",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation), manage memory consumption during match detection by adjusting batch sizes, and configure external logging for centralized monitoring.<br><br><strong>v2.2.0</strong>",
                     "items": [
                         {
                             "key": "reset",
