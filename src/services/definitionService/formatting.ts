@@ -56,9 +56,8 @@ export const evaluateVelocityTemplate = (
     context: RenderContext,
     maxLength?: number
 ): string | undefined => {
-    const extendedContext: RenderContext = { ...context, ...contextHelpers }
     // Null prototype so `$constructor` / `$__proto__` do not resolve via Object.prototype.
-    const renderContext = Object.assign(Object.create(null), extendedContext) as RenderContext
+    const renderContext = Object.assign(Object.create(null), context, contextHelpers) as RenderContext
     logger.debug(`Evaluating velocity template - expression: ${expression}`)
 
     // Check cache for compiled template
@@ -154,3 +153,4 @@ export const padNumber = (number: number, length: number): string => {
     const numStr = number.toString()
     return numStr.length < length ? numStr.padStart(length, '0') : numStr
 }
+
