@@ -102,6 +102,7 @@ async function cascadeAggregateSources(
  * @param nativeIdentity - The native identity (unique ID) of the fusion account
  * @param attributeOperations - Flags controlling which attribute operations to perform
  * @param services - Object containing the services needed for rebuilding
+ * @param triggerCascadeAggregation - Optional flag to trigger cascade aggregation before fetching managed accounts
  * @returns The rebuilt FusionAccount, or undefined if not found
  */
 export const rebuildFusionAccount = async (

@@ -284,6 +284,7 @@ To avoid oversized reports, warning/error details are intentionally summarized (
 To run report-like analysis without persisting changes, invoke `std:account:list` with the dry-run mode enabled: `{ dryRun: { enabled: true } }`. You can optionally add `saveFile: true` to write the summary and HTML report to disk, or `sendEmail` to deliver the report via email.
 
 Dry-run mode:
+
 - Executes the full Map, Define, and Match pipeline without persistence.
 - Sends a terminal summary with totals and diagnostics (rowsSent, identities/managed-accounts found, issue summary, timing) via `res.send`.
 - When `saveFile` is enabled, writes an HTML report to `./reports/` before the terminal summary (durable-first ordering).
