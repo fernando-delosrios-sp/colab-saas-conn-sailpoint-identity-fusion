@@ -2,6 +2,7 @@
 
 ## 2.2.0
 
+- (2026-07-23) **Performance:** Replaced `Object.values().find()` linear scans in `formProcessor` dictionary-path extractors (`readCorrelatedIdentityId`, `extractAccountInfoFromFormInput`, `extractCandidateIdsFromFormInput`) with direct key lookup plus `for...in` fallback — same extracted values, no values-array allocation per field read. Fixed object-shaped `name`/`source` fields on the account-object branch. Added `form-service` spec requirement and expanded `formProcessor.test.ts` coverage (flat, arbitrary-key, direct-key, correlated-identity dictionary paths).
 - (2026-07-23) **Performance:** Replaced boolean match-flag arrays in `jaroSimilarity` with zero-initialized `Uint8Array` buffers — same Jaro-Winkler scores, less allocation overhead on hot string comparisons.
 - (2026-07-23) **Observability:** Added run-scoped `fullScanFallbackCount` on `FusionRun` when trigram candidate blocking falls back to a full identity scan (managed account missing all mandatory trigram attributes). `MatchingService.getCandidates` emits throttled warnings (first 5, then every 100th); `accountList` process phase logs a run summary when the count is non-zero.
 - (2026-07-23) **Performance:** Added `fusionAccountsIterable()` on `FusionRun` for zero-copy iteration over fusion accounts; linked-account index build and decision processing now iterate without `Array.from`/`allFusionAccounts` copies. Defensive-copy getter preserved for callers that mutate arrays.
@@ -104,6 +105,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 

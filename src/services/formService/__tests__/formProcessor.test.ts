@@ -1,4 +1,8 @@
-import { createFusionDecision, extractCandidateIdsFromFormInput } from '../formProcessor'
+import {
+    createFusionDecision,
+    extractAccountInfoFromFormInput,
+    extractCandidateIdsFromFormInput,
+} from '../formProcessor'
 
 describe('formProcessor createFusionDecision', () => {
     it('treats SUBMITTED state as finished', async () => {
@@ -44,6 +48,72 @@ describe('formProcessor createFusionDecision', () => {
 
         expect(decision).toBeNull()
     })
+
+    it('reads correlated identity id from dictionary-shaped formInput', async () => {
+        const decision = await createFusionDecision({
+            id: 'fi-dict-correlated',
+            state: 'SUBMITTED',
+            recipients: [{ id: 'reviewer-1', type: 'IDENTITY' }],
+            formInput: {
+                a: { id: 'account', value: 'src-1::account-1' },
+                b: { id: 'name', value: 'Account One' },
+                c: { id: 'source', value: 'HR' },
+                d: { id: 'identityId', value: 'correlated-uuid' },
+                sourceType: 'authoritative',
+            },
+            formData: {
+                newIdentity: true,
+                comments: 'Dictionary correlated identity',
+            },
+        } as any)
+
+        expect(decision).toBeDefined()
+        expect(decision?.correlatedIdentityId).toBe('correlated-uuid')
+    })
+})
+
+describe('extractAccountInfoFromFormInput', () => {
+    it('reads flat form input unchanged', () => {
+        expect(
+            extractAccountInfoFromFormInput({
+                account: 'src::nat',
+                name: 'Account One',
+                source: 'HR',
+            })
+        ).toEqual({
+            id: 'src::nat',
+            name: 'Account One',
+            sourceName: 'HR',
+        })
+    })
+
+    it('reads account from dictionary with arbitrary keys', () => {
+        expect(
+            extractAccountInfoFromFormInput({
+                a: { id: 'account', value: 'src::nat' },
+                b: { id: 'name', value: 'Account One' },
+                c: { id: 'source', value: 'HR' },
+            })
+        ).toEqual({
+            id: 'src::nat',
+            name: 'Account One',
+            sourceName: 'HR',
+        })
+    })
+
+    it('reads account when dictionary keys match field ids', () => {
+        expect(
+            extractAccountInfoFromFormInput({
+                account: { id: 'account', value: 'src::nat' },
+                name: { id: 'name', value: 'Account One' },
+                source: { id: 'source', value: 'HR' },
+            })
+        ).toEqual({
+            id: 'src::nat',
+            name: 'Account One',
+            sourceName: 'HR',
+        })
+    })
 })
 
 describe('extractCandidateIdsFromFormInput', () => {
@@ -66,6 +136,15 @@ describe('extractCandidateIdsFromFormInput', () => {
             b: { id: 'candidates', value: 'id-x,id-y' },
         }
         expect(extractCandidateIdsFromFormInput(formInput)).toEqual(['id-x', 'id-y'])
+    })
+
+    it('reads from dictionary when keys match field ids', () => {
+        expect(
+            extractCandidateIdsFromFormInput({
+                account: { id: 'account', value: 'src::nat' },
+                candidates: { id: 'candidates', value: 'only-keyed' },
+            })
+        ).toEqual(['only-keyed'])
     })
 
     it('falls back to description when value is empty', () => {
