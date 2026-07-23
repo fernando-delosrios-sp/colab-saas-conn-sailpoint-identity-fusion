@@ -3,10 +3,13 @@ import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
 import { AggregationStats } from '../../services/fusionService/types'
 import { FusionAccount } from '../../model/account'
+import { generateReport } from './generateReport'
+import { buildTerminalSummary, DryRunInput } from './accountListHelpers'
 
 export interface PhaseOptions {
     isPersistent: boolean
     tracker?: AggregationTracker
+    streamProgress?: { sent: number }
 }
 
 export interface FetchResult {
@@ -92,6 +95,7 @@ export async function setupPhase(
     const forceAttributeRefresh = isPersistent && config.forceAttributeRefresh
 
     if (tracker) fusion.setTracker(tracker)
+    fusion.setPersistentRun(isPersistent)
 
     await sources.fetchAllSources(isPersistent)
     log.info(`Loaded ${sources.managedSources.length} managed source(s)`)
@@ -179,7 +183,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
         sources.fetchFusionAccounts(),
         forms.fetchFormInstances(isPersistent),
     ]
-    if (sources.delayedAggregationSources?.length) {
+    if (isPersistent && sources.delayedAggregationSources?.length) {
         fetchTasks.push(workflows.fetchDelayedAggregationSender())
     }
 
@@ -286,7 +290,10 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
     log.info('Sending accounts to platform')
     const sendAccountsOp = log.track('outputPhase.sendAccounts')
     const { sent, eligible } = await fusion.forEachISCAccount(
-        (account) => res.send(account),
+        (account) => {
+            res.send(account)
+            if (options.streamProgress) options.streamProgress.sent++
+        },
         isPersistent
     )
     log.info(`Sent ${sent} account(s) to platform`)
@@ -306,6 +313,71 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
     await forms.awaitPendingDeleteOperations()
     log.info('Queued form deletions completed')
     return sent
+}
+
+export interface ReportEpilogueOptions {
+    isPersistent: boolean
+    dryRun?: DryRunInput
+    fetchResult?: FetchResult
+    outputCount?: number
+    timer: ReturnType<ServiceRegistry['log']['timer']>
+    runError?: unknown
+}
+
+export async function reportEpilogue(
+    serviceRegistry: ServiceRegistry,
+    options: ReportEpilogueOptions
+): Promise<unknown | undefined> {
+    const { log, reports, res, fusion } = serviceRegistry
+    const { isPersistent, dryRun, fetchResult, outputCount, timer } = options
+    let deferredError: unknown
+
+    if (isPersistent && fetchResult && fusion.fusionReportOnAggregation) {
+        try {
+            log.info('Generating aggregation report')
+            const reportOp = log.track('reportPhase.generateReport')
+            await generateReport(false, serviceRegistry, fetchResultToAggregationStats(fetchResult, timer))
+            reportOp.done()
+        } catch (error) {
+            log.warn(`Report epilogue: aggregation report failed: ${(error as Error).message}`)
+        }
+    }
+
+    if (dryRun && fetchResult) {
+        if (dryRun.saveFile || dryRun.sendEmail) {
+            try {
+                const { report } = reports.initializeDryRunReport({
+                    fetchResult,
+                    totalProcessingTime: timer.totalElapsed(),
+                    phaseTiming: timer.getPhaseBreakdown(),
+                })
+                const { reportHtmlOutputPath } = await reports.finalizeDryRunReport({
+                    report,
+                    fetchResult,
+                    totalProcessingTime: timer.totalElapsed(),
+                    phaseBreakdownThroughOutput: timer.getPhaseBreakdown(),
+                    saveFile: dryRun.saveFile,
+                    sendEmail: dryRun.sendEmail,
+                })
+                if (reportHtmlOutputPath) {
+                    log.info(`Dry-run HTML report written to ${reportHtmlOutputPath}`)
+                }
+            } catch (error) {
+                log.warn(`Report epilogue: dry-run report failed: ${(error as Error).message}`)
+            }
+        }
+
+        try {
+            const summary = buildTerminalSummary(serviceRegistry, { outputCount, fetchResult, timer }, dryRun)
+            res.send(summary)
+        } catch (error) {
+            log.warn(`Report epilogue: terminal summary send failed: ${(error as Error).message}`)
+            deferredError = error
+        }
+    }
+
+    timer.phase('Epilogue: report generation', 'info', 'Report')
+    return deferredError
 }
 
 /**

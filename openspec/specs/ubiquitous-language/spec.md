@@ -147,6 +147,22 @@ The term **dry-run mode** SHALL refer to the accountList operation running with 
 - **WHEN** the connector handles an accountList invocation with `{ dryRun: { enabled: true } }`
 - **THEN** the system SHALL identify this as an execution in "dry-run mode" in logs, metrics, and report data
 
+### Requirement: The report step is the Epilogue, not a phase
+The term **Epilogue** SHALL denote the terminal block of the account-list operation that emits reports and summaries after the pipeline phases complete, regardless of whether the pipeline succeeded or failed. The report step SHALL NOT be called a phase. Code, log labels, and documentation SHALL use "Epilogue" (for example `Epilogue: report generation`) instead of "PHASE 6" or "PHASE 7". The `Report` short label in phase-timing rows SHALL be preserved unchanged.
+
+#### Scenario: Log labels use Epilogue terminology
+- **WHEN** the account-list operation logs the report step
+- **THEN** the label SHALL read "Epilogue: …" and SHALL NOT use a phase number
+
+#### Scenario: Code naming follows the Epilogue term
+- **WHEN** code refers to the terminal report block of the account-list pipeline
+- **THEN** identifiers SHALL use canonical terms (for example `reportEpilogue`, `ReportEpilogueOptions`), consistent with the **Epilogue** glossary entry
+
+#### Scenario: Glossary defines Epilogue alongside Phase
+- **WHEN** the "Operations, phases, and sweeps" glossary table is consulted
+- **THEN** it SHALL contain an **Epilogue** entry defined as the always-runs terminal report block
+- **AND** the **Phase** entry SHALL NOT list the report step as an example phase
+
 ## Canonical Terms
 
 ### Account taxonomy
@@ -177,7 +193,8 @@ The connector refers to an ISC identity and to the Fusion account itself through
 |------|------------|
 | **Operation** | A connector entry point such as `std:account:list` (the **accountList operation**). The operation is the command definition. The accountList operation supports an optional **dry-run mode** (`dryRun.enabled: true` on the input) for non-persistent analysis. |
 | **Operation run** | A single execution or instance of an operation. A run is the execution of an operation. |
-| **Phase** | A major stage of an operation pipeline (for example the identity documents phase, the Fusion accounts phase, the managed accounts phase, or the report phase). |
+| **Phase** | A major stage of an operation pipeline (for example the identity documents phase, the Fusion accounts phase, or the managed accounts phase). The report step is not a phase; see **Epilogue**. |
+| **Epilogue** | The always-runs terminal block of the account-list operation that emits reports and summaries after the pipeline phases complete, regardless of pipeline success. Ordered most-durable-first (report file, report email, summary send). |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
 | **Correlated account sweep** | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts. |
 | **Aggregation** | The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters. |

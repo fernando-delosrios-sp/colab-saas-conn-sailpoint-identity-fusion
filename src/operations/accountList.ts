@@ -1,8 +1,8 @@
 import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { AggregationTracker } from '../services/fusionService'
-import { generateReport } from './helpers/generateReport'
-import { parseDryRunInput, buildTerminalSummary } from './helpers/accountListHelpers'
+import { FetchResult } from './helpers/accountListPhases'
+import { parseDryRunInput } from './helpers/accountListHelpers'
 import {
     PhaseOptions,
     setupPhase,
@@ -10,7 +10,7 @@ import {
     refreshPhase,
     processPhase,
     outputPhase,
-    fetchResultToAggregationStats,
+    reportEpilogue,
 } from './helpers/accountListPhases'
 
 export { hydrateCorrelatedManagedAccountIdentities } from './helpers/accountListPhases'
@@ -21,43 +21,59 @@ export { hydrateCorrelatedManagedAccountIdentities } from './helpers/accountList
  * Supports an optional dry-run mode via the dryRun input parameter:
  *   { dryRun: { enabled: true, saveFile?: boolean, sendEmail?: string | string[] } }
  *
- * When dry-run mode is active, the operation runs non-persistently, streams
- * 1-to-1 StdAccountListOutput rows, and sends a terminal summary object.
+ * When dry-run mode is active, the operation runs non-persistently (no state,
+ * forms, correlation, or scheduling side effects), emits optional report
+ * artifacts (file and/or email), and sends a terminal summary object last.
+ *
+ * The pipeline (phases 1-5) is fallible; the report epilogue always runs so
+ * that durable artifacts survive pipeline failures. Pipeline errors are
+ * rethrown after the epilogue so failed runs are still marked failed.
  */
 export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
-    const { log, reports, res, sources } = serviceRegistry
+    const { log, sources } = serviceRegistry
     const tracker = new AggregationTracker()
     const dryRun = parseDryRunInput(input)
     const isPersistent = !dryRun
     const timer = log.timer()
+    const streamProgress = { sent: 0 }
+    let fetchResult: FetchResult | undefined
+    let outputCount: number | undefined
+    let runError: unknown
 
     try {
-        log.info(dryRun ? 'Starting dry-run analysis' : 'Starting aggregation')
+        try {
+            log.info(dryRun ? 'Starting dry-run analysis' : 'Starting aggregation')
 
-        const options: PhaseOptions = { isPersistent, tracker }
+            const options: PhaseOptions = { isPersistent, tracker, streamProgress }
 
-        if (!(await setupPhase(serviceRegistry, input.schema, options))) return
-        timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
+            if (!(await setupPhase(serviceRegistry, input.schema, options))) return
+            timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
 
-        const fetchResult = await fetchPhase(serviceRegistry, options)
-        timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
+            fetchResult = await fetchPhase(serviceRegistry, options)
+            timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
 
-        await refreshPhase(serviceRegistry)
-        timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
+            await refreshPhase(serviceRegistry)
+            timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
 
-        await processPhase(serviceRegistry, options)
-        timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
+            await processPhase(serviceRegistry, options)
+            timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
 
-        const outputCount = await outputPhase(serviceRegistry, options)
-        timer.phase('PHASE 5: Output (JIT attributes, serialize & clean up memory)', 'info', 'Output')
-
-        if (isPersistent && fetchResult && serviceRegistry.fusion.fusionReportOnAggregation) {
-            log.info('Generating aggregation report')
-            const reportOp = log.track('reportPhase.generateReport')
-            await generateReport(false, serviceRegistry, fetchResultToAggregationStats(fetchResult, timer))
-            reportOp.done()
+            outputCount = await outputPhase(serviceRegistry, options)
+            timer.phase('PHASE 5: Output (JIT attributes, serialize & clean up memory)', 'info', 'Output')
+        } catch (error) {
+            runError = error
+            log.warn(`Pipeline failed — running report epilogue before propagating: ${(error as Error).message}`)
         }
-        timer.phase('PHASE 6: Report generation', 'info', 'Report')
+
+        const epilogueError = await reportEpilogue(serviceRegistry, {
+            isPersistent,
+            dryRun,
+            fetchResult,
+            outputCount,
+            timer,
+            runError,
+        })
+        runError = runError ?? epilogueError
 
         if (!sources.run.isRecordMode) {
             sources.clearFusionAccounts()
@@ -66,38 +82,16 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         }
         log.info('Account caches cleared from memory')
 
-        if (dryRun && fetchResult) {
-            const summary = buildTerminalSummary(serviceRegistry, { outputCount, fetchResult, timer }, dryRun)
-            res.send(summary)
-
-            if (dryRun.saveFile || dryRun.sendEmail) {
-                const { report } = reports.initializeDryRunReport({
-                    fetchResult,
-                    totalProcessingTime: timer.totalElapsed(),
-                    phaseTiming: timer.getPhaseBreakdown(),
-                })
-                const { reportHtmlOutputPath } = await reports.finalizeDryRunReport({
-                    report,
-                    fetchResult,
-                    totalProcessingTime: timer.totalElapsed(),
-                    phaseBreakdownThroughOutput: timer.getPhaseBreakdown(),
-                    saveFile: dryRun.saveFile,
-                    sendEmail: dryRun.sendEmail,
-                })
-                if (reportHtmlOutputPath) {
-                    log.info(`Dry-run HTML report written to ${reportHtmlOutputPath}`)
-                }
+        if (runError) {
+            if (runError instanceof ConnectorError) throw runError
+            if (isPersistent) {
+                log.crash('Failed to list accounts', runError as any)
             }
+            throw runError
         }
 
         const label = dryRun ? 'Dry-run analysis' : 'Account list operation'
         timer.end(`✓ ${label} completed successfully - ${outputCount ?? 0} account(s) processed`)
-    } catch (error) {
-        if (error instanceof ConnectorError) throw error
-        if (isPersistent && !(error instanceof ConnectorError)) {
-            log.crash('Failed to list accounts', error as any)
-        }
-        throw error
     } finally {
         if (isPersistent) {
             await sources.releaseProcessLock()

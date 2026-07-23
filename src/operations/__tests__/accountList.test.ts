@@ -260,4 +260,132 @@ describe('accountList dry-run mode', () => {
         expect(sources.setProcessLock).toHaveBeenCalledTimes(1)
         expect(sources.releaseProcessLock).toHaveBeenCalledTimes(1)
     })
+
+    it('does not fetch the delayed-aggregation sender workflow in dry-run', async () => {
+        const delayedSource = {
+            name: 'HR Source',
+            correlationMode: 'none' as const,
+            aggregationMode: 'delayed' as const,
+            aggregationDelay: 7,
+            optimizedAggregation: false,
+        }
+        const { registry, sources } = createMockRegistry([delayedSource])
+        const workflows = registry.workflows
+
+        sources.managedSources = [
+            {
+                id: 'source-1',
+                name: delayedSource.name,
+                config: {
+                    aggregationMode: delayedSource.aggregationMode,
+                    aggregationDelay: delayedSource.aggregationDelay,
+                    optimizedAggregation: delayedSource.optimizedAggregation,
+                },
+            },
+        ] as any
+
+        sources.aggregateDelayedSources.mockImplementation(async (schedule: any) => {
+            await schedule({
+                sourceId: 'source-1',
+                delayMinutes: 7,
+                disableOptimization: true,
+            })
+        })
+
+        const input = { dryRun: { enabled: true }, schema: { attributes: [] } } as any
+
+        await accountList(registry, input)
+
+        expect(workflows.fetchDelayedAggregationSender).not.toHaveBeenCalled()
+    })
+})
+
+describe('accountList report epilogue', () => {
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('emits the aggregation report and rethrows when res.send fails mid-stream', async () => {
+        const { registry, sources, fusion } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
+        fusion.fusionReportOnAggregation = true
+        fusion.forEachISCAccount.mockImplementation(async (sendFn: (a: unknown) => void) => {
+            sendFn({ id: 'a1' })
+            return { sent: 1, eligible: 1 }
+        })
+        ;(registry.res.send as Mock).mockImplementation(() => {
+            throw new Error('write after end')
+        })
+
+        await expect(accountList(registry, { schema: { attributes: [] } } as any)).rejects.toThrow(
+            'write after end'
+        )
+
+        expect(registry.reports.generateAndSendFusionReport).toHaveBeenCalledTimes(1)
+        expect(registry.definition.saveState).not.toHaveBeenCalled()
+        expect(sources.saveBatchCumulativeCount).not.toHaveBeenCalled()
+        expect(sources.releaseProcessLock).toHaveBeenCalledTimes(1)
+    })
+
+    it('saves dry-run report artifacts before a failing summary send', async () => {
+        const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
+        const reports = registry.reports as any
+        reports.initializeDryRunReport = vi.fn().mockReturnValue({ report: {}, stats: {} })
+        reports.finalizeDryRunReport = vi.fn().mockResolvedValue({ reportHtmlOutputPath: './reports/dry-run.html' })
+        ;(registry.res.send as Mock).mockImplementation(() => {
+            throw new Error('write after end')
+        })
+        const input = { dryRun: { enabled: true, saveFile: true }, schema: { attributes: [] } } as any
+
+        await expect(accountList(registry, input)).rejects.toThrow('write after end')
+
+        expect(reports.finalizeDryRunReport).toHaveBeenCalledTimes(1)
+        expect(reports.finalizeDryRunReport.mock.invocationCallOrder[0]).toBeLessThan(
+            (registry.res.send as Mock).mock.invocationCallOrder[0]
+        )
+    })
+
+    it('sends the summary even when dry-run report artifacts fail', async () => {
+        const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
+        const reports = registry.reports as any
+        reports.initializeDryRunReport = vi.fn().mockReturnValue({ report: {}, stats: {} })
+        reports.finalizeDryRunReport = vi.fn().mockRejectedValue(new Error('email down'))
+        const input = { dryRun: { enabled: true, saveFile: true }, schema: { attributes: [] } } as any
+
+        await accountList(registry, input)
+
+        expect(registry.res.send).toHaveBeenCalledWith(expect.objectContaining({ rowsSent: expect.any(Number) }))
+    })
+
+    it('emits report artifacts before the summary on a clean dry-run', async () => {
+        const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
+        const reports = registry.reports as any
+        reports.initializeDryRunReport = vi.fn().mockReturnValue({ report: {}, stats: {} })
+        reports.finalizeDryRunReport = vi.fn().mockResolvedValue({ reportHtmlOutputPath: './reports/dry-run.html' })
+        const input = { dryRun: { enabled: true, saveFile: true }, schema: { attributes: [] } } as any
+
+        await accountList(registry, input)
+
+        expect(reports.finalizeDryRunReport.mock.invocationCallOrder[0]).toBeLessThan(
+            (registry.res.send as Mock).mock.invocationCallOrder[0]
+        )
+        expect(registry.res.send).toHaveBeenCalledWith(expect.objectContaining({ rowsSent: expect.any(Number) }))
+    })
+
+    it('logs Epilogue labels and no numbered report phases', async () => {
+        const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
+        const logSpy = vi.spyOn(registry.log, 'info')
+
+        await accountList(registry, { schema: { attributes: [] } } as any)
+
+        const phaseMessages = logSpy.mock.calls
+            .map((call) => String(call[0]))
+            .filter((msg) => /\b(?:PHASE [1-7]|Epilogue):/.test(msg))
+
+        expect(phaseMessages.length).toBeGreaterThan(0)
+        expect(phaseMessages.some((msg) => msg.startsWith('Epilogue: report generation'))).toBe(true)
+        expect(phaseMessages.some((msg) => /PHASE [67]:/.test(msg))).toBe(false)
+        expect(phaseMessages.some((msg) => /PHASE [1-5]:/.test(msg))).toBe(true)
+
+        logSpy.mockRestore()
+    })
 })

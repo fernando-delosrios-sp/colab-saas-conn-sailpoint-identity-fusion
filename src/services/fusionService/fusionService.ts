@@ -77,6 +77,8 @@ export class FusionService {
     public readonly commandType?: StandardCommand
     /** When true, report data should be captured even during aggregation (e.g. custom:dryrun). */
     private readonly shouldCaptureReportData: boolean
+    /** Runtime flag set by setupPhase — when false, correlation-on-aggregation is suppressed. */
+    private _isPersistentRun = true
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -129,7 +131,8 @@ export class FusionService {
             log,
             this.sources,
             this.identities,
-            () => this.accountAssembly.isAggregationAccountListMode()
+            () => this.accountAssembly.isAggregationAccountListMode(),
+            () => this._isPersistentRun
         )
         this.identityProcessor = new IdentityProcessor(
             config,
@@ -234,6 +237,14 @@ export class FusionService {
      */
     public setTracker(tracker: AggregationTracker): void {
         this.run.setTracker(tracker)
+    }
+
+    /**
+     * Sets whether the run is persistent (true) or non-persistent (dry-run, report context).
+     * When false, correlation-on-aggregation is suppressed in CorrelationManager.
+     */
+    public setPersistentRun(isPersistent: boolean): void {
+        this._isPersistentRun = isPersistent
     }
 
     /**
