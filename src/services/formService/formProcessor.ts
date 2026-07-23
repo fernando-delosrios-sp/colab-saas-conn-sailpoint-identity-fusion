@@ -1,4 +1,4 @@
-import { FormInstanceResponseV2025, FormDefinitionInputV2025 } from 'sailpoint-api-client'
+import { FormInstanceResponseV2025 } from 'sailpoint-api-client'
 import { logger } from '@sailpoint/connector-sdk'
 import { SourceType } from '../../model/config'
 import { FusionDecision } from '../../model/form'
@@ -11,6 +11,9 @@ import { FusionAttribute } from '../../data/schema'
 // ============================================================================
 // Internal Helpers
 // ============================================================================
+
+/** Dictionary-shaped form instance input (arbitrary keys; fields located by `id`). */
+type FormInputDictionary = Record<string, { id?: string; value?: string; description?: string }>
 
 /**
  * Coerces any scalar or object value to a plain string, extracting a `.value`
@@ -126,7 +129,7 @@ export const extractAccountInfoFromFormInput = (
             (typeof sourceField === 'string' ? sourceField : sourceField?.value || sourceField?.description)
     } else {
         // Try dictionary structure (direct key lookup, then id-aligned scan)
-        const formInputs = formInput as FormDefinitionInputV2025 | undefined
+        const formInputs = formInput as FormInputDictionary | undefined
         let accountInput = formInputs?.account
         if (!(accountInput && accountInput.id === 'account' && (accountInput.value?.length ?? 0) > 0)) {
             accountInput = undefined
@@ -370,6 +373,7 @@ const extractSourceType = (formInput: any): SourceType => {
     }
     return SourceType.Authoritative
 }
+
 
 
 

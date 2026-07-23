@@ -17,7 +17,7 @@ export function extractTrigrams(normalized: string): Set<string> {
     const padded = `  ${normalized} `
     const len = padded.length
     for (let i = 0; i <= len - 3; i++) {
-        result.add(padded[i] + padded[i + 1] + padded[i + 2])
+        result.add(padded.substring(i, i + 3))
     }
     return result
 }
@@ -60,7 +60,7 @@ export function queryAttributeIndex(index: TrigramIndex, accountValue: string): 
     const padded = `  ${normalized} `
     const len = padded.length
     for (let i = 0; i <= len - 3; i++) {
-        const trigram = padded[i] + padded[i + 1] + padded[i + 2]
+        const trigram = padded.substring(i, i + 3)
         const bucket = index.get(trigram)
         if (bucket) {
             for (const identity of bucket) {
@@ -70,3 +70,4 @@ export function queryAttributeIndex(index: TrigramIndex, accountValue: string): 
     }
     return candidates
 }
+
