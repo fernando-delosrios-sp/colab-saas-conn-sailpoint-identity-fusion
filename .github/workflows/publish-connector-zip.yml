@@ -23,7 +23,7 @@ jobs:
             - name: Setup Node
               uses: actions/setup-node@v4
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: npm
 
             - name: Build package zip
@@ -51,3 +51,4 @@ jobs:
                   name: ${{ steps.pkg.outputs.name }} v${{ steps.pkg.outputs.version }}
                   generate_release_notes: true
                   files: dist/*.zip
+
