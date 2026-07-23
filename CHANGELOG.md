@@ -2,7 +2,7 @@
 
 ## 2.2.0
 
-- (2026-07-23) **Performance:** Identity-sweep non-match comparisons no longer allocate `ScoreReport[]` breakdown arrays. `compareFusionAccounts` uses a fast combined-score-only path when report capture is off; threshold-passing matches re-run once with full breakdown (matches are rare). Deferred candidates and report-capture runs unchanged. Wired via `MatchingService.setCaptureBreakdown()` from `FusionService.initializeManagedAccountProcessing`. LIG3 upper-bound skip logic colocated in `scoringHelpers` (`lig3UpperBound`, `lig3UpperBoundSkipIfUnreachable`).
+- (2026-07-23) **Performance:** Identity-sweep non-match comparisons no longer allocate `ScoreReport[]` breakdown arrays or skipped-report padding. Fast path uses combined-score totals only (`evaluateRuleTotals`); LIG3 upper-bound checks avoid skip `ScoreReport` allocation. Threshold-passing matches re-run once with full breakdown (matches are rare). Deferred candidates and report-capture runs unchanged. Wired via `MatchingService.setCaptureBreakdown()` from `FusionService.initializeManagedAccountProcessing`. LIG3 upper-bound helpers colocated in `scoringHelpers` (`lig3UpperBound`, `lig3UpperBoundSkipIfUnreachable`).
 - (2026-07-23) **Performance:** Capped managed-account identity and deferred scoring concurrency via new developer setting `scoringMaxConcurrency` (default **12**, max 50). `scoreManagedAccounts` now uses `promiseAllBatched` instead of uncapped `Promise.all` over the full batch — peak memory during Match no longer scales with `managedAccountsBatchSize` (default 100). Batch grouping unchanged; scoring throughput is independently tunable under Advanced Settings → Developer Settings.
 - (2026-07-23) **Resilience:** Replaced the inline "PHASE 6" report block with a failure-isolated `reportEpilogue()` helper that always runs after the pipeline — reports survive stream crashes. Dry-run emission reordered (file → email → summary, most-durable-first) so a broken `res.send` connection never loses the HTML report or email. PHASE 6/7 log markers renamed to "Epilogue:". Ubiquitous-language spec gains the **Epilogue** term. `accountList` pipeline errors are captured, reports emitted, then the error is rethrown (runs still fail, but never silently).
 - (2026-07-23) **Fix:** Dry-run mode no longer writes correlation state to ISC. `CorrelationManager.applyPerSourceCorrelationIfNeeded` now guards on a runtime persistence flag (`FusionService.setPersistentRun`) so "Correlate missing accounts on aggregation" is a no-op in dry-run. The delayed-aggregation sender workflow fetch is also suppressed in dry-run.
@@ -99,6 +99,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 

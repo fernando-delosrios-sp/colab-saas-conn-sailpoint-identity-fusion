@@ -2683,4 +2683,48 @@ describe('FusionService', () => {
             expect(sentKeys).toEqual(accounts.map((x) => x.managedKey))
         })
     })
+
+    describe('initializeManagedAccountProcessing captureBreakdown wiring', () => {
+        async function initializeWithReportCaptureFlag(shouldCaptureReportData: boolean): Promise<FusionService> {
+            const localRun = new FusionRun()
+            localRun.log = mockLog
+            Object.defineProperty(localRun, 'managedAccountsById', {
+                get: () => new Map(),
+                configurable: true,
+            })
+
+            mockMatchingService.buildTrigramIndex = vi.fn()
+            mockMatchingService.setCaptureBreakdown = vi.fn()
+
+            const service = new FusionService(
+                mockConfig,
+                mockLog,
+                mockIdentities,
+                mockSources,
+                mockForms,
+                mockMappingService,
+                mockDefinitionService,
+                mockMatchingService,
+                mockSchemas,
+                localRun,
+                StandardCommand.StdAccountList,
+                shouldCaptureReportData
+            )
+            service.setTracker(new AggregationTracker())
+
+            await service.initializeManagedAccountProcessing()
+            return service
+        }
+
+        it('sets captureBreakdown false when report capture is disabled', async () => {
+            await initializeWithReportCaptureFlag(false)
+            expect(mockMatchingService.setCaptureBreakdown).toHaveBeenCalledWith(false)
+        })
+
+        it('sets captureBreakdown true when report capture is enabled', async () => {
+            vi.mocked(mockMatchingService.setCaptureBreakdown).mockClear()
+            await initializeWithReportCaptureFlag(true)
+            expect(mockMatchingService.setCaptureBreakdown).toHaveBeenCalledWith(true)
+        })
+    })
 })

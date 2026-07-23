@@ -7,6 +7,7 @@ import { countIdentityCandidateFusionMatches } from './matchingHelpers'
 import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
 import {
     normalizeLIG3,
+    lig3UpperBound,
     lig3UpperBoundSkipIfUnreachable,
     scoreBinary,
     scoreCustomVelocity,
@@ -55,6 +56,14 @@ const SCORING_IDENTITY_YIELD_INTERVAL = 100
 
 /** Attribute label on the synthetic combined score row in reports and forms. */
 export const COMBINED_SCORE_ROW_ATTRIBUTE = 'Combined score'
+
+/** Minimal rule outcome for fast-path combined score evaluation (no ScoreReport retention). */
+type RuleScoreTotals = {
+    score: number
+    isMatch: boolean
+    skipped: boolean
+    fusionScore?: number
+}
 
 /**
  * Service for calculating and managing similarity scores for identity matching.
@@ -539,14 +548,15 @@ export class MatchingService {
                 continue
             }
 
-            const lig3UpperBoundSkip = this.lig3UpperBoundSkipForPair(
-                fusionAccount,
-                fusionIdentity,
-                matching,
-                accountAttribute,
-                identityAttribute
-            )
-            if (lig3UpperBoundSkip) {
+            if (
+                this.isLig3UpperBoundUnreachable(
+                    fusionAccount,
+                    fusionIdentity,
+                    matching,
+                    accountAttribute,
+                    identityAttribute
+                )
+            ) {
                 if (matching.mandatory) {
                     hasFailedMandatory = true
                     break
@@ -554,19 +564,19 @@ export class MatchingService {
                 continue
             }
 
-            const scoreReport = this.scoreRulePair(
+            const ruleTotals = this.evaluateRuleTotals(
                 fusionAccount,
                 fusionIdentity,
                 matching,
                 accountAttribute,
                 identityAttribute
             )
-            if (!scoreReport.skipped) {
-                const w = MatchingService.blendWeight(scoreReport.fusionScore)
-                weightedSum += w * scoreReport.score
+            if (!ruleTotals.skipped) {
+                const w = MatchingService.blendWeight(ruleTotals.fusionScore)
+                weightedSum += w * ruleTotals.score
                 weightTotal += w
             }
-            if (matching.mandatory && !scoreReport.isMatch) {
+            if (matching.mandatory && !ruleTotals.isMatch) {
                 hasFailedMandatory = true
                 break
             }
@@ -586,7 +596,7 @@ export class MatchingService {
     }
 
     /**
-     * Score one matching rule for a fusion account pair (shared by fast and full comparison paths).
+     * Score one matching rule for a fusion account pair (full breakdown path).
      * LIG3 upper-bound short-circuit is handled separately via {@link lig3UpperBoundSkipForPair}.
      */
     private scoreRulePair(
@@ -596,7 +606,56 @@ export class MatchingService {
         accountAttribute: unknown,
         identityAttribute: unknown
     ): ScoreReport {
-        let scoreReport: ScoreReport
+        const scoreReport = this.dispatchRuleScore(
+            fusionAccount,
+            fusionIdentity,
+            matching,
+            accountAttribute,
+            identityAttribute
+        )
+        if (!scoreReport.skipped && effectiveSkipMatchIfThresholdNotMet(matching) && !scoreReport.isMatch) {
+            return makeSkippedReport(matching, 'Rule skipped (score below threshold)')
+        }
+        return scoreReport
+    }
+
+    /**
+     * Rule totals for fast-path combined score evaluation. Scorer functions may allocate transient
+     * ScoreReport objects; this path does not retain them or build breakdown arrays.
+     */
+    private evaluateRuleTotals(
+        fusionAccount: FusionAccount,
+        fusionIdentity: FusionAccount,
+        matching: MatchingConfig,
+        accountAttribute: unknown,
+        identityAttribute: unknown
+    ): RuleScoreTotals {
+        const scoreReport = this.dispatchRuleScore(
+            fusionAccount,
+            fusionIdentity,
+            matching,
+            accountAttribute,
+            identityAttribute
+        )
+        if (!scoreReport.skipped && effectiveSkipMatchIfThresholdNotMet(matching) && !scoreReport.isMatch) {
+            return { score: 0, isMatch: false, skipped: true, fusionScore: matching.fusionScore }
+        }
+        return {
+            score: scoreReport.score,
+            isMatch: scoreReport.isMatch,
+            skipped: scoreReport.skipped ?? false,
+            fusionScore: scoreReport.fusionScore,
+        }
+    }
+
+    /** Shared algorithm dispatch for full and fast comparison paths. */
+    private dispatchRuleScore(
+        fusionAccount: FusionAccount,
+        fusionIdentity: FusionAccount,
+        matching: MatchingConfig,
+        accountAttribute: unknown,
+        identityAttribute: unknown
+    ): ScoreReport {
         if (matching.algorithm === 'lig3') {
             const normAccount = this.getNormalized(
                 fusionAccount,
@@ -608,8 +667,9 @@ export class MatchingService {
                 matching.attribute,
                 (identityAttribute ?? '').toString()
             )
-            scoreReport = scoreLIG3Normalized(normAccount, normIdentity, matching)
-        } else if (matching.algorithm === 'name-matcher') {
+            return scoreLIG3Normalized(normAccount, normIdentity, matching)
+        }
+        if (matching.algorithm === 'name-matcher') {
             const normAccount = this.getNameNormalized(
                 fusionAccount,
                 matching.attribute,
@@ -620,18 +680,31 @@ export class MatchingService {
                 matching.attribute,
                 (identityAttribute ?? '').toString()
             )
-            scoreReport = scoreNameMatcherNormalized(normAccount, normIdentity, matching)
-        } else {
-            scoreReport = this.scoreAttribute(
-                (accountAttribute ?? '').toString(),
-                (identityAttribute ?? '').toString(),
-                matching
-            )
+            return scoreNameMatcherNormalized(normAccount, normIdentity, matching)
         }
-        if (!scoreReport.skipped && effectiveSkipMatchIfThresholdNotMet(matching) && !scoreReport.isMatch) {
-            return makeSkippedReport(matching, 'Rule skipped (score below threshold)')
-        }
-        return scoreReport
+        return this.scoreAttribute(
+            (accountAttribute ?? '').toString(),
+            (identityAttribute ?? '').toString(),
+            matching
+        )
+    }
+
+    /** LIG3 length-ratio upper bound check without allocating a skip ScoreReport. */
+    private isLig3UpperBoundUnreachable(
+        fusionAccount: FusionAccount,
+        fusionIdentity: FusionAccount,
+        matching: MatchingConfig,
+        accountAttribute: unknown,
+        identityAttribute: unknown
+    ): boolean {
+        if (matching.algorithm !== 'lig3') return false
+        const normAccount = this.getNormalized(fusionAccount, matching.attribute, (accountAttribute ?? '').toString())
+        const normIdentity = this.getNormalized(
+            fusionIdentity,
+            matching.attribute,
+            (identityAttribute ?? '').toString()
+        )
+        return lig3UpperBound(normAccount, normIdentity) < (matching.fusionScore ?? 0)
     }
 
     /** Normalization cache + delegate to {@link lig3UpperBoundSkipIfUnreachable}. */
