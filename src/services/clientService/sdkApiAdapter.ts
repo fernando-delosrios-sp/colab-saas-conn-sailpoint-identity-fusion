@@ -37,8 +37,14 @@ export class SdkApiAdapter implements IscApiAdapter {
         // after axios exhausts its own budget — multiplying the effective retry count unexpectedly.
         const retriesConfig = createRetriesConfig(0)
 
-        // Inject https agent with keepAlive: true to reuse TCP connections
-        const agent = new https.Agent({ keepAlive: true })
+        // Inject https agent with keepAlive and connection pool bounds
+        const agent = new https.Agent({
+            keepAlive: true,
+            keepAliveMsecs: 30000,
+            maxSockets: 50,
+            maxFreeSockets: 10,
+            timeout: 60000,
+        })
 
         this.config = new Configuration({ ...fusionConfig, tokenUrl, baseOptions: { httpsAgent: agent } } as any)
         this.config.retriesConfig = retriesConfig
@@ -93,3 +99,4 @@ export class SdkApiAdapter implements IscApiAdapter {
         return (this._identityAttributesApi ??= new IdentityAttributesV2025Api(this.config))
     }
 }
+
