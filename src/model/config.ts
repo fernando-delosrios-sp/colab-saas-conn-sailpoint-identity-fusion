@@ -336,6 +336,11 @@ export interface DeveloperSettingsSection {
      */
     managedAccountsBatchSize?: number
     /**
+     * Maximum concurrent identity-comparison scoring operations during managed-account analysis.
+     * Independent from managedAccountsBatchSize (batch grouping). Default: 12.
+     */
+    scoringMaxConcurrency?: number
+    /**
      * Force recalculation of all computed Normal-type attributes on every aggregation,
      * even when no changes were detected.
      */
@@ -507,3 +512,4 @@ export interface FusionConfig
         InternalConfig {
     recording?: RecordingConfig
 }
+

@@ -1,5 +1,6 @@
-import { compact, promiseAllBatched, forEachBatched } from '../collections'
+import { compact, promiseAllBatched, forEachBatched, getScoringMaxConcurrency } from '../collections'
 import { yieldToEventLoop } from '../../../utils/yieldToEventLoop'
+import type { FusionConfig } from '../../../model/config'
 
 describe('collections utilities', () => {
     describe('compact', () => {
@@ -74,6 +75,24 @@ describe('collections utilities', () => {
         })
     })
 
+    describe('getScoringMaxConcurrency', () => {
+        it('defaults to 12 when unset', () => {
+            expect(getScoringMaxConcurrency({} as FusionConfig)).toBe(12)
+        })
+
+        it('returns configured value within bounds', () => {
+            expect(getScoringMaxConcurrency({ scoringMaxConcurrency: 5 } as FusionConfig)).toBe(5)
+        })
+
+        it('clamps low values to 1', () => {
+            expect(getScoringMaxConcurrency({ scoringMaxConcurrency: 0 } as FusionConfig)).toBe(1)
+        })
+
+        it('clamps high values to 50', () => {
+            expect(getScoringMaxConcurrency({ scoringMaxConcurrency: 200 } as FusionConfig)).toBe(50)
+        })
+    })
+
     describe('forEachBatched', () => {
         it('should process an empty array', async () => {
             const fn = vi.fn()
@@ -100,3 +119,4 @@ describe('collections utilities', () => {
         })
     })
 })
+
