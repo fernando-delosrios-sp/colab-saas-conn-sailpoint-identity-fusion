@@ -180,6 +180,34 @@ export function scoreNameMatcherNormalized(normA: string, normB: string, matchin
 }
 
 /**
+ * Conservative upper bound on the LIG3 similarity score for a pair of already-normalized strings.
+ * LIG3 gap penalties (0.8–0.9) mean the similarity can never exceed `min(len1,len2)/max(len1,len2)*100`.
+ * If this bound is below the required threshold, the full DP can be skipped entirely.
+ */
+export function lig3UpperBound(normA: string, normB: string): number {
+    const lenA = normA.length
+    const lenB = normB.length
+    if (lenA === 0 || lenB === 0) return 0
+    return (Math.min(lenA, lenB) / Math.max(lenA, lenB)) * 100
+}
+
+/**
+ * When LIG3 length-ratio upper bound makes the threshold unreachable, return a skipped report.
+ * Callers pass already-normalized strings (e.g. from MatchingService normalization cache).
+ */
+export function lig3UpperBoundSkipIfUnreachable(
+    matching: MatchingConfig,
+    normA: string,
+    normB: string
+): ScoreReport | undefined {
+    if (matching.algorithm !== 'lig3') return undefined
+    if (lig3UpperBound(normA, normB) < (matching.fusionScore ?? 0)) {
+        return makeScoreReport(matching, 0, false, 'Length ratio upper bound below threshold', true)
+    }
+    return undefined
+}
+
+/**
  * LIG3 scoring on already-normalized strings. Called by the ScoringService cache layer
  * after it has pre-normalized both sides; avoids repeated normalization in the O(n×m) loop.
  */

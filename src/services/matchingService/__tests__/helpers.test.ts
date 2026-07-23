@@ -6,6 +6,8 @@ import {
     scoreJaroWinkler,
     scoreLIG3,
     scoreNameMatcher,
+    lig3UpperBound,
+    lig3UpperBoundSkipIfUnreachable,
 } from '../scoringHelpers'
 
 const baseMatching = {
@@ -130,6 +132,35 @@ describe('scoringService helpers', () => {
         it('should respect fusionScore threshold', () => {
             const result = scoreBinary('abc', 'abc', { ...binaryMatching, fusionScore: 80 })
             expect(result.isMatch).toBe(true)
+        })
+    })
+
+    describe('lig3UpperBound', () => {
+        it('returns 0 when either side is empty', () => {
+            expect(lig3UpperBound('', 'abc')).toBe(0)
+            expect(lig3UpperBound('abc', '')).toBe(0)
+        })
+
+        it('returns length ratio times 100 for non-empty strings', () => {
+            expect(lig3UpperBound('abc', 'abcdef')).toBe(50)
+        })
+    })
+
+    describe('lig3UpperBoundSkipIfUnreachable', () => {
+        const lig3Matching = { ...baseMatching, algorithm: 'lig3' as const, fusionScore: 80 }
+
+        it('returns undefined for non-lig3 algorithms', () => {
+            expect(lig3UpperBoundSkipIfUnreachable(baseMatching, 'a', 'b')).toBeUndefined()
+        })
+
+        it('returns skipped report when upper bound is below threshold', () => {
+            const result = lig3UpperBoundSkipIfUnreachable(lig3Matching, 'ab', 'abcdefgh')
+            expect(result?.skipped).toBe(true)
+            expect(result?.comment).toBe('Length ratio upper bound below threshold')
+        })
+
+        it('returns undefined when upper bound meets threshold', () => {
+            expect(lig3UpperBoundSkipIfUnreachable(lig3Matching, 'john', 'john')).toBeUndefined()
         })
     })
 
@@ -263,3 +294,4 @@ describe('scoringService helpers', () => {
         })
     })
 })
+
