@@ -1,6 +1,14 @@
 import { ConnectorError } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 
+/**
+ * Account discover schema operation — dynamically builds the Fusion account schema.
+ *
+ * Inspects all configured managed source schemas and attribute mapping definitions
+ * to construct a unified connector account schema.
+ *
+ * @param serviceRegistry - Service registry providing access to all connector services
+ */
 export const accountDiscoverSchema = async (serviceRegistry: ServiceRegistry) => {
     const { log, schemas, sources, res } = serviceRegistry
 
