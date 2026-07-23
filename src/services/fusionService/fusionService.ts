@@ -21,7 +21,6 @@ import { forEachBatched, compact } from './collections'
 import { FusionDecision } from '../../model/form'
 import { SchemaService } from '../schemaService'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats } from './types'
-import { OperationContext } from '../../model/operationContext'
 import { FusionReportBlend } from '../../model/fusionReportBlend'
 import {
     batchProcess,
@@ -76,8 +75,8 @@ export class FusionService {
     public readonly fusionOwnerIsGlobalReviewer: boolean
     public readonly fusionReportOnAggregation: boolean
     public readonly commandType?: StandardCommand
-    /** Connector operation name (e.g. {@link OperationContext.AccountList}) — used when SDK commandType alone is ambiguous. */
-    private readonly operationContext?: OperationContext
+    /** When true, report data should be captured even during aggregation (e.g. custom:dryrun). */
+    private readonly shouldCaptureReportData: boolean
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -94,7 +93,7 @@ export class FusionService {
      * @param matchingService - Match service for identity matching and scoring
      * @param schemas - Schema service for attribute schema lookups
      * @param commandType - The current SDK command type (e.g. StdAccountList)
-     * @param operationContext - Handler operation name from the connector (e.g. {@link OperationContext.CustomDryRun})
+     * @param shouldCaptureReportData - When true, report data is captured even during aggregation (e.g. custom:dryrun)
      */
     constructor(
         public config: FusionConfig,
@@ -108,7 +107,8 @@ export class FusionService {
         public schemas: SchemaService,
         public run: FusionRun,
         commandType?: StandardCommand,
-        operationContext?: OperationContext
+        shouldCaptureReportData?: boolean,
+        isAggregationMode?: boolean
     ) {
         FusionAccount.configure(config)
         this.configSourceNames = new Set(config.sources.map((s) => s.name))
@@ -120,7 +120,7 @@ export class FusionService {
             log: this.log,
             config: this.config,
             commandType,
-            operationContext,
+            isAggregationMode: isAggregationMode ?? false,
             buildFusionBlend: (fa, account) => this.buildFusionBlend(fa, account),
             getTracker: () => this.run.getTracker(),
         })
@@ -170,7 +170,7 @@ export class FusionService {
             shouldCaptureReportData: () => this.shouldCaptureManagedAccountReportData(),
         })
         this.commandType = commandType
-        this.operationContext = operationContext
+        this.shouldCaptureReportData = shouldCaptureReportData ?? false
         this.run.setDisableOperationFactory(async (account) => {
             if (!this.accountAssembly.isAggregationAccountListMode()) {
                 return
@@ -201,7 +201,7 @@ export class FusionService {
         return (
             this.fusionReportOnAggregation ||
             !this.accountAssembly.isAggregationAccountListMode() ||
-            this.operationContext === OperationContext.CustomDryRun
+            this.shouldCaptureReportData
         )
     }
 

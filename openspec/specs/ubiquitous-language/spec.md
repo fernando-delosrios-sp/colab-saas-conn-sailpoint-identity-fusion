@@ -132,186 +132,20 @@ The connector SHALL distinguish between the authoritative identity alias, the hu
 
 - **WHEN** code needs the value used for the Fusion display attribute override or for identity lookup
 - **THEN** it SHALL use the **identity alias**, defined as the top-level `displayName` field of the `IdentityDocument` as reported by the SailPoint SDK
-- **AND** it SHALL NOT use `IdentityDocument.name` for that purpose
+  - **AND** it SHALL NOT use `IdentityDocument.name` for that purpose
 
-#### Scenario: Identifying the human-friendly identity name
+### Requirement: Dry-run mode is referenced as a mode, not an operation
 
-- **WHEN** code needs a readable label for reports, review form candidates, emails, logs, or other user-facing references
-- **THEN** it SHALL use the **identity name**, computed as `IdentityDocument.attributes.displayName`, falling back to `IdentityDocument.name`, then to `FusionAccount.name`
+The term **dry-run mode** SHALL refer to the accountList operation running with `dryRun.enabled: true` on its input. The retired term `custom:dryrun` SHALL NOT be used to refer to this behavior.
 
-#### Scenario: Identifying the Fusion account name
+#### Scenario: Describing non-persistent analysis
+- **WHEN** describing a non-persistent aggregation analysis that shares the accountList pipeline
+- **THEN** the term "dry-run mode" or "the accountList operation in dry-run mode" SHALL be used
+- **AND** the term "dryRun operation" or "custom:dryrun" SHALL NOT be used
 
-- **WHEN** code refers to the `name` property of a `FusionAccount` (`state.name`)
-- **THEN** it SHALL use the term **Fusion account name**
-- **AND** it SHALL use that value only for internal logging, history entries, and conflict tracking unless the display attribute override is explicitly configured to consume it
-
-### Requirement: Fusion display attribute override uses the identity alias
-
-When a Fusion account is linked to an identity, the display attribute (`fusionDisplayAttribute`) SHALL be set from the identity alias.
-
-#### Scenario: Identity-linked Fusion account output
-
-- **WHEN** `getISCAccount` serializes a Fusion account that has an identity linkage
-- **THEN** `attributes[fusionDisplayAttribute]` SHALL equal the identity alias
-- **AND** it SHALL NOT equal the managed source account name or a stale persisted value
-
-### Requirement: User-facing identity references use the identity name
-
-Reports, review form candidates, emails, logs, and other user-facing references to a correlated identity SHALL use the identity name.
-
-#### Scenario: Match candidate label in a review form
-
-- **WHEN** the connector renders an identity candidate for a Fusion review form
-- **THEN** the candidate label SHALL be the identity name
-- **AND** it SHALL fall back through `IdentityDocument.name` and `FusionAccount.name` only when `IdentityDocument.attributes.displayName` is unavailable
-
-### Requirement: Velocity identity context exposes alias, name, and id
-
-The Velocity `$identity` object SHALL expose `alias`, `name`, and `id` properties.
-
-#### Scenario: Velocity template references identity metadata
-
-- **WHEN** a normal attribute definition template uses `$identity.alias`, `$identity.name`, or `$identity.id`
-- **THEN** `$identity.alias` SHALL resolve to the identity alias
-- **AND** `$identity.name` SHALL resolve to the identity name
-- **AND** `$identity.id` SHALL resolve to the identity ID
-
-### Requirement: Operation, phase, and sweep vocabulary is used consistently
-
-The terms **operation**, **phase**, and **sweep** SHALL be used as defined in this spec. Generic terms such as "run", "pass", or "round" SHALL NOT be used when a more precise term applies.
-
-#### Scenario: Naming a connector entry point
-
-- **WHEN** referring to a connector entry point such as `std:account:list` or `custom:dryrun`
-- **THEN** the term "operation" SHALL be used (e.g., "accountList operation", "dryRun operation")
-
-#### Scenario: Naming an execution of a connector entry point
-
-- **WHEN** referring to a single execution or instance of a connector operation
-- **THEN** the term "operation run" or "run" SHALL be used (e.g., "an accountList operation run", "during the run"), not "processing run" or "aggregation run"
-
-#### Scenario: Naming a major pipeline stage
-
-- **WHEN** referring to a major stage of an operation pipeline
-- **THEN** the term "phase" SHALL be used (e.g., "managed accounts phase")
-
-#### Scenario: Naming a focused account traversal
-
-- **WHEN** referring to a traversal of a set of accounts with a single purpose within a phase
-- **THEN** the term "sweep" SHALL be used, not "pass" or "round"
-
-### Requirement: Matching and scoring are distinguished
-
-The terms **matching** and **scoring** SHALL be used as defined in this spec. Matching is the business process; scoring is the similarity-calculation technique it uses. The product step name remains **Match**.
-
-#### Scenario: Describing the business process
-
-- **WHEN** describing whether a new Fusion account potentially belongs to an existing identity
-- **THEN** the term "matching" SHALL be used
-
-#### Scenario: Describing the similarity calculation
-
-- **WHEN** describing the algorithmic computation of a similarity value
-- **THEN** the term "scoring" SHALL be used
-
-#### Scenario: Naming the product step
-
-- **WHEN** referring to the Map/Define/Match step in user-facing documentation
-- **THEN** the term "Match" (capitalized) SHALL be used
-
-### Requirement: Match outcome dispatch is owned by MatchingService
-
-The **Match outcome dispatch** (routing a scored managed source account to exact match, partial match, deferred match, or non-match and applying the resulting action) SHALL be implemented inside `src/services/matchingService/`. `FusionService` SHALL orchestrate the operation run but SHALL NOT implement Match resolution logic.
-
-#### Scenario: Code references Match outcome dispatch
-
-- **WHEN** code routes a scored managed source account to one of the four Match outcomes
-- **THEN** it SHALL reside in `MatchOutcomeDispatcher` within `src/services/matchingService/`
-- **AND** it SHALL use the canonical term "Match outcome dispatch" in identifiers and comments
-
-#### Scenario: Distinguishing orchestration from Match logic
-
-- **WHEN** a module coordinates an operation run
-- **THEN** it SHALL be considered operation-run orchestration and live in `FusionService`
-- **AND** the Match step's scoring and outcome dispatch SHALL remain in `MatchingService`
-
-### Requirement: Candidate types are identity or deferred
-
-Candidate types SHALL be **identity** or **deferred**. The retired term `new-unmatched` and its wire value `new-unmatched` SHALL NOT be used.
-
-#### Scenario: Internal type naming
-
-- **WHEN** defining a candidate type enum or constant
-- **THEN** the value SHALL be `Deferred`, not `NewUnmatched`
-
-#### Scenario: Dry-run wire output
-
-- **WHEN** emitting candidate type in dry-run output
-- **THEN** the wire value SHALL be `deferred` and SHALL NOT be translated from another internal value
-
-### Requirement: Services are stateless; FusionRun is the single source of truth
-
-All services SHALL be stateless strategy objects that receive FusionRun for accessing and modifying mutable state. The FusionRun object SHALL be the single source of truth for all mutable data during an operation run. No service SHALL hold mutable run-scoped state internally.
-
-#### Scenario: Services read from FusionRun
-
-- **WHEN** a service needs access to managed accounts, identities, Fusion accounts, or matching state
-- **THEN** it SHALL read from the FusionRun instance
-- **AND** it SHALL NOT read from internally-owned maps or sets
-
-#### Scenario: Services write to FusionRun
-
-- **WHEN** a service modifies run-scoped data
-- **THEN** it SHALL write to the FusionRun instance
-- **AND** it SHALL NOT accumulate state internally
-
-### Requirement: Aggregation is qualified by source
-
-The term **aggregation** SHALL refer to the ISC source-refresh operation. When ambiguity is possible, the terms **managed source aggregation** or **Fusion source aggregation** SHALL be used. Generic "processing run" SHALL be replaced with the specific operation name.
-
-#### Scenario: Describing source refresh
-
-- **WHEN** describing an ISC source-refresh operation
-- **THEN** the term "aggregation" MAY be used
-
-#### Scenario: Distinguishing source refreshes
-
-- **WHEN** describing aggregation of a configured Fusion source versus a managed source
-- **THEN** the terms "Fusion source aggregation" or "managed source aggregation" SHALL be used
-
-#### Scenario: Describing a connector invocation
-
-- **WHEN** describing the execution of a connector entry point
-- **THEN** the specific operation name (e.g., "accountList operation") SHALL be used, not "processing run"
-
-### Requirement: Retired terms are not reintroduced
-
-Retired terms and symbols SHALL NOT be reintroduced into code, configuration, or documentation. The retired term list SHALL include `AttributeService`, `ScoringService`, and `identity display name` in addition to the previously retired terms. Retired terms include, but are not limited to: `consolidated account`, `raw account`, `identity-based Fusion account`, `pass`, `round`, `new-unmatched`, `NewUnmatched`, `analyzeIdentityPhase`, `analyzeDeferredPhase`, `hasNewUnmatchedPeerMatches`, `ManagedAccountPassRunner`, `AttributeService`, `ScoringService`, and `identity display name`.
-
-#### Scenario: Code review discovers AttributeService reference
-
-- **WHEN** a code review finds `AttributeService` in identifiers or imports
-- **THEN** the contributor SHALL rename to `MappingService` or `DefinitionService` based on the phase being referenced
-
-#### Scenario: Code review discovers ScoringService reference
-
-- **WHEN** a code review finds `ScoringService` in identifiers or imports
-- **THEN** the contributor SHALL rename to `MatchingService`
-
-#### Scenario: Code review discovers a retired term
-
-- **WHEN** a code review finds a retired term in identifiers or comments
-- **THEN** the contributor SHALL rename or rewrite it to use the canonical term
-
-#### Scenario: Documentation review discovers a retired term
-
-- **WHEN** a documentation review finds a retired term
-- **THEN** the contributor SHALL replace it with the canonical term
-
-#### Scenario: Code or docs use the retired term "identity display name"
-
-- **WHEN** code or documentation uses the term `identity display name` or a property named `identityDisplayName` to mean the human-friendly identity label
-- **THEN** the contributor SHALL replace it with **identity name**
+#### Scenario: Naming the operation in configuration or documentation
+- **WHEN** the connector handles an accountList invocation with `{ dryRun: { enabled: true } }`
+- **THEN** the system SHALL identify this as an execution in "dry-run mode" in logs, metrics, and report data
 
 ## Canonical Terms
 
@@ -341,7 +175,7 @@ The connector refers to an ISC identity and to the Fusion account itself through
 
 | Term | Definition |
 |------|------------|
-| **Operation** | A connector entry point such as `std:account:list` (the **accountList operation**) or `custom:dryrun` (the **dryRun operation**). The operation is the command definition. |
+| **Operation** | A connector entry point such as `std:account:list` (the **accountList operation**). The operation is the command definition. The accountList operation supports an optional **dry-run mode** (`dryRun.enabled: true` on the input) for non-persistent analysis. |
 | **Operation run** | A single execution or instance of an operation. A run is the execution of an operation. |
 | **Phase** | A major stage of an operation pipeline (for example the identity documents phase, the Fusion accounts phase, the managed accounts phase, or the report phase). |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
@@ -586,3 +420,4 @@ The following terms are retired and SHALL NOT be used in new code, configuration
 | `identity display name` / `identityDisplayName` | identity name (for the human-friendly reference label) |
 | `attribute-service` (spec) | `mapping-service` + `definition-service` |
 | `scoring-service` (spec) | `matching-service` |
+| `custom:dryrun` | dry-run mode of the accountList operation |

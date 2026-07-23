@@ -1,6 +1,5 @@
 import { SourceType } from '../../model/config'
 import type { FusionReportBlend } from '../../model/fusionReportBlend'
-export { OperationContext } from '../../model/operationContext'
 
 // ============================================================================
 // Type Definitions — Fusion Report

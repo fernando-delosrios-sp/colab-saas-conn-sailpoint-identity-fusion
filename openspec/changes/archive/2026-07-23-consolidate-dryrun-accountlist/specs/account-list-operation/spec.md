@@ -1,25 +1,4 @@
-# account-list Spec
-
-## Purpose
-
-The account-list operation streams accounts to ISC aggregation. This spec defines the contract for account listing behavior, including an optional non-persistent dry-run mode.
-
-## Requirements
-
-### Requirement: Account list streams all accounts
-The system SHALL stream all available accounts when the account-list operation is invoked. In dry-run mode (`dryRun.enabled: true`), the system SHALL stream all accounts non-persistently without modifying state.
-
-#### Scenario: Successful account listing
-- **WHEN** the account-list operation is invoked
-- **THEN** the system SHALL stream all accounts in the configured sources
-
-#### Scenario: Account listing with filters
-- **WHEN** the account-list operation is invoked with filter criteria
-- **THEN** the system SHALL stream only accounts matching the filter criteria
-
-#### Scenario: Successful dry-run listing
-- **WHEN** the account-list operation is invoked in dry-run mode
-- **THEN** the system SHALL stream all accounts without persisting any state changes
+## ADDED Requirements
 
 ### Requirement: Account list supports an optional dry-run input parameter
 The account-list operation SHALL accept an optional `dryRun` input object with fields `enabled` (boolean, default false), `saveFile` (boolean, optional), and `sendEmail` (string or array of strings, optional). When `enabled` is true, the operation SHALL run in non-persistent dry-run mode.
@@ -65,3 +44,20 @@ The dry-run report SHALL use `includeNonMatches: false` (consolidated counters o
 - **WHEN** a dry-run report email is delivered
 - **THEN** the email SHALL use the same subject format, Handlebars template, and section layout as the aggregation report
 - **AND** the title SHALL be `'Identity Fusion Dry Run Report'`
+
+## MODIFIED Requirements
+
+### Requirement: Account list streams all accounts
+The system SHALL stream all available accounts when the account-list operation is invoked. In dry-run mode (`dryRun.enabled: true`), the system SHALL stream all accounts non-persistently without modifying state.
+
+#### Scenario: Successful account listing
+- **WHEN** the account-list operation is invoked
+- **THEN** the system SHALL stream all accounts in the configured sources
+
+#### Scenario: Account listing with filters
+- **WHEN** the account-list operation is invoked with filter criteria
+- **THEN** the system SHALL stream only accounts matching the filter criteria
+
+#### Scenario: Successful dry-run listing
+- **WHEN** the account-list operation is invoked in dry-run mode
+- **THEN** the system SHALL stream all accounts without persisting any state changes

@@ -279,18 +279,18 @@ When **Send report to owner on aggregation?** is enabled, reports include:
 
 To avoid oversized reports, warning/error details are intentionally summarized (not full log dumps).
 
-### Non-persistent analysis with `custom:dryrun`
+### Non-persistent analysis with dry-run mode
 
-When you want report-like visibility during aggregation analysis without persisting changes, run the connector command `custom:dryrun`.
+To run report-like analysis without persisting changes, invoke `std:account:list` with the dry-run mode enabled: `{ dryRun: { enabled: true } }`. You can optionally add `saveFile: true` to write the summary and HTML report to disk, or `sendEmail` to deliver the report via email.
 
-`custom:dryrun`:
+Dry-run mode:
+- Executes the full Map, Define, and Match pipeline without persistence.
+- Streams 1-to-1 `StdAccountListOutput` rows (identical to aggregation output).
+- Sends a terminal summary with totals and diagnostics (rowsSent, identities/managed-accounts found, issue summary, timing).
+- When `saveFile` is enabled, writes the summary JSON and HTML report to `./reports/`.
+- When `sendEmail` is set, delivers the report email using the same template as the aggregation report, titled **Identity Fusion Dry Run Report**.
 
-- Executes fetch + matching analysis flow only (no account-list persistence/writeback phase).
-- Streams final ISC account rows with an additional `attributes.matching` object.
-- Includes matching and non-matching visibility in `matching.status` and `matching.matches`.
-- Sends a final `custom:dryrun:summary` payload with totals and diagnostics (warnings/errors and sampled messages).
-
-Use this command while tuning matching thresholds, validating source precedence, or reviewing correlation context before enabling/adjusting production automation.
+Use dry-run mode while tuning matching thresholds, validating source precedence, or reviewing correlation context before enabling/adjusting production automation.
 
 **Choosing form attributes:**
 

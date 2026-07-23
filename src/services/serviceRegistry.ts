@@ -1,7 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Context, ConnectorError, ConnectorErrorType, Response, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
-import { OperationContext } from '../model/operationContext'
 import { LogService } from './logService'
 import { InMemoryLockService } from './lockService'
 import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
@@ -154,7 +153,8 @@ export class ServiceRegistry {
                 this.schemas,
                 this.run,
                 commandType,
-                operationContext as OperationContext | undefined
+                operationContext === 'custom:dryrun',
+                operationContext === 'accountList'
             )
 
         // Wire the MatchOutcomeDispatcher through the registry using real collaborators already
@@ -170,7 +170,6 @@ export class ServiceRegistry {
             forms: this.forms,
             decisionProcessor: this.fusion.decisionProcessor,
             commandType,
-            operationContext: operationContext as OperationContext | undefined,
         })
         this.fusion.matchOutcomeDispatcher = this.matchOutcomeDispatcher
 

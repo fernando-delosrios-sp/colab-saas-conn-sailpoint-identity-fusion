@@ -1,7 +1,6 @@
 import type { Mocked } from 'vitest'
 import { FusionService } from '../fusionService'
 import { AggregationTracker } from '../aggregationTracker'
-import { OperationContext } from '../types'
 import { MatchOutcomeDispatcher } from '../../matchingService/matchOutcomeDispatcher'
 import { LogService } from '../../logService'
 import { IdentityService } from '../../identityService'
@@ -45,7 +44,7 @@ describe('FusionService', () => {
     let mockSchemas: Mocked<SchemaService>
     let mockConfig: FusionConfig
 
-    function createDispatcherFor(fusionService: FusionService, operationContext?: OperationContext): MatchOutcomeDispatcher {
+    function createDispatcherFor(fusionService: FusionService): MatchOutcomeDispatcher {
         return new MatchOutcomeDispatcher({
             config: fusionService.config,
             log: fusionService.log,
@@ -57,7 +56,6 @@ describe('FusionService', () => {
             forms: fusionService.forms,
             decisionProcessor: fusionService.decisionProcessor,
             commandType: fusionService.commandType,
-            operationContext,
         })
     }
 
@@ -1283,9 +1281,9 @@ describe('FusionService', () => {
                 mockSchemas,
                 run,
                 StandardCommand.StdAccountList,
-                OperationContext.CustomDryRun
+                true
             )
-            customReportFusion.matchOutcomeDispatcher = createDispatcherFor(customReportFusion, OperationContext.CustomDryRun)
+            customReportFusion.matchOutcomeDispatcher = createDispatcherFor(customReportFusion)
             customReportFusion.setTracker(new AggregationTracker())
 
             const mockManagedAccount = {

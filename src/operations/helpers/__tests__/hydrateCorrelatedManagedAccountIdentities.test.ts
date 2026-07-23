@@ -3,7 +3,7 @@ import { IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount } from '../../../model/account'
 import { FusionConfig } from '../../../model/config'
 import { FusionRun } from '../../../model/fusionRun'
-import { hydrateCorrelatedManagedAccountIdentities } from '../corePipeline'
+import { hydrateCorrelatedManagedAccountIdentities } from '../../accountList'
 
 describe('hydrateCorrelatedManagedAccountIdentities', () => {
     const minimalConfig = {

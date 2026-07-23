@@ -130,7 +130,6 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
     const reports = registry.reports as any
     if (reports) {
         reports.generateAndSendFusionReport = vi.fn().mockResolvedValue(undefined)
-        reports.writeAndSendDryRunReport = vi.fn().mockResolvedValue(undefined)
         reports.sendReportTo = vi.fn().mockResolvedValue(undefined)
         reports.deliverReportToRecipients = vi.fn().mockResolvedValue(undefined)
     }

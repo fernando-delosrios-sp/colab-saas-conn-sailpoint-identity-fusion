@@ -11,8 +11,7 @@
         "std:account:create",
         "std:account:update",
         "std:account:discover-schema",
-        "std:entitlement:list",
-        "custom:dryrun"
+        "std:entitlement:list"
     ],
     "supportsCustomSchemas": true,
     "showDebugLoggingOption": true,

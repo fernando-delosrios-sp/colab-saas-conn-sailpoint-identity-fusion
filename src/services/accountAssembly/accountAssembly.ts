@@ -9,7 +9,6 @@ import { MappingService } from '../mappingService'
 import { DefinitionService } from '../definitionService'
 import { FusionReportBlend } from '../../model/fusionReportBlend'
 import { AggregationTracker } from '../../model/aggregationTracker'
-import { OperationContext } from '../../model/operationContext'
 import { assert } from '../../utils/assert'
 
 export interface AccountAssemblyDeps {
@@ -20,7 +19,7 @@ export interface AccountAssemblyDeps {
     log: LogService
     config: FusionConfig
     commandType?: StandardCommand
-    operationContext?: OperationContext
+    isAggregationMode?: boolean
     buildFusionBlend?: (fusionAccount: FusionAccount, account: Account) => FusionReportBlend
     getTracker?: () => AggregationTracker | undefined
 }
@@ -42,7 +41,7 @@ export class AccountAssembly {
     public isAggregationAccountListMode(): boolean {
         return (
             this.deps.commandType === StandardCommand.StdAccountList ||
-            this.deps.operationContext === OperationContext.AccountList
+            this.deps.isAggregationMode === true
         )
     }
 

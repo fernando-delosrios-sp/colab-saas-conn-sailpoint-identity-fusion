@@ -307,41 +307,47 @@ For step-by-step instructions and UI details, see the [Map](docs/guides/map.md),
 
 ---
 
-## Custom command: `custom:dryrun`
+## Dry-run mode
 
-Use `custom:dryrun` to run a **non-persistent aggregation analysis**. It evaluates managed accounts with the same matching logic used for reports, but it does not execute the persistence/writeback phase used by `std:account:list`. The connector records match/deferred/non-match report data for this command using the operation name (`custom:dryrun`), so deferred and other totals align with aggregation even when the SDK reports `commandType` as account list. When **Owner is global reviewer?** is enabled, it also loads the fusion source owner’s identity if missing from cache (same as `std:account:list`), so Match/reviewer setup works even when the Fusion source has no accounts yet.
+`std:account:list` supports an optional dry-run mode for **non-persistent aggregation analysis**. Pass `{ dryRun: { enabled: true } }` on the input to run the full Map, Define, and Match pipeline without persisting state changes, form updates, or aggregation scheduling. The pipeline is identical to a real aggregation, so deferred totals and other analysis align with production runs.
 
 ### Input options
 
-`custom:dryrun` supports optional runtime controls in the command input:
+Pass a `dryRun` object on the `std:account:list` input:
 
-- `includeExisting` (boolean): Emit **every** fusion account row produced by the connector’s fusion account listing (`forEachISCAccount`), regardless of origin (identity baseline, identity-correlated, uncorrelated, managed-grown, and so on). Detail rows include the **`existing-fusion`** category; **`baseline`** and **`identity-linked`** may also appear as descriptive tags when they apply. Synthetic deferred stubs (`orphan-deferred:…`) and fallback analyzed-managed rows are not fusion listing rows and are not tagged `existing-fusion`. In the summary, **`emitted.includeExisting`** matches **`totals.fusionAccountsExisting`** (the same fusion inventory count from fetch / in-memory totals).
-- `includeNonMatched` (boolean): Emit rows categorized as NonMatched.
-- `includeMatched` (boolean): Emit rows whose `matching.status` is `matched`.
-- `includeExact` (boolean): Emit rows that have at least one **exact** match candidate: every real attribute rule scored 100 with none skipped. You can use this without `includeMatched` to list only those rows.
-  - `includeDeferred` (boolean): Emit rows whose `matching.status` is `deferred`. Deferred candidate matches that are not yet linked on any fusion account’s `accounts` list in this run are still included via a synthetic stub row (key `orphan-deferred:<managedAccountId>`), matching aggregation-style deferred reporting.
-- `includeReview` (boolean): Emit rows with `review.pending === true`.
-- `includeDecisions` (boolean): Emit rows linked to processed fusion review decisions.
-  - `writeToDisk` (boolean): When `true`, **does not** stream per-account rows in the HTTP response (which avoids client “maximum response size” limits). Instead, the connector writes one **pretty-printed JSON document** to a file under the connector host’s working directory in a `reports` subfolder: `{ “rows”: [ ... ], “summary”: { ... } }`, where `summary` is the same `custom:dryrun:summary` object returned over HTTP. The file name is `./reports/dry-run-<host-label>-<timestamp>.json`, where `<timestamp>` is the run start time in UTC as an ISO-8601 string with `:` and `.` replaced by `-` (for example `2026-04-04T14-30-00-000Z`), and `<host-label>` is the **first DNS label** of the API host in the connector **`baseurl`** (for example `acme` from `https://acme.api.identitynow.com`), not the full FQDN—so tenant or environment names stay short in filenames. When `writeToDisk` is enabled, the connector also writes the HTML report to `./reports/dry-run-<host-label>-<timestamp>.html`. The HTTP response still ends with that summary object, which includes `writeToDisk: true`, `reportOutputPath`, and `reportHtmlOutputPath` (absolute paths on the host where the connector process runs). Defaults to `false`.
+```json
+{
+  "dryRun": {
+    "enabled": true,
+    "saveFile": true,
+    "sendEmail": ["reviewer@example.com"]
+  }
+}
+```
 
-All `include*` options default to `false`. If none are enabled, no account rows are streamed (or written).
-`summary` is always emitted by default and is not a runtime option.
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | boolean | `false` | Set to `true` to run in non-persistent dry-run mode. |
+| `saveFile` | boolean | `false` | Write the terminal summary and HTML report to `./reports/dry-run-<host>-<timestamp>.json` and `.html`. |
+| `sendEmail` | string or string[] | — | Deliver the dry-run report to the specified email address(es). |
+
+When `enabled` is `false` or absent, the operation runs as a normal persistent aggregation and `saveFile`/`sendEmail` are silently ignored.
 
 ### What it returns
 
-- Unless `writeToDisk` is `true`, streams final ISC account rows (`key`, `attributes`, `disabled`) like account list output. With `writeToDisk`, those row objects are stored under the `rows` array in the report file (not over HTTP).
-- Adds root-level `matchingStatus` (and related context) to every streamed row with:
-    - `status`: `matched`, `deferred`, `non-matched`, `review-error`, or `not-analyzed`
-    - `matchAttempts`: how many managed accounts had Match executed for this row in this report
-    - `matches`: candidate identities and per-attribute scores when available
-- Adds root-level `sourceStatus` and `correlationStatus` (source provenance and linked account context: `accounts`, `missing-accounts`, `reviews`, `statuses`, etc.)
-- Adds root-level `review` only for rows categorized as `review` or `decisions`:
-    - `pending`: whether there is an active pending form instance linked to any account id in `attributes.accounts`
-    - `forms`: pending form references (`formInstanceId`, `url`)
-    - `reviewers`: resolved reviewer identities (`id`, `name`, `email`)
-    - `candidates`: candidate identity details (`id`, `name`, `scores`, `attributes`)
-- Adds root-level `reportCategories` to every streamed row, listing all matched output categories for that row.
-- Sends a final summary object with `type: custom:dryrun:summary` containing: `options` (the `include*` / `writeToDisk` flags used for the run), `emitted` (per **emitted** row, how often each report category appeared—filtered by your `include*` flags, so e.g. `includeDeferred` can stay `0` while `totals.deferredMatches` is non-zero if you did not enable `includeDeferred`), `totals` (run-wide analysis: Fusion account counts from the loaded source, dry-run Match-attempt slice counts such as `matchAttempts`, `matches`, `deferredMatches`, `nonMatches`, etc.), diagnostics, optional report `stats`, and processing time.
+- Streams 1-to-1 `StdAccountListOutput` rows via `res.send`, identical in shape to aggregation rows (no enrichment payloads).
+- Sends a terminal summary object containing: `rowsSent`, `identitiesFound`, `managedAccountsFound`, `totalProcessingTime`, `phaseTiming`, `issueSummary`, and the `options` used for the run.
+- When `saveFile` is `true`, the summary and an HTML report are written to `./reports/`. Rows are always streamed (no disk-only mode — redirect stdout to a file for row capture).
+- When `sendEmail` is set, the HTML report is delivered via email. The email uses the same Handlebars template and section layout as the aggregation report, titled **Identity Fusion Dry Run Report**.
+
+### Migration from `custom:dryrun`
+
+The `custom:dryrun` command has been removed. Replace invocations:
+
+- **Before:** `custom:dryrun` with `includeExisting`, `includeMatched`, `writeToDisk`, `sendReportTo`, etc.
+- **After:** `std:account:list` with `{ dryRun: { enabled: true, saveFile: true, sendEmail: [...] } }`
+
+Output rows no longer carry `matchingStatus` / `reportCategories` / `review` payloads. Match analysis detail lives in the HTML report and terminal summary.
 
 ### Typical use cases
 

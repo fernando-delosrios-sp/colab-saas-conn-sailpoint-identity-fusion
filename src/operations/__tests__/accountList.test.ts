@@ -224,3 +224,40 @@ describe('accountList two-sweep aggregation lifecycle', () => {
         expect(res.send).toHaveBeenCalledTimes(scenario.sweepData.sweep2.outputAccounts.length)
     })
 })
+
+describe('accountList dry-run mode', () => {
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('runs non-persistently and sends terminal summary when dryRun.enabled is true', async () => {
+        const { registry, sources } = createMockRegistry([])
+        const res = registry.res
+        const input = { dryRun: { enabled: true }, schema: { attributes: [] } } as any
+
+        await accountList(registry, input)
+
+        expect(sources.setProcessLock).not.toHaveBeenCalled()
+        expect(sources.releaseProcessLock).not.toHaveBeenCalled()
+        expect(res.send).toHaveBeenCalledWith(
+            expect.objectContaining({
+                rowsSent: expect.any(Number),
+                identitiesFound: expect.any(Number),
+                managedAccountsFound: expect.any(Number),
+                totalProcessingTime: expect.any(String),
+                issueSummary: expect.any(Object),
+                options: expect.objectContaining({ saveFile: false, sendEmail: false }),
+            })
+        )
+    })
+
+    it('skips summary-only options when dryRun.enabled is absent', async () => {
+        const { registry, sources } = createMockRegistry([])
+        const input = { dryRun: { saveFile: true }, schema: { attributes: [] } } as any
+
+        await accountList(registry, input)
+
+        expect(sources.setProcessLock).toHaveBeenCalledTimes(1)
+        expect(sources.releaseProcessLock).toHaveBeenCalledTimes(1)
+    })
+})
