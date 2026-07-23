@@ -379,7 +379,7 @@ function isAllowedWebSocketOrigin(req) {
   if (!origin) return true;
   const host = req.headers.host;
   if (!host) return false;
-  return origin === 'http://' + host;
+  return origin === 'http://' + host || origin === 'https://' + host;
 }
 
 // ========== HTTP Request Handler ==========
@@ -721,3 +721,4 @@ module.exports = {
   OPCODES,
   MAX_FRAME_PAYLOAD_BYTES
 };
+
