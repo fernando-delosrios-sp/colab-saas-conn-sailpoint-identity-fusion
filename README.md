@@ -335,10 +335,9 @@ When `enabled` is `false` or absent, the operation runs as a normal persistent a
 
 ### What it returns
 
-- Streams 1-to-1 `StdAccountListOutput` rows via `res.send`, identical in shape to aggregation rows (no enrichment payloads).
-- Sends a terminal summary object containing: `rowsSent`, `identitiesFound`, `managedAccountsFound`, `totalProcessingTime`, `phaseTiming`, `issueSummary`, and the `options` used for the run.
-- When `saveFile` is `true`, the summary and an HTML report are written to `./reports/`. Rows are always streamed (no disk-only mode — redirect stdout to a file for row capture).
-- When `sendEmail` is set, the HTML report is delivered via email. The email uses the same Handlebars template and section layout as the aggregation report, titled **Identity Fusion Dry Run Report**.
+- Sends a terminal summary object via `res.send` containing: `rowsSent`, `identitiesFound`, `managedAccountsFound`, `totalProcessingTime`, `phaseTiming`, `issueSummary`, and the `options` used for the run.
+- When `saveFile` is `true`, an HTML report is written to `./reports/` before the terminal summary (durable-first ordering).
+- When `sendEmail` is set, the HTML report is delivered via email before the terminal summary. The email uses the same Handlebars template and section layout as the aggregation report, titled **Identity Fusion Dry Run Report**.
 
 ### Migration from `custom:dryrun`
 

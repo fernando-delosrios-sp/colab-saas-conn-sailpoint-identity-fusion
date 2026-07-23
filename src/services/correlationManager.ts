@@ -11,7 +11,8 @@ export class CorrelationManager {
         private log: LogService,
         private sources: SourceService,
         private identities: IdentityService,
-        private isAggregationMode: () => boolean
+        private isAggregationMode: () => boolean,
+        private isPersistentRun: () => boolean = () => true
     ) {}
 
     /**
@@ -86,6 +87,7 @@ export class CorrelationManager {
         authorizedLinkDecision?: FusionDecision
     ): Promise<void> {
         if (!this.isAggregationMode()) return
+        if (!this.isPersistentRun()) return
         if (fusionAccount.missingAccountIdsSet.size === 0) return
         await this.correlatePerSource(fusionAccount, authorizedLinkDecision)
     }

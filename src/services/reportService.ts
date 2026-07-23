@@ -429,7 +429,7 @@ export class ReportService {
         }
 
         if (typeof reportPhaseStartedAt === 'number') {
-            this.log?.info?.(`PHASE 7: Report — HTML/email and stats (${PhaseTimer.formatElapsed(reportElapsedMs)})`)
+            this.log?.info?.(`Epilogue: report — HTML/email and stats (${PhaseTimer.formatElapsed(reportElapsedMs)})`)
         }
 
         const emailReport = this.buildEmailReportFromFusionReport(report, statsForRender)
@@ -474,7 +474,7 @@ export class ReportService {
             const tracker = this.fusion.tracker
             const report = this.fusion.generateReport(tracker, includeNonMatches, stats)
             report.fusionReviewDecisions = this.buildFusionReviewDecisions()
-            reportPhaseTimer.phase('PHASE 7: Report (fusion report)', 'info', 'Report')
+            reportPhaseTimer.phase('Epilogue: fusion report', 'info', 'Report')
             const priorPhases = aggregationStats.phaseTiming ?? []
             stats.phaseTiming = [...priorPhases, ...reportPhaseTimer.getPhaseBreakdown()]
             report.stats = stats
