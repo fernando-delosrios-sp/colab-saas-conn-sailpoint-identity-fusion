@@ -811,7 +811,9 @@ export class DefinitionService {
         }
 
         this.log.error(
-            `Failed to generate unique value for attribute ${definition.name} after ${maxAttempts} attempts`
+            `DefinitionService: Failed to generate unique value for attribute ${definition.name} ` +
+                `for account: ${fusionAccount.name ?? fusionAccount.managedKey ?? 'unknown'} ` +
+                `(${fusionAccount.sourceName}) after ${maxAttempts} attempts (incremental counter)`
         )
         return undefined
     }
@@ -864,7 +866,9 @@ export class DefinitionService {
         }
 
         this.log.error(
-            `Failed to generate unique value for attribute ${definition.name} after ${maxAttempts} attempts`
+            `DefinitionService: Failed to generate unique value for attribute ${definition.name} ` +
+                `for account: ${fusionAccount.name ?? fusionAccount.managedKey ?? 'unknown'} ` +
+                `(${fusionAccount.sourceName}) after ${maxAttempts} attempts (collision disambiguation)`
         )
         return undefined
     }

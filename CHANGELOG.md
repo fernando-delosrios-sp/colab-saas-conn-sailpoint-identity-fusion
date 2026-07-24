@@ -2,6 +2,7 @@
 
 ## 2.2.0
 
+- (2026-07-24) **Performance:** Parallel account pagination now uses a **sliding-window** scheduler instead of sequential batch barriers — when one page completes, the next offset is enqueued immediately (up to `parallelBatchSize` in-flight pages per stream). Removes straggler idle slots on large Fetch runs. `parallelBatchSize` is no longer capped to `maxConcurrentRequests` at construction; the shared API queue still enforces global concurrency. Fetch `onPageProgress` / STATUS `fetched` deltas update after each page completes. See advanced-connection-settings guide.
 - (2026-07-24) **Observability:** STATUS heartbeat lines now show **pipeline progress delta** on `progress=done/total` (optional unit: `fetched`, `processed`, `analyzed`, `sent`, `registered`) separately from **api-queue throughput**. The queue segment is relabeled from `queue … processed=` to `api-queue … completed=` so local pipeline work is not confused with HTTP queue completions. Fetch phase updates progress during paginated loads. Log scrapers matching `queue processed=` should migrate to `api-queue completed=`.
 - (2026-07-24) **Performance:** Record-type sources with **Include record accounts in Match** disabled now bulk-register unique attribute values in a dedicated **record unique registration** phase after the correlated sweep and before uncorrelated match scoring. Thousands of record-only accounts no longer enter the match sweep or run full Map/Define assembly — only selective attribute maps whose targets coincide with unique definitions (plus passthrough when the source attribute name matches) are evaluated, then values are registered and accounts are removed from the work queue. Process logs include a `record-unique-registration` step with `registered` progress. Form decision no-match outcomes reuse the same registration helper. See source-configuration guide. `account-list-operation`, `definition-service`, `mapping-service`, and `matching-service` specs updated.
 - (2026-07-24) **Configuration:** Operation heartbeat interval is now configurable in Advanced Settings → Advanced Connection Settings as **Heartbeat interval (seconds)** (`heartbeatInterval`). Default is **10 seconds** (was an internal 30-second constant). Runtime value remains `statsLoggingIntervalMs` for STATUS and EVENT_SUMMARY emission during `accountList`. Set to 30 to restore prior log frequency.
@@ -114,6 +115,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 
