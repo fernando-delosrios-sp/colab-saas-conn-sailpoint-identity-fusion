@@ -7,8 +7,36 @@
   function nextReconnectDelay(current, max) {
     return Math.min(current * 2, max);
   }
+
+  // Swap-and-drain until empty so events enqueued mid-flush are not discarded.
+  // Stops when nothing can be sent (e.g. socket closed) to avoid spinning on failures.
+  function drainEventQueueSnapshot(queue, trySend) {
+    while (queue.length > 0) {
+      const batch = queue;
+      queue = [];
+      let sentAny = false;
+      for (const item of batch) {
+        if (trySend(item)) {
+          sentAny = true;
+        } else {
+          queue.push(item);
+        }
+      }
+      if (!sentAny) {
+        break;
+      }
+    }
+    return queue;
+  }
+
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { nextReconnectDelay, MIN_RECONNECT_MS, MAX_RECONNECT_MS, TOMBSTONE_AFTER_MS };
+    module.exports = {
+      nextReconnectDelay,
+      drainEventQueueSnapshot,
+      MIN_RECONNECT_MS,
+      MAX_RECONNECT_MS,
+      TOMBSTONE_AFTER_MS
+    };
   }
 
   // Everything below is browser-only; bail out when loaded in Node (tests).
@@ -75,6 +103,36 @@
     if (document.body) document.body.appendChild(el);
   }
 
+  function trySendQueuedEvent(event) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify(event));
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  function drainEventQueue() {
+    while (eventQueue.length > 0) {
+      const batch = eventQueue;
+      eventQueue = [];
+      let sentAny = false;
+      for (const e of batch) {
+        if (trySendQueuedEvent(e)) {
+          sentAny = true;
+        } else {
+          eventQueue.push(e);
+        }
+      }
+      if (!sentAny) {
+        return;
+      }
+    }
+  }
+
   function connect() {
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     setStatus(everConnected ? 'reconnecting' : 'connecting');
@@ -87,8 +145,7 @@
       reconnectDelay = MIN_RECONNECT_MS;
       tombstoneShown = false;
       setStatus('connected');
-      eventQueue.forEach(e => ws.send(JSON.stringify(e)));
-      eventQueue = [];
+      drainEventQueue();
       // Recovered from a tombstoned outage (e.g. the server restarted on the same
       // port) — reload through the keyed bootstrap when possible so the cookie is
       // refreshed before the visible URL returns to bare /.
@@ -120,9 +177,7 @@
 
   function sendEvent(event) {
     event.timestamp = Date.now();
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(event));
-    } else {
+    if (!trySendQueuedEvent(event)) {
       eventQueue.push(event);
     }
   }
@@ -166,4 +221,5 @@
 
   connect();
 })();
+
 
