@@ -133,7 +133,7 @@ describe('LogService.metric', () => {
         vi.advanceTimersByTime(1234)
         log.metric('test.operation', startedAt)
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('METRIC test.operation durationMs=1234')
+            expect.stringContaining('METRIC test.operation duration=1.2S')
         )
         vi.useRealTimers()
     })
@@ -146,7 +146,7 @@ describe('LogService.metric', () => {
         vi.advanceTimersByTime(567)
         log.metric('outputPhase.sendAccounts', startedAt, { count: 500, batchSize: 100 })
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('METRIC outputPhase.sendAccounts durationMs=567 count=500 batchSize=100')
+            expect.stringContaining('METRIC outputPhase.sendAccounts duration=567MS count=500 batchSize=100')
         )
         vi.useRealTimers()
     })
@@ -159,7 +159,7 @@ describe('LogService.metric', () => {
         vi.advanceTimersByTime(89)
         log.metric('outputPhase.saveAttributeState', startedAt)
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('METRIC outputPhase.saveAttributeState durationMs=89')
+            expect.stringContaining('METRIC outputPhase.saveAttributeState duration=89MS')
         )
         vi.useRealTimers()
     })
@@ -179,7 +179,7 @@ describe('TrackedOperation via LogService.track', () => {
         vi.advanceTimersByTime(1234)
         op.done()
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('METRIC test.operation durationMs=1234')
+            expect.stringContaining('METRIC test.operation duration=1.2S')
         )
         vi.useRealTimers()
     })
@@ -192,7 +192,7 @@ describe('TrackedOperation via LogService.track', () => {
         vi.advanceTimersByTime(567)
         op.done({ count: 500, batchSize: 100 })
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('METRIC outputPhase.sendAccounts durationMs=567 count=500 batchSize=100')
+            expect.stringContaining('METRIC outputPhase.sendAccounts duration=567MS count=500 batchSize=100')
         )
         vi.useRealTimers()
     })
@@ -219,9 +219,10 @@ describe('TrackedOperation via LogService.track', () => {
         vi.advanceTimersByTime(300)
         op.done({ count: 3 })
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('METRIC test.progress durationMs=800 count=3')
+            expect.stringContaining('METRIC test.progress duration=800MS count=3')
         )
         vi.useRealTimers()
     })
 })
+
 

@@ -575,7 +575,7 @@ export class LogService {
     metric(name: string, startedAt: number, data?: Record<string, any>): void {
         const durationMs = Date.now() - startedAt
         const dataStr = data ? ' ' + Object.entries(data).map(([k, v]) => `${k}=${v}`).join(' ') : ''
-        this.info(`METRIC ${name} durationMs=${durationMs}${dataStr}`)
+        this.info(`METRIC ${name} duration=${PhaseTimer.formatElapsed(durationMs)}${dataStr}`)
     }
 
     getLogLevel(): LogLevel {
@@ -617,4 +617,5 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+
 

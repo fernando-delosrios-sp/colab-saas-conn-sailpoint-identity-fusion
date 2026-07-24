@@ -3,7 +3,6 @@ import type { TemplateDelegate as HandlebarsTemplateDelegate } from 'handlebars'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { SourceType } from '../../model/config'
 
-export { registerHandlebarsHelpers } from './messagingHandlebarsRegistration'
 
 // ============================================================================
 // Template Compilation

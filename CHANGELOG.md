@@ -2,6 +2,8 @@
 
 ## 2.2.0
 
+- (2026-07-24) **Fix:** Correlated orphan managed accounts (correlated on the source but not linked to a Fusion row) now hydrate out-of-scope identities in the Process phase, immediately before the correlated account sweep, instead of during Fetch when the Fusion account map is empty. `MatchOutcomeDispatcher` applies the identity layer to each new Fusion account created from those orphans so display-attribute overrides can use `identityAlias`. Fetch phase no longer performs this hydration pass. Process logs include an `orphan-identity-hydration` step. `fusion-run` and `account-list-operation` specs updated.
+- (2026-07-24) **Observability:** Operation heartbeat `STATUS` lines now include `queue-pending` labels when the API queue is backed up and `work-pending` counts for disable ops, form candidates, review URLs, and deferred match candidates. `WARN STALL` lines include pending queue labels. `METRIC` duration fields use human-readable elapsed format (`567MS`, `1.2S`) instead of raw milliseconds.
 - (2026-07-24) **Performance:** Replaced uniform RPS spacing in `ApiQueue` with a sliding-window rate limiter aligned to ISC tenant limits (default 80 request starts per 10s, hard cap 100/10s). Concurrency slots now count only in-flight HTTP work, not rate-limit waits — improving Fetch-phase throughput on large tenants. Legacy `requestsPerSecond` still derives an equivalent window cap. Advanced Connection Settings defaults: `maxConcurrentRequests` 20 (UI max 30), new `parallelBatchSize` 12 (range 1–16). See advanced-connection-settings guide for tuning on strict tenants.
 - (2026-07-24) **Resilience:** `ClientService` aborts in-flight HTTP when `provisioningTimeout` elapses — merged caller `abortSignal` and timeout propagate to axios via `SdkApiAdapter`, so timed-out requests no longer hold queue slots or sockets. Client-service spec updated; queue, rate limiter, abort, and adapter tests expanded (75 clientService tests).
 - (2026-07-24) **Observability:** Unified `accountList` operation heartbeat replaces standalone `Queue Stats:` and `Memory usage` log lines. Every 30s a `STATUS` line reports phase, step, progress, queue delta, and memory; `EVENT_SUMMARY` lines aggregate match and correlation activity; `WARN STALL` fires when the API queue stops completing. Per-account match/correlation INFO lines are summarized into the heartbeat (detail remains at debug). Log monitors should grep `STATUS` / `WARN STALL` instead of `Queue Stats:` / `Memory usage`.
@@ -109,6 +111,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 

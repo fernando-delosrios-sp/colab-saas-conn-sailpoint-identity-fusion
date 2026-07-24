@@ -2,7 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { LogService } from './logService'
 import { FusionRun } from '../model/fusionRun'
-import { FusionConfig } from '../model/config'
+import { FusionConfig, RecordingConfig } from '../model/config'
 import { ApiLogEntry } from './clientService/recordingApiAdapter'
 
 function sanitizeForJson(value: unknown): unknown {
@@ -36,7 +36,7 @@ export class RecordingService {
         private readonly log: LogService,
         private readonly config: FusionConfig
     ) {
-        const recConfig = config.recording
+        const recConfig: RecordingConfig | undefined = config.recording
         this.chainName = recConfig?.chainName ?? `recording-${Date.now()}`
         this.recordingDir = path.resolve('test-data', 'recordings', this.chainName)
         this.apiLogPath = path.join(this.recordingDir, 'api-log.ndjson')
@@ -245,3 +245,4 @@ export class RecordingService {
         }
     }
 }
+
