@@ -27,7 +27,8 @@
         "attributeMerge": "first",
         "maxRetries": 20,
         "requestsPerSecond": 10,
-        "maxConcurrentRequests": 10,
+        "maxConcurrentRequests": 20,
+        "parallelBatchSize": 12,
         "processingWait": 60,
         "externalLoggingLevel": "info",
         "scoringMaxConcurrency": 12,
@@ -1097,8 +1098,17 @@
                             "type": "number",
                             "required": false,
                             "min": "1",
-                            "max": "10",
-                            "helpKey": "How many requests can run at the same time. Lower values are safer for rate-limited APIs."
+                            "max": "30",
+                            "helpKey": "How many HTTP requests can run at the same time. ISC allows roughly 100 requests per 10 seconds; default 20 balances throughput and 429 risk."
+                        },
+                        {
+                            "key": "parallelBatchSize",
+                            "label": "Parallel pagination batch size",
+                            "type": "number",
+                            "required": false,
+                            "min": "1",
+                            "max": "16",
+                            "helpKey": "Pages fetched in parallel during account pagination. Should be at or below maximum concurrent requests. Default 12."
                         },
                         {
                             "key": "requestsPerSecond",
@@ -1107,7 +1117,7 @@
                             "required": false,
                             "min": "1",
                             "max": "12",
-                            "helpKey": "Maximum number of requests sent per second. Reduce this if you are getting rate-limit errors."
+                            "helpKey": "Legacy rate hint: derives the sliding-window cap as requests per second × 10 seconds (max 100). ISC tenant limit is ~100 requests per 10 seconds. Lower if you see HTTP 429 errors."
                         },
                         {
                             "key": "maxRetries",

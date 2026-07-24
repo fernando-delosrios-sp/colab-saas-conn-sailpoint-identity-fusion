@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { QueueItem, QueueStats, QueueConfig, QueuePriority, QueuedItemInfo } from './types'
 import { shouldRetry, calculateRetryDelay } from './helpers'
 import { internalConfig } from '../../data/config'
+import { SlidingWindowRateLimiter, resolveRateLimitMaxRequests } from './rateLimiter'
 
 /** Ordered list of priorities from highest to lowest, used when dequeueing. */
 const PRIORITY_ORDER = [QueuePriority.HIGH, QueuePriority.MEDIUM, QueuePriority.LOW] as const
@@ -25,7 +26,7 @@ export class ApiQueue {
     private activeRequests: number = 0
     private activeItems: Map<string, QueueItem> = new Map()
     private processing: boolean = false
-    private nextRequestTime: number = 0
+    private rateLimiter: SlidingWindowRateLimiter
     private stats: QueueStats = {
         totalProcessed: 0,
         totalFailed: 0,
@@ -47,11 +48,10 @@ export class ApiQueue {
     private processingTimesCount: number = 0
     private processingTimesSum: number = 0
 
-    private lastRequestTime: number = 0
-    private minRequestInterval: number
-
     constructor(private config: QueueConfig) {
-        this.minRequestInterval = 1000 / config.requestsPerSecond
+        const windowMs = config.rateLimitWindowMs ?? internalConfig.clientService.rateLimitWindowMs ?? 10_000
+        const maxRequests = resolveRateLimitMaxRequests(config)
+        this.rateLimiter = new SlidingWindowRateLimiter(windowMs, maxRequests)
         this.startProcessing()
     }
 
@@ -162,90 +162,95 @@ export class ApiQueue {
      */
     private async processQueue(): Promise<void> {
         if (!this.processing) return
+        if (this.totalQueueLength() === 0) return
+        if (this.activeRequests >= this.config.maxConcurrentRequests) return
 
-        // Process requests up to the concurrency limit
-        while (this.totalQueueLength() > 0 && this.activeRequests < this.config.maxConcurrentRequests) {
-            const item = this.dequeueNext()!
-            this.stats.queueLength = this.totalQueueLength()
+        const item = this.dequeueNext()!
+        this.stats.queueLength = this.totalQueueLength()
 
-            // Execute the request immediately (it will handle its own throttling)
-            // Don't await - let multiple requests run concurrently up to maxConcurrentRequests
-            this.executeRequest(item).catch(() => {
-                // Error already handled in executeRequest
-            })
-        }
+        this.executeRequest(item).catch(() => {
+            // Error already handled in executeRequest
+        })
+    }
 
-        // Continue processing if there are items in queue and capacity available
-        if (this.totalQueueLength() > 0 && this.activeRequests < this.config.maxConcurrentRequests) {
-            setTimeout(() => this.processQueue(), internalConfig.clientService.queueProcessingIntervalMs)
-        }
+    private scheduleProcessQueue(): void {
+        setTimeout(() => this.processQueue(), 0)
+    }
+
+    private canContinue(): boolean {
+        return this.processing
     }
 
     /**
      * Execute a single request with throttling and retry
      */
     private async executeRequest<T>(item: QueueItem<T>): Promise<void> {
-        this.activeRequests++
-        this.stats.activeRequests = this.activeRequests
-        this.activeItems.set(item.id, item)
-
-        const waitTime = Date.now() - item.createdAt
-        this.pushStat('wait', waitTime)
-
-        // Throttle: ensure minimum time between requests
-        const now = Date.now()
-        const targetTime = Math.max(now, this.nextRequestTime)
-        this.nextRequestTime = targetTime + this.minRequestInterval
-        
-        const delay = targetTime - now
-        if (delay > 0) {
-            await this.sleep(delay)
-        }
-
-        const startTime = Date.now()
-
         try {
+            await this.rateLimiter.waitForSlot(() => this.canContinue())
+
             if (item.abortSignal?.aborted) {
                 throw new Error('Aborted')
             }
-            const result = await item.execute()
-            const processingTime = Date.now() - startTime
-            this.pushStat('processing', processingTime)
 
-            this.stats.totalProcessed++
-            this.updateStats()
-            item.resolve(result)
-        } catch (error: unknown) {
-            const processingTime = Date.now() - startTime
-            this.pushStat('processing', processingTime)
-
-            // Check if we should retry
-            if (!item.noRetry && shouldRetry(error) && item.retryCount < item.maxRetries) {
-                item.retryCount++
-                this.stats.totalRetries++
-                this.updateStats()
-
-                const delay = calculateRetryDelay(item.retryCount, error)
-                logger.debug(
-                    `Retrying request [${item.id}] (attempt ${item.retryCount}/${item.maxRetries}) after ${delay}ms`
-                )
-
-                await this.sleep(delay)
-
+            if (this.activeRequests >= this.config.maxConcurrentRequests) {
                 this.enqueueItem(item)
                 this.stats.queueLength = this.totalQueueLength()
-            } else {
-                this.stats.totalFailed++
-                this.updateStats()
-                item.reject(error)
+                this.scheduleProcessQueue()
+                return
             }
-        } finally {
-            this.activeRequests--
-            this.stats.activeRequests = this.activeRequests
-            this.activeItems.delete(item.id)
 
-            // Continue processing
-            setTimeout(() => this.processQueue(), 0)
+            this.activeRequests++
+            this.stats.activeRequests = this.activeRequests
+            this.activeItems.set(item.id, item)
+
+            const waitTime = Date.now() - item.createdAt
+            this.pushStat('wait', waitTime)
+
+            const startTime = Date.now()
+
+            try {
+                const result = await item.execute()
+                const processingTime = Date.now() - startTime
+                this.pushStat('processing', processingTime)
+
+                this.stats.totalProcessed++
+                this.updateStats()
+                item.resolve(result)
+            } catch (error: unknown) {
+                const processingTime = Date.now() - startTime
+                this.pushStat('processing', processingTime)
+
+                // Check if we should retry
+                if (!item.noRetry && shouldRetry(error) && item.retryCount < item.maxRetries) {
+                    item.retryCount++
+                    this.stats.totalRetries++
+                    this.updateStats()
+
+                    const delay = calculateRetryDelay(item.retryCount, error)
+                    logger.debug(
+                        `Retrying request [${item.id}] (attempt ${item.retryCount}/${item.maxRetries}) after ${delay}ms`
+                    )
+
+                    await this.sleep(delay)
+
+                    this.enqueueItem(item)
+                    this.stats.queueLength = this.totalQueueLength()
+                    this.scheduleProcessQueue()
+                } else {
+                    this.stats.totalFailed++
+                    this.updateStats()
+                    item.reject(error)
+                }
+            } finally {
+                this.activeRequests--
+                this.stats.activeRequests = this.activeRequests
+                this.activeItems.delete(item.id)
+
+                this.scheduleProcessQueue()
+            }
+        } catch (error: unknown) {
+            item.reject(error)
+            this.scheduleProcessQueue()
         }
     }
 
@@ -342,6 +347,7 @@ export class ApiQueue {
      * Clear the queue
      */
     clear(): void {
+        this.processing = false
         for (const q of this.queues.values()) {
             q.forEach((item) => item.reject(new Error('Queue cleared')))
             q.length = 0
@@ -352,6 +358,7 @@ export class ApiQueue {
         this.activeItems.clear()
         this.stats.queueLength = 0
         this.stats.activeRequests = 0
+        this.activeRequests = 0
     }
 
     /**
@@ -368,3 +375,4 @@ export class ApiQueue {
         return new Promise((resolve) => setTimeout(resolve, ms))
     }
 }
+

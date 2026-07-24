@@ -126,6 +126,51 @@ describe('ClientService', () => {
         ).rejects.toThrow(error)
     })
 
+    it('passes merged abort signal when provisioning timeout is configured', async () => {
+        mockQueue.enqueue.mockResolvedValue(undefined)
+        const config = { ...mockConfig, provisioningTimeout: 1 } as FusionConfig
+        const client = new ClientService(mockAdapter, mockQueue, config, mockLog)
+        activeClients.push(client)
+
+        await client.call(() => new Promise(() => {}))
+
+        expect(mockQueue.enqueue).toHaveBeenCalledWith(
+            expect.any(Function),
+            expect.objectContaining({ abortSignal: expect.any(AbortSignal) })
+        )
+    })
+
+    it('aborts slow queued request when provisioning timeout expires', async () => {
+        vi.useFakeTimers()
+        const realQueue = new ApiQueue({
+            requestsPerSecond: 100,
+            maxConcurrentRequests: 10,
+            maxRetries: 0,
+            enablePriority: true,
+        })
+        const config = { ...mockConfig, provisioningTimeout: 1 } as FusionConfig
+        const client = new ClientService(mockAdapter, realQueue, config, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            updateAccount: vi.fn(() => new Promise(() => {})),
+        } as any
+
+        try {
+            const promise = client.call(
+                (api: IscApiSurface) => api.accounts.updateAccount({} as any),
+                { throwOnError: true }
+            )
+            const assertion = expect(promise).rejects.toThrow(/timed out/i)
+            await vi.advanceTimersByTimeAsync(1000)
+            await assertion
+        } finally {
+            realQueue.stop()
+            realQueue.clear()
+            vi.useRealTimers()
+        }
+    })
+
     it('passes priority, context, and noRetry from policy via call()', async () => {
         mockQueue.enqueue.mockResolvedValue('result')
         const client = new ClientService(mockAdapter, mockQueue, mockConfig, mockLog)
@@ -322,3 +367,4 @@ describe('ClientService', () => {
         expect(mockQueue.stop).toHaveBeenCalled()
     })
 })
+

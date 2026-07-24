@@ -1,8 +1,9 @@
 import https from 'https'
+import axios, { AxiosInstance } from 'axios'
 import { Configuration, AccountsV2025Api, IdentitiesV2025Api, SearchApi, SourcesV2025Api, CustomFormsV2025Api, WorkflowsV2025Api, EntitlementsV2025Api, TransformsApi, GovernanceGroupsV2025Api, TaskManagementV2025Api, IdentityProfilesV2025Api, IdentityAttributesV2025Api } from 'sailpoint-api-client'
 import { IscApiAdapter } from './iscApiAdapter'
 import { FusionConfig } from '../../model/config'
-import { createRetriesConfig } from './helpers'
+import { createRetriesConfig, getRequestAbortSignal } from './helpers'
 import { LogService } from '../logService'
 
 /**
@@ -10,6 +11,7 @@ import { LogService } from '../logService'
  */
 export class SdkApiAdapter implements IscApiAdapter {
     public readonly config: Configuration
+    private readonly axiosInstance: AxiosInstance
 
     // Lazy-loaded API instances
     private _accountsApi?: AccountsV2025Api
@@ -46,57 +48,67 @@ export class SdkApiAdapter implements IscApiAdapter {
             timeout: 60000,
         })
 
+        this.axiosInstance = axios.create()
+        this.axiosInstance.interceptors.request.use((requestConfig) => {
+            const signal = getRequestAbortSignal()
+            if (signal) {
+                requestConfig.signal = signal
+            }
+            return requestConfig
+        })
+
         this.config = new Configuration({ ...fusionConfig, tokenUrl, baseOptions: { httpsAgent: agent } } as any)
         this.config.retriesConfig = retriesConfig
 
     }
 
     public get accountsApi(): AccountsV2025Api {
-        return (this._accountsApi ??= new AccountsV2025Api(this.config))
+        return (this._accountsApi ??= new AccountsV2025Api(this.config, undefined, this.axiosInstance))
     }
 
     public get identitiesApi(): IdentitiesV2025Api {
-        return (this._identitiesApi ??= new IdentitiesV2025Api(this.config))
+        return (this._identitiesApi ??= new IdentitiesV2025Api(this.config, undefined, this.axiosInstance))
     }
 
     public get searchApi(): SearchApi {
-        return (this._searchApi ??= new SearchApi(this.config))
+        return (this._searchApi ??= new SearchApi(this.config, undefined, this.axiosInstance))
     }
 
     public get sourcesApi(): SourcesV2025Api {
-        return (this._sourcesApi ??= new SourcesV2025Api(this.config))
+        return (this._sourcesApi ??= new SourcesV2025Api(this.config, undefined, this.axiosInstance))
     }
 
     public get customFormsApi(): CustomFormsV2025Api {
-        return (this._customFormsApi ??= new CustomFormsV2025Api(this.config))
+        return (this._customFormsApi ??= new CustomFormsV2025Api(this.config, undefined, this.axiosInstance))
     }
 
     public get workflowsApi(): WorkflowsV2025Api {
-        return (this._workflowsApi ??= new WorkflowsV2025Api(this.config))
+        return (this._workflowsApi ??= new WorkflowsV2025Api(this.config, undefined, this.axiosInstance))
     }
 
     public get entitlementsApi(): EntitlementsV2025Api {
-        return (this._entitlementsApi ??= new EntitlementsV2025Api(this.config))
+        return (this._entitlementsApi ??= new EntitlementsV2025Api(this.config, undefined, this.axiosInstance))
     }
 
     public get transformsApi(): TransformsApi {
-        return (this._transformsApi ??= new TransformsApi(this.config))
+        return (this._transformsApi ??= new TransformsApi(this.config, undefined, this.axiosInstance))
     }
 
     public get governanceGroupsApi(): GovernanceGroupsV2025Api {
-        return (this._governanceGroupsApi ??= new GovernanceGroupsV2025Api(this.config))
+        return (this._governanceGroupsApi ??= new GovernanceGroupsV2025Api(this.config, undefined, this.axiosInstance))
     }
 
     public get taskManagementApi(): TaskManagementV2025Api {
-        return (this._taskManagementApi ??= new TaskManagementV2025Api(this.config))
+        return (this._taskManagementApi ??= new TaskManagementV2025Api(this.config, undefined, this.axiosInstance))
     }
 
     public get identityProfilesApi(): IdentityProfilesV2025Api {
-        return (this._identityProfilesApi ??= new IdentityProfilesV2025Api(this.config))
+        return (this._identityProfilesApi ??= new IdentityProfilesV2025Api(this.config, undefined, this.axiosInstance))
     }
 
     public get identityAttributesApi(): IdentityAttributesV2025Api {
-        return (this._identityAttributesApi ??= new IdentityAttributesV2025Api(this.config))
+        return (this._identityAttributesApi ??= new IdentityAttributesV2025Api(this.config, undefined, this.axiosInstance))
     }
 }
+
 

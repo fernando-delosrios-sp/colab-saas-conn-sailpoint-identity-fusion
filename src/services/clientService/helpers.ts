@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { IAxiosRetryConfig } from 'axios-retry'
 import { logger } from '@sailpoint/connector-sdk'
 import axiosRetry from 'axios-retry'
@@ -110,3 +111,47 @@ export function calculateRetryDelay(retryCount: number, error: unknown): number 
     const jitter = Math.random() * RETRY_JITTER_FACTOR * exponentialDelay
     return Math.min(exponentialDelay + jitter, MAX_RETRY_DELAY_MS)
 }
+
+const requestAbortSignalStorage = new AsyncLocalStorage<AbortSignal | undefined>()
+
+/** AbortSignal for the in-flight queued HTTP request (read by SdkApiAdapter axios interceptor). */
+export function getRequestAbortSignal(): AbortSignal | undefined {
+    return requestAbortSignalStorage.getStore()
+}
+
+/** Run fn with the given abort signal visible to outbound axios requests. */
+export function runWithRequestAbortSignal<T>(signal: AbortSignal | undefined, fn: () => Promise<T>): Promise<T> {
+    if (!signal) return fn()
+    return requestAbortSignalStorage.run(signal, fn)
+}
+
+/** Combine multiple abort signals; aborts when any input signal aborts. */
+export function mergeAbortSignals(signals: (AbortSignal | undefined)[]): AbortSignal | undefined {
+    const active = signals.filter((signal): signal is AbortSignal => signal != null)
+    if (active.length === 0) return undefined
+    if (active.length === 1) return active[0]
+    return AbortSignal.any(active)
+}
+
+/** Run fn and reject when signal aborts (propagates abort to caller promise). */
+export function invokeAbortable<T>(fn: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (!signal) return fn()
+    if (signal.aborted) {
+        return Promise.reject(signal.reason ?? new Error('Aborted'))
+    }
+
+    return new Promise<T>((resolve, reject) => {
+        const onAbort = () => reject(signal.reason ?? new Error('Aborted'))
+        signal.addEventListener('abort', onAbort, { once: true })
+        fn()
+            .then((value) => {
+                signal.removeEventListener('abort', onAbort)
+                resolve(value)
+            })
+            .catch((error) => {
+                signal.removeEventListener('abort', onAbort)
+                reject(error)
+            })
+    })
+}
+

@@ -2,7 +2,7 @@ import type { Mock } from 'vitest'
 import { FusionConfig } from '../../../model/config'
 import { LogService } from '../../logService'
 
-const { agentOptions, AgentMock, configurationArgs, ConfigurationMock, apiConfigByCtor } = vi.hoisted(() => {
+const { agentOptions, AgentMock, configurationArgs, ConfigurationMock, apiConfigByCtor, axiosCreateMock, requestInterceptor } = vi.hoisted(() => {
     const agentOptions: Record<string, unknown>[] = []
     const AgentMock = vi.fn(function (this: { options: Record<string, unknown> }, options: Record<string, unknown>) {
         agentOptions.push(options)
@@ -20,8 +20,19 @@ const { agentOptions, AgentMock, configurationArgs, ConfigurationMock, apiConfig
     })
 
     const apiConfigByCtor = new Map<Mock, unknown>()
+    let requestInterceptor: (config: Record<string, unknown>) => Record<string, unknown> = (config) => config
+    const axiosInstance = {
+        interceptors: {
+            request: {
+                use: vi.fn((fn: typeof requestInterceptor) => {
+                    requestInterceptor = fn
+                }),
+            },
+        },
+    }
+    const axiosCreateMock = vi.fn(() => axiosInstance)
 
-    return { agentOptions, AgentMock, configurationArgs, ConfigurationMock, apiConfigByCtor }
+    return { agentOptions, AgentMock, configurationArgs, ConfigurationMock, apiConfigByCtor, axiosCreateMock, requestInterceptor: () => requestInterceptor }
 })
 
 function mockApiCtor() {
@@ -36,6 +47,20 @@ vi.mock('https', () => ({
     default: { Agent: AgentMock },
     Agent: AgentMock,
 }))
+
+vi.mock('axios', () => ({
+    default: {
+        create: axiosCreateMock,
+    },
+}))
+
+vi.mock('../helpers', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../helpers')>()
+    return {
+        ...actual,
+        getRequestAbortSignal: vi.fn(),
+    }
+})
 
 vi.mock('sailpoint-api-client', () => ({
     Configuration: ConfigurationMock,
@@ -54,6 +79,7 @@ vi.mock('sailpoint-api-client', () => ({
 }))
 
 import { SdkApiAdapter } from '../sdkApiAdapter'
+import { getRequestAbortSignal } from '../helpers'
 
 describe('SdkApiAdapter', () => {
     const fusionConfig = {
@@ -100,4 +126,36 @@ describe('SdkApiAdapter', () => {
         expect(accountsApi.config).toBe(adapter.config)
         expect(searchApi.config).toBe(adapter.config)
     })
+
+    it('registers a dedicated axios instance with request interceptor', () => {
+        new SdkApiAdapter(fusionConfig, log)
+
+        expect(axiosCreateMock).toHaveBeenCalledOnce()
+    })
+
+    it('applies abort signal from AsyncLocalStorage to axios request config', () => {
+        const controller = new AbortController()
+        vi.mocked(getRequestAbortSignal).mockReturnValue(controller.signal)
+
+        const adapter = new SdkApiAdapter(fusionConfig, log)
+        adapter.accountsApi
+
+        const config = { headers: {} }
+        const result = requestInterceptor()(config)
+
+        expect(result.signal).toBe(controller.signal)
+    })
+
+    it('leaves axios request config unchanged when no abort signal is active', () => {
+        vi.mocked(getRequestAbortSignal).mockReturnValue(undefined)
+
+        const adapter = new SdkApiAdapter(fusionConfig, log)
+        adapter.accountsApi
+
+        const config = { headers: {} }
+        const result = requestInterceptor()(config)
+
+        expect(result.signal).toBeUndefined()
+    })
 })
+

@@ -214,6 +214,7 @@ const merged = {
     maxRetries: advancedConnection.maxRetries,
     requestsPerSecond: advancedConnection.requestsPerSecond,
     maxConcurrentRequests: advancedConnection.maxConcurrentRequests,
+    parallelBatchSize: advancedConnection.parallelBatchSize,
     processingWait: advancedConnection.processingWait,
     batchSize: advancedConnection.batchSize,
     ...developer,
@@ -228,3 +229,4 @@ const merged = {
 const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'))
 spec.sourceConfigInitialValues = merged
 fs.writeFileSync(specPath, JSON.stringify(spec, null, 4) + '\n', 'utf8')
+

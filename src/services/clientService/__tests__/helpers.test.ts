@@ -1,4 +1,4 @@
-import { createRetriesConfig, shouldRetry, calculateRetryDelay } from '../helpers'
+import { createRetriesConfig, shouldRetry, calculateRetryDelay, getRequestAbortSignal, runWithRequestAbortSignal, invokeAbortable, mergeAbortSignals } from '../helpers'
 import {
     BASE_RETRY_DELAY_MS,
     MAX_RETRY_DELAY_MS,
@@ -152,4 +152,48 @@ describe('clientService helpers', () => {
             expect(delay).toBeLessThanOrEqual(BASE_RETRY_DELAY_MS * (1 + RETRY_JITTER_FACTOR))
         })
     })
+
+    describe('abort signal helpers', () => {
+        it('runWithRequestAbortSignal exposes signal to getRequestAbortSignal', async () => {
+            const controller = new AbortController()
+            await runWithRequestAbortSignal(controller.signal, async () => {
+                expect(getRequestAbortSignal()).toBe(controller.signal)
+            })
+        })
+
+        it('invokeAbortable rejects when signal aborts before execution', async () => {
+            const controller = new AbortController()
+            controller.abort()
+            await expect(invokeAbortable(async () => 'done', controller.signal)).rejects.toThrow(/aborted/i)
+        })
+
+        it('invokeAbortable rejects when signal aborts during in-flight work', async () => {
+            const controller = new AbortController()
+            let startedResolve: () => void
+            const started = new Promise<void>((resolve) => {
+                startedResolve = resolve
+            })
+
+            const promise = invokeAbortable(async () => {
+                startedResolve!()
+                await new Promise((resolve) => setTimeout(resolve, 5000))
+                return 'done'
+            }, controller.signal)
+
+            await started
+            controller.abort()
+            await expect(promise).rejects.toThrow(/aborted/i)
+        })
+
+        it('mergeAbortSignals returns undefined when no signals provided', () => {
+            expect(mergeAbortSignals([])).toBeUndefined()
+            expect(mergeAbortSignals([undefined])).toBeUndefined()
+        })
+
+        it('mergeAbortSignals returns single signal unchanged', () => {
+            const controller = new AbortController()
+            expect(mergeAbortSignals([controller.signal])).toBe(controller.signal)
+        })
+    })
 })
+
