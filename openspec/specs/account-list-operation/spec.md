@@ -156,7 +156,7 @@ The account-list operation SHALL start an operation heartbeat at the beginning o
 
 ### Requirement: Account-list pipeline logs phase and step boundaries
 
-The account-list operation SHALL emit PHASE and STEP START lines at the beginning of each major phase (Setup, Fetch, Refresh, Process, Output) and at named sub-steps within Process and Output (including identity processing, correlated sweep, uncorrelated sweep, await-disable-ops, form reconciliation, form cleanup, send-accounts, save-state, schedule-aggregations, await-form-deletes). Phase completion timing lines SHALL remain for report phase-timing breakdown.
+The account-list operation SHALL emit PHASE and STEP START lines at the beginning of each major phase (Setup, Fetch, Refresh, Process, Output) and at named sub-steps within Process and Output (including identity processing, correlated sweep, **record unique registration**, uncorrelated sweep, await-disable-ops, form reconciliation, form cleanup, send-accounts, save-state, schedule-aggregations, await-form-deletes). Phase completion timing lines SHALL remain for report phase-timing breakdown.
 
 #### Scenario: Process phase visible during long matching run
 
@@ -164,6 +164,24 @@ The account-list operation SHALL emit PHASE and STEP START lines at the beginnin
 - **WHEN** an operator reads logs mid-run
 - **THEN** a `PHASE 4 Process START` line SHALL appear before matching work
 - **AND** subsequent STATUS lines SHALL show `phase=Process` with the active step name
+
+#### Scenario: Record unique registration step visible during bulk registration
+
+- **GIVEN** thousands of record-only managed accounts with match disabled
+- **WHEN** the record unique registration step runs
+- **THEN** a STEP START line for `record-unique-registration` SHALL appear before uncorrelated sweep
+- **AND** STATUS progress during that step SHALL use unit `registered` rather than `analyzed`
+
+### Requirement: Account-list process phase runs record unique registration before uncorrelated sweep
+
+The account-list Process phase SHALL run record unique registration after the correlated managed-account sweep and before the uncorrelated match sweep. Accounts handled in this step SHALL be removed from the managed-account work queue.
+
+#### Scenario: Uncorrelated sweep queue excludes pre-registered record accounts
+
+- **GIVEN** 5000 record-only accounts with match disabled and 200 authoritative uncorrelated accounts
+- **WHEN** record unique registration completes
+- **THEN** the uncorrelated sweep SHALL process approximately 200 accounts
+- **AND** STATUS for uncorrelated sweep SHALL NOT count the 5000 record-only accounts
 
 ### Requirement: Account-list aggregates match and correlation logs at INFO
 
@@ -182,4 +200,5 @@ During account-list execution, per-account match discovery (`MATCH FOUND`, `EXAC
 - **WHEN** the operation runs with default INFO log level
 - **THEN** individual `Triggering correlation for` INFO lines SHALL NOT appear
 - **AND** EVENT_SUMMARY lines SHALL report aggregate correlation counts
+
 

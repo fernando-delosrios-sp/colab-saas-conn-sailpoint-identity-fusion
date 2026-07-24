@@ -15,6 +15,10 @@ import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
 import { trimStr } from '../../utils/safeRead'
 import { getManagedAccountSnapshotKey } from '../../utils/velocityAccountSnapshot'
 
+export interface MapAttributesOptions {
+    onlyTargets?: ReadonlySet<string>
+}
+
 export class MappingService {
     private cachedAttributeMappingConfig?: Map<string, AttributeMappingConfig>
     private readonly attributeMaps?: AttributeMap[]
@@ -30,7 +34,7 @@ export class MappingService {
         this.sourceConfigs = config.sources
     }
 
-    mapAttributes(fusionAccount: FusionAccount, _run: FusionRun): void {
+    mapAttributes(fusionAccount: FusionAccount, _run: FusionRun, options?: MapAttributesOptions): void {
         if (fusionAccount.type === FusionAccountKind.Identity) return
 
         const { attributeBag, needsRefresh } = fusionAccount
@@ -62,6 +66,10 @@ export class MappingService {
             const mappingTargets = this.getAttributeMappingTargetNames()
 
             for (const attribute of mappingTargets) {
+                if (options?.onlyTargets && !options.onlyTargets.has(attribute)) {
+                    continue
+                }
+
                 if (this.isSystemProvenanceAttribute(attribute)) {
                     continue
                 }
@@ -186,3 +194,4 @@ export class MappingService {
         fusionAccount.importHistory(history)
     }
 }
+

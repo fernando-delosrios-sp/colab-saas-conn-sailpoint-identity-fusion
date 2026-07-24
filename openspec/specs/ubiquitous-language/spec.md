@@ -262,6 +262,7 @@ The connector refers to an ISC identity and to the Fusion account itself through
 |------|------------|
 | **Authoritative accounts** | Managed source accounts that create new ISC identities when they do not match an existing identity. Fusion typically owns correlation decisions for these sources. |
 | **Records** | Managed source accounts that run **Map** and **Define** and may register unique attributes, but do not create Fusion accounts for non-matched rows. |
+| **Record unique registration** | A bulk Process-phase step (`record-unique-registration`) that registers unique attribute values for Record-type managed accounts with **Include record accounts in Match** disabled. Applies selective attribute mapping (targets coincident with unique definition names) and `registerUniqueAttributes` only — skipping normal Define, Match scoring, and Fusion account creation. Runs after the correlated sweep and before the uncorrelated sweep. |
 | **Orphan accounts** | Managed source accounts whose non-matched rows are dropped; optionally, stale orphan accounts can be disabled. |
 
 ### Processing states and outcomes

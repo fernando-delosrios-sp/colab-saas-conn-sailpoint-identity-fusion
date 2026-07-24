@@ -1,6 +1,6 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
-import { FusionConfig } from '../../model/config'
+import { FusionConfig, SourceType } from '../../model/config'
 import { LogService } from '../logService'
 import { FormService } from '../formService'
 import { IdentityService } from '../identityService'
@@ -14,6 +14,7 @@ import {
     hasIdentityCandidateMatches as checkHasIdentityCandidateMatches,
     hasDeferredCandidateMatches as checkHasDeferredCandidateMatches,
     formatFusionMatchDiscoveryLog,
+    isRecordMatchingEnabledForSource,
 } from '../matchingService/matchingHelpers'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
@@ -154,6 +155,7 @@ export class FusionService {
                 identities: this.identities,
                 correlationManager: this.correlationManager,
                 definitionService: this.definitionService,
+                mappingService: this.mappingService,
                 accountAssembly: this.accountAssembly,
             }
         )
@@ -657,6 +659,7 @@ export class FusionService {
     public async processManagedAccounts(): Promise<void> {
         await this.initializeManagedAccountProcessing()
         await this.processCorrelatedManagedAccounts()
+        await this.processRecordUniqueRegistration()
         const { processed } = await this.processUncorrelatedManagedAccounts()
         this.log.info(`Managed accounts phase finished: ${processed} analyzed (matching workflow complete)`)
     }
@@ -1194,6 +1197,53 @@ export class FusionService {
     }
 
     /** Correlated account sweep: resolve linked/correlated managed accounts before uncorrelated scoring. */
+
+    /**
+     * Bulk-register unique attribute values for record sources with match disabled.
+     * Removes processed accounts from the managed-account work queue.
+     */
+    public async processRecordUniqueRegistration(): Promise<{ registered: number }> {
+        this.ensureManagedAccountProcessingInitialized()
+        const map = this.run.managedAccountsById
+        const eligible: Account[] = []
+
+        for (const account of map.values()) {
+            if (!account.sourceName) continue
+            const sourceInfo = this.run.sourcesByName.get(account.sourceName)
+            if (sourceInfo?.sourceType !== SourceType.Record) continue
+            if (isRecordMatchingEnabledForSource(account.sourceName, this.run.sourcesByName)) continue
+            eligible.push(account)
+        }
+
+        if (eligible.length === 0) {
+            return { registered: 0 }
+        }
+
+        this.log.info(
+            `Registering unique attribute values for ${eligible.length} record managed account(s) with match disabled`
+        )
+
+        const registered = await this.definitionService.registerUniqueValuesFromRecordManagedAccounts(
+            eligible,
+            this.mappingService,
+            this.run,
+            {
+                onProgress: (done, total) => this.log.setProgress(done, total, 'registered'),
+            }
+        )
+
+        for (const account of eligible) {
+            const key = getManagedAccountKeyFromAccount(account)
+            if (key) {
+                this.run.claimAccount(key, account.identityId)
+            }
+        }
+
+        this.log.recordEvent('recordUniqueRegistered', { count: registered })
+        this.log.info(`Record unique registration complete: ${registered} account(s) processed`)
+        return { registered }
+    }
+
     public async processCorrelatedManagedAccounts(): Promise<void> {
         this.ensureManagedAccountProcessingInitialized()
         const map = this.run.managedAccountsById
