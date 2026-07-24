@@ -3,9 +3,7 @@
 ## Purpose
 
 The log service (`src/services/logService/`) is the connector's logging facade. It defines the `LogService` interface, the SDK adapter that writes to the connector host, and the helper utilities used elsewhere in the codebase to log structured events, known operation function names, and a small set of standardized debug/warn patterns. This spec defines the contract for what the rest of the connector can assume about the log surface (level, structured fields, redaction) and what the host receives.
-
 ## Requirements
-
 ### Requirement: The log service MUST expose a stable, structured log surface
 
 The log service MUST expose a `LogService` interface with the standard levels (`debug`, `info`, `warn`, `error`). The SDK adapter MUST forward every call to the connector host as a plain text message without lossy transformation. For operations with an `operationContext` (for example `accountList`), messages SHALL be prefixed with `[operationContext]`. Structured metadata MAY be passed as optional arguments for message formatting, but the host-visible contract for operational visibility SHALL be standardized text line kinds (`STATUS`, `EVENT_SUMMARY`, `PHASE`, `STEP`, `METRIC`, `WARN STALL`, `EPILOGUE`) rather than host-indexed structured fields.
@@ -24,7 +22,7 @@ The log service MUST expose a `LogService` interface with the standard levels (`
 
 ### Requirement: Operation heartbeat emits periodic STATUS lines
 
-The log service SHALL provide an operation heartbeat that emits a `STATUS` text line at a configurable interval (default: `statsLoggingIntervalMs`, 30 seconds) while an operation heartbeat is active. Each `STATUS` line SHALL include, when available: current phase, current step, progress (`done/total`), operation elapsed time, API queue statistics with processed-count delta since the previous tick, and process memory (RSS and heap used).
+The log service SHALL provide an operation heartbeat that emits a `STATUS` text line at a configurable interval while an operation heartbeat is active. The interval SHALL be `statsLoggingIntervalMs` from Advanced Connection Settings (configured as `heartbeatInterval` in seconds in the connector UI; default 10 seconds). Each `STATUS` line SHALL include, when available: current phase, current step, progress (`done/total`), operation elapsed time, API queue statistics with processed-count delta since the previous tick, and process memory (RSS and heap used).
 
 #### Scenario: STATUS line during account-list Process phase
 
@@ -38,6 +36,12 @@ The log service SHALL provide an operation heartbeat that emits a `STATUS` text 
 - **GIVEN** the API queue processed count was 537 at the previous STATUS tick and remains 537
 - **WHEN** the next STATUS line is emitted
 - **THEN** the line SHALL include `processed=537` and a delta indicating zero completions since the previous tick
+
+#### Scenario: Default 10 second heartbeat interval
+
+- **GIVEN** a source configuration with default Advanced Connection Settings (no explicit `heartbeatInterval`)
+- **WHEN** an account-list operation runs longer than 10 seconds
+- **THEN** at least one STATUS line SHALL be emitted within the first 10 seconds of the operation heartbeat
 
 ### Requirement: Operation heartbeat emits EVENT_SUMMARY lines
 
@@ -94,4 +98,27 @@ The service registry SHALL expose an `OperationRunContext` updated by log servic
 - **GIVEN** a caller invokes `setProgress(450, 800, 'analyzed')`
 - **WHEN** the next STATUS heartbeat fires
 - **THEN** the STATUS line SHALL include `progress=450/800`
+
+### Requirement: Heartbeat interval is configurable in Advanced Connection Settings
+
+The connector SHALL expose a **Heartbeat interval (seconds)** setting (`heartbeatInterval`) in Advanced Connection Settings. The setting SHALL default to 10 seconds when unset. At runtime the connector SHALL convert the configured value to milliseconds and expose it as `statsLoggingIntervalMs` on `FusionConfig` for operation heartbeat consumption.
+
+#### Scenario: Default heartbeat interval when setting omitted
+
+- **GIVEN** a source configuration with no `heartbeatInterval` value
+- **WHEN** `safeReadConfig` completes
+- **THEN** `statsLoggingIntervalMs` SHALL be 10000
+
+#### Scenario: Custom heartbeat interval from advanced settings
+
+- **GIVEN** a source configuration with `heartbeatInterval` set to 30
+- **WHEN** `safeReadConfig` completes
+- **THEN** `statsLoggingIntervalMs` SHALL be 30000
+
+#### Scenario: Setting appears in connector-spec Advanced Connection Settings
+
+- **GIVEN** an operator views Advanced Connection Settings in the connector UI
+- **WHEN** the section renders
+- **THEN** a **Heartbeat interval (seconds)** field keyed `heartbeatInterval` SHALL be present
+- **AND** the documented default SHALL be 10 seconds
 

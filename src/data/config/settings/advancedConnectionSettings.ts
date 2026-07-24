@@ -13,6 +13,7 @@ export const connectorSpecInitialValues = {
     maxConcurrentRequests: 20,
     parallelBatchSize: 12,
     processingWait: 60,
+    heartbeatInterval: 10,
 } as const
 
 export const runtimeDefaults = {
@@ -23,13 +24,23 @@ export const runtimeDefaults = {
     enablePriority: matchingInitialValues.enablePriority,
     processingWait: internalConfig.clientService.processingWaitConstant,
     provisioningTimeout: connectorSpecInitialValues.provisioningTimeout,
+    statsLoggingIntervalMs: connectorSpecInitialValues.heartbeatInterval * 1000,
 } as const
 
-export function readSettings(raw: Record<string, unknown>): AdvancedConnectionSettingsSection {
+export type AdvancedConnectionSettingsReadResult = AdvancedConnectionSettingsSection & {
+    statsLoggingIntervalMs: number
+}
+
+export function readSettings(raw: Record<string, unknown>): AdvancedConnectionSettingsReadResult {
     const processingWaitMs =
         raw.processingWait !== undefined
             ? (raw.processingWait as number) * 1000
             : runtimeDefaults.processingWait
+
+    const statsLoggingIntervalMs =
+        raw.heartbeatInterval !== undefined
+            ? (raw.heartbeatInterval as number) * 1000
+            : runtimeDefaults.statsLoggingIntervalMs
 
     return {
         maxRetries: (raw.maxRetries as number | undefined) ?? runtimeDefaults.maxRetries,
@@ -39,5 +50,6 @@ export function readSettings(raw: Record<string, unknown>): AdvancedConnectionSe
         enablePriority: extractBoolean(raw, 'enablePriority') ?? runtimeDefaults.enablePriority,
         processingWait: processingWaitMs,
         provisioningTimeout: (raw.provisioningTimeout as number | undefined) ?? runtimeDefaults.provisioningTimeout,
+        statsLoggingIntervalMs,
     }
 }

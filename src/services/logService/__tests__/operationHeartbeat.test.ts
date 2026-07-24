@@ -1,6 +1,12 @@
 import { OperationRunContext } from '../operationRunContext'
-import { formatEventSummaryLines, formatStatusLine, formatStallWarning, groupActiveLabels } from '../operationHeartbeat'
-import { PhaseTimer } from '../logService'
+import {
+    OperationHeartbeat,
+    formatEventSummaryLines,
+    formatStatusLine,
+    formatStallWarning,
+    groupActiveLabels,
+} from '../operationHeartbeat'
+import { LogService, PhaseTimer } from '../logService'
 
 describe('operation heartbeat formatters', () => {
     it('formats STATUS with phase, step, progress, queue delta, and memory', () => {
@@ -139,6 +145,32 @@ describe('operation heartbeat formatters', () => {
 describe('PhaseTimer in STATUS elapsed', () => {
     it('uses uppercase duration units', () => {
         expect(PhaseTimer.formatElapsed(1500)).toBe('1.5S')
+    })
+})
+
+describe('OperationHeartbeat timing', () => {
+    it('emits STATUS on first tick at 10 second interval', () => {
+        vi.useFakeTimers()
+        const info = vi.fn()
+        const log = { info } as unknown as LogService
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Process'
+
+        const heartbeat = new OperationHeartbeat(log, () => ({
+            runContext,
+            intervalMs: 10_000,
+        }))
+
+        heartbeat.start()
+        expect(info).not.toHaveBeenCalled()
+
+        vi.advanceTimersByTime(10_000)
+
+        expect(info).toHaveBeenCalledTimes(1)
+        expect(info.mock.calls[0][0]).toContain('STATUS')
+
+        heartbeat.stop()
+        vi.useRealTimers()
     })
 })
 

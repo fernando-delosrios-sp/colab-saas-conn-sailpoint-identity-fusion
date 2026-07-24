@@ -25,7 +25,6 @@ export function getInternalConfigFlat(): {
     maxRetryDelayMs: number
     retryJitterFactor: number
     rateLimitJitterFactor: number
-    statsLoggingIntervalMs: number
     maxStatsSamples: number
     queueProcessingIntervalMs: number
     sailPointListMax: number
@@ -51,3 +50,4 @@ export function getInternalConfigFlat(): {
         ...formService,
     }
 }
+
