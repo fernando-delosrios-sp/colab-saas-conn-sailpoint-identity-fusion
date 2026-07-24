@@ -328,6 +328,142 @@ describe('MatchOutcomeDispatcher', () => {
             expect(run.getFusionAccountByManagedKey('source-a-id::native-1')).toBeUndefined()
         })
 
+        it('applies identity layer to correlated orphan accounts when identity is in cache', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
+            run.addIdentity('identity-orphan', {
+                id: 'identity-orphan',
+                name: 'aanderson',
+                displayName: 'Alice Anderson',
+                attributes: { displayName: 'Alice Anderson' },
+            } as any)
+
+            const scoreSpy = vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
+
+            const account = managedAccount({
+                uncorrelated: false,
+                identityId: 'identity-orphan',
+            })
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(result.nonMatch).toBe(1)
+            expect(scoreSpy).not.toHaveBeenCalled()
+            expect(result.resolved[0].fusionAccount.identityAlias).toBe('Alice Anderson')
+            expect(result.resolved[0].fusionAccount.isIdentity).toBe(true)
+        })
+
+        it('drops linked correlated accounts without applying the orphan identity layer path', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.initLinkedAccountIndex()
+            run.addToLinkedAccountIndex('source-a-id::native-linked')
+            run.addIdentity('identity-linked', {
+                id: 'identity-linked',
+                name: 'linked-login',
+                displayName: 'Linked Display',
+                attributes: { displayName: 'Linked Display' },
+            } as any)
+
+            const scoreSpy = vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
+
+            const account = managedAccount({
+                uncorrelated: false,
+                identityId: 'identity-linked',
+                nativeIdentity: 'native-linked',
+                id: 'acct-linked',
+            })
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(result.processed).toBe(1)
+            expect(result.nonMatch).toBe(0)
+            expect(result.resolved).toHaveLength(0)
+            expect(scoreSpy).not.toHaveBeenCalled()
+            expect(run.managedAccountsById.has('source-a-id::native-linked')).toBe(false)
+        })
+
+        it('applies identity layer to each correlated orphan sharing the same identityId', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
+            run.addIdentity('identity-shared', {
+                id: 'identity-shared',
+                name: 'shared-login',
+                displayName: 'Shared Display Name',
+                attributes: { displayName: 'Shared Display Name' },
+            } as any)
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
+
+            const account1 = managedAccount({
+                uncorrelated: false,
+                identityId: 'identity-shared',
+                nativeIdentity: 'native-1',
+                id: 'acct-1',
+                name: 'Orphan One',
+            })
+            const account2 = managedAccount({
+                uncorrelated: false,
+                identityId: 'identity-shared',
+                nativeIdentity: 'native-2',
+                id: 'acct-2',
+                name: 'Orphan Two',
+            })
+
+            const result = await dispatcher.runMatchSweep([account1, account2], 2)
+
+            expect(result.nonMatch).toBe(2)
+            expect(result.resolved[0].fusionAccount.identityAlias).toBe('Shared Display Name')
+            expect(result.resolved[1].fusionAccount.identityAlias).toBe('Shared Display Name')
+            expect(result.resolved[0].fusionAccount.isIdentity).toBe(true)
+            expect(result.resolved[1].fusionAccount.isIdentity).toBe(true)
+        })
+
+        it('skips identity layer for correlated orphan when identity is protected', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
+            run.addIdentity('identity-orphan', {
+                id: 'identity-orphan',
+                name: 'aanderson',
+                displayName: 'Alice Anderson',
+                attributes: {},
+                protected: true,
+            } as any)
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
+
+            const account = managedAccount({
+                uncorrelated: false,
+                identityId: 'identity-orphan',
+            })
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(result.nonMatch).toBe(1)
+            expect(result.resolved[0].fusionAccount.identityAlias).not.toBe('Alice Anderson')
+        })
+
 
 
         it('skips identity scoring for record sources when matching is disabled', async () => {
@@ -569,6 +705,7 @@ describe('MatchOutcomeDispatcher', () => {
         })
     })
 })
+
 
 
 

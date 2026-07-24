@@ -2,7 +2,6 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
 import { AggregationStats } from '../../services/fusionService/types'
-import { FusionAccount } from '../../model/account'
 import { generateReport } from './generateReport'
 import { buildTerminalSummary, DryRunInput } from './accountListHelpers'
 
@@ -45,36 +44,25 @@ export function fetchResultToAggregationStats(
     }
 }
 
+/**
+ * Hydrates out-of-scope identities for correlated orphan managed accounts still on the
+ * work queue after refresh. Enables {@link FusionAccount.identityAlias} on new Fusion
+ * accounts created from those orphans during the correlated account sweep.
+ */
 export async function hydrateCorrelatedManagedAccountIdentities(deps: {
-    managedAccounts: Iterable<{ identityId?: string }>
-    fusionAccounts: Iterable<FusionAccount>
-    managedAccountsByKey: Map<string, { identityId?: string }>
-    getIdentity: (id: string) => { protected?: boolean } | undefined
+    managedAccounts: Iterable<{ identityId?: string; uncorrelated?: boolean }>
     hydrateMissingIdentitiesById: (ids: string[]) => Promise<void>
-}): Promise<{ hydrated: number; applied: number }> {
+}): Promise<{ hydrated: number }> {
     const distinctIds = new Set<string>()
     for (const managed of deps.managedAccounts) {
+        if (managed.uncorrelated !== false) continue
         const id = managed.identityId
         if (id) distinctIds.add(id)
     }
-    if (distinctIds.size === 0) return { hydrated: 0, applied: 0 }
+    if (distinctIds.size === 0) return { hydrated: 0 }
 
     await deps.hydrateMissingIdentitiesById(Array.from(distinctIds))
-
-    let applied = 0
-    for (const fusionAccount of deps.fusionAccounts) {
-        if (fusionAccount.identityInfo) continue
-        const originKey = fusionAccount.originAccountId
-        if (!originKey) continue
-        const managed = deps.managedAccountsByKey.get(originKey)
-        const identityId = managed?.identityId
-        if (!identityId) continue
-        const identity = deps.getIdentity(identityId)
-        if (!identity || identity.protected) continue
-        fusionAccount.addIdentityLayer(identity as Parameters<typeof fusionAccount.addIdentityLayer>[0])
-        applied++
-    }
-    return { hydrated: distinctIds.size, applied }
+    return { hydrated: distinctIds.size }
 }
 
 async function applyFusionReset(serviceRegistry: ServiceRegistry): Promise<void> {
@@ -196,18 +184,6 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
     await forms.processFetchedFormData()
     processFormDataOp.done()
 
-    log.info('Hydrating correlated identities for managed accounts')
-    const hydrationResult = await hydrateCorrelatedManagedAccountIdentities({
-        managedAccounts: sources.run.managedAccountsById.values(),
-        fusionAccounts: sources.run.allFusionAccounts,
-        managedAccountsByKey: sources.run.managedAccountsById as Map<string, { identityId?: string }>,
-        getIdentity: (id) => sources.run.getIdentity(id),
-        hydrateMissingIdentitiesById: (ids) => identities.hydrateMissingIdentitiesById(ids),
-    })
-    log.info(
-        `Hydrated ${hydrationResult.hydrated} correlated identity/identities; applied identity layer to ${hydrationResult.applied} fusion account(s)`
-    )
-
     const counts = countManagedAccountsByType(sources)
     log.info(
         `Loaded ${sources.fusionAccountCount} fusion account(s), ${identities.identityCount} identities, ${counts.managedAccountsFound} managed account(s)`
@@ -248,6 +224,14 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Ph
     }
 
     await fusion.initializeManagedAccountProcessing()
+
+    log.stepStart('orphan-identity-hydration')
+    const hydrationResult = await hydrateCorrelatedManagedAccountIdentities({
+        managedAccounts: sources.run.managedAccountsById.values(),
+        hydrateMissingIdentitiesById: (ids) => identities.hydrateMissingIdentitiesById(ids),
+    })
+    log.info(`Hydrated ${hydrationResult.hydrated} orphan correlated identity/identities`)
+    log.stepEnd('orphan-identity-hydration', { hydrated: hydrationResult.hydrated })
 
     log.stepStart('correlated-sweep')
     await fusion.processCorrelatedManagedAccounts()

@@ -138,7 +138,7 @@ describe('SdkApiAdapter', () => {
         vi.mocked(getRequestAbortSignal).mockReturnValue(controller.signal)
 
         const adapter = new SdkApiAdapter(fusionConfig, log)
-        adapter.accountsApi
+        expect(adapter.accountsApi).toBeDefined()
 
         const config = { headers: {} }
         const result = requestInterceptor()(config)
@@ -150,7 +150,7 @@ describe('SdkApiAdapter', () => {
         vi.mocked(getRequestAbortSignal).mockReturnValue(undefined)
 
         const adapter = new SdkApiAdapter(fusionConfig, log)
-        adapter.accountsApi
+        expect(adapter.accountsApi).toBeDefined()
 
         const config = { headers: {} }
         const result = requestInterceptor()(config)
@@ -158,4 +158,5 @@ describe('SdkApiAdapter', () => {
         expect(result.signal).toBeUndefined()
     })
 })
+
 

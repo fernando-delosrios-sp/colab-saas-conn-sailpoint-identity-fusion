@@ -2,10 +2,19 @@ import { QueuedItemInfo, QueueStats } from '../clientService/types'
 import { LogService, PhaseTimer } from './logService'
 import { EventCounters, OperationRunContext } from './operationRunContext'
 
+type FusionPendingSnapshot = {
+    disableOps: number
+    formCandidates: number
+    reviewUrls: number
+    deferredCandidates: number
+}
+
 export type HeartbeatSnapshot = {
     runContext: OperationRunContext
     queueStats?: QueueStats
     activeItems?: QueuedItemInfo[]
+    pendingItems?: QueuedItemInfo[]
+    fusionPending?: FusionPendingSnapshot
     memory?: NodeJS.MemoryUsage
     intervalMs: number
 }
@@ -29,7 +38,7 @@ export function formatStatusLine(
     previousProcessed: number | undefined,
     intervalMs: number
 ): string {
-    const { runContext, queueStats, memory } = snapshot
+    const { runContext, queueStats, memory, pendingItems, fusionPending } = snapshot
     const parts: string[] = ['STATUS']
 
     if (runContext.phase) parts.push(`phase=${runContext.phase}`)
@@ -49,7 +58,13 @@ export function formatStatusLine(
         parts.push(
             `queue active=${queueStats.activeRequests} queued=${queueStats.queueLength} processed=${queueStats.totalProcessed}${deltaSuffix}`
         )
+        if (queueStats.queueLength > 0 && pendingItems && pendingItems.length > 0) {
+            parts.push(`queue-pending=${groupActiveLabels(pendingItems)}`)
+        }
     }
+
+    const workPending = formatFusionPending(fusionPending)
+    if (workPending) parts.push(workPending)
 
     if (memory) {
         parts.push(
@@ -104,11 +119,25 @@ export function groupActiveLabels(activeItems: QueuedItemInfo[] | undefined, lim
         .join(', ')
 }
 
+function formatFusionPending(pending: FusionPendingSnapshot | undefined): string {
+    if (!pending) return ''
+    const parts: string[] = []
+    if (pending.disableOps > 0) parts.push(`disable=${pending.disableOps}`)
+    if (pending.formCandidates > 0) parts.push(`candidates=${pending.formCandidates}`)
+    if (pending.reviewUrls > 0) parts.push(`reviews=${pending.reviewUrls}`)
+    if (pending.deferredCandidates > 0) parts.push(`deferred=${pending.deferredCandidates}`)
+    if (parts.length === 0) return ''
+    return `work-pending ${parts.join(' ')}`
+}
+
 export function formatStallWarning(
     unchangedMs: number,
-    activeItems: QueuedItemInfo[] | undefined
+    activeItems: QueuedItemInfo[] | undefined,
+    pendingItems?: QueuedItemInfo[]
 ): string {
-    return `WARN STALL queue processed unchanged ${Math.round(unchangedMs / 1000)}s | active=${groupActiveLabels(activeItems)}`
+    const pendingSuffix =
+        pendingItems && pendingItems.length > 0 ? ` | pending=${groupActiveLabels(pendingItems)}` : ''
+    return `WARN STALL queue processed unchanged ${Math.round(unchangedMs / 1000)}s | active=${groupActiveLabels(activeItems)}${pendingSuffix}`
 }
 
 export class OperationHeartbeat {
@@ -137,7 +166,7 @@ export class OperationHeartbeat {
 
     tick(): void {
         const snapshot = this.getSnapshot()
-        const { runContext, queueStats, activeItems } = snapshot
+        const { runContext, queueStats, activeItems, pendingItems } = snapshot
 
         const statusLine = formatStatusLine(snapshot, this.previousProcessed, snapshot.intervalMs)
         const stallDetected =
@@ -158,7 +187,7 @@ export class OperationHeartbeat {
             this.log.info(`${statusLine}${statusSuffix}`)
             if (this.zeroDeltaTicks === 2) {
                 this.log.warn(
-                    formatStallWarning(snapshot.intervalMs * this.zeroDeltaTicks, activeItems)
+                    formatStallWarning(snapshot.intervalMs * this.zeroDeltaTicks, activeItems, pendingItems)
                 )
             }
         } else {
@@ -177,4 +206,5 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 

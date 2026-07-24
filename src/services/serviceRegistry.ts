@@ -233,10 +233,26 @@ export class ServiceRegistry {
     /** Snapshot for the operation heartbeat (queue, memory, run context). */
     getHeartbeatSnapshot(): HeartbeatSnapshot {
         const queueItems = this.client.getQueueItems()
+        const run = this.run
+        let reviewUrls = 0
+        for (const urls of run.pendingReviewUrlsByReviewerId.values()) {
+            reviewUrls += urls.length
+        }
+        for (const urls of run.pendingReviewUrlsByCandidateId.values()) {
+            reviewUrls += urls.length
+        }
+
         return {
             runContext: this.runContext,
             queueStats: this.client.getQueueStats(),
             activeItems: queueItems.active,
+            pendingItems: queueItems.pending,
+            fusionPending: {
+                disableOps: run.pendingDisableOperationsCount,
+                formCandidates: run.pendingCandidateIdentityIds.size,
+                reviewUrls,
+                deferredCandidates: run.deferredCandidateCount,
+            },
             memory: process.memoryUsage(),
             intervalMs: this.config.statsLoggingIntervalMs,
         }
@@ -252,6 +268,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

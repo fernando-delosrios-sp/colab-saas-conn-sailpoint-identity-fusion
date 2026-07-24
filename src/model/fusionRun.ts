@@ -125,6 +125,10 @@ export class FusionRun {
         return this._pendingDisableOperations.size
     }
 
+    get deferredCandidateCount(): number {
+        return this._candidateRegistry.count()
+    }
+
     get autoAssignedIdentityIds(): ReadonlySet<string> {
         return this._autoAssignedIdentityIds
     }

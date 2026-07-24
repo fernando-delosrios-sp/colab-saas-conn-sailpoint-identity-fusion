@@ -40,6 +40,15 @@ export class CandidateRegistry {
         this.candidatesBySource.clear()
     }
 
+    /** Total deferred-match candidates registered for the current sweep. */
+    count(): number {
+        let total = 0
+        for (const keys of this.candidatesBySource.values()) {
+            total += keys.size
+        }
+        return total
+    }
+
     private sourceKey(sourceName: string | null | undefined): string {
         return sourceName ?? ''
     }
@@ -54,3 +63,4 @@ export class CandidateRegistry {
         return coerceBoolean(info.config.deferredMatching) ?? true
     }
 }
+

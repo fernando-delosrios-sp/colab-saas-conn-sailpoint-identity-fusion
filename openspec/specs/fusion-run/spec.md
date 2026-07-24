@@ -301,30 +301,44 @@ FusionRun SHALL be the single source of truth for source inventory maps such as 
 
 ### Requirement: Correlated identities are hydrated before the managed-account sweep
 
-The connector SHALL ensure that the identity correlated to each fetched managed source account is present in the run-scoped identity cache before any Fusion account derived from that managed account is serialized.
+The connector SHALL hydrate identities correlated to **orphan correlated managed accounts** — managed source accounts that are correlated on the source (`uncorrelated === false`) and remain on the work queue after the refresh phase because they are not linked to any account key on a loaded Fusion row — before the correlated account sweep creates Fusion accounts from them. Hydration SHALL occur only for identities not already present in the run-scoped identity cache after the configured `identityScopeQuery` fetch. The connector SHALL NOT perform this hydration pass for managed accounts already linked to an existing Fusion row or for uncorrelated managed accounts.
 
-#### Scenario: Managed account correlated to an identity outside the configured scope
-- **WHEN** a managed source account fetched during aggregation has a non-empty `identityId`
-- **AND** the identity is not in the run-scoped identity cache after the configured `identityScopeQuery` fetch
-- **THEN** the connector SHALL hydrate the identity by id
-- **AND** it SHALL apply the identity layer to the corresponding Fusion account before `getISCAccount` serializes it
+For each orphan correlated managed account whose identity is hydrated, the connector SHALL apply the identity layer to the **new** Fusion account created from that managed account during the correlated account sweep, before `getISCAccount` serializes it, so the Fusion display-attribute override can consume the identity alias.
 
-#### Scenario: Multiple managed accounts correlated to the same identity
-- **WHEN** two or more fetched managed accounts share the same `identityId`
+#### Scenario: Orphan correlated managed account with identity outside configured scope
+
+- **WHEN** a managed source account is correlated on the source (`uncorrelated === false`)
+- **AND** the account is not linked to any account key on a loaded Fusion row after refresh
+- **AND** the account remains on the work queue with a non-empty `identityId`
+- **AND** the correlated identity is not in the run-scoped identity cache after the configured `identityScopeQuery` fetch
+- **THEN** the connector SHALL hydrate the identity by id before the correlated account sweep
+- **AND** it SHALL apply the identity layer to the new Fusion account created from that managed account before `getISCAccount` serializes it
+
+#### Scenario: Correlated managed account already linked to a Fusion row
+
+- **WHEN** a managed source account is correlated on the source
+- **AND** the account is linked to an account key on a loaded Fusion row during refresh
+- **THEN** the connector SHALL NOT include that account's `identityId` in the orphan hydration pass
+
+#### Scenario: Multiple orphan correlated accounts share the same identity
+
+- **WHEN** two or more orphan correlated managed accounts on the work queue share the same `identityId`
 - **THEN** the connector SHALL hydrate the identity once
-- **AND** it SHALL apply the identity layer to each affected Fusion account
+- **AND** it SHALL apply the identity layer to each new Fusion account created from those managed accounts during the correlated sweep
 
 #### Scenario: Correlated identity is protected
-- **WHEN** a hydrated identity is flagged as `protected`
-- **THEN** the connector SHALL NOT apply the identity layer to the corresponding Fusion account
 
-#### Scenario: No managed account has a correlated identity
-- **WHEN** no fetched managed account has a non-empty `identityId`
-- **THEN** the connector SHALL NOT perform any additional identity hydration
-- **AND** it SHALL NOT add the identity layer to any Fusion account
+- **WHEN** a hydrated identity is flagged as `protected`
+- **THEN** the connector SHALL NOT apply the identity layer to the corresponding new Fusion account
+
+#### Scenario: No orphan correlated managed accounts on the work queue
+
+- **WHEN** no work-queue managed account is correlated on the source and unlinked from loaded Fusion rows
+- **THEN** the connector SHALL NOT perform any additional identity hydration for the correlated orphan pass
 
 #### Scenario: Hydration query length is bounded
-- **WHEN** the connector hydrates correlated identities
+
+- **WHEN** the connector hydrates orphan correlated identities
 - **THEN** it SHALL split the identity-id set into chunks of no more than 50 ids per query
 - **AND** it SHALL execute the chunked queries in parallel with per-chunk error isolation
 

@@ -343,6 +343,13 @@ export class MatchOutcomeDispatcher {
                     `Correlated managed account not linked to Fusion; treating as non-match: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
                 )
                 const fusionAccount = await accountAssembly.assembleManagedAccount(account)
+                const orphanIdentityId = account.identityId
+                if (orphanIdentityId) {
+                    const identity = run.getIdentity(orphanIdentityId)
+                    if (identity && !identity.protected) {
+                        fusionAccount.addIdentityLayer(identity)
+                    }
+                }
                 run.claimAccount(managedAccountKey!, account.identityId)
                 const nonMatchAccount = await this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
                 processedCount++
@@ -605,6 +612,7 @@ function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 
             return 'nonMatch'
     }
 }
+
 
 
 

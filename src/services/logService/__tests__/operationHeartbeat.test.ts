@@ -40,6 +40,65 @@ describe('operation heartbeat formatters', () => {
         vi.useRealTimers()
     })
 
+    it('formats STATUS with queue-pending labels and work-pending counts', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Process'
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                queueStats: {
+                    activeRequests: 10,
+                    queueLength: 97,
+                    totalProcessed: 537,
+                    totalFailed: 0,
+                    totalRetries: 0,
+                    averageWaitTime: 894,
+                    averageProcessingTime: 4733,
+                },
+                pendingItems: [
+                    { id: '1', priority: 1, label: 'IdentityService>correlate', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
+                    { id: '2', priority: 1, label: 'IdentityService>correlate', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
+                    { id: '3', priority: 1, label: 'MatchingService>score', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
+                ] as any,
+                fusionPending: {
+                    disableOps: 2,
+                    formCandidates: 12,
+                    reviewUrls: 5,
+                    deferredCandidates: 45,
+                },
+                intervalMs: 30_000,
+            },
+            undefined,
+            30_000
+        )
+
+        expect(line).toContain('queue-pending=IdentityService>correlate×2, MatchingService>score×1')
+        expect(line).toContain('work-pending disable=2 candidates=12 reviews=5 deferred=45')
+        vi.useRealTimers()
+    })
+
+    it('omits work-pending when all fusion counts are zero', () => {
+        const runContext = new OperationRunContext()
+        const line = formatStatusLine(
+            {
+                runContext,
+                fusionPending: {
+                    disableOps: 0,
+                    formCandidates: 0,
+                    reviewUrls: 0,
+                    deferredCandidates: 0,
+                },
+                intervalMs: 30_000,
+            },
+            undefined,
+            30_000
+        )
+        expect(line).not.toContain('work-pending')
+    })
+
     it('formats EVENT_SUMMARY lines for matches and correlations', () => {
         const lines = formatEventSummaryLines({
             matchExact: 2,
@@ -67,8 +126,13 @@ describe('operation heartbeat formatters', () => {
         expect(grouped).toContain('MatchingService>score×1')
     })
 
-    it('formats stall warning with elapsed seconds', () => {
+    it('formats stall warning with active and pending queue labels', () => {
         expect(formatStallWarning(60_000, [])).toBe('WARN STALL queue processed unchanged 60s | active=none')
+        expect(
+            formatStallWarning(60_000, [], [
+                { id: '1', priority: 1, label: 'FormService>create', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
+            ] as any)
+        ).toBe('WARN STALL queue processed unchanged 60s | active=none | pending=FormService>create×1')
     })
 })
 
@@ -77,3 +141,4 @@ describe('PhaseTimer in STATUS elapsed', () => {
         expect(PhaseTimer.formatElapsed(1500)).toBe('1.5S')
     })
 })
+
