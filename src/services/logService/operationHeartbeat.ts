@@ -19,6 +19,11 @@ export type HeartbeatSnapshot = {
     intervalMs: number
 }
 
+export type StatusLineBaselines = {
+    previousProcessed?: number
+    previousProgressDone?: number
+}
+
 function formatMb(bytes: number): string {
     return (bytes / 1024 / 1024).toFixed(2)
 }
@@ -33,30 +38,53 @@ function formatDetailSuffix(detail?: Record<string, unknown>): string {
     )
 }
 
+export function formatDeltaSuffix(
+    current: number,
+    previous: number | undefined,
+    intervalMs: number
+): string {
+    if (previous === undefined) return ''
+    const delta = current - previous
+    return `(Δ${delta >= 0 ? '+' : ''}${delta}/${Math.round(intervalMs / 1000)}s)`
+}
+
+function formatProgressSegment(
+    done: number,
+    total: number,
+    unit: string | undefined,
+    previousDone: number | undefined,
+    intervalMs: number
+): string {
+    const fraction = `${done}/${total}`
+    const deltaSuffix = formatDeltaSuffix(done, previousDone, intervalMs)
+    if (unit) {
+        return `progress=${fraction} ${unit}${deltaSuffix}`
+    }
+    return `progress=${fraction}${deltaSuffix}`
+}
+
 export function formatStatusLine(
     snapshot: HeartbeatSnapshot,
-    previousProcessed: number | undefined,
+    baselines: StatusLineBaselines,
     intervalMs: number
 ): string {
     const { runContext, queueStats, memory, pendingItems, fusionPending } = snapshot
+    const { previousProcessed, previousProgressDone } = baselines
     const parts: string[] = ['STATUS']
 
     if (runContext.phase) parts.push(`phase=${runContext.phase}`)
     if (runContext.step) parts.push(`step=${runContext.step}`)
     if (runContext.progress) {
-        const { done, total } = runContext.progress
-        parts.push(`progress=${done}/${total}`)
+        const { done, total, unit } = runContext.progress
+        parts.push(formatProgressSegment(done, total, unit, previousProgressDone, intervalMs))
     }
 
     parts.push(`elapsed=${PhaseTimer.formatElapsed(Date.now() - runContext.operationStartedAt)}`)
 
     if (queueStats) {
-        const delta =
-            previousProcessed === undefined ? undefined : queueStats.totalProcessed - previousProcessed
-        const deltaSuffix =
-            delta === undefined ? '' : `(Δ${delta >= 0 ? '+' : ''}${delta}/${Math.round(intervalMs / 1000)}s)`
+        const deltaSuffix = formatDeltaSuffix(queueStats.totalProcessed, previousProcessed, intervalMs)
         parts.push(
-            `queue active=${queueStats.activeRequests} queued=${queueStats.queueLength} processed=${queueStats.totalProcessed}${deltaSuffix}`
+            `api-queue active=${queueStats.activeRequests} queued=${queueStats.queueLength} completed=${queueStats.totalProcessed}${deltaSuffix}`
         )
         if (queueStats.queueLength > 0 && pendingItems && pendingItems.length > 0) {
             parts.push(`queue-pending=${groupActiveLabels(pendingItems)}`)
@@ -137,12 +165,13 @@ export function formatStallWarning(
 ): string {
     const pendingSuffix =
         pendingItems && pendingItems.length > 0 ? ` | pending=${groupActiveLabels(pendingItems)}` : ''
-    return `WARN STALL queue processed unchanged ${Math.round(unchangedMs / 1000)}s | active=${groupActiveLabels(activeItems)}${pendingSuffix}`
+    return `WARN STALL api-queue completed unchanged ${Math.round(unchangedMs / 1000)}s | active=${groupActiveLabels(activeItems)}${pendingSuffix}`
 }
 
 export class OperationHeartbeat {
     private interval?: ReturnType<typeof setInterval>
     private previousProcessed?: number
+    private previousProgressDone?: number
     private zeroDeltaTicks = 0
 
     constructor(
@@ -161,6 +190,7 @@ export class OperationHeartbeat {
         clearInterval(this.interval)
         this.interval = undefined
         this.previousProcessed = undefined
+        this.previousProgressDone = undefined
         this.zeroDeltaTicks = 0
     }
 
@@ -168,7 +198,14 @@ export class OperationHeartbeat {
         const snapshot = this.getSnapshot()
         const { runContext, queueStats, activeItems, pendingItems } = snapshot
 
-        const statusLine = formatStatusLine(snapshot, this.previousProcessed, snapshot.intervalMs)
+        const statusLine = formatStatusLine(
+            snapshot,
+            {
+                previousProcessed: this.previousProcessed,
+                previousProgressDone: this.previousProgressDone,
+            },
+            snapshot.intervalMs
+        )
         const stallDetected =
             queueStats !== undefined &&
             (queueStats.activeRequests > 0 || queueStats.queueLength > 0) &&
@@ -199,6 +236,9 @@ export class OperationHeartbeat {
             this.log.info(line)
         }
 
+        if (runContext.progress) {
+            this.previousProgressDone = runContext.progress.done
+        }
         if (queueStats) {
             this.previousProcessed = queueStats.totalProcessed
         }
@@ -206,5 +246,3 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
-
-

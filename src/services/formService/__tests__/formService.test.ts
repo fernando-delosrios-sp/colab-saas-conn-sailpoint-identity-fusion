@@ -1,5 +1,31 @@
 import { FormService } from '../formService'
 
+/** Minimal client.call mock that supports sequential pagination used by form instance fetch. */
+function createFormClientCallMock(customFormsMock: Record<string, unknown>) {
+    return async (fn: (api: { customForms: typeof customFormsMock }, params?: unknown) => Promise<unknown>, policy?: {
+        paginate?: { mode: string; baseParams?: Record<string, unknown> }
+        onPageProgress?: (loaded: number, total?: number) => void
+    }) => {
+        const api = { customForms: customFormsMock }
+        if (policy?.paginate?.mode === 'sequential') {
+            const params = { ...(policy.paginate.baseParams ?? {}), limit: 250, offset: 0 }
+            const page = (await fn(api, params)) as { data?: unknown[] }
+            const items = page?.data ?? []
+            policy.onPageProgress?.(items.length)
+            return items
+        }
+        const result = await fn(api)
+        if (result && typeof result === 'object' && 'data' in result) {
+            const data = (result as { data: unknown }).data
+            if (Array.isArray(data)) return data
+            if (data && typeof data === 'object' && 'results' in data) {
+                return (data as { results: unknown[] }).results
+            }
+        }
+        return result
+    }
+}
+
 describe('FormService fetchFormInstancesByDefinitionId', () => {
     it('filters out instances with mismatched formDefinitionId', async () => {
         const warn = vi.fn()
@@ -19,7 +45,7 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
             { warn, debug } as any,
             {
                 customFormsApi: customFormsMock,
-                call: async (fn: (api: any) => Promise<any>) => fn({ customForms: customFormsMock }),
+                call: createFormClientCallMock(customFormsMock),
             } as any,
             {} as any
         )
@@ -49,7 +75,7 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
             { warn, debug: vi.fn() } as any,
             {
                 customFormsApi: customFormsMock,
-                call: async (fn: (api: any) => Promise<any>) => fn({ customForms: customFormsMock }),
+                call: createFormClientCallMock(customFormsMock),
             } as any,
             {} as any
         )
@@ -57,6 +83,32 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
         await service.fetchFormInstancesByDefinitionId('fd-1')
 
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('returned 250 instance(s) for formDefinitionId=fd-1'))
+    })
+
+    it('reports instance fetch progress via onInstancesLoaded callback', async () => {
+        const customFormsMock = {
+            searchFormInstancesByTenant: vi.fn().mockResolvedValue({
+                data: [
+                    { id: '1', formDefinitionId: 'fd-1' },
+                    { id: '2', formDefinitionId: 'fd-1' },
+                ],
+            }),
+        }
+
+        const service = new FormService(
+            {} as any,
+            { warn: vi.fn(), debug: vi.fn() } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+            } as any,
+            {} as any
+        )
+
+        const deltas: number[] = []
+        await service.fetchFormInstancesByDefinitionId('fd-1', (delta) => deltas.push(delta))
+
+        expect(deltas).toEqual([2])
     })
 })
 
@@ -83,21 +135,16 @@ describe('FormService stale-form cleanup queue', () => {
             deleteFormDefinition,
         }
 
+        const setProgress = vi.fn()
         const service = new FormService(
             {
                 fusionFormNamePattern: 'Fusion',
                 fusionFormExpirationDays: 7,
             } as any,
-            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn(), setProgress } as any,
             {
                 customFormsApi: customFormsMock,
-                call: async (fn: (api: any, ...args: any[]) => Promise<any>) => {
-                    const result = await fn({ customForms: customFormsMock })
-                    if (result && typeof result === 'object' && 'data' in result && Array.isArray(result.data)) {
-                        return result.data
-                    }
-                    return result
-                },
+                call: createFormClientCallMock(customFormsMock),
                 execute: async (fn: () => Promise<any>) => fn(),
             } as any,
             {} as any
@@ -108,9 +155,10 @@ describe('FormService stale-form cleanup queue', () => {
         await service.awaitPendingDeleteOperations()
 
         expect(searchFormInstancesByTenant).toHaveBeenCalledTimes(1)
-        expect(searchFormInstancesByTenant).toHaveBeenCalledWith({
-            filters: 'formDefinitionId eq "form-fresh"',
-        })
+        expect(searchFormInstancesByTenant).toHaveBeenCalledWith(
+            expect.objectContaining({ filters: 'formDefinitionId eq "form-fresh"' })
+        )
+        expect(setProgress).not.toHaveBeenCalled()
         expect(deleteFormDefinition).toHaveBeenCalledTimes(1)
         expect(deleteFormDefinition).toHaveBeenCalledWith({ formDefinitionID: 'form-stale' })
     })
@@ -137,7 +185,7 @@ describe('FormService stale-form cleanup queue', () => {
             { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
             {
                 customFormsApi: customFormsMock,
-                call: async (fn: (api: any) => Promise<any>) => fn({ customForms: customFormsMock }),
+                call: createFormClientCallMock(customFormsMock),
             } as any,
             {} as any
         )
@@ -232,3 +280,4 @@ describe('FormService managed work queue synchronization', () => {
         expect(managedAccountsByIdentityId.has(identityId)).toBe(false)
     })
 })
+

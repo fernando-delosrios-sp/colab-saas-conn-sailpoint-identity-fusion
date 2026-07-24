@@ -115,7 +115,13 @@ export class IdentityService {
             await wrapConnectorError(async () => {
                 const identities = await this.client.call<IdentityDocument>(
                     (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
-                    { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentities searchPost' }
+                    {
+                        paginate: { mode: 'searchAfter', search: query as any },
+                        priority: QueuePriority.HIGH,
+                        context: 'IdentityService>fetchIdentities searchPost',
+                        onPageProgress: (loaded, total) =>
+                            this.log.setProgress(loaded, total ?? loaded, 'fetched'),
+                    }
                 )
                 this.run.clearIdentities()
                 for (const identity of identities) {

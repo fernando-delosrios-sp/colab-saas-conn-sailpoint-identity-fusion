@@ -1,6 +1,7 @@
 import { OperationRunContext } from '../operationRunContext'
 import {
     OperationHeartbeat,
+    formatDeltaSuffix,
     formatEventSummaryLines,
     formatStatusLine,
     formatStallWarning,
@@ -9,7 +10,16 @@ import {
 import { LogService, PhaseTimer } from '../logService'
 
 describe('operation heartbeat formatters', () => {
-    it('formats STATUS with phase, step, progress, queue delta, and memory', () => {
+    it('formatDeltaSuffix omits suffix on first tick', () => {
+        expect(formatDeltaSuffix(100, undefined, 10_000)).toBe('')
+    })
+
+    it('formatDeltaSuffix formats zero and positive deltas', () => {
+        expect(formatDeltaSuffix(537, 537, 30_000)).toBe('(Δ+0/30s)')
+        expect(formatDeltaSuffix(10296, 7596, 10_000)).toBe('(Δ+2700/10s)')
+    })
+
+    it('formats STATUS with phase, step, progress delta, api-queue delta, and memory', () => {
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const runContext = new OperationRunContext()
@@ -33,17 +43,45 @@ describe('operation heartbeat formatters', () => {
                 memory: { rss: 505413632, heapUsed: 503316480, heapTotal: 523239424 } as NodeJS.MemoryUsage,
                 intervalMs: 30_000,
             },
-            537,
+            { previousProcessed: 537, previousProgressDone: 450 },
             30_000
         )
 
         expect(line).toContain('STATUS')
         expect(line).toContain('phase=Process')
         expect(line).toContain('step=uncorrelated-sweep')
-        expect(line).toContain('progress=537/800')
-        expect(line).toContain('processed=537(Δ+0/30s)')
+        expect(line).toContain('progress=537/800 analyzed(Δ+87/30s)')
+        expect(line).toContain('api-queue active=10 queued=97 completed=537(Δ+0/30s)')
         expect(line).toContain('mem rss=')
         vi.useRealTimers()
+    })
+
+    it('omits progress and api-queue deltas on first STATUS tick', () => {
+        const runContext = new OperationRunContext()
+        runContext.progress = { done: 250, total: 1000, unit: 'fetched' }
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                queueStats: {
+                    activeRequests: 2,
+                    queueLength: 0,
+                    totalProcessed: 12,
+                    totalFailed: 0,
+                    totalRetries: 0,
+                    averageWaitTime: 0,
+                    averageProcessingTime: 0,
+                },
+                intervalMs: 10_000,
+            },
+            {},
+            10_000
+        )
+
+        expect(line).toContain('progress=250/1000 fetched')
+        expect(line).not.toContain('progress=250/1000 fetched(Δ')
+        expect(line).toContain('completed=12')
+        expect(line).not.toContain('completed=12(Δ')
     })
 
     it('formats STATUS with queue-pending labels and work-pending counts', () => {
@@ -77,7 +115,7 @@ describe('operation heartbeat formatters', () => {
                 },
                 intervalMs: 30_000,
             },
-            undefined,
+            {},
             30_000
         )
 
@@ -99,7 +137,7 @@ describe('operation heartbeat formatters', () => {
                 },
                 intervalMs: 30_000,
             },
-            undefined,
+            {},
             30_000
         )
         expect(line).not.toContain('work-pending')
@@ -133,12 +171,12 @@ describe('operation heartbeat formatters', () => {
     })
 
     it('formats stall warning with active and pending queue labels', () => {
-        expect(formatStallWarning(60_000, [])).toBe('WARN STALL queue processed unchanged 60s | active=none')
+        expect(formatStallWarning(60_000, [])).toBe('WARN STALL api-queue completed unchanged 60s | active=none')
         expect(
             formatStallWarning(60_000, [], [
                 { id: '1', priority: 1, label: 'FormService>create', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
             ] as any)
-        ).toBe('WARN STALL queue processed unchanged 60s | active=none | pending=FormService>create×1')
+        ).toBe('WARN STALL api-queue completed unchanged 60s | active=none | pending=FormService>create×1')
     })
 })
 
@@ -172,5 +210,107 @@ describe('OperationHeartbeat timing', () => {
         heartbeat.stop()
         vi.useRealTimers()
     })
-})
 
+    it('does not emit WARN STALL when pipeline progress advances but api-queue is idle', () => {
+        vi.useFakeTimers()
+        const info = vi.fn()
+        const warn = vi.fn()
+        const log = { info, warn } as unknown as LogService
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Refresh'
+        runContext.progress = { done: 7596, total: 18495, unit: 'processed' }
+
+        const heartbeat = new OperationHeartbeat(log, () => ({
+            runContext,
+            queueStats: {
+                activeRequests: 0,
+                queueLength: 0,
+                totalProcessed: 635,
+                totalFailed: 0,
+                totalRetries: 0,
+                averageWaitTime: 0,
+                averageProcessingTime: 0,
+            },
+            intervalMs: 10_000,
+        }))
+
+        heartbeat.start()
+        vi.advanceTimersByTime(10_000)
+        runContext.progress = { done: 10296, total: 18495, unit: 'processed' }
+        vi.advanceTimersByTime(10_000)
+        runContext.progress = { done: 13008, total: 18495, unit: 'processed' }
+        vi.advanceTimersByTime(10_000)
+
+        expect(warn).not.toHaveBeenCalled()
+        expect(info.mock.calls[2][0]).toContain('progress=13008/18495 processed(Δ+2712/10s)')
+        expect(info.mock.calls[2][0]).toContain('completed=635(Δ+0/10s)')
+
+        heartbeat.stop()
+        vi.useRealTimers()
+    })
+
+    it('formats Fetch phase STATUS with fetched progress delta', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Fetch'
+        runContext.progress = { done: 1200, total: 5000, unit: 'fetched' }
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                queueStats: {
+                    activeRequests: 4,
+                    queueLength: 12,
+                    totalProcessed: 80,
+                    totalFailed: 0,
+                    totalRetries: 0,
+                    averageWaitTime: 0,
+                    averageProcessingTime: 0,
+                },
+                intervalMs: 10_000,
+            },
+            { previousProgressDone: 800, previousProcessed: 50 },
+            10_000
+        )
+
+        expect(line).toContain('phase=Fetch')
+        expect(line).toContain('progress=1200/5000 fetched(Δ+400/10s)')
+        expect(line).toContain('completed=80(Δ+30/10s)')
+    })
+
+    it('shows independent non-zero pipeline and api-queue deltas during Fetch', () => {
+        vi.useFakeTimers()
+        const info = vi.fn()
+        const log = { info } as unknown as LogService
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Fetch'
+        runContext.progress = { done: 500, total: 2000, unit: 'fetched' }
+
+        let queueProcessed = 10
+        const heartbeat = new OperationHeartbeat(log, () => ({
+            runContext,
+            queueStats: {
+                activeRequests: 2,
+                queueLength: 3,
+                totalProcessed: queueProcessed,
+                totalFailed: 0,
+                totalRetries: 0,
+                averageWaitTime: 0,
+                averageProcessingTime: 0,
+            },
+            intervalMs: 10_000,
+        }))
+
+        heartbeat.start()
+        vi.advanceTimersByTime(10_000)
+
+        runContext.progress = { done: 900, total: 2000, unit: 'fetched' }
+        queueProcessed = 25
+        vi.advanceTimersByTime(10_000)
+
+        expect(info.mock.calls[1][0]).toContain('progress=900/2000 fetched(Δ+400/10s)')
+        expect(info.mock.calls[1][0]).toContain('completed=25(Δ+15/10s)')
+
+        heartbeat.stop()
+        vi.useRealTimers()
+    })
+})

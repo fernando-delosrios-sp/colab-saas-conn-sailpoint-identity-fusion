@@ -72,6 +72,8 @@ export interface CallPolicy {
     throwOnError?: boolean
     noRetry?: boolean
     abortSignal?: AbortSignal
+    /** Called as paginated loads advance; `loaded` is cumulative items for this pagination stream. */
+    onPageProgress?: (loaded: number, total?: number) => void
 }
 
 interface OffsetPaginate {
@@ -96,4 +98,5 @@ export class PaginationError extends Error {
         this.name = 'PaginationError'
     }
 }
+
 

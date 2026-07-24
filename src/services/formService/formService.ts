@@ -129,9 +129,16 @@ export class FormService {
 
         // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
         // to prevent API rate limiting issues when iterating over a large number of forms
+        let instancesFetched = 0
+        const reportInstanceFetchProgress = (delta: number) => {
+            if (delta <= 0) return
+            instancesFetched += delta
+            this.log.setProgress(instancesFetched, instancesFetched, 'fetched')
+        }
+
         this._fetchedFormInstances = await promiseAllBatched(activeForms, async (form) => {
             this.log.debug(`Fetching instances for form definition: ${form.id} (${form.name || 'unknown'})`)
-            const instances = await this.fetchFormInstancesByDefinitionId(form.id)
+            const instances = await this.fetchFormInstancesByDefinitionId(form.id, reportInstanceFetchProgress)
             this.log.debug(`Fetched ${instances.length} instance(s) for form definition: ${form.id}`)
             return instances
         })
@@ -671,19 +678,36 @@ export class FormService {
     /**
      * Fetch form instances by definition ID
      */
-    public async fetchFormInstancesByDefinitionId(formDefinitionId?: string): Promise<FormInstanceResponseV2025[]> {
+    public async fetchFormInstancesByDefinitionId(
+        formDefinitionId?: string,
+        onInstancesLoaded?: (delta: number) => void
+    ): Promise<FormInstanceResponseV2025[]> {
+        if (!formDefinitionId) {
+            const allInstances = await this.client.call<FormInstanceResponseV2025[]>(
+                (api: any) => api.customForms.searchFormInstancesByTenant({}).then((r: any) => r.data ?? []),
+                { context: 'FormService>searchFormInstancesByTenant formDef=all' }
+            )
+            return allInstances ?? []
+        }
+
         const requestParameters: CustomFormsV2025ApiSearchFormInstancesByTenantRequest = {
             filters: `formDefinitionId eq "${formDefinitionId}"`,
         }
-        const allInstances = await this.client.call<FormInstanceResponseV2025[]>(
-            (api: any) => api.customForms.searchFormInstancesByTenant(requestParameters).then((r: any) => r.data ?? []),
-            { context: `FormService>searchFormInstancesByTenant formDef=${formDefinitionId ?? 'all'}` }
-        )
-        if (!allInstances) return []
-
-        if (!formDefinitionId) {
-            return allInstances
-        }
+        let lastLoaded = 0
+        const allInstances =
+            (await this.client.call<FormInstanceResponseV2025>(
+                (api: any, params: any) =>
+                    api.customForms.searchFormInstancesByTenant(params).then((r: any) => ({ data: r.data ?? [] })),
+                {
+                    paginate: { mode: 'sequential', baseParams: requestParameters as any },
+                    context: `FormService>searchFormInstancesByTenant formDef=${formDefinitionId}`,
+                    onPageProgress: (loaded) => {
+                        const delta = loaded - lastLoaded
+                        lastLoaded = loaded
+                        if (delta > 0) onInstancesLoaded?.(delta)
+                    },
+                }
+            )) ?? []
 
         const matchingInstances = allInstances.filter((instance) => instance.formDefinitionId === formDefinitionId)
         const mismatchedCount = allInstances.length - matchingInstances.length
