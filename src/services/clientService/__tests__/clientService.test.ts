@@ -318,9 +318,13 @@ describe('ClientService', () => {
             }),
         } as any
 
+        const progressCalls: Array<{ loaded: number; total?: number }> = []
         const gen = client.call(
             (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { paginate: { mode: 'parallel', baseParams: {} } }
+            {
+                paginate: { mode: 'parallel', baseParams: {} },
+                onPageProgress: (loaded, total) => progressCalls.push({ loaded, total }),
+            }
         )
 
         const collected: any[][] = []
@@ -329,6 +333,10 @@ describe('ClientService', () => {
         }
 
         expect(collected).toEqual([[{ id: 'a' }, { id: 'b' }], [{ id: 'c' }]])
+        expect(progressCalls).toEqual([
+            { loaded: 2, total: 3 },
+            { loaded: 3, total: 3 },
+        ])
     })
 
     it('throws PaginationError on parallel pagination failure', async () => {
@@ -367,4 +375,5 @@ describe('ClientService', () => {
         expect(mockQueue.stop).toHaveBeenCalled()
     })
 })
+
 

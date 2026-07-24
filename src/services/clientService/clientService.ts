@@ -198,6 +198,8 @@ export class ClientService {
         all.push(...p1)
 
         const effL = ol ?? (hel ? bl : undefined)
+        const reportProgress = () => policy.onPageProgress?.(all.length, effL)
+        reportProgress()
         if (p1.length < il || (effL != null && all.length >= effL)) {
             return effL != null && all.length > effL ? all.slice(0, effL) : all
         }
@@ -212,10 +214,12 @@ export class ClientService {
             const pd = rp.data || []
             if (!pd.length) break
             all.push(...pd)
+            reportProgress()
             if (pd.length < rq) break
             offset += rq
         }
         if (effL != null && all.length > effL) all.splice(effL)
+        reportProgress()
         return all
     }
 
@@ -235,10 +239,14 @@ export class ClientService {
         if (!r1) throw new PaginationError(`Pagination failed on initial page (${policy.context ?? 'paginate'}).`, 0)
         const i1 = r1.data || []
         yield i1
-        if (limit != null && i1.length >= limit) return
+        if (limit != null && i1.length >= limit) {
+            policy.onPageProgress?.(Math.min(i1.length, limit), limit)
+            return
+        }
         const tc = parseInt(r1.headers?.['x-total-count'] || '0', 10)
-        if (!tc || tc <= i1.length) return
         const fc = limit != null ? Math.min(tc, limit) : tc
+        policy.onPageProgress?.(i1.length, tc > 0 ? fc : undefined)
+        if (!tc || tc <= i1.length) return
         const offs: number[] = []
         for (let o = i1.length; o < fc; o += eps) offs.push(o)
         let coll = i1.length
@@ -251,6 +259,7 @@ export class ClientService {
                 if (!rs[j]) throw new PaginationError(`Pagination failed at batch offset ${bo[j]} (${policy.context ?? 'paginate'}). ${coll} item(s) collected before failure.`, coll)
                 if (rs[j]!.data?.length) { coll += rs[j]!.data.length; yield rs[j]!.data }
             }
+            policy.onPageProgress?.(coll, fc)
         }
     }
 
@@ -271,6 +280,7 @@ export class ClientService {
             if (!r) throw new PaginationError(`Search pagination failed at page ${pn} (${policy.context ?? 'search'}). ${all.length} item(s) collected before failure.`, all.length)
             const items = (r.data ?? []) as T[]
             if (items.length) all.push(...items)
+            policy.onPageProgress?.(all.length, undefined)
             if (items.length < ps) { more = false } else { const li = (items[items.length - 1] as { id?: string }).id; if (!li) { more = false } else { sa = [li] } }
             first = false; pn++
         }

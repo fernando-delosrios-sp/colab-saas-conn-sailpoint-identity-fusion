@@ -147,7 +147,7 @@ During long `accountList` aggregations, the connector emits standardized text pr
 
 | Prefix | Level | Purpose |
 | ------ | ----- | ------- |
-| `STATUS` | Info | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, progress, queue delta, memory, elapsed time |
+| `STATUS` | Info | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, `api-queue completed` delta, memory, elapsed time |
 | `EVENT_SUMMARY` | Info | Aggregated match/correlation counts since the previous heartbeat tick |
 | `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END`) |
 | `WARN STALL` | Warn | API queue stopped completing requests for two consecutive heartbeat ticks; includes active request labels |
@@ -158,7 +158,7 @@ During long `accountList` aggregations, the connector emits standardized text pr
 
 | Legacy pattern (removed) | Replace with |
 | ------------------------ | ------------ |
-| `Queue Stats:` | `STATUS` (queue stats appear inside STATUS lines) |
+| `Queue Stats:` | `STATUS` (`api-queue completed=` appears inside STATUS lines) |
 | `Memory usage` | `STATUS` (RSS/heap appear inside STATUS lines) |
 | Per-account `MATCH FOUND:` / `Triggering correlation` at Info | `EVENT_SUMMARY` (per-account detail remains at Debug) |
 
@@ -480,6 +480,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](troubleshooting.md).
+
 
 
 

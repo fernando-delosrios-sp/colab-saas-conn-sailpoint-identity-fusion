@@ -12,6 +12,7 @@ This spec is the master reference for the project's domain vocabulary. `docs/con
 #### Scenario: Code uses a term not defined in the spec
 - **WHEN** a developer introduces a new domain term in code or documentation
 - **THEN** the term SHALL be added to this spec before it is used elsewhere
+
 ### Requirement: New domain terms are added to the spec before use
 All new domain terms, states, or classifications SHALL be defined in this spec before they are used in code, configuration, or documentation.
 #### Scenario: Introducing a new account state
@@ -20,6 +21,7 @@ All new domain terms, states, or classifications SHALL be defined in this spec b
 #### Scenario: Introducing a new candidate type
 - **WHEN** a new candidate type or classification is introduced
 - **THEN** it SHALL be defined in this spec before it is used in types, APIs, or dry-run output
+
 ### Requirement: Code uses canonical terms
 Source code SHALL use the canonical terms from this spec for variable names, function names, type names, class names, file names, and comments. The retired term **AttributeService** SHALL be replaced with **MappingService** or **DefinitionService** as appropriate. The retired term **ScoringService** SHALL be replaced with **MatchingService**. The retired term **identity display name** (and the `identityDisplayName` property) SHALL be replaced with **identity name**.
 #### Scenario: Variable naming follows ubiquitous language (updated)
@@ -39,6 +41,7 @@ Source code SHALL use the canonical terms from this spec for variable names, fun
 - **THEN** the type SHALL reference `MatchingService`, not `ScoringService`
 ... [lean-ctx: omitted 1 lines]
 - **THEN** the type name SHALL use canonical terms (e.g., `MatchCandidateType.Deferred`, not `NewUnmatched`; `ManagedAccountMatchingRunner`, not `ManagedAccountPassRunner`)
+
 ### Requirement: Configuration uses canonical terms
 Connector configuration (`connector-spec.json`, settings definitions, and UI labels) SHALL use canonical terms for field names, labels, help text, and option values.
 #### Scenario: Configuration field naming
@@ -47,6 +50,7 @@ Connector configuration (`connector-spec.json`, settings definitions, and UI lab
 #### Scenario: Configuration help text
 - **WHEN** help text explains a configuration option
 - **THEN** the help text SHALL use canonical terms consistently
+
 ### Requirement: Documentation uses canonical terms
 All documentation (`docs/`, `README.md`, inline comments) SHALL use canonical terms consistently. Retired terms (such as `consolidated account`, `raw account`, `pass`, or `new-unmatched`) SHALL be replaced with their canonical successors.
 #### Scenario: Guide documentation
@@ -55,6 +59,7 @@ All documentation (`docs/`, `README.md`, inline comments) SHALL use canonical te
 #### Scenario: Operation documentation
 - **WHEN** an operation is documented
 - **THEN** the documentation SHALL use canonical terms for inputs, outputs, phases, sweeps, and behavior
+
 ### Requirement: AI agents use canonical terms
 AI agents (via `.agents/AGENTS.md` and related instructions) SHALL be instructed to use canonical terms when generating code, documentation, or configuration.
 #### Scenario: Agent generates code
@@ -63,6 +68,7 @@ AI agents (via `.agents/AGENTS.md` and related instructions) SHALL be instructed
 #### Scenario: Agent generates documentation
 - **WHEN** an AI agent generates or modifies documentation
 - **THEN** the agent SHALL use canonical terms consistently and SHALL retire outdated synonyms
+
 ### Requirement: Account taxonomy terms are used precisely
 Code, configuration, and documentation SHALL use the account taxonomy defined in this spec and SHALL distinguish between ISC accounts, managed source accounts, Fusion accounts, Fusion identities, identity-origin Fusion accounts, and provisional Fusion accounts.
 #### Scenario: Referring to an incoming source account
@@ -74,12 +80,14 @@ Code, configuration, and documentation SHALL use the account taxonomy defined in
 #### Scenario: Referring to a Fusion account seeded from an identity
 - **WHEN** describing a Fusion account created from an existing ISC identity rather than a managed source account
 - **THEN** the term "identity-origin Fusion account" SHALL be used, not "identity-based Fusion account"
+
 ### Requirement: Identity reference terms are defined precisely
 The connector SHALL distinguish between the authoritative identity alias, the human-friendly identity name, and the internal Fusion account name.
 #### Scenario: Identifying the authoritative identity alias
 - **WHEN** code needs the value used for the Fusion display attribute override or for identity lookup
 - **THEN** it SHALL use the **identity alias**, defined as the top-level `displayName` field of the `IdentityDocument` as reported by the SailPoint SDK
   - **AND** it SHALL NOT use `IdentityDocument.name` for that purpose
+
 ### Requirement: Dry-run mode is referenced as a mode, not an operation
 The term **dry-run mode** SHALL refer to the accountList operation running with `dryRun.enabled: true` on its input. The retired term `custom:dryrun` SHALL NOT be used to refer to this behavior.
 #### Scenario: Describing non-persistent analysis
@@ -89,6 +97,7 @@ The term **dry-run mode** SHALL refer to the accountList operation running with 
 #### Scenario: Naming the operation in configuration or documentation
 - **WHEN** the connector handles an accountList invocation with `{ dryRun: { enabled: true } }`
 - **THEN** the system SHALL identify this as an execution in "dry-run mode" in logs, metrics, and report data
+
 ### Requirement: The report step is the Epilogue, not a phase
 The term **Epilogue** SHALL denote the terminal block of the account-list operation that emits reports and summaries after the pipeline phases complete, regardless of whether the pipeline succeeded or failed. The report step SHALL NOT be called a phase. Code, log labels, and documentation SHALL use "Epilogue" (for example `Epilogue: report generation`) instead of "PHASE 6" or "PHASE 7". The `Report` short label in phase-timing rows SHALL be preserved unchanged.
 #### Scenario: Log labels use Epilogue terminology
@@ -101,26 +110,58 @@ The term **Epilogue** SHALL denote the terminal block of the account-list operat
 - **WHEN** the "Operations, phases, and sweeps" glossary table is consulted
 - **THEN** it SHALL contain an **Epilogue** entry defined as the always-runs terminal report block
 ... [lean-ctx: omitted 1 lines]
+
 ### Requirement: Glossary defines operation heartbeat terms
-The ubiquitous-language glossary SHALL define **Operation heartbeat**, **STATUS line**, and **EVENT_SUMMARY line** as canonical terms for periodic operation visibility logging. The **Operation heartbeat** entry SHALL state the default interval is 10 seconds (configurable via **Heartbeat interval** in Advanced Connection Settings).
+
+The ubiquitous-language glossary SHALL define **Operation heartbeat**, **STATUS line**, **Pipeline progress delta**, **API queue completed delta**, and **EVENT_SUMMARY line** as canonical terms for periodic operation visibility logging. The **Operation heartbeat** entry SHALL state the default interval is 10 seconds (configurable via **Heartbeat interval** in Advanced Connection Settings). The **STATUS line** entry SHALL explain that pipeline progress and api-queue completion are separate counters with independent deltas.
+
 #### Scenario: Glossary entry for Operation heartbeat
+
 - **GIVEN** a reader opens the ubiquitous-language glossary table
-... [lean-ctx: omitted 1 lines]
+- **WHEN** they look up periodic operation visibility
 - **THEN** it SHALL contain an **Operation heartbeat** entry describing the periodic STATUS and EVENT_SUMMARY emission during long-running operations with a default interval of 10 seconds
+
 #### Scenario: Glossary entry for STATUS line
+
 - **GIVEN** a reader opens the ubiquitous-language glossary table
-... [lean-ctx: omitted 1 lines]
-- **THEN** it SHALL contain a **STATUS line** entry describing the primary situational heartbeat text line (grep prefix `STATUS`)
+- **WHEN** they look up situational heartbeat text
+- **THEN** it SHALL contain a **STATUS line** entry describing the primary situational heartbeat text line (grep prefix `STATUS`) including pipeline `progress=` and `api-queue completed=` segments
+
+#### Scenario: Glossary entry for pipeline progress delta
+
+- **GIVEN** a reader opens the ubiquitous-language glossary table
+- **WHEN** they look up heartbeat throughput metrics
+- **THEN** it SHALL contain a **Pipeline progress delta** entry describing the change in enumerable pipeline work (`progress.done`) since the previous STATUS tick
+
+#### Scenario: Glossary entry for API queue completed delta
+
+- **GIVEN** a reader opens the ubiquitous-language glossary table
+- **WHEN** they look up heartbeat throughput metrics
+- **THEN** it SHALL contain an **API queue completed delta** entry describing the change in HTTP requests completed through ApiQueue since the previous STATUS tick, distinct from pipeline progress
+
 #### Scenario: Glossary entry for EVENT_SUMMARY line
+
 - **GIVEN** a reader opens the ubiquitous-language glossary table
-... [lean-ctx: omitted 1 lines]
+- **WHEN** they look up aggregated account activity logging
 - **THEN** it SHALL contain an **EVENT_SUMMARY line** entry describing aggregated account-level activity between heartbeat ticks
+
 ### Requirement: Glossary defines Heartbeat interval
 The ubiquitous-language glossary SHALL define **Heartbeat interval** as the canonical term for the Advanced Connection Settings field that controls how often the operation heartbeat emits STATUS and EVENT_SUMMARY lines.
 #### Scenario: Glossary entry for Heartbeat interval
 - **GIVEN** a reader opens the ubiquitous-language glossary table
 ... [lean-ctx: omitted 1 lines]
 - **THEN** it SHALL contain a **Heartbeat interval** entry describing the seconds-based Advanced Connection Settings field and its relationship to `statsLoggingIntervalMs`
+
+### Requirement: Glossary table includes heartbeat delta terms
+
+The canonical glossary table under Operations, phases, and sweeps SHALL include rows for **Pipeline progress delta** and **API queue completed delta** with definitions that distinguish enumerable pipeline work from ApiQueue HTTP completions.
+
+#### Scenario: Delta terms appear in operations glossary table
+
+- **GIVEN** a reader consults the Operations, phases, and sweeps glossary table
+- **WHEN** they search for heartbeat delta vocabulary
+- **THEN** rows for **Pipeline progress delta** and **API queue completed delta** SHALL be present
+
 ## Canonical Terms
 ### Account taxonomy
 | Term | Definition |

@@ -558,7 +558,8 @@ export class SourceService {
     public async *fetchAccountsBySourceIdGenerator(
         sourceId: string,
         abortSignal?: AbortSignal,
-        limit?: number
+        limit?: number,
+        onPageProgress?: (loaded: number, total?: number) => void
     ): AsyncGenerator<Account[], void, unknown> {
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
@@ -576,7 +577,13 @@ export class SourceService {
         const ctx = `SourceService>fetchAccountsBySourceIdGenerator ${sourceInfo.name}`
         yield* this.client.call<any>(
             (api: any, params: any) => api.accounts.listAccounts(params),
-            { paginate: { mode: 'parallel', baseParams: requestParameters as any, limit }, priority: QueuePriority.HIGH, context: ctx, abortSignal }
+            {
+                paginate: { mode: 'parallel', baseParams: requestParameters as any, limit },
+                priority: QueuePriority.HIGH,
+                context: ctx,
+                abortSignal,
+                onPageProgress,
+            }
         )
     }
 
@@ -588,7 +595,12 @@ export class SourceService {
         this.log.debug('Fetching fusion accounts')
         await wrapConnectorError(async () => {
             const accounts: Account[] = []
-            for await (const batch of this.fetchAccountsBySourceIdGenerator(this.fusionSourceId)) {
+            for await (const batch of this.fetchAccountsBySourceIdGenerator(
+                this.fusionSourceId,
+                undefined,
+                undefined,
+                (loaded, total) => this.log.setProgress(loaded, total ?? loaded, 'fetched')
+            )) {
                 accounts.push(...batch)
             }
             this.fusionAccountsByNativeIdentity = new Map(accounts.map((account) => [account.nativeIdentity!, account]))
@@ -622,6 +634,19 @@ export class SourceService {
         })
 
         await wrapConnectorError(async () => {
+            const sourceProgress = new Map<string, { loaded: number; total?: number }>()
+            const reportAggregateFetchProgress = () => {
+                let sumLoaded = 0
+                let sumTotal = 0
+                let allTotalsKnown = true
+                for (const { loaded, total } of sourceProgress.values()) {
+                    sumLoaded += loaded
+                    if (total !== undefined) sumTotal += total
+                    else allTotalsKnown = false
+                }
+                this.log.setProgress(sumLoaded, allTotalsKnown ? sumTotal : sumLoaded, 'fetched')
+            }
+
             await Promise.all(
                 sourcesWithLimits.map(async ({ source, effectiveLimit }) => {
                     this.log.info(`Fetching accounts from source: ${source.name}`)
@@ -631,7 +656,11 @@ export class SourceService {
                     for await (const batch of this.fetchAccountsBySourceIdGenerator(
                         source.id,
                         abortSignal,
-                        effectiveLimit
+                        effectiveLimit,
+                        (loaded, total) => {
+                            sourceProgress.set(source.id, { loaded, total })
+                            reportAggregateFetchProgress()
+                        }
                     )) {
                         const filteredBatch = this.applyManagedJmespathFilter(source, batch)
                         for (const account of filteredBatch) {
