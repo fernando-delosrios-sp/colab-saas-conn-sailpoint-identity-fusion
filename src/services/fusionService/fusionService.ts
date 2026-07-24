@@ -357,7 +357,7 @@ export class FusionService {
     public async processFusionAccounts(): Promise<FusionAccount[]> {
         const { fusionAccounts } = this.sources
         this.log.info(
-            `Processing fusion accounts: for each of ${fusionAccounts.length} fusion account(s), match managed accounts from the work queue and build fusion layers`
+            `Processing Fusion accounts: for each of ${fusionAccounts.length} fusion account(s), match managed accounts from the work queue and build fusion layers`
         )
         const results = await batchProcess(fusionAccounts, 'Fusion accounts', async (x: Account) => {
             return await this.processFusionAccount(x)
@@ -456,7 +456,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${fusionAccount.managedKey}), ` +
-                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.run.managedAccountsById, 'Managed accounts have not been loaded')
@@ -511,8 +511,8 @@ export class FusionService {
                 originIdentityId && originIdentityInScope !== undefined
                     ? originIdentityInScope
                     : originIdentityId
-                      ? this.identities.hasIdentityInScope(originIdentityId)
-                      : false
+                        ? this.identities.hasIdentityInScope(originIdentityId)
+                        : false
             fusionAccount.setOriginIdentityInScope(inScope)
         }
 
@@ -547,7 +547,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.accountAssembly.registerFusionAccount(fusionAccount)
@@ -672,7 +672,7 @@ export class FusionService {
                 this.run.sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                        `Managed accounts from this source will be treated as NonMatched.`
+                    `Managed accounts from this source will be treated as NonMatched.`
                 )
             }
         }
@@ -1091,7 +1091,7 @@ export class FusionService {
      * register every managed source as a reviewer source and populate pending reviews.
      */
     public async initializeSourceReviewers(): Promise<void> {
-                this.run.sourcesByName.clear()
+        this.run.sourcesByName.clear()
         for (const source of this.sources.managedSources) {
             this.run.sourcesByName.set(source.name, source)
         }

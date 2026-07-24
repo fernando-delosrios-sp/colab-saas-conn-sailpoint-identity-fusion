@@ -2,6 +2,7 @@
 
 ## 2.2.0
 
+- (2026-07-24) **Performance:** Record-type sources with **Include record accounts in Match** disabled now bulk-register unique attribute values in a dedicated **record unique registration** phase after the correlated sweep and before uncorrelated match scoring. Thousands of record-only accounts no longer enter the match sweep or run full Map/Define assembly — only selective attribute maps whose targets coincide with unique definitions (plus passthrough when the source attribute name matches) are evaluated, then values are registered and accounts are removed from the work queue. Process logs include a `record-unique-registration` step with `registered` progress. Form decision no-match outcomes reuse the same registration helper. See source-configuration guide. `account-list-operation`, `definition-service`, `mapping-service`, and `matching-service` specs updated.
 - (2026-07-24) **Configuration:** Operation heartbeat interval is now configurable in Advanced Settings → Advanced Connection Settings as **Heartbeat interval (seconds)** (`heartbeatInterval`). Default is **10 seconds** (was an internal 30-second constant). Runtime value remains `statsLoggingIntervalMs` for STATUS and EVENT_SUMMARY emission during `accountList`. Set to 30 to restore prior log frequency.
 - (2026-07-24) **Fix:** Correlated orphan managed accounts (correlated on the source but not linked to a Fusion row) now hydrate out-of-scope identities in the Process phase, immediately before the correlated account sweep, instead of during Fetch when the Fusion account map is empty. `MatchOutcomeDispatcher` applies the identity layer to each new Fusion account created from those orphans so display-attribute overrides can use `identityAlias`. Fetch phase no longer performs this hydration pass. Process logs include an `orphan-identity-hydration` step. `fusion-run` and `account-list-operation` specs updated.
 - (2026-07-24) **Observability:** Operation heartbeat `STATUS` lines now include `queue-pending` labels when the API queue is backed up and `work-pending` counts for disable ops, form candidates, review URLs, and deferred match candidates. `WARN STALL` lines include pending queue labels. `METRIC` duration fields use human-readable elapsed format (`567MS`, `1.2S`) instead of raw milliseconds.
@@ -112,6 +113,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 
