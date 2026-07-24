@@ -319,4 +319,28 @@ describe('ReportService', () => {
 
         expect(deps.email.sendEmail).toHaveBeenCalledTimes(1)
     })
+
+    it('hydrates global owner identities before resolving report recipient emails', async () => {
+        const fetchGlobalOwnerIdentityIds = vi.fn(async () => ['owner-1'])
+        const hydrateMissingIdentitiesById = vi.fn(async () => undefined)
+        const getRecipientEmails = vi.fn(async () => ['owner@example.com'])
+        const sendEmail = vi.fn(async () => undefined)
+
+        const { service } = createService({
+            sources: { fetchGlobalOwnerIdentityIds },
+            identities: {
+                hydrateMissingIdentitiesById,
+                getIdentityById: vi.fn(() => undefined),
+            },
+            email: { getRecipientEmails, sendEmail },
+        })
+
+        await service.sendReport({ accounts: [], matches: 0 } as any, 'aggregation')
+
+        expect(fetchGlobalOwnerIdentityIds).toHaveBeenCalledTimes(1)
+        expect(hydrateMissingIdentitiesById).toHaveBeenCalledWith(['owner-1'])
+        expect(getRecipientEmails).toHaveBeenCalledWith(['owner-1'])
+        expect(sendEmail).toHaveBeenCalledTimes(1)
+    })
 })
+
