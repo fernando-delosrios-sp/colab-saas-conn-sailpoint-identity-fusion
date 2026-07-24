@@ -88,7 +88,9 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
     fusion.forEachISCAccount = vi.fn().mockResolvedValue({ sent: 0, eligible: 0 })
     fusion.streamAndClearEligibleAccounts = vi.fn().mockResolvedValue({ sent: 0, eligible: 0 })
     fusion.refreshUniqueAttributes = vi.fn().mockResolvedValue(0)
-    fusion.initializeManagedAccountProcessing = vi.fn().mockResolvedValue(undefined)
+    fusion.initializeManagedAccountProcessing = vi.fn().mockImplementation(async () => {
+        fusion.run.startManagedAccountProcessing(1)
+    })
     fusion.processCorrelatedManagedAccounts = vi.fn().mockResolvedValue(undefined)
     fusion.processUncorrelatedManagedAccounts = vi.fn().mockResolvedValue({ processed: 0, matchScoringMs: 0 })
     fusion.processManagedAccounts = vi.fn().mockResolvedValue(undefined)
@@ -137,3 +139,4 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
 
     return registry
 }
+

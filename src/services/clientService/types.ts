@@ -61,6 +61,8 @@ export interface QueueConfig {
     maxConcurrentRequests: number
     maxRetries: number
     enablePriority: boolean
+    rateLimitWindowMs?: number
+    rateLimitMaxRequests?: number
 }
 
 /** Base policy for `client.call()`. */
@@ -94,3 +96,4 @@ export class PaginationError extends Error {
         this.name = 'PaginationError'
     }
 }
+

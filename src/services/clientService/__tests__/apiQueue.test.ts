@@ -1,6 +1,6 @@
 import { ApiQueue } from '../queue'
 import { QueuePriority, QueueConfig } from '../types'
-import { shouldRetry, calculateRetryDelay } from '../helpers'
+import { shouldRetry, calculateRetryDelay, invokeAbortable } from '../helpers'
 import type { Mock } from 'vitest'
 
 vi.mock('@sailpoint/connector-sdk', () => ({
@@ -16,30 +16,51 @@ vi.mock('../../../data/config', () => ({
     internalConfig: {
         clientService: {
             maxStatsSamples: 100,
-            queueProcessingIntervalMs: 10
+            queueProcessingIntervalMs: 10,
+            rateLimitWindowMs: 10_000,
+            rateLimitMaxRequestsDefault: 80,
+            rateLimitMaxRequestsCap: 100,
         }
     }
 }))
 
-// We need to mock helpers but also retain the ability to change mock implementation
-vi.mock('../helpers', () => ({
-    shouldRetry: vi.fn(),
-    calculateRetryDelay: vi.fn()
-}))
+// Mock retry helpers only; keep abort/signal helpers real for in-flight abort tests
+vi.mock('../helpers', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../helpers')>()
+    return {
+        ...actual,
+        shouldRetry: vi.fn(),
+        calculateRetryDelay: vi.fn(),
+    }
+})
 
 describe('ApiQueue', () => {
     let queue: ApiQueue;
+    const tracked: Promise<unknown>[] = [];
 
-    afterEach(() => {
+    const track = <T>(promise: Promise<T>): Promise<T> => {
+        tracked.push(promise)
+        return promise
+    }
+
+    const trackEnqueue = <T>(
+        execute: () => Promise<T>,
+        options?: Parameters<ApiQueue['enqueue']>[1]
+    ) => track(queue.enqueue(execute, options))
+
+    afterEach(async () => {
         if (queue) {
             queue.stop();
             queue.clear();
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            await Promise.allSettled(tracked);
+            tracked.length = 0;
         }
         vi.clearAllMocks();
     });
 
     const createConfig = (overrides?: Partial<QueueConfig>): QueueConfig => ({
-        requestsPerSecond: 1000,
+        requestsPerSecond: 10,
         maxConcurrentRequests: 10,
         maxRetries: 3,
         enablePriority: true,
@@ -53,7 +74,7 @@ describe('ApiQueue', () => {
         const blocker = new Promise<void>(resolve => { blockerResolve = resolve });
         
         // Take up the only concurrency slot so others queue up
-        queue.enqueue(() => blocker, { priority: QueuePriority.HIGH });
+        trackEnqueue(() => blocker, { priority: QueuePriority.HIGH });
 
         const executedOrder: string[] = [];
         const createTask = (id: string) => async () => {
@@ -61,9 +82,9 @@ describe('ApiQueue', () => {
             return id;
         };
 
-        const p1 = queue.enqueue(createTask('low'), { priority: QueuePriority.LOW });
-        const p2 = queue.enqueue(createTask('medium'), { priority: QueuePriority.MEDIUM });
-        const p3 = queue.enqueue(createTask('high'), { priority: QueuePriority.HIGH });
+        const p1 = trackEnqueue(createTask('low'), { priority: QueuePriority.LOW });
+        const p2 = trackEnqueue(createTask('medium'), { priority: QueuePriority.MEDIUM });
+        const p3 = trackEnqueue(createTask('high'), { priority: QueuePriority.HIGH });
 
         // Wait a tick to ensure all are enqueued and waiting in their sub-queues
         await new Promise(resolve => setTimeout(resolve, 10));
@@ -80,7 +101,7 @@ describe('ApiQueue', () => {
 
         let blockerResolve: () => void;
         const blocker = new Promise<void>(resolve => { blockerResolve = resolve });
-        queue.enqueue(() => blocker, { priority: QueuePriority.MEDIUM });
+        trackEnqueue(() => blocker, { priority: QueuePriority.MEDIUM });
 
         const executedOrder: string[] = [];
         const createTask = (id: string) => async () => {
@@ -88,9 +109,9 @@ describe('ApiQueue', () => {
             return id;
         };
 
-        const p1 = queue.enqueue(createTask('first'), { priority: QueuePriority.MEDIUM });
-        const p2 = queue.enqueue(createTask('second'), { priority: QueuePriority.MEDIUM });
-        const p3 = queue.enqueue(createTask('third'), { priority: QueuePriority.MEDIUM });
+        const p1 = trackEnqueue(createTask('first'), { priority: QueuePriority.MEDIUM });
+        const p2 = trackEnqueue(createTask('second'), { priority: QueuePriority.MEDIUM });
+        const p3 = trackEnqueue(createTask('third'), { priority: QueuePriority.MEDIUM });
 
         await new Promise(resolve => setTimeout(resolve, 10));
 
@@ -105,7 +126,7 @@ describe('ApiQueue', () => {
 
         let blockerResolve: () => void;
         const blocker = new Promise<void>(resolve => { blockerResolve = resolve });
-        queue.enqueue(() => blocker, { priority: QueuePriority.HIGH });
+        trackEnqueue(() => blocker, { priority: QueuePriority.HIGH });
 
         const executedOrder: string[] = [];
         const createTask = (id: string) => async () => {
@@ -114,9 +135,9 @@ describe('ApiQueue', () => {
         };
 
         // Even though we specify priorities, they should execute in insertion order because priority is disabled
-        const p1 = queue.enqueue(createTask('first-low'), { priority: QueuePriority.LOW });
-        const p2 = queue.enqueue(createTask('second-high'), { priority: QueuePriority.HIGH });
-        const p3 = queue.enqueue(createTask('third-medium'), { priority: QueuePriority.MEDIUM });
+        const p1 = trackEnqueue(createTask('first-low'), { priority: QueuePriority.LOW });
+        const p2 = trackEnqueue(createTask('second-high'), { priority: QueuePriority.HIGH });
+        const p3 = trackEnqueue(createTask('third-medium'), { priority: QueuePriority.MEDIUM });
 
         await new Promise(resolve => setTimeout(resolve, 10));
 
@@ -140,7 +161,7 @@ describe('ApiQueue', () => {
             active--;
         };
         
-        const promises = Array(5).fill(0).map(() => queue.enqueue(createTask()));
+        const promises = Array(5).fill(0).map(() => trackEnqueue(createTask()));
         
         // Wait for event loop to let tasks start
         await new Promise(resolve => setTimeout(resolve, 20));
@@ -167,27 +188,85 @@ describe('ApiQueue', () => {
         expect(maxActive).toBe(2); // Never exceeded 2
     });
 
-    it('5. Rate limiting — Set requestsPerSecond: 10 (100ms interval), enqueue 3 items, verify minimum spacing.', async () => {
-        queue = new ApiQueue(createConfig({ requestsPerSecond: 10, maxConcurrentRequests: 10 }));
-        
-        const executionTimes: number[] = [];
+    it('5. Sliding window rate limiting — burst within window allowed up to cap.', async () => {
+        queue = new ApiQueue(createConfig({
+            rateLimitMaxRequests: 3,
+            rateLimitWindowMs: 10_000,
+            maxConcurrentRequests: 10,
+        }))
+
+        const executionTimes: number[] = []
         const createTask = () => async () => {
-            executionTimes.push(Date.now());
-        };
-        
+            executionTimes.push(Date.now())
+        }
+
         await Promise.all([
-            queue.enqueue(createTask()),
-            queue.enqueue(createTask()),
-            queue.enqueue(createTask())
-        ]);
-        
-        expect(executionTimes.length).toBe(3);
-        const diff1 = executionTimes[1] - executionTimes[0];
-        const diff2 = executionTimes[2] - executionTimes[1];
-        
-        expect(diff1).toBeGreaterThanOrEqual(95); // 100ms interval, allowing slight timing variance
-        expect(diff2).toBeGreaterThanOrEqual(95);
-    });
+            trackEnqueue(createTask()),
+            trackEnqueue(createTask()),
+            trackEnqueue(createTask()),
+        ])
+
+        expect(executionTimes.length).toBe(3)
+        const span = executionTimes[2] - executionTimes[0]
+        expect(span).toBeLessThan(200)
+    })
+
+    it('5b. Rate-limit wait does not consume concurrency slots.', async () => {
+        queue = new ApiQueue(createConfig({
+            maxConcurrentRequests: 5,
+            rateLimitMaxRequests: 2,
+            rateLimitWindowMs: 10_000,
+        }))
+
+        const resolves: Array<() => void> = []
+        const slowTask = () => new Promise<void>((resolve) => resolves.push(resolve))
+
+        const p1 = trackEnqueue(slowTask)
+        const p2 = trackEnqueue(slowTask)
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        expect(queue.getStats().activeRequests).toBe(2)
+
+        const waiting = [
+            trackEnqueue(slowTask),
+            trackEnqueue(slowTask),
+            trackEnqueue(slowTask),
+        ]
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        expect(queue.getStats().activeRequests).toBe(2)
+
+        for (const resolve of resolves) resolve()
+        await Promise.allSettled([p1, p2])
+        queue.stop()
+        await Promise.allSettled(waiting)
+    })
+
+    it('5c. Fifteen in-flight with headroom — rate waiters do not block new HTTP starts', async () => {
+        queue = new ApiQueue(createConfig({
+            maxConcurrentRequests: 20,
+            rateLimitMaxRequests: 100,
+            rateLimitWindowMs: 10_000,
+        }))
+
+        const resolves: Array<() => void> = []
+        const slowTask = () => new Promise<void>((resolve) => resolves.push(resolve))
+        const started: string[] = []
+        const idTask = (id: string) => async () => {
+            started.push(id)
+            await slowTask()
+        }
+
+        const first15 = Array.from({ length: 15 }, (_, i) => trackEnqueue(idTask(`slow-${i}`)))
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        expect(queue.getStats().activeRequests).toBe(15)
+
+        const next5 = Array.from({ length: 5 }, (_, i) => trackEnqueue(idTask(`fast-${i}`)))
+        await new Promise((resolve) => setTimeout(resolve, 50))
+        expect(queue.getStats().activeRequests).toBe(20)
+        expect(started.filter((id) => id.startsWith('fast-'))).toHaveLength(5)
+
+        for (const resolve of resolves) resolve()
+        await Promise.allSettled([...first15, ...next5])
+    })
 
     it('6. Retry on failure — Enqueue a function that fails with 429 on first call, succeeds on second.', async () => {
         queue = new ApiQueue(createConfig());
@@ -204,7 +283,7 @@ describe('ApiQueue', () => {
             return 'success';
         };
         
-        const result = await queue.enqueue(task, { maxRetries: 3 });
+        const result = await trackEnqueue(task, { maxRetries: 3 });
         
         expect(calls).toBe(2);
         expect(result).toBe('success');
@@ -227,7 +306,7 @@ describe('ApiQueue', () => {
             throw error;
         };
         
-        await expect(queue.enqueue(task, { maxRetries: 2 })).rejects.toThrow('500 Internal Server Error');
+        await expect(trackEnqueue(task, { maxRetries: 2 })).rejects.toThrow('500 Internal Server Error');
         
         // 1 initial call + 2 retries = 3 total attempts
         expect(calls).toBe(3);
@@ -250,7 +329,7 @@ describe('ApiQueue', () => {
             throw error;
         };
         
-        await expect(queue.enqueue(task, { maxRetries: 3, noRetry: true })).rejects.toThrow('500 Internal Server Error');
+        await expect(trackEnqueue(task, { maxRetries: 3, noRetry: true })).rejects.toThrow('500 Internal Server Error');
         
         expect(calls).toBe(1);
         
@@ -266,10 +345,10 @@ describe('ApiQueue', () => {
         
         let blockerResolve: () => void;
         const blocker = new Promise<void>(resolve => { blockerResolve = resolve });
-        const p1 = queue.enqueue(() => blocker); // Block the queue
+        const p1 = trackEnqueue(() => blocker); // Block the queue
         
         const task = async () => 'should not execute';
-        const promise = queue.enqueue(task, { abortSignal: abortController.signal });
+        const promise = trackEnqueue(task, { abortSignal: abortController.signal });
         
         abortController.abort();
         
@@ -279,15 +358,38 @@ describe('ApiQueue', () => {
         await p1;
     });
 
+    it('9b. Abort signal — abort during in-flight execution', async () => {
+        queue = new ApiQueue(createConfig({ maxConcurrentRequests: 5 }))
+
+        const abortController = new AbortController()
+        let startedResolve: () => void
+        const started = new Promise<void>((resolve) => {
+            startedResolve = resolve
+        })
+
+        const task = async () => {
+            startedResolve!()
+            return invokeAbortable(
+                () => new Promise<string>((resolve) => setTimeout(() => resolve('done'), 5000)),
+                abortController.signal
+            )
+        }
+
+        const promise = trackEnqueue(task, { abortSignal: abortController.signal })
+        await started
+        abortController.abort()
+        await expect(promise).rejects.toThrow(/aborted/i)
+    })
+
     it('10. clear() — Enqueue items, call clear(), verify all pending items reject.', async () => {
         queue = new ApiQueue(createConfig({ maxConcurrentRequests: 1 }));
         
         let _blockerResolve: () => void;
         const blocker = new Promise<void>(resolve => { _blockerResolve = resolve });
-        const p1 = queue.enqueue(() => blocker); // Block the queue (active item)
+        const p1 = trackEnqueue(() => blocker); // Block the queue (active item)
         
-        const p2 = queue.enqueue(async () => 'queued'); // Pending item
-        const p3 = queue.enqueue(async () => 'queued'); // Pending item
+        const p2 = trackEnqueue(async () => 'queued'); // Pending item
+        const p3 = trackEnqueue(async () => 'queued'); // Pending item
         
         await new Promise(resolve => setTimeout(resolve, 10)); // Ensure enqueued
         
@@ -307,7 +409,7 @@ describe('ApiQueue', () => {
         queue.stop();
         
         let executed = false;
-        const p = queue.enqueue(async () => { executed = true; });
+        const p = trackEnqueue(async () => { executed = true; });
         
         await new Promise(resolve => setTimeout(resolve, 50));
         
@@ -324,8 +426,8 @@ describe('ApiQueue', () => {
             return 'done';
         };
         
-        await queue.enqueue(task);
-        await queue.enqueue(task);
+        await trackEnqueue(task);
+        await trackEnqueue(task);
         
         // Wait for stats to flush from finally blocks
         await new Promise(resolve => setTimeout(resolve, 10));
@@ -344,8 +446,8 @@ describe('ApiQueue', () => {
         let blockerResolve: () => void;
         const blocker = new Promise<void>(resolve => { blockerResolve = resolve });
         
-        const p1 = queue.enqueue(() => blocker, { id: 'active-item', priority: QueuePriority.HIGH, label: 'Active' });
-        const p2 = queue.enqueue(async () => 'done', { id: 'pending-item', priority: QueuePriority.LOW, label: 'Pending' });
+        const p1 = trackEnqueue(() => blocker, { id: 'active-item', priority: QueuePriority.HIGH, label: 'Active' });
+        const p2 = trackEnqueue(async () => 'done', { id: 'pending-item', priority: QueuePriority.LOW, label: 'Pending' });
         
         await new Promise(resolve => setTimeout(resolve, 10)); // Ensure queued
         
@@ -372,3 +474,4 @@ describe('ApiQueue', () => {
         await p2;
     });
 });
+

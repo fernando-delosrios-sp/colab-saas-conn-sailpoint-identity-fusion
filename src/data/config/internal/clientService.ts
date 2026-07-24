@@ -1,5 +1,8 @@
 /** HTTP client, auth path, pagination caps, queue stats — not in `connector-spec.json`. */
 export const internalConfigClientService = {
+    rateLimitWindowMs: 10_000,
+    rateLimitMaxRequestsDefault: 80,
+    rateLimitMaxRequestsCap: 100,
     requestsPerSecondConstant: 100,
     pageSize: 250,
     tokenUrlPath: '/oauth/token',
@@ -13,3 +16,4 @@ export const internalConfigClientService = {
     queueProcessingIntervalMs: 10,
     sailPointListMax: 250,
 } as const
+

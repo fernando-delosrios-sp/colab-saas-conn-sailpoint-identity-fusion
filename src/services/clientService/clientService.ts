@@ -3,6 +3,7 @@ import { QueuePriority, QueueStats, QueuedItemInfo, CallPolicy, PaginatePolicy, 
 import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
 import { readNumber } from '../../utils/safeRead'
+import { mergeAbortSignals, invokeAbortable, runWithRequestAbortSignal } from './helpers'
 import { IscApiAdapter } from './iscApiAdapter'
 import { IscApiSurface } from './iscApiSurface'
 import type { Search, AccountsV2025Api, IdentitiesV2025Api, IdentityAttributesV2025Api, IdentityProfilesV2025Api, CustomFormsV2025Api, EntitlementsV2025Api, GovernanceGroupsV2025Api, TaskManagementV2025Api, SearchApi, TransformsApi, SourcesV2025Api, WorkflowsV2025Api, Configuration } from 'sailpoint-api-client'
@@ -40,9 +41,8 @@ export class ClientService {
         // Store pageSize for pagination
         this.pageSize = fusionConfig.pageSize
         this.sailPointListMax = fusionConfig.sailPointListMax
-        const parallelBatchSize = fusionConfig.parallelBatchSize ?? 8
-        const requestsPerSecond = fusionConfig.requestsPerSecond ?? fusionConfig.requestsPerSecondConstant
-        const maxConcurrentRequests = fusionConfig.maxConcurrentRequests ?? Math.max(10, requestsPerSecond * 2)
+        const parallelBatchSize = fusionConfig.parallelBatchSize ?? 12
+        const maxConcurrentRequests = fusionConfig.maxConcurrentRequests ?? 20
 
         if (this.queue) {
             // parallelBatchSize caps concurrent page fetches in paginateParallel at the
@@ -301,34 +301,32 @@ export class ClientService {
         throwOnError: boolean = false,
         noRetry?: boolean
     ): Promise<TResponse | undefined> {
+        const timeoutController = this.requestTimeoutMs ? new AbortController() : undefined
+        let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+        if (timeoutController && this.requestTimeoutMs) {
+            timeoutId = setTimeout(() => {
+                timeoutController.abort(new Error(`Request timed out after ${this.requestTimeoutMs}ms`))
+            }, this.requestTimeoutMs)
+        }
+
+        const mergedSignal = mergeAbortSignals([abortSignal, timeoutController?.signal])
+
         const fn = () => {
-            if (abortSignal?.aborted) {
-                return Promise.reject(new Error('Aborted'))
+            if (mergedSignal?.aborted) {
+                return Promise.reject(mergedSignal.reason ?? new Error('Aborted'))
             }
-            if (!this.requestTimeoutMs) {
-                return apiFunction()
-            }
-
-            return new Promise<TResponse>((resolve, reject) => {
-                const timer = setTimeout(() => {
-                    reject(new Error(`Request timed out after ${this.requestTimeoutMs}ms`))
-                }, this.requestTimeoutMs)
-
-                apiFunction()
-                    .then((response) => {
-                        clearTimeout(timer)
-                        resolve(response)
-                    })
-                    .catch((error) => {
-                        clearTimeout(timer)
-                        reject(error)
-                    })
-            })
+            return invokeAbortable(() => runWithRequestAbortSignal(mergedSignal, apiFunction), mergedSignal)
         }
 
         try {
             if (this.queue) {
-                return await this.queue.enqueue(() => fn(), { priority, abortSignal, label: context, noRetry })
+                return await this.queue.enqueue(() => fn(), {
+                    priority,
+                    abortSignal: mergedSignal,
+                    label: context,
+                    noRetry,
+                })
             }
 
             return await fn()
@@ -352,6 +350,8 @@ export class ClientService {
                 throw error
             }
             return undefined
+        } finally {
+            if (timeoutId) clearTimeout(timeoutId)
         }
     }
 

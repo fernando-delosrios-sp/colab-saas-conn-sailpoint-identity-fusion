@@ -30,6 +30,7 @@ export const connectorSpecInitialValues = {
     maxRetries: advancedConnectionSettings.connectorSpecInitialValues.maxRetries,
     requestsPerSecond: advancedConnectionSettings.connectorSpecInitialValues.requestsPerSecond,
     maxConcurrentRequests: advancedConnectionSettings.connectorSpecInitialValues.maxConcurrentRequests,
+    parallelBatchSize: advancedConnectionSettings.connectorSpecInitialValues.parallelBatchSize,
     processingWait: advancedConnectionSettings.connectorSpecInitialValues.processingWait,
     ...developerSettings.connectorSpecInitialValues,
     ...proxySettings.connectorSpecInitialValues,
@@ -53,3 +54,4 @@ export const runtimeDefaults = {
     ...attributeMappingDefinitionsSettings.runtimeDefaults,
     ...uniqueAttributeDefinitionsSettings.runtimeDefaults,
 } as const
+

@@ -10,7 +10,8 @@ export const connectorSpecInitialValues = {
     provisioningTimeout: 300,
     maxRetries: 20,
     requestsPerSecond: 10,
-    maxConcurrentRequests: 10,
+    maxConcurrentRequests: 20,
+    parallelBatchSize: 12,
     processingWait: 60,
 } as const
 
@@ -18,7 +19,7 @@ export const runtimeDefaults = {
     maxRetries: internalConfig.clientService.retriesConstant,
     requestsPerSecond: connectorSpecInitialValues.requestsPerSecond,
     maxConcurrentRequests: connectorSpecInitialValues.maxConcurrentRequests,
-    parallelBatchSize: 8,
+    parallelBatchSize: connectorSpecInitialValues.parallelBatchSize,
     enablePriority: matchingInitialValues.enablePriority,
     processingWait: internalConfig.clientService.processingWaitConstant,
     provisioningTimeout: connectorSpecInitialValues.provisioningTimeout,

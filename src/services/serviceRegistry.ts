@@ -25,6 +25,7 @@ import { ProxyService } from './proxyService'
 import { ReportService } from './reportService'
 import { RecordingService } from './recordingService'
 import { FusionRun } from '../model/fusionRun'
+import { internalConfig } from '../data/config'
 
 /**
  * Central dependency injection container for all connector services.
@@ -105,11 +106,13 @@ export class ServiceRegistry {
                 adapter = new ReplayApiAdapter(entries, adapter.config)
             }
 
+            const requestsPerSecond = this.config.requestsPerSecond ?? this.config.requestsPerSecondConstant
             const queueConfig = {
-                requestsPerSecond: this.config.requestsPerSecond ?? this.config.requestsPerSecondConstant,
-                maxConcurrentRequests: this.config.maxConcurrentRequests ?? Math.max(10, (this.config.requestsPerSecond ?? this.config.requestsPerSecondConstant) * 2),
+                requestsPerSecond,
+                maxConcurrentRequests: this.config.maxConcurrentRequests ?? 20,
                 maxRetries: this.config.maxRetries ?? this.config.retriesConstant,
                 enablePriority: this.config.enablePriority ?? true,
+                rateLimitWindowMs: internalConfig.clientService.rateLimitWindowMs,
             }
             const queue = new ApiQueue(queueConfig)
             this.client = new ClientService(adapter, queue, this.config, this.log)
@@ -249,5 +252,6 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 

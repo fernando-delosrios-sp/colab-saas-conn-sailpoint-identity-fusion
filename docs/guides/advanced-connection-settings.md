@@ -175,7 +175,7 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 | Category                  | Fields                                         | Purpose                               |
 | ------------------------- | ---------------------------------------------- | ------------------------------------- |
 | **Provisioning & timing** | Provisioning timeout, Processing wait time     | Max wait times for operations         |
-| **Queue**                 | Max concurrent requests, Requests per second   | Rate limiting and concurrency control |
+| **Queue**                 | Max concurrent requests, Parallel batch size, Requests per second | Rate limiting and concurrency control |
 | **Retry**                 | API request retries                            | Automatic retry for failed requests   |
 
 **Screenshot placeholder:** Advanced Connection Settings interface.
@@ -208,29 +208,31 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 
 ### Queue (rate limiting and concurrency)
 
-Queue management is always enabled and provides rate limiting and concurrency control.
+The connector uses a **sliding-window rate limiter** aligned with ISC tenant API limits (~**100 requests per 10 seconds**). Default cap is **80 starts per 10 seconds** (conservative headroom). Burst starts within the window are allowed; the legacy **Requests per second** field derives the window cap when customized (`RPS × 10`, max 100).
 
-| Field                           | Default | Range   | Purpose                    |
-| ------------------------------- | ------- | ------- | -------------------------- |
-| **Maximum concurrent requests** | 10      | 1–10    | Max simultaneous API calls |
-| **Requests per second**         | 10      | 1–12    | Rate limit (throttle)      |
+| Field                           | Default | Range   | Purpose                                      |
+| ------------------------------- | ------- | ------- | -------------------------------------------- |
+| **Maximum concurrent requests** | 20      | 1–30    | Max simultaneous in-flight HTTP calls        |
+| **Parallel pagination batch size** | 12   | 1–16    | Pages fetched in parallel during pagination  |
+| **Requests per second**         | 10      | 1–12    | Legacy hint; derives sliding-window cap when changed |
 
 **When to adjust queue settings:**
 
-| Scenario                        | Configuration                        |
-| ------------------------------- | ------------------------------------ |
-| Production (>500 accounts)      | Max concurrent: 10; RPS: 10          |
-| Large dataset (>5,000 accounts) | Start at max concurrent: 10; RPS: 10 |
-| ISC API rate limits             | RPS ≤ ISC limit                      |
-| HTTP 429 errors                 | Lower RPS                            |
-| Testing/development             | Default settings usually fine        |
+| Scenario                        | Configuration                                      |
+| ------------------------------- | -------------------------------------------------- |
+| Production (>500 accounts)      | Max concurrent: 20; parallel batch: 12             |
+| Large dataset (>5,000 accounts) | Start at defaults; raise concurrent cautiously     |
+| ISC API rate limits             | Lower requests per second (lowers window cap)      |
+| HTTP 429 errors                 | Lower RPS and/or max concurrent requests           |
+| Testing/development             | Default settings usually fine                      |
 
 **Tuning guidelines:**
 
-| Metric                      | Initial value | Adjust if...                                                                          |
-| --------------------------- | ------------- | ------------------------------------------------------------------------------------- |
-| **Max concurrent requests** | 10            | HTTP 429 errors → decrease to 5–8; slow aggregation and no errors → increase to 15–20 |
-| **Requests per second**     | 10            | HTTP 429 errors → decrease to 4–6; increase carefully toward tenant limits            |
+| Metric                      | Initial value | Adjust if...                                                                                  |
+| --------------------------- | ------------- | --------------------------------------------------------------------------------------------- |
+| **Max concurrent requests** | 20            | HTTP 429 errors → decrease to 10–15; slow aggregation and no errors → increase toward 25–30 |
+| **Parallel batch size**     | 12            | Keep ≤ max concurrent; lower if pagination bursts trigger 429s                                |
+| **Requests per second**     | 10            | HTTP 429 errors → decrease to 4–6; lowers derived window cap                                  |
 
 **Interaction with Connection Settings:**
 
@@ -244,12 +246,11 @@ The **Requests per second** field also appears in **Connection Settings**. They 
 
 ```
 1. API request added to queue
-2. Queue checks:
-   - Current concurrent requests < max?
-   - Request rate < RPS limit?
-3. If yes → execute request
-4. If no → wait and retry
-5. Repeat until executed or timeout
+2. Queue checks sliding window (starts in last 10s < cap)
+3. When a rate slot is available AND activeRequests < max concurrent:
+   → HTTP execution begins (activeRequests++)
+4. If rate-limited but concurrency available → wait for window slot (does not hold concurrency)
+5. Retries reuse existing retry policy
 ```
 
 ### Retry
@@ -316,7 +317,8 @@ Developer Settings:
 
 Advanced Connection Settings:
 - Provisioning timeout: 600 seconds
-- Max concurrent requests: 15
+- Max concurrent requests: 20
+- Parallel pagination batch size: 12
 - API request retries: 20
 - Requests per second: 10
 ```
@@ -334,7 +336,8 @@ Advanced Connection Settings:
 ```
 Advanced Connection Settings:
 - Provisioning timeout: 1800 seconds (30 min)
-- Max concurrent requests: 10
+- Max concurrent requests: 20
+- Parallel pagination batch size: 12
 - API request retries: 20
 - Requests per second: 10
 ```
@@ -476,4 +479,5 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](troubleshooting.md).
+
 
