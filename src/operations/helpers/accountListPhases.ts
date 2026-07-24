@@ -228,15 +228,17 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Ph
     const { log, fusion, identities, sources } = serviceRegistry
     const { isPersistent } = options
 
-    log.info('Processing identities')
+    log.stepStart('process-identities')
     const identitiesOp = log.track('FusionService.processIdentities')
     await fusion.processIdentities()
     identitiesOp.done({ count: identities.identityCount })
+    log.stepEnd('process-identities', { count: identities.identityCount })
 
-    log.info('Processing fusion identity decisions (new identity)')
+    log.stepStart('process-decisions')
     const decisionsOp = log.track('FusionService.processFusionIdentityDecisions')
     const decisions = await fusion.processFusionIdentityDecisions()
     decisionsOp.done({ count: decisions.length })
+    log.stepEnd('process-decisions', { count: decisions.length })
 
     if (!sources.run.isRecordMode) {
         identities.clear()
@@ -245,12 +247,18 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Ph
         log.info('Identities cache retained for recording')
     }
 
-    log.info('Processing managed accounts (Match)')
     await fusion.initializeManagedAccountProcessing()
+
+    log.stepStart('correlated-sweep')
     await fusion.processCorrelatedManagedAccounts()
+    log.stepEnd('correlated-sweep', { remaining: sources.run.managedAccountsById.size })
+
+    const uncorrelatedCount = sources.run.managedAccountsById.size
+    log.stepStart('uncorrelated-sweep', { accounts: uncorrelatedCount })
     const managedAccountsOp = log.track('FusionService.processManagedAccounts')
     const { processed, matchScoringMs } = await fusion.processUncorrelatedManagedAccounts()
     managedAccountsOp.done({ analyzed: processed, matchScoringMs })
+    log.stepEnd('uncorrelated-sweep', { analyzed: processed })
 
     if (sources.run.fullScanFallbackCount > 0) {
         log.warn(
@@ -259,12 +267,14 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Ph
     }
 
     if (isPersistent) {
-        log.info('Waiting for pending disable operations')
+        log.stepStart('await-disable-ops', { pending: fusion.run.pendingDisableOperationsCount })
         await fusion.awaitPendingDisableOperations()
+        log.stepEnd('await-disable-ops')
     }
 
-    log.info('Reconciling pending form state (candidates + reviewer links)')
+    log.stepStart('form-reconcile')
     fusion.reconcilePendingFormState()
+    log.stepEnd('form-reconcile', { remaining: sources.run.managedAccountsById.size })
     log.info(`Process phase complete - ${sources.run.managedAccountsById.size} unprocessed account(s) remaining`)
 }
 
@@ -289,11 +299,12 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
     }
 
     const formCleanupOp = log.track('outputPhase.formCleanup')
+    log.stepStart('form-cleanup')
     await forms.cleanUpForms()
-    log.info('Form cleanup queued')
     formCleanupOp.done()
+    log.stepEnd('form-cleanup')
 
-    log.info('Sending accounts to platform')
+    log.stepStart('send-accounts')
     const sendAccountsOp = log.track('outputPhase.sendAccounts')
     const { sent, eligible } = await fusion.forEachISCAccount(
         (account) => {
@@ -302,21 +313,26 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
         },
         isPersistent
     )
-    log.info(`Sent ${sent} account(s) to platform`)
     sendAccountsOp.done({ sent, eligible })
+    log.stepEnd('send-accounts', { sent, eligible })
+    log.info(`Sent ${sent} account(s) to platform`)
 
+    log.stepStart('save-state')
     const saveStateOp = log.track('outputPhase.savePersistentState')
     await definition.saveState()
     await sources.saveBatchCumulativeCount()
-    log.info('Attribute state saved')
-    log.info('Batch cumulative count saved')
     saveStateOp.done()
+    log.stepEnd('save-state')
 
+    log.stepStart('schedule-aggregations')
     const scheduleAggregationOp = log.track('outputPhase.scheduleDelayedAggregations')
     await sources.aggregateDelayedSources((params) => workflows.scheduleDelayedAggregation(params))
     scheduleAggregationOp.done()
+    log.stepEnd('schedule-aggregations')
 
+    log.stepStart('await-form-deletes')
     await forms.awaitPendingDeleteOperations()
+    log.stepEnd('await-form-deletes')
     log.info('Queued form deletions completed')
     return sent
 }
@@ -337,6 +353,9 @@ export async function reportEpilogue(
     const { log, reports, res, fusion } = serviceRegistry
     const { isPersistent, dryRun, fetchResult, outputCount, timer } = options
     let deferredError: unknown
+
+    serviceRegistry.runContext.phase = 'Epilogue'
+    log.info('EPILOGUE report START')
 
     if (isPersistent && fetchResult && fusion.fusionReportOnAggregation) {
         try {
@@ -416,4 +435,5 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+
 

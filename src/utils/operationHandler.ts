@@ -46,10 +46,6 @@ function scheduleKeepAlive(
             return undefined
         }
         return setInterval(() => {
-            const memoryUsage = process.memoryUsage()
-            logger.info(
-                `Memory usage - RSS: ${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB, Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB, Heap Total: ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`
-            )
             res.keepAlive()
         }, everyMs)
     }
@@ -127,3 +123,4 @@ export function createOperationHandler(
         }
     }
 }
+

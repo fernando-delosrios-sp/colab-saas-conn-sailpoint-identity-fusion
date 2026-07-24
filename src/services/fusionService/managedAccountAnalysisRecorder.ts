@@ -50,7 +50,11 @@ export class ManagedAccountAnalysisRecorder {
                     (m) => (m.candidateType ?? MatchCandidateType.Identity) === MatchCandidateType.Identity
                 )
                 const { headline, summary } = formatFusionMatchDiscoveryLog(identityMatches, false)
-                log.info(`${headline}: ${name} [${sourceName}] - ${summary}`)
+                const matchType = headline.includes('EXACT') ? 'exact' : 'partial'
+                log.recordEvent('match', { type: matchType })
+                if (log.getLogLevel() === 'debug') {
+                    log.debug(`${headline}: ${name} [${sourceName}] - ${summary}`)
+                }
             }
             if (!shouldCaptureReportData()) return
             const reportAccountId = resolveReportAccountId(fusionAccount, sources)
@@ -136,3 +140,4 @@ export class ManagedAccountAnalysisRecorder {
         })
     }
 }
+

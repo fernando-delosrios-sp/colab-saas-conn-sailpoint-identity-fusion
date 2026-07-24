@@ -293,9 +293,12 @@ export class IdentityService {
             return true
         }
 
-        this.log.info(
-            `Triggering correlation for ${targetIds.length} account(s) for fusion account ${fusionAccount.name}`
-        )
+        this.log.recordEvent('correlation', { accounts: targetIds.length })
+        if (this.log.getLogLevel() === 'debug') {
+            this.log.debug(
+                `Triggering correlation for ${targetIds.length} account(s) for fusion account ${fusionAccount.name}`
+            )
+        }
 
         await Promise.all(
             targetIds.map((accountId) => this.correlateSingleAccount(fusionAccount, accountId, identityId))
@@ -422,3 +425,4 @@ export class IdentityService {
             })
     }
 }
+

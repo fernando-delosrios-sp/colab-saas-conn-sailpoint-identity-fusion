@@ -1,26 +1,4 @@
-# log-service Spec
-
-## Purpose
-
-The log service (`src/services/logService/`) is the connector's logging facade. It defines the `LogService` interface, the SDK adapter that writes to the connector host, and the helper utilities used elsewhere in the codebase to log structured events, known operation function names, and a small set of standardized debug/warn patterns. This spec defines the contract for what the rest of the connector can assume about the log surface (level, structured fields, redaction) and what the host receives.
-
-## Requirements
-
-### Requirement: The log service MUST expose a stable, structured log surface
-
-The log service MUST expose a `LogService` interface with the standard levels (`debug`, `info`, `warn`, `error`). The SDK adapter MUST forward every call to the connector host as a plain text message without lossy transformation. For operations with an `operationContext` (for example `accountList`), messages SHALL be prefixed with `[operationContext]`. Structured metadata MAY be passed as optional arguments for message formatting, but the host-visible contract for operational visibility SHALL be standardized text line kinds (`STATUS`, `EVENT_SUMMARY`, `PHASE`, `STEP`, `METRIC`, `WARN STALL`, `EPILOGUE`) rather than host-indexed structured fields.
-
-#### Scenario: A log call reaches the connector host as plain text
-
-- **GIVEN** a caller invokes `log.info('PHASE 4 Process START')` during accountList
-- **WHEN** the host processes the event
-- **THEN** the host sees one INFO event whose message includes `[accountList] PHASE 4 Process START`
-
-#### Scenario: Operation context prefixes heartbeat lines
-
-- **GIVEN** the account-list operation has `operationContext` set to `accountList`
-- **WHEN** the operation heartbeat emits a STATUS line
-- **THEN** the message SHALL begin with `[accountList] STATUS`
+## ADDED Requirements
 
 ### Requirement: Operation heartbeat emits periodic STATUS lines
 
@@ -39,6 +17,8 @@ The log service SHALL provide an operation heartbeat that emits a `STATUS` text 
 - **WHEN** the next STATUS line is emitted
 - **THEN** the line SHALL include `processed=537` and a delta indicating zero completions since the previous tick
 
+---
+
 ### Requirement: Operation heartbeat emits EVENT_SUMMARY lines
 
 The log service SHALL aggregate account-level events recorded via `recordEvent` between heartbeat ticks and emit one or more `EVENT_SUMMARY` text lines at each tick. Counters SHALL reset after each flush. Multiple summary lines MAY be used when a single line would be excessively long.
@@ -56,6 +36,8 @@ The log service SHALL aggregate account-level events recorded via `recordEvent` 
 - **WHEN** the heartbeat flushes event counters
 - **THEN** the connector host SHALL receive an INFO `EVENT_SUMMARY` line reporting correlation totals
 
+---
+
 ### Requirement: Operation heartbeat detects and warns on queue stall
 
 When the API queue `totalProcessed` count does not increase for two consecutive STATUS ticks while the queue has active or queued items, the heartbeat SHALL emit a `WARN STALL` line listing the top active queue item labels grouped by count.
@@ -67,6 +49,8 @@ When the API queue `totalProcessed` count does not increase for two consecutive 
 - **WHEN** the second STATUS tick completes
 - **THEN** the connector host SHALL receive a WARN line containing `STALL`
 - **AND** the line SHALL name the most frequent active queue labels
+
+---
 
 ### Requirement: Phase and step boundaries use standardized text prefixes
 
@@ -85,6 +69,8 @@ The log service SHALL emit `PHASE` and `STEP` text lines at operation pipeline b
 - **WHEN** the sweep starts
 - **THEN** an INFO line `STEP uncorrelated-sweep START` SHALL be emitted with account count detail
 
+---
+
 ### Requirement: OperationRunContext tracks run state for heartbeat consumption
 
 The service registry SHALL expose an `OperationRunContext` updated by log service helpers (`phaseStart`, `phaseEnd`, `stepStart`, `stepEnd`, `setProgress`, `recordEvent`) and readable by the operation heartbeat within the active AsyncLocalStorage scope.
@@ -95,3 +81,20 @@ The service registry SHALL expose an `OperationRunContext` updated by log servic
 - **WHEN** the next STATUS heartbeat fires
 - **THEN** the STATUS line SHALL include `progress=450/800`
 
+## MODIFIED Requirements
+
+### Requirement: The log service MUST expose a stable, structured log surface
+
+The log service MUST expose a `LogService` interface with the standard levels (`debug`, `info`, `warn`, `error`). The SDK adapter MUST forward every call to the connector host as a plain text message without lossy transformation. For operations with an `operationContext` (for example `accountList`), messages SHALL be prefixed with `[operationContext]`. Structured metadata MAY be passed as optional arguments for message formatting, but the host-visible contract for operational visibility SHALL be standardized text line kinds (`STATUS`, `EVENT_SUMMARY`, `PHASE`, `STEP`, `METRIC`, `WARN STALL`, `EPILOGUE`) rather than host-indexed structured fields.
+
+#### Scenario: A log call reaches the connector host as plain text
+
+- **GIVEN** a caller invokes `log.info('PHASE 4 Process START')` during accountList
+- **WHEN** the host processes the event
+- **THEN** the host sees one INFO event whose message includes `[accountList] PHASE 4 Process START`
+
+#### Scenario: Operation context prefixes heartbeat lines
+
+- **GIVEN** the account-list operation has `operationContext` set to `accountList`
+- **WHEN** the operation heartbeat emits a STATUS line
+- **THEN** the message SHALL begin with `[accountList] STATUS`

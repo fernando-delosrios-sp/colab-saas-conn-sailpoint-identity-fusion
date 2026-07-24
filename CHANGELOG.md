@@ -2,7 +2,8 @@
 
 ## 2.2.0
 
-- (2026-07-23) **Performance:** Replaced character concatenation with `substring(i, i + 3)` in trigram index extraction and query (`extractTrigrams`, `queryAttributeIndex`) — identical trigram sets and candidate results, fewer transient string allocations on the matching pre-filter hot path. `matching-service` spec documents padded substring window invariants.
+- (2026-07-24) **Observability:** Unified `accountList` operation heartbeat replaces standalone `Queue Stats:` and `Memory usage` log lines. Every 30s a `STATUS` line reports phase, step, progress, queue delta, and memory; `EVENT_SUMMARY` lines aggregate match and correlation activity; `WARN STALL` fires when the API queue stops completing. Per-account match/correlation INFO lines are summarized into the heartbeat (detail remains at debug). Log monitors should grep `STATUS` / `WARN STALL` instead of `Queue Stats:` / `Memory usage`.
+- (2026-07-24) **Performance:** Replaced `slice(i, i + 3)` with `substring(i, i + 3)` in trigram index extraction and query (`extractTrigrams`, `queryAttributeIndex`) — identical trigram sets and candidate results, fewer transient string allocations on the matching pre-filter hot path. `matching-service` spec documents padded substring window invariants.
 - (2026-07-23) **Performance:** Replaced `Object.values().find()` linear scans in `formProcessor` dictionary-path extractors (`readCorrelatedIdentityId`, `extractAccountInfoFromFormInput`, `extractCandidateIdsFromFormInput`) with direct key lookup plus `for...in` fallback — same extracted values, no values-array allocation per field read. Fixed object-shaped `name`/`source` fields on the account-object branch. Added `form-service` spec requirement and expanded `formProcessor.test.ts` coverage (flat, arbitrary-key, direct-key, correlated-identity dictionary paths).
 - (2026-07-23) **Performance:** Replaced boolean match-flag arrays in `jaroSimilarity` with zero-initialized `Uint8Array` buffers — same Jaro-Winkler scores, less allocation overhead on hot string comparisons.
 - (2026-07-23) **Observability:** Added run-scoped `fullScanFallbackCount` on `FusionRun` when trigram candidate blocking falls back to a full identity scan (managed account missing all mandatory trigram attributes). `MatchingService.getCandidates` emits throttled warnings (first 5, then every 100th); `accountList` process phase logs a run summary when the count is non-zero.
@@ -106,6 +107,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 

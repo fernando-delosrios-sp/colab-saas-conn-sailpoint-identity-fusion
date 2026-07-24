@@ -48,6 +48,9 @@ describe('MatchOutcomeDispatcher', () => {
             error: vi.fn(),
             crash: vi.fn(),
             assert: vi.fn(),
+            recordEvent: vi.fn(),
+            getLogLevel: vi.fn().mockReturnValue('info'),
+            setProgress: vi.fn(),
         } as any
         const run = new FusionRun(log)
         const matchingService = new MatchingService(config, log)
@@ -249,7 +252,7 @@ describe('MatchOutcomeDispatcher', () => {
 
             expect(result.deferred).toBe(1)
             expect(run.managedAccountsById.has('source-a-id::native-new')).toBe(false)
-            expect(log.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
+            expect(log.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('dispatches a non-match by registering an authoritative fusion account', async () => {
@@ -559,4 +562,5 @@ describe('MatchOutcomeDispatcher', () => {
         })
     })
 })
+
 

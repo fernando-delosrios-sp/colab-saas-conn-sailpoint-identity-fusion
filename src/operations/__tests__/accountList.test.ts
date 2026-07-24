@@ -373,16 +373,19 @@ describe('accountList report epilogue', () => {
         expect(registry.res.send).toHaveBeenCalledWith(expect.objectContaining({ rowsSent: expect.any(Number) }))
     })
 
-    it('logs Epilogue labels and no numbered report phases', async () => {
+    it('logs phase START, Epilogue labels, and no legacy heartbeats', async () => {
         const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const logSpy = vi.spyOn(registry.log, 'info')
 
         await accountList(registry, { schema: { attributes: [] } } as any)
 
-        const phaseMessages = logSpy.mock.calls
-            .map((call) => String(call[0]))
-            .filter((msg) => /\b(?:PHASE [1-7]|Epilogue):/.test(msg))
+        const messages = logSpy.mock.calls.map((call) => String(call[0]))
+        expect(messages.some((msg) => msg.includes('PHASE 1 Setup START'))).toBe(true)
+        expect(messages.some((msg) => msg.includes('EPILOGUE report START'))).toBe(true)
+        expect(messages.some((msg) => msg.includes('Queue Stats:'))).toBe(false)
+        expect(messages.some((msg) => msg.includes('Memory usage'))).toBe(false)
 
+        const phaseMessages = messages.filter((msg) => /\b(?:PHASE [1-7]|Epilogue):/.test(msg))
         expect(phaseMessages.length).toBeGreaterThan(0)
         expect(phaseMessages.some((msg) => msg.startsWith('Epilogue: report generation'))).toBe(true)
         expect(phaseMessages.some((msg) => /PHASE [67]:/.test(msg))).toBe(false)
@@ -391,3 +394,4 @@ describe('accountList report epilogue', () => {
         logSpy.mockRestore()
     })
 })
+

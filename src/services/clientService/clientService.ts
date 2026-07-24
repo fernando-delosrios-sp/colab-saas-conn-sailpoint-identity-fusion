@@ -20,13 +20,9 @@ import type { Search, AccountsV2025Api, IdentitiesV2025Api, IdentityAttributesV2
 export class ClientService {
     private readonly pageSize: number
     private readonly sailPointListMax: number
-    private readonly statsLoggingIntervalMs: number
     private readonly requestTimeoutMs?: number
     /** Number of pages to fetch in parallel inside paginateParallel. */
     private readonly parallelBatchSize: number
-    /** Handle for the stats logging interval so it can be cleared in dispose(). */
-    private statsLoggingInterval?: ReturnType<typeof setInterval>
-
     constructor(
         private adapter: IscApiAdapter,
         protected readonly queue: ApiQueue | null,
@@ -44,7 +40,6 @@ export class ClientService {
         // Store pageSize for pagination
         this.pageSize = fusionConfig.pageSize
         this.sailPointListMax = fusionConfig.sailPointListMax
-        this.statsLoggingIntervalMs = fusionConfig.statsLoggingIntervalMs
         const parallelBatchSize = fusionConfig.parallelBatchSize ?? 8
         const requestsPerSecond = fusionConfig.requestsPerSecond ?? fusionConfig.requestsPerSecondConstant
         const maxConcurrentRequests = fusionConfig.maxConcurrentRequests ?? Math.max(10, requestsPerSecond * 2)
@@ -54,7 +49,6 @@ export class ClientService {
             // smaller of the configured value and maxConcurrentRequests.
             this.parallelBatchSize = Math.min(parallelBatchSize, maxConcurrentRequests)
 
-            this.startStatsLogging()
             this.log.info(
                 `API client ready: queue enabled, ` +
                     `max concurrent: ${maxConcurrentRequests}, keep-alive: true`
@@ -624,36 +618,10 @@ export class ClientService {
     }
 
     /**
-     * Start periodic stats logging (only called when queue is enabled).
-     * The interval handle is stored so it can be cleared by dispose().
-     */
-    protected startStatsLogging(): void {
-        if (!this.queue) {
-            return
-        }
-
-        this.statsLoggingInterval = setInterval(() => {
-            const stats = this.queue!.getStats()
-            if (stats.queueLength > 0 || stats.activeRequests > 0) {
-                this.log.info(
-                    `Queue Stats: ${stats.activeRequests} active, ${stats.queueLength} queued, ` +
-                        `${stats.totalProcessed} processed, ${stats.totalFailed} failed, ` +
-                        `avg wait: ${stats.averageWaitTime.toFixed(0)}ms, ` +
-                        `avg process: ${stats.averageProcessingTime.toFixed(0)}ms`
-                )
-            }
-        }, this.statsLoggingIntervalMs)
-    }
-
-    /**
-     * Release resources held by this client (stats logging interval, queue).
+     * Release resources held by this client (queue).
      * Safe to call multiple times.
      */
     public dispose(): void {
-        if (this.statsLoggingInterval !== undefined) {
-            clearInterval(this.statsLoggingInterval)
-            this.statsLoggingInterval = undefined
-        }
         this.queue?.stop()
     }
 
