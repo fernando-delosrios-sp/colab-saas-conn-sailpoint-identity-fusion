@@ -2,6 +2,8 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { Context, ConnectorError, ConnectorErrorType, Response, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
+import { HeartbeatSnapshot } from './logService/operationHeartbeat'
+import { OperationRunContext } from './logService/operationRunContext'
 import { InMemoryLockService } from './lockService'
 import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
 import { IscApiAdapter } from './clientService/iscApiAdapter'
@@ -54,6 +56,7 @@ export class ServiceRegistry {
     public recording?: RecordingService
     public matchOutcomeDispatcher: MatchOutcomeDispatcher
     public run: FusionRun
+    public runContext: OperationRunContext
 
     /**
      * Creates a new ServiceRegistry, initializing all services in dependency order.
@@ -73,6 +76,8 @@ export class ServiceRegistry {
         // Initialize core services first
         const logConfig = operationContext ? { ...config, operationContext } : config
         this.log = context.logService ?? new LogService(logConfig)
+        this.runContext = new OperationRunContext()
+        this.log.bindRunContext(this.runContext)
         this.run = new FusionRun(this.log, this.config)
         this.locks = context.lockService ?? new InMemoryLockService(this.log)
 
@@ -221,6 +226,18 @@ export class ServiceRegistry {
         return reg
     }
 
+    /** Snapshot for the operation heartbeat (queue, memory, run context). */
+    getHeartbeatSnapshot(): HeartbeatSnapshot {
+        const queueItems = this.client.getQueueItems()
+        return {
+            runContext: this.runContext,
+            queueStats: this.client.getQueueStats(),
+            activeItems: queueItems.active,
+            memory: process.memoryUsage(),
+            intervalMs: this.config.statsLoggingIntervalMs,
+        }
+    }
+
     /**
      * Flushes pending logs for the active registry, if any. Retained for backward
      * compatibility with callers that previously invoked `clear()` to drop the
@@ -231,3 +248,4 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+

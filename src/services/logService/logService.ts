@@ -2,8 +2,8 @@ import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector
 import { ApiQueue } from '../clientService/queue'
 import { QueuePriority } from '../clientService/types'
 import { getCallerInfo } from './helpers'
-
-
+import { HeartbeatSnapshot, OperationHeartbeat, formatDetailSuffix } from './operationHeartbeat'
+import { OperationPhase, OperationRunContext } from './operationRunContext'
 
 type Logger = typeof logger
 
@@ -191,6 +191,8 @@ export class LogService {
     }
     private static readonly ISSUE_SAMPLE_LIMIT = 6
     private static readonly ISSUE_MESSAGE_MAX_LENGTH = 180
+    private runContext: OperationRunContext | null = null
+    private operationHeartbeat: OperationHeartbeat | null = null
 
     /**
      * @param config - Logging configuration including level, debug flag, and external logging settings
@@ -222,6 +224,60 @@ export class LogService {
      */
     setQueue(queue: ApiQueue | null): void {
         this.apiQueue = queue
+    }
+
+    bindRunContext(context: OperationRunContext): void {
+        this.runContext = context
+    }
+
+    getRunContext(): OperationRunContext | null {
+        return this.runContext
+    }
+
+    phaseStart(phaseNumber: number, phase: OperationPhase): void {
+        if (this.runContext) {
+            this.runContext.phase = phase
+        }
+        this.info(`PHASE ${phaseNumber} ${phase} START`)
+    }
+
+    stepStart(step: string, detail?: Record<string, unknown>): void {
+        if (this.runContext) {
+            this.runContext.step = step
+            this.runContext.stepStartedAt = Date.now()
+        }
+        this.info(`STEP ${step} START${formatDetailSuffix(detail)}`)
+    }
+
+    stepEnd(step: string, detail?: Record<string, unknown>): void {
+        const startedAt = this.runContext?.stepStartedAt
+        const elapsed =
+            startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
+        this.info(`STEP ${step} END${elapsed}${formatDetailSuffix(detail)}`)
+        if (this.runContext) {
+            this.runContext.stepStartedAt = undefined
+        }
+    }
+
+    setProgress(done: number, total: number, unit?: string): void {
+        if (this.runContext) {
+            this.runContext.progress = { done, total, unit }
+        }
+    }
+
+    recordEvent(category: string, detail?: Record<string, unknown>): void {
+        this.runContext?.recordEvent(category, detail)
+    }
+
+    startOperationHeartbeat(getSnapshot: () => HeartbeatSnapshot): void {
+        this.stopOperationHeartbeat()
+        this.operationHeartbeat = new OperationHeartbeat(this, getSnapshot)
+        this.operationHeartbeat.start()
+    }
+
+    stopOperationHeartbeat(): void {
+        this.operationHeartbeat?.stop()
+        this.operationHeartbeat = null
     }
 
     /**
@@ -519,7 +575,7 @@ export class LogService {
     metric(name: string, startedAt: number, data?: Record<string, any>): void {
         const durationMs = Date.now() - startedAt
         const dataStr = data ? ' ' + Object.entries(data).map(([k, v]) => `${k}=${v}`).join(' ') : ''
-        this.info(`Performance metric: ${name} durationMs=${durationMs}${dataStr}`)
+        this.info(`METRIC ${name} durationMs=${durationMs}${dataStr}`)
     }
 
     getLogLevel(): LogLevel {
@@ -561,3 +617,4 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+

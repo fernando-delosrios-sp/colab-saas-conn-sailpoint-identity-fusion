@@ -35,6 +35,7 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
     const dryRun = parseDryRunInput(input)
     const isPersistent = !dryRun
     const timer = log.timer()
+    log.startOperationHeartbeat(() => serviceRegistry.getHeartbeatSnapshot())
     const streamProgress = { sent: 0 }
     let fetchResult: FetchResult | undefined
     let outputCount: number | undefined
@@ -46,18 +47,23 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
 
             const options: PhaseOptions = { isPersistent, tracker, streamProgress }
 
+            log.phaseStart(1, 'Setup')
             if (!(await setupPhase(serviceRegistry, input.schema, options))) return
             timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
 
+            log.phaseStart(2, 'Fetch')
             fetchResult = await fetchPhase(serviceRegistry, options)
             timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
 
+            log.phaseStart(3, 'Refresh')
             await refreshPhase(serviceRegistry)
             timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
 
+            log.phaseStart(4, 'Process')
             await processPhase(serviceRegistry, options)
             timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
 
+            log.phaseStart(5, 'Output')
             outputCount = await outputPhase(serviceRegistry, options)
             timer.phase('PHASE 5: Output (JIT attributes, serialize & clean up memory)', 'info', 'Output')
         } catch (error) {
@@ -93,8 +99,10 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         const label = dryRun ? 'Dry-run analysis' : 'Account list operation'
         timer.end(`✓ ${label} completed successfully - ${outputCount ?? 0} account(s) processed`)
     } finally {
+        log.stopOperationHeartbeat()
         if (isPersistent) {
             await sources.releaseProcessLock()
         }
     }
 }
+

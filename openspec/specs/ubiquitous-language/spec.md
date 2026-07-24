@@ -163,6 +163,25 @@ The term **Epilogue** SHALL denote the terminal block of the account-list operat
 - **THEN** it SHALL contain an **Epilogue** entry defined as the always-runs terminal report block
 - **AND** the **Phase** entry SHALL NOT list the report step as an example phase
 
+### Requirement: Glossary defines operation heartbeat terms
+
+The ubiquitous-language glossary SHALL define **Operation heartbeat**, **STATUS line**, and **EVENT_SUMMARY line** as canonical terms for periodic operation visibility logging.
+
+#### Scenario: Glossary entry for Operation heartbeat
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain an **Operation heartbeat** entry describing the periodic STATUS and EVENT_SUMMARY emission during long-running operations
+
+#### Scenario: Glossary entry for STATUS line
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **STATUS line** entry describing the primary situational text line (phase, step, progress, queue, memory, elapsed)
+
+#### Scenario: Glossary entry for EVENT_SUMMARY line
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain an **EVENT_SUMMARY line** entry describing aggregated account-level activity between heartbeat ticks
+
 ## Canonical Terms
 
 ### Account taxonomy
@@ -195,6 +214,9 @@ The connector refers to an ISC identity and to the Fusion account itself through
 | **Operation run** | A single execution or instance of an operation. A run is the execution of an operation. |
 | **Phase** | A major stage of an operation pipeline (for example the identity documents phase, the Fusion accounts phase, or the managed accounts phase). The report step is not a phase; see **Epilogue**. |
 | **Epilogue** | The always-runs terminal block of the account-list operation that emits reports and summaries after the pipeline phases complete, regardless of pipeline success. Ordered most-durable-first (report file, report email, summary send). |
+| **Operation heartbeat** | A periodic logging interval (default 30s) during long-running operations that emits **STATUS line** and **EVENT_SUMMARY line** text to explain phase, step, progress, queue state, and aggregated account activity. |
+| **STATUS line** | The primary situational text line emitted by the operation heartbeat: phase, step, progress, queue delta, memory, and elapsed time (grep prefix `STATUS`). |
+| **EVENT_SUMMARY line** | A heartbeat text line aggregating account-level activity (matches, correlations, outcomes) recorded since the previous tick (grep prefix `EVENT_SUMMARY`). |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
 | **Correlated account sweep** | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts. |
 | **Aggregation** | The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters. |
@@ -438,3 +460,4 @@ The following terms are retired and SHALL NOT be used in new code, configuration
 | `attribute-service` (spec) | `mapping-service` + `definition-service` |
 | `scoring-service` (spec) | `matching-service` |
 | `custom:dryrun` | dry-run mode of the accountList operation |
+

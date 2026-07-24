@@ -4,7 +4,7 @@ import { FusionConfig, SourceType } from '../../model/config'
 import { FusionAccount } from '../../model/account'
 import { FusionDecision } from '../../model/form'
 import { FusionRun } from '../../model/fusionRun'
-import { LogService, PhaseTimer } from '../logService'
+import { LogService } from '../logService'
 import { SourceInfo } from '../sourceService'
 import { FormService } from '../formService'
 import { MatchingService, COMBINED_SCORE_ROW_ATTRIBUTE } from './matchingService'
@@ -269,7 +269,6 @@ export class MatchOutcomeDispatcher {
         }
 
         const { run, log, accountAssembly } = this.deps
-        const startedAt = Date.now()
         const result: MatchSweepResult = {
             processed: 0,
             matchScoringMs: run.matchScoringMs,
@@ -286,19 +285,8 @@ export class MatchOutcomeDispatcher {
 
         const initialQueueSize = accounts.length
         let processedCount = 0
-        const logProgressEvery = Math.max(1, Math.min(batchSize, initialQueueSize))
-        const logProgress = (): void => {
-            if (
-                processedCount === 1 ||
-                processedCount % logProgressEvery === 0 ||
-                processedCount === initialQueueSize
-            ) {
-                log.info(
-                    `Managed accounts progress: ${processedCount}/${initialQueueSize} analyzed | RUN ELAPSED ${PhaseTimer.formatElapsed(
-                        Date.now() - startedAt
-                    )}`
-                )
-            }
+        const updateProgress = (): void => {
+            log.setProgress(processedCount, initialQueueSize, 'analyzed')
         }
 
         interface PendingScore {
@@ -318,7 +306,7 @@ export class MatchOutcomeDispatcher {
                 )
                 run.claimAccount(managedAccountKey!, account.identityId)
                 processedCount++
-                logProgress()
+                updateProgress()
                 continue
             }
 
@@ -329,7 +317,7 @@ export class MatchOutcomeDispatcher {
                 const fusionAccount = await accountAssembly.assembleManagedAccount(account)
                 const nonMatchAccount = await this.handleNoReviewerAccount(fusionAccount, sourceType, sourceInfo, account)
                 processedCount++
-                logProgress()
+                updateProgress()
                 result.nonMatch++
                 result.resolved.push({
                     account,
@@ -347,7 +335,7 @@ export class MatchOutcomeDispatcher {
                 run.claimAccount(managedAccountKey!, account.identityId)
                 const nonMatchAccount = await this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
                 processedCount++
-                logProgress()
+                updateProgress()
                 result.nonMatch++
                 result.resolved.push({
                     account,
@@ -373,7 +361,7 @@ export class MatchOutcomeDispatcher {
                 }
                 const resolved = await this.dispatchOutcome(scored)
                 processedCount++
-                logProgress()
+                updateProgress()
                 if (resolved) {
                     result.resolved.push(resolved)
                     result[resolutionCountKey(resolved.resolution)]++
@@ -534,7 +522,12 @@ export class MatchOutcomeDispatcher {
     private handleDeferredMatch(fusionAccount: FusionAccount, account: Account): void {
         const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'deferred')
         const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
-        this.deps.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}; skipping account for now`)
+        this.deps.log.recordEvent('match', { type: 'deferred' })
+        if (this.deps.log.getLogLevel() === 'debug') {
+            this.deps.log.debug(
+                `${headline}: ${account.name} [${account.sourceName}] - ${summary}; skipping account for now`
+            )
+        }
         this.deps.run.claimAccount(getManagedAccountKeyFromAccount(account)!, account.identityId)
     }
 
@@ -601,5 +594,6 @@ function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 
             return 'nonMatch'
     }
 }
+
 
 

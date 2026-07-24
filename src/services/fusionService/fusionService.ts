@@ -802,7 +802,10 @@ export class FusionService {
                     (m: FusionMatch) => m.candidateType === MatchCandidateType.Deferred
                 )
                 const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
-                this.log.info(`${headline}: ${account.name} [${account.sourceName}] - ${summary}`)
+                this.log.recordEvent('match', { type: 'deferred' })
+                if (this.log.getLogLevel() === 'debug') {
+                    this.log.debug(`${headline}: ${account.name} [${account.sourceName}] - ${summary}`)
+                }
             }
             results.push(fusionAccount)
             processed += 1
@@ -899,9 +902,7 @@ export class FusionService {
                 currentBatch === totalBatches ||
                 processedInLoop === totalEligible
             ) {
-                this.log.info(
-                    `Sending accounts progress: batches ${currentBatch}/${totalBatches} | eligible processed ${processedInLoop}/${totalEligible} | sent ${count}`
-                )
+                this.log.setProgress(processedInLoop, totalEligible, 'sent')
             }
             await yieldToEventLoop()
         }

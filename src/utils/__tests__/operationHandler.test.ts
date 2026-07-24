@@ -1,5 +1,5 @@
 import { createOperationHandler, OperationHandlerOptions } from '../operationHandler'
-import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
+import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import type { Mock } from 'vitest'
 
@@ -160,7 +160,7 @@ describe('createOperationHandler', () => {
             expect(res.keepAlive).toHaveBeenCalledTimes(2)
         })
 
-        it('should start memory keepAlive interval', async () => {
+        it('should start memory keepAlive interval without memory log line', async () => {
             // eslint-disable-next-line prefer-const
             let resolveRegistry: any
             let resolveFn: () => void
@@ -182,6 +182,7 @@ describe('createOperationHandler', () => {
 
             vi.advanceTimersByTime(1000)
             expect(res.keepAlive).toHaveBeenCalledTimes(1)
+            expect(logger.info).not.toHaveBeenCalledWith(expect.stringContaining('Memory usage'))
 
             resolveFn!()
             await promise
@@ -310,3 +311,4 @@ describe('createOperationHandler', () => {
 
 
 })
+

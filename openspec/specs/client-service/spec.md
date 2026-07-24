@@ -108,6 +108,23 @@ A public `accessToken` getter is provided for services that need to resolve API 
 - **THEN** the underlying HTTP client SHALL use the same shared `httpsAgent` from `Configuration.baseOptions`
 - **AND** outbound requests SHALL continue to route through the client service queue unchanged
 
+### Requirement: Queue statistics are consumed by operation heartbeat not standalone logging
+
+The client service SHALL expose queue statistics and active item information via `getQueueStats()` and `getQueueItems()` for operation heartbeat consumption. The client service SHALL NOT emit standalone periodic `Queue Stats:` log lines when an operation heartbeat is active for the current registry context.
+
+#### Scenario: No standalone queue stats interval during account-list
+
+- **GIVEN** an account-list operation with an active operation heartbeat
+- **WHEN** the run exceeds two heartbeat intervals
+- **THEN** log output SHALL NOT contain standalone lines beginning with `Queue Stats:`
+- **AND** queue statistics SHALL appear inside `STATUS` heartbeat lines instead
+
+#### Scenario: Queue stats API remains available
+
+- **GIVEN** any connector operation using the shared API queue
+- **WHEN** a caller invokes `client.getQueueStats()`
+- **THEN** current queue statistics SHALL be returned regardless of heartbeat state
+
 ## Known Exceptions
 
 ### `paginateSearchApiGenerator()` remains public
@@ -117,4 +134,5 @@ The `call()` method does not support a generator-based searchAfter overload. `id
 ### `createRetriesConfig()` retained in helpers.ts
 
 This function is used by `sdkApiAdapter.ts` to set `retriesConfig.retries = 0` at the axios SDK level. This disables axios-level retry so the `ApiQueue` is the sole retry authority, preventing double-retry. It is not dead code.
+
 

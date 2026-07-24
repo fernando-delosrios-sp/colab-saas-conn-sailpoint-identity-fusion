@@ -5,7 +5,14 @@ import { SourceType } from '../../../model/config'
 import { MatchCandidateType } from '../../matchingService/types'
 
 function makeRecorder(overrides: Record<string, any> = {}) {
-    const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+    const log = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        recordEvent: vi.fn(),
+        getLogLevel: vi.fn().mockReturnValue('info'),
+    } as any
     const tracker = new AggregationTracker()
     const urlContext = {
         identity: vi.fn(() => 'identity-url'),
@@ -33,7 +40,7 @@ function makeRecorder(overrides: Record<string, any> = {}) {
 
 describe('ManagedAccountAnalysisRecorder', () => {
     it('records a match account', () => {
-        const { recorder, tracker } = makeRecorder()
+        const { recorder, tracker, log } = makeRecorder()
         const fusionAccount = {
             isMatch: true,
             fusionMatches: [
@@ -50,6 +57,7 @@ describe('ManagedAccountAnalysisRecorder', () => {
         })
         expect(tracker.matchAccounts).toContain(fusionAccount)
         expect(tracker.fusionIdentityComparisonsByAccount.get(fusionAccount)).toBe(5)
+        expect(log.recordEvent).toHaveBeenCalledWith('match', { type: 'partial' })
     })
 
     it('records a deferred match account', () => {
@@ -98,3 +106,4 @@ describe('ManagedAccountAnalysisRecorder', () => {
         expect(tracker.failedMatchingAccounts.length).toBe(1)
     })
 })
+

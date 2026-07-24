@@ -766,7 +766,7 @@ describe('FusionService', () => {
 
             expect(fusionService.fusionAccounts).toHaveLength(1)
             expect(workQueue.has('source-a-id::native-seq-2')).toBe(false)
-            expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
+            expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('keeps deferred candidate visibility within a managed-account batch', async () => {
@@ -826,7 +826,7 @@ describe('FusionService', () => {
 
             expect(fusionService.fusionAccounts).toHaveLength(1)
             expect(workQueue.has('source-a-id::native-batch-def-2')).toBe(false)
-            expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
+            expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('runs deferred source identity phase in parallel while deferred candidate scoring stays batched', async () => {
@@ -957,7 +957,7 @@ describe('FusionService', () => {
             expect(maxInFlightIdentityA).toBeGreaterThan(1)
             expect(maxInFlightIdentityB).toBeGreaterThan(1)
             expect(maxInFlightDeferredB).toBeGreaterThan(1)
-            expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
+            expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('does not include deferred candidates from other sources', async () => {
@@ -1211,7 +1211,7 @@ describe('FusionService', () => {
             expect(result).toBeDefined()
             expect(result?.fusionMatches.some((m) => m.candidateType === 'deferred')).toBe(true)
             expect(workQueue.has('source-a-id::native-deferred-1')).toBe(false)
-            expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
+            expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('does not record deferred match report rows when StdAccountList, fusionReportOnAggregation false, and not custom:dryrun', async () => {
@@ -1916,7 +1916,7 @@ describe('FusionService', () => {
 
             expect(analyzed).toHaveLength(2)
             expect(analyzed[1].fusionMatches.some((match) => match.candidateType === 'deferred')).toBe(true)
-            expect(mockLog.info).toHaveBeenCalledWith(expect.stringMatching(/DEFERRED .*MATCH FOUND/))
+            expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('makes previously-persisted non-match accounts visible as deferred candidates', async () => {

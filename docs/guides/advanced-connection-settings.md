@@ -141,6 +141,29 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 }
 ```
 
+### Operation log line kinds (`accountList`)
+
+During long `accountList` aggregations, the connector emits standardized text prefixes in log messages (prefixed with `[accountList]`). Use these for monitoring and alerting instead of legacy patterns.
+
+| Prefix | Level | Purpose |
+| ------ | ----- | ------- |
+| `STATUS` | Info | Periodic heartbeat (~30s): phase, step, progress, queue delta, memory, elapsed time |
+| `EVENT_SUMMARY` | Info | Aggregated match/correlation counts since the previous heartbeat tick |
+| `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END`) |
+| `WARN STALL` | Warn | API queue stopped completing requests for ~60s; includes active request labels |
+| `EPILOGUE` | Info | Report epilogue start (not a numbered phase) |
+| `METRIC` | Info | Phase/step timing metrics |
+
+**Log monitor migration:**
+
+| Legacy pattern (removed) | Replace with |
+| ------------------------ | ------------ |
+| `Queue Stats:` | `STATUS` (queue stats appear inside STATUS lines) |
+| `Memory usage` | `STATUS` (RSS/heap appear inside STATUS lines) |
+| Per-account `MATCH FOUND:` / `Triggering correlation` at Info | `EVENT_SUMMARY` (per-account detail remains at Debug) |
+
+**Example grep targets:** `STATUS`, `WARN STALL`, `EVENT_SUMMARY`, `PHASE 4 Process START`
+
 ---
 
 ## Part 2: Advanced Connection Settings
@@ -453,3 +476,4 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](troubleshooting.md).
+
