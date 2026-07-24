@@ -359,6 +359,136 @@ describe('ClientService', () => {
         }).rejects.toThrow(PaginationError)
     })
 
+    it('schedules next offset when a fast page frees a sliding-window slot before a slow page completes', async () => {
+        const sc = {
+            ...mockConfig,
+            pageSize: 1,
+            sailPointListMax: 250,
+            parallelBatchSize: 2,
+            maxConcurrentRequests: 10,
+        }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        const slowOffset = 2
+        let maxInFlight = 0
+        let inFlight = 0
+        let offset3StartedWhileOffset2InFlight = false
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                inFlight++
+                maxInFlight = Math.max(maxInFlight, inFlight)
+                if (offset === 3 && inFlight > 1) {
+                    offset3StartedWhileOffset2InFlight = true
+                }
+                return new Promise((resolve) => {
+                    const delayMs = offset === slowOffset ? 50 : 0
+                    setTimeout(() => {
+                        inFlight--
+                        if (offset === 0) {
+                            resolve({ data: [{ id: 'p0' }], headers: { 'x-total-count': '4' } })
+                        } else {
+                            resolve({ data: [{ id: `p${offset}` }] })
+                        }
+                    }, delayMs)
+                })
+            }),
+        } as any
+
+        const gen = client.call(
+            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+            { paginate: { mode: 'parallel', baseParams: {}, batchSize: 2 } }
+        )
+
+        const pages: any[][] = []
+        for await (const page of gen) {
+            pages.push(page)
+        }
+
+        expect(pages.flat().map((item) => item.id)).toEqual(['p0', 'p1', 'p2', 'p3'])
+        expect(maxInFlight).toBeGreaterThan(1)
+        expect(offset3StartedWhileOffset2InFlight).toBe(true)
+    })
+
+    it('yields parallel pages in ascending offset order when completions arrive out of order', async () => {
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, parallelBatchSize: 3 }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                const delayMs = offset === 1 ? 30 : offset === 2 ? 0 : 10
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        if (offset === 0) {
+                            resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '3' } })
+                        } else {
+                            resolve({ data: [{ id: `a${offset}` }] })
+                        }
+                    }, delayMs)
+                })
+            }),
+        } as any
+
+        const gen = client.call(
+            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+            { paginate: { mode: 'parallel', baseParams: {} } }
+        )
+
+        const collected: any[][] = []
+        for await (const page of gen) {
+            collected.push(page)
+        }
+
+        expect(collected.flat().map((item) => item.id)).toEqual(['a0', 'a1', 'a2'])
+    })
+
+    it('reports onPageProgress after each parallel page completes', async () => {
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, parallelBatchSize: 2 }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '3' } })
+                }
+                return Promise.resolve({ data: [{ id: `a${offset}` }] })
+            }),
+        } as any
+
+        const progressCalls: number[] = []
+        const gen = client.call(
+            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+            {
+                paginate: { mode: 'parallel', baseParams: {} },
+                onPageProgress: (loaded) => progressCalls.push(loaded),
+            }
+        )
+
+        for await (const _page of gen) {
+            // consume
+        }
+
+        expect(progressCalls).toEqual([1, 2, 3])
+    })
+
+    it('preserves configured parallelBatchSize when greater than maxConcurrentRequests', () => {
+        const sc = {
+            ...mockConfig,
+            parallelBatchSize: 16,
+            maxConcurrentRequests: 10,
+        }
+        const client = new ClientService(mockAdapter, mockQueue, sc, mockLog)
+        activeClients.push(client)
+
+        expect((client as any).parallelBatchSize).toBe(16)
+    })
+
     // -------------------------------------------------------------------------
     // Public API surface
     // -------------------------------------------------------------------------
@@ -375,5 +505,6 @@ describe('ClientService', () => {
         expect(mockQueue.stop).toHaveBeenCalled()
     })
 })
+
 
 

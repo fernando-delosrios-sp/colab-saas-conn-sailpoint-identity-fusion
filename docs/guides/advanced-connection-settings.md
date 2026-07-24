@@ -214,7 +214,7 @@ The connector uses a **sliding-window rate limiter** aligned with ISC tenant API
 | Field                           | Default | Range   | Purpose                                      |
 | ------------------------------- | ------- | ------- | -------------------------------------------- |
 | **Maximum concurrent requests** | 20      | 1–30    | Max simultaneous in-flight HTTP calls        |
-| **Parallel pagination batch size** | 12   | 1–16    | Pages fetched in parallel during pagination  |
+| **Parallel pagination batch size** | 12   | 1–16    | Max in-flight pages per parallel pagination stream (sliding window); global concurrency still capped by max concurrent requests |
 | **Requests per second**         | 10      | 1–12    | Legacy hint; derives sliding-window cap when changed |
 
 **When to adjust queue settings:**
@@ -232,7 +232,7 @@ The connector uses a **sliding-window rate limiter** aligned with ISC tenant API
 | Metric                      | Initial value | Adjust if...                                                                                  |
 | --------------------------- | ------------- | --------------------------------------------------------------------------------------------- |
 | **Max concurrent requests** | 20            | HTTP 429 errors → decrease to 10–15; slow aggregation and no errors → increase toward 25–30 |
-| **Parallel batch size**     | 12            | Keep ≤ max concurrent; lower if pagination bursts trigger 429s                                |
+| **Parallel batch size**     | 12            | May exceed max concurrent for pipelining; lower if 429s appear on large fetches                |
 | **Requests per second**     | 10            | HTTP 429 errors → decrease to 4–6; lowers derived window cap                                  |
 
 **Interaction with Connection Settings:**
@@ -246,6 +246,13 @@ The **Requests per second** field also appears in **Connection Settings**. They 
 **Queue behavior:**
 
 ```
+Parallel pagination (Fetch):
+1. Initial page fetched with X-Total-Count
+2. Sliding window keeps up to parallelBatchSize page requests in flight
+3. When any page completes → next offset enqueued (no batch barrier)
+4. Pages yielded to callers in ascending offset order
+
+Shared API queue:
 1. API request added to queue
 2. Queue checks sliding window (starts in last 10s < cap)
 3. When a rate slot is available AND activeRequests < max concurrent:
@@ -480,6 +487,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](troubleshooting.md).
+
 
 
 

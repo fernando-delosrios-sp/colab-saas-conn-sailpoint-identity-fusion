@@ -313,4 +313,41 @@ describe('OperationHeartbeat timing', () => {
         heartbeat.stop()
         vi.useRealTimers()
     })
+
+    it('shows page-sized fetch progress deltas between heartbeat ticks', () => {
+        vi.useFakeTimers()
+        const info = vi.fn()
+        const log = { info } as unknown as LogService
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Fetch'
+        runContext.progress = { done: 500, total: 101_561, unit: 'fetched' }
+
+        const heartbeat = new OperationHeartbeat(log, () => ({
+            runContext,
+            queueStats: {
+                activeRequests: 10,
+                queueLength: 0,
+                totalProcessed: 120,
+                totalFailed: 0,
+                totalRetries: 0,
+                averageWaitTime: 0,
+                averageProcessingTime: 0,
+            },
+            intervalMs: 10_000,
+        }))
+
+        heartbeat.start()
+        vi.advanceTimersByTime(10_000)
+
+        runContext.progress = { done: 750, total: 101_561, unit: 'fetched' }
+        vi.advanceTimersByTime(10_000)
+
+        const secondStatus = info.mock.calls[1][0] as string
+        expect(secondStatus).toContain('progress=750/101561 fetched(Δ+250/10s)')
+        expect(secondStatus).not.toContain('Δ+2500/10s')
+
+        heartbeat.stop()
+        vi.useRealTimers()
+    })
 })
+

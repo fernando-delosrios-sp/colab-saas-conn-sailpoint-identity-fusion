@@ -398,9 +398,9 @@ export interface AdvancedConnectionSettingsSection {
     enablePriority?: boolean
 
     /**
-     * Number of pages to fetch concurrently inside paginateParallel.
-     * Defaults to 8 when unset. The effective value is capped at maxConcurrentRequests
-     * so it never exceeds the queue's concurrency budget.
+     * Maximum in-flight parallel page requests per pagination stream (sliding window).
+     * Defaults to 12 when unset. Independent from maxConcurrentRequests — the shared
+     * ApiQueue still enforces global HTTP concurrency and rate-window limits.
      */
     parallelBatchSize?: number
 
@@ -519,5 +519,6 @@ export interface FusionConfig
         InternalConfig {
     recording?: RecordingConfig
 }
+
 
 

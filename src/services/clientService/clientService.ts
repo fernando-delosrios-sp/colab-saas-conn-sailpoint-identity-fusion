@@ -44,18 +44,17 @@ export class ClientService {
         const parallelBatchSize = fusionConfig.parallelBatchSize ?? 12
         const maxConcurrentRequests = fusionConfig.maxConcurrentRequests ?? 20
 
-        if (this.queue) {
-            // parallelBatchSize caps concurrent page fetches in paginateParallel at the
-            // smaller of the configured value and maxConcurrentRequests.
-            this.parallelBatchSize = Math.min(parallelBatchSize, maxConcurrentRequests)
+        this.parallelBatchSize = parallelBatchSize
 
+        if (this.queue) {
             this.log.info(
                 `API client ready: queue enabled, ` +
-                    `max concurrent: ${maxConcurrentRequests}, keep-alive: true`
+                    `max concurrent: ${maxConcurrentRequests}, parallel page window: ${parallelBatchSize}, keep-alive: true`
             )
         } else {
-            this.parallelBatchSize = parallelBatchSize
-            this.log.info('API client ready (direct calls, no queue, keep-alive: true)')
+            this.log.info(
+                `API client ready (direct calls, no queue, parallel page window: ${parallelBatchSize}, keep-alive: true)`
+            )
         }
     }
 
@@ -249,17 +248,107 @@ export class ClientService {
         if (!tc || tc <= i1.length) return
         const offs: number[] = []
         for (let o = i1.length; o < fc; o += eps) offs.push(o)
-        let coll = i1.length
-        for (let i = 0; i < offs.length; i += bs) {
-            if (policy.abortSignal?.aborted) return
-            const bo = offs.slice(i, i + bs)
-            const ps = bo.map((o) => this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit: eps, offset: o }), policy.priority, ctx(`[offset ${o}]`), policy.abortSignal))
-            const rs = await Promise.all(ps)
-            for (let j = 0; j < rs.length; j++) {
-                if (!rs[j]) throw new PaginationError(`Pagination failed at batch offset ${bo[j]} (${policy.context ?? 'paginate'}). ${coll} item(s) collected before failure.`, coll)
-                if (rs[j]!.data?.length) { coll += rs[j]!.data.length; yield rs[j]!.data }
+
+        yield* this._runParallelOffsetWindow(
+            offs,
+            bs,
+            i1.length,
+            fc,
+            async (offset) => {
+                const response = await this.execute<{ data: T[] }>(
+                    () => fn(api, { ...bp, limit: eps, offset }),
+                    policy.priority,
+                    ctx(`[offset ${offset}]`),
+                    policy.abortSignal
+                )
+                if (!response) {
+                    return undefined
+                }
+                return response.data || []
+            },
+            (offset, loaded) =>
+                new PaginationError(
+                    `Pagination failed at offset ${offset} (${policy.context ?? 'paginate'}). ${loaded} item(s) collected before failure.`,
+                    loaded
+                ),
+            (loaded, total) => policy.onPageProgress?.(loaded, total),
+            policy.abortSignal
+        )
+    }
+
+    /**
+     * Fetch offset pages with a sliding window: up to `windowSize` in-flight requests;
+     * schedules the next offset when any page completes. Yields pages in ascending offset order.
+     */
+    private async *_runParallelOffsetWindow<T>(
+        offsets: number[],
+        windowSize: number,
+        initialLoaded: number,
+        progressTotal: number | undefined,
+        fetchPage: (offset: number) => Promise<T[] | undefined>,
+        fail: (offset: number, loadedBeforeFailure: number) => PaginationError,
+        onPageComplete: (loaded: number, total?: number) => void,
+        abortSignal?: AbortSignal
+    ): AsyncGenerator<T[], void, unknown> {
+        if (abortSignal?.aborted || offsets.length === 0) {
+            return
+        }
+
+        let loaded = initialLoaded
+        let scheduleIndex = 0
+        let yieldIndex = 0
+        const completed = new Map<number, T[]>()
+        const inFlight = new Map<number, Promise<void>>()
+
+        const pump = (): void => {
+            while (inFlight.size < windowSize && scheduleIndex < offsets.length) {
+                const offset = offsets[scheduleIndex++]
+                const task = (async () => {
+                    if (abortSignal?.aborted) {
+                        return
+                    }
+                    const page = await fetchPage(offset)
+                    if (page === undefined) {
+                        throw fail(offset, loaded)
+                    }
+                    completed.set(offset, page)
+                    loaded += page.length
+                    onPageComplete(loaded, progressTotal)
+                })().finally(() => {
+                    inFlight.delete(offset)
+                })
+                inFlight.set(offset, task)
             }
-            policy.onPageProgress?.(coll, fc)
+        }
+
+        pump()
+
+        while (yieldIndex < offsets.length || inFlight.size > 0) {
+            if (abortSignal?.aborted) {
+                return
+            }
+
+            while (yieldIndex < offsets.length) {
+                const offset = offsets[yieldIndex]
+                const page = completed.get(offset)
+                if (!page) {
+                    break
+                }
+                completed.delete(offset)
+                yieldIndex++
+                if (page.length > 0) {
+                    yield page
+                }
+            }
+
+            if (yieldIndex >= offsets.length && inFlight.size === 0) {
+                break
+            }
+
+            if (inFlight.size > 0) {
+                await Promise.race(Array.from(inFlight.values()))
+                pump()
+            }
         }
     }
 
@@ -708,27 +797,36 @@ export class ClientService {
             offsets.push(offset)
         }
 
-        // Process offsets in batches
-        for (let i = 0; i < offsets.length; i += batchSize) {
-            if (abortSignal?.aborted) return
-
-            const batchOffsets = offsets.slice(i, i + batchSize)
-            const promises = batchOffsets.map((offset) => {
+        yield* this._runParallelOffsetWindow(
+            offsets,
+            batchSize,
+            initialItems.length,
+            fetchCeiling,
+            async (offset) => {
                 const params = {
                     ...baseParameters,
                     limit: effectivePageSize,
                     offset,
                 } as TRequestParams
-                const ctx = context ? `${context} [offset ${offset}]` : `list [offset ${offset}]`
-                return this.execute<{ data: T[] }>(() => callFunction(params), priority, ctx, abortSignal)
-            })
-
-            const responses = await Promise.all(promises)
-            for (const response of responses) {
-                if (response?.data && response.data.length > 0) {
-                    yield response.data
+                const pageCtx = context ? `${context} [offset ${offset}]` : `list [offset ${offset}]`
+                const response = await this.execute<{ data: T[] }>(
+                    () => callFunction(params),
+                    priority,
+                    pageCtx,
+                    abortSignal
+                )
+                if (!response) {
+                    return undefined
                 }
-            }
-        }
+                return response.data || []
+            },
+            (offset, loaded) =>
+                new PaginationError(
+                    `Pagination failed at offset ${offset} (${context ?? 'paginate'}). ${loaded} item(s) collected before failure.`,
+                    loaded
+                ),
+            () => {},
+            abortSignal
+        )
     }
 }

@@ -25,6 +25,7 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         info: vi.fn(),
         warn: vi.fn(),
         error: vi.fn(),
+        setProgress: vi.fn(),
     }
     const client: any = {
         execute: async (fn: () => Promise<any>) => fn(),
@@ -104,6 +105,108 @@ describe('SourceService Accounts JMESPath filter', () => {
         expect((service as any).run.managedAccountsById.size).toBe(1)
         expect((service as any).run.managedAccountsById.has('managed-source-id::eng-1')).toBe(true)
         expect((service as any).run.managedAccountsById.has('managed-source-id::fin-1')).toBe(false)
+    })
+
+    it('updates aggregate fetch progress on each page progress callback', async () => {
+        const { service, sourceInfo, log } = createService()
+
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(
+            async function* (_sourceId, _abort, _limit, onPageProgress) {
+                onPageProgress?.(100, 300)
+                yield [{ id: 'a1', nativeIdentity: 'n1', sourceId: sourceInfo.id } as any]
+                onPageProgress?.(200, 300)
+                yield [{ id: 'a2', nativeIdentity: 'n2', sourceId: sourceInfo.id } as any]
+                onPageProgress?.(300, 300)
+            }
+        )
+        ;(service as any)._allSources = [sourceInfo]
+
+        await service.fetchManagedAccounts()
+
+        expect(log.setProgress).toHaveBeenCalledWith(100, 300, 'fetched')
+        expect(log.setProgress).toHaveBeenCalledWith(200, 300, 'fetched')
+        expect(log.setProgress).toHaveBeenCalledWith(300, 300, 'fetched')
+    })
+
+    it('aggregates fetch progress across concurrent managed sources on each page callback', async () => {
+        const config: any = {
+            sources: [
+                { name: 'Source A', sourceType: SourceType.Authoritative },
+                { name: 'Source B', sourceType: SourceType.Authoritative },
+            ],
+            spConnectorInstanceId: 'fusion-id',
+            concurrencyCheckEnabled: true,
+            batchCumulativeCount: {},
+            attributeMaps: [],
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [],
+        }
+        const log: any = {
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+            setProgress: vi.fn(),
+        }
+        const client: any = {
+            execute: async (fn: () => Promise<any>) => fn(),
+            call: vi.fn(),
+            paginate: vi.fn(),
+            paginateParallel: vi.fn(),
+            accountsApi: { listAccounts: vi.fn() },
+            sourcesApi: { importAccounts: vi.fn() },
+            taskManagementApi: { getTaskStatus: vi.fn() },
+            identityProfilesApi: {},
+            identityAttributesApi: {},
+        }
+        const run = new FusionRun()
+        const service = new SourceService(config, log, client, run)
+        const sourceA: SourceInfo = {
+            id: 'source-a-id',
+            name: 'Source A',
+            isManaged: true,
+            sourceType: SourceType.Authoritative,
+            config: config.sources[0],
+        }
+        const sourceB: SourceInfo = {
+            id: 'source-b-id',
+            name: 'Source B',
+            isManaged: true,
+            sourceType: SourceType.Authoritative,
+            config: config.sources[1],
+        }
+        ;(service as any)._allSources = [sourceA, sourceB]
+        ;(service as any).sourcesById = new Map([
+            [sourceA.id, sourceA],
+            [sourceB.id, sourceB],
+        ])
+        ;(service.run as any).sourcesByName = new Map([
+            [sourceA.name, sourceA],
+            [sourceB.name, sourceB],
+        ])
+
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(
+            async function* (sourceId, _abort, _limit, onPageProgress) {
+                if (sourceId === sourceA.id) {
+                    onPageProgress?.(100, 200)
+                    yield [{ id: 'a1', nativeIdentity: 'a1', sourceId: sourceA.id } as any]
+                    await new Promise((resolve) => setTimeout(resolve, 10))
+                    onPageProgress?.(200, 200)
+                } else if (sourceId === sourceB.id) {
+                    await new Promise((resolve) => setTimeout(resolve, 5))
+                    onPageProgress?.(150, 300)
+                    yield [{ id: 'b1', nativeIdentity: 'b1', sourceId: sourceB.id } as any]
+                    onPageProgress?.(300, 300)
+                }
+            }
+        )
+
+        await service.fetchManagedAccounts()
+
+        expect(log.setProgress).toHaveBeenCalledWith(100, 200, 'fetched')
+        expect(log.setProgress).toHaveBeenCalledWith(250, 500, 'fetched')
+        expect(log.setProgress).toHaveBeenCalledWith(400, 500, 'fetched')
+        expect(log.setProgress).toHaveBeenCalledWith(500, 500, 'fetched')
     })
 
     it('rejects invalid JMESPath expressions in validation', () => {
@@ -711,3 +814,4 @@ describe('ensureIdentityAttribute', () => {
         })
     })
 })
+

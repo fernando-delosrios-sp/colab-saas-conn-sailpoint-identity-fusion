@@ -3,9 +3,7 @@
 ## Purpose
 
 The source service (`src/services/sourceService/`) is the connector's read/write adapter for managed sources. It wraps the SailPoint API client's `AccountV2025` resource, provides jmespath-based account filtering, manages the source-specific reverse-correlation error vocabulary, and exposes the per-source type definitions. This spec defines the contract for how the connector resolves accounts from a source, applies the configured filters, and surfaces source-specific failure modes.
-
 ## Requirements
-
 ### Requirement: The source service MUST resolve accounts using the source's configured filters
 
 The source service MUST resolve accounts from a managed source by applying the source-specific filter expression via jmespath, then expose the resulting account list to the operations layer. Source-specific reverse-correlation errors MUST be surfaced using the dedicated error vocabulary in `sourceReverseCorrelationErrors.ts` so the rest of the connector can distinguish them from generic upstream failures.
@@ -45,4 +43,24 @@ SourceService SHALL write all account inventory data to FusionRun rather than ma
 - **THEN** it SHALL prefer the work queue entry when present
 - **AND** it SHALL fall back to `run.getManagedAccountInfo(key)?.id` when the key is not in the work queue
 - **AND** it SHALL NOT read from `managedAccountsAllById`
+
+### Requirement: Managed-account parallel fetch SHALL report page-level progress to the operation heartbeat
+
+When fetching managed accounts via parallel offset pagination, `SourceService` SHALL wire pagination `onPageProgress` so that `LogService.setProgress` is invoked after each page completes with unit `fetched`, using the aggregate loaded count across all in-flight managed sources when multiple sources fetch concurrently.
+
+#### Scenario: Aggregate fetch progress advances on each page completion
+
+- **GIVEN** `fetchManagedAccounts` loading two sources concurrently via parallel pagination
+- **WHEN** any managed-source page completes
+- **THEN** `setProgress` SHALL be called with an updated aggregate loaded count
+- **AND** the progress unit SHALL be `fetched`
+- **AND** the total SHALL reflect known `X-Total-Count` sums when all active sources have known totals
+
+#### Scenario: Single large source shows incremental heartbeat progress
+
+- **GIVEN** a managed source with more than 1000 accounts fetched via parallel pagination
+- **AND** heartbeat interval 10 seconds
+- **WHEN** Fetch phase runs long enough for multiple STATUS ticks
+- **THEN** pipeline progress delta for unit `fetched` SHALL increase on more than one tick before the source completes
+- **AND** increases SHALL correspond to page completions rather than only multi-thousand-account batch jumps
 
