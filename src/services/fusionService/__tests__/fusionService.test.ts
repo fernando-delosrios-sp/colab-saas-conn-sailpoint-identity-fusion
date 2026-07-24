@@ -60,6 +60,7 @@ describe('FusionService', () => {
             matchingService: fusionService.matchingService,
             correlationManager: fusionService.correlationManager,
             definitionService: mockDefinitionService,
+            mappingService: mockMappingService,
             accountAssembly: fusionService.accountAssembly,
             forms: fusionService.forms,
             decisionProcessor: fusionService.decisionProcessor,
@@ -1128,6 +1129,62 @@ describe('FusionService', () => {
             await fusionService.processManagedAccount(mockManagedAccount)
 
             expect(mockMatchingService.scoreFusionAccount).not.toHaveBeenCalled()
+        })
+
+        it('processRecordUniqueRegistration removes match-disabled record accounts from the work queue', async () => {
+            const recordAccount = {
+                id: 'src-record-skip::native-record-1',
+                nativeIdentity: 'native-record-1',
+                name: 'Record Only User',
+                sourceId: 'src-record-skip',
+                sourceName: 'Record Skip Match Source',
+                attributes: { externalId: 'EXT-1' },
+                uncorrelated: true,
+            } as Account
+            const authAccount = {
+                id: 'src-auth::native-auth-1',
+                nativeIdentity: 'native-auth-1',
+                name: 'Auth User',
+                sourceId: 'src-auth',
+                sourceName: 'Auth Source',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+            const managedMap = new Map<string, Account>([
+                [recordAccount.id!, recordAccount],
+                [authAccount.id!, authAccount],
+            ])
+
+            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            ;(fusionService as any).run.sourcesByName.set('Record Skip Match Source', {
+                id: 'src-record-skip',
+                name: 'Record Skip Match Source',
+                sourceType: 'record',
+                config: { includeRecordAccountsForMatching: false },
+            })
+            ;(fusionService as any).run.sourcesByName.set('Auth Source', {
+                id: 'src-auth',
+                name: 'Auth Source',
+                sourceType: 'authoritative',
+                config: {},
+            })
+
+            const registerSpy = vi
+                .spyOn(mockDefinitionService, 'registerUniqueValuesFromRecordManagedAccounts')
+                .mockResolvedValue(1)
+
+            await fusionService.initializeManagedAccountProcessing()
+            const result = await fusionService.processRecordUniqueRegistration()
+
+            expect(result.registered).toBe(1)
+            expect(registerSpy).toHaveBeenCalledWith(
+                [recordAccount],
+                mockMappingService,
+                run,
+                expect.objectContaining({ onProgress: expect.any(Function) })
+            )
+            expect(managedMap.has(recordAccount.id!)).toBe(false)
+            expect(managedMap.has(authAccount.id!)).toBe(true)
         })
 
         it('runs Match scoring for record sources when includeRecordAccountsForMatching is omitted (default)', async () => {
@@ -2450,18 +2507,39 @@ describe('FusionService', () => {
         })
 
         it('registers unique attributes and skips output for record no-match decisions', async () => {
-            const managedMap = new Map<string, Account>()
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            const managedKey = 'src-record-src::record-native-1'
+            const managedAccount = {
+                id: managedKey,
+                name: 'Record User',
+                sourceName: 'Record Source',
+                sourceId: 'src-record-src',
+                nativeIdentity: 'record-native-1',
+                attributes: {},
+            } as Account
+            const managedMap = new Map<string, Account>([[managedKey, managedAccount]])
+            Object.defineProperty(run, 'managedAccountsById', {
+                get: () => managedMap,
+                configurable: true,
+            })
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map())
+            seedRunInventory(run, new Map([[managedKey, managedAccount]]))
+            run.sourcesByName.set('Record Source', {
+                id: 'src-record-src',
+                name: 'Record Source',
+                sourceType: 'record',
+                config: {},
+            })
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+            const registerRecordSpy = vi
+                .spyOn(mockDefinitionService, 'registerUniqueValuesFromRecordManagedAccount')
+                .mockResolvedValue(undefined)
 
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
                 account: {
-                    id: 'src-record-src::record-native-1',
+                    id: managedKey,
                     name: 'Record User',
                     sourceName: 'Record Source',
                     sourceId: 'src-record-src',
@@ -2477,22 +2555,18 @@ describe('FusionService', () => {
             const result = await fusionService.processFusionIdentityDecision(decision)
 
             expect(result).toBeUndefined()
-            expect(mockDefinitionService.registerUniqueAttributes).toHaveBeenCalledTimes(1)
+            expect(registerRecordSpy).toHaveBeenCalledWith(managedAccount, mockMappingService, run)
+            expect(mockDefinitionService.registerUniqueAttributes).not.toHaveBeenCalled()
         })
 
         it('safely skips orphan disable queue when account is no longer in managed map', async () => {
-            const managedAccount = {
-                id: 'acct-orphan-1',
-                name: 'Orphan User',
-                sourceId: 'src-orphan-1',
-                nativeIdentity: 'orphan-native-1',
-                sourceName: 'Orphan Source',
-                attributes: {},
-            } as Account
             const managedKeyOrphan = 'src-orphan-1::orphan-native-1'
-            const managedMap = new Map<string, Account>([[managedKeyOrphan, managedAccount]])
+            const managedMap = new Map<string, Account>()
 
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            Object.defineProperty(run, 'managedAccountsById', {
+                get: () => managedMap,
+                configurable: true,
+            })
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             seedRunInventory(run, new Map())
             mockMappingService.mapAttributes.mockImplementation((account) => account)

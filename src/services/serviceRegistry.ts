@@ -171,6 +171,7 @@ export class ServiceRegistry {
             matchingService: this.matching,
             correlationManager: this.fusion.correlationManager,
             definitionService: this.definition,
+            mappingService: this.mapping,
             accountAssembly: this.fusion.accountAssembly,
             forms: this.forms,
             decisionProcessor: this.fusion.decisionProcessor,
@@ -248,4 +249,5 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 

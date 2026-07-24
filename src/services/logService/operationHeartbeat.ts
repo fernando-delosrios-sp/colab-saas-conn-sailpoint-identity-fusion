@@ -80,6 +80,9 @@ export function formatEventSummaryLines(events: EventCounters): string[] {
     if (events.nonMatch > 0) outcomeParts.push(`nonMatch=${events.nonMatch}`)
     if (events.autoAssigned > 0) outcomeParts.push(`autoAssigned=${events.autoAssigned}`)
     if (events.formsQueued > 0) outcomeParts.push(`formsQueued=${events.formsQueued}`)
+    if (events.recordUniqueRegistered > 0) {
+        outcomeParts.push(`recordUniqueRegistered=${events.recordUniqueRegistered}`)
+    }
     if (outcomeParts.length > 0) {
         lines.push(`EVENT_SUMMARY outcomes ${outcomeParts.join(' ')}`)
     }
@@ -174,3 +177,4 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+

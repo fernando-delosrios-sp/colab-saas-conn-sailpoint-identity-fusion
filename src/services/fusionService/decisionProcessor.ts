@@ -13,6 +13,7 @@ import type { FormService } from '../formService'
 import type { IdentityService } from '../identityService'
 import type { CorrelationManager } from '../correlationManager'
 import type { DefinitionService } from '../definitionService'
+import type { MappingService } from '../mappingService'
 import { applyNonAuthoritativeNoMatch } from '../matchingService/matchOutcomeDispatcher'
 import { AccountAssembly } from '../accountAssembly'
 
@@ -21,6 +22,7 @@ export interface DecisionProcessorDeps {
     identities: IdentityService
     correlationManager: CorrelationManager
     definitionService: DefinitionService
+    mappingService: MappingService
     accountAssembly: AccountAssembly
 }
 
@@ -171,6 +173,9 @@ export class DecisionProcessor {
         const skipBlendHistoryForManagedKeys = normalizedDecisionKey
             ? new Set([normalizedDecisionKey])
             : undefined
+        const managedAccountForNoMatch = normalizedDecisionKey
+            ? this.run.managedAccountsById.get(normalizedDecisionKey)
+            : undefined
 
         await this.deps.accountAssembly.assembleAccount(fusionAccount, { skipBlendHistoryForManagedKeys })
 
@@ -182,11 +187,11 @@ export class DecisionProcessor {
 
         if (fusionDecision.newIdentity) {
             const sourceInfo = this.run.sourcesByName.get(fusionDecision.account.sourceName)
-            const decisionManagedKey = trimStr(fusionDecision.account.id) ?? ''
-            const managedAccount = decisionManagedKey
-                ? this.run.managedAccountsById.get(decisionManagedKey)
-                : undefined
-            if (await applyNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccount, { definitionService: this.deps.definitionService, run: this.run })) {
+            if (await applyNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccountForNoMatch, {
+                definitionService: this.deps.definitionService,
+                mappingService: this.deps.mappingService,
+                run: this.run,
+            })) {
                 if (sourceType === SourceType.Record) {
                     this.log.debug(
                         `Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`
@@ -259,4 +264,5 @@ export class DecisionProcessor {
         }
     }
 }
+
 

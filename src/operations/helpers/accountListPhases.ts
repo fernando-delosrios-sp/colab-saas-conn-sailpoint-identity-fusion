@@ -253,6 +253,12 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Ph
     await fusion.processCorrelatedManagedAccounts()
     log.stepEnd('correlated-sweep', { remaining: sources.run.managedAccountsById.size })
 
+    log.stepStart('record-unique-registration')
+    const recordUniqueOp = log.track('FusionService.processRecordUniqueRegistration')
+    const { registered: recordUniqueRegistered } = await fusion.processRecordUniqueRegistration()
+    recordUniqueOp.done({ registered: recordUniqueRegistered })
+    log.stepEnd('record-unique-registration', { registered: recordUniqueRegistered })
+
     const uncorrelatedCount = sources.run.managedAccountsById.size
     log.stepStart('uncorrelated-sweep', { accounts: uncorrelatedCount })
     const managedAccountsOp = log.track('FusionService.processManagedAccounts')
@@ -435,5 +441,6 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+
 
 

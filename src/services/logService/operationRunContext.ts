@@ -11,6 +11,7 @@ export type EventCounters = {
     nonMatch: number
     autoAssigned: number
     formsQueued: number
+    recordUniqueRegistered: number
 }
 
 type ProgressSnapshot = {
@@ -29,6 +30,7 @@ export function createEmptyEventCounters(): EventCounters {
         nonMatch: 0,
         autoAssigned: 0,
         formsQueued: 0,
+        recordUniqueRegistered: 0,
     }
 }
 
@@ -73,6 +75,13 @@ export class OperationRunContext {
             case 'formsQueued':
                 this.events.formsQueued++
                 break
+            case 'recordUniqueRegistered': {
+                const count = detail?.count
+                if (typeof count === 'number') {
+                    this.events.recordUniqueRegistered += count
+                }
+                break
+            }
             default:
                 break
         }
@@ -89,3 +98,4 @@ export class OperationRunContext {
         return { ...this.events }
     }
 }
+

@@ -21,6 +21,15 @@ import { isValidAttributeValue } from '../../utils/attributes'
 import { hasValue, isNullish, missing, readString, trimStr } from '../../utils/safeRead'
 import { runtimeDefaults } from '../../data/config'
 import { FusionAttribute } from '../../data/schema'
+import { AccountV2025 as Account } from 'sailpoint-api-client'
+import { FusionRun } from '../../model/fusionRun'
+import { MappingService } from '../mappingService'
+import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
+import { buildUniqueRegistrationPlan, UniqueRegistrationPlan } from './uniqueRegistrationPlan'
+
+export interface RecordUniqueRegistrationProgress {
+    onProgress?: (done: number, total: number) => void
+}
 
 export class DefinitionService {
     private normalDefinitions: NormalAttributeDefinition[] = []
@@ -33,6 +42,7 @@ export class DefinitionService {
     private readonly forceAttributeRefresh: boolean
     private readonly maxAttempts?: number
     private readonly reverseSources: SourceConfig[]
+    readonly registrationPlan: UniqueRegistrationPlan
 
     constructor(
         private config: FusionConfig,
@@ -53,6 +63,7 @@ export class DefinitionService {
         this.reverseSources = (config.sources ?? []).filter(
             (sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute
         )
+        this.registrationPlan = buildUniqueRegistrationPlan(config)
     }
 
     public setStateWrapper(state: Record<string, unknown> | undefined): void {
@@ -259,6 +270,48 @@ export class DefinitionService {
                 this.getUniqueValues(definition.name).add(valueStr)
             })
         }
+    }
+
+
+    /**
+     * Lightweight record-only path: selective map + register without normal/unique Define evaluation.
+     */
+    public async registerUniqueValuesFromRecordManagedAccount(
+        account: Account,
+        mappingService: MappingService,
+        run: FusionRun
+    ): Promise<void> {
+        const fusionAccount = FusionAccount.fromManagedAccount(account)
+        mappingService.mapAttributes(fusionAccount, run, {
+            onlyTargets: this.registrationPlan.mapTargets,
+        })
+        await this.registerUniqueAttributes(fusionAccount)
+    }
+
+    public async registerUniqueValuesFromRecordManagedAccounts(
+        accounts: Account[],
+        mappingService: MappingService,
+        run: FusionRun,
+        options?: RecordUniqueRegistrationProgress
+    ): Promise<number> {
+        if (accounts.length === 0 || this.uniqueDefinitions.length === 0) {
+            return 0
+        }
+
+        let done = 0
+        for (const account of accounts) {
+            await this.registerUniqueValuesFromRecordManagedAccount(account, mappingService, run)
+            done++
+            options?.onProgress?.(done, accounts.length)
+            if (done % 50 === 0) {
+                await yieldToEventLoop()
+            }
+        }
+
+        this.log.debug(
+            `Registered unique values from ${accounts.length} record managed account(s) using registration plan`
+        )
+        return done
     }
 
     public async unregisterUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {

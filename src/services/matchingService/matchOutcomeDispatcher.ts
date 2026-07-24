@@ -18,6 +18,7 @@ import { ManagedAccountAnalysisContext, ManagedAccountMatchingResult, MatchCandi
 import { AccountAssembly } from '../accountAssembly'
 import { CorrelationManager } from '../correlationManager'
 import { DefinitionService } from '../definitionService'
+import { MappingService } from '../mappingService'
 import { assert } from '../../utils/assert'
 import { hasValue } from '../../utils/safeRead'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
@@ -189,6 +190,7 @@ async function scoreManagedAccounts(
 
 export interface ApplyNonAuthoritativeNoMatchDeps {
     readonly definitionService: DefinitionService
+    readonly mappingService: MappingService
     readonly run: FusionRun
 }
 
@@ -205,7 +207,15 @@ export async function applyNonAuthoritativeNoMatch(
     deps: ApplyNonAuthoritativeNoMatchDeps
 ): Promise<boolean> {
     if (sourceType === SourceType.Record) {
-        await deps.definitionService.registerUniqueAttributes(fusionAccount)
+        if (account) {
+            await deps.definitionService.registerUniqueValuesFromRecordManagedAccount(
+                account,
+                deps.mappingService,
+                deps.run
+            )
+        } else {
+            await deps.definitionService.registerUniqueAttributes(fusionAccount)
+        }
         return true
     }
     if (sourceType === SourceType.Orphan) {
@@ -228,6 +238,7 @@ export interface MatchOutcomeDispatcherDeps {
     readonly matchingService: MatchingService
     readonly correlationManager: CorrelationManager
     readonly definitionService: DefinitionService
+    readonly mappingService: MappingService
     readonly accountAssembly: AccountAssembly
     readonly forms: FormService
     readonly decisionProcessor: DecisionProcessor
@@ -594,6 +605,7 @@ function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 
             return 'nonMatch'
     }
 }
+
 
 
 

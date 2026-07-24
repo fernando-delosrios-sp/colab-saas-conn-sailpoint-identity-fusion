@@ -59,6 +59,7 @@ describe('MatchOutcomeDispatcher', () => {
             refreshNormalAttributes: vi.fn().mockResolvedValue(undefined),
             refreshReverseCorrelationAttributes: vi.fn(),
             registerUniqueAttributes: vi.fn().mockResolvedValue(undefined),
+            registerUniqueValuesFromRecordManagedAccount: vi.fn().mockResolvedValue(undefined),
         } as any
         const sources = { managedAccountInventory: new Map() } as any
         const accountAssembly = new AccountAssembly({
@@ -89,6 +90,7 @@ describe('MatchOutcomeDispatcher', () => {
             matchingService,
             correlationManager,
             definitionService,
+            mappingService,
             accountAssembly,
             forms,
             decisionProcessor,
@@ -288,17 +290,22 @@ describe('MatchOutcomeDispatcher', () => {
         })
 
         it('handles record sources by registering unique attributes without creating a fusion account', async () => {
-            const { dispatcher, matchingService, definitionService, run } = createDispatcher({
+            const { dispatcher, matchingService, definitionService, mappingService, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Record, config: {} }))
 
             vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
 
-            const result = await dispatcher.runMatchSweep([managedAccount()], 1)
+            const account = managedAccount()
+            const result = await dispatcher.runMatchSweep([account], 1)
 
             expect(result.nonMatch).toBe(1)
-            expect(definitionService.registerUniqueAttributes).toHaveBeenCalledWith(expect.any(FusionAccount))
+            expect(definitionService.registerUniqueValuesFromRecordManagedAccount).toHaveBeenCalledWith(
+                account,
+                mappingService,
+                run
+            )
             expect(run.getFusionAccountByManagedKey('source-a-id::native-1')).toBeUndefined()
         })
 
@@ -562,5 +569,6 @@ describe('MatchOutcomeDispatcher', () => {
         })
     })
 })
+
 
 
