@@ -157,7 +157,6 @@ describe('AttributeService mainAccount stale cleanup', () => {
                     [
                         {
                             accountKey: 'src-hr::acct-1',
-                            _id: 'src-hr::acct-1',
                             source: { id: 'src-hr', name: 'HR' },
                             schema: { id: 'acct-1', name: 'acct-1' },
                         },
@@ -333,7 +332,6 @@ describe('AttributeService mapping undefined behavior', () => {
                     [
                         {
                             preferredName: 'Neo',
-                            _id: 'src-hr::acct-1',
                             source: { id: 'src-hr', name: 'HR' },
                             schema: { id: 'acct-1', name: 'Neo' },
                         },
@@ -605,7 +603,7 @@ describe('AttributeService template evaluation fallback behavior', () => {
         expect(fusionAccount.attributes.computed).toBeUndefined()
     })
 
-    it('returns undefined for unique definition with unresolved vars when $counter is auto-appended', async () => {
+    it('falls back to a generated UUID for unique definition with unresolved vars when $counter is auto-appended', async () => {
         const config = {
             attributeMaps: [],
             attributeMerge: 'first',
@@ -671,7 +669,148 @@ describe('AttributeService template evaluation fallback behavior', () => {
 
         await service.refreshUniqueAttributes(fusionAccount)
 
-        expect(fusionAccount.attributes.id).toBeUndefined()
+        expect(fusionAccount.attributes.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+    })
+
+    it('falls back to a generated UUID for normal definition of identity attribute with unresolved vars', async () => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [
+                {
+                    name: 'id',
+                    expression: '${firstname}${lastname}',
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    refresh: true,
+                },
+            ],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        await service.refreshNormalAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+    })
+
+    it('uses identity name for display attribute on correlated accounts', async () => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: [
+                {
+                    name: 'name',
+                    expression: '${missing}',
+                    case: 'same',
+                    normalize: false,
+                    spaces: false,
+                    trim: true,
+                    refresh: true,
+                },
+            ],
+            uniqueAttributeDefinitions: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+
+        const service = new AttributeService(config, schemas, sourceService, log, locks)
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: { name: 'John Smith' },
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'jsmith',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: true,
+            identityDisplayName: 'John Smith',
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        await service.refreshNormalAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.name).toBe('John Smith')
     })
 
     it('does not auto-append $counter when unique expression includes $UUID', async () => {
@@ -964,7 +1103,6 @@ describe('AttributeService mainAccount override', () => {
                         {
                             preferredName: 'Neo',
                             employeeId: 'hr-id-001',
-                            _id: 'src-hr::ni-hr',
                             source: { id: 'src-hr', name: 'HR' },
                             schema: { id: 'ni-hr', name: 'Neo' },
                         },
@@ -976,7 +1114,6 @@ describe('AttributeService mainAccount override', () => {
                         {
                             preferredName: 'Trinity',
                             employeeId: 'erp-id-777',
-                            _id: 'src-erp::ni-erp',
                             source: { id: 'src-erp', name: 'ERP' },
                             schema: { id: 'ni-erp', name: 'Trinity' },
                         },
@@ -1126,7 +1263,6 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
                     [
                         {
                             preferredName: 'Neo',
-                            _id: 'src-hr::ni-hr',
                             source: { id: 'src-hr', name: 'HR' },
                             schema: { id: 'ni-hr', name: 'Neo' },
                         },
@@ -1138,7 +1274,6 @@ describe('AttributeService mainAccount immediate in-pass effect', () => {
                         {
                             preferredName: 'Trinity',
                             preferredAccountId: 'src-erp::ni-erp',
-                            _id: 'src-erp::ni-erp',
                             source: { id: 'src-erp', name: 'ERP' },
                             schema: { id: 'ni-erp', name: 'Trinity' },
                         },
@@ -1427,7 +1562,6 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     [
                         {
                             preferredName: 'FromHR',
-                            _id: 'src-hr::native-m1',
                             schema: { name: 'FromHR', id: 'native-m1' },
                             source: { id: 'src-hr', name: 'HR' },
                         },
@@ -1475,7 +1609,6 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     'HR',
                     [
                         {
-                            _id: 'src-h42::managed-42',
                             schema: { name: 'Contoso Smith', id: 'managed-42' },
                             source: { id: 'src-h42', name: 'HR' },
                             IIQDisabled: false,
@@ -1525,7 +1658,6 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
                     [
                         {
                             employeeNumber: 'E-MANAGED',
-                            _id: 'src-h::same-id',
                             schema: { name: 'managed', id: 'same-id' },
                             source: { id: 'src-h', name: 'HR' },
                         },
@@ -1618,55 +1750,6 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
             sources: ['Identities'],
             originSource: 'Identities',
             originAccountId: 'id-only',
-            disabled: false,
-            history: [],
-            importHistory: jest.fn(),
-            attributeBag,
-        }
-        attachAttributesAccessor(fusionAccount, attributeBag)
-        await service.refreshNormalAttributes(fusionAccount)
-        expect(fusionAccount.attributes.derived).toBeUndefined()
-    })
-
-    it('does not resolve managed $account by transient account.id fallback', async () => {
-        const { sourceService, log, locks } = velocityDeps()
-        const service = new AttributeService(
-            velocityConfig('$account.employeeNumber', [{ name: 'HR' }]),
-            velocitySchemas,
-            sourceService,
-            log,
-            locks
-        )
-        const attributeBag = {
-            current: {},
-            previous: {},
-            identity: { employeeNumber: 'E-ID' },
-            accounts: [],
-            sources: new Map<string, Record<string, any>[]>([
-                [
-                    'HR',
-                    [
-                        {
-                            employeeNumber: 'E-MANAGED',
-                            _id: 'legacy-row-id',
-                            schema: { name: 'managed', id: 'managed-42' },
-                            source: { id: 'src-h42', name: 'HR' },
-                        },
-                    ],
-                ],
-            ]),
-        }
-        const fusionAccount: any = {
-            type: 'fusion',
-            needsRefresh: true,
-            needsReset: false,
-            name: 'y',
-            sourceName: 'Fusion',
-            fromIdentity: true,
-            isIdentity: true,
-            sources: ['HR', 'Identities'],
-            originSource: 'Identities',
-            originAccountId: 'legacy-row-id',
             disabled: false,
             history: [],
             importHistory: jest.fn(),
@@ -1786,6 +1869,196 @@ describe('AttributeService $originAccount and $account Velocity context', () => 
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
         expect(fusionAccount.attributes.derived).toBe('prefix-acc-99')
+    })
+
+    it('exposes $identity.name as the root identity name', async () => {
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('$identity.name', [{ name: 'Identities' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: { firstname: 'Ada' },
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'Ada Wong',
+            sourceName: 'Fusion',
+            fromIdentity: true,
+            isIdentity: true,
+            sources: ['Identities'],
+            originSource: 'Identities',
+            originAccountId: 'identity-123',
+            identityId: 'identity-123',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.derived).toBe('Ada Wong')
+    })
+
+    it('has $identity.name override identity.attributes.name', async () => {
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('$identity.name', [{ name: 'Identities' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: { name: 'Attributes Name', firstname: 'Ada' },
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'Ada Wong',
+            sourceName: 'Fusion',
+            fromIdentity: true,
+            isIdentity: true,
+            sources: ['Identities'],
+            originSource: 'Identities',
+            originAccountId: 'identity-123',
+            identityId: 'identity-123',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.derived).toBe('Ada Wong')
+    })
+
+    it('falls back $name to identity name for identity-based accounts', async () => {
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('$name', [{ name: 'Identities' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: { firstname: 'Ada' },
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'Ada Wong',
+            sourceName: 'Fusion',
+            fromIdentity: true,
+            isIdentity: true,
+            sources: ['Identities'],
+            originSource: 'Identities',
+            originAccountId: 'identity-123',
+            identityId: 'identity-123',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.derived).toBe('Ada Wong')
+    })
+
+    it('prefers mapped name attribute over identity name for $name', async () => {
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('$name', [{ name: 'Identities' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: { name: 'Mapped Name' },
+            previous: {},
+            identity: { firstname: 'Ada' },
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'Ada Wong',
+            sourceName: 'Fusion',
+            fromIdentity: true,
+            isIdentity: true,
+            sources: ['Identities'],
+            originSource: 'Identities',
+            originAccountId: 'identity-123',
+            identityId: 'identity-123',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.derived).toBe('Mapped Name')
+    })
+
+    it('exposes $account.name for identity-backed origin snapshot', async () => {
+        const { sourceService, log, locks } = velocityDeps()
+        const service = new AttributeService(
+            velocityConfig('$account.name', [{ name: 'Identities' }]),
+            velocitySchemas,
+            sourceService,
+            log,
+            locks
+        )
+        const attributeBag = {
+            current: {},
+            previous: {},
+            identity: { firstname: 'Ada' },
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+        const fusionAccount: any = {
+            type: 'fusion',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'Ada Wong',
+            sourceName: 'Fusion',
+            fromIdentity: true,
+            isIdentity: true,
+            sources: ['Identities'],
+            originSource: 'Identities',
+            originAccountId: 'identity-123',
+            identityId: 'identity-123',
+            disabled: false,
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        attachAttributesAccessor(fusionAccount, attributeBag)
+        await service.refreshNormalAttributes(fusionAccount)
+        expect(fusionAccount.attributes.derived).toBe('Ada Wong')
     })
 })
 
@@ -2179,5 +2452,145 @@ describe('AttributeService fusion identity/display safe defaults when undefined'
         attachAttributesAccessor(fusionAccount, attributeBag)
         await service.refreshNormalAttributes(fusionAccount)
         expect(fusionAccount.attributes.name).toBe('fusion-account-slug')
+    })
+})
+
+describe('AttributeService maxLength ordering after post-processing transforms', () => {
+    const buildService = (def: any) => {
+        const config = {
+            attributeMaps: [],
+            attributeMerge: 'first',
+            sources: [{ name: 'HR' }],
+            normalAttributeDefinitions: def.normalAttributeDefinitions ?? [],
+            uniqueAttributeDefinitions: def.uniqueAttributeDefinitions ?? [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+        } as any
+        const schemas = {
+            listSchemaAttributeNames: jest.fn(() => ['id', 'name', 'nickname']),
+            getSchemaAttributes: jest.fn(() => [{ name: 'id' }, { name: 'name' }, { name: 'nickname' }]),
+            fusionIdentityAttribute: 'id',
+            fusionDisplayAttribute: 'name',
+        } as any
+        const sourceService = {} as any
+        const log = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } as any
+        const locks = {
+            withLock: jest.fn(async (_key: string, fn: () => Promise<any>) => await fn()),
+            waitForAllPendingOperations: jest.fn(async () => undefined),
+        } as any
+        return new AttributeService(config, schemas, sourceService, log, locks)
+    }
+
+    const buildFusionAccount = (attrs: Record<string, any>) => {
+        const attributeBag = {
+            current: { ...attrs },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>([['HR', [{ source: { name: 'HR' } }]]]),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'test',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: jest.fn(),
+            attributeBag,
+        }
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+        return fusionAccount
+    }
+
+    it('applies maxLength after trim for a normal definition (final value is exactly maxLength chars)', async () => {
+        const service = buildService({
+            normalAttributeDefinitions: [
+                {
+                    name: 'nickname',
+                    expression: '  hello world  ',
+                    trim: true,
+                    maxLength: 5,
+                    refresh: true,
+                },
+            ],
+        })
+        const fusionAccount = buildFusionAccount({})
+
+        await service.refreshNormalAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.nickname).toBe('hello')
+        expect(fusionAccount.attributes.nickname.length).toBe(5)
+    })
+
+    it('applies maxLength after trim for a unique definition (final value is exactly maxLength chars)', async () => {
+        const service = buildService({
+            uniqueAttributeDefinitions: [
+                {
+                    name: 'id',
+                    expression: '  hello world  ',
+                    useIncrementalCounter: false,
+                    trim: true,
+                    maxLength: 5,
+                },
+            ],
+        })
+        const fusionAccount = buildFusionAccount({})
+
+        await service.refreshUniqueAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.id).toBe('hello')
+        expect(fusionAccount.attributes.id.length).toBe(5)
+    })
+
+    it('applies maxLength after case for a normal definition', async () => {
+        const service = buildService({
+            normalAttributeDefinitions: [
+                {
+                    name: 'nickname',
+                    expression: 'ABCDEF',
+                    case: 'lower',
+                    maxLength: 5,
+                    refresh: true,
+                },
+            ],
+        })
+        const fusionAccount = buildFusionAccount({})
+
+        await service.refreshNormalAttributes(fusionAccount)
+
+        expect(fusionAccount.attributes.nickname).toBe('abcde')
+        expect(fusionAccount.attributes.nickname.length).toBe(5)
+    })
+
+    it('applyUniqueValueOutputTransforms and evaluateTemplate produce the same result for the same definition and raw input', async () => {
+        const service = buildService({})
+        const definition: any = {
+            name: 'login',
+            expression: '$firstName.$lastName$counter',
+            useIncrementalCounter: false,
+            trim: true,
+            case: 'lower',
+            spaces: true,
+            normalize: false,
+            maxLength: 10,
+        }
+        const context = { firstName: '  John ', lastName: ' Doe ', counter: '01' }
+        const evaluateResult = (service as any).evaluateTemplate(definition, context, 'test')
+        const transformsResult = (service as any).applyUniqueValueOutputTransforms(
+            definition,
+            '  John . Doe 01',
+            definition.expression,
+            context
+        )
+        expect(evaluateResult).toBe(transformsResult)
     })
 })

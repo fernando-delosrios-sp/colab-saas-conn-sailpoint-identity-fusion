@@ -140,4 +140,94 @@ describe('rebuildFusionAccount', () => {
         )
         expect(fetchManagedAccount).not.toHaveBeenCalled()
     })
+
+    it('checks identity scope for identity-origin accounts and passes result to processFusionAccount', async () => {
+        const processFusionAccount = jest.fn().mockResolvedValue({ nativeIdentity: 'fusion-scope-1' })
+        const isIdentityInScope = jest.fn().mockResolvedValue(false)
+
+        const registry = {
+            sources: {
+                fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
+                fusionAccountsByNativeIdentity: new Map([
+                    [
+                        'fusion-scope-1',
+                        {
+                            nativeIdentity: 'fusion-scope-1',
+                            identityId: 'identity-1',
+                            attributes: {
+                                originSource: 'Identities',
+                                originAccount: 'identity-1',
+                                accounts: [],
+                            },
+                        },
+                    ],
+                ]),
+                fetchManagedAccount: jest.fn().mockResolvedValue(undefined),
+                getSourceByName: jest.fn(),
+            },
+            identities: {
+                fetchIdentityById: jest.fn().mockResolvedValue(undefined),
+                getIdentityById: jest.fn().mockReturnValue({ id: 'identity-1', accounts: [] }),
+                isIdentityInScope,
+            },
+            fusion: {
+                processFusionAccount,
+            },
+            log: { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() },
+        } as any
+
+        await rebuildFusionAccount('fusion-scope-1', {} as any, registry)
+
+        expect(isIdentityInScope).toHaveBeenCalledWith('identity-1')
+        expect(processFusionAccount).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            false
+        )
+    })
+
+    it('does not check identity scope for managed-origin accounts', async () => {
+        const processFusionAccount = jest.fn().mockResolvedValue({ nativeIdentity: 'fusion-managed-origin-1' })
+        const isIdentityInScope = jest.fn().mockResolvedValue(false)
+
+        const registry = {
+            sources: {
+                fetchFusionAccount: jest.fn().mockResolvedValue(undefined),
+                fusionAccountsByNativeIdentity: new Map([
+                    [
+                        'fusion-managed-origin-1',
+                        {
+                            nativeIdentity: 'fusion-managed-origin-1',
+                            identityId: 'identity-1',
+                            attributes: {
+                                originSource: 'Source A',
+                                originAccount: 'source-a-id::native-1',
+                                accounts: [],
+                            },
+                        },
+                    ],
+                ]),
+                fetchManagedAccount: jest.fn().mockResolvedValue(undefined),
+                getSourceByName: jest.fn(),
+            },
+            identities: {
+                fetchIdentityById: jest.fn().mockResolvedValue(undefined),
+                getIdentityById: jest.fn().mockReturnValue({ id: 'identity-1', accounts: [] }),
+                isIdentityInScope,
+            },
+            fusion: {
+                processFusionAccount,
+            },
+            log: { warn: jest.fn(), debug: jest.fn(), info: jest.fn(), error: jest.fn() },
+        } as any
+
+        await rebuildFusionAccount('fusion-managed-origin-1', {} as any, registry)
+
+        expect(isIdentityInScope).not.toHaveBeenCalled()
+        expect(processFusionAccount).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            undefined
+        )
+    })
 })

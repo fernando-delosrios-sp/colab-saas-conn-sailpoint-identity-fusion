@@ -53,11 +53,7 @@ export const switchCase = (str: string, caseType: 'lower' | 'upper' | 'capitaliz
  * Evaluate Velocity template expression with extended context (Math, Date, Datefns)
  * Uses template caching to avoid repeated parsing and compilation
  */
-export const evaluateVelocityTemplate = (
-    expression: string,
-    context: RenderContext,
-    maxLength?: number
-): string | undefined => {
+export const evaluateVelocityTemplate = (expression: string, context: RenderContext): string | undefined => {
     const extendedContext: RenderContext = { ...context, ...contextHelpers }
     // Null prototype so `$constructor` / `$__proto__` do not resolve via Object.prototype.
     const renderContext = Object.assign(Object.create(null), extendedContext) as RenderContext
@@ -73,18 +69,7 @@ export const evaluateVelocityTemplate = (
         logger.debug(`Compiled and cached new velocity template: ${expression}`)
     }
 
-    let result = velocity.render(renderContext)
-
-    if (maxLength && result.length > maxLength) {
-        result = truncateResultToMaxLength(result, expression, renderContext, maxLength)
-    }
-
-    if (result === '') {
-        logger.debug(
-            'Velocity template evaluated to empty string (e.g. Normalize helper returned undefined), returning undefined'
-        )
-        return undefined
-    }
+    const result = velocity.render(renderContext)
 
     logger.debug(`Velocity template evaluation result: ${result}`)
     return result
@@ -93,7 +78,7 @@ export const evaluateVelocityTemplate = (
 /**
  * Truncate result to maxLength, smartly preserving counter anywhere in the string
  */
-const truncateResultToMaxLength = (
+export const truncateResultToMaxLength = (
     result: string,
     expression: string,
     context: RenderContext,

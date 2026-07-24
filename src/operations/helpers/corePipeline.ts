@@ -214,11 +214,11 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Co
     log.info('Processing fusion identity decisions (new identity)')
     await fusion.processFusionIdentityDecisions()
 
-    identities.clear()
     log.info('Identities cache cleared from memory')
 
     log.info('Processing managed accounts (Match)')
     await fusion.processManagedAccounts()
+    identities.clear()
 
     if (isPersistent) {
         log.info('Waiting for pending disable operations')
@@ -324,9 +324,6 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
             `Performance metric: outputPhase.saveBatchCumulativeCount durationMs=${Date.now() - saveCumulativeCountStartedAt}`
         )
     }
-
-    sources.clearFusionAccounts()
-    log.info('Account caches cleared from memory')
 
     if (isPersistent) {
         await sources.aggregateDelayedSources(async ({ sourceId, delayMinutes, disableOptimization }) => {

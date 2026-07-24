@@ -11,9 +11,16 @@ import { FusionAccount } from '../../model/account'
 import { SchemaService } from '../schemaService'
 import { Account } from 'sailpoint-api-client'
 import { CompoundKey, CompoundKeyType, SimpleKey, SimpleKeyType, StandardCommand } from '@sailpoint/connector-sdk'
-import { evaluateVelocityTemplate, normalize, padNumber, removeSpaces, switchCase } from './formatting'
+import {
+    evaluateVelocityTemplate,
+    normalize,
+    padNumber,
+    removeSpaces,
+    switchCase,
+    truncateResultToMaxLength,
+} from './formatting'
 import { LockService } from '../lockService'
-export type RenderContext = Record<string, any>;
+export type RenderContext = Record<string, any>
 import { v4 as uuidv4 } from 'uuid'
 import { assert } from '../../utils/assert'
 import { SourceService } from '../sourceService'
@@ -109,7 +116,9 @@ export class AttributeService {
         this.uniqueAttributeNames = new Set(this.uniqueDefinitions.map((d) => d.name))
 
         this.setStateWrapper(config.fusionState)
-        this.reverseSources = this.sourceConfigs.filter((sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute)
+        this.reverseSources = this.sourceConfigs.filter(
+            (sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute
+        )
     }
 
     // ------------------------------------------------------------------------
@@ -228,6 +237,10 @@ export class AttributeService {
             )
             const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sc) => sc.name)
+            if (fusionAccount.originSource === 'Identities') {
+                sourceOrder.push('Identities')
+                sourceAttributeMap.set('Identities', [attributeBag.identity])
+            }
             let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
             const mappingTargets = this.getAttributeMappingTargetNames()
             for (const attribute of mappingTargets) {
@@ -405,7 +418,7 @@ export class AttributeService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -684,7 +697,16 @@ export class AttributeService {
         const context: Record<string, any> = { ...fusionAccount.attributeBag.current }
         const orderedAccounts = this.getOrderedAccountsForContext(fusionAccount)
 
-        context.identity = fusionAccount.attributeBag.identity
+        context.identity = { ...fusionAccount.attributeBag.identity }
+        if (fusionAccount.fromIdentity) {
+            const identityName = trimStr(fusionAccount.name)
+            if (identityName) {
+                context.identity.name = identityName
+                if (!trimStr(context.name)) {
+                    context.name = identityName
+                }
+            }
+        }
         context.accounts = orderedAccounts
         context.previous = fusionAccount.attributeBag.previous
         context.sources = fusionAccount.attributeBag.sources
@@ -730,6 +752,7 @@ export class AttributeService {
         if (originSource === 'Identities' && identityHasData && identityMatchesOrigin) {
             return {
                 ...identityBag,
+                name: schemaName,
                 source: { name: 'Identities' },
                 schema: {
                     name: schemaName,
@@ -750,12 +773,7 @@ export class AttributeService {
     }
 
     private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
-        const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
-        return (
-            trimStr(fusionAccount.name) ??
-            trimStr(identityBag?.name) ??
-            trimStr(fusionAccount.identityDisplayName)
-        )
+        return trimStr(fusionAccount.name)
     }
 
     private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
@@ -792,10 +810,7 @@ export class AttributeService {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
-        const prioritizedIndex = ordered.findIndex(
-            (account) =>
-                getManagedAccountSnapshotKey(account) === mainAccountId || trimStr(account?._id) === mainAccountId
-        )
+        const prioritizedIndex = ordered.findIndex((account) => getManagedAccountSnapshotKey(account) === mainAccountId)
         if (prioritizedIndex <= 0) return ordered
 
         const prioritizedAccount = ordered[prioritizedIndex]
@@ -821,9 +836,7 @@ export class AttributeService {
         accountId: string
     ): Record<string, any> | undefined {
         for (const accounts of sourceAttributeMap.values()) {
-            const match = accounts.find(
-                (account) => getManagedAccountSnapshotKey(account) === accountId || trimStr(account?._id) === accountId
-            )
+            const match = accounts.find((account) => getManagedAccountSnapshotKey(account) === accountId)
             if (match) return match
         }
 
@@ -849,27 +862,16 @@ export class AttributeService {
             return undefined
         }
 
-        let value = evaluateVelocityTemplate(expression, context, definition.maxLength)
-        if (!value) {
-            this.log.error(`Failed to evaluate velocity template for attribute ${definition.name}`)
-            return undefined
-        }
-
-        // Compare to expression without trailing $counter (UniqueAttributeDefinition may auto-append it)
-        const exprWithoutCounter = expression.replace(COUNTER_SUFFIX_RE, '')
-        const outputMatchesExpression =
-            value === expression || (exprWithoutCounter !== expression && value === exprWithoutCounter)
-        if (outputMatchesExpression && this.hasVelocityVariableReference(exprWithoutCounter || expression)) {
-            this.log.warn(
-                `Velocity template for attribute ${definition.name} returned unresolved variable expression: ${value}`
-            )
-            return undefined
-        }
+        let value = evaluateVelocityTemplate(expression, context)
+        if (!value) return undefined
 
         if (definition.trim) value = value.trim()
         if (definition.case) value = switchCase(value, definition.case)
         if (definition.spaces) value = removeSpaces(value)
         if (definition.normalize) value = normalize(value)
+        if (definition.maxLength && value.length > definition.maxLength) {
+            value = truncateResultToMaxLength(value, expression, context, definition.maxLength)
+        }
 
         this.log.debug(`[${accountName}] ${definition.name} = ${value}`)
 
@@ -1045,7 +1047,9 @@ export class AttributeService {
         if (attributeName === fusionIdentityAttribute) {
             const fromTop = trimStr(fusionAccount.originAccountId)
             if (fromTop !== undefined) return fromTop
-            return trimStr(fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE])
+            const fromOrigin = trimStr(fusionAccount.attributes[ORIGIN_ACCOUNT_ATTRIBUTE])
+            if (fromOrigin !== undefined) return fromOrigin
+            return uuidv4()
         }
         if (attributeName === fusionDisplayAttribute) {
             return trimStr(fusionAccount.name)
@@ -1097,7 +1101,7 @@ export class AttributeService {
             return
         }
 
-        if (fusionAccount.fromIdentity && name === fusionDisplayAttribute) {
+        if (fusionAccount.isIdentity && name === fusionDisplayAttribute) {
             const label = this.hostingIdentityName(fusionAccount)
             if (label) {
                 this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
@@ -1159,11 +1163,10 @@ export class AttributeService {
         const hasValue = isValidAttributeValue(existingValue)
         const isFusionIdentityAttribute = name === fusionIdentityAttribute
         const isFusionDisplayAttribute = name === fusionDisplayAttribute
-        const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
-        const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
+        const isExistingIdentity = fusionAccount.isIdentity
 
         const prevIsUnique = context.isUnique
-        context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value)
+        context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value, context)
         try {
             // Don't regenerate unique values if the account is not being reset
             if (hasValue && !fusionAccount.needsReset) {
@@ -1182,7 +1185,7 @@ export class AttributeService {
             }
 
             // Set identity name for display attribute if the account is an identity
-            if (fusionAccount.fromIdentity && isFusionDisplayAttribute) {
+            if (fusionAccount.isIdentity && isFusionDisplayAttribute) {
                 const label = this.hostingIdentityName(fusionAccount)
                 if (label) {
                     this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
@@ -1233,26 +1236,37 @@ export class AttributeService {
      * {@link unregisterUniqueAttributes} removes this account's prior value from the set
      * before evaluation, so the registry reflects other accounts only during generation.
      */
-    private isUniqueTemplateValue(definition: UniqueAttributeDefinition, value: unknown): boolean {
+    private isUniqueTemplateValue(
+        definition: UniqueAttributeDefinition,
+        value: unknown,
+        context: RenderContext
+    ): boolean {
         if (missing(value)) return false
         const raw = String(value)
 
-        const transformed = this.applyUniqueValueOutputTransforms(definition, raw)
+        const transformed = this.applyUniqueValueOutputTransforms(definition, raw, definition.expression, context)
         if (transformed === '') return false
 
         return !this.getUniqueValues(definition.name).has(transformed)
     }
 
     /** Match {@link evaluateTemplate} post-velocity transforms for a unique definition (including maxLength). */
-    private applyUniqueValueOutputTransforms(definition: UniqueAttributeDefinition, raw: string): string {
+    private applyUniqueValueOutputTransforms(
+        definition: UniqueAttributeDefinition,
+        raw: string,
+        expression: string | undefined,
+        context: RenderContext
+    ): string {
         let s = raw
-        if (definition.maxLength && s.length > definition.maxLength) {
-            s = s.substring(0, definition.maxLength)
-        }
         if (definition.trim) s = s.trim()
         if (definition.case) s = switchCase(s, definition.case)
         if (definition.spaces) s = removeSpaces(s)
         if (definition.normalize) s = normalize(s)
+        if (definition.maxLength && s.length > definition.maxLength) {
+            s = expression
+                ? truncateResultToMaxLength(s, expression, context, definition.maxLength)
+                : s.substring(0, definition.maxLength)
+        }
         return s
     }
 

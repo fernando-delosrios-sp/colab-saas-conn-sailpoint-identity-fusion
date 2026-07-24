@@ -17,6 +17,7 @@ describe('ReportService', () => {
                 name ? { sourceType: SourceType.Authoritative } : undefined
             ),
             resolveIscAccountIdForManagedKey: jest.fn((id?: string) => id),
+            managedAccountsAllById: new Map<string, any>(),
         }
         const identities = {
             getIdentityById: jest.fn((id?: string) => (id ? { id, displayName: `Name ${id}` } : undefined)),
@@ -97,6 +98,160 @@ describe('ReportService', () => {
         expect(decisions[0].selectedIdentityName).toBe('Name id-1')
         expect(decisions[0].accountUrl).toContain('/human-accounts/')
         expect(decisions[0].decision).toBe('assign-existing-identity')
+    })
+
+    it('resolves account name from managed account when decision account name is the composite key', () => {
+        const managedAccountsAllById = new Map<string, any>([
+            ['source-1::native-1', { id: 'isc-acc-1', name: 'John Smith', sourceId: 'source-1' }],
+        ])
+        const { service } = createService({
+            sources: { managedAccountsAllById },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        sourceType: SourceType.Authoritative,
+                        account: {
+                            id: 'source-1::native-1',
+                            name: 'source-1::native-1',
+                            sourceName: 'HR',
+                            sourceId: 'source-1',
+                            nativeIdentity: 'native-1',
+                        },
+                        submitter: { id: 'rev-1', name: 'Reviewer One' },
+                        identityId: 'id-new',
+                        newIdentity: true,
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+        expect(decisions[0].accountName).toBe('John Smith')
+        expect(decisions[0].accountUrl).toContain('/human-accounts/')
+        expect(decisions[0].decision).toBe('create-new-identity')
+    })
+
+    it('resolves accountUrl from managed account id when resolveIscAccountIdForManagedKey returns undefined', () => {
+        // Production behavior: the account has a distinct ISC id but resolveIscAccountIdForManagedKey
+        // returns undefined (e.g. account not loaded in its internal lookup). The second pass
+        // must read the id directly from managedAccountsAllById so the link is preserved.
+        const managedAccountsAllById = new Map<string, any>([
+            [
+                'source-1::native-1',
+                { id: 'isc-acc-distinct', name: 'John Smith', sourceId: 'source-1', nativeIdentity: 'native-1' },
+            ],
+        ])
+        const { service } = createService({
+            sources: {
+                managedAccountsAllById,
+                resolveIscAccountIdForManagedKey: jest.fn(() => undefined),
+            },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        sourceType: SourceType.Authoritative,
+                        account: {
+                            id: 'source-1::native-1',
+                            name: 'source-1::native-1',
+                            sourceName: 'HR',
+                            sourceId: 'source-1',
+                            nativeIdentity: 'native-1',
+                        },
+                        submitter: { id: 'rev-1', name: 'Reviewer One' },
+                        identityId: 'id-new',
+                        newIdentity: true,
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+        expect(decisions[0].accountUrl).toBeDefined()
+        expect(decisions[0].accountUrl).toContain('/human-accounts/isc-acc-distinct')
+    })
+
+
+
+    it('falls back to composite key for accountUrl when no separate ISC id is available', () => {
+        // Regression: when the managed account has no ISC id (record/orphan sources, or
+        // accounts whose `id` equals the composite key), the link must still be present
+        // using the composite key as the URL segment so reviewers can navigate to the
+        // human-accounts page.
+        const managedAccountsAllById = new Map<string, any>([
+            [
+                'source-1::native-1',
+                { id: 'source-1::native-1', name: 'John Smith', sourceId: 'source-1', nativeIdentity: 'native-1' },
+            ],
+        ])
+        const { service } = createService({
+            sources: {
+                managedAccountsAllById,
+                resolveIscAccountIdForManagedKey: jest.fn(() => undefined),
+            },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        sourceType: SourceType.Authoritative,
+                        account: {
+                            id: 'source-1::native-1',
+                            name: 'source-1::native-1',
+                            sourceName: 'HR',
+                            sourceId: 'source-1',
+                            nativeIdentity: 'native-1',
+                        },
+                        submitter: { id: 'rev-1', name: 'Reviewer One' },
+                        identityId: 'id-new',
+                        newIdentity: true,
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+        expect(decisions[0].accountUrl).toBeDefined()
+        expect(decisions[0].accountUrl).toContain('/human-accounts/')
+    })
+
+    it('falls back to composite key only when no managed account name is available', () => {
+        const { service } = createService({
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        sourceType: SourceType.Authoritative,
+                        account: { id: 'source-x::native-x', name: '', sourceName: 'HR' },
+                        submitter: { id: 'rev-1', name: 'Reviewer One' },
+                        identityId: 'id-1',
+                        newIdentity: true,
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+        expect(decisions[0].accountName).toBe('source-x::native-x')
+    })
+
+    it('does not use raw identityId as selectedIdentityName fallback', () => {
+        const { service } = createService({
+            identities: {
+                getIdentityById: jest.fn(() => undefined),
+            },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        sourceType: SourceType.Authoritative,
+                        account: { id: 'acc-1', name: 'Account 1', sourceName: 'source-a' },
+                        submitter: { id: 'rev-1', name: 'Reviewer' },
+                        identityId: 'id-1',
+                        newIdentity: false,
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+        expect(decisions[0].selectedIdentityName).toBeUndefined()
+        expect(decisions[0].selectedIdentityId).toBe('id-1')
     })
 
     it('builds report stats from decisions and aggregation inputs', () => {

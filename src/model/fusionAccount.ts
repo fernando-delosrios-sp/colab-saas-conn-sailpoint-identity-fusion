@@ -65,9 +65,12 @@ export class FusionAccount {
     private _originSource?: string
     /** Identity id or managed account key (sourceId::nativeIdentity) that created this fusion account (immutable). */
     private _originAccount?: string
+    /** Whether the origin identity (for identity-origin accounts) was found in the configured identity scope. */
+    private _originIdentityInScope?: boolean
 
     // State flags
     private _uncorrelated = false
+    private _isIdentity = false
     private _disabled = false
     private _needsRefresh = false
     private _needsReset = false
@@ -135,8 +138,7 @@ export class FusionAccount {
     /** Identity-side label: attributes.displayName || displayName || name || id. */
     private static identityLabelFromIdentity(identity: IdentityDocument): string | undefined {
         const fromAttrs = (identity.attributes as Record<string, unknown> | undefined)?.displayName as
-            | string
-            | undefined
+            string | undefined
         const top = (identity as { displayName?: string }).displayName
         return fromAttrs || top || identity.name || identity.id || undefined
     }
@@ -252,11 +254,17 @@ export class FusionAccount {
     public static fromFusionAccount(account: Account): FusionAccount {
         const fusionAccount = new FusionAccount()
         const sourceSet = new Set<string>()
-        const statuses = attributeToSet(account.attributes, 'statuses')
         const { identityDisplayName, accountName } = FusionAccount.labelsFromAccount(account)
         const accountDisplayName = accountName || identityDisplayName || undefined
         const resolvedCompositeManagedKey = FusionAccount.resolveCompositeKeyFromFusionRecord(account)
-        if (statuses.has('baseline')) sourceSet.add('Identities')
+
+        // Resolve the persisted origin source up front so the 'Identities' virtual
+        // source can be added to sourceSet BEFORE initializeBasicProperties snapshots it.
+        const persistedOriginSource =
+            typeof account.attributes?.originSource === 'string' ? account.attributes.originSource : undefined
+        if (persistedOriginSource === 'Identities') {
+            sourceSet.add('Identities')
+        }
 
         fusionAccount.initializeBasicProperties({
             type: FusionAccountKind.Fusion,
@@ -271,8 +279,14 @@ export class FusionAccount {
             modified: account.modified ?? '',
         })
         // Restore persisted origin metadata from existing fusion account attributes.
-        if (typeof account.attributes?.originSource === 'string') {
-            fusionAccount._originSource = account.attributes.originSource
+        if (persistedOriginSource !== undefined) {
+            fusionAccount._originSource = persistedOriginSource
+        }
+        // Identity-origin accounts carry a permanent 'baseline' status marker.
+        // Re-assert it defensively so legacy or migrated records that lost it from
+        // the persisted statuses array are still classified correctly on restore.
+        if (fusionAccount.fromIdentity && !fusionAccount._statuses.has('baseline')) {
+            fusionAccount._statuses.add('baseline')
         }
         if (typeof account.attributes?.originAccount === 'string') {
             const normalizedOriginAccount = normalizeCompositeManagedAccountKey(account.attributes.originAccount)
@@ -287,6 +301,10 @@ export class FusionAccount {
         const historyAttr = account.attributes?.history
         if (Array.isArray(historyAttr) && historyAttr.length > 0) {
             fusionAccount.importHistory(historyAttr)
+        }
+
+        if (account.attributes?.originSource === 'Identities' || account.uncorrelated === false) {
+            fusionAccount._isIdentity = true
         }
 
         return fusionAccount
@@ -318,6 +336,7 @@ export class FusionAccount {
         })
         fusionAccount._originSource = 'Identities'
         fusionAccount._originAccount = identity.id ?? undefined
+        fusionAccount._isIdentity = true
         fusionAccount.setBaseline()
         return fusionAccount
     }
@@ -335,7 +354,7 @@ export class FusionAccount {
         const sourcesAttr = account.attributes?.sources
         const sourceSet = sourcesAttr ? new Set(attrSplit(String(sourcesAttr))) : new Set<string>()
         const { identityDisplayName, accountName } = FusionAccount.labelsFromAccount(account)
-        const accountDisplayName = accountName || identityDisplayName || undefined
+        const accountDisplayName = identityDisplayName || accountName || undefined
 
         const managedAccountKey = getManagedAccountKeyFromAccount(account)
         if (!managedAccountKey) {
@@ -361,6 +380,9 @@ export class FusionAccount {
         fusionAccount.setUncorrelatedAccount(managedAccountKey)
         fusionAccount.setManagedAccount(account, false)
         fusionAccount.setNeedsReset(true)
+        if (account.uncorrelated === false) {
+            fusionAccount._isIdentity = true
+        }
         return fusionAccount
     }
 
@@ -479,6 +501,14 @@ export class FusionAccount {
         return this._originAccount
     }
 
+    /**
+     * Whether the origin identity (for identity-origin accounts) was found in the
+     * configured identity scope. Undefined until explicitly set by a processing layer.
+     */
+    public get originIdentityInScope(): boolean | undefined {
+        return this._originIdentityInScope
+    }
+
     // ============================================================================
     // Accessors - State Flags
     // ============================================================================
@@ -495,7 +525,7 @@ export class FusionAccount {
 
     /** Whether this fusion account is associated to an ISC identity. */
     public get isIdentity(): boolean {
-        return this._identityId !== undefined
+        return this._isIdentity
     }
 
     /**
@@ -689,6 +719,14 @@ export class FusionAccount {
 
     public setSourceName(sourceName: string): void {
         this._sourceName = sourceName
+    }
+
+    /**
+     * Records whether this account's origin identity (for identity-origin accounts)
+     * was found in the configured identity scope. Used by orphan detection.
+     */
+    public setOriginIdentityInScope(inScope: boolean): void {
+        this._originIdentityInScope = inScope
     }
 
     // ============================================================================
@@ -1087,7 +1125,9 @@ export class FusionAccount {
             this._identityDisplayName = label
         }
         this._attributeBag.identity = identity.attributes ?? {}
+        this._attributeBag.identity.name = identity.name
         this._identityId = identity.id ?? undefined
+        this._isIdentity = true
 
         if (!this._needsRefresh && isNewerThan(identity.modified, this._modified)) {
             this._needsRefresh = true
@@ -1201,11 +1241,21 @@ export class FusionAccount {
             }
         }
 
-        // Update orphan status based on final account state
-        // An account is orphaned if it has no managed accounts and is not a baseline identity
-        if (this._accountIds.size === 0 && !this._statuses.has('baseline')) {
-            this._statuses.add('orphan')
-            this._needsRefresh = false
+        // Update orphan status based on final account state.
+        // Managed-origin accounts are orphaned when they have no managed accounts.
+        // Identity-origin accounts are orphaned when they have no managed accounts AND
+        // their origin identity is not present in the configured identity scope.
+        if (this._accountIds.size === 0) {
+            if (this.fromIdentity) {
+                const originIdentityId = this._originAccount ?? this._identityId
+                if (originIdentityId && !this._originIdentityInScope) {
+                    this._statuses.add('orphan')
+                    this._needsRefresh = false
+                }
+            } else {
+                this._statuses.add('orphan')
+                this._needsRefresh = false
+            }
         } else {
             this._statuses.delete('orphan')
         }

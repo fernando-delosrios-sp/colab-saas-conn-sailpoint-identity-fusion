@@ -20,7 +20,7 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 
 | Field                                             | Purpose                                     | Recommended value                                                                  |
 | ------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------- |
-| **Maximum attempts for unique Define generation** | Cap on retries for generating unique values | 100 (default); increase for large datasets with high collision risk (e.g. 200–500) |
+| **Maximum attempts for unique Define generation** | Cap on retries for generating unique values | 20 (default); increase for large datasets with high collision risk (e.g. 50–200) |
 
 **Why this matters:** For **Unique** type attributes, if the generated value already exists, the connector appends a counter and retries. This setting prevents infinite loops if the expression always produces the same value.
 
@@ -33,12 +33,12 @@ For each attribute you want to generate, add an **Attribute Definition**:
 | Field                                 | Type                | Purpose                                                                                       | Options / Example                                                                               |
 | ------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **Attribute Name**                    | String (required)   | Name of generated attribute                                                                   | `username`, `uuid`, `employeeNumber`, `fullName`, `formattedHireDate`                           |
-| **Apache Velocity expression**        | String (optional)   | Template to compute value                                                                     | `#set($i=$firstname.substring(0,1))$i$lastname`                                                 |
+| **Apache Velocity expression**        | String (required)   | Template to compute value (required for both Normal and Unique)                               | `#set($i=$firstname.substring(0,1))$i$lastname` for Normal; same with `$counter` appended for Unique |
 | **Case selection**                    | Dropdown (required) | Text case transformation                                                                      | Do not change, Lower case, Upper case, Capitalize                                               |
-| **Attribute Type**                    | Dropdown (required) | Generation behavior                                                                           | **Normal**, **Unique**, **UUID**, **Counter-based**                                             |
-| **Counter start value**               | Integer             | Starting number (Counter type)                                                                | 1, 1000, 50000                                                                                  |
-| **Minimum counter digits**            | Integer             | Zero-padding (Counter/Unique types)                                                           | 3 → `001`, `002`; 5 → `00001`                                                                   |
-| **Maximum length**                    | Integer (optional)  | Truncate to this length                                                                       | 20; counter preserved at end for Unique/Counter                                                 |
+| **Attribute Type**                    | Dropdown (required) | Generation behavior                                                                           | **Normal** (standard computed attribute) or **Unique** (must be unique across accounts). UUID and incremental counter are sub-modes of **Unique**: include `$UUID` in the expression for UUID generation; toggle **Use incremental counter?** for sequential IDs. |
+| **Counter start value**               | Integer             | Starting number when **Use incremental counter?** is on                                       | 1, 1000, 50000                                                                                  |
+| **Minimum counter digits**            | Integer             | Zero-padding for the counter (Unique type)                                                    | 3 → `001`, `002`; 5 → `00001`                                                                   |
+| **Maximum length**                    | Integer (optional)  | Truncate to this length                                                                       | 20; counter preserved at end for Unique                                                         |
 | **Normalize special characters?**     | Boolean             | Remove special chars/quotes                                                                   | Yes for usernames/IDs                                                                           |
 | **Remove spaces?**                    | Boolean             | Remove all whitespace                                                                         | Yes for usernames/IDs                                                                           |
 | **Trim leading and trailing spaces?** | Boolean             | Strip leading/trailing whitespace                                                             | Yes for most attributes                                                                         |
@@ -93,7 +93,7 @@ $Math.floor($Datefns.differenceInDays($Datefns.now(), $hireDate) / 365)
 
 **`$isUnique(value)` helper:** Unique definitions can call `$isUnique(...)` inside the Velocity expression to test whether a candidate value is currently free after the same trim/case/spaces/normalize/maxLength rules are applied. Use this to choose between candidate formats before the connector falls back to automatic `$counter` disambiguation.
 
-> **Template safety note:** Keep Velocity directives on separate lines (`#if`, `#else`, `#end`, `#set`) to avoid parser ambiguities. The connector will automatically append `$counter` to expressions that do not explicitly include it, including templates containing Velocity conditionals, ensuring safe collision disambiguation.
+> **Template safety note:** The connector auto-appends `$counter` to unique expressions that do not already reference `$counter` or `$UUID`, but the auto-append is **skipped when the expression contains Velocity directives** (`#if`, `#set`, `#else`, `#end`, etc.) because appending after `#end` would break parsing. In that case include `$counter` explicitly in your expression (or use `$UUID`).
 
 **Examples:**
 
@@ -124,11 +124,9 @@ Firstname="John", Lastname="Smith"
 #end
 ```
 
-### UUID type
+### Unique sub-mode: UUID
 
-**Behavior:** Generates immutable universally unique identifier (v4 UUID).
-
-**No expression needed:** UUID is auto-generated; any expression is ignored.
+**Behavior:** Generates an immutable universally unique identifier (v4 UUID). The expression is **required**; include `$UUID` anywhere in the expression and the connector injects a fresh v4 UUID per attempt.
 
 **Characteristics:**
 
@@ -143,22 +141,29 @@ Firstname="John", Lastname="Smith"
 - **Account name** when you need immutable identifier
 - Cross-system correlation (UUID as common key)
 
-### Counter-based type
+**Example expression:**
 
-**Behavior:** Sequential incrementing number; each account gets next number in sequence.
+```velocity
+$UUID
+```
+
+### Unique sub-mode: Incremental counter
+
+**Behavior:** Sequential incrementing number; each account gets the next number in sequence. The counter is persistent (survives across aggregations) and always increments.
 
 **How it works:**
 
-1. Check highest existing counter value
-2. Next account gets: max + 1
-3. Counter state persisted across aggregations
+1. The connector reads the current counter value for this attribute from state.
+2. It increments, applies **Minimum counter digits** for zero-padding, and substitutes `$counter` in the expression.
+3. The new counter value is persisted for the next account.
 
 **Fields:**
 
-- **Counter start value:** First number in sequence (e.g. 1, 1000, 50000)
-- **Minimum counter digits:** Zero-padding (e.g. 5 → `00001`, `00002`)
+- **Use incremental counter?** (Unique type only): turn on to switch from collision-based disambiguation to a persistent, always-incrementing counter.
+- **Counter start value:** First number in sequence (e.g. 1, 1000, 50000). Ignored unless the persistent counter has not been seeded yet.
+- **Minimum counter digits:** Zero-padding (e.g. 5 → `00001`, `00002`).
 
-**Expression support:** Counter type supports Velocity expression with special `$counter` variable:
+**Example expression with prefix:**
 
 ```velocity
 # Employee number with prefix
@@ -180,14 +185,15 @@ The **Apache Velocity expression** field provides a powerful templating language
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | **Mapped account attributes** | All attributes from Attribute Mapping                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | `$jobTitle`, `$department`, `$email`                                       |
 | **Source account attributes** | Direct source attributes (if no mapping)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `$firstname`, `$lastname`, `$hireDate`                                     |
-| **Identity attributes**       | When Include identities = Yes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `$identity.firstname`, `$identity.employeeNumber`                          |
-| **$accounts**                 | Managed account snapshots: source **`attributes`** plus **`_id`** (composite key `sourceId::nativeIdentity`), nested **`source`** (`id`, `name` — managed accounts only for `id`), nested **`schema`** (`id` = native identity, `name` = display name), and **`IIQDisabled`**. Top-level **`$originAccount`** is the same composite key for the origin row only. Ordered by configured source order, then account insertion order, then unknown sources. If `mainAccount` contains a valid managed account key, that account is moved to index 0. | `$accounts[0]._id`, `$accounts[0].source.name`, `$accounts[0].schema.name` |
-| **$sources**                  | Managed account snapshots grouped by source name                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `$sources.get("Workday")`                                                  |
+| **Identity attributes**       | When Include identities = Yes. `$identity.name` is the root identity name. `$name` falls back to the identity name for identity-based accounts when no mapped attribute named `name` exists.                                                                                                                                                                                                         
+                                                                                                                                                                                                               | `$identity.name`, `$identity.employeeNumber`, `$name`                      |
+| **$accounts**                 | Managed account snapshots: source **`attributes`** plus nested **`source`** (`id`, `name` — managed accounts only for `id`), nested **`schema`** (`id` = native identity, `name` = display name), and **`IIQDisabled`**. The top-level **`$originAccount`** is the composite `sourceId::nativeIdentity` key for the origin row only. Ordered by configured source order, then account insertion order within each source, then unknown sources appended. If `mainAccount` contains a valid managed account key, that account is moved to index 0. | `$accounts[0].source.name`, `$accounts[0].schema.name`, `$accounts[0].schema.id` |
+| **$sources**                  | Map of source name → list of managed account snapshots (the same shape as `$accounts[]` entries). Access with `$sources.get('SourceName')` (dot access is not supported on a Map).                                                                                                                                                                                                                                                                                                                                                                 | `$sources.get("Workday")`                                                  |
 | **$previous**                 | Previous generated account state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `$previous.username`                                                       |
 | **$originSource**             | Source that originally created the Fusion account (when available)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `Identities`, `Workday`                                                    |
-| **$originAccount**            | String id of the identity or managed account that originally created the Fusion account (same as the `originAccount` attribute)                                                                                                                                                                                                                                                                                                                                                                                                                   | Use as a scalar in expressions                                             |
-| **$account**                  | Snapshot for the origin only: same shape as `$accounts[]` entries when the origin is a managed account; when the origin is **Identities** and identity attributes are available, identity-backed fields are used first (then synthetic identity row if needed). Use **`$originAccount`** for the composite key or identity id string. Identity-backed rows use **`source.name`** = **`Identities`** (no `source.id`) and **`schema`** for display name and id (`_id` matches the identity id).                                                    | `$originAccount`, `$account.schema.name`, `$account.source.name`           |
-| **Special variables**         | `$counter` (Counter type only)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `$counter` in expression for Counter type                                  |
+| **$originAccount**            | String id of the identity or managed account that originally created the Fusion account (same as the `originAccount` attribute). For managed origins this is the composite `sourceId::nativeIdentity`; for identity origins this is the identity id.                                                                                                                                                                                                                                                                                              | Use as a scalar in expressions                                             |
+| **$account**                  | Snapshot for the origin only: same shape as `$accounts[]` entries when the origin is a managed account; when the origin is **Identities** and identity attributes are available, identity-backed fields are used first (then synthetic identity row if needed). Use **`$originAccount`** for the composite key or identity id string. Identity-backed rows use **`source.name`** = **`Identities`** (no `source.id`) and **`schema`** for display name and id; `$account.name` is also available for identity-backed rows. Note: `$account` is the origin snapshot — when `mainAccount` points elsewhere, `$accounts[0]` will differ from `$account`. | `$originAccount`, `$account.schema.name`, `$account.source.name`, `$account.name` |
+| **Special variables**         | `$counter` (Unique type, collision mode renders empty on first try, padded suffix on subsequent attempts; auto-append is skipped when the expression uses Velocity directives), `$UUID` (Unique type, fresh v4 per attempt when referenced), `$isUnique(value)` (Unique type, returns true if the value is not already registered) | `$counter` in expression for Unique type                                   |
 
 ### Available utilities
 
