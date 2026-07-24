@@ -206,7 +206,7 @@ export const registerHandlebarsHelpers = (): void => {
         return cards
     })
 
-    const PIPELINE_PHASE_ORDER = ['Setup', 'Fetch', 'Refresh', 'Process', 'Unique attributes', 'Output'] as const
+    const PIPELINE_PHASE_ORDER = ['Setup', 'Fetch', 'Refresh', 'Process', 'Output', 'Report'] as const
 
     /** Ordered phase tiles for HTML; missing phases show an em dash. */
     Handlebars.registerHelper('orderedPhaseTimingEntries', (stats: Record<string, unknown> | null | undefined) => {
@@ -227,3 +227,4 @@ export const registerHandlebarsHelpers = (): void => {
         }))
     })
 }
+

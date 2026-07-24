@@ -168,9 +168,12 @@ export class ReportService {
 
         if (this.identities && this.sources) {
             const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
-            if (globalOwnerIds.length > 0 && this.email?.getRecipientEmails) {
-                const ownerEmails = await this.email.getRecipientEmails(globalOwnerIds)
-                for (const e of ownerEmails) recipientEmails.add(e)
+            if (globalOwnerIds.length > 0) {
+                await this.hydrateIdentitiesById(globalOwnerIds)
+                if (this.email?.getRecipientEmails) {
+                    const ownerEmails = await this.email.getRecipientEmails(globalOwnerIds)
+                    for (const e of ownerEmails) recipientEmails.add(e)
+                }
             }
         }
 
@@ -193,13 +196,19 @@ export class ReportService {
             if (decision?.submitter?.id) idsToHydrate.add(decision.submitter.id)
             if (decision?.identityId) idsToHydrate.add(decision.identityId)
         }
+        await this.hydrateIdentitiesById([...idsToHydrate])
+    }
+
+    /** Reload identity records needed for report email/metadata after earlier pipeline cache clears. */
+    private async hydrateIdentitiesById(identityIds: string[]): Promise<void> {
+        if (identityIds.length === 0 || !this.identities) return
         if (typeof (this.identities as any)?.hydrateMissingIdentitiesById === 'function') {
-            await this.identities.hydrateMissingIdentitiesById([...idsToHydrate])
+            await this.identities.hydrateMissingIdentitiesById(identityIds)
             return
         }
         // Backward-compatible path for legacy test doubles that only mock get/fetch by id.
         await Promise.all(
-            [...idsToHydrate]
+            identityIds
                 .filter((id) => !this.identities?.getIdentityById?.(id))
                 .map((id) => this.identities?.fetchIdentityById?.(id).catch(() => {}))
         )
@@ -587,3 +596,4 @@ export class ReportService {
         }
     }
 }
+

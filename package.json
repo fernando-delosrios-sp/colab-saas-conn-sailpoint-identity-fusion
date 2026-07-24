@@ -13,7 +13,7 @@
         "docs:serve": "npm run docs:prepare && node scripts/docs-venv.cjs serve",
         "start": "spcx run dist/index.js $PORT",
         "debug": "spcx run dist/index.js",
-        "debug:messages": "node scripts/debug-messages.cjs",
+        "debug:messages": "mkdir -p logs && LOG_FILE=logs/debug-messages-$(date +%Y%m%d).log node scripts/debug-messages.cjs",
         "proxy": "concurrently \"cross-env spcx run dist/index.js\" \"wait-on tcp:3000 && npx tmole 3000\"",
         "log-server": "mkdir -p logs && LOG_FILE=logs/remote-logs-$(date +%Y%m%d).log node log-server.js 2>&1 | grep -v '\\[200 OK\\]\\|\\[201\\|\\[204\\|\\[404\\|\\[500'",
         "remote-log-server": "mkdir -p logs && LOG_FILE=logs/remote-logs-$(date +%Y%m%d).log concurrently --raw \"node log-server.js\" \"wait-on tcp:2389 && npx tmole 2389 2>&1 | grep -v '\\[200 OK\\]\\|\\[201\\|\\[204\\|\\[404\\|\\[500'\"",
