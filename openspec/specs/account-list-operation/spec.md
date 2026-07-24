@@ -136,7 +136,7 @@ State persistence is all-or-nothing: when the account-list pipeline fails for an
 
 ### Requirement: Account-list operation runs an operation heartbeat
 
-The account-list operation SHALL start an operation heartbeat at the beginning of the run and stop it in a `finally` block so the heartbeat is active for the full pipeline and epilogue. The heartbeat SHALL use the configured `statsLoggingIntervalMs` interval.
+The account-list operation SHALL start an operation heartbeat at the beginning of the run and stop it in a `finally` block so the heartbeat is active for the full pipeline and epilogue. The heartbeat SHALL use the configured `statsLoggingIntervalMs` interval from Advanced Connection Settings (default 10 seconds).
 
 #### Scenario: Heartbeat active for entire account-list run
 
@@ -151,6 +151,12 @@ The account-list operation SHALL start an operation heartbeat at the beginning o
 - **WHEN** the report epilogue runs and the operation rethrows the error
 - **THEN** the heartbeat SHALL still have emitted STATUS lines up to the failure window
 - **AND** the heartbeat SHALL stop in `finally` without leaking the interval
+
+#### Scenario: Default 10 second interval for account-list heartbeat
+
+- **GIVEN** a source configuration with default Advanced Connection Settings
+- **WHEN** a persistent account-list aggregation runs for more than 10 seconds
+- **THEN** at least one STATUS heartbeat line SHALL appear within the first 10 seconds
 
 ### Requirement: Account-list pipeline logs phase and step boundaries
 

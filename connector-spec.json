@@ -30,6 +30,7 @@
         "maxConcurrentRequests": 20,
         "parallelBatchSize": 12,
         "processingWait": 60,
+        "heartbeatInterval": 10,
         "externalLoggingLevel": "info",
         "scoringMaxConcurrency": 12,
         "proxyEnabled": false,
@@ -1135,6 +1136,14 @@
                             "required": false,
                             "min": "10",
                             "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts."
+                        },
+                        {
+                            "key": "heartbeatInterval",
+                            "label": "Heartbeat interval (seconds)",
+                            "type": "number",
+                            "required": false,
+                            "min": "5",
+                            "helpKey": "How often (in seconds) the connector emits STATUS and EVENT_SUMMARY lines during long operations. Lower values give faster visibility; higher values reduce log volume. Default 10 seconds."
                         },
                         {
                             "key": "enablePriority",

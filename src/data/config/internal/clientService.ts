@@ -11,9 +11,9 @@ export const internalConfigClientService = {
     maxRetryDelayMs: 60000,
     retryJitterFactor: 0.3,
     rateLimitJitterFactor: 0.1,
-    statsLoggingIntervalMs: 30000,
     maxStatsSamples: 1000,
     queueProcessingIntervalMs: 10,
     sailPointListMax: 250,
 } as const
+
 

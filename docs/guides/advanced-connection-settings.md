@@ -147,10 +147,10 @@ During long `accountList` aggregations, the connector emits standardized text pr
 
 | Prefix | Level | Purpose |
 | ------ | ----- | ------- |
-| `STATUS` | Info | Periodic heartbeat (~30s): phase, step, progress, queue delta, memory, elapsed time |
+| `STATUS` | Info | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, progress, queue delta, memory, elapsed time |
 | `EVENT_SUMMARY` | Info | Aggregated match/correlation counts since the previous heartbeat tick |
 | `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END`) |
-| `WARN STALL` | Warn | API queue stopped completing requests for ~60s; includes active request labels |
+| `WARN STALL` | Warn | API queue stopped completing requests for two consecutive heartbeat ticks; includes active request labels |
 | `EPILOGUE` | Info | Report epilogue start (not a numbered phase) |
 | `METRIC` | Info | Phase/step timing metrics |
 
@@ -174,7 +174,7 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 
 | Category                  | Fields                                         | Purpose                               |
 | ------------------------- | ---------------------------------------------- | ------------------------------------- |
-| **Provisioning & timing** | Provisioning timeout, Processing wait time     | Max wait times for operations         |
+| **Provisioning & timing** | Provisioning timeout, Processing wait time, Heartbeat interval | Max wait times and operation log cadence |
 | **Queue**                 | Max concurrent requests, Parallel batch size, Requests per second | Rate limiting and concurrency control |
 | **Retry**                 | API request retries                            | Automatic retry for failed requests   |
 
@@ -190,6 +190,7 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 | ---------------------------------- | ------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
 | **Provisioning timeout (seconds)** | 300     | 60–3600 | Max wait for provisioning operations (enable/disable, create/update)                                                     |
 | **Processing wait time (seconds)** | 60      | 0–600   | Interval between keep-alive signals during account list and account update; prevents timeouts on long-running operations |
+| **Heartbeat interval (seconds)**   | 10      | 5+      | How often STATUS and EVENT_SUMMARY lines are emitted during long operations; lower = faster visibility, higher = less log volume |
 
 **Provisioning timeout tuning:**
 
@@ -463,7 +464,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 | Setting category          | Key fields                            | Use for                                 |
 | ------------------------- | ------------------------------------- | --------------------------------------- |
 | **Developer Settings**    | Reset accounts, External logging      | Testing, troubleshooting, monitoring    |
-| **Provisioning & timing** | Provisioning timeout, Processing wait | Operation timeouts                      |
+| **Provisioning & timing** | Provisioning timeout, Processing wait, Heartbeat interval | Operation timeouts and log cadence      |
 | **Queue**                 | Max concurrent, RPS                   | Rate limiting, concurrency control      |
 | **Retry**                 | API request retries                   | Resilience, handling transient failures |
 
@@ -479,5 +480,6 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](troubleshooting.md).
+
 
 

@@ -403,6 +403,13 @@ export interface AdvancedConnectionSettingsSection {
      * so it never exceeds the queue's concurrency budget.
      */
     parallelBatchSize?: number
+
+    /**
+     * Interval (in seconds) between operation heartbeat STATUS and EVENT_SUMMARY lines
+     * during long-running operations. Configured in Advanced Connection Settings as
+     * `heartbeatInterval`; converted to `statsLoggingIntervalMs` at runtime. Default 10 seconds.
+     */
+    heartbeatInterval?: number
 }
 
 // Proxy Settings Section
@@ -512,4 +519,5 @@ export interface FusionConfig
         InternalConfig {
     recording?: RecordingConfig
 }
+
 
