@@ -43,12 +43,8 @@ import {
 } from './accountFilters'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 
-
 type ReverseCorrelationArtifact =
-    | 'fusion_schema_attribute'
-    | 'identity_attribute'
-    | 'identity_profile_mapping'
-    | 'managed_source_correlation'
+    'fusion_schema_attribute' | 'identity_attribute' | 'identity_profile_mapping' | 'managed_source_correlation'
 
 interface ReverseCorrelationSetupStatus {
     isConsistent: boolean
@@ -424,7 +420,13 @@ export class SourceService {
      * Get fusion source info
      */
     public getFusionSource(): SourceInfo | undefined {
-        return Array.from(this.sourcesById.values()).find((s) => !s.isManaged)
+        // ⚡ Bolt: Iterate Map values directly to prevent Array.from heap allocation
+        for (const source of this.sourcesById.values()) {
+            if (!source.isManaged) {
+                return source
+            }
+        }
+        return undefined
     }
 
     /**
@@ -1035,10 +1037,7 @@ export class SourceService {
         const requestParameters: SourcesV2025ApiGetSourceSchemasRequest = {
             sourceId,
         }
-        const schemas = await this.executeGetSourceSchemas(
-            requestParameters,
-            'SourceService>listSourceSchemas'
-        )
+        const schemas = await this.executeGetSourceSchemas(requestParameters, 'SourceService>listSourceSchemas')
         if (!schemas) {
             throw new ConnectorError(
                 `Failed to fetch schemas for source "${sourceId}". The API call returned no data.`,
