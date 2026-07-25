@@ -628,23 +628,21 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
    - Export current accounts (if needed)
    - Document current state
 
-2. Enable reset:
+2. Enable reset (as needed):
    Advanced Settings → Developer Settings
-   → Reset accounts?: Yes
+   → Reset accounts?: Yes   (to wipe Fusion account data)
+   → Reset forms?: Yes      (optional — also delete review forms)
 
 3. Save configuration
 
 4. Run FULL account aggregation
-   (Rebuilds all accounts from scratch)
+   (Reset-accounts run emits zero accounts; run again to rebuild)
    (This may take hours for large datasets)
 
-5. Verify accounts rebuilt correctly
+5. Verify accounts rebuilt correctly on the follow-up run
 
-6. IMMEDIATELY disable reset:
-   → Reset accounts?: No
-
-7. Save configuration
-   (Critical: prevents accidental reset on next run)
+6. Confirm flags auto-disabled
+   (Both reset toggles turn off automatically after the run that consumed them)
 ```
 
 **Alternative (safer):** Test with small batch first using **Aggregation batch size** before full reset.
@@ -737,3 +735,4 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 
 - For specific feature guidance, see the other usage guides (Map & Define, Match, matching algorithms, advanced settings, proxy mode).
 - For ISC general troubleshooting, see [SailPoint documentation](https://documentation.sailpoint.com/saas/).
+

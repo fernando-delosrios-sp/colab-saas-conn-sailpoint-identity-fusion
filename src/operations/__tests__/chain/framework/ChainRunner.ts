@@ -28,6 +28,8 @@ export interface ScenararioConfig {
     skipAccountsWithMissingId?: boolean
     maxHistoryMessages?: number
     reset?: boolean
+    resetAccounts?: boolean
+    resetForms?: boolean
     forceAttributeRefresh?: boolean
     [key: string]: unknown
 }
@@ -238,3 +240,4 @@ export function registerStepFn(
 function getStepFn(operation: string): ((step: StepDefinition, context: ChainContext) => Promise<unknown>) | undefined {
     return stepFns.get(operation)
 }
+

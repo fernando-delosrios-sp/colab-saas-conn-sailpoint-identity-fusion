@@ -27,7 +27,8 @@ flowchart TD
 1.  **Setup & Initialization**:
     - Loads all managed sources.
     - Acquires a **process lock** to prevent concurrent aggregations.
-    - Checks for a "Reset" flag; if detected, it clears existing forms and resets state instead of performing aggregation.
+    - Checks for **Reset forms?**; when enabled, deletes all Fusion review form definitions and auto-disables the flag (aggregation continues unless account reset is also set).
+    - Checks for **Reset accounts?**; when enabled, clears persisted fusion state, auto-disables the flag, and exits Setup without performing aggregation (zero accounts emitted).
     - Checks for **Force attribute refresh on next aggregation?**; when enabled, the connector disables the flag immediately so it applies to a single aggregation only, then proceeds with the run (Normal-type attributes are recalculated when their definitions execute in step 3/step 4).
     - Sets the fusion account schema.
     - **Reverse correlation setup**: Validates and updates reverse correlation transforms if sources are configured for reverse correlation.
@@ -192,3 +193,4 @@ Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion
 ### Preventing Fusion account creation (empty nativeIdentity skip pattern)
 
 One can purposely generate an empty `nativeIdentity` (by designing attribute definitions that produce an empty fusion identity attribute) in conjunction with the "Skip accounts with a missing identifier" processing option. When the fusion identity attribute evaluates to empty and the skip option is enabled, the account is omitted from the output, effectively preventing specific managed accounts or identities from generating Fusion accounts.
+

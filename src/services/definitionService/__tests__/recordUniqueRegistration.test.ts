@@ -16,7 +16,8 @@ describe('DefinitionService record unique registration', () => {
         sources: [{ name: 'Record Source', id: 'src-record', type: 'record' }],
         fusionAccountRefreshThresholdInSeconds: 3600,
         maxHistoryMessages: 50,
-        reset: false,
+        resetAccounts: false,
+        resetForms: false,
     } as unknown as FusionConfig
 
     beforeAll(() => {
@@ -69,3 +70,4 @@ describe('DefinitionService record unique registration', () => {
         expect((definitionService as any).getUniqueValues('email').size).toBe(0)
     })
 })
+

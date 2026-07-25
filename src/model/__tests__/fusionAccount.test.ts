@@ -14,7 +14,8 @@ describe('FusionAccount', () => {
         ],
         fusionAccountRefreshThresholdInSeconds: 3600,
         maxHistoryMessages: 50,
-        reset: false,
+        resetAccounts: false,
+        resetForms: false,
     } as unknown as FusionConfig
 
     beforeAll(() => {

@@ -16,7 +16,8 @@ export const runtimeDefaults = {
     externalLoggingLevel: connectorSpecInitialValues.externalLoggingLevel,
     managedAccountsBatchSize: connectorSpecInitialValues.managedAccountsBatchSize,
     scoringMaxConcurrency: connectorSpecInitialValues.scoringMaxConcurrency,
-    reset: false,
+    resetAccounts: false,
+    resetForms: false,
     externalLoggingEnabled: false,
     concurrencyCheckEnabled: true,
     forceAttributeRefresh: false,
@@ -43,7 +44,11 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
     logger.info('Configuration validation completed successfully')
 
     return {
-        reset: extractBoolean(raw, 'reset') ?? runtimeDefaults.reset,
+        resetAccounts:
+            extractBoolean(raw, 'resetAccounts') ??
+            extractBoolean(raw, 'reset') ??
+            runtimeDefaults.resetAccounts,
+        resetForms: extractBoolean(raw, 'resetForms') ?? runtimeDefaults.resetForms,
         managedAccountsBatchSize: (raw.managedAccountsBatchSize as number | undefined) ?? runtimeDefaults.managedAccountsBatchSize,
         scoringMaxConcurrency: (raw.scoringMaxConcurrency as number | undefined) ?? runtimeDefaults.scoringMaxConcurrency,
         concurrencyCheckEnabled: extractBoolean(raw, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled,
@@ -53,3 +58,4 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
         externalLoggingLevel,
     }
 }
+

@@ -30,6 +30,7 @@
         "maxConcurrentRequests": 20,
         "parallelBatchSize": 12,
         "processingWait": 60,
+        "heartbeatInterval": 10,
         "externalLoggingLevel": "info",
         "scoringMaxConcurrency": 12,
         "proxyEnabled": false,
@@ -1001,11 +1002,18 @@
                     "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation), manage memory consumption during match detection by adjusting batch sizes, and configure external logging for centralized monitoring.<br><br><strong>v2.2.0</strong>",
                     "items": [
                         {
-                            "key": "reset",
+                            "key": "resetAccounts",
                             "label": "Reset accounts?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Rebuild all Fusion accounts from scratch on the next aggregation. Use with caution in production and remember to turn this off after it completes"
+                            "helpKey": "On the next aggregation only, clear all Fusion account data and emit zero accounts (rebuild from scratch on the following run). Does not delete source accounts or identities. Automatically turned off after it completes"
+                        },
+                        {
+                            "key": "resetForms",
+                            "label": "Reset forms?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "On the next aggregation only, delete all Fusion review form definitions. Aggregation continues unless Reset accounts? is also enabled. Automatically turned off after it completes"
                         },
                         {
                             "key": "forceAttributeRefresh",

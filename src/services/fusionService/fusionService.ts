@@ -71,7 +71,8 @@ export class FusionService {
         return this.matchOutcomeDispatcher
     }
 
-    private readonly reset: boolean
+    private readonly resetAccounts: boolean
+    private readonly resetForms: boolean
     private readonly reportAttributes: string[]
     public readonly urlContext: UrlContext
     private readonly deleteEmpty: boolean
@@ -163,7 +164,8 @@ export class FusionService {
                 accountAssembly: this.accountAssembly,
             }
         )
-        this.reset = config.reset
+        this.resetAccounts = config.resetAccounts
+        this.resetForms = config.resetForms
         this.fusionOwnerIsGlobalReviewer = config.fusionOwnerIsGlobalReviewer ?? false
         this.fusionReportOnAggregation = config.fusionReportOnAggregation ?? false
         this.reportAttributes = config.fusionFormAttributes ?? []
@@ -219,12 +221,21 @@ export class FusionService {
     // ------------------------------------------------------------------------
 
     /**
-     * Checks if the reset flag is enabled in configuration.
+     * Checks if the account reset flag is enabled in configuration.
      *
-     * @returns true if a full reset was requested
+     * @returns true when Fusion accounts should be cleared on the next aggregation
      */
-    public isReset(): boolean {
-        return this.reset
+    public isResetAccounts(): boolean {
+        return this.resetAccounts
+    }
+
+    /**
+     * Checks if the form reset flag is enabled in configuration.
+     *
+     * @returns true when Fusion review forms should be deleted on the next aggregation
+     */
+    public isResetForms(): boolean {
+        return this.resetForms
     }
 
     /**
@@ -275,15 +286,33 @@ export class FusionService {
     }
 
     /**
-     * Disable the reset flag in the source configuration
+     * Disable the account reset flag in the source configuration.
+     * Also clears the legacy `reset` connector attribute when present.
      */
-    public async disableReset(): Promise<void> {
+    public async disableResetAccounts(): Promise<void> {
         const { fusionSourceId } = this.sources
+        await this.sources.patchSourceConfig(
+            fusionSourceId,
+            '/connectorAttributes/resetAccounts',
+            false,
+            'FusionService>disableResetAccounts'
+        )
         await this.sources.patchSourceConfig(
             fusionSourceId,
             '/connectorAttributes/reset',
             false,
-            'FusionService>disableReset'
+            'FusionService>disableResetAccounts>legacyReset'
+        )
+    }
+
+    /** Disable the form reset flag in the source configuration. */
+    public async disableResetForms(): Promise<void> {
+        const { fusionSourceId } = this.sources
+        await this.sources.patchSourceConfig(
+            fusionSourceId,
+            '/connectorAttributes/resetForms',
+            false,
+            'FusionService>disableResetForms'
         )
     }
 
@@ -1316,6 +1345,7 @@ export class FusionService {
                 reportAttributes: this.reportAttributes,
                 fusionIdentityComparisonsByAccount: tracker.fusionIdentityComparisonsByAccount,
                 sources: this.sources,
+                fusionEnableAutoAssignment: this.config.fusionEnableAutoAssignment,
                 fusionAutoAssignmentScore: this.config.fusionAutoAssignmentScore,
             },
             includeNonMatches,

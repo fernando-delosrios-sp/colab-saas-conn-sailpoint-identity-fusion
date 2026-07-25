@@ -65,10 +65,15 @@ export async function hydrateCorrelatedManagedAccountIdentities(deps: {
     return { hydrated: distinctIds.size }
 }
 
-async function applyFusionReset(serviceRegistry: ServiceRegistry): Promise<void> {
-    const { forms, fusion, sources } = serviceRegistry
+async function applyFusionFormsReset(serviceRegistry: ServiceRegistry): Promise<void> {
+    const { forms, fusion } = serviceRegistry
     await forms.deleteExistingForms()
-    await fusion.disableReset()
+    await fusion.disableResetForms()
+}
+
+async function applyFusionAccountReset(serviceRegistry: ServiceRegistry): Promise<void> {
+    const { fusion, sources } = serviceRegistry
+    await fusion.disableResetAccounts()
     await fusion.resetState()
     await sources.resetBatchCumulativeCount()
 }
@@ -95,9 +100,14 @@ export async function setupPhase(
 
     if (isPersistent) await sources.setProcessLock()
 
-    if (fusion.isReset()) {
-        log.info('Reset flag detected, disabling reset and exiting')
-        if (isPersistent) await applyFusionReset(serviceRegistry)
+    if (isPersistent && fusion.isResetForms()) {
+        log.info('Reset forms flag detected, deleting fusion review forms')
+        await applyFusionFormsReset(serviceRegistry)
+    }
+
+    if (fusion.isResetAccounts()) {
+        log.info('Reset accounts flag detected, clearing state and exiting')
+        if (isPersistent) await applyFusionAccountReset(serviceRegistry)
         return false
     }
 
@@ -183,6 +193,9 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
     const processFormDataOp = log.track('fetchPhase.processFormData')
     await forms.processFetchedFormData()
     processFormDataOp.done()
+    log.info(
+        `Fusion reviews found: ${forms.formsFound}, Fusion review instances found: ${forms.formInstancesFound}`
+    )
 
     const counts = countManagedAccountsByType(sources)
     log.info(

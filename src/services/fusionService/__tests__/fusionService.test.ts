@@ -73,7 +73,8 @@ describe('FusionService', () => {
 
         // Mock config with Type assertion
         mockConfig = {
-            reset: false,
+            resetAccounts: false,
+            resetForms: false,
             fusionOwnerIsGlobalReviewer: false,
             fusionReportOnAggregation: false,
             fusionFormAttributes: ['email', 'firstName', 'lastName'],
@@ -212,7 +213,63 @@ describe('FusionService', () => {
     describe('initialization', () => {
         it('should initialize with provided config', () => {
             expect(fusionService).toBeDefined()
-            expect(fusionService.isReset()).toBe(false)
+            expect(fusionService.isResetAccounts()).toBe(false)
+            expect(fusionService.isResetForms()).toBe(false)
+        })
+    })
+
+    describe('reset flags', () => {
+        beforeEach(() => {
+            mockSources.patchSourceConfig = vi.fn().mockResolvedValue(undefined)
+        })
+
+        it('reflects resetAccounts and resetForms from config at construction', () => {
+            const service = new FusionService(
+                { ...mockConfig, resetAccounts: true, resetForms: false } as FusionConfig,
+                mockLog,
+                mockIdentities,
+                mockSources,
+                mockForms,
+                mockMappingService,
+                mockDefinitionService,
+                mockMatchingService,
+                mockSchemas,
+                run,
+                StandardCommand.StdAccountList
+            )
+
+            expect(service.isResetAccounts()).toBe(true)
+            expect(service.isResetForms()).toBe(false)
+        })
+
+        it('disableResetAccounts patches resetAccounts and legacy reset', async () => {
+            await fusionService.disableResetAccounts()
+
+            expect(mockSources.patchSourceConfig).toHaveBeenCalledTimes(2)
+            expect(mockSources.patchSourceConfig).toHaveBeenCalledWith(
+                FUSION_SOURCE_ID,
+                '/connectorAttributes/resetAccounts',
+                false,
+                'FusionService>disableResetAccounts'
+            )
+            expect(mockSources.patchSourceConfig).toHaveBeenCalledWith(
+                FUSION_SOURCE_ID,
+                '/connectorAttributes/reset',
+                false,
+                'FusionService>disableResetAccounts>legacyReset'
+            )
+        })
+
+        it('disableResetForms patches resetForms only', async () => {
+            await fusionService.disableResetForms()
+
+            expect(mockSources.patchSourceConfig).toHaveBeenCalledTimes(1)
+            expect(mockSources.patchSourceConfig).toHaveBeenCalledWith(
+                FUSION_SOURCE_ID,
+                '/connectorAttributes/resetForms',
+                false,
+                'FusionService>disableResetForms'
+            )
         })
     })
 
