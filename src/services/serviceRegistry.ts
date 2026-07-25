@@ -179,6 +179,7 @@ export class ServiceRegistry {
             forms: this.forms,
             decisionProcessor: this.fusion.decisionProcessor,
             commandType,
+            isPersistentRun: () => this.fusion.isPersistentRun(),
         })
         this.fusion.matchOutcomeDispatcher = this.matchOutcomeDispatcher
 
@@ -261,6 +262,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 
