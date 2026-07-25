@@ -72,8 +72,10 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
     fusion.setTracker = vi.fn()
     fusion.setPersistentRun = vi.fn()
     fusion.getTracker = vi.fn()
-    fusion.isReset = vi.fn().mockReturnValue(false)
-    fusion.disableReset = vi.fn().mockResolvedValue(undefined)
+    fusion.isResetAccounts = vi.fn().mockReturnValue(false)
+    fusion.isResetForms = vi.fn().mockReturnValue(false)
+    fusion.disableResetAccounts = vi.fn().mockResolvedValue(undefined)
+    fusion.disableResetForms = vi.fn().mockResolvedValue(undefined)
     fusion.disableForceAttributeRefresh = vi.fn().mockResolvedValue(undefined)
     fusion.resetState = vi.fn().mockResolvedValue(undefined)
     fusion.preProcessFusionAccounts = vi.fn().mockResolvedValue([])
@@ -139,4 +141,5 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
 
     return registry
 }
+
 

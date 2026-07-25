@@ -11,7 +11,8 @@ describe('hydrateCorrelatedManagedAccountIdentities', () => {
         ],
         fusionAccountRefreshThresholdInSeconds: 3600,
         maxHistoryMessages: 50,
-        reset: false,
+        resetAccounts: false,
+        resetForms: false,
     } as unknown as FusionConfig
 
     beforeAll(() => {
@@ -94,3 +95,4 @@ describe('hydrateCorrelatedManagedAccountIdentities', () => {
         expect(collectedChunks[0].length).toBe(N)
     })
 })
+

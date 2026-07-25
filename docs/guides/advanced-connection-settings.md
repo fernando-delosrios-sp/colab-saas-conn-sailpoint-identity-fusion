@@ -30,7 +30,8 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 
 | Field                                            | Type     | Purpose                                                                                        | Default                                                | Risk level                                    |
 | ------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------- |
-| **Reset accounts?**                              | Boolean  | Force rebuild of all Fusion accounts from scratch                                              | No                                                     | ⚠️ **HIGH** — Deletes all Fusion account data |
+| **Reset accounts?**                              | Boolean  | Clear Fusion account data and emit zero accounts on the next aggregation (rebuild on the following run) | No                                                     | ⚠️ **HIGH** — Deletes all Fusion account data |
+| **Reset forms?**                                 | Boolean  | Delete all Fusion review form definitions on the next aggregation                                       | No                                                     | Medium — removes pending and completed review forms |
 | **Managed accounts batch size**                  | Number   | Number of uncorrelated managed accounts per batch                                              | 100                                                    | Low                                           |
 | **Force attribute refresh on next aggregation?** | Boolean  | Recalculate Normal-type attributes on the next aggregation only (auto-disabled after that run) | No                                                     | Medium                                        |
 | **Enable concurrency check?**                    | Boolean  | Prevent concurrent aggregations                                                                | Yes                                                    | Low                                           |
@@ -50,34 +51,53 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 
 **What it does:**
 
-- Deletes all existing Fusion account state (attributes, history, processing flags)
-- Next aggregation rebuilds accounts from scratch using current configuration
-- Does NOT delete source accounts or identities
+- Clears persisted Fusion account state (attributes, history, processing flags)
+- Emits zero accounts on the reset run; the following aggregation rebuilds from scratch
+- Does NOT delete source accounts, identities, or review forms (unless **Reset forms?** is also enabled)
+- Automatically turns off after one aggregation
 
-**When to use:**
+### Reset forms
 
-| Scenario                                      | Use Reset?    | Alternative                                    |
-| --------------------------------------------- | ------------- | ---------------------------------------------- |
-| Testing major config changes                  | Yes (once)    | Test with small batch first                    |
-| Schema changes (attribute mapping/definition) | Maybe         | Discover Schema usually sufficient             |
-| Stuck processing state                        | No            | Retry aggregation (auto-resets the stuck flag) |
-| Production environment                        | ⚠️ **Rarely** | High impact; requires careful planning         |
+**Purpose:** Delete all Fusion review form definitions without wiping account data.
 
-**Workflow:**
+**What it does:**
+
+- Removes all Fusion review form definitions (pending and completed)
+- Aggregation continues normally unless **Reset accounts?** is also enabled
+- Automatically turns off after one aggregation
+
+**Combined behavior:**
+
+| Reset accounts? | Reset forms? | Result |
+| ---------------- | ------------ | ------ |
+| No | No | Normal aggregation |
+| Yes | No | Account reset only — zero accounts emitted |
+| No | Yes | Forms deleted — aggregation continues |
+| Yes | Yes | Forms deleted, then account reset — zero accounts emitted |
+
+**When to use reset accounts:**
+
+| Scenario                                      | Use Reset accounts? | Alternative                                    |
+| --------------------------------------------- | ------------------- | ---------------------------------------------- |
+| Testing major config changes                  | Yes (once)          | Test with small batch first                    |
+| Schema changes (attribute mapping/definition) | Maybe               | Discover Schema usually sufficient             |
+| Stuck processing state                        | No                  | Retry aggregation (auto-resets the stuck flag) |
+| Production environment                        | ⚠️ **Rarely**       | High impact; requires careful planning         |
+
+**Workflow (account reset):**
 
 ```
-1. Enable "Reset accounts?" = Yes
+1. Enable "Reset accounts?" = Yes (and "Reset forms?" = Yes if you also need forms cleared)
 2. Save configuration
-3. Run account aggregation (rebuilds all accounts)
-4. Verify accounts rebuilt correctly
-5. IMMEDIATELY disable "Reset accounts?" = No
-6. Save configuration
-→ Prevents accidental reset on next run
+3. Run account aggregation (reset run emits zero accounts)
+4. Run aggregation again to rebuild accounts
+5. Flags auto-disable after the run that consumed them
 ```
 
 !!! warning
 
-    - **Data loss:** All Fusion account history, processing state, and custom attributes are deleted
+    - **Data loss:** Account reset deletes Fusion account history, processing state, and custom attributes
+    - **Forms-only reset:** Managed accounts held by pending forms re-enter Match on the same run
     - **Performance:** Full rebuild can take hours for large datasets (10k+ accounts)
     - **Identity impact:** If Fusion is authoritative, identities may be temporarily impacted
     - **Coordination:** Notify stakeholders before resetting in production
@@ -446,7 +466,7 @@ Advanced Connection Settings:
 | **Slow aggregation**            | Low concurrency                        | Increase max concurrent requests; tune RPS                   |
 | **Accounts stuck processing**   | Timeout; unfinished run                | Increase timeout; retry aggregation (auto-resets stuck flag) |
 | **External logs not appearing** | Wrong URL; endpoint down               | Verify URL; check endpoint availability                      |
-| **Reset not working**           | Didn't disable after reset             | Reset works once; must disable to prevent repeat             |
+| **Reset not working**           | Flag still enabled after run           | Reset flags auto-disable after one run; verify connector version supports `resetAccounts` / `resetForms` |
 
 ---
 
@@ -487,6 +507,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](troubleshooting.md).
+
 
 
 

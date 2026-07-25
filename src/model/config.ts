@@ -326,9 +326,10 @@ interface AttributeMatchingSettingsMenu extends MatchingSettingsSection, ReviewS
 // Advanced Settings Menu
 // ============================================================================
 
-/** Developer/debug settings including reset flag, attribute refresh behavior, concurrency check, and external logging. */
+/** Developer/debug settings including reset flags, attribute refresh behavior, concurrency check, and external logging. */
 export interface DeveloperSettingsSection {
-    reset: boolean
+    resetAccounts: boolean
+    resetForms: boolean
     /**
      * Batch size for processing uncorrelated managed accounts during Match.
      * Lower values reduce peak memory usage; higher values may improve throughput.
@@ -519,6 +520,7 @@ export interface FusionConfig
         InternalConfig {
     recording?: RecordingConfig
 }
+
 
 
 

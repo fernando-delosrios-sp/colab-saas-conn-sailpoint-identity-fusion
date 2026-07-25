@@ -37,7 +37,8 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
             ],
             fusionAccountRefreshThresholdInSeconds: 3600,
             maxHistoryMessages: 50,
-            reset: false,
+            resetAccounts: false,
+            resetForms: false,
         } as unknown as FusionConfig
         FusionAccount.configure(minimalConfig)
     })
@@ -78,3 +79,4 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
         expect(acc.attributeBag.current['name']).toBe('persisted')
     })
 })
+

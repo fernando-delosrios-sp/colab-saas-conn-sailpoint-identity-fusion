@@ -2,6 +2,7 @@
 
 ## 2.2.0
 
+- (2026-07-25) **Enhancement:** Split Developer Settings reset into independent **Reset accounts?** (`resetAccounts`) and **Reset forms?** (`resetForms`) toggles — both default to off and auto-disable after one persistent aggregation. Account reset clears fusion state and emits zero accounts without deleting review forms unless **Reset forms?** is also enabled. Form reset deletes all Fusion review form definitions and allows aggregation to continue. Legacy connector attribute `reset` still maps to `resetAccounts` on read; disable clears both keys. `account-list-operation` and `fusion-service` specs updated.
 - (2026-07-25) **Fix:** Pending Fusion review forms again **deplete the managed-account work queue during Fetch** — `FormService` normalizes composite keys from form input, claims via run inventory when instances are pending, and retains inventory metadata (including optional `identityId`) after claim. **Partial matches** now call `claimAccount` after successful review form creation in the same aggregation run. **`getOrCreateFormDefinition`** recovers from duplicate-name ISC conflicts (409 / `400.1.409`) by retrying exact-name lookup. Prevents duplicate form work and `400.1.409` errors when accounts awaiting reviewer decision re-enter Match. `form-service`, `fusion-run`, and `match-outcome-dispatch` specs updated.
 - (2026-07-25) **Fix:** Correlated managed accounts linked only via **persisted Fusion account keys** (`previousAccountIds` / missing references) or matching **identity-origin Fusion rows** are recognized as already linked — `isManagedAccountLinkedInFusion` centralizes the check used by the correlated sweep and Match pre-filter. `FusionAccount.previousAccountIdsSet` exposes persisted keys for the linked-key index.
 - (2026-07-25) **Fix:** `buildManagedAccountKey` / `getManagedAccountKeyFromAccount` accept accounts whose `sourceId` is only present on nested `source.id`, matching ISC account shapes that previously produced no composite key.
@@ -119,6 +120,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 

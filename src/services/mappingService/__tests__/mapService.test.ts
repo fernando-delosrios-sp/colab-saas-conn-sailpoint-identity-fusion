@@ -14,7 +14,8 @@ describe('MappingService selective targets', () => {
         sources: [{ name: 'Record Source' }],
         fusionAccountRefreshThresholdInSeconds: 3600,
         maxHistoryMessages: 50,
-        reset: false,
+        resetAccounts: false,
+        resetForms: false,
     } as any
 
     beforeAll(() => {
@@ -68,3 +69,4 @@ describe('MappingService selective targets', () => {
         service.mapAttributes(account, run, { onlyTargets: new Set(['employeeId']) })
     })
 })
+

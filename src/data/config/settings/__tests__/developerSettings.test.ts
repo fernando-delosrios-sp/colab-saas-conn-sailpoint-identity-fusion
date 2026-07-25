@@ -1,12 +1,20 @@
 import { readSettings, connectorSpecInitialValues } from '../developerSettings'
 
 describe('developerSettings readSettings', () => {
-    it('defaults reset to false when omitted', () => {
+    it('defaults resetAccounts to false when omitted', () => {
         const raw = {}
 
         const result = readSettings(raw)
 
-        expect(result.reset).toBe(false)
+        expect(result.resetAccounts).toBe(false)
+    })
+
+    it('defaults resetForms to false when omitted', () => {
+        const raw = {}
+
+        const result = readSettings(raw)
+
+        expect(result.resetForms).toBe(false)
     })
 
     it('defaults managedAccountsBatchSize to 100 when omitted', () => {
@@ -41,20 +49,47 @@ describe('developerSettings readSettings', () => {
         expect(result.scoringMaxConcurrency).toBe(5)
     })
 
-    it('normalizes string "true" to boolean true for reset', () => {
+    it('normalizes string "true" to boolean true for resetAccounts', () => {
+        const raw = { resetAccounts: 'true' as unknown as boolean }
+
+        const result = readSettings(raw)
+
+        expect(result.resetAccounts).toBe(true)
+    })
+
+    it('normalizes string "false" to boolean false for resetAccounts', () => {
+        const raw = { resetAccounts: 'false' as unknown as boolean }
+
+        const result = readSettings(raw)
+
+        expect(result.resetAccounts).toBe(false)
+    })
+
+    it('reads legacy reset key as resetAccounts when resetAccounts is omitted', () => {
         const raw = { reset: 'true' as unknown as boolean }
 
         const result = readSettings(raw)
 
-        expect(result.reset).toBe(true)
+        expect(result.resetAccounts).toBe(true)
     })
 
-    it('normalizes string "false" to boolean false for reset', () => {
-        const raw = { reset: 'false' as unknown as boolean }
+    it('prefers resetAccounts over legacy reset key', () => {
+        const raw = {
+            resetAccounts: 'false' as unknown as boolean,
+            reset: 'true' as unknown as boolean,
+        }
 
         const result = readSettings(raw)
 
-        expect(result.reset).toBe(false)
+        expect(result.resetAccounts).toBe(false)
+    })
+
+    it('normalizes string "true" to boolean true for resetForms', () => {
+        const raw = { resetForms: 'true' as unknown as boolean }
+
+        const result = readSettings(raw)
+
+        expect(result.resetForms).toBe(true)
     })
 
     it('defaults concurrencyCheckEnabled to true when omitted', () => {
