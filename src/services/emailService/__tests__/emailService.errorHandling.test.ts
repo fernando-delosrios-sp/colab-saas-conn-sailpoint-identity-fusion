@@ -67,3 +67,25 @@ describe('EmailService error handling', () => {
         )
     })
 })
+
+describe('EmailService.getRecipientEmails', () => {
+    it('resolves emailAddress from identity profile API fallback', async () => {
+        const { service } = createEmailService()
+        const identities = {
+            getIdentityById: vi.fn(() => ({ id: 'owner-1', attributes: {} })),
+            hydrateMissingIdentitiesById: vi.fn(async () => undefined),
+            fetchIdentityById: vi.fn(async () => ({ id: 'owner-1', attributes: {} })),
+            fetchIdentityProfileById: vi.fn(async () => ({
+                id: 'owner-1',
+                email: 'owner@example.com',
+                attributes: { email: 'owner@example.com' },
+            })),
+        }
+        ;(service as any).identities = identities
+
+        const emails = await service.getRecipientEmails(['owner-1'])
+
+        expect(emails).toEqual(['owner@example.com'])
+        expect(identities.fetchIdentityProfileById).toHaveBeenCalledWith('owner-1')
+    })
+})

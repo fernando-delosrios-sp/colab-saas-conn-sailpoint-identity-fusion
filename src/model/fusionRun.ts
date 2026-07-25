@@ -18,6 +18,7 @@ export type ManagedAccountInfo = {
     sourceName: string
     sourceId?: string
     nativeIdentity?: string
+    identityId?: string
 }
 
 export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
@@ -27,6 +28,7 @@ export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
         sourceName: account.sourceName ?? '',
         sourceId: account.sourceId,
         nativeIdentity: account.nativeIdentity,
+        identityId: account.identityId,
     }
 }
 

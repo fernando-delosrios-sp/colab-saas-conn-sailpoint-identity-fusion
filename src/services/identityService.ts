@@ -227,6 +227,46 @@ export class IdentityService {
         }, `Failed to fetch identity by name "${name}"`)
     }
 
+    /**
+     * Fetch identity profile via Identities API (includes emailAddress not always present in search).
+     */
+    public async fetchIdentityProfileById(id: string): Promise<IdentityDocument | undefined> {
+        if (!id) return undefined
+        this.log.debug(`Fetching identity profile ${id}.`)
+
+        return wrapConnectorError(async () => {
+            const profile = await this.client.call<any>(
+                (api: any) => api.identities.getIdentity({ id }).then((r: any) => r.data),
+                { priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentityProfileById getIdentity' }
+            )
+            if (!profile?.id) return undefined
+            const doc = this.identityDocumentFromProfile(profile)
+            this.run.addIdentity(doc.id!, doc)
+            return doc
+        }, `Failed to fetch identity profile by ID "${id}"`)
+    }
+
+    private identityDocumentFromProfile(profile: any): IdentityDocument {
+        const attributes =
+            profile.attributes && typeof profile.attributes === 'object'
+                ? { ...(profile.attributes as Record<string, unknown>) }
+                : {}
+        const emailAddress = profile.emailAddress ?? profile.email
+        if (emailAddress && !attributes.email) {
+            attributes.email = emailAddress
+        }
+        return {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email ?? profile.emailAddress ?? undefined,
+            attributes,
+            accounts: [],
+            disabled: profile.identityStatus === 'INACTIVE',
+            protected: false,
+        } as IdentityDocument
+    }
+
+
     // ------------------------------------------------------------------------
     // Public Lookup Methods
     // ------------------------------------------------------------------------

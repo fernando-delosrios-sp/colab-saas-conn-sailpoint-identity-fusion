@@ -20,8 +20,8 @@ import { CorrelationManager } from '../correlationManager'
 import { DefinitionService } from '../definitionService'
 import { MappingService } from '../mappingService'
 import { assert } from '../../utils/assert'
-import { hasValue } from '../../utils/safeRead'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { isManagedAccountLinkedInFusion } from '../../model/managedAccountLink'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { promiseAllBatched, getScoringMaxConcurrency } from '../fusionService/collections'
@@ -425,23 +425,7 @@ export class MatchOutcomeDispatcher {
     }
 
     private isCorrelatedManagedAccountLinkedInFusion(account: Account): boolean {
-        const key = getManagedAccountKeyFromAccount(account)
-        if (key) {
-            const index = this.deps.run.linkedAccountKeyIndex
-            if (index) {
-                if (index.has(key)) return true
-            } else {
-                const isLinked = [...this.deps.run.allFusionAccounts, ...this.deps.run.allFusionIdentities].some(
-                    (fa) => fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)
-                )
-                if (isLinked) return true
-            }
-        }
-        const identityId = account.identityId
-        if (hasValue(identityId) && this.deps.run.hasFusionIdentity(identityId)) {
-            return true
-        }
-        return false
+        return isManagedAccountLinkedInFusion(account, this.deps.run)
     }
 
     private async handleNoReviewerAccount(
@@ -480,7 +464,7 @@ export class MatchOutcomeDispatcher {
                       }
                     : undefined
             }
-            await this.handlePartialMatch(fusionAccount, sourceInfo)
+            await this.handlePartialMatch(fusionAccount, sourceInfo, account)
             return { account, fusionAccount, resolution: 'partial-match' }
         }
 
@@ -510,7 +494,8 @@ export class MatchOutcomeDispatcher {
 
     private async handlePartialMatch(
         fusionAccount: FusionAccount,
-        sourceInfo: SourceInfo | undefined
+        sourceInfo: SourceInfo | undefined,
+        account: Account
     ): Promise<void> {
         assert(sourceInfo, 'Source info not found')
         const reviewers = this.deps.run.reviewersBySourceId.get(sourceInfo.id!)
@@ -525,6 +510,10 @@ export class MatchOutcomeDispatcher {
                         : `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
                 this.deps.run.trackFailed(fusionAccount, message)
             } else {
+                const managedAccountKey = getManagedAccountKeyFromAccount(account)
+                if (managedAccountKey) {
+                    this.deps.run.claimAccount(managedAccountKey, account.identityId)
+                }
                 const eligibleReviewerCount = [...(reviewers ?? [])].filter((r) => r.identityId).length
                 if (eligibleReviewerCount > 0 && outcome.newReviewInstancesQueued === 0) {
                     this.deps.run.removeMatchAccount(fusionAccount.managedAccountId)
@@ -612,6 +601,7 @@ function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 
             return 'nonMatch'
     }
 }
+
 
 
 

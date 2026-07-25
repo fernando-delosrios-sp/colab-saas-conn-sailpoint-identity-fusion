@@ -815,3 +815,34 @@ describe('ensureIdentityAttribute', () => {
     })
 })
 
+
+describe('SourceService fetchGlobalOwnerIdentityIds', () => {
+    it('expands GOVERNANCE_GROUP source owners to member identity IDs', async () => {
+        const { service, client } = createService()
+        ;(service as any)._fusionSourceOwner = { id: 'owner-workgroup', type: 'GOVERNANCE_GROUP' }
+        client.governanceGroupsApi = {
+            listWorkgroupMembers: vi.fn().mockResolvedValue({
+                data: [{ id: 'member-1' }, { id: 'member-2' }],
+            }),
+        }
+
+        const ids = await service.fetchGlobalOwnerIdentityIds()
+
+        expect(ids).toEqual(['member-1', 'member-2'])
+        expect(client.governanceGroupsApi.listWorkgroupMembers).toHaveBeenCalledWith({
+            workgroupId: 'owner-workgroup',
+            limit: 250,
+        })
+    })
+
+    it('uses identity owner ID directly when owner type is IDENTITY', async () => {
+        const { service, client } = createService()
+        ;(service as any)._fusionSourceOwner = { id: 'owner-identity', type: 'IDENTITY' }
+        client.governanceGroupsApi = { listWorkgroupMembers: vi.fn() }
+
+        const ids = await service.fetchGlobalOwnerIdentityIds()
+
+        expect(ids).toEqual(['owner-identity'])
+        expect(client.governanceGroupsApi.listWorkgroupMembers).not.toHaveBeenCalled()
+    })
+})

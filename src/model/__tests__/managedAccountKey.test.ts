@@ -15,6 +15,15 @@ describe('managedAccountKey helpers', () => {
         ).toBe('source-a::native-1')
     })
 
+    it('builds composite key from nested source.id when sourceId is absent', () => {
+        expect(
+            buildManagedAccountKey({
+                nativeIdentity: '116144',
+                source: { id: '355fb49e084e4f35adb755410affe0c8' },
+            })
+        ).toBe('355fb49e084e4f35adb755410affe0c8::116144')
+    })
+
     it('returns undefined when composite fields are missing', () => {
         expect(buildManagedAccountKey({})).toBeUndefined()
     })
@@ -29,3 +38,4 @@ describe('managedAccountKey helpers', () => {
         expect(normalizeCompositeManagedAccountKey(' source-a :: native-1 ')).toBe('source-a::native-1')
     })
 })
+

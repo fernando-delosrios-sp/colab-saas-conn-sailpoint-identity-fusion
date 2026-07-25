@@ -216,10 +216,73 @@ describe('MatchOutcomeDispatcher', () => {
                 return 1
             })
 
-            const result = await dispatcher.runMatchSweep([managedAccount()], 1)
+            const account = managedAccount()
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            const result = await dispatcher.runMatchSweep([account], 1)
 
             expect(result.partial).toBe(1)
             expect(forms.createFusionForm).toHaveBeenCalledWith(expect.any(FusionAccount), expect.any(Set))
+            expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(false)
+        })
+
+        it('does not claim the account when partial-match form creation fails', async () => {
+            const { dispatcher, matchingService, forms, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.reviewersBySourceId.set(SOURCE_ID, new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)]))
+            const account = managedAccount()
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            forms.createFusionForm.mockResolvedValueOnce({
+                formDefinitionReady: false,
+                newReviewInstancesQueued: 0,
+            })
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.addFusionMatch({
+                        identityId: 'identity-1',
+                        identityName: 'Identity One',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
+                    })
+                }
+                return 1
+            })
+
+            await dispatcher.runMatchSweep([account], 1)
+
+            expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(true)
+        })
+
+        it('does not claim the account when partial-match form creation throws', async () => {
+            const { dispatcher, matchingService, forms, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.reviewersBySourceId.set(SOURCE_ID, new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)]))
+            const account = managedAccount()
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            forms.createFusionForm.mockRejectedValueOnce(new Error('Form creation failed'))
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.addFusionMatch({
+                        identityId: 'identity-1',
+                        identityName: 'Identity One',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
+                    })
+                }
+                return 1
+            })
+
+            await dispatcher.runMatchSweep([account], 1)
+
+            expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(true)
         })
 
         it('dispatches a deferred match by claiming the account from the work queue', async () => {

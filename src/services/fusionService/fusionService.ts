@@ -37,8 +37,12 @@ import { AggregationTracker } from './aggregationTracker'
 
 import { AttributeOperations } from '../definitionService/types'
 import { getManagedAccountKeyFromAccount, normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
+import {
+    addFusionAccountLinkedKeysToIndex,
+    isManagedAccountLinkedInFusion,
+} from '../../model/managedAccountLink'
 import { StatusEntitlement } from '../../model/statusEntitlement'
-import { hasValue, trimStr } from '../../utils/safeRead'
+import { trimStr } from '../../utils/safeRead'
 import { IdentityProcessor } from './identityProcessor'
 import { CorrelationManager } from '../correlationManager'
 import { DecisionProcessor } from './decisionProcessor'
@@ -680,16 +684,14 @@ export class FusionService {
 
     private buildLinkedAccountKeyIndex(): void {
         // Build a one-shot flat index of every account key already linked in a loaded Fusion row.
-        // isCorrelatedManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
+        // isManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
         // of scanning fusionAccountMap + identity-linked Fusion account map (O(A+I)) for every correlated account.
         this.run.initLinkedAccountIndex()
         for (const fa of this.run.fusionAccountsIterable()) {
-            for (const key of fa.accountIdsSet) this.run.addToLinkedAccountIndex(key)
-            for (const key of fa.missingAccountIdsSet) this.run.addToLinkedAccountIndex(key)
+            addFusionAccountLinkedKeysToIndex(fa, this.run)
         }
         for (const fa of this.run.allFusionIdentities) {
-            for (const key of fa.accountIdsSet) this.run.addToLinkedAccountIndex(key)
-            for (const key of fa.missingAccountIdsSet) this.run.addToLinkedAccountIndex(key)
+            addFusionAccountLinkedKeysToIndex(fa, this.run)
         }
     }
 
@@ -1021,23 +1023,7 @@ export class FusionService {
      * falling back to a linear scan of fusionAccountMap + identity-linked Fusion account map for standalone calls.
      */
     private isCorrelatedManagedAccountLinkedInFusion(account: Account): boolean {
-        const key = getManagedAccountKeyFromAccount(account)
-        if (key) {
-            const index = this.run.linkedAccountKeyIndex
-            if (index) {
-                if (index.has(key)) return true
-            } else {
-                const isLinked = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities].some(
-                    (fa) => fa.accountIdsSet.has(key) || fa.missingAccountIdsSet.has(key)
-                )
-                if (isLinked) return true
-            }
-        }
-        const identityId = account.identityId
-        if (hasValue(identityId) && this.run.hasFusionIdentity(identityId)) {
-            return true
-        }
-        return false
+        return isManagedAccountLinkedInFusion(account, this.run)
     }
 
     /**

@@ -29,6 +29,7 @@ import {
     getReviewerInfo,
 } from './formProcessor'
 import { FusionMatch } from '../matchingService/types'
+import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 
 export type { PendingReviewFormContext,  PendingReviewAccountContext } from './types'
 
@@ -408,13 +409,46 @@ export class FormService {
         let formDefinition = await this.getFormDefinitionByName(formName)
         if (!formDefinition) {
             this.log.debug(`Form definition not found, creating new one: ${formName}`)
-            formDefinition = await this.buildFusionFormDefinition(formName, fusionAccount, candidates)
+            try {
+                formDefinition = await this.buildFusionFormDefinition(formName, fusionAccount, candidates)
+            } catch (error) {
+                if (this.isDuplicateFormDefinitionNameConflict(error)) {
+                    this.log.warn(
+                        `Form definition create conflict for name ${formName}; retrying lookup by exact name`
+                    )
+                    formDefinition = await this.getFormDefinitionByName(formName)
+                }
+                if (!formDefinition) {
+                    throw error
+                }
+            }
             softAssert(formDefinition, 'Failed to create form definition')
             softAssert(formDefinition?.id, 'Form definition ID is required')
         } else {
             this.log.debug(`Using existing form definition: ${formDefinition.id}`)
         }
         return formDefinition
+    }
+
+    private isDuplicateFormDefinitionNameConflict(error: unknown): boolean {
+        if (!error || typeof error !== 'object') {
+            return false
+        }
+        const err = error as {
+            message?: string
+            status?: number
+            response?: { status?: number; data?: { detailCode?: string; errorCode?: string; message?: string } }
+        }
+        const status = err.response?.status ?? err.status
+        if (status === 409) {
+            return true
+        }
+        const detailCode = err.response?.data?.detailCode ?? err.response?.data?.errorCode
+        if (detailCode === '400.1.409') {
+            return true
+        }
+        const message = String(err.message ?? err.response?.data?.message ?? '')
+        return /another form definition with the same name already exists/i.test(message)
     }
 
     /**
@@ -1060,7 +1094,8 @@ export class FormService {
      */
     private extractAccountIdFromInstance(instance: FormInstanceResponseV2025): string | undefined {
         const accountInfo = extractAccountInfoFromFormInput(instance.formInput)
-        return accountInfo?.id
+        const accountId = accountInfo?.id
+        return accountId ? normalizeCompositeManagedAccountKey(accountId) ?? accountId : undefined
     }
 
     private managedAccountExists(accountId: string): boolean {
@@ -1085,22 +1120,25 @@ export class FormService {
             return undefined
         }
 
+        const normalizedAccountId = normalizeCompositeManagedAccountKey(accountId) ?? accountId
         const workQueue = this.run.managedAccountsById
         assert(workQueue, 'Managed accounts have not been loaded')
 
-        const queueAccount = workQueue.get(accountId)
-        const info = queueAccount ? undefined : this.run.getManagedAccountInfo(accountId)
-        if (!queueAccount && !info) {
+        const queueAccount = workQueue.get(normalizedAccountId)
+        const info = queueAccount ? undefined : this.run.getManagedAccountInfo(normalizedAccountId)
+        if (!queueAccount && !info && !this.run.hasManagedAccount(normalizedAccountId)) {
             return undefined
         }
 
-        if (shouldRemoveAccountFromMap && queueAccount) {
-            this.sources.run.claimAccount(accountId, queueAccount.identityId)
+        if (shouldRemoveAccountFromMap && this.run.hasManagedAccount(normalizedAccountId) && queueAccount) {
+            const inventoryInfo = this.run.getManagedAccountInfo(normalizedAccountId)
+            const claimIdentityId = queueAccount.identityId ?? inventoryInfo?.identityId
+            this.sources.run.claimAccount(normalizedAccountId, claimIdentityId)
         }
 
         if (queueAccount) {
             return {
-                id: accountId,
+                id: normalizedAccountId,
                 name: trimStr(queueAccount.name) || '',
                 sourceName: queueAccount.sourceName || '',
                 sourceId: readString(queueAccount, 'sourceId'),
@@ -1108,12 +1146,20 @@ export class FormService {
             }
         }
 
+        if (info) {
+            return {
+                id: normalizedAccountId,
+                name: info.name,
+                sourceName: info.sourceName,
+                sourceId: info.sourceId,
+                nativeIdentity: info.nativeIdentity,
+            }
+        }
+
         return {
-            id: accountId,
-            name: info!.name,
-            sourceName: info!.sourceName,
-            sourceId: info!.sourceId,
-            nativeIdentity: info!.nativeIdentity,
+            id: normalizedAccountId,
+            name: '',
+            sourceName: '',
         }
     }
 

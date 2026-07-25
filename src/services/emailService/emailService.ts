@@ -327,14 +327,33 @@ export class EmailService {
         const validIds = identityIds.filter(Boolean) as string[]
         if (validIds.length === 0 || !this.identities) return []
 
+        const missingInCache = validIds.filter((id) => !this.identities?.getIdentityById(id))
+        if (missingInCache.length > 0 && typeof this.identities.hydrateMissingIdentitiesById === 'function') {
+            await this.identities.hydrateMissingIdentitiesById(missingInCache)
+        }
+
         const emails = new Set<string>()
 
         for (const id of validIds) {
             try {
-                const identity = this.identities.getIdentityById(id)
-                const attributes = (identity as any)?.attributes || {}
-                const email = identity?.email || attributes.email || attributes.workEmail
-                const normalized = normalizeEmailValue(email)[0]
+                let identity = this.identities.getIdentityById(id)
+                let normalized = this.extractIdentityEmail(identity)
+                if (!normalized && typeof this.identities.fetchIdentityById === 'function') {
+                    try {
+                        identity = await this.identities.fetchIdentityById(id)
+                        normalized = this.extractIdentityEmail(identity)
+                    } catch (e) {
+                        this.log.debug(`Unable to fetch identity ${id} for recipient email: ${e}`)
+                    }
+                }
+                if (!normalized && typeof (this.identities as any).fetchIdentityProfileById === 'function') {
+                    try {
+                        identity = await (this.identities as any).fetchIdentityProfileById(id)
+                        normalized = this.extractIdentityEmail(identity)
+                    } catch (e) {
+                        this.log.debug(`Unable to fetch identity profile ${id} for recipient email: ${e}`)
+                    }
+                }
                 if (normalized) {
                     emails.add(normalized)
                 }
@@ -344,6 +363,21 @@ export class EmailService {
         }
 
         return Array.from(emails)
+    }
+
+    private extractIdentityEmail(identity: unknown): string | undefined {
+        if (!identity || typeof identity !== 'object') return undefined
+        const doc = identity as { email?: unknown; emailAddress?: unknown; attributes?: Record<string, unknown> }
+        const attributes = doc.attributes || {}
+        const email =
+            doc.email ||
+            doc.emailAddress ||
+            attributes.email ||
+            attributes.emailAddress ||
+            attributes.workEmail ||
+            attributes.primaryEmail ||
+            attributes.mail
+        return normalizeEmailValue(email)[0]
     }
 
     private async getWorkflow(): Promise<any> {
@@ -376,3 +410,4 @@ export class EmailService {
         )
     }
 }
+

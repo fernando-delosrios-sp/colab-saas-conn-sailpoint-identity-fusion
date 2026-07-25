@@ -196,6 +196,22 @@ describe('FusionRun', () => {
         expect(run.getManagedAccountInfo('src-a::native-1')?.name).toBe('Test User')
     })
 
+    it('inventory retains identityId after setManagedAccount and claimAccount', () => {
+        const run = new FusionRun()
+        const account = {
+            id: 'isc-1',
+            sourceId: 'src-a',
+            sourceName: 'Source A',
+            nativeIdentity: 'native-1',
+            identityId: 'identity-1',
+            name: 'Test User',
+        } as any
+        run.setManagedAccount('src-a::native-1', account)
+        run.claimAccount('src-a::native-1', 'identity-1')
+
+        expect(run.getManagedAccountInfo('src-a::native-1')?.identityId).toBe('identity-1')
+    })
+
     it('snapshot returns serializable state', () => {
         const run = new FusionRun()
         run.managedAccountsById.set('k1', { name: 'a1' } as any)
@@ -313,4 +329,5 @@ function makeMockRecorder(options: { tracker: AggregationTracker }) {
     }
     return recorder
 }
+
 

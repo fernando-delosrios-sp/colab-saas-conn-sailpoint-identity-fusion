@@ -165,9 +165,16 @@ export class ReportService {
         reportType: 'aggregation' | 'fusion'
     ): Promise<void> {
         const recipientEmails = new Set<string>()
+        let globalOwnerIds: string[] = []
+        let ownerType: string | undefined
 
         if (this.identities && this.sources) {
-            const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
+            globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
+            try {
+                ownerType = this.sources.fusionSourceOwner.type
+            } catch {
+                ownerType = undefined
+            }
             if (globalOwnerIds.length > 0) {
                 await this.hydrateIdentitiesById(globalOwnerIds)
                 if (this.email?.getRecipientEmails) {
@@ -178,7 +185,9 @@ export class ReportService {
         }
 
         if (recipientEmails.size === 0) {
-            this.log?.warn?.('No recipient email found for report')
+            this.log?.warn?.(
+                `No recipient email found for report (ownerType=${ownerType ?? 'unknown'}, ownerIdentityIds=${globalOwnerIds.length})`
+            )
             return
         }
 
@@ -596,4 +605,5 @@ export class ReportService {
         }
     }
 }
+
 
