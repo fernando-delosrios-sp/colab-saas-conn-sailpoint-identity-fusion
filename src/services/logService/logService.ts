@@ -287,7 +287,12 @@ export class LogService {
         }
 
         const url = this.externalLoggingUrl
-        if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
+        try {
+            const parsedUrl = new URL(url)
+            if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+                return
+            }
+        } catch {
             return
         }
         const doFetch = () =>

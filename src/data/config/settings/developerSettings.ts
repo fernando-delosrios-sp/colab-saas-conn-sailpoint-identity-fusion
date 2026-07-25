@@ -27,11 +27,14 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
 
     if (externalLoggingEnabled) {
         assert(externalLoggingUrl, 'External logging URL is required when external logging is enabled')
-        assert(
-            externalLoggingUrl.toLowerCase().startsWith('http://') ||
-                externalLoggingUrl.toLowerCase().startsWith('https://'),
-            'External logging URL must use http or https protocol'
-        )
+        let isValidProtocol = false
+        try {
+            const parsedUrl = new URL(externalLoggingUrl)
+            isValidProtocol = parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:'
+        } catch (_e) {
+            // ignore parsing errors
+        }
+        assert(isValidProtocol, 'External logging URL must use http or https protocol')
         assert(
             ['error', 'warn', 'info', 'debug'].includes(externalLoggingLevel || ''),
             'External logging level must be one of: error, warn, info, debug'

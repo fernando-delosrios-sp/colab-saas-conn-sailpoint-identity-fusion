@@ -42,3 +42,7 @@
 **Vulnerability:** The LogService (`src/services/logService/logService.ts`) fetched data directly from a user-configured `externalLoggingUrl` without validating the scheme, making it vulnerable to Server-Side Request Forgery (SSRF) if a user supplied a malicious URL scheme like `file://` or an internal metadata endpoint.
 **Learning:** External or user-provided URLs must always be validated prior to making network requests, especially in Node.js where `fetch` or HTTP clients might attempt to resolve arbitrary schemes or hostnames.
 **Prevention:** Enforce strict URL scheme validation (e.g., checking for `http://` or `https://`) whenever initializing requests with configured URLs.
+## 2024-05-25 - Fix SSRF Vulnerability in URL scheme validation
+**Vulnerability:** Several places in the codebase checked the protocol of a URL using `startsWith('http://')` or `startsWith('https://')` instead of using the `URL` object to strictly parse the scheme. This simple prefix matching opens up SSRF bypass vectors where an attacker can supply malicious URLs.
+**Learning:** Checking the prefix of a URL string is not a secure way to validate the URL scheme or host.
+**Prevention:** Always use the `URL` object constructor to securely parse and validate URLs and their protocols.
