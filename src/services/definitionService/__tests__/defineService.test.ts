@@ -80,3 +80,117 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
     })
 })
 
+
+describe('DefinitionService.refreshUniqueAttributes preservation', () => {
+    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+    const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
+    const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
+
+    const createService = (uniqueAttributeDefinitions: any[]) => {
+        const config = {
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions,
+            attributeMaps: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+            maxAttempts: 20,
+        } as any
+        const service = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
+        service.setStateWrapper({})
+        return service
+    }
+
+    const createFusionAccount = (attrs: Record<string, any>, options: { needsReset?: boolean } = {}) => {
+        const attributeBag = {
+            current: { ...attrs },
+            previous: Object.keys(attrs).length > 0 ? { ...attrs } : {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: options.needsReset ?? false,
+            name: 'neo-1',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: vi.fn(),
+            attributeBag,
+        }
+
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+
+        return fusionAccount
+    }
+
+    it('preserves existing unique values when needsRefresh is true but needsReset is false', async () => {
+        const service = createService([
+            {
+                name: 'UID',
+                expression: 'WD$counter',
+                useIncrementalCounter: true,
+                digits: 6,
+                counterStart: 1,
+            },
+        ])
+        await service.initializeCounters()
+
+        const existing = createFusionAccount({ UID: 'WD000015' })
+        await service.registerUniqueAttributes(existing)
+        await service.refreshUniqueAttributes(existing)
+
+        expect(existing.attributes.UID).toBe('WD000015')
+        expect(mockLog.error).not.toHaveBeenCalled()
+    })
+
+    it('seeds the persistent counter from existing incremental values', async () => {
+        const service = createService([
+            {
+                name: 'UID',
+                expression: 'NG$counter',
+                useIncrementalCounter: true,
+                digits: 3,
+                counterStart: 1,
+            },
+        ])
+        await service.initializeCounters()
+
+        const existing = createFusionAccount({ UID: 'NG015' })
+        await service.refreshUniqueAttributes(existing)
+
+        expect(await service.getStateObject()).toEqual({ UID: 15 })
+
+        const next = createFusionAccount({})
+        await service.refreshUniqueAttributes(next)
+
+        expect(next.attributes.UID).toBe('NG016')
+        expect(await service.getStateObject()).toEqual({ UID: 16 })
+    })
+
+    it('regenerates unique values when needsReset is true', async () => {
+        const service = createService([
+            {
+                name: 'UID',
+                expression: 'generated-$counter',
+                useIncrementalCounter: false,
+                digits: 1,
+            },
+        ])
+
+        const account = createFusionAccount({ UID: 'old-value' }, { needsReset: true })
+        await service.registerUniqueAttributes(account)
+        await service.refreshUniqueAttributes(account)
+
+        expect(account.attributes.UID).not.toBe('old-value')
+    })
+})
