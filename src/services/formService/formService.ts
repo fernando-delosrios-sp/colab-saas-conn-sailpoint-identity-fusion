@@ -1416,7 +1416,7 @@ export class FormService {
                     throw error
                 }
             },
-            { context: `FormService>createFormDefinition name=${form.body.name}` }
+            { context: 'FormService>createFormDefinition' }
         )
         assert(formInstance, 'Failed to create form definition')
         assert(formInstance.id, 'Form definition ID is missing')
