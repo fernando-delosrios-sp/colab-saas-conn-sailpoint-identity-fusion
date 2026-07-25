@@ -246,13 +246,18 @@ FusionRun SHALL own form processing counters and the form deletion queue state. 
 
 ### Requirement: FusionRun maintains a lightweight managed account inventory
 
-FusionRun SHALL maintain `managedAccountInventory`, a map of managed account keys to `ManagedAccountInfo` records containing at minimum `id`, `name`, `sourceName`, and optionally `sourceId` and `nativeIdentity`. The inventory SHALL be populated when `setManagedAccount` is called and SHALL retain every key loaded during the run until explicitly cleared, independent of work-queue depletion via `claimAccount`.
+FusionRun SHALL maintain `managedAccountInventory`, a map of managed account keys to `ManagedAccountInfo` records containing at minimum `id`, `name`, `sourceName`, and optionally `sourceId`, `nativeIdentity`, and `identityId`. The inventory SHALL be populated when `setManagedAccount` is called and SHALL retain every key loaded during the run until explicitly cleared, independent of work-queue depletion via `claimAccount`.
 
 #### Scenario: Inventory retains keys after work queue claim
 - **GIVEN** a managed account key loaded via `setManagedAccount`
 - **WHEN** `claimAccount` removes the key from `managedAccountsById`
 - **THEN** `hasManagedAccount(key)` SHALL still return true
 - **AND** `getManagedAccountInfo(key)` SHALL return the cached metadata
+
+#### Scenario: Inventory stores identityId for claim fallback
+- **WHEN** `setManagedAccount` registers a managed account with a non-empty `identityId`
+- **THEN** `managedAccountInventory.get(key).identityId` SHALL equal that identity id
+- **AND** FormService MAY use inventory `identityId` when invoking `claimAccount` after the work-queue entry was already removed in the same Fetch pass
 
 #### Scenario: Inventory is populated in setManagedAccount only
 - **WHEN** SourceService loads a managed account
@@ -368,4 +373,5 @@ FusionRun SHALL provide `fusionAccountsIterable()` returning an iterable over fu
 - **WHEN** a caller accesses `run.allFusionAccounts`
 - **THEN** a new array copy SHALL be returned
 - **AND** mutating the returned array SHALL NOT mutate internal run state
+
 

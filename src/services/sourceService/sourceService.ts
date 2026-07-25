@@ -56,7 +56,7 @@ export class SourceService {
     private _fusionSourceId?: string
     private _fusionSourceOwner?: OwnerDto
     private _fusionSourceManagementWorkgroupId?: string
-    private _fusionSourceWorkgroupMemberIds?: string[]
+    private _workgroupMemberIdsByWorkgroupId = new Map<string, string[]>()
     private _processLockAcquired = false
     private sourceSchemasCache: Map<string, SchemaV2025[]> = new Map()
 
@@ -291,10 +291,10 @@ export class SourceService {
             this._fusionSourceId = fusionSource.id!
             this._fusionSourceOwner = {
                 id: fusionSource.owner.id!,
-                type: 'IDENTITY',
+                type: (fusionSource.owner.type ?? 'IDENTITY') as OwnerDto['type'],
             }
             this._fusionSourceManagementWorkgroupId = readPathString(fusionSource, ['managementWorkgroup', 'id'])
-            this._fusionSourceWorkgroupMemberIds = undefined
+            this._workgroupMemberIdsByWorkgroupId.clear()
 
             resolvedSources.push({
                 id: fusionSource.id!,
@@ -313,7 +313,7 @@ export class SourceService {
             this._fusionSourceId = undefined
             this._fusionSourceOwner = undefined
             this._fusionSourceManagementWorkgroupId = undefined
-            this._fusionSourceWorkgroupMemberIds = undefined
+            this._workgroupMemberIdsByWorkgroupId.clear()
             this.log.warn(
                 'Fusion source not found for this run. Continuing with managed sources only (custom report mode).'
             )
@@ -365,33 +365,50 @@ export class SourceService {
     public async fetchGlobalOwnerIdentityIds(): Promise<string[]> {
         const ownerIdSet = new Set<string>()
 
-        let ownerId: string | undefined
+        let owner: OwnerDto
         // Only swallow the specific "owner not found" error; rethrow unexpected errors
         // so callers can distinguish between a missing owner (expected empty result) and
         // other failures (propagate upward).
         try {
-            ownerId = this.fusionSourceOwner.id
+            owner = this.fusionSourceOwner
         } catch (error) {
             if (error instanceof Error && error.message.includes('Fusion source owner not found')) {
                 return []
             }
             throw error
         }
-        if (ownerId) ownerIdSet.add(ownerId)
+
+        if (owner.id) {
+            if (String(owner.type).toUpperCase() === 'GOVERNANCE_GROUP') {
+                const memberIds = await this.listWorkgroupMemberIdentityIds(owner.id)
+                for (const id of memberIds) ownerIdSet.add(id)
+            } else {
+                ownerIdSet.add(owner.id)
+            }
+        }
 
         const workgroupId = this._fusionSourceManagementWorkgroupId
         if (workgroupId) {
-            if (this._fusionSourceWorkgroupMemberIds === undefined) {
-                const members = await this.client.call<any[]>(
-                    (api: any) => api.governanceGroups.listWorkgroupMembers({ workgroupId, limit: 250 }).then((r: any) => r.data),
-                    { priority: QueuePriority.HIGH, context: 'SourceService>fetchGlobalOwnerIdentityIds' }
-                )
-                this._fusionSourceWorkgroupMemberIds = (members ?? []).filter((m: any) => m.id).map((m: any) => m.id!)
-            }
-            for (const id of this._fusionSourceWorkgroupMemberIds!) ownerIdSet.add(id)
+            const memberIds = await this.listWorkgroupMemberIdentityIds(workgroupId)
+            for (const id of memberIds) ownerIdSet.add(id)
         }
 
         return Array.from(ownerIdSet)
+    }
+
+    /** Resolve governance-group membership to identity IDs for report/reviewer delivery. */
+    private async listWorkgroupMemberIdentityIds(workgroupId: string): Promise<string[]> {
+        const cached = this._workgroupMemberIdsByWorkgroupId.get(workgroupId)
+        if (cached) return cached
+
+        const members = await this.client.call<any[]>(
+            (api: any) =>
+                api.governanceGroups.listWorkgroupMembers({ workgroupId, limit: 250 }).then((r: any) => r.data),
+            { priority: QueuePriority.HIGH, context: 'SourceService>fetchGlobalOwnerIdentityIds' }
+        )
+        const memberIds = (members ?? []).filter((m: any) => m.id).map((m: any) => m.id!)
+        this._workgroupMemberIdsByWorkgroupId.set(workgroupId, memberIds)
+        return memberIds
     }
 
     /**

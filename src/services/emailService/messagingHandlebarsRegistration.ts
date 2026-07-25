@@ -180,7 +180,7 @@ export const registerHandlebarsHelpers = (): void => {
         return out
     })
 
-    Handlebars.registerHelper('processingStatsCards', function(this: any, reportDate: Date | string, stats: Record<string, any>, options: any) {
+    Handlebars.registerHelper('processingStatsCards', function(this: any, stats: Record<string, any>, options: any) {
         const locale = options?.data?.root?.locale
         if (!stats || typeof stats !== 'object') return []
         const cards: Array<{ label: string; value: string }> = []
@@ -188,11 +188,10 @@ export const registerHandlebarsHelpers = (): void => {
             if (missing(value)) return
             cards.push({ label: translate(labelKey, locale), value: String(value) })
         }
-        const formattedDate = reportDate ? formatDateYmd(reportDate) : undefined
 
-        pushCard('report_date', formattedDate)
         pushCard('total_processing_time', stats.totalProcessingTime)
         pushCard('used_memory', stats.usedMemory)
+        pushCard('fusion_accounts_returned', stats.totalFusionAccounts)
         pushCard('fusion_accounts_found', stats.fusionAccountsFound)
         pushCard('identities_found', stats.identitiesFound)
         pushCard('managed_accounts_found', stats.managedAccountsFound)
@@ -201,7 +200,6 @@ export const registerHandlebarsHelpers = (): void => {
         pushCard('managed_accounts_processed', stats.managedAccountsProcessed)
         pushCard('fusion_reviews_found', stats.fusionReviewsFound)
         pushCard('fusion_review_instances_found', stats.fusionReviewInstancesFound)
-        pushCard('fusion_accounts_returned', stats.totalFusionAccounts)
 
         return cards
     })
@@ -227,4 +225,5 @@ export const registerHandlebarsHelpers = (): void => {
         }))
     })
 }
+
 

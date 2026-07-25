@@ -30,7 +30,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
         <div style="margin-top: 18px;">
           <div style="font-size: 12px; color: #0b5cab; font-weight: 800; text-transform: uppercase; margin-bottom: 8px;">{{i18n "processing_statistics"}}</div>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse; table-layout:fixed;">
-            {{#each (chunk (processingStatsCards reportDate stats) 3)}}
+            {{#each (chunk (processingStatsCards stats) 3)}}
             <tr>
               {{#each this}}
               <td width="33.33%" style="width:33.33%; vertical-align:top; padding:6px 6px;">

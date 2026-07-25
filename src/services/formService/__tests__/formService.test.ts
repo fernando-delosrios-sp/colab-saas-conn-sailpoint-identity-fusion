@@ -1,4 +1,6 @@
 import { FormService } from '../formService'
+import { FusionRun } from '../../../model/fusionRun'
+import { FusionAccount } from '../../../model/account'
 
 /** Minimal client.call mock that supports sequential pagination used by form instance fetch. */
 function createFormClientCallMock(customFormsMock: Record<string, unknown>) {
@@ -279,5 +281,201 @@ describe('FormService managed work queue synchronization', () => {
         expect(managedAccountsById.has(managedKey)).toBe(false)
         expect(managedAccountsByIdentityId.has(identityId)).toBe(false)
     })
+
+    it('claims pending review account using normalized form account id', () => {
+        const managedKey = 'source-a-id::native-sync-1'
+        const identityId = 'identity-sync-1'
+        const managedAccount = {
+            id: 'acct-sync-1',
+            sourceId: 'source-a-id',
+            sourceName: 'Source A',
+            nativeIdentity: 'native-sync-1',
+            identityId,
+            name: 'Sync User',
+        } as any
+
+        const managedAccountsById = new Map([[managedKey, managedAccount]])
+        const managedAccountInventory = new Map([
+            [
+                managedKey,
+                {
+                    id: managedAccount.id,
+                    name: managedAccount.name,
+                    sourceName: managedAccount.sourceName,
+                    sourceId: managedAccount.sourceId,
+                    nativeIdentity: managedAccount.nativeIdentity,
+                    identityId,
+                },
+            ],
+        ])
+        const managedAccountsByIdentityId = new Map([[identityId, new Set([managedKey])]])
+        const claimAccount = vi.fn((key: string, claimIdentityId?: string) => {
+            managedAccountsById.delete(key)
+            if (claimIdentityId) {
+                const idSet = managedAccountsByIdentityId.get(claimIdentityId)
+                idSet?.delete(key)
+                if (idSet && idSet.size === 0) {
+                    managedAccountsByIdentityId.delete(claimIdentityId)
+                }
+            }
+            return true
+        })
+
+        const run = {
+            managedAccountsById,
+            managedAccountInventory,
+            managedAccountsByIdentityId,
+            hasManagedAccount: (key: string) => managedAccountInventory.has(key),
+            getManagedAccountInfo: (key: string) => managedAccountInventory.get(key),
+            claimAccount,
+        } as any
+
+        const service = new FormService(
+            {} as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
+            {} as any,
+            { run, getSourceByNameSafe: vi.fn(() => undefined) } as any,
+            undefined,
+            undefined,
+            run
+        )
+
+        const accountInfo = (service as any).extractAccountInfoOverride(' source-a-id::native-sync-1 ', true)
+
+        expect(accountInfo?.id).toBe(managedKey)
+        expect(claimAccount).toHaveBeenCalledWith(managedKey, identityId)
+        expect(managedAccountsById.has(managedKey)).toBe(false)
+    })
+
+    it('returns inventory metadata after prior pending-review claim in the same batch', () => {
+        const managedKey = 'source-a-id::native-sync-1'
+        const identityId = 'identity-sync-1'
+        const inventoryInfo = {
+            id: 'acct-sync-1',
+            name: 'Sync User',
+            sourceName: 'Source A',
+            sourceId: 'source-a-id',
+            nativeIdentity: 'native-sync-1',
+            identityId,
+        }
+        const managedAccountsById = new Map<string, any>()
+        const managedAccountInventory = new Map([[managedKey, inventoryInfo]])
+        const run = {
+            managedAccountsById,
+            managedAccountInventory,
+            managedAccountsByIdentityId: new Map(),
+            hasManagedAccount: (key: string) => managedAccountInventory.has(key),
+            getManagedAccountInfo: (key: string) => managedAccountInventory.get(key),
+            claimAccount: vi.fn(),
+        } as any
+
+        const service = new FormService(
+            {} as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
+            {} as any,
+            { run, getSourceByNameSafe: vi.fn(() => undefined) } as any,
+            undefined,
+            undefined,
+            run
+        )
+
+        const accountInfo = (service as any).extractAccountInfoOverride(managedKey, true)
+
+        expect(accountInfo).toEqual({
+            id: managedKey,
+            name: 'Sync User',
+            sourceName: 'Source A',
+            sourceId: 'source-a-id',
+            nativeIdentity: 'native-sync-1',
+        })
+        expect(run.claimAccount).not.toHaveBeenCalled()
+    })
 })
+
+describe('FormService processFetchedFormData pending review queue depletion', () => {
+    it('removes pending-review account from work queue while retaining inventory', async () => {
+        const managedKey = 'source-a-id::native-sync-1'
+        const run = new FusionRun()
+        run.setManagedAccount(managedKey, {
+            id: 'acct-sync-1',
+            sourceId: 'source-a-id',
+            sourceName: 'Source A',
+            nativeIdentity: 'native-sync-1',
+            identityId: 'identity-sync-1',
+            name: 'Sync User',
+        } as any)
+
+        const service = new FormService(
+            {} as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
+            {} as any,
+            { run, getSourceByNameSafe: vi.fn(() => undefined) } as any,
+            undefined,
+            undefined,
+            run
+        )
+
+        ;(service as any)._fetchedFormInstances = [
+            [
+                {
+                    id: 'instance-1',
+                    state: 'PENDING',
+                    formDefinitionId: 'form-def-1',
+                    formInput: {
+                        account: managedKey,
+                        name: 'Sync User',
+                        source: 'Source A',
+                    },
+                },
+            ],
+        ]
+
+        await service.processFetchedFormData()
+
+        expect(run.managedAccountsById.has(managedKey)).toBe(false)
+        expect(run.hasManagedAccount(managedKey)).toBe(true)
+        expect(run.getManagedAccountInfo(managedKey)?.identityId).toBe('identity-sync-1')
+    })
+})
+
+describe('FormService getOrCreateFormDefinition conflict recovery', () => {
+    it('reuses existing definition after duplicate-name create conflict', async () => {
+        FusionAccount.configure({ sources: [] } as any)
+        const existingDefinition = { id: 'form-existing', name: 'Fusion Test Form' }
+        const getFormDefinitionByName = vi
+            .fn()
+            .mockResolvedValueOnce(undefined)
+            .mockResolvedValueOnce(existingDefinition)
+        const buildFusionFormDefinition = vi.fn().mockRejectedValue({
+            response: { status: 409, data: { detailCode: '400.1.409' } },
+        })
+
+        const service = new FormService(
+            {} as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
+            {} as any,
+            {} as any
+        )
+        ;(service as any).getFormDefinitionByName = getFormDefinitionByName
+        ;(service as any).buildFusionFormDefinition = buildFusionFormDefinition
+
+        const result = await (service as any).getOrCreateFormDefinition(
+            'Fusion Test Form',
+            FusionAccount.fromManagedAccount({
+                id: 'acct-1',
+                nativeIdentity: 'native-1',
+                name: 'Managed Account',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+            } as any),
+            []
+        )
+
+        expect(result).toEqual(existingDefinition)
+        expect(getFormDefinitionByName).toHaveBeenCalledTimes(2)
+        expect(buildFusionFormDefinition).toHaveBeenCalledTimes(1)
+    })
+})
+
 

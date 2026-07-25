@@ -620,6 +620,11 @@ export class FusionAccount {
         return this.collections.missingAccountIds
     }
 
+    /** Persisted managed-account keys from the last aggregation (`accounts` attribute). */
+    get previousAccountIdsSet(): ReadonlySet<string> {
+        return this.collections.previousAccountIds
+    }
+
     get statuses(): string[] {
         return Array.from(this.collections.statusesSet)
     }
@@ -830,3 +835,4 @@ export class FusionAccount {
         }
     }
 }
+

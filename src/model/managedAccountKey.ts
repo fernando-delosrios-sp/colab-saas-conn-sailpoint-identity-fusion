@@ -1,5 +1,5 @@
 import { AccountV2025 as Account } from 'sailpoint-api-client'
-import { readString, trimStr } from '../utils/safeRead'
+import { trimStr } from '../utils/safeRead'
 
 const MANAGED_ACCOUNT_KEY_SEPARATOR = '::'
 
@@ -63,9 +63,7 @@ export function parseManagedAccountKey(
 }
 
 export function getManagedAccountKeyFromAccount(account: Account): string | undefined {
-    const rawKey = buildManagedAccountKey({
-        sourceId: readString(account, 'sourceId'),
-        nativeIdentity: account.nativeIdentity,
-    })
+    const rawKey = buildManagedAccountKey(account as ManagedKeyAccountLike)
     return rawKey ? normalizeCompositeManagedAccountKey(rawKey) : undefined
 }
+

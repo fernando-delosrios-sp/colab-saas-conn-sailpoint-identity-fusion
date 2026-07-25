@@ -210,3 +210,21 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
         expect(service.hasIdentityInScope('')).toBe(false)
     })
 })
+
+describe('IdentityService.fetchIdentityProfileById', () => {
+    it('loads emailAddress from identities API into cache', async () => {
+        const { service, client } = makeService()
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            if (policy?.context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return { id: 'owner-1', name: 'Owner', emailAddress: 'owner@example.com', attributes: {} }
+            }
+            return []
+        })
+
+        const doc = await service.fetchIdentityProfileById('owner-1')
+
+        expect(doc?.email).toBe('owner@example.com')
+        expect((doc?.attributes as any)?.email).toBe('owner@example.com')
+        expect(service.getIdentityById('owner-1')?.email).toBe('owner@example.com')
+    })
+})
