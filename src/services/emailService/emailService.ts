@@ -226,7 +226,7 @@ export class EmailService {
 
         const request = {
             input: {
-                recipients: validRecipients.join(','),
+                recipients: validRecipients,
                 subject,
                 body: fittedBody,
                 accessToken,
@@ -259,7 +259,7 @@ export class EmailService {
         return Buffer.byteLength(
             JSON.stringify({
                 input: {
-                    recipients: recipients.join(','),
+                    recipients,
                     subject,
                     body,
                     accessToken: 'x'.repeat(128),
@@ -291,7 +291,7 @@ export class EmailService {
 
         const sampleToken = 'x'.repeat(128)
         const envelopeBytes = Buffer.byteLength(
-            JSON.stringify({ input: { recipients: recipients.join(','), subject, body: '', accessToken: sampleToken } }),
+            JSON.stringify({ input: { recipients, subject, body: '', accessToken: sampleToken } }),
             'utf8'
         )
         const allowedBodyBytes = Math.max(256, maxSerializedInputBytes - envelopeBytes - 128)
@@ -410,4 +410,5 @@ export class EmailService {
         )
     }
 }
+
 

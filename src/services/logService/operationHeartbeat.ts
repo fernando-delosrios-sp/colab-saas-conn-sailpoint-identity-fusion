@@ -79,7 +79,7 @@ export function formatApiQueueSegment(
         return undefined
     }
     const deltaSuffix = formatDeltaSuffix(queueStats.totalProcessed, previousProcessed, intervalMs)
-    return `api=${queueStats.activeRequests}/${queueStats.queueLength}/${queueStats.totalProcessed}${deltaSuffix}`
+    return `api=${queueStats.activeRequests}a/${queueStats.queueLength}q/${queueStats.totalProcessed}c${deltaSuffix}`
 }
 
 export function formatStatusLine(
@@ -122,9 +122,8 @@ export function formatStatusLine(
     if (workPending) parts.push(workPending)
 
     if (memory) {
-        parts.push(
-            `mem rss=${formatMb(memory.rss)}MB heap=${formatMb(memory.heapUsed)}MB`
-        )
+        const heapPct = Math.round((memory.heapUsed / memory.rss) * 100)
+        parts.push(`mem=${formatMb(memory.rss)}MB(${heapPct}%)`)
     }
 
     return parts.join(' ')
@@ -292,5 +291,6 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 

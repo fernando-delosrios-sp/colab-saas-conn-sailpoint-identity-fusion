@@ -1,0 +1,36 @@
+import { parseDryRunInput } from '../accountListHelpers'
+
+describe('parseDryRunInput', () => {
+    it('returns undefined when dryRun is absent or enabled is false', () => {
+        expect(parseDryRunInput({ schema: { attributes: [] } } as any)).toBeUndefined()
+        expect(parseDryRunInput({ dryRun: { enabled: false, sendEmail: 'a@b.com' } } as any)).toBeUndefined()
+    })
+
+    it('parses sendEmail as a single string', () => {
+        const result = parseDryRunInput({
+            dryRun: { enabled: true, sendEmail: 'reviewer@example.com' },
+        } as any)
+
+        expect(result).toEqual({
+            enabled: true,
+            saveFile: false,
+            sendEmail: ['reviewer@example.com'],
+        })
+    })
+
+    it('parses sendEmail as an array of strings', () => {
+        const result = parseDryRunInput({
+            dryRun: { enabled: true, sendEmail: ['a@example.com', 'b@example.com'] },
+        } as any)
+
+        expect(result?.sendEmail).toEqual(['a@example.com', 'b@example.com'])
+    })
+
+    it('omits sendEmail when no valid recipients remain after sanitization', () => {
+        const result = parseDryRunInput({
+            dryRun: { enabled: true, sendEmail: ['', '   '] },
+        } as any)
+
+        expect(result?.sendEmail).toBeUndefined()
+    })
+})

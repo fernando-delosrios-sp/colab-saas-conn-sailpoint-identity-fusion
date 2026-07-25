@@ -1,7 +1,7 @@
 import { StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
-import { readBoolean, readArray } from '../../utils/safeRead'
-import { sanitizeRecipients } from '../../services/emailService/email'
+import { readBoolean, readUnknown } from '../../utils/safeRead'
+import { normalizeEmailValue, sanitizeRecipients } from '../../services/emailService/email'
 
 export interface DryRunInput {
     enabled: boolean
@@ -15,9 +15,7 @@ export function parseDryRunInput(input: StdAccountListInput): DryRunInput | unde
     const enabled = readBoolean(dryRun, 'enabled', false)
     if (!enabled) return undefined
     const saveFile = readBoolean(dryRun, 'saveFile', false)
-    const rawEmail = (readArray(dryRun, 'sendEmail', []) as (string | undefined)[])
-        .filter((e): e is string => typeof e === 'string')
-    const sendEmail = sanitizeRecipients(rawEmail)
+    const sendEmail = sanitizeRecipients(normalizeEmailValue(readUnknown(dryRun, 'sendEmail')))
     return { enabled, saveFile, sendEmail: sendEmail.length > 0 ? sendEmail : undefined }
 }
 
@@ -38,3 +36,4 @@ export function buildTerminalSummary(
         options: { saveFile: dryRun.saveFile ?? false, sendEmail: Boolean(dryRun.sendEmail) },
     }
 }
+

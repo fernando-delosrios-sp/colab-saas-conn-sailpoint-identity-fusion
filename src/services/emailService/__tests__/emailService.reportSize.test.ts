@@ -74,6 +74,7 @@ describe('EmailService report size limits', () => {
 
         const sentInput = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input
         expect(sentInput.body).not.toContain('Report content was truncated to fit ISC workflow input size limits')
+        expect(sentInput.recipients).toEqual(['reviewer@example.com'])
     })
 
     it('shrinks report body when workflow definition already consumes most of the combined budget', async () => {
@@ -126,3 +127,4 @@ describe('EmailService report size limits', () => {
         expect(sentInput.body).toContain('Report content was truncated to fit ISC workflow input size limits')
     })
 })
+
