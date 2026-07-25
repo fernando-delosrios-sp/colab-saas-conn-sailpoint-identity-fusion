@@ -217,9 +217,9 @@ describe('operation heartbeat formatters', () => {
             matchDeferred: 0,
             correlationTriggers: 2,
             correlationAccounts: 3,
-            nonMatch: 0,
+            nonMatch: 5,
             autoAssigned: 4,
-            formsQueued: 0,
+            formsQueued: 2,
             recordUniqueRegistered: 0,
         }
         expect(formatEventSummaryLines(events, 'Refresh')).toEqual([
@@ -227,7 +227,7 @@ describe('operation heartbeat formatters', () => {
         ])
         expect(formatEventSummaryLines(events, 'Process')).toEqual([
             'EVENT_SUMMARY matches exact=1',
-            'EVENT_SUMMARY outcomes autoAssigned=4',
+            'EVENT_SUMMARY outcomes unmatched=5 auto=4 manual=2',
             'EVENT_SUMMARY correlations triggered=2 accounts=3',
         ])
     })
@@ -422,6 +422,7 @@ describe('OperationHeartbeat timing', () => {
         vi.useRealTimers()
     })
 })
+
 
 
 
