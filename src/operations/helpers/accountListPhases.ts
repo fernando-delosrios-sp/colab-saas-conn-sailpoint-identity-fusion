@@ -236,7 +236,11 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Ph
         log.info('Identities cache retained for recording')
     }
 
+    log.stepStart('managed-account-init')
+    const initOp = log.track('FusionService.initializeManagedAccountProcessing')
     await fusion.initializeManagedAccountProcessing()
+    initOp.done()
+    log.stepEnd('managed-account-init', { remaining: sources.run.managedAccountsById.size })
 
     log.stepStart('orphan-identity-hydration')
     const hydrationResult = await hydrateCorrelatedManagedAccountIdentities({
@@ -286,7 +290,12 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
     const { isPersistent } = options
 
     if (!sources.run.isRecordMode) {
+        const managedAccountCount = sources.run.managedAccountsById.size
+        log.stepStart('clear-managed-accounts', { accounts: managedAccountCount })
+        const clearOp = log.track('outputPhase.clearManagedAccounts')
         sources.clearManagedAccounts()
+        clearOp.done()
+        log.stepEnd('clear-managed-accounts', { cleared: managedAccountCount })
     } else {
         log.info('Managed accounts cache retained for recording')
     }

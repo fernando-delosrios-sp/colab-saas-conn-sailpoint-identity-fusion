@@ -93,6 +93,7 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
     fusion.initializeManagedAccountProcessing = vi.fn().mockImplementation(async () => {
         fusion.run.startManagedAccountProcessing(1)
     })
+    fusion.processRecordUniqueRegistration = vi.fn().mockResolvedValue({ registered: 0 })
     fusion.processCorrelatedManagedAccounts = vi.fn().mockResolvedValue(undefined)
     fusion.processUncorrelatedManagedAccounts = vi.fn().mockResolvedValue({ processed: 0, matchScoringMs: 0 })
     fusion.processManagedAccounts = vi.fn().mockResolvedValue(undefined)
@@ -141,5 +142,6 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
 
     return registry
 }
+
 
 
