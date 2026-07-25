@@ -373,6 +373,26 @@ describe('accountList report epilogue', () => {
         expect(registry.res.send).toHaveBeenCalledWith(expect.objectContaining({ rowsSent: expect.any(Number) }))
     })
 
+    it('delegates sendEmail string input to dry-run report delivery', async () => {
+        const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
+        const reports = registry.reports as any
+        reports.initializeDryRunReport = vi.fn().mockReturnValue({ report: {}, stats: {} })
+        reports.finalizeDryRunReport = vi.fn().mockResolvedValue({})
+        const input = {
+            dryRun: { enabled: true, sendEmail: 'reviewer@example.com' },
+            schema: { attributes: [] },
+        } as any
+
+        await accountList(registry, input)
+
+        expect(reports.finalizeDryRunReport).toHaveBeenCalledWith(
+            expect.objectContaining({ sendEmail: ['reviewer@example.com'], saveFile: false })
+        )
+        expect(registry.res.send).toHaveBeenCalledWith(
+            expect.objectContaining({ options: expect.objectContaining({ sendEmail: true }) })
+        )
+    })
+
     it('logs phase START, Epilogue labels, and no legacy heartbeats', async () => {
         const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const logSpy = vi.spyOn(registry.log, 'info')
@@ -394,4 +414,5 @@ describe('accountList report epilogue', () => {
         logSpy.mockRestore()
     })
 })
+
 
