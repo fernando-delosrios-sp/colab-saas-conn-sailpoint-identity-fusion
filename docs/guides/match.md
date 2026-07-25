@@ -209,7 +209,7 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 - With **Skip match if threshold not met = No** (default), every evaluated rule contributes its weight and raw similarity to the combined score, even when the score is below the rule's own minimum. The rule simply fails to "pass" but still dilutes the blend.
 - With **Skip match if threshold not met = Yes**, a non-mandatory rule whose similarity is below its `fusionScore` is excluded from the combined score (zero weight, zero raw score). The combined score is then computed only from the rules that passed their thresholds, which can raise the combined score compared with keeping weak rules in the blend.
 - **Mandatory** rules always ignore this toggle: a below-threshold mandatory rule fails the candidate just as it would with the toggle disabled.
-- Enabling this option can change the combined score and the manual review / automatic assignment outcome. Test with `custom:dryrun` before promoting to production.
+- Enabling this option can change the combined score and the manual review / automatic assignment outcome. Test with [dry-run mode](../operations/dry-run.md) before promoting to production.
 
 **Example:**
 
@@ -290,7 +290,7 @@ Dry-run mode:
 - When `saveFile` is enabled, writes an HTML report to `./reports/` before the terminal summary (durable-first ordering).
 - When `sendEmail` is set, delivers the report email using the same template as the aggregation report, titled **Identity Fusion Dry Run Report**, before the terminal summary.
 
-Use dry-run mode while tuning matching thresholds, validating source precedence, or reviewing correlation context before enabling/adjusting production automation.
+Use dry-run mode while tuning matching thresholds, validating source precedence, or reviewing correlation context before enabling/adjusting production automation. See [Dry-run mode](../operations/dry-run.md) for input options, suppressed side effects, and invocation examples.
 
 **Choosing form attributes:**
 
@@ -530,3 +530,4 @@ Track these metrics to assess Match effectiveness:
 - For algorithm selection and tuning, see [Effective use of matching algorithms](matching-algorithms.md).
 - For attribute merging strategies, see [Effective use of Map](map.md).
 - For ISC setup (connection, schema, identity profile), see the [repository README](../index.md#quick-start).
+

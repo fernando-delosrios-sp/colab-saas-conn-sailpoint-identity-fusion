@@ -5,7 +5,7 @@ This section documents the connector operations that ISC invokes, including conn
 ## Connectivity
 
 - [Test connection](test-connection.md): Validates connector initialization and required service access.
-- [Dry run (custom)](custom-dryrun.md): Runs a no-write execution path to verify mapping and processing behavior.
+- [Dry-run mode](dry-run.md): Non-persistent account-list analysis for tuning Map, Define, and Match without write side effects.
 
 ## Schema and reads
 
@@ -23,3 +23,4 @@ This section documents the connector operations that ISC invokes, including conn
 ## Entitlements
 
 - [Entitlement list](entitlement-list.md): Returns entitlement objects for aggregation.
+
