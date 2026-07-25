@@ -487,6 +487,7 @@ export class MatchOutcomeDispatcher {
             `Account ${account.name} [${fusionAccount.sourceName}] meets the automatic assignment threshold, auto-assigning to identity ${identityId}`
         )
         this.deps.run.markAutoAssigned(identityId)
+        this.deps.log.recordEvent('autoAssigned')
         const syntheticDecision = this.deps.forms.createAutomaticAssignmentDecision(fusionAccount, account, identityId)
         this.deps.forms.registerFinishedDecision(syntheticDecision)
         return this.deps.decisionProcessor.processFusionIdentityDecision(syntheticDecision)
@@ -601,6 +602,7 @@ function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 
             return 'nonMatch'
     }
 }
+
 
 
 

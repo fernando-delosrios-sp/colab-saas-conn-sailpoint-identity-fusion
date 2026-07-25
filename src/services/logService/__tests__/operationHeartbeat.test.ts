@@ -109,9 +109,9 @@ describe('operation heartbeat formatters', () => {
                 ] as any,
                 fusionPending: {
                     disableOps: 2,
-                    formCandidates: 12,
-                    reviewUrls: 5,
                     deferredCandidates: 45,
+                    fusionReviewsFound: 143,
+                    fusionReviewInstancesFound: 187,
                 },
                 intervalMs: 30_000,
             },
@@ -120,8 +120,28 @@ describe('operation heartbeat formatters', () => {
         )
 
         expect(line).toContain('queue-pending=IdentityService>correlate×2, MatchingService>score×1')
-        expect(line).toContain('work-pending disable=2 candidates=12 reviews=5 deferred=45')
+        expect(line).not.toContain('fusion-reviews=')
+        expect(line).toContain('work-pending disable=2 deferred=45')
         vi.useRealTimers()
+    })
+
+    it('includes fusion review inventory on STATUS only during Fetch phase', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Fetch'
+        const fusionPending = {
+            disableOps: 0,
+            deferredCandidates: 0,
+            fusionReviewsFound: 143,
+            fusionReviewInstancesFound: 187,
+        }
+
+        const fetchLine = formatStatusLine({ runContext, fusionPending, intervalMs: 10_000 }, {}, 10_000)
+        expect(fetchLine).toContain('fusion-reviews=143 fusion-review-instances=187')
+
+        runContext.phase = 'Refresh'
+        const refreshLine = formatStatusLine({ runContext, fusionPending, intervalMs: 10_000 }, {}, 10_000)
+        expect(refreshLine).not.toContain('fusion-reviews=')
+        expect(refreshLine).not.toContain('fusion-review-instances=')
     })
 
     it('omits work-pending when all fusion counts are zero', () => {
@@ -131,9 +151,9 @@ describe('operation heartbeat formatters', () => {
                 runContext,
                 fusionPending: {
                     disableOps: 0,
-                    formCandidates: 0,
-                    reviewUrls: 0,
                     deferredCandidates: 0,
+                    fusionReviewsFound: 0,
+                    fusionReviewInstancesFound: 0,
                 },
                 intervalMs: 30_000,
             },
@@ -144,7 +164,7 @@ describe('operation heartbeat formatters', () => {
     })
 
     it('formats EVENT_SUMMARY lines for matches and correlations', () => {
-        const lines = formatEventSummaryLines({
+        const events = {
             matchExact: 2,
             matchPartial: 12,
             matchDeferred: 3,
@@ -153,10 +173,33 @@ describe('operation heartbeat formatters', () => {
             nonMatch: 0,
             autoAssigned: 0,
             formsQueued: 0,
-        })
-        expect(lines).toEqual([
+            recordUniqueRegistered: 0,
+        }
+        expect(formatEventSummaryLines(events, 'Process')).toEqual([
             'EVENT_SUMMARY matches exact=2 partial=12 deferred=3',
             'EVENT_SUMMARY correlations triggered=14 accounts=18',
+        ])
+    })
+
+    it('emits match and outcome EVENT_SUMMARY only during Process phase', () => {
+        const events = {
+            matchExact: 1,
+            matchPartial: 0,
+            matchDeferred: 0,
+            correlationTriggers: 2,
+            correlationAccounts: 3,
+            nonMatch: 0,
+            autoAssigned: 4,
+            formsQueued: 0,
+            recordUniqueRegistered: 0,
+        }
+        expect(formatEventSummaryLines(events, 'Refresh')).toEqual([
+            'EVENT_SUMMARY correlations triggered=2 accounts=3',
+        ])
+        expect(formatEventSummaryLines(events, 'Process')).toEqual([
+            'EVENT_SUMMARY matches exact=1',
+            'EVENT_SUMMARY outcomes autoAssigned=4',
+            'EVENT_SUMMARY correlations triggered=2 accounts=3',
         ])
     })
 
@@ -350,4 +393,5 @@ describe('OperationHeartbeat timing', () => {
         vi.useRealTimers()
     })
 })
+
 

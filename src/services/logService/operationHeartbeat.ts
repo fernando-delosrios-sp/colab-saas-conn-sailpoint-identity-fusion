@@ -1,12 +1,14 @@
 import { QueuedItemInfo, QueueStats } from '../clientService/types'
 import { LogService, PhaseTimer } from './logService'
-import { EventCounters, OperationRunContext } from './operationRunContext'
+import { EventCounters, OperationPhase, OperationRunContext } from './operationRunContext'
 
 type FusionPendingSnapshot = {
     disableOps: number
-    formCandidates: number
-    reviewUrls: number
     deferredCandidates: number
+    /** Active Fusion review form definitions fetched this run (report: Fusion Reviews Found). */
+    fusionReviewsFound: number
+    /** Fusion review form instances fetched this run (report: Fusion Review Instances Found). */
+    fusionReviewInstancesFound: number
 }
 
 export type HeartbeatSnapshot = {
@@ -91,7 +93,10 @@ export function formatStatusLine(
         }
     }
 
-    const workPending = formatFusionPending(fusionPending)
+    const fusionReviewInventory = formatFusionReviewInventory(fusionPending, runContext.phase)
+    if (fusionReviewInventory) parts.push(fusionReviewInventory)
+
+    const workPending = formatFusionWorkPending(fusionPending)
     if (workPending) parts.push(workPending)
 
     if (memory) {
@@ -103,31 +108,38 @@ export function formatStatusLine(
     return parts.join(' ')
 }
 
-export function formatEventSummaryLines(events: EventCounters): string[] {
+export function formatEventSummaryLines(
+    events: EventCounters,
+    phase: OperationPhase | null = null
+): string[] {
     const lines: string[] = []
-    const matchParts: string[] = []
-    if (events.matchExact > 0) matchParts.push(`exact=${events.matchExact}`)
-    if (events.matchPartial > 0) matchParts.push(`partial=${events.matchPartial}`)
-    if (events.matchDeferred > 0) matchParts.push(`deferred=${events.matchDeferred}`)
-    if (matchParts.length > 0) {
-        lines.push(`EVENT_SUMMARY matches ${matchParts.join(' ')}`)
+    const inProcessPhase = phase === 'Process'
+
+    if (inProcessPhase) {
+        const matchParts: string[] = []
+        if (events.matchExact > 0) matchParts.push(`exact=${events.matchExact}`)
+        if (events.matchPartial > 0) matchParts.push(`partial=${events.matchPartial}`)
+        if (events.matchDeferred > 0) matchParts.push(`deferred=${events.matchDeferred}`)
+        if (matchParts.length > 0) {
+            lines.push(`EVENT_SUMMARY matches ${matchParts.join(' ')}`)
+        }
+
+        const outcomeParts: string[] = []
+        if (events.nonMatch > 0) outcomeParts.push(`nonMatch=${events.nonMatch}`)
+        if (events.autoAssigned > 0) outcomeParts.push(`autoAssigned=${events.autoAssigned}`)
+        if (events.formsQueued > 0) outcomeParts.push(`formsQueued=${events.formsQueued}`)
+        if (events.recordUniqueRegistered > 0) {
+            outcomeParts.push(`recordUniqueRegistered=${events.recordUniqueRegistered}`)
+        }
+        if (outcomeParts.length > 0) {
+            lines.push(`EVENT_SUMMARY outcomes ${outcomeParts.join(' ')}`)
+        }
     }
 
     if (events.correlationTriggers > 0) {
         lines.push(
             `EVENT_SUMMARY correlations triggered=${events.correlationTriggers} accounts=${events.correlationAccounts}`
         )
-    }
-
-    const outcomeParts: string[] = []
-    if (events.nonMatch > 0) outcomeParts.push(`nonMatch=${events.nonMatch}`)
-    if (events.autoAssigned > 0) outcomeParts.push(`autoAssigned=${events.autoAssigned}`)
-    if (events.formsQueued > 0) outcomeParts.push(`formsQueued=${events.formsQueued}`)
-    if (events.recordUniqueRegistered > 0) {
-        outcomeParts.push(`recordUniqueRegistered=${events.recordUniqueRegistered}`)
-    }
-    if (outcomeParts.length > 0) {
-        lines.push(`EVENT_SUMMARY outcomes ${outcomeParts.join(' ')}`)
     }
 
     return lines
@@ -147,12 +159,24 @@ export function groupActiveLabels(activeItems: QueuedItemInfo[] | undefined, lim
         .join(', ')
 }
 
-function formatFusionPending(pending: FusionPendingSnapshot | undefined): string {
+function formatFusionReviewInventory(
+    pending: FusionPendingSnapshot | undefined,
+    phase: OperationPhase | null
+): string {
+    if (phase !== 'Fetch' || !pending) return ''
+    const parts: string[] = []
+    if (pending.fusionReviewsFound > 0) parts.push(`fusion-reviews=${pending.fusionReviewsFound}`)
+    if (pending.fusionReviewInstancesFound > 0) {
+        parts.push(`fusion-review-instances=${pending.fusionReviewInstancesFound}`)
+    }
+    if (parts.length === 0) return ''
+    return parts.join(' ')
+}
+
+function formatFusionWorkPending(pending: FusionPendingSnapshot | undefined): string {
     if (!pending) return ''
     const parts: string[] = []
     if (pending.disableOps > 0) parts.push(`disable=${pending.disableOps}`)
-    if (pending.formCandidates > 0) parts.push(`candidates=${pending.formCandidates}`)
-    if (pending.reviewUrls > 0) parts.push(`reviews=${pending.reviewUrls}`)
     if (pending.deferredCandidates > 0) parts.push(`deferred=${pending.deferredCandidates}`)
     if (parts.length === 0) return ''
     return `work-pending ${parts.join(' ')}`
@@ -232,7 +256,7 @@ export class OperationHeartbeat {
         }
 
         const events = runContext.flushEventCounters()
-        for (const line of formatEventSummaryLines(events)) {
+        for (const line of formatEventSummaryLines(events, runContext.phase)) {
             this.log.info(line)
         }
 
@@ -246,3 +270,4 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+

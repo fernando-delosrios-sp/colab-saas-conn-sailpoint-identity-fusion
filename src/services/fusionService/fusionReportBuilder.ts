@@ -24,6 +24,7 @@ export interface FusionReportState {
     reportAttributes: string[]
     fusionIdentityComparisonsByAccount: WeakMap<FusionAccount, number>
     sources: SourceService
+    fusionEnableAutoAssignment: boolean
     fusionAutoAssignmentScore?: number
 }
 
@@ -68,7 +69,10 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
                 (s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE
             )
             const score = combinedReport?.score ?? 0
-            const auto = state.fusionAutoAssignmentScore !== undefined && score >= state.fusionAutoAssignmentScore
+            const auto =
+                state.fusionEnableAutoAssignment &&
+                state.fusionAutoAssignmentScore !== undefined &&
+                score >= state.fusionAutoAssignmentScore
 
             return {
                 ...fusionReportMatchCandidateAccountFields(match),
@@ -128,3 +132,4 @@ function buildNonMatchAccounts(state: FusionReportState): FusionReportAccount[] 
     nonMatchAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
     return nonMatchAccounts
 }
+
