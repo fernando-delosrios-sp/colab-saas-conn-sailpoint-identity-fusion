@@ -65,6 +65,23 @@ function formatProgressSegment(
     return `progress=${fraction}${deltaSuffix}`
 }
 
+function isApiQueueIdle(queueStats: QueueStats): boolean {
+    return queueStats.activeRequests === 0 && queueStats.queueLength === 0
+}
+
+export function formatApiQueueSegment(
+    queueStats: QueueStats,
+    previousProcessed: number | undefined,
+    intervalMs: number,
+    phase: OperationPhase | null
+): string | undefined {
+    if (phase === 'Refresh' && isApiQueueIdle(queueStats)) {
+        return undefined
+    }
+    const deltaSuffix = formatDeltaSuffix(queueStats.totalProcessed, previousProcessed, intervalMs)
+    return `api=${queueStats.activeRequests}/${queueStats.queueLength}/${queueStats.totalProcessed}${deltaSuffix}`
+}
+
 export function formatStatusLine(
     snapshot: HeartbeatSnapshot,
     baselines: StatusLineBaselines,
@@ -84,10 +101,15 @@ export function formatStatusLine(
     parts.push(`elapsed=${PhaseTimer.formatElapsed(Date.now() - runContext.operationStartedAt)}`)
 
     if (queueStats) {
-        const deltaSuffix = formatDeltaSuffix(queueStats.totalProcessed, previousProcessed, intervalMs)
-        parts.push(
-            `api-queue active=${queueStats.activeRequests} queued=${queueStats.queueLength} completed=${queueStats.totalProcessed}${deltaSuffix}`
+        const apiQueueSegment = formatApiQueueSegment(
+            queueStats,
+            previousProcessed,
+            intervalMs,
+            runContext.phase
         )
+        if (apiQueueSegment) {
+            parts.push(apiQueueSegment)
+        }
         if (queueStats.queueLength > 0 && pendingItems && pendingItems.length > 0) {
             parts.push(`queue-pending=${groupActiveLabels(pendingItems)}`)
         }
@@ -270,4 +292,5 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 

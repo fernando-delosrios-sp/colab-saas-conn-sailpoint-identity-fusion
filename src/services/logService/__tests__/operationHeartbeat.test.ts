@@ -1,6 +1,7 @@
 import { OperationRunContext } from '../operationRunContext'
 import {
     OperationHeartbeat,
+    formatApiQueueSegment,
     formatDeltaSuffix,
     formatEventSummaryLines,
     formatStatusLine,
@@ -17,6 +18,33 @@ describe('operation heartbeat formatters', () => {
     it('formatDeltaSuffix formats zero and positive deltas', () => {
         expect(formatDeltaSuffix(537, 537, 30_000)).toBe('(Δ+0/30s)')
         expect(formatDeltaSuffix(10296, 7596, 10_000)).toBe('(Δ+2700/10s)')
+    })
+
+    it('formatApiQueueSegment uses compact active/queued/completed layout', () => {
+        const queueStats = {
+            activeRequests: 16,
+            queueLength: 0,
+            totalProcessed: 398,
+            totalFailed: 0,
+            totalRetries: 0,
+            averageWaitTime: 0,
+            averageProcessingTime: 0,
+        }
+        expect(formatApiQueueSegment(queueStats, 389, 10_000, 'Process')).toBe('api=16/0/398(Δ+9/10s)')
+    })
+
+    it('formatApiQueueSegment omits idle queue during Refresh phase', () => {
+        const queueStats = {
+            activeRequests: 0,
+            queueLength: 0,
+            totalProcessed: 635,
+            totalFailed: 0,
+            totalRetries: 0,
+            averageWaitTime: 0,
+            averageProcessingTime: 0,
+        }
+        expect(formatApiQueueSegment(queueStats, 635, 10_000, 'Refresh')).toBeUndefined()
+        expect(formatApiQueueSegment(queueStats, 635, 10_000, 'Process')).toBe('api=0/0/635(Δ+0/10s)')
     })
 
     it('formats STATUS with phase, step, progress delta, api-queue delta, and memory', () => {
@@ -51,7 +79,7 @@ describe('operation heartbeat formatters', () => {
         expect(line).toContain('phase=Process')
         expect(line).toContain('step=uncorrelated-sweep')
         expect(line).toContain('progress=537/800 analyzed(Δ+87/30s)')
-        expect(line).toContain('api-queue active=10 queued=97 completed=537(Δ+0/30s)')
+        expect(line).toContain('api=10/97/537(Δ+0/30s)')
         expect(line).toContain('mem rss=')
         vi.useRealTimers()
     })
@@ -80,8 +108,8 @@ describe('operation heartbeat formatters', () => {
 
         expect(line).toContain('progress=250/1000 fetched')
         expect(line).not.toContain('progress=250/1000 fetched(Δ')
-        expect(line).toContain('completed=12')
-        expect(line).not.toContain('completed=12(Δ')
+        expect(line).toContain('api=2/0/12')
+        expect(line).not.toContain('api=2/0/12(Δ')
     })
 
     it('formats STATUS with queue-pending labels and work-pending counts', () => {
@@ -142,6 +170,7 @@ describe('operation heartbeat formatters', () => {
         const refreshLine = formatStatusLine({ runContext, fusionPending, intervalMs: 10_000 }, {}, 10_000)
         expect(refreshLine).not.toContain('fusion-reviews=')
         expect(refreshLine).not.toContain('fusion-review-instances=')
+        expect(refreshLine).not.toContain('api=')
     })
 
     it('omits work-pending when all fusion counts are zero', () => {
@@ -286,7 +315,7 @@ describe('OperationHeartbeat timing', () => {
 
         expect(warn).not.toHaveBeenCalled()
         expect(info.mock.calls[2][0]).toContain('progress=13008/18495 processed(Δ+2712/10s)')
-        expect(info.mock.calls[2][0]).toContain('completed=635(Δ+0/10s)')
+        expect(info.mock.calls[2][0]).not.toContain('api=')
 
         heartbeat.stop()
         vi.useRealTimers()
@@ -317,7 +346,7 @@ describe('OperationHeartbeat timing', () => {
 
         expect(line).toContain('phase=Fetch')
         expect(line).toContain('progress=1200/5000 fetched(Δ+400/10s)')
-        expect(line).toContain('completed=80(Δ+30/10s)')
+        expect(line).toContain('api=4/12/80(Δ+30/10s)')
     })
 
     it('shows independent non-zero pipeline and api-queue deltas during Fetch', () => {
@@ -351,7 +380,7 @@ describe('OperationHeartbeat timing', () => {
         vi.advanceTimersByTime(10_000)
 
         expect(info.mock.calls[1][0]).toContain('progress=900/2000 fetched(Δ+400/10s)')
-        expect(info.mock.calls[1][0]).toContain('completed=25(Δ+15/10s)')
+        expect(info.mock.calls[1][0]).toContain('api=2/3/25(Δ+15/10s)')
 
         heartbeat.stop()
         vi.useRealTimers()
@@ -393,5 +422,6 @@ describe('OperationHeartbeat timing', () => {
         vi.useRealTimers()
     })
 })
+
 
 
