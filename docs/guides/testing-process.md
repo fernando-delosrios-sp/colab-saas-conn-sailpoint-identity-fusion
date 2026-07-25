@@ -40,9 +40,25 @@ Run tests:
 npm test -- src/operations/__tests__/accountList.test.ts src/services/fusionService/__tests__/fusionService.test.ts
 ```
 
+## Dry-run validation (pre-production)
+
+Before changing Match thresholds or source settings in production, run a [dry-run](../operations/dry-run.md) against a representative sample (100–500 managed accounts is a practical starting point):
+
+```json
+{
+  "dryRun": {
+    "enabled": true,
+    "saveFile": true
+  }
+}
+```
+
+Review the HTML report under `./reports/` for potential matches, score breakdowns, and issue summaries. Dry-run performs no write side effects, so it is safe to repeat while iterating on configuration.
+
 ## Required assertions
 
 - Sweep1 should create potential/candidate matching state without over-correlation.
 - Sweep2 should apply submitted decisions deterministically.
 - Correlation/non-matched counts and disable side effects should be stable for each run.
 - Single-account operation tests remain isolated from accountList lifecycle tests.
+
