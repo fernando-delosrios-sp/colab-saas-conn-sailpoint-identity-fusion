@@ -28,6 +28,7 @@ describe('MatchOutcomeDispatcher', () => {
     function createDispatcher(options: {
         commandType?: StandardCommand
         isAggregationMode?: boolean
+        isPersistentRun?: boolean
         configOverrides?: Partial<FusionConfig>
         tracker?: AggregationTracker
     } = {}) {
@@ -95,6 +96,7 @@ describe('MatchOutcomeDispatcher', () => {
             forms,
             decisionProcessor,
             commandType: options.commandType,
+            isPersistentRun: () => options.isPersistentRun ?? true,
         })
 
         return {
@@ -225,6 +227,68 @@ describe('MatchOutcomeDispatcher', () => {
             expect(forms.createFusionForm).toHaveBeenCalledWith(expect.any(FusionAccount), expect.any(Set))
             expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(false)
         })
+        it('does not create review forms during non-persistent partial matches', async () => {
+            const { dispatcher, matchingService, forms, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                isPersistentRun: false,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.reviewersBySourceId.set(SOURCE_ID, new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)]))
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.addFusionMatch({
+                        identityId: 'identity-1',
+                        identityName: 'Identity One',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
+                    })
+                }
+                return 1
+            })
+
+            const account = managedAccount()
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(result.partial).toBe(1)
+            expect(forms.createFusionForm).not.toHaveBeenCalled()
+            expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(true)
+        })
+
+        it('does not auto-assign during non-persistent exact matches', async () => {
+            const { dispatcher, matchingService, forms, decisionProcessor, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                isPersistentRun: false,
+                configOverrides: { fusionEnableAutoAssignment: true, fusionAutoAssignmentScore: 90 },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.reviewersBySourceId.set(SOURCE_ID, new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)]))
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.addFusionMatch({
+                        identityId: 'identity-1',
+                        identityName: 'Identity One',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 95, isMatch: true }],
+                    })
+                }
+                return 1
+            })
+
+            const account = managedAccount()
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(result.exact).toBe(1)
+            expect(forms.createFusionForm).not.toHaveBeenCalled()
+            expect(decisionProcessor.processFusionIdentityDecision).not.toHaveBeenCalled()
+            expect(run.autoAssignedIdentityIds.has('identity-1')).toBe(false)
+        })
+
 
         it('does not claim the account when partial-match form creation fails', async () => {
             const { dispatcher, matchingService, forms, run } = createDispatcher({

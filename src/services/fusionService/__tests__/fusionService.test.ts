@@ -65,6 +65,7 @@ describe('FusionService', () => {
             forms: fusionService.forms,
             decisionProcessor: fusionService.decisionProcessor,
             commandType: fusionService.commandType,
+            isPersistentRun: () => fusionService.isPersistentRun(),
         })
     }
 

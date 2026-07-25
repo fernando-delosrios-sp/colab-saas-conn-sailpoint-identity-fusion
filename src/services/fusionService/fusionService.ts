@@ -264,6 +264,11 @@ export class FusionService {
         this._isPersistentRun = isPersistent
     }
 
+    /** True during persistent aggregations; false for dry-run and report-only runs. */
+    public isPersistentRun(): boolean {
+        return this._isPersistentRun
+    }
+
     /**
      * Retrieves the AggregationTracker instance.
      */
