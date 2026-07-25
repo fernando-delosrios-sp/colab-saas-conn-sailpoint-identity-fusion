@@ -335,7 +335,7 @@ export class MatchOutcomeDispatcher {
                 const nonMatchAccount = await this.handleNoReviewerAccount(fusionAccount, sourceType, sourceInfo, account)
                 processedCount++
                 updateProgress()
-                result.nonMatch++
+                this.bumpNonMatch(result)
                 result.resolved.push({
                     account,
                     fusionAccount: nonMatchAccount ?? fusionAccount,
@@ -360,7 +360,7 @@ export class MatchOutcomeDispatcher {
                 const nonMatchAccount = await this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
                 processedCount++
                 updateProgress()
-                result.nonMatch++
+                this.bumpNonMatch(result)
                 result.resolved.push({
                     account,
                     fusionAccount: nonMatchAccount ?? fusionAccount,
@@ -388,7 +388,12 @@ export class MatchOutcomeDispatcher {
                 updateProgress()
                 if (resolved) {
                     result.resolved.push(resolved)
-                    result[resolutionCountKey(resolved.resolution)]++
+                    const countKey = resolutionCountKey(resolved.resolution)
+                    if (countKey === 'nonMatch') {
+                        this.bumpNonMatch(result)
+                    } else {
+                        result[countKey]++
+                    }
                 }
             }
         }
@@ -531,6 +536,7 @@ export class MatchOutcomeDispatcher {
                         : `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
                 this.deps.run.trackFailed(fusionAccount, message)
             } else {
+                this.deps.log.recordEvent('formsQueued')
                 const managedAccountKey = getManagedAccountKeyFromAccount(account)
                 if (managedAccountKey) {
                     this.deps.run.claimAccount(managedAccountKey, account.identityId)
@@ -586,6 +592,11 @@ export class MatchOutcomeDispatcher {
         return fusionAccount
     }
 
+    private bumpNonMatch(result: MatchSweepResult): void {
+        result.nonMatch++
+        this.deps.log.recordEvent('nonMatch')
+    }
+
     private getBestAutoAssignMatch(matches: import('./types').FusionMatch[]): import('./types').FusionMatch | undefined {
         if (this.deps.config.fusionAutoAssignmentScore === undefined) return undefined
         let bestMatch: import('./types').FusionMatch | undefined
@@ -622,6 +633,7 @@ function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 
             return 'nonMatch'
     }
 }
+
 
 
 

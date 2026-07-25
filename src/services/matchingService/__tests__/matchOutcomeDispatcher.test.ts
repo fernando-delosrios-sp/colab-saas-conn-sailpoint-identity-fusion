@@ -200,7 +200,7 @@ describe('MatchOutcomeDispatcher', () => {
         })
 
         it('dispatches a partial match to a review form when auto-assignment is disabled', async () => {
-            const { dispatcher, matchingService, forms, run } = createDispatcher({
+            const { dispatcher, matchingService, forms, log, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
@@ -225,6 +225,7 @@ describe('MatchOutcomeDispatcher', () => {
 
             expect(result.partial).toBe(1)
             expect(forms.createFusionForm).toHaveBeenCalledWith(expect.any(FusionAccount), expect.any(Set))
+            expect(log.recordEvent).toHaveBeenCalledWith('formsQueued')
             expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(false)
         })
         it('does not create review forms during non-persistent partial matches', async () => {
@@ -385,7 +386,7 @@ describe('MatchOutcomeDispatcher', () => {
         })
 
         it('dispatches a non-match by registering an authoritative fusion account', async () => {
-            const { dispatcher, matchingService, run } = createDispatcher({
+            const { dispatcher, matchingService, log, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
@@ -396,6 +397,7 @@ describe('MatchOutcomeDispatcher', () => {
             const result = await dispatcher.runMatchSweep([account], 1)
 
             expect(result.nonMatch).toBe(1)
+            expect(log.recordEvent).toHaveBeenCalledWith('nonMatch')
             expect(result.resolved[0].fusionAccount.statuses).toContain('nonMatched')
             expect(run.getFusionAccountByManagedKey('source-a-id::native-1')).toBeDefined()
         })

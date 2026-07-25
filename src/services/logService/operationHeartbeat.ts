@@ -146,9 +146,9 @@ export function formatEventSummaryLines(
         }
 
         const outcomeParts: string[] = []
-        if (events.nonMatch > 0) outcomeParts.push(`nonMatch=${events.nonMatch}`)
-        if (events.autoAssigned > 0) outcomeParts.push(`autoAssigned=${events.autoAssigned}`)
-        if (events.formsQueued > 0) outcomeParts.push(`formsQueued=${events.formsQueued}`)
+        if (events.nonMatch > 0) outcomeParts.push(`unmatched=${events.nonMatch}`)
+        if (events.autoAssigned > 0) outcomeParts.push(`auto=${events.autoAssigned}`)
+        if (events.formsQueued > 0) outcomeParts.push(`manual=${events.formsQueued}`)
         if (events.recordUniqueRegistered > 0) {
             outcomeParts.push(`recordUniqueRegistered=${events.recordUniqueRegistered}`)
         }
@@ -291,6 +291,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 
