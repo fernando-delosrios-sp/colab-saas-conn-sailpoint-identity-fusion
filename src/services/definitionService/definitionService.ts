@@ -12,7 +12,7 @@ import { SchemaService } from '../schemaService'
 import { InMemoryLockService } from '../lockService'
 import { StateWrapper } from './stateWrapper'
 import { SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
-import { evaluateAttributeTemplate } from './templateEvaluator'
+import { applyOutputTransforms, evaluateAttributeTemplate } from './templateEvaluator'
 import { padNumber } from './formatting'
 import crypto from 'crypto'
 import { assert } from '../../utils/assert'
@@ -709,26 +709,75 @@ export class DefinitionService {
         fusionAccount: FusionAccount,
         context: Record<string, any>
     ): Promise<void> {
-        const { fusionIdentityAttribute } = this.schemas
+        const { name } = definition
+        if (this.isSystemProvenanceAttribute(name)) return
 
-        if (definition.name === fusionIdentityAttribute) {
-            const existingValue = fusionAccount.attributes[definition.name]
-            if (
-                isValidAttributeValue(existingValue) &&
-                this.isExistingFusionAccount(fusionAccount)
-            ) {
+        const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
+        const existingValue = fusionAccount.attributes[name]
+        const hasValue = isValidAttributeValue(existingValue)
+        const isFusionIdentityAttribute = name === fusionIdentityAttribute
+        const isFusionDisplayAttribute = name === fusionDisplayAttribute
+        const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
+        const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
+
+        const prevIsUnique = context.isUnique
+        context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value, context)
+        try {
+            // Preserve stable unique values unless the account is being reset.
+            if (hasValue && !fusionAccount.needsReset) {
+                const valueStr = String(existingValue)
+                this.getUniqueValues(name).add(valueStr)
+                if (definition.useIncrementalCounter) {
+                    await this.seedIncrementalCounterFromExistingValue(definition, valueStr)
+                }
                 return
             }
-        }
 
-        const value = await this.generateUniqueAttributeValue(
-            definition,
-            fusionAccount,
-            context
-        )
-        if (value !== undefined && value !== null) {
-            fusionAccount.attributes[definition.name] = value
-            context[definition.name] = value
+            if (hasValue && isFusionIdentityAttribute && isExistingIdentity) {
+                this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
+                return
+            }
+
+            if (fusionAccount.isIdentity && isFusionDisplayAttribute) {
+                const label = fusionAccount.identityAlias
+                if (label) {
+                    this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
+                    fusionAccount.attributes[name] = label
+                }
+                return
+            }
+
+            if (hasValue) {
+                this.getUniqueValues(name).delete(String(existingValue))
+            }
+
+            const value = await this.generateUniqueAttributeValue(definition, fusionAccount, context)
+            if (value === undefined || value === null) {
+                const fallback = this.fusionAttributeSafeDefault(
+                    name,
+                    fusionAccount,
+                    fusionIdentityAttribute,
+                    fusionDisplayAttribute
+                )
+                if (fallback !== undefined) {
+                    this.getUniqueValues(name).add(fallback)
+                    fusionAccount.attributes[name] = fallback
+                    context[name] = fallback
+                    return
+                }
+                delete fusionAccount.attributes[name]
+                delete context[name]
+                return
+            }
+
+            fusionAccount.attributes[name] = value
+            context[name] = value
+        } finally {
+            if (prevIsUnique !== undefined) {
+                context.isUnique = prevIsUnique
+            } else {
+                delete context.isUnique
+            }
         }
     }
 
@@ -945,6 +994,44 @@ export class DefinitionService {
                 }
             }
         }
+    }
+
+    private isUniqueTemplateValue(
+        definition: UniqueAttributeDefinition,
+        value: unknown,
+        context: Record<string, any>
+    ): boolean {
+        if (missing(value)) return false
+        const raw = String(value)
+
+        const transformed = applyOutputTransforms(raw, definition, definition.expression, context)
+        if (transformed === '') return false
+
+        return !this.getUniqueValues(definition.name).has(String(transformed))
+    }
+
+    private async seedIncrementalCounterFromExistingValue(
+        definition: UniqueAttributeDefinition,
+        value: string
+    ): Promise<void> {
+        const match = value.match(/(\d+)\s*$/)
+        if (!match) return
+        const parsed = Number.parseInt(match[1], 10)
+        if (!Number.isFinite(parsed) || parsed <= 0) return
+
+        const stateWrapper = this.getStateWrapper()
+        const key = definition.name
+        const lockKey = `counter:${key}`
+        await this.locks.withLock(lockKey, async () => {
+            if (stateWrapper.get(key) === undefined) {
+                const start = definition.counterStart ?? 1
+                await stateWrapper.initCounter(key, start)
+            }
+            const nextCurrent = stateWrapper.get(key) ?? 0
+            if (parsed > nextCurrent) {
+                stateWrapper.set(key, parsed)
+            }
+        })
     }
 
     // ========================================================================
