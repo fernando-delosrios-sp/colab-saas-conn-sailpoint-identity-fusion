@@ -125,6 +125,11 @@ export class ClientService {
         return this.queue
     }
 
+    /** Wraps the current adapter (for example with DryRunApiAdapter) without rebuilding the queue. */
+    public wrapAdapter(wrap: (inner: IscApiAdapter) => IscApiAdapter): void {
+        this.adapter = wrap(this.adapter)
+    }
+
     // -------------------------------------------------------------------------
     // call() — single public entry point for all ISC API invocations
     // -------------------------------------------------------------------------

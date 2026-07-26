@@ -232,24 +232,54 @@ describe('accountList dry-run mode', () => {
         vi.restoreAllMocks()
     })
 
-    it('runs non-persistently and sends terminal summary when dryRun.enabled is true', async () => {
-        const { registry, sources } = createMockRegistry([])
+    it('streams accounts and sends terminal summary when dryRun.enabled is true', async () => {
+        const { registry, sources, fusion } = createMockRegistry([])
         const res = registry.res
+        const outputAccounts = [{ identity: 'acct-1' }, { identity: 'acct-2' }]
+        fusion.forEachISCAccount.mockImplementation(async (sendFn: (account: unknown) => void) => {
+            for (const account of outputAccounts) {
+                sendFn(account)
+            }
+            return { sent: outputAccounts.length, eligible: outputAccounts.length }
+        })
         const input = { dryRun: { enabled: true }, schema: { attributes: [] } } as any
 
         await accountList(registry, input)
 
         expect(sources.setProcessLock).not.toHaveBeenCalled()
         expect(sources.releaseProcessLock).not.toHaveBeenCalled()
+        expect(fusion.forEachISCAccount).toHaveBeenCalledWith(expect.any(Function), true)
+        expect(res.send).toHaveBeenCalledWith(outputAccounts[0])
+        expect(res.send).toHaveBeenCalledWith(outputAccounts[1])
         expect(res.send).toHaveBeenCalledWith(
             expect.objectContaining({
-                rowsSent: expect.any(Number),
+                rowsSent: outputAccounts.length,
                 identitiesFound: expect.any(Number),
                 managedAccountsFound: expect.any(Number),
                 totalProcessingTime: expect.any(String),
                 issueSummary: expect.any(Object),
                 options: expect.objectContaining({ saveFile: false, sendEmail: false }),
             })
+        )
+    })
+
+    it('rejects dry-run when recording mode is active', async () => {
+        const { registry } = createMockRegistry([])
+        registry.config.recording = { mode: 'record' } as any
+        const input = { dryRun: { enabled: true }, schema: { attributes: [] } } as any
+
+        await expect(accountList(registry, input)).rejects.toThrow(
+            'Dry-run mode cannot be combined with recording mode'
+        )
+    })
+
+    it('rejects dry-run when replay mode is active', async () => {
+        const { registry } = createMockRegistry([])
+        registry.config.recording = { mode: 'replay' } as any
+        const input = { dryRun: { enabled: true }, schema: { attributes: [] } } as any
+
+        await expect(accountList(registry, input)).rejects.toThrow(
+            'Dry-run mode cannot be combined with recording mode'
         )
     })
 
@@ -414,5 +444,6 @@ describe('accountList report epilogue', () => {
         logSpy.mockRestore()
     })
 })
+
 
 

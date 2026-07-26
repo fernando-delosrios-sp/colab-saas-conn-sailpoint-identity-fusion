@@ -3,41 +3,10 @@ import * as fs from 'fs'
 import { IscApiAdapter } from './iscApiAdapter'
 import { ApiLogEntry } from './recordingApiAdapter'
 import { ConnectorError } from '@sailpoint/connector-sdk'
+import { isWriteMethod, stableApiCallKey } from './apiWriteClassification'
 
 function stableKey(apiName: string, method: string, args: unknown[]): string {
-    return `${apiName}.${method}:${JSON.stringify(args)}`
-}
-
-const WRITE_METHODS = new Set([
-    'post',
-    'put',
-    'patch',
-    'delete',
-    'createFormDefinition',
-    'createFormInstance',
-    'updateFormInstance',
-    'deleteFormDefinition',
-    'createFormInstanceReviewer',
-    'importSourceSchema',
-    'exportSourceSchema',
-    'updateSourceSchema',
-    'createConfiguration',
-    'updateConfiguration',
-])
-
-function isWriteMethod(method: string): boolean {
-    const lower = method.toLowerCase()
-    return (
-        WRITE_METHODS.has(method) ||
-        lower.startsWith('create') ||
-        lower.startsWith('update') ||
-        lower.startsWith('delete') ||
-        lower.startsWith('patch') ||
-        lower.startsWith('post') ||
-        lower.startsWith('put') ||
-        lower.startsWith('import') ||
-        lower.startsWith('export')
-    )
+    return stableApiCallKey(apiName, method, args)
 }
 
 export class ReplayApiAdapter implements IscApiAdapter {
@@ -117,3 +86,4 @@ export function loadApiLog(filePath: string): ApiLogEntry[] {
     if (!content) return []
     return content.split('\n').map((line) => JSON.parse(line))
 }
+

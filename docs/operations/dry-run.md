@@ -2,19 +2,23 @@
 
 ## Description
 
-Dry-run mode is a **non-persistent** variant of the [Account list](account-list.md) operation (`std:account:list`). It runs the full Map, Define, and Match pipeline in memory so you can analyze outcomes before changing production data.
+Dry-run mode is a **non-persistent** variant of the [Account list](account-list.md) operation (`std:account:list`). It runs the full Map, Define, and Match pipeline against live ISC read APIs so you can analyze outcomes before changing production data.
 
 Dry-run mode is activated by passing a `dryRun` object on the account-list input. It is intended for **local or out-of-platform execution** (for example `spcx`, proxy server, or connector development). ISC platform aggregations do not send this input, so scheduled aggregations remain persistent.
 
+Write side effects are inhibited at the API adapter boundary (`DryRunApiAdapter`). Business logic (Match, Correlation, Output) runs identically to a persistent aggregation; only ISC write API calls are suppressed with synthetic responses.
+
 The former `custom:dryrun` command has been removed. Use dry-run mode on `std:account:list` instead.
+
+Dry-run mode cannot be combined with recording mode (`recording.mode: record` or `replay`).
 
 ## When to use it
 
 | Use case | Why dry-run |
 | -------- | ----------- |
-| Tune Match thresholds and algorithms | See potential matches and score breakdowns in the HTML report without creating forms or updating accounts |
-| Validate source ordering and attribute mapping | Confirm Map/Define output and `originSource` behavior before a production aggregation |
-| Review correlation and matching context | Inspect managed-account counts, issue summaries, and phase timing without side effects |
+| Tune Match thresholds and algorithms | See potential matches, score breakdowns, and streamed account rows without mutating the tenant |
+| Validate source ordering and attribute mapping | Confirm Map/Define output, JIT unique attributes, and `originSource` behavior before a production aggregation |
+| Review correlation and matching context | Inspect managed-account counts, issue summaries, and phase timing with the same account stream ISC would receive |
 | Large-tenant analysis | Use `saveFile: true` to write the HTML report to disk when the HTTP response is not the primary deliverable |
 
 ## Input options
@@ -41,15 +45,16 @@ When `enabled` is `false` or absent, the operation runs as a normal persistent a
 
 ## Process flow
 
-Dry-run reuses the same pipeline phases as a persistent aggregation through Process (phases 1–4). Output and persistence differ.
+Dry-run reuses the same pipeline phases as a persistent aggregation. Phase 5 streams accounts; persistence-only tail steps (form cleanup, state save, delayed scheduling) are skipped.
 
 ```mermaid
 flowchart TD
-    Start([std:account:list with dryRun.enabled]) --> Setup[1. Setup — no process lock]
+    Start([std:account:list with dryRun.enabled]) --> Adapter[DryRunApiAdapter activated]
+    Adapter --> Setup[1. Setup — no process lock]
     Setup --> Fetch[2. Fetch — no delayed-aggregation sender]
     Fetch --> Refresh[3. Refresh fusion accounts]
-    Refresh --> Process[4. Process — no correlation PATCH, no orphan disable]
-    Process --> Output[5. Output — skip account streaming and state save]
+    Refresh --> Process[4. Process — full Match and Correlation logic]
+    Process --> Output[5. Output — stream accounts with JIT unique attributes]
     Output --> Epilogue[Epilogue — HTML report and/or email, then terminal summary]
     Epilogue --> End([End])
 ```
@@ -59,20 +64,19 @@ flowchart TD
 - Managed source and identity fetch
 - Fusion account refresh (Map + normal Define)
 - Identity processing and managed-account matching (Match)
+- Correlation-on-aggregation logic (writes inhibited at adapter)
+- Account streaming via `forEachISCAccount` with JIT unique attribute refresh
 - In-memory form reconciliation for report context
-- Global unique attribute refresh logic inside the processing pipeline
 
-### What is suppressed (no write side effects)
+### What is suppressed (no tenant write side effects)
 
 | Side effect | Persistent aggregation | Dry-run |
 | ----------- | ---------------------- | ------- |
 | Process lock | Acquired | Skipped |
-| Stream Fusion accounts to ISC | Yes | No |
-| Save attribute / batch state | Yes | No |
-| Form cleanup and form API writes | Yes | No |
-| Correlation-on-aggregation PATCH calls | Yes (when configured) | No |
-| Orphan disable operations | Awaited and executed | Skipped |
-| Delayed-aggregation workflow fetch and scheduling | Yes (when configured) | No |
+| ISC write API calls | Executed | Inhibited via `DryRunApiAdapter` (synthetic responses) |
+| Save attribute / batch state to tenant | Yes | Skipped (code may run; PATCH inhibited) |
+| Form cleanup API deletes | Yes | Skipped |
+| Delayed-aggregation workflow fetch and scheduling | Yes (when configured) | No fetch; no scheduling |
 | Reset forms / reset accounts flags | Applied when set | Detected but not applied |
 
 !!! note "Reset flags in dry-run"
@@ -80,13 +84,17 @@ flowchart TD
 
 ## Output
 
+### Account stream
+
+Dry-run emits the same `StdAccountListOutput` rows as a persistent aggregation for the same ISC input state, including JIT unique attributes refreshed during Phase 5.
+
 ### Terminal summary
 
 The final `res.send` call is a summary object:
 
 | Field | Description |
 | ----- | ----------- |
-| `rowsSent` | Always `0` in dry-run (accounts are not streamed to the platform) |
+| `rowsSent` | Number of account rows streamed before the summary |
 | `identitiesFound` | Identities loaded during fetch |
 | `managedAccountsFound` | Managed accounts loaded during fetch |
 | `totalProcessingTime` | Total elapsed time for the run |
@@ -129,7 +137,7 @@ npm run build
 npm run dev
 ```
 
-Pass `{ "dryRun": { "enabled": true, "saveFile": true } }` on the `std:account:list` input together with your connector configuration.
+Pass `{ "dryRun": { enabled: true, "saveFile": true } }` on the `std:account:list` input together with your connector configuration.
 
 ### Proxy mode
 
@@ -145,7 +153,7 @@ See [Proxy mode](../guides/proxy-mode.md) for architecture and setup.
 | `writeToDisk` | `saveFile: true` |
 | `sendReportTo` | `sendEmail: ["address@example.com"]` |
 | `includeExisting`, `includeMatched` | Removed — full pipeline always runs; detail is in the HTML report |
-| Enriched output rows (`matchingStatus`, `reportCategories`, `review`) | Removed — use the HTML report and terminal summary |
+| Enriched output rows (`matchingStatus`, `reportCategories`, `review`) | Removed — use the HTML report, account stream, and terminal summary |
 
 ## Related documentation
 
