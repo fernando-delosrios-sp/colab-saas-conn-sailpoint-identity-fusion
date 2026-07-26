@@ -340,6 +340,36 @@ describe('OperationHeartbeat timing', () => {
         vi.useRealTimers()
     })
 
+    it('omits progress delta on first STATUS tick after phase change', () => {
+        vi.useFakeTimers()
+        const info = vi.fn()
+        const log = { info } as unknown as LogService
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Fetch'
+        runContext.progress = { done: 18311, total: 18811, unit: 'fetched' }
+
+        const heartbeat = new OperationHeartbeat(log, () => ({
+            runContext,
+            intervalMs: 10_000,
+        }))
+
+        heartbeat.start()
+        vi.advanceTimersByTime(10_000)
+        runContext.phase = 'Refresh'
+        runContext.progress = { done: 6468, total: 18811, unit: 'processed' }
+        runContext.refreshedCount = 6454
+        vi.advanceTimersByTime(10_000)
+
+        const refreshStatusLine = info.mock.calls[1][0] as string
+        expect(refreshStatusLine).toContain('phase=Refresh')
+        expect(refreshStatusLine).toContain('progress=6468/18811 processed')
+        expect(refreshStatusLine).not.toMatch(/processed\(Δ-/)
+        expect(refreshStatusLine).not.toContain('processed(Δ')
+
+        heartbeat.stop()
+        vi.useRealTimers()
+    })
+
     it('does not emit WARN STALL when pipeline progress advances but api-queue is idle', () => {
         vi.useFakeTimers()
         const info = vi.fn()
@@ -519,6 +549,7 @@ describe('OperationHeartbeat timing', () => {
         vi.useRealTimers()
     })
 })
+
 
 
 

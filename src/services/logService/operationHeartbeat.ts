@@ -299,6 +299,8 @@ export class OperationHeartbeat {
     private interval?: ReturnType<typeof setInterval>
     private previousProcessed?: number
     private previousProgressDone?: number
+    private previousPhase?: OperationPhase | null
+    private previousProgressUnit?: string
     private zeroDeltaTicks = 0
 
     constructor(
@@ -318,12 +320,33 @@ export class OperationHeartbeat {
         this.interval = undefined
         this.previousProcessed = undefined
         this.previousProgressDone = undefined
+        this.previousPhase = undefined
+        this.previousProgressUnit = undefined
         this.zeroDeltaTicks = 0
+    }
+
+    private resetProgressBaselineIfContextChanged(runContext: OperationRunContext): void {
+        const phase = runContext.phase
+        const unit = runContext.progress?.unit
+        const phaseChanged = this.previousPhase !== undefined && phase !== this.previousPhase
+        const unitChanged = this.previousProgressUnit !== undefined && unit !== this.previousProgressUnit
+        const progressReset =
+            runContext.progress !== undefined &&
+            this.previousProgressDone !== undefined &&
+            runContext.progress.done < this.previousProgressDone &&
+            !phaseChanged &&
+            !unitChanged
+
+        if (phaseChanged || unitChanged || progressReset) {
+            this.previousProgressDone = undefined
+        }
     }
 
     tick(): void {
         const snapshot = this.getSnapshot()
         const { runContext, queueStats, activeItems, pendingItems } = snapshot
+
+        this.resetProgressBaselineIfContextChanged(runContext)
 
         const statusLine = formatStatusLine(
             snapshot,
@@ -366,6 +389,8 @@ export class OperationHeartbeat {
         if (runContext.progress) {
             this.previousProgressDone = runContext.progress.done
         }
+        this.previousPhase = runContext.phase
+        this.previousProgressUnit = runContext.progress?.unit
         if (queueStats) {
             this.previousProcessed = queueStats.totalProcessed
         }
@@ -373,6 +398,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 
