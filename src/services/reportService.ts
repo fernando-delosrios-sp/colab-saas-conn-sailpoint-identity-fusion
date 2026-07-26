@@ -554,7 +554,8 @@ export class ReportService {
         const managedAccountsFound =
             managedAccountsFoundAuthoritative + managedAccountsFoundRecord + managedAccountsFoundOrphan
 
-        const totalFusionAccounts = this.run?.totalFusionAccountCount ?? 0
+        const totalFusionAccounts =
+            aggregationStats.fusionAccountsReturned ?? this.run?.totalFusionAccountCount ?? 0
 
         const warningSamples: string[] = []
         const errorSamples: string[] = []

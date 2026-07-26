@@ -135,12 +135,14 @@ export type AggregationStats = {
     managedAccountsFoundAuthoritative?: number
     managedAccountsFoundRecord?: number
     managedAccountsFoundOrphan?: number
+    /** Accounts streamed to the platform during output; set when the run registry is cleared after send */
+    fusionAccountsReturned?: number
     totalProcessingTime: string
     phaseTiming?: PhaseTimingBreakdownEntry[]
 }
 
 export type FusionReportStats = {
-    /** Total fusion accounts in memory after processing (existing + new) */
+    /** Fusion accounts returned to the platform; falls back to in-memory count when output did not run */
     totalFusionAccounts?: number
     /** Number of fusion accounts fetched from the Fusion source */
     fusionAccountsFound?: number
@@ -246,4 +248,5 @@ export type FusionReport = {
     /** Global warnings surfaced during report generation */
     warnings?: FusionReportWarnings
 }
+
 

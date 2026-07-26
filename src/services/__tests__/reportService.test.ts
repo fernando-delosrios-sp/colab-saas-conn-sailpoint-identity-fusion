@@ -281,6 +281,35 @@ describe('ReportService', () => {
         expect(stats.managedAccountsFoundOrphan).toBe(2)
     })
 
+    it('prefers fusionAccountsReturned over cleared run registry for totalFusionAccounts', () => {
+        const { service } = createService({
+            run: { totalFusionAccountCount: 0 },
+        })
+
+        const stats = service.buildDryRunStats({
+            identitiesFound: 0,
+            managedAccountsFound: 0,
+            totalProcessingTime: '1s',
+            fusionAccountsReturned: 18875,
+        })
+
+        expect(stats.totalFusionAccounts).toBe(18875)
+    })
+
+    it('falls back to run totalFusionAccountCount when fusionAccountsReturned is absent', () => {
+        const { service } = createService({
+            run: { totalFusionAccountCount: 42 },
+        })
+
+        const stats = service.buildDryRunStats({
+            identitiesFound: 0,
+            managedAccountsFound: 0,
+            totalProcessingTime: '1s',
+        })
+
+        expect(stats.totalFusionAccounts).toBe(42)
+    })
+
     it('preloads reviewer and selected identity objects before rendering decisions', async () => {
         const { service, deps } = createService({
             forms: {
@@ -370,5 +399,6 @@ describe('ReportService', () => {
         expect(sendEmail).toHaveBeenCalledTimes(1)
     })
 })
+
 
 
