@@ -22,6 +22,7 @@ vi.mock('@sailpoint/connector-sdk', () => {
 })
 
 import { LogService, PhaseTimer } from '../logService'
+import { OperationRunContext } from '../operationRunContext'
 
 describe('LogService aggregation issue summary', () => {
     beforeEach(() => {
@@ -146,7 +147,7 @@ describe('LogService.metric', () => {
         vi.advanceTimersByTime(567)
         log.metric('outputPhase.sendAccounts', startedAt, { count: 500, batchSize: 100 })
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('METRIC outputPhase.sendAccounts duration=567MS count=500 batchSize=100')
+            expect.stringContaining('METRIC outputPhase.sendAccounts count=500 batchSize=100 duration=567MS')
         )
         vi.useRealTimers()
     })
@@ -192,7 +193,7 @@ describe('TrackedOperation via LogService.track', () => {
         vi.advanceTimersByTime(567)
         op.done({ count: 500, batchSize: 100 })
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('METRIC outputPhase.sendAccounts duration=567MS count=500 batchSize=100')
+            expect.stringContaining('METRIC outputPhase.sendAccounts count=500 batchSize=100 duration=567MS')
         )
         vi.useRealTimers()
     })
@@ -219,10 +220,32 @@ describe('TrackedOperation via LogService.track', () => {
         vi.advanceTimersByTime(300)
         op.done({ count: 3 })
         expect(mockLogger.info).toHaveBeenCalledWith(
-            expect.stringContaining('METRIC test.progress duration=800MS count=3')
+            expect.stringContaining('METRIC test.progress count=3 duration=800MS')
         )
         vi.useRealTimers()
     })
 })
+
+describe('LogService step boundaries', () => {
+    beforeEach(() => {
+        mockLogger.level = 'info'
+        mockLogger.info.mockClear()
+    })
+
+    it('stepEnd places elapsed after detail fields', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        log.bindRunContext(new OperationRunContext())
+        log.stepStart('process-identities')
+        vi.advanceTimersByTime(42)
+        log.stepEnd('process-identities', { count: 0 })
+        expect(mockLogger.info).toHaveBeenLastCalledWith(
+            expect.stringContaining('STEP process-identities END count=0 elapsed=42MS')
+        )
+        vi.useRealTimers()
+    })
+})
+
 
 

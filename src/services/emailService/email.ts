@@ -27,10 +27,16 @@
 export function normalizeEmailValue(value: unknown): string[] {
     if (!value) return []
 
-    // Handle string values
+    // Handle string values (including comma-separated lists from dry-run input)
     if (typeof value === 'string') {
         const trimmed = value.trim()
-        return trimmed.length > 0 ? [trimmed] : []
+        if (trimmed.length === 0) return []
+        if (trimmed.includes(',')) {
+            return trimmed
+                .split(',')
+                .flatMap((part) => normalizeEmailValue(part.trim()))
+        }
+        return [trimmed]
     }
 
     // Handle array values (recursively normalize each element)
@@ -87,3 +93,39 @@ export function sanitizeRecipients(recipients: (string | undefined | null)[]): s
 
     return result
 }
+
+/**
+ * Format recipients for ISC email workflow triggers.
+ * The send-email action expects `recipientEmailList` as a string or array of strings.
+ * A single address is sent as a plain string for maximum workflow-engine compatibility.
+ */
+export function formatWorkflowRecipientList(recipients: string[]): string | string[] {
+    if (recipients.length === 1) return recipients[0]
+    return recipients
+}
+
+export interface EmailWorkflowTriggerInput {
+    recipients: string | string[]
+    recipientEmailList: string | string[]
+    subject: string
+    body: string
+}
+
+/**
+ * Build the workflow test trigger payload for fusion email delivery.
+ * Includes both `recipients` and `recipientEmailList` so tenant workflows can map either key.
+ */
+export function buildEmailWorkflowTriggerInput(
+    recipients: string[],
+    subject: string,
+    body: string
+): EmailWorkflowTriggerInput {
+    const recipientList = formatWorkflowRecipientList(recipients)
+    return {
+        recipients: recipientList,
+        recipientEmailList: recipientList,
+        subject,
+        body,
+    }
+}
+

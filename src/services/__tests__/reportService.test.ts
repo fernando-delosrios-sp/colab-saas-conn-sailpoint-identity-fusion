@@ -36,6 +36,8 @@ describe('ReportService', () => {
             totalFusionAccountCount: 11,
             newManagedAccountsCount: 13,
             identitiesProcessedCount: 17,
+            tracker: {},
+            generateReport: vi.fn(() => ({ accounts: [], matches: 0 })),
             getFusionIdentity: vi.fn(() => undefined),
             getFusionAccountByManagedKey: vi.fn(() => undefined),
             fusionIdentities: [],
@@ -213,6 +215,31 @@ describe('ReportService', () => {
         expect(decisions[0].accountName).toBe('key-only')
     })
 
+    it('builds dry-run initialize stats from fetch-phase counters', () => {
+        const { service } = createService()
+
+        const { stats } = service.initializeDryRunReport({
+            fetchResult: {
+                identitiesFound: 42,
+                managedAccountsFound: 100,
+                managedAccountsFoundAuthoritative: 80,
+                managedAccountsFoundRecord: 15,
+                managedAccountsFoundOrphan: 5,
+            },
+            totalProcessingTime: '2m 10s',
+            phaseTiming: [{ phase: 'Fetch', elapsed: '30s' }],
+        })
+
+        expect(stats.identitiesFound).toBe(42)
+        expect(stats.managedAccountsFound).toBe(100)
+        expect(stats.managedAccountsFoundAuthoritative).toBe(80)
+        expect(stats.managedAccountsFoundRecord).toBe(15)
+        expect(stats.managedAccountsFoundOrphan).toBe(5)
+        expect(stats.totalProcessingTime).toBe('2m 10s')
+        expect(stats.fusionAccountsFound).toBe(7)
+        expect(stats.usedMemory).toMatch(/^\d+ MB$/)
+    })
+
     it('builds dry-run report stats correctly mapping authoritative, record, and orphan decisions', () => {
         const { service } = createService({
             forms: {
@@ -343,4 +370,5 @@ describe('ReportService', () => {
         expect(sendEmail).toHaveBeenCalledTimes(1)
     })
 })
+
 

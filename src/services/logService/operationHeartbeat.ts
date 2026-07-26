@@ -125,8 +125,6 @@ export function formatStatusLine(
         parts.push(`refreshed(${runContext.refreshedCount})`)
     }
 
-    parts.push(`elapsed=${PhaseTimer.formatElapsed(Date.now() - runContext.operationStartedAt)}`)
-
     if (queueStats) {
         const apiQueueSegment = formatApiQueueSegment(
             queueStats,
@@ -152,6 +150,8 @@ export function formatStatusLine(
         const heapPct = Math.round((memory.heapUsed / memory.rss) * 100)
         parts.push(`mem=${formatMb(memory.rss)}MB(${heapPct}%)`)
     }
+
+    parts.push(`elapsed=${PhaseTimer.formatElapsed(Date.now() - runContext.operationStartedAt)}`)
 
     return parts.join(' ')
 }
@@ -193,17 +193,72 @@ export function formatEventSummaryLines(
     return lines
 }
 
+/** Matches pagination suffixes such as `[offset 18500]` or `[page, offset 250]`. */
+const OFFSET_LABEL_SUFFIX = /\[(?:page(?: \d+)?, )?offset (\d+)\]$/
+
+const FETCH_ACCOUNTS_LABEL_PREFIX = /^SourceService>fetchAccountsBySourceId(?:Generator)? /
+
+type ParsedQueueLabel =
+    | { kind: 'paginated'; base: string; offset: number }
+    | { kind: 'plain'; label: string }
+
+function parseQueueLabel(label: string): ParsedQueueLabel {
+    const match = label.match(OFFSET_LABEL_SUFFIX)
+    if (match && match.index !== undefined) {
+        return {
+            kind: 'paginated',
+            base: label.slice(0, match.index).trimEnd(),
+            offset: Number(match[1]),
+        }
+    }
+    return { kind: 'plain', label }
+}
+
+function formatPaginatedGroupBase(base: string): string {
+    return base.replace(FETCH_ACCOUNTS_LABEL_PREFIX, '')
+}
+
+function formatPlainGroupLabel(label: string, count: number): string {
+    return count > 1 ? `${label}×${count}` : label
+}
+
 export function groupActiveLabels(activeItems: QueuedItemInfo[] | undefined, limit = 3): string {
     if (!activeItems || activeItems.length === 0) return 'none'
-    const counts = new Map<string, number>()
+
+    const plainCounts = new Map<string, number>()
+    const paginatedOffsets = new Map<string, number[]>()
+
     for (const item of activeItems) {
-        const label = item.label ?? 'unknown'
-        counts.set(label, (counts.get(label) ?? 0) + 1)
+        const raw = item.label ?? 'unknown'
+        const parsed = parseQueueLabel(raw)
+        if (parsed.kind === 'paginated') {
+            const offsets = paginatedOffsets.get(parsed.base) ?? []
+            offsets.push(parsed.offset)
+            paginatedOffsets.set(parsed.base, offsets)
+        } else {
+            plainCounts.set(parsed.label, (plainCounts.get(parsed.label) ?? 0) + 1)
+        }
     }
-    return [...counts.entries()]
-        .sort((a, b) => b[1] - a[1])
+
+    type LabelGroup = { text: string; count: number }
+    const groups: LabelGroup[] = []
+
+    for (const [label, count] of plainCounts) {
+        groups.push({ text: formatPlainGroupLabel(label, count), count })
+    }
+
+    for (const [base, offsets] of paginatedOffsets) {
+        const sortedOffsets = [...offsets].sort((a, b) => a - b)
+        groups.push({
+            text: `${formatPaginatedGroupBase(base)} [${sortedOffsets.join(', ')}]`,
+            count: offsets.length,
+        })
+    }
+
+    return groups
+        .sort((a, b) => b.count - a.count)
         .slice(0, limit)
-        .map(([label, count]) => `${label}×${count}`)
+        .map((group) => group.text)
         .join(', ')
 }
 
@@ -318,6 +373,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 

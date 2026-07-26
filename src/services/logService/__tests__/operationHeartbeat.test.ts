@@ -87,6 +87,7 @@ describe('operation heartbeat formatters', () => {
         expect(line).toContain('matches(2n/1m/1a)')
         expect(line).toContain('api=10a/97q/537c(Δ+0/30s)')
         expect(line).toContain('mem=482.00MB(100%)')
+        expect(line.endsWith(' elapsed=5.0S')).toBe(true)
         vi.useRealTimers()
     })
 
@@ -171,7 +172,7 @@ describe('operation heartbeat formatters', () => {
             30_000
         )
 
-        expect(line).toContain('queue-pending=IdentityService>correlate×2, MatchingService>score×1')
+        expect(line).toContain('queue-pending=IdentityService>correlate×2, MatchingService>score')
         expect(line).not.toContain('fusion-reviews=')
         expect(line).toContain('work-pending disable=2 deferred=45')
         vi.useRealTimers()
@@ -264,7 +265,38 @@ describe('operation heartbeat formatters', () => {
             { id: '3', priority: 1, label: 'MatchingService>score', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
         ] as any)
         expect(grouped).toContain('IdentityService>correlate×2')
-        expect(grouped).toContain('MatchingService>score×1')
+        expect(grouped).toContain('MatchingService>score')
+    })
+
+    it('groups paginated queue labels by source with offsets instead of ×1', () => {
+        const item = {
+            priority: 1,
+            createdAt: 0,
+            retryCount: 0,
+            maxRetries: 3,
+            waitTimeMs: 100,
+        }
+        const grouped = groupActiveLabels([
+            {
+                ...item,
+                id: '1',
+                label: 'SourceService>fetchAccountsBySourceIdGenerator Identity Fusion NG [offset 18500]',
+            },
+            {
+                ...item,
+                id: '2',
+                label: 'SourceService>fetchAccountsBySourceIdGenerator Identity Fusion NG [offset 18750]',
+            },
+            {
+                ...item,
+                id: '3',
+                label: 'SourceService>fetchAccountsBySourceIdGenerator Workday - Employees [offset 18000]',
+            },
+        ] as any)
+
+        expect(grouped).toBe(
+            'Identity Fusion NG [18500, 18750], Workday - Employees [18000]'
+        )
     })
 
     it('formats stall warning with active and pending queue labels', () => {
@@ -273,7 +305,7 @@ describe('operation heartbeat formatters', () => {
             formatStallWarning(60_000, [], [
                 { id: '1', priority: 1, label: 'FormService>create', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
             ] as any)
-        ).toBe('WARN STALL api-queue completed unchanged 60s | active=none | pending=FormService>create×1')
+        ).toBe('WARN STALL api-queue completed unchanged 60s | active=none | pending=FormService>create')
     })
 })
 
@@ -487,6 +519,7 @@ describe('OperationHeartbeat timing', () => {
         vi.useRealTimers()
     })
 })
+
 
 
 

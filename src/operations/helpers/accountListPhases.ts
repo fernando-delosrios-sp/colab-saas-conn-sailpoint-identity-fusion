@@ -374,16 +374,10 @@ export async function reportEpilogue(
     if (dryRun && fetchResult) {
         if (dryRun.saveFile || dryRun.sendEmail) {
             try {
-                const { report } = reports.initializeDryRunReport({
-                    fetchResult,
-                    totalProcessingTime: timer.totalElapsed(),
-                    phaseTiming: timer.getPhaseBreakdown(),
-                })
-                const { reportHtmlOutputPath } = await reports.finalizeDryRunReport({
-                    report,
-                    fetchResult,
-                    totalProcessingTime: timer.totalElapsed(),
-                    phaseBreakdownThroughOutput: timer.getPhaseBreakdown(),
+                const reportPhaseStartedAt = Date.now()
+                const { reportHtmlOutputPath } = await reports.generateDryRunReport({
+                    aggregationStats: fetchResultToAggregationStats(fetchResult, timer),
+                    reportPhaseStartedAt,
                     saveFile: dryRun.saveFile,
                     sendEmail: dryRun.sendEmail,
                 })
@@ -438,6 +432,7 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+
 
 
 

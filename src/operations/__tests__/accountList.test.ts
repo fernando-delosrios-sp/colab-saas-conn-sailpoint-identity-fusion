@@ -361,8 +361,7 @@ describe('accountList report epilogue', () => {
     it('saves dry-run report artifacts before a failing summary send', async () => {
         const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const reports = registry.reports as any
-        reports.initializeDryRunReport = vi.fn().mockReturnValue({ report: {}, stats: {} })
-        reports.finalizeDryRunReport = vi.fn().mockResolvedValue({ reportHtmlOutputPath: './reports/dry-run.html' })
+        reports.generateDryRunReport = vi.fn().mockResolvedValue({ reportHtmlOutputPath: './reports/dry-run.html' })
         ;(registry.res.send as Mock).mockImplementation(() => {
             throw new Error('write after end')
         })
@@ -370,8 +369,8 @@ describe('accountList report epilogue', () => {
 
         await expect(accountList(registry, input)).rejects.toThrow('write after end')
 
-        expect(reports.finalizeDryRunReport).toHaveBeenCalledTimes(1)
-        expect(reports.finalizeDryRunReport.mock.invocationCallOrder[0]).toBeLessThan(
+        expect(reports.generateDryRunReport).toHaveBeenCalledTimes(1)
+        expect(reports.generateDryRunReport.mock.invocationCallOrder[0]).toBeLessThan(
             (registry.res.send as Mock).mock.invocationCallOrder[0]
         )
     })
@@ -379,8 +378,7 @@ describe('accountList report epilogue', () => {
     it('sends the summary even when dry-run report artifacts fail', async () => {
         const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const reports = registry.reports as any
-        reports.initializeDryRunReport = vi.fn().mockReturnValue({ report: {}, stats: {} })
-        reports.finalizeDryRunReport = vi.fn().mockRejectedValue(new Error('email down'))
+        reports.generateDryRunReport = vi.fn().mockRejectedValue(new Error('email down'))
         const input = { dryRun: { enabled: true, saveFile: true }, schema: { attributes: [] } } as any
 
         await accountList(registry, input)
@@ -391,13 +389,12 @@ describe('accountList report epilogue', () => {
     it('emits report artifacts before the summary on a clean dry-run', async () => {
         const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const reports = registry.reports as any
-        reports.initializeDryRunReport = vi.fn().mockReturnValue({ report: {}, stats: {} })
-        reports.finalizeDryRunReport = vi.fn().mockResolvedValue({ reportHtmlOutputPath: './reports/dry-run.html' })
+        reports.generateDryRunReport = vi.fn().mockResolvedValue({ reportHtmlOutputPath: './reports/dry-run.html' })
         const input = { dryRun: { enabled: true, saveFile: true }, schema: { attributes: [] } } as any
 
         await accountList(registry, input)
 
-        expect(reports.finalizeDryRunReport.mock.invocationCallOrder[0]).toBeLessThan(
+        expect(reports.generateDryRunReport.mock.invocationCallOrder[0]).toBeLessThan(
             (registry.res.send as Mock).mock.invocationCallOrder[0]
         )
         expect(registry.res.send).toHaveBeenCalledWith(expect.objectContaining({ rowsSent: expect.any(Number) }))
@@ -406,8 +403,7 @@ describe('accountList report epilogue', () => {
     it('delegates sendEmail string input to dry-run report delivery', async () => {
         const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const reports = registry.reports as any
-        reports.initializeDryRunReport = vi.fn().mockReturnValue({ report: {}, stats: {} })
-        reports.finalizeDryRunReport = vi.fn().mockResolvedValue({})
+        reports.generateDryRunReport = vi.fn().mockResolvedValue({})
         const input = {
             dryRun: { enabled: true, sendEmail: 'reviewer@example.com' },
             schema: { attributes: [] },
@@ -415,7 +411,7 @@ describe('accountList report epilogue', () => {
 
         await accountList(registry, input)
 
-        expect(reports.finalizeDryRunReport).toHaveBeenCalledWith(
+        expect(reports.generateDryRunReport).toHaveBeenCalledWith(
             expect.objectContaining({ sendEmail: ['reviewer@example.com'], saveFile: false })
         )
         expect(registry.res.send).toHaveBeenCalledWith(
@@ -444,6 +440,7 @@ describe('accountList report epilogue', () => {
         logSpy.mockRestore()
     })
 })
+
 
 
 

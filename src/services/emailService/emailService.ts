@@ -11,7 +11,7 @@ import { createUrlContext, getUIOriginFromBaseUrl, UrlContext } from '../../util
 import { pickAttributes } from '../../utils/attributes'
 import { compileEmailTemplates, renderFusionReviewEmail, FusionReviewEmailData } from './helpers'
 import { registerHandlebarsHelpers } from './messagingHandlebarsRegistration'
-import { normalizeEmailValue, sanitizeRecipients } from './email'
+import { normalizeEmailValue, sanitizeRecipients, buildEmailWorkflowTriggerInput } from './email'
 import { normalizeLanguageCode } from './localization'
 
 export interface FusionEmailContext {
@@ -218,19 +218,11 @@ export class EmailService {
 
         await this.refreshEmailWorkflowDefinitionBytes()
 
-        const accessToken = await this.resolveAccessToken()
-        assert(accessToken, 'Unable to resolve access token for email workflow')
-
         const maxSerializedInputBytes = this.getMaxTestWorkflowInputBytes()
         const fittedBody = this.fitEmailBodyToWorkflowLimit(subject, validRecipients, body, maxSerializedInputBytes)
 
         const request = {
-            input: {
-                recipients: validRecipients,
-                subject,
-                body: fittedBody,
-                accessToken,
-            },
+            input: buildEmailWorkflowTriggerInput(validRecipients, subject, fittedBody),
         }
 
         const requestParameters = {
@@ -241,9 +233,10 @@ export class EmailService {
         try {
             const response = await this.executeWorkflowTest(requestParameters)
             assert(response, 'Email workflow response is required')
+            const responseDetail = this.describeWorkflowResponse(response)
             softAssert(
                 response.status === 200,
-                `Failed to send email workflow - received status ${response.status}`,
+                `Failed to send email workflow - received status ${response.status}${responseDetail}`,
                 'error'
             )
             this.log.info(`Sent email "${subject}" to ${validRecipients.length} recipient(s)`)
@@ -255,15 +248,21 @@ export class EmailService {
         }
     }
 
+    private describeWorkflowResponse(response: any): string {
+        const data = response?.data ?? response?.body ?? response?.error
+        if (data === undefined || data === null) return ''
+        if (typeof data === 'string') return `: ${data}`
+        try {
+            return `: ${JSON.stringify(data)}`
+        } catch {
+            return ''
+        }
+    }
+
     public workflowInputByteLength(subject: string, body: string, recipients: string[]): number {
         return Buffer.byteLength(
             JSON.stringify({
-                input: {
-                    recipients,
-                    subject,
-                    body,
-                    accessToken: 'x'.repeat(128),
-                },
+                input: buildEmailWorkflowTriggerInput(recipients, subject, body),
             }),
             'utf8'
         )
@@ -289,9 +288,8 @@ export class EmailService {
         const currentBytes = this.workflowInputByteLength(subject, body, recipients)
         if (currentBytes <= maxSerializedInputBytes) return body
 
-        const sampleToken = 'x'.repeat(128)
         const envelopeBytes = Buffer.byteLength(
-            JSON.stringify({ input: { recipients, subject, body: '', accessToken: sampleToken } }),
+            JSON.stringify({ input: buildEmailWorkflowTriggerInput(recipients, subject, '') }),
             'utf8'
         )
         const allowedBodyBytes = Math.max(256, maxSerializedInputBytes - envelopeBytes - 128)
@@ -410,5 +408,6 @@ export class EmailService {
         )
     }
 }
+
 
 
