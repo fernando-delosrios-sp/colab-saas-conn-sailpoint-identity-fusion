@@ -33,7 +33,8 @@ function createEmptyFetchResult(): FetchResult {
 
 export function fetchResultToAggregationStats(
     fetchResult: FetchResult,
-    timer: ReturnType<ServiceRegistry['log']['timer']>
+    timer: ReturnType<ServiceRegistry['log']['timer']>,
+    options?: { fusionAccountsReturned?: number }
 ): AggregationStats {
     return {
         identitiesFound: fetchResult.identitiesFound,
@@ -41,6 +42,7 @@ export function fetchResultToAggregationStats(
         managedAccountsFoundAuthoritative: fetchResult.managedAccountsFoundAuthoritative,
         managedAccountsFoundRecord: fetchResult.managedAccountsFoundRecord,
         managedAccountsFoundOrphan: fetchResult.managedAccountsFoundOrphan,
+        fusionAccountsReturned: options?.fusionAccountsReturned,
         totalProcessingTime: timer.totalElapsed(),
         phaseTiming: timer.getPhaseBreakdown(),
     }
@@ -364,7 +366,11 @@ export async function reportEpilogue(
         try {
             log.info('Generating aggregation report')
             const reportOp = log.track('reportPhase.generateReport')
-            await generateReport(false, serviceRegistry, fetchResultToAggregationStats(fetchResult, timer))
+            await generateReport(
+                false,
+                serviceRegistry,
+                fetchResultToAggregationStats(fetchResult, timer, { fusionAccountsReturned: outputCount })
+            )
             reportOp.done()
         } catch (error) {
             log.warn(`Report epilogue: aggregation report failed: ${(error as Error).message}`)
@@ -376,7 +382,9 @@ export async function reportEpilogue(
             try {
                 const reportPhaseStartedAt = Date.now()
                 const { reportHtmlOutputPath } = await reports.generateDryRunReport({
-                    aggregationStats: fetchResultToAggregationStats(fetchResult, timer),
+                    aggregationStats: fetchResultToAggregationStats(fetchResult, timer, {
+                        fusionAccountsReturned: outputCount,
+                    }),
                     reportPhaseStartedAt,
                     saveFile: dryRun.saveFile,
                     sendEmail: dryRun.sendEmail,
@@ -432,6 +440,7 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+
 
 
 
