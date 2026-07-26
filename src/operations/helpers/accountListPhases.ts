@@ -1,4 +1,5 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
+import { PhaseTimer } from '../../services/logService'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
 import { AggregationStats } from '../../services/fusionService/types'
@@ -264,7 +265,7 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Ph
     log.stepStart('uncorrelated-sweep', { accounts: uncorrelatedCount })
     const managedAccountsOp = log.track('FusionService.processManagedAccounts')
     const { processed, matchScoringMs } = await fusion.processUncorrelatedManagedAccounts()
-    managedAccountsOp.done({ analyzed: processed, matchScoringMs })
+    managedAccountsOp.done({ analyzed: processed, matchScoring: PhaseTimer.formatElapsed(matchScoringMs) })
     log.stepEnd('uncorrelated-sweep', { analyzed: processed })
 
     if (sources.run.fullScanFallbackCount > 0) {
