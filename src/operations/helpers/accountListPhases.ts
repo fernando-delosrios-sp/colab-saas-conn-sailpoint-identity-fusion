@@ -209,7 +209,7 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<vo
     const refreshOp = log.track('refreshPhase.processFusionAccounts')
     const processedFusionAccounts = await fusion.processFusionAccounts()
     refreshOp.done({ count: processedFusionAccounts.length })
-    log.info(`Refresh phase complete - ${sources.run.managedAccountsById.size} unprocessed account(s) remaining`)
+    log.info('Refresh phase complete')
 }
 
 export async function processPhase(serviceRegistry: ServiceRegistry, _options: PhaseOptions): Promise<void> {
@@ -279,9 +279,7 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
     fusion.reconcilePendingFormState()
     log.stepEnd('form-reconcile', { remaining: sources.run.managedAccountsById.size })
     const matchOutcomes = formatMatchOutcomesSegment(log.getCumulativeOutcomes(), true)
-    log.info(
-        `Process phase complete - ${sources.run.managedAccountsById.size} unprocessed account(s) remaining ${matchOutcomes}`
-    )
+    log.info(`Process phase complete - ${matchOutcomes}`)
 }
 
 export async function outputPhase(serviceRegistry: ServiceRegistry, options: PhaseOptions): Promise<number> {
