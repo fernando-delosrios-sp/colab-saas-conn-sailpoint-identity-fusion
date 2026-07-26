@@ -42,7 +42,7 @@ Use Identity Fusion for Match when you face these challenges:
 | --------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **Access profiles for reviewers** | Create access profile per source with reviewer entitlement    | Assign reviewers per source for targeted notifications                                          |
 | **Fusion report access profile**  | Access profile with "Fusion report" entitlement               | Allow specific users to view potential match reports                                            |
-| **Automatic assignment**          | **Attribute Matching Settings → Enable automatic assignment** | Assign without manual review when the combined score meets the automatic assignment match score |
+| **Automatic merge**          | **Attribute Matching Settings → Enable automatic merge** | Assign without manual review when the combined score meets the automatic merge match score |
 
 **Screenshot placeholder:** High-level Match flow diagram.
 
@@ -133,7 +133,7 @@ Configure **Attribute Matching Settings → Matching Settings** to define match 
 | Field                                 | Purpose                                                                        | Recommended value                                  |
 | ------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------- |
 | **Manual review match score [0-100]** | Global floor for the weighted combined match score                             | 80 (start); tune with false positive/negative rate |
-| **Enable automatic assignment**       | Skip review when the combined score meets the automatic assignment match score | No initially; enable after tuning                  |
+| **Enable automatic merge**       | Skip review when the combined score meets the automatic merge match score | No initially; enable after tuning                  |
 | **Fusion attribute matches**          | List of identity attributes to compare                                         | At least 2 attributes (e.g. name + email)          |
 
 **Screenshot placeholder:** Attribute Matching Settings - Matching section.
@@ -209,7 +209,7 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 - With **Skip match if threshold not met = No** (default), every evaluated rule contributes its weight and raw similarity to the combined score, even when the score is below the rule's own minimum. The rule simply fails to "pass" but still dilutes the blend.
 - With **Skip match if threshold not met = Yes**, a non-mandatory rule whose similarity is below its `fusionScore` is excluded from the combined score (zero weight, zero raw score). The combined score is then computed only from the rules that passed their thresholds, which can raise the combined score compared with keeping weak rules in the blend.
 - **Mandatory** rules always ignore this toggle: a below-threshold mandatory rule fails the candidate just as it would with the toggle disabled.
-- Enabling this option can change the combined score and the manual review / automatic assignment outcome. Test with [dry-run mode](../operations/dry-run.md) before promoting to production.
+- Enabling this option can change the combined score and the manual review / automatic merge outcome. Test with [dry-run mode](../operations/dry-run.md) before promoting to production.
 
 **Example:**
 
@@ -221,14 +221,14 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 → Potential match if all mandatory rules pass (87.6 ≥ 80)
 ```
 
-### Automatic assignment (thresholds)
+### Automatic merge (thresholds)
 
 | Field                           | Value | Effect                                                                         |
 | ------------------------------- | ----- | ------------------------------------------------------------------------------ |
-| **Enable automatic assignment** | No    | All potential matches go to manual review                                      |
-| **Enable automatic assignment** | Yes   | Threshold matches are assigned without review; borderline cases still reviewed |
+| **Enable automatic merge** | No    | All potential matches go to manual review                                      |
+| **Enable automatic merge** | Yes   | Threshold matches are merged without review; borderline cases still reviewed |
 
-**When to enable automatic assignment:**
+**When to enable automatic merge:**
 
 - You have tuned thresholds and are confident in the algorithm
 - False positive rate is very low
@@ -358,7 +358,7 @@ Create an access profile for viewing match reports:
 
 ## Enforced correlation role
 
-An **enforced correlation role** is an automatically assigned ISC role that operates on Fusion identities to ensure that managed accounts are correlated to their corresponding Fusion identities.
+An **enforced correlation role** is an automatically mergeed ISC role that operates on Fusion identities to ensure that managed accounts are correlated to their corresponding Fusion identities.
 
 - **What it does**
     - Assigns a **correlated action entitlement** to those Fusion identities that currently have either:
@@ -383,9 +383,9 @@ An **enforced correlation role** is an automatically assigned ISC role that oper
 | 1    | **Connector** | Account aggregation operations (manual or scheduled)                      | Reads accounts from configured sources     |
 | 2    | **Connector** | Merges source account data into Fusion accounts                     | Consolidated accounts per person           |
 | 3    | **Connector** | Compares each Fusion account to identities in scope                 | Similarity scores per identity + attribute |
-| 4    | **Connector** | If similarity threshold met and automatic assignment does not apply | Creates review form                        |
+| 4    | **Connector** | If similarity threshold met and automatic merge does not apply | Creates review form                        |
 | 5    | **ISC**       | Sends email notification to reviewers                               | Reviewers notified                         |
-| 6    | **Reviewer**  | Reviews form, chooses: link to existing identity or create new      | Decision recorded                          |
+| 6    | **Reviewer**  | Reviews form, chooses: merge with existing identity or create new      | Decision recorded                          |
 | 7    | **Connector** | On next aggregation, applies reviewer decision                      | Account correlated or new identity created |
 | 8    | **Connector** | Updates account history                                             | Audit trail maintained                     |
 
@@ -432,7 +432,7 @@ For each potential match:
 
 | Condition                                                                                            | Action                                                              |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| **Enable automatic assignment** = Yes, and **combined score** ≥ **Automatic assignment match score** | Skip review form; assign and apply (same as an authorized decision) |
+| **Enable automatic merge** = Yes, and **combined score** ≥ **Automatic merge match score** | Skip review form; merge and apply (same as an authorized decision) |
 | Else                                                                                                 | Create review form; notify reviewers                                |
 
 **Step 5–6: Manual review**
@@ -477,7 +477,7 @@ On next aggregation:
 | **3. Review results**              | Check review forms: Are matches obvious? Many false positives?                                   | Calibrate                                      |
 | **4. Adjust**                      | Lower thresholds if missing matches; raise if too many false positives                           | Fine-tune                                      |
 | **5. Full rollout**                | Remove **Aggregation batch size** limit; run on all accounts                                     | Production                                     |
-| **6. Enable automatic assignment** | Once confident, set an automatic assignment threshold and toggle **Enable automatic assignment** | Reduce manual burden                           |
+| **6. Enable automatic merge** | Once confident, set an automatic merge threshold and toggle **Enable automatic merge** | Reduce manual burden                           |
 
 ### Monitoring and metrics
 
@@ -488,7 +488,7 @@ Track these metrics to assess Match effectiveness:
 | **False positive rate**       | Manual review: % of "Create new" decisions               | <10%                                               |
 | **False negative rate**       | Audits: matches that passed through                      | <5%                                                |
 | **Review response time**      | Time from form creation to decision                      | <2 days (adjust **Manual review expiration days**) |
-| **Automatic assignment rate** | % of matches assigned automatically vs manually reviewed | >60% after tuning                                  |
+| **Automatic merge rate** | % of matches assigned automatically vs manually reviewed | >60% after tuning                                  |
 
 ### Common issues and fixes
 
@@ -496,7 +496,7 @@ Track these metrics to assess Match effectiveness:
 | ---------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | **No matches found**         | Zero review forms despite expecting matches | Lower **Similarity score** thresholds; check **Identity Scope Query** returns identities |
 | **Too many false positives** | Many obvious non-duplicates flagged         | Raise **Similarity score** thresholds; use **Mandatory match?** for critical attributes  |
-| **Reviewer overload**        | Hundreds of review forms                    | Enable **Enable automatic assignment** and configure an appropriate assignment threshold |
+| **Reviewer overload**        | Hundreds of review forms                    | Enable **Enable automatic merge** and configure an appropriate assignment threshold |
 | **Forms expiring**           | Forms timing out before review              | Increase **Manual review expiration days**; notify reviewers                             |
 | **Incorrect algorithm**      | Matches don't make sense                    | Switch algorithm (see [Matching algorithms](matching-algorithms.md))                     |
 
@@ -513,7 +513,7 @@ Track these metrics to assess Match effectiveness:
 | **Source Settings (Scope)**                | Define identity baseline                     | Include identities = Yes; Identity Scope Query                     |
 | **Source Settings (Sources)**              | Sources contributing account data            | Source names (2+); account aggregation mode (optional)             |
 | **Attribute Mapping**                      | Merge source attributes into Fusion accounts | Merge strategies (first/list/concatenate)                          |
-| **Attribute Matching Settings (Matching)** | Duplicate detection rules                    | Fusion attribute matches; algorithms; scores; automatic assignment |
+| **Attribute Matching Settings (Matching)** | Duplicate detection rules                    | Fusion attribute matches; algorithms; scores; automatic merge |
 | **Attribute Matching Settings (Review)**   | Manual review workflow                       | Form attributes; expiration days; max candidates; global reviewer  |
 | **Access Profiles**                        | Reviewer permissions                         | Per-source reviewer access profiles; Fusion report                 |
 

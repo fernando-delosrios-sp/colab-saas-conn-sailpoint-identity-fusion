@@ -43,7 +43,7 @@ export interface RunStateSnapshot {
     sourcesByName: Record<string, any>
     currentRunNonMatchedKeysBySource: Record<string, string[]>
     fusionBlends: Record<string, any>[]
-    autoAssignedIds: string[]
+    autoMergedIds: string[]
     matchScoringMs: number
     phaseTimings: { phase: string; elapsed: string }[]
     managedAccountInventory: Record<string, ManagedAccountInfo>
@@ -75,6 +75,8 @@ export interface RunStateSnapshot {
  */
 export class FusionRun {
     public readonly isRecordMode: boolean
+    /** Set when account-list dry-run mode activates write inhibition. */
+    public isDryRunMode = false
     readonly managedAccountsById = new Map<string, Account>()
     readonly managedAccountInventory = new Map<string, ManagedAccountInfo>()
     readonly managedAccountsByIdentityId = new Map<string, Set<string>>()
@@ -82,7 +84,7 @@ export class FusionRun {
     private readonly _fusionIdentityMap = new Map<string, FusionAccount>()
     private readonly _identityMap = new Map<string, IdentityDocument>()
     readonly sourcesByName = new Map<string, SourceInfo>()
-    private readonly _autoAssignedIdentityIds = new Set<string>()
+    private readonly _autoMergedIdentityIds = new Set<string>()
     private readonly _currentRunNonMatchedKeysBySource = new Map<string, Set<string>>()
     readonly reviewersBySourceId = new Map<string, Set<FusionAccount>>()
     readonly sourcesWithoutReviewers = new Set<string>()
@@ -119,8 +121,8 @@ export class FusionRun {
     activeFormDeleteWorkers: number = 0
     pendingFormDeleteTasks: Set<Promise<void>> = new Set()
 
-    get autoAssignedCount(): number {
-        return this._autoAssignedIdentityIds.size
+    get autoMergedCount(): number {
+        return this._autoMergedIdentityIds.size
     }
 
     get pendingDisableOperationsCount(): number {
@@ -131,8 +133,8 @@ export class FusionRun {
         return this._candidateRegistry.count()
     }
 
-    get autoAssignedIdentityIds(): ReadonlySet<string> {
-        return this._autoAssignedIdentityIds
+    get autoMergedIdentityIds(): ReadonlySet<string> {
+        return this._autoMergedIdentityIds
     }
 
     get identityCount(): number {
@@ -486,16 +488,16 @@ export class FusionRun {
         return this._identityMap.has(id)
     }
 
-    markAutoAssigned(identityId: string): void {
-        this._autoAssignedIdentityIds.add(identityId)
+    markAutoMerged(identityId: string): void {
+        this._autoMergedIdentityIds.add(identityId)
     }
 
-    isAutoAssigned(identityId: string): boolean {
-        return this._autoAssignedIdentityIds.has(identityId)
+    isAutoMerged(identityId: string): boolean {
+        return this._autoMergedIdentityIds.has(identityId)
     }
 
     resetScoringState(): void {
-        this._autoAssignedIdentityIds.clear()
+        this._autoMergedIdentityIds.clear()
         this.matchScoringMs = 0
     }
 
@@ -709,7 +711,7 @@ export class FusionRun {
                 Array.from(this._currentRunNonMatchedKeysBySource).map(([k, v]) => [k, Array.from(v)])
             ),
             fusionBlends: this.fusionBlends,
-            autoAssignedIds: Array.from(this._autoAssignedIdentityIds),
+            autoMergedIds: Array.from(this._autoMergedIdentityIds),
             matchScoringMs: this.matchScoringMs,
             phaseTimings: this.phaseTimings,
             managedAccountInventory: Object.fromEntries(this.managedAccountInventory),
@@ -759,9 +761,9 @@ export class FusionRun {
             this._currentRunNonMatchedKeysBySource.set(k, new Set(v))
         }
         this.fusionBlends = snapshot.fusionBlends as FusionReportBlend[]
-        this._autoAssignedIdentityIds.clear()
-        for (const id of snapshot.autoAssignedIds) {
-            this._autoAssignedIdentityIds.add(id)
+        this._autoMergedIdentityIds.clear()
+        for (const id of snapshot.autoMergedIds) {
+            this._autoMergedIdentityIds.add(id)
         }
         this.matchScoringMs = snapshot.matchScoringMs
         this.phaseTimings = snapshot.phaseTimings

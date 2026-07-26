@@ -98,8 +98,8 @@ async function scoreManagedAccounts(
 
         if (recordMatchingEnabled) {
             const excludeIds =
-                config.fusionEnableAutoAssignment && run.autoAssignedIdentityIds.size > 0
-                    ? run.autoAssignedIdentityIds
+                config.fusionEnableAutoMerge && run.autoMergedIdentityIds.size > 0
+                    ? run.autoMergedIdentityIds
                     : undefined
             const candidateSet = matchingService.getCandidates(fusionAccount, log, excludeIds)
             const identityPool: Iterable<FusionAccount> =
@@ -458,7 +458,7 @@ export class MatchOutcomeDispatcher {
                 return { account, fusionAccount, resolution: 'partial-match' }
             }
             const bestMatch = this.getBestAutoAssignMatch(fusionAccount.fusionMatches)
-            if (this.deps.config.fusionEnableAutoAssignment && bestMatch?.identityId) {
+            if (this.deps.config.fusionEnableAutoMerge && bestMatch?.identityId) {
                 const assigned = await this.handleExactMatch(fusionAccount, account, bestMatch.identityId)
                 return assigned
                     ? {
@@ -489,11 +489,11 @@ export class MatchOutcomeDispatcher {
     ): Promise<FusionAccount | undefined> {
         this.deps.run.removeMatchAccount(fusionAccount.managedAccountId)
         this.deps.log.debug(
-            `Account ${account.name} [${fusionAccount.sourceName}] meets the automatic assignment threshold, auto-assigning to identity ${identityId}`
+            `Account ${account.name} [${fusionAccount.sourceName}] meets the automatic merge threshold, auto-merging into identity ${identityId}`
         )
-        this.deps.run.markAutoAssigned(identityId)
-        this.deps.log.recordEvent('autoAssigned')
-        const syntheticDecision = this.deps.forms.createAutomaticAssignmentDecision(fusionAccount, account, identityId)
+        this.deps.run.markAutoMerged(identityId)
+        this.deps.log.recordEvent('autoMerged')
+        const syntheticDecision = this.deps.forms.createAutomaticMergeDecision(fusionAccount, account, identityId)
         this.deps.forms.registerFinishedDecision(syntheticDecision)
         return this.deps.decisionProcessor.processFusionIdentityDecision(syntheticDecision)
     }
@@ -578,13 +578,13 @@ export class MatchOutcomeDispatcher {
     }
 
     private getBestAutoAssignMatch(matches: import('./types').FusionMatch[]): import('./types').FusionMatch | undefined {
-        if (this.deps.config.fusionAutoAssignmentScore === undefined) return undefined
+        if (this.deps.config.fusionAutoMergeScore === undefined) return undefined
         let bestMatch: import('./types').FusionMatch | undefined
         let highestScore = -1
         for (const m of matches) {
             const combinedReport = m.scores.find((s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE)
             const score = combinedReport?.score ?? 0
-            if (score >= this.deps.config.fusionAutoAssignmentScore && score > highestScore) {
+            if (score >= this.deps.config.fusionAutoMergeScore && score > highestScore) {
                 highestScore = score
                 bestMatch = m
             }
@@ -613,6 +613,7 @@ function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 
             return 'nonMatch'
     }
 }
+
 
 
 

@@ -241,20 +241,20 @@ Combined = (85×80 + 90×90 + 70×75) / (80+90+75) ≈ 82.5
 ... [lean-ctx: omitted 1 lines]
 | **High false positives** | Many forms for obvious non-duplicates | Raise thresholds; add mandatory matches for critical attributes                                |
 | **High false negatives** | Missing obvious matches               | Lower thresholds; add more attributes; try different algorithms                                |
-| **Borderline cases**     | Many ambiguous matches                | Toggle **Enable automatic assignment** for obvious ones; manual review for borderline |
+| **Borderline cases**     | Many ambiguous matches                | Toggle **Enable automatic merge** for obvious ones; manual review for borderline |
 ... [lean-ctx: omitted 2 lines]
 <!-- PLACEHOLDER: Screenshot of review form showing per-attribute similarity scores. Save as docs/assets/images/matching-algorithms-scores-form.png -->
 ... [lean-ctx: omitted 1 lines]
-## Automatic assignment
+## Automatic merge
 ### When to use
-**Enable automatic assignment** = Yes
-**Effect:** Candidates whose combined score meets or exceeds the **Automatic assignment match score** threshold are assigned to that identity without manual review.
+**Enable automatic merge** = Yes
+**Effect:** Candidates whose combined score meets or exceeds the **Automatic merge match score** threshold are assigned to that identity without manual review.
 ... [lean-ctx: omitted 1 lines]
 | -------------------------------------- | --------------------------------------- |
 ... [lean-ctx: omitted 1 lines]
 | False positive rate is <5%             | High-risk merges (finance, healthcare)  |
 ... [lean-ctx: omitted 2 lines]
-**When it runs:** When **Enable automatic assignment** is enabled, the connector skips the review form when the candidate's combined score meets or exceeds the **Automatic assignment match score**.
+**When it runs:** When **Enable automatic merge** is enabled, the connector skips the review form when the candidate's combined score meets or exceeds the **Automatic merge match score**.
 ... [lean-ctx: omitted 1 lines]
 ## Common matching patterns
 ### Pattern 1: Conservative (high confidence only)
@@ -315,7 +315,7 @@ The rows below are **fictional** composites. **Source A** and **Source B** stand
 - **Source A:** Chris Johnson, `2000-09-15`, M
 ... [lean-ctx: omitted 1 lines]
 **Why it is ambiguous:** **Enhanced Name Matcher** is intended to relate common nickname ↔ legal pairs when comparing person-name attributes.
-**What to do:** Prefer **Enhanced Name Matcher** on `name` or `firstname`; add a second signal (DOB, email, employee ID) if automatic assignment must stay conservative.
+**What to do:** Prefer **Enhanced Name Matcher** on `name` or `firstname`; add a second signal (DOB, email, employee ID) if automatic merge must stay conservative.
 ### Multipart or cultural last-name variation
 - **Source A:** Maria De La Cruz, `1996-11-02`, F
 ... [lean-ctx: omitted 1 lines]
@@ -334,7 +334,7 @@ The rows below are **fictional** composites. **Source A** and **Source B** stand
 - **Source A:** Aisha Khan, `2001-05-18`, F — (no email, no phone on record)
 - **Source B:** Aisha Khan, `2001-05-18`, F — `aisha.khan@example.com`, `402-555-3333`
 ... [lean-ctx: omitted 1 lines]
-**What to do:** Keep strong non-skipped rules (name + DOB) where populated; document reviewer expectations; consider **Skip match if missing** = No only for attributes you intentionally want to penalize when absent, understanding side effects on combined score and automatic assignment.
+**What to do:** Keep strong non-skipped rules (name + DOB) where populated; document reviewer expectations; consider **Skip match if missing** = No only for attributes you intentionally want to penalize when absent, understanding side effects on combined score and automatic merge.
 ### Weak signal on a non-critical attribute
 - **Source A:** Daniel Carter, `daniel.carter@example.com`, Senior Engineer
 ... [lean-ctx: omitted 1 lines]
@@ -386,6 +386,6 @@ Dates are notoriously poor candidates for pure string-matching algorithms due to
 2. **Use appropriate algorithms** — Names (Enhanced Name Matcher), short text (Jaro-Winkler), long text (Dice), phonetic (Double Metaphone)
 ... [lean-ctx: omitted 2 lines]
 5. **Balance precision and recall** — Lower thresholds catch more matches but increase false positives
-6. **Consider automatic assignment** — Enable after tuning to reduce manual review burden
+6. **Consider automatic merge** — Enable after tuning to reduce manual review burden
 ... [lean-ctx: omitted 3 lines]
 

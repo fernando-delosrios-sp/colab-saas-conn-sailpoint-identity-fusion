@@ -72,7 +72,7 @@ type RuleScoreTotals = {
 export class MatchingService {
     private readonly matchingConfigs: MatchingConfig[]
     private readonly fusionManualReviewScore: number
-    private readonly fusionEnableAutoAssignment: boolean
+    private readonly fusionEnableAutoMerge: boolean
     private readonly fusionMaxIdentityMatchCandidates: number
     private readonly fusionScoreMap: Map<string, number>
     private _captureBreakdown = false
@@ -85,7 +85,7 @@ export class MatchingService {
     constructor(config: FusionConfig, _log: LogService, private run?: FusionRun) {
         this.matchingConfigs = config.matchingConfigs ?? []
         this.fusionManualReviewScore = config.fusionManualReviewScore ?? 0
-        this.fusionEnableAutoAssignment = config.fusionEnableAutoAssignment ?? false
+        this.fusionEnableAutoMerge = config.fusionEnableAutoMerge ?? false
         this.fusionMaxIdentityMatchCandidates = config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
         this.fusionScoreMap = config.fusionScoreMap ?? new Map()
     }
@@ -300,11 +300,11 @@ export class MatchingService {
         // false positives (empty scores would otherwise mark every identity as a match).
         if (this.matchingConfigs.length === 0) return 0
 
-        // When exact-match automatic assignment is enabled, there is no benefit in
+        // When exact-match automatic merge is enabled, there is no benefit in
         // continuing to score after a perfect match is found: the first exact match
         // wins and all subsequent comparisons would be discarded. Early exit here
         // avoids O(n) identity comparisons for every exact-match account.
-        const earlyExitOnExactMatch = this.fusionEnableAutoAssignment && candidateType === MatchCandidateType.Identity
+        const earlyExitOnExactMatch = this.fusionEnableAutoMerge && candidateType === MatchCandidateType.Identity
         const maxIdentity =
             candidateType === MatchCandidateType.Identity
                 ? (maxIdentityMatches ?? this.fusionMaxIdentityMatchCandidates)

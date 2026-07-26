@@ -38,6 +38,30 @@ describe('OperationRunContext', () => {
         expect(flushed.correlationTriggers).toBe(2)
         expect(flushed.correlationAccounts).toBe(5)
     })
+
+    it('increments refreshedCount', () => {
+        const ctx = new OperationRunContext()
+        expect(ctx.refreshedCount).toBe(0)
+        ctx.incrementRefreshedCount()
+        ctx.incrementRefreshedCount()
+        expect(ctx.refreshedCount).toBe(2)
+    })
+
+    it('tracks cumulative outcomes separately from flushed tick counters', () => {
+        const ctx = new OperationRunContext()
+        ctx.recordEvent('nonMatch')
+        ctx.recordEvent('autoMerged')
+        ctx.recordEvent('formsQueued')
+
+        const flushed = ctx.flushEventCounters()
+        expect(flushed.nonMatch).toBe(1)
+        expect(flushed.autoMerged).toBe(1)
+        expect(flushed.formsQueued).toBe(1)
+        expect(ctx.getCumulativeOutcomes()).toEqual({ nonMatch: 1, autoMerged: 1, formsQueued: 1 })
+
+        ctx.resetCumulativeOutcomes()
+        expect(ctx.getCumulativeOutcomes()).toEqual({ nonMatch: 0, autoMerged: 0, formsQueued: 0 })
+    })
 })
 
 describe('LogService operation helpers', () => {
@@ -58,4 +82,20 @@ describe('LogService operation helpers', () => {
         expect(mockLogger.info).toHaveBeenCalledWith('[accountList] STEP uncorrelated-sweep START accounts=10')
         expect(ctx.progress).toEqual({ done: 3, total: 10, unit: 'analyzed' })
     })
+
+    it('records refreshed accounts only during Refresh phase', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, operationContext: 'accountList' })
+        const ctx = new OperationRunContext()
+        log.bindRunContext(ctx)
+
+        ctx.phase = 'Process'
+        log.recordRefreshedAccount()
+        expect(ctx.refreshedCount).toBe(0)
+
+        ctx.phase = 'Refresh'
+        log.recordRefreshedAccount()
+        log.recordRefreshedAccount()
+        expect(ctx.refreshedCount).toBe(2)
+    })
 })
+

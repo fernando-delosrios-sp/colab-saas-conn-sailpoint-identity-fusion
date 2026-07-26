@@ -20,7 +20,7 @@ import {
     PendingReviewAccountContext,
 } from './types'
 import { defaultFusionMaxCandidatesForForm, internalConfig } from '../../data/config'
-import { createAutomaticAssignmentDecision, resolveIdentitiesSelectLabel } from './helpers'
+import { createAutomaticMergeDecision, resolveIdentitiesSelectLabel } from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 import {
     createFusionDecision,
@@ -43,7 +43,7 @@ export type { PendingReviewFormContext,  PendingReviewAccountContext } from './t
  */
 export class FormService {
     private readonly formDeleteQueueConcurrency = 1
-    private fusionAssignmentDecisionMap: Map<string, FusionDecision> = new Map()
+    private fusionMergeDecisionMap: Map<string, FusionDecision> = new Map()
     /** Pending (unanswered) form instance URLs by recipient identityId, populated during fetchFormData. */
     private _pendingReviewContextByAccountId: Map<
         string,
@@ -170,7 +170,7 @@ export class FormService {
 
     private resetFormDataState(): void {
         this.run.clearDecisions()
-        this.fusionAssignmentDecisionMap = new Map()
+        this.fusionMergeDecisionMap = new Map()
         this.run.clearReviewUrls()
         this._pendingReviewContextByAccountId = new Map()
         this._finishedFusionDecisions = []
@@ -608,6 +608,11 @@ export class FormService {
             return
         }
 
+        if (this.run.isDryRunMode) {
+            this.log.debug(`Skipping review email for form ${formInstance.id} — dry-run mode`)
+            return
+        }
+
         if (hasPreviousInstance) {
             this.log.debug(
                 `Previous instance existed for reviewer ${reviewerId}; still sending review email for new instance ${formInstance.id}`
@@ -679,16 +684,16 @@ export class FormService {
     }
 
     /**
-     * Builds a synthetic fusion decision for automatic assignment (exact match).
+     * Builds a synthetic fusion decision for automatic merge (exact match).
      * This is the FormService-owned entry point so callers depend on the service,
      * not on the helper function directly.
      */
-    public createAutomaticAssignmentDecision(
+    public createAutomaticMergeDecision(
         fusionAccount: FusionAccount,
         account: Account,
         identityId: string
     ): FusionDecision {
-        return createAutomaticAssignmentDecision(fusionAccount, account, identityId)
+        return createAutomaticMergeDecision(fusionAccount, account, identityId)
     }
 
     /**
@@ -703,10 +708,10 @@ export class FormService {
     }
 
     /**
-     * Get assignment fusion decision for an identity ID
+     * Get merge fusion decision for an identity ID
      */
-    public getFusionAssignmentDecision(identityId: string): FusionDecision | undefined {
-        return this.fusionAssignmentDecisionMap.get(identityId)
+    public getFusionMergeDecision(identityId: string): FusionDecision | undefined {
+        return this.fusionMergeDecisionMap.get(identityId)
     }
 
     /**
@@ -943,7 +948,7 @@ export class FormService {
      */
     private async processFusionFormInstances(formInstances: FormInstanceResponseV2025[]): Promise<void> {
         assert(Array.isArray(this.run.fusionIdentityDecisions), 'Fusion identity decisions array is not initialized')
-        assert(this.fusionAssignmentDecisionMap, 'Fusion assignment decision map is not initialized')
+        assert(this.fusionMergeDecisionMap, 'Fusion merge decision map is not initialized')
         assert(formInstances, 'Form instances array is required')
 
         const processingResult = this.analyzeFormInstances(formInstances)
@@ -1185,7 +1190,7 @@ export class FormService {
             if (decision.finished) {
                 this.registerFinishedDecision(decision, decision.newIdentity)
                 if (!decision.newIdentity) {
-                    this.fusionAssignmentDecisionMap!.set(decision.identityId!, decision)
+                    this.fusionMergeDecisionMap!.set(decision.identityId!, decision)
                 }
 
                 decisionsAdded++
@@ -1200,7 +1205,7 @@ export class FormService {
      * Log fusion decision details
      */
     private logFusionDecision(decision: FusionDecision): void {
-        const decisionType = decision.newIdentity ? 'new identity' : `link to ${decision.identityId}`
+        const decisionType = decision.newIdentity ? 'new identity' : `merge to ${decision.identityId}`
         this.log.debug(
             `Processed fusion decision for account ${decision.account.id}, reviewer ${decision.submitter.id}, ` +
                 `decision: ${decisionType}`
@@ -1248,7 +1253,7 @@ export class FormService {
             body: {
                 name: formName,
                 description:
-                    'Review potential matching identity and decide whether to create a new identity or link to an existing one',
+                    'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
                 owner,
                 formElements: formFields,
                 formInput: formInputs,

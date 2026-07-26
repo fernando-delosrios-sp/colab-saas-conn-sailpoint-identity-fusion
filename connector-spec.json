@@ -741,7 +741,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Matching Settings",
-                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><ul><li><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.</li><li><strong>Thresholds & weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.</li><li><strong>Auto-assignment:</strong> Optionally bypass manual review and automatically assign the managed account to a matched identity if the combined score meets or exceeds your defined automatic assignment threshold.</li></ul>",
+                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><ul><li><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.</li><li><strong>Thresholds & weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.</li><li><strong>Automatic merge:</strong> Optionally bypass manual review and automatically merge the managed account into the matched Fusion identity if the combined score meets or exceeds your defined automatic merge threshold.</li></ul>",
                     "items": [
                         {
                             "key": "fusionManualReviewScore",
@@ -751,20 +751,20 @@
                             "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match. Mandatory rules must still meet their own minimums."
                         },
                         {
-                            "key": "fusionEnableAutoAssignment",
-                            "label": "Enable automatic assignment",
+                            "key": "fusionEnableAutoMerge",
+                            "label": "Enable automatic merge",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "When enabled, assign the managed account to the matched identity without a review form if the combined score meets or exceeds the automatic assignment match score. Merge and correlation behave like a link-to-existing review, but the fusion account receives the Auto status entitlement only (not Authorized)."
+                            "helpKey": "When enabled, merge the managed account into the matched Fusion identity without a review form if the combined score meets or exceeds the automatic merge match score. Merge and correlation behave like a merge-with-existing review, but the fusion account receives the Auto status entitlement only (not Authorized)."
                         },
                         {
-                            "key": "fusionAutoAssignmentScore",
-                            "label": "Automatic assignment match score [0-100]",
+                            "key": "fusionAutoMergeScore",
+                            "label": "Automatic merge match score [0-100]",
                             "type": "number",
                             "required": true,
-                            "parentKey": "fusionEnableAutoAssignment",
+                            "parentKey": "fusionEnableAutoMerge",
                             "parentValue": "true",
-                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically assigned. Must be greater than the manual review score. If this condition is not met, the connector will fail to initialize with a configuration error."
+                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically merged. Must be greater than the manual review score. If this condition is not met, the connector will fail to initialize with a configuration error."
                         },
                         {
                             "key": "matchingConfigs",

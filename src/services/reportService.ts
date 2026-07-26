@@ -37,11 +37,11 @@ const toReportDecision = (
         ? isNoMatchSource
             ? 'confirm-no-match'
             : 'create-new-identity'
-        : 'assign-existing-identity'
+        : 'merge-existing-identity'
 
     const decisionLabel =
-        decisionType === 'assign-existing-identity'
-            ? 'Assigned to existing identity'
+        decisionType === 'merge-existing-identity'
+            ? 'Merged into existing identity'
             : decisionType === 'create-new-identity'
               ? 'Created new identity'
               : 'Confirmed no match'
@@ -82,7 +82,7 @@ const toReportDecision = (
         selectedIdentityUrl: selectedIdentityContext.selectedIdentityUrl,
         comments: decision.comments || undefined,
         formUrl: decision.formUrl || undefined,
-        automaticAssignment: decision.automaticAssignment === true ? true : undefined,
+        automaticMerge: decision.automaticMerge === true ? true : undefined,
     }
 }
 
@@ -605,5 +605,6 @@ export class ReportService {
         }
     }
 }
+
 
 

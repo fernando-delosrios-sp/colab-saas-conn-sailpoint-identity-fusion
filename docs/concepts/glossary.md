@@ -48,7 +48,7 @@ This page defines the canonical terms used throughout the connector, its configu
 |------|------------|
 | **Map** | Merging attributes from one or more managed source accounts into a single Fusion account schema. |
 | **Define** | Computing new attributes (normal attributes) and generating persistent unique attributes (UUIDs, counters, disambiguated values) using Apache Velocity templates. |
-| **Match** | The product step that determines whether a Fusion account corresponds to an existing identity, using scoring and optional automatic assignment or manual review. |
+| **Match** | The product step that determines whether a Fusion account corresponds to an existing identity, using scoring and optional automatic merge or manual review. |
 
 ## Entitlement system
 
@@ -76,8 +76,8 @@ Fusion accounts carry two kinds of entitlements, distinguished by how they are a
 | **Baseline** | `baseline` | The identity existed before this Fusion source aggregation and is included as a comparison point during Match. |
 | **Non-matched** | `nonMatched` | A managed source account completed the Match step without finding any acceptable identity candidate. |
 | **Orphan** | `orphan` | A Fusion account that no longer has any contributing managed source accounts. |
-| **Authorized** | `authorized` | A managed source account was manually correlated to an identity by a reviewer. |
-| **Auto** | `auto` | A managed source account was automatically assigned to an identity after an exact attribute match (all rules scored 100). |
+| **Authorized** | `authorized` | A managed source account was manually merged into an existing Fusion identity by a reviewer. |
+| **Auto** | `auto` | A managed source account was automatically merged into an existing Fusion identity after an exact attribute match (all rules scored 100). |
 | **Manual** | `manual` | A new Fusion account was manually approved by a reviewer. |
 | **Reviewer** | `reviewer` | The identity is a Match reviewer for one or more managed sources. Set alongside the `reviewer:<sourceId>` action entitlement. |
 | **Requested** | `requested` | The account was requested (created via provisioning). |
@@ -88,9 +88,9 @@ Fusion accounts carry two kinds of entitlements, distinguished by how they are a
 
 | Term | Definition |
 |------|------------|
-| **Reviewer** | A person who reviews identity candidates presented in a Fusion review form and decides whether a Fusion account should link to an existing identity or create a new one. A reviewer's Fusion identity carries the `reviewer` status entitlement and one or more `reviewer:<sourceId>` action entitlements. |
-| **Review form** | An ISC form instance presented to reviewers showing identity candidates and their attribute values, with options to link to an existing identity or create a new one. |
-| **FusionDecision** | A reviewer's decision on a review form. Contains the chosen outcome (link to existing identity or create new identity), the submitter, comments, and whether the decision is finished. |
+| **Reviewer** | A person who reviews identity candidates presented in a Fusion review form and decides whether a Fusion account should merge with an existing identity or create a new one. A reviewer's Fusion identity carries the `reviewer` status entitlement and one or more `reviewer:<sourceId>` action entitlements. |
+| **Review form** | An ISC form instance presented to reviewers showing identity candidates and their attribute values, with options to merge with an existing identity or create a new one. |
+| **FusionDecision** | A reviewer's decision on a review form. Contains the chosen outcome (merge with existing identity or create new identity), the submitter, comments, and whether the decision is finished. |
 | **Manual review workflow** | The process flow: potential matches are identified → review forms are created with top candidates → reviewers evaluate and decide → decisions are applied by the connector on the next account aggregation. |
 | **Global reviewer** | A reviewer automatically added to all review forms regardless of source. Controlled by **Owners are global reviewers?** in Review Settings. When enabled, Fusion source owners and members of the source governance group are added as reviewers on every form. |
 | **Form attributes** | The Fusion account attributes displayed on the review form to help reviewers compare candidates. Configured in **Review Settings → List of Fusion account attributes to include in form**. |
@@ -104,8 +104,10 @@ Fusion accounts carry two kinds of entitlements, distinguished by how they are a
 | **Scoring** | The similarity-calculation method used by matching to compare attribute values. |
 | **Combined match score** | The weighted mean of evaluated rule similarities used to decide whether a candidate is a potential match. |
 | **Potential match** | A candidate whose combined match score meets or exceeds the configured threshold and whose mandatory rules pass. |
-| **Automatic assignment** | The decision to link a matched Fusion account to a specific identity without manual review when the combined score meets the automatic assignment threshold. |
-| **Match outcome dispatch** | The routing of a scored managed source account to one of four outcomes (exact match, partial match, deferred match, or non-match) and the application of the resulting action. Implemented by `MatchOutcomeDispatcher` in `src/services/matchingService/`. |
+| **Merge** | The Match outcome where a managed source account (via its provisional Fusion account) is combined with an existing Fusion identity rather than creating a new identity. |
+| **Manual merge** | A merge decided by a reviewer on a review form. Sets the `authorized` status entitlement. |
+| **Automatic merge** | A merge applied without review when the combined score meets the automatic merge threshold. Sets the `auto` status entitlement. |
+| **Match outcome dispatch** | The routing of a scored managed source account to one of four outcomes (exact match, partial match, deferred match, or non-match) and the application of the resulting action (automatic merge, review-form creation, deferred claim, or non-match registration). Implemented by `MatchOutcomeDispatcher` in `src/services/matchingService/`. |
 
 ### Matching nuances
 
@@ -116,7 +118,7 @@ Fusion accounts carry two kinds of entitlements, distinguished by how they are a
 | **Skip match if missing** | When enabled on a matching rule, the rule is excluded from the combined score if the attribute is absent from either side of the comparison. |
 | **Skip match if threshold not met** | When enabled on a matching rule, the rule contributes a zero-weighted score but does not disqualify the candidate if its individual threshold is not met. |
 | **Manual review match score** | The minimum combined match score (0–100) required for a candidate to enter manual review. Candidates scoring below this threshold but above any lower cutoff are non-matched. |
-| **Automatic assignment match score** | The minimum combined match score (0–100) above which a candidate is automatically linked to an identity without manual review. Requires **Enable automatic assignment** to be on. |
+| **Automatic merge match score** | The minimum combined match score (0–100) above which a candidate is automatically merged to an identity without manual review. Requires **Enable automatic merge** to be on. |
 | **Maximum candidates per review form** | The maximum number of identity candidates displayed on a single review form. Configured in Review Settings. |
 
 ### Matching algorithms
@@ -193,7 +195,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Normal Attribute Definitions** | The section defining Velocity expressions that compute Fusion account attributes. Runs on every aggregation; supports static (one-time) or refreshable evaluation. |
 | **Unique Attribute Definitions** | The section defining Velocity expressions that generate values guaranteed unique across all Fusion accounts. Uses collision-based disambiguation or incremental counters. |
 | **Attribute Matching Settings** | The top-level configuration menu for the Match step. Contains Matching Settings and Review Settings. |
-| **Matching Settings** | The section configuring per-attribute matching rules (algorithm, threshold, weight, mandatory, skip flags), the manual review score threshold, and automatic assignment. |
+| **Matching Settings** | The section configuring per-attribute matching rules (algorithm, threshold, weight, mandatory, skip flags), the manual review score threshold, and automatic merge. |
 | **Review Settings** | The section configuring the manual review workflow: form attributes, form expiration, maximum candidates per form, and global reviewer behavior. |
 | **Advanced Settings** | The top-level configuration menu for developer and integration settings. Contains Developer Settings, Advanced Connection Settings, and Proxy Settings. |
 | **Developer Settings** | The section for operation tuning: provisioning timeout, batch size, processing wait, priority processing, concurrency checks, forced refresh, and account reset. |
@@ -244,6 +246,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Golden artifact** | A pre-validated expected output file (e.g., `output.sweep1.expected.json`) used as the reference for automated test comparison. Generated artifacts are compared against golden artifacts to detect regressions. |
 | **Sweep** (testing) | A single aggregation run within a test scenario. Multi-sweep scenarios (sweep 1, sweep 2) validate stateful behavior across sequential aggregations. |
 | **Side effects** | Non-account changes produced during an aggregation run (e.g., form creation, correlation API calls). Captured in side-effect files for test validation. |
+
 
 
 

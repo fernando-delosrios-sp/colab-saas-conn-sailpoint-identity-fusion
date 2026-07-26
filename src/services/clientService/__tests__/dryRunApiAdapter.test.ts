@@ -72,9 +72,18 @@ describe('DryRunApiAdapter', () => {
         const adapter = new DryRunApiAdapter(createInnerMock())
         const formsApi = adapter.customFormsApi as any
 
-        const response = await formsApi.createFormInstance({ formDefinitionId: 'def-1', body: {} })
+        const response = await formsApi.createFormInstance({
+            body: {
+                formDefinitionId: 'def-1',
+                recipients: [{ id: 'reviewer-1', type: 'IDENTITY' }],
+                formInput: { accountId: 'acct-1' },
+            },
+        })
 
         expect(response.data.id).toMatch(/^dryrun-[a-f0-9]{16}$/)
+        expect(response.data.formDefinitionId).toBe('def-1')
+        expect(response.data.recipients).toEqual([{ id: 'reviewer-1', type: 'IDENTITY' }])
+        expect(response.data.formInput).toEqual({ accountId: 'acct-1' })
     })
 
     it('exposes all 12 IscApiAdapter getters', () => {
@@ -107,3 +116,4 @@ describe('DryRunApiAdapter', () => {
         expect(writeEntries).toHaveLength(0)
     })
 })
+

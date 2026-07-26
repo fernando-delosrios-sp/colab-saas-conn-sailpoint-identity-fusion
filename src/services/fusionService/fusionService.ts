@@ -489,7 +489,7 @@ export class FusionService {
             this.populateReviewerFusionReviewsFromPending(fusionAccount)
         }
 
-        let authorizedLinkDecision: FusionDecision | undefined
+        let mergeDecision: FusionDecision | undefined
         // Apply the identity layer whenever the fusion account references an identity and we have
         // that document in scope. Platform `uncorrelated` on the fusion Account means pending
         // managed-account correlation work, not "ignore the identity" — skipping the layer left
@@ -505,9 +505,9 @@ export class FusionService {
             // buildIdentityInfo when account.identityId is set, or from the persisted
             // attributes.identityId attribute otherwise. No re-registration is needed here.
 
-            authorizedLinkDecision = this.forms.getFusionAssignmentDecision(identityId)
-            if (authorizedLinkDecision) {
-                fusionAccount.addFusionDecisionLayer(authorizedLinkDecision)
+            mergeDecision = this.forms.getFusionMergeDecision(identityId)
+            if (mergeDecision) {
+                fusionAccount.addFusionDecisionLayer(mergeDecision)
             }
             this.log.debug(`Applied identity layer for ${fusionAccount.name}: identityId=${identityId}`)
         }
@@ -516,8 +516,8 @@ export class FusionService {
         // do not append the generic "Blended managed account …" for that same managed key
         // (persisted accounts list can lag identity until the next account write).
         let skipBlendHistoryForManagedKeys: ReadonlySet<string> | undefined
-        if (authorizedLinkDecision) {
-            const rawKey = trimStr(authorizedLinkDecision.account.id) ?? ''
+        if (mergeDecision) {
+            const rawKey = trimStr(mergeDecision.account.id) ?? ''
             const normalized = normalizeCompositeManagedAccountKey(rawKey)
             if (normalized) {
                 skipBlendHistoryForManagedKeys = new Set([normalized])
@@ -556,10 +556,14 @@ export class FusionService {
         )
         fusionAccount.setNeedsReset(resetDefinition)
 
+        if (fusionAccount.needsRefresh) {
+            this.log.recordRefreshedAccount()
+        }
+
         await this.accountAssembly.applyAttributeProcessing(fusionAccount)
 
         // Per-source correlation for missing accounts during aggregation
-        await this.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, authorizedLinkDecision)
+        await this.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, mergeDecision)
 
         // Sync _uncorrelated flag with actual _missingAccountIds state so that
         // setFusionAccount routes the account to the correct map (identity-linked
@@ -1334,8 +1338,8 @@ export class FusionService {
                 reportAttributes: this.reportAttributes,
                 fusionIdentityComparisonsByAccount: tracker.fusionIdentityComparisonsByAccount,
                 sources: this.sources,
-                fusionEnableAutoAssignment: this.config.fusionEnableAutoAssignment,
-                fusionAutoAssignmentScore: this.config.fusionAutoAssignmentScore,
+                fusionEnableAutoMerge: this.config.fusionEnableAutoMerge,
+                fusionAutoMergeScore: this.config.fusionAutoMergeScore,
             },
             includeNonMatches,
             stats

@@ -23,14 +23,14 @@ export class CorrelationManager {
      * - `reverse`: Set the dedicated Fusion attribute to the first missing account name
      * - `none`: Skip correlation
      *
-     * `authorizedLinkDecision` (link-to-existing form outcome): when managed-account metadata is
+     * `mergeDecision` (link-to-existing form outcome): when managed-account metadata is
      * missing for the assigned account id, `decision.account.sourceName` supplies the source for
      * the correlate check so aggregation still PATCHes when that source is `correlationMode: correlate`.
      * All other missing rows still follow `getManagedAccountInfo` + per-source mode only.
      */
     private async correlatePerSource(
         fusionAccount: FusionAccount,
-        authorizedLinkDecision?: FusionDecision,
+        mergeDecision?: FusionDecision,
         forceDirectCorrelation: boolean = false
     ): Promise<void> {
         const missingIds = fusionAccount.missingAccountIds
@@ -52,9 +52,9 @@ export class CorrelationManager {
 
         // Recovery path: if decision payload has source context but account metadata is missing
         // from the managed-account map, still include that assigned key for direct correlation.
-        if (authorizedLinkDecision && !authorizedLinkDecision.newIdentity && canDirectCorrelate) {
-            const assignedKey = authorizedLinkDecision.account.id
-            const assignedSource = authorizedLinkDecision.account.sourceName
+        if (mergeDecision && !mergeDecision.newIdentity && canDirectCorrelate) {
+            const assignedKey = mergeDecision.account.id
+            const assignedSource = mergeDecision.account.sourceName
             if (
                 assignedKey &&
                 assignedSource &&
@@ -83,11 +83,11 @@ export class CorrelationManager {
      */
     public async applyPerSourceCorrelationIfNeeded(
         fusionAccount: FusionAccount,
-        authorizedLinkDecision?: FusionDecision
+        mergeDecision?: FusionDecision
     ): Promise<void> {
         if (!this.isAggregationMode()) return
         if (fusionAccount.missingAccountIdsSet.size === 0) return
-        await this.correlatePerSource(fusionAccount, authorizedLinkDecision)
+        await this.correlatePerSource(fusionAccount, mergeDecision)
     }
 
     /**

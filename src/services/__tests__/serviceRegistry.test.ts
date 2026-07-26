@@ -26,6 +26,7 @@ describe('ServiceRegistry.activateDryRunMode', () => {
 
         registry.activateDryRunMode()
 
+        expect(registry.run.isDryRunMode).toBe(true)
         expect(wrapSpy).toHaveBeenCalledTimes(1)
         const wrapFn = wrapSpy.mock.calls[0][0]
         const inner = { config: {} as any } as IscApiAdapter
@@ -74,3 +75,4 @@ describe('ServiceRegistry.activateDryRunMode', () => {
         expect(inner.accountsApi.updateAccount).not.toHaveBeenCalled()
     })
 })
+

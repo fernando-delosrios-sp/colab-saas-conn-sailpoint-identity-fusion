@@ -22,8 +22,8 @@ describe('FusionRun', () => {
         expect(run.identityMap.size).toBe(0)
         expect(run.sourcesByName).toBeInstanceOf(Map)
         expect(run.sourcesByName.size).toBe(0)
-        expect(run.autoAssignedIdentityIds).toBeInstanceOf(Set)
-        expect(run.autoAssignedIdentityIds.size).toBe(0)
+        expect(run.autoMergedIdentityIds).toBeInstanceOf(Set)
+        expect(run.autoMergedIdentityIds.size).toBe(0)
         expect(run.fusionIdentityDecisions.length).toBe(0)
         expect(run.fusionBlends).toEqual([])
         expect(run.matchScoringMs).toBe(0)
@@ -69,11 +69,11 @@ describe('FusionRun', () => {
 
     it('tracks auto-assigned identity IDs', () => {
         const run = new FusionRun()
-        run.markAutoAssigned('id-1')
-        run.markAutoAssigned('id-2')
-        expect(run.isAutoAssigned('id-1')).toBe(true)
-        expect(run.isAutoAssigned('id-2')).toBe(true)
-        expect(run.isAutoAssigned('id-3')).toBe(false)
+        run.markAutoMerged('id-1')
+        run.markAutoMerged('id-2')
+        expect(run.isAutoMerged('id-1')).toBe(true)
+        expect(run.isAutoMerged('id-2')).toBe(true)
+        expect(run.isAutoMerged('id-3')).toBe(false)
     })
 
     it('fusionAccountsIterable yields registered accounts without copying the map', () => {
@@ -222,17 +222,17 @@ describe('FusionRun', () => {
         expect(snap.managedAccounts).toHaveLength(1)
         expect(snap.fusionAccounts).toHaveLength(1)
         expect(snap.matchScoringMs).toBe(1500)
-        expect(snap.autoAssignedIds).toEqual([])
+        expect(snap.autoMergedIds).toEqual([])
         expect(JSON.stringify(snap)).toBeTruthy()
     })
 
     it('snapshot captures auto-assigned IDs', () => {
         const run = new FusionRun()
-        run.markAutoAssigned('id-a')
-        run.markAutoAssigned('id-b')
+        run.markAutoMerged('id-a')
+        run.markAutoMerged('id-b')
 
         const snap = run.snapshot()
-        expect(snap.autoAssignedIds).toEqual(expect.arrayContaining(['id-a', 'id-b']))
+        expect(snap.autoMergedIds).toEqual(expect.arrayContaining(['id-a', 'id-b']))
     })
 
     it('snapshot captures form processing state', () => {
@@ -259,7 +259,7 @@ describe('FusionRun', () => {
             sourcesByName: {},
             currentRunNonMatchedKeysBySource: {},
             fusionBlends: [],
-            autoAssignedIds: ['id-a'],
+            autoMergedIds: ['id-a'],
             matchScoringMs: 2500,
             phaseTimings: [{ phase: 'Setup', elapsed: '1.2s' }],
         }
@@ -271,7 +271,7 @@ describe('FusionRun', () => {
         expect(run.fusionAccountMap.size).toBe(1)
         expect(run.identityMap.size).toBe(1)
         expect(run.matchScoringMs).toBe(2500)
-        expect(run.autoAssignedIdentityIds.has('id-a')).toBe(true)
+        expect(run.autoMergedIdentityIds.has('id-a')).toBe(true)
         expect(run.phaseTimings).toEqual([{ phase: 'Setup', elapsed: '1.2s' }])
     })
 
@@ -293,7 +293,7 @@ describe('FusionRun', () => {
             sourcesByName: { 'Source A': sourceInfo as any },
             currentRunNonMatchedKeysBySource: {},
             fusionBlends: [],
-            autoAssignedIds: [],
+            autoMergedIds: [],
             matchScoringMs: 0,
             phaseTimings: [],
         }

@@ -14,39 +14,41 @@ export const connectorSpecInitialValues = {
 } as const
 
 export const runtimeDefaults = {
-    fusionEnableAutoAssignment: false,
+    fusionEnableAutoMerge: false,
     fusionManualReviewScore: connectorSpecInitialValues.fusionManualReviewScore,
 } as const
 
 export function readSettings(raw: Record<string, unknown>): MatchingSettingsSection & { fusionScoreMap: Map<string, number> } {
     migrateConfigKey(raw, 'fusionAverageScore', 'fusionManualReviewScore')
-    migrateConfigKey(raw, 'fusionMergingExactMatch', 'fusionEnableAutoAssignment')
+    migrateConfigKey(raw, 'fusionMergingExactMatch', 'fusionEnableAutoMerge')
+    migrateConfigKey(raw, 'fusionEnableAutoAssignment', 'fusionEnableAutoMerge')
+    migrateConfigKey(raw, 'fusionAutoAssignmentScore', 'fusionAutoMergeScore')
 
     const matchingConfigs = (raw.matchingConfigs as MatchingConfig[]) ?? []
-    const fusionEnableAutoAssignment = extractBoolean(raw, 'fusionEnableAutoAssignment') ?? runtimeDefaults.fusionEnableAutoAssignment
+    const fusionEnableAutoMerge = extractBoolean(raw, 'fusionEnableAutoMerge') ?? runtimeDefaults.fusionEnableAutoMerge
     const fusionManualReviewScore = (raw.fusionManualReviewScore as number | undefined) ?? runtimeDefaults.fusionManualReviewScore
-    const fusionAutoAssignmentScore = raw.fusionAutoAssignmentScore as number | undefined
+    const fusionAutoMergeScore = raw.fusionAutoMergeScore as number | undefined
 
     assert(
         fusionManualReviewScore >= 0 && fusionManualReviewScore <= 100,
         'Minimum score for manual review (fusionManualReviewScore) must be between 0 and 100'
     )
 
-    if (fusionAutoAssignmentScore !== undefined) {
+    if (fusionAutoMergeScore !== undefined) {
         assert(
-            fusionAutoAssignmentScore >= 0 && fusionAutoAssignmentScore <= 100,
-            'Automatic assignment match score (fusionAutoAssignmentScore) must be between 0 and 100'
+            fusionAutoMergeScore >= 0 && fusionAutoMergeScore <= 100,
+            'Automatic merge match score (fusionAutoMergeScore) must be between 0 and 100'
         )
     }
 
-    if (fusionEnableAutoAssignment) {
+    if (fusionEnableAutoMerge) {
         assert(
-            fusionAutoAssignmentScore !== undefined,
-            'Automatic assignment match score (fusionAutoAssignmentScore) is required when automatic assignment is enabled'
+            fusionAutoMergeScore !== undefined,
+            'Automatic merge match score (fusionAutoMergeScore) is required when automatic merge is enabled'
         )
         assert(
-            fusionAutoAssignmentScore! > fusionManualReviewScore,
-            'Automatic assignment match score (fusionAutoAssignmentScore) must be strictly greater than the minimum score for manual review (fusionManualReviewScore)'
+            fusionAutoMergeScore! > fusionManualReviewScore,
+            'Automatic merge match score (fusionAutoMergeScore) must be strictly greater than the minimum score for manual review (fusionManualReviewScore)'
         )
     }
 
@@ -74,9 +76,9 @@ export function readSettings(raw: Record<string, unknown>): MatchingSettingsSect
 
     return {
         matchingConfigs,
-        fusionEnableAutoAssignment,
+        fusionEnableAutoMerge,
         fusionManualReviewScore,
-        fusionAutoAssignmentScore,
+        fusionAutoMergeScore,
         fusionScoreMap,
     }
 }

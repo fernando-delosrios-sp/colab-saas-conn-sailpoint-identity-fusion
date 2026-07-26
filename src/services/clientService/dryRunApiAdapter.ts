@@ -4,6 +4,17 @@ import { isWriteMethod, stableApiCallKey, syntheticDryRunId } from './apiWriteCl
 
 type ShadowResponse = unknown
 
+function extractRequestBody(args: unknown[]): Record<string, unknown> | undefined {
+    const first = args[0]
+    if (!first || typeof first !== 'object') return undefined
+    const params = first as Record<string, unknown>
+    const body = params.body
+    if (body && typeof body === 'object') {
+        return body as Record<string, unknown>
+    }
+    return params
+}
+
 /**
  * Wraps a live SDK adapter and inhibits write API calls during dry-run aggregation.
  * Reads delegate to the inner adapter; writes return synthetic SDK-shaped responses
@@ -31,7 +42,16 @@ export class DryRunApiAdapter implements IscApiAdapter {
         if (lower.includes('formdefinition') || method === 'createFormDefinition') {
             response = { data: { id, name: `dry-run-form-${id}` } }
         } else if (lower.includes('forminstance') || method === 'createFormInstance') {
-            response = { data: { id, formDefinitionId: id, state: 'ASSIGNED' } }
+            const body = extractRequestBody(args)
+            response = {
+                data: {
+                    id,
+                    formDefinitionId: body?.formDefinitionId ?? id,
+                    state: 'ASSIGNED',
+                    recipients: body?.recipients ?? [],
+                    formInput: body?.formInput,
+                },
+            }
         } else if (lower.startsWith('delete')) {
             response = { data: undefined }
         } else if (lower.startsWith('update') || lower.startsWith('patch') || lower.startsWith('put')) {
@@ -98,3 +118,4 @@ export class DryRunApiAdapter implements IscApiAdapter {
         return this.createApiProxy('identityAttributes', this.inner.identityAttributesApi)
     }
 }
+
