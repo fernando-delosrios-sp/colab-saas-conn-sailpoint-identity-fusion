@@ -26,6 +26,14 @@ describe('parseDryRunInput', () => {
         expect(result?.sendEmail).toEqual(['a@example.com', 'b@example.com'])
     })
 
+    it('parses comma-separated sendEmail string into multiple recipients', () => {
+        const result = parseDryRunInput({
+            dryRun: { enabled: true, sendEmail: 'a@example.com, b@example.com' },
+        } as any)
+
+        expect(result?.sendEmail).toEqual(['a@example.com', 'b@example.com'])
+    })
+
     it('omits sendEmail when no valid recipients remain after sanitization', () => {
         const result = parseDryRunInput({
             dryRun: { enabled: true, sendEmail: ['', '   '] },
@@ -34,3 +42,4 @@ describe('parseDryRunInput', () => {
         expect(result?.sendEmail).toBeUndefined()
     })
 })
+

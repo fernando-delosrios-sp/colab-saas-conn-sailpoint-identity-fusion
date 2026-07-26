@@ -256,7 +256,7 @@ export class LogService {
         const startedAt = this.runContext?.stepStartedAt
         const elapsed =
             startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
-        this.info(`STEP ${step} END${elapsed}${formatDetailSuffix(detail)}`)
+        this.info(`STEP ${step} END${formatDetailSuffix(detail)}${elapsed}`)
         if (this.runContext) {
             this.runContext.stepStartedAt = undefined
         }
@@ -588,7 +588,7 @@ export class LogService {
     metric(name: string, startedAt: number, data?: Record<string, any>): void {
         const durationMs = Date.now() - startedAt
         const dataStr = data ? ' ' + Object.entries(data).map(([k, v]) => `${k}=${v}`).join(' ') : ''
-        this.info(`METRIC ${name} duration=${PhaseTimer.formatElapsed(durationMs)}${dataStr}`)
+        this.info(`METRIC ${name}${dataStr} duration=${PhaseTimer.formatElapsed(durationMs)}`)
     }
 
     getLogLevel(): LogLevel {
@@ -630,6 +630,7 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+
 
 
 

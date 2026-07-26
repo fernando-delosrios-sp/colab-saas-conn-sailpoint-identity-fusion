@@ -30,7 +30,6 @@
         "maxConcurrentRequests": 20,
         "parallelBatchSize": 12,
         "processingWait": 60,
-        "heartbeatInterval": 10,
         "externalLoggingLevel": "info",
         "scoringMaxConcurrency": 12,
         "proxyEnabled": false,

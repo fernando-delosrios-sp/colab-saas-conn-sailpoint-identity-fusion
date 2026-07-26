@@ -20,6 +20,15 @@ import { sanitizeRecipients } from './emailService/email'
 
 type DryRunStats = AggregationStats & FusionReportStats
 
+/** Fetch-phase counters passed from account-list orchestration into dry-run reports. */
+type FetchResultLike = {
+    identitiesFound?: number
+    managedAccountsFound?: number
+    managedAccountsFoundAuthoritative?: number
+    managedAccountsFoundRecord?: number
+    managedAccountsFoundOrphan?: number
+}
+
 const toReportDecision = (
     decision: FusionDecision,
     resolveSourceType?: (sourceName?: string) => SourceType | undefined,
@@ -374,16 +383,11 @@ export class ReportService {
 
     /** Initialize report for dry-run row streaming. */
     public initializeDryRunReport(args: {
-        fetchResult?: any
+        fetchResult?: FetchResultLike
         totalProcessingTime?: string
-        phaseTiming?: any
-    }): { report: FusionReport; stats: AggregationStats } {
-        const stats: AggregationStats = {
-            identitiesFound: args.fetchResult?.stats?.identitiesFound ?? 0,
-            managedAccountsFound: args.fetchResult?.stats?.totalManagedAccountsProcessed ?? 0,
-            totalProcessingTime: args.totalProcessingTime ?? '0s',
-            phaseTiming: args.phaseTiming,
-        }
+        phaseTiming?: AggregationStats['phaseTiming']
+    }): { report: FusionReport; stats: DryRunStats } {
+        const stats = this.buildDryRunStats(this.aggregationStatsFromFetchResult(args))
         const tracker = this.fusion.tracker
         const report = this.fusion.generateReport(tracker, false, stats)
         return { report, stats }
@@ -392,18 +396,13 @@ export class ReportService {
     /** Finalize and output dry-run report. */
     public async finalizeDryRunReport(args: {
         report: FusionReport
-        fetchResult?: any
+        fetchResult?: FetchResultLike
         totalProcessingTime?: string
-        phaseBreakdownThroughOutput?: any
+        phaseBreakdownThroughOutput?: AggregationStats['phaseTiming']
         saveFile?: boolean
         sendEmail?: string | string[]
     }): Promise<{ reportHtmlOutputPath?: string }> {
-        const finalDryRunStats: AggregationStats = {
-            identitiesFound: args.fetchResult?.stats?.identitiesFound ?? 0,
-            managedAccountsFound: args.fetchResult?.stats?.totalManagedAccountsProcessed ?? 0,
-            totalProcessingTime: args.totalProcessingTime ?? '0s',
-            phaseTiming: args.phaseBreakdownThroughOutput,
-        }
+        const finalDryRunStats = this.buildDryRunStats(this.aggregationStatsFromFetchResult(args))
         const { reportHtmlOutputPath } = await this.writeAndSendDryRunReport({
             report: args.report,
             finalDryRunStats,
@@ -434,7 +433,7 @@ export class ReportService {
 
         await this.hydrateIdentitiesForReportDecisions()
 
-        const report = this.fusion.generateReport(this.fusion.tracker, true, finalDryRunStats as any)
+        const report = this.fusion.generateReport(this.fusion.tracker, false, finalDryRunStats as any)
         report.fusionReviewDecisions = this.buildFusionReviewDecisions()
 
         const baseTiming = finalDryRunStats.phaseTiming ?? []
@@ -505,6 +504,25 @@ export class ReportService {
         report.fusionReviewDecisions = this.buildFusionReviewDecisions()
         await this.sendReport(report, 'fusion')
         this.identities.clear()
+    }
+
+    /** Map fetch-phase counters into AggregationStats for dry-run report rendering. */
+    private aggregationStatsFromFetchResult(args: {
+        fetchResult?: FetchResultLike
+        totalProcessingTime?: string
+        phaseTiming?: AggregationStats['phaseTiming']
+        phaseBreakdownThroughOutput?: AggregationStats['phaseTiming']
+    }): AggregationStats {
+        const fetchResult = args.fetchResult
+        return {
+            identitiesFound: fetchResult?.identitiesFound ?? 0,
+            managedAccountsFound: fetchResult?.managedAccountsFound ?? 0,
+            managedAccountsFoundAuthoritative: fetchResult?.managedAccountsFoundAuthoritative,
+            managedAccountsFoundRecord: fetchResult?.managedAccountsFoundRecord,
+            managedAccountsFoundOrphan: fetchResult?.managedAccountsFoundOrphan,
+            totalProcessingTime: args.totalProcessingTime ?? '0s',
+            phaseTiming: args.phaseBreakdownThroughOutput ?? args.phaseTiming,
+        }
     }
 
     /** Build normalized FusionReportStats structure from AggregationStats. */
@@ -605,6 +623,7 @@ export class ReportService {
         }
     }
 }
+
 
 
 
