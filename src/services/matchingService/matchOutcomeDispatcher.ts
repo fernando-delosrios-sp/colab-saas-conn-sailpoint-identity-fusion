@@ -192,7 +192,6 @@ export interface ApplyNonAuthoritativeNoMatchDeps {
     readonly definitionService: DefinitionService
     readonly mappingService: MappingService
     readonly run: FusionRun
-    readonly isPersistentRun?: () => boolean
 }
 
 /**
@@ -220,7 +219,7 @@ export async function applyNonAuthoritativeNoMatch(
         return true
     }
     if (sourceType === SourceType.Orphan) {
-        if (sourceInfo?.config?.disableNonMatchingAccounts && account && (deps.isPersistentRun?.() ?? true)) {
+        if (sourceInfo?.config?.disableNonMatchingAccounts && account) {
             deps.run.queueDisableOperation(account)
         }
         return true
@@ -244,7 +243,6 @@ export interface MatchOutcomeDispatcherDeps {
     readonly forms: FormService
     readonly decisionProcessor: DecisionProcessor
     readonly commandType?: StandardCommand
-    readonly isPersistentRun?: () => boolean
 }
 
 /**
@@ -253,10 +251,6 @@ export interface MatchOutcomeDispatcherDeps {
  */
 export class MatchOutcomeDispatcher {
     constructor(private readonly deps: MatchOutcomeDispatcherDeps) {}
-
-    private isPersistentRun(): boolean {
-        return this.deps.isPersistentRun?.() ?? true
-    }
 
     private runScoring(accounts: Account[], batchSize: number): Promise<ManagedAccountMatchingResult[]> {
         return scoreManagedAccounts(accounts, batchSize, {
@@ -493,13 +487,6 @@ export class MatchOutcomeDispatcher {
         account: Account,
         identityId: string
     ): Promise<FusionAccount | undefined> {
-        if (!this.isPersistentRun()) {
-            this.deps.log.debug(
-                `Skipping automatic assignment for non-persistent run: ${account.name} [${fusionAccount.sourceName}]`
-            )
-            fusionAccount.clearFusionIdentityReferences()
-            return fusionAccount
-        }
         this.deps.run.removeMatchAccount(fusionAccount.managedAccountId)
         this.deps.log.debug(
             `Account ${account.name} [${fusionAccount.sourceName}] meets the automatic assignment threshold, auto-assigning to identity ${identityId}`
@@ -517,13 +504,6 @@ export class MatchOutcomeDispatcher {
         account: Account
     ): Promise<void> {
         assert(sourceInfo, 'Source info not found')
-        if (!this.isPersistentRun()) {
-            this.deps.log.debug(
-                `Skipping review form creation for non-persistent run: ${account.name} [${fusionAccount.sourceName}]`
-            )
-            fusionAccount.clearFusionIdentityReferences()
-            return
-        }
         const reviewers = this.deps.run.reviewersBySourceId.get(sourceInfo.id!)
         try {
             const outcome = await this.deps.forms.createFusionForm(fusionAccount, reviewers)
@@ -633,6 +613,7 @@ function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 
             return 'nonMatch'
     }
 }
+
 
 
 

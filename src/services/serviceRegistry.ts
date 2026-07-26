@@ -9,6 +9,7 @@ import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
 import { IscApiAdapter } from './clientService/iscApiAdapter'
 import { RecordingApiAdapter, ApiLogEntry } from './clientService/recordingApiAdapter'
 import { ReplayApiAdapter, loadApiLog } from './clientService/replayApiAdapter'
+import { DryRunApiAdapter } from './clientService/dryRunApiAdapter'
 import { SourceService } from './sourceService'
 import { FusionService } from './fusionService'
 import { IdentityService } from './identityService'
@@ -58,6 +59,7 @@ export class ServiceRegistry {
     public matchOutcomeDispatcher: MatchOutcomeDispatcher
     public run: FusionRun
     public runContext: OperationRunContext
+    private readonly clientUsesInjection: boolean
 
     /**
      * Creates a new ServiceRegistry, initializing all services in dependency order.
@@ -81,6 +83,7 @@ export class ServiceRegistry {
         this.log.bindRunContext(this.runContext)
         this.run = new FusionRun(this.log, this.config)
         this.locks = context.lockService ?? new InMemoryLockService(this.log)
+        this.clientUsesInjection = !!context.connectionService
 
         if (context.connectionService) {
             this.client = context.connectionService
@@ -179,7 +182,6 @@ export class ServiceRegistry {
             forms: this.forms,
             decisionProcessor: this.fusion.decisionProcessor,
             commandType,
-            isPersistentRun: () => this.fusion.isPersistentRun(),
         })
         this.fusion.matchOutcomeDispatcher = this.matchOutcomeDispatcher
 
@@ -195,6 +197,18 @@ export class ServiceRegistry {
         )
 
         this.proxy = context.proxyService ?? new ProxyService(this.config, this.log, this.res, commandType)
+    }
+
+    /**
+     * Wraps the live client adapter with {@link DryRunApiAdapter} to inhibit tenant writes.
+     * Must be called after parsing dry-run input and before any account-list phase API calls.
+     */
+    activateDryRunMode(): void {
+        if (this.clientUsesInjection) {
+            return
+        }
+        this.client.wrapAdapter((inner) => new DryRunApiAdapter(inner))
+        this.log.info('DryRunApiAdapter enabled — ISC write calls inhibited for this run')
     }
 
     /**
@@ -262,6 +276,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

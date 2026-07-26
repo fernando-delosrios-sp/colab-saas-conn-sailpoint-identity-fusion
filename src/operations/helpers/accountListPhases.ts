@@ -89,7 +89,6 @@ export async function setupPhase(
     const forceAttributeRefresh = isPersistent && config.forceAttributeRefresh
 
     if (tracker) fusion.setTracker(tracker)
-    fusion.setPersistentRun(isPersistent)
 
     await sources.fetchAllSources(isPersistent)
     log.info(`Loaded ${sources.managedSources.length} managed source(s)`)
@@ -125,22 +124,20 @@ export async function setupPhase(
     }
     log.info('Fusion account schema set successfully')
 
-    if (isPersistent) {
-        sources.clearReverseCorrelationReadinessCache()
-        const reverseCorrelationOp = log.track('reverseCorrelationSetup')
-        const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
-        const reverseCorrelationCount = await sources.setupReverseCorrelationSources(schemaAttrNames)
-        if (reverseCorrelationCount > 0) {
-            await schemas.setFusionAccountSchema(undefined)
-            log.debug('Fusion account schema refreshed after reverse correlation setup')
-            log.info(`Reverse correlation setup completed for ${reverseCorrelationCount} source(s)`)
-            reverseCorrelationOp.done({ sources: reverseCorrelationCount })
-        }
-        const aggregateManagedSourcesOp = log.track('aggregateManagedSources')
-        await sources.aggregateManagedSources()
-        log.info('Managed sources aggregated')
-        aggregateManagedSourcesOp.done({ sources: sources.managedSources.length })
+    sources.clearReverseCorrelationReadinessCache()
+    const reverseCorrelationOp = log.track('reverseCorrelationSetup')
+    const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
+    const reverseCorrelationCount = await sources.setupReverseCorrelationSources(schemaAttrNames)
+    if (reverseCorrelationCount > 0) {
+        await schemas.setFusionAccountSchema(undefined)
+        log.debug('Fusion account schema refreshed after reverse correlation setup')
+        log.info(`Reverse correlation setup completed for ${reverseCorrelationCount} source(s)`)
+        reverseCorrelationOp.done({ sources: reverseCorrelationCount })
     }
+    const aggregateManagedSourcesOp = log.track('aggregateManagedSources')
+    await sources.aggregateManagedSources()
+    log.info('Managed sources aggregated')
+    aggregateManagedSourcesOp.done({ sources: sources.managedSources.length })
 
     await definition.initializeCounters()
     log.info('Attribute counters initialized')
@@ -214,9 +211,8 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<vo
     log.info(`Refresh phase complete - ${sources.run.managedAccountsById.size} unprocessed account(s) remaining`)
 }
 
-export async function processPhase(serviceRegistry: ServiceRegistry, options: PhaseOptions): Promise<void> {
+export async function processPhase(serviceRegistry: ServiceRegistry, _options: PhaseOptions): Promise<void> {
     const { log, fusion, identities, sources } = serviceRegistry
-    const { isPersistent } = options
 
     log.stepStart('process-identities')
     const identitiesOp = log.track('FusionService.processIdentities')
@@ -274,11 +270,9 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Ph
         )
     }
 
-    if (isPersistent) {
-        log.stepStart('await-disable-ops', { pending: fusion.run.pendingDisableOperationsCount })
-        await fusion.awaitPendingDisableOperations()
-        log.stepEnd('await-disable-ops')
-    }
+    log.stepStart('await-disable-ops', { pending: fusion.run.pendingDisableOperationsCount })
+    await fusion.awaitPendingDisableOperations()
+    log.stepEnd('await-disable-ops')
 
     log.stepStart('form-reconcile')
     fusion.reconcilePendingFormState()
@@ -301,22 +295,6 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
         log.info('Managed accounts cache retained for recording')
     }
 
-    if (!isPersistent) {
-        if (!sources.run.isRecordMode) {
-            sources.clearFusionAccounts()
-        } else {
-            log.info('Fusion accounts cache retained for recording')
-        }
-        log.info('Account caches cleared from memory')
-        return 0
-    }
-
-    const formCleanupOp = log.track('outputPhase.formCleanup')
-    log.stepStart('form-cleanup')
-    await forms.cleanUpForms()
-    formCleanupOp.done()
-    log.stepEnd('form-cleanup')
-
     log.stepStart('send-accounts')
     const sendAccountsOp = log.track('outputPhase.sendAccounts')
     const { sent, eligible } = await fusion.forEachISCAccount(
@@ -324,11 +302,21 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
             res.send(account)
             if (options.streamProgress) options.streamProgress.sent++
         },
-        isPersistent
+        true
     )
     sendAccountsOp.done({ sent, eligible })
     log.stepEnd('send-accounts', { sent, eligible })
     log.info(`Sent ${sent} account(s) to platform`)
+
+    if (!isPersistent) {
+        return sent
+    }
+
+    const formCleanupOp = log.track('outputPhase.formCleanup')
+    log.stepStart('form-cleanup')
+    await forms.cleanUpForms()
+    formCleanupOp.done()
+    log.stepEnd('form-cleanup')
 
     log.stepStart('save-state')
     const saveStateOp = log.track('outputPhase.savePersistentState')

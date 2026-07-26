@@ -70,7 +70,6 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
 
     const fusion = registry.fusion as any
     fusion.setTracker = vi.fn()
-    fusion.setPersistentRun = vi.fn()
     fusion.getTracker = vi.fn()
     fusion.isResetAccounts = vi.fn().mockReturnValue(false)
     fusion.isResetForms = vi.fn().mockReturnValue(false)

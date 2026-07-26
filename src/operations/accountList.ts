@@ -1,4 +1,4 @@
-import { ConnectorError, StdAccountListInput } from '@sailpoint/connector-sdk'
+import { ConnectorError, ConnectorErrorType, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { AggregationTracker } from '../services/fusionService'
 import { FetchResult } from './helpers/accountListPhases'
@@ -21,19 +21,31 @@ export { hydrateCorrelatedManagedAccountIdentities } from './helpers/accountList
  * Supports an optional dry-run mode via the dryRun input parameter:
  *   { dryRun: { enabled: true, saveFile?: boolean, sendEmail?: string | string[] } }
  *
- * When dry-run mode is active, the operation runs non-persistently (no state,
- * forms, correlation, or scheduling side effects), emits optional report
- * artifacts (file and/or email), and sends a terminal summary object last.
+ * When dry-run mode is active, the operation runs the full account-list pipeline
+ * with write inhibition via DryRunApiAdapter, emits optional report artifacts
+ * (file and/or email), streams account rows identical to persistent aggregation,
+ * and sends a terminal summary object last.
  *
  * The pipeline (phases 1-5) is fallible; the report epilogue always runs so
  * that durable artifacts survive pipeline failures. Pipeline errors are
  * rethrown after the epilogue so failed runs are still marked failed.
  */
 export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAccountListInput) => {
-    const { log, sources } = serviceRegistry
+    const { log, sources, config } = serviceRegistry
     const tracker = new AggregationTracker()
     const dryRun = parseDryRunInput(input)
-    const isPersistent = !dryRun
+    const isPersistent = !dryRun?.enabled
+
+    if (dryRun?.enabled) {
+        const recordingMode = config.recording?.mode ?? 'off'
+        if (recordingMode !== 'off' || serviceRegistry.run.isRecordMode) {
+            throw new ConnectorError(
+                'Dry-run mode cannot be combined with recording mode. Disable recording or dry-run before running account list.',
+                ConnectorErrorType.Generic
+            )
+        }
+        serviceRegistry.activateDryRunMode()
+    }
     const timer = log.timer()
     log.startOperationHeartbeat(() => serviceRegistry.getHeartbeatSnapshot())
     const streamProgress = { sent: 0 }
