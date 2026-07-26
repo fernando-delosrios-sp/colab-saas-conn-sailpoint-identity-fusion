@@ -16,22 +16,22 @@ import { readString, trimStr } from '../../utils/safeRead'
 
 /**
  * Builds a synthetic fusion decision when all attribute scores are 100 (exact match),
- * skipping manual review (automatic assignment to the selected identity).
+ * skipping manual review (automatic merge into the selected identity).
  *
- * @param fusionAccount - The fusion account being assigned
+ * @param fusionAccount - The fusion account being merged
  * @param account - The managed account
  * @param identityId - The target identity ID
- * @returns Synthetic FusionDecision for automatic assignment
+ * @returns Synthetic FusionDecision for automatic merge
  */
-export function createAutomaticAssignmentDecision(
+export function createAutomaticMergeDecision(
     fusionAccount: FusionAccount,
     account: Account,
     identityId: string
 ): FusionDecision {
     const accountKey = getManagedAccountKeyFromAccount(account)
-    assert(accountKey, 'Managed account missing composite key for automatic assignment decision')
+    assert(accountKey, 'Managed account missing composite key for automatic merge decision')
     return {
-        submitter: { id: 'system', email: '', name: 'System (automatic assignment)' },
+        submitter: { id: 'system', email: '', name: 'System (automatic merge)' },
         account: {
             id: accountKey,
             name: fusionAccount.name ?? account.name ?? '',
@@ -41,9 +41,9 @@ export function createAutomaticAssignmentDecision(
         },
         newIdentity: false,
         identityId,
-        comments: 'Automatically assigned: combined score met or exceeded threshold',
+        comments: 'Automatically merged: combined score met or exceeded threshold',
         finished: true,
-        automaticAssignment: true,
+        automaticMerge: true,
     }
 }
 
@@ -160,3 +160,4 @@ export const getFormOwner = (sources: SourceService): OwnerDto => {
     assert(owner, 'Fusion source owner not found')
     return owner
 }
+

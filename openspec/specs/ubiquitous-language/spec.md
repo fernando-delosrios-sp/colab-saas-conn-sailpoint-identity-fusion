@@ -23,24 +23,37 @@ All new domain terms, states, or classifications SHALL be defined in this spec b
 - **THEN** it SHALL be defined in this spec before it is used in types, APIs, or dry-run output
 
 ### Requirement: Code uses canonical terms
-Source code SHALL use the canonical terms from this spec for variable names, function names, type names, class names, file names, and comments. The retired term **AttributeService** SHALL be replaced with **MappingService** or **DefinitionService** as appropriate. The retired term **ScoringService** SHALL be replaced with **MatchingService**. The retired term **identity display name** (and the `identityDisplayName` property) SHALL be replaced with **identity name**.
+
+Source code SHALL use the canonical terms from this spec for variable names, function names, type names, class names, file names, and comments. The retired term **AttributeService** SHALL be replaced with **MappingService** or **DefinitionService** as appropriate. The retired term **ScoringService** SHALL be replaced with **MatchingService**. The retired term **identity display name** (and the `identityDisplayName` property) SHALL be replaced with **identity name**. Match-outcome identifiers SHALL use **merge** vocabulary (for example `fusionMergeDecisionMap`, `automaticMerge`, `mergeDecision`) and SHALL NOT use assign/link synonyms for that concept.
+
 #### Scenario: Variable naming follows ubiquitous language (updated)
+
 - **WHEN** a developer declares a variable representing the map service
 - **THEN** the variable SHALL be named `mappingService`, not `attributeService`
-... [lean-ctx: omitted 1 lines]
+- **WHEN** a developer declares a variable representing the matching service
 - **THEN** the variable SHALL be named `matchingService`, not `scoringService`
-... [lean-ctx: omitted 1 lines]
+- **WHEN** a developer declares a variable representing a domain concept
 - **THEN** the variable name SHALL match the canonical term (e.g., `fusionAccount`, not `consolidatedAccount`; `managedSourceAccount`, not `rawAccount`)
+- **WHEN** a developer declares a variable for a Match outcome joining an existing Fusion identity
+- **THEN** the variable SHALL use merge vocabulary (e.g., `mergeDecision`, `automaticMerge`), not `authorizedLinkDecision` or `automaticAssignment`
+
 #### Scenario: Function naming follows ubiquitous language (updated)
+
 - **WHEN** a developer creates a function that calls the map service
 - **THEN** the function SHALL reference `mappingService.mapAttributes`, not `attributeService.mapAttributes`
-... [lean-ctx: omitted 1 lines]
+- **WHEN** a developer creates a function that operates on domain concepts
 - **THEN** the function name SHALL use canonical terms (e.g., `scoreIdentityCandidates`, not `analyzeIdentityPhase`; `hasDeferredCandidateMatches`, not `hasNewUnmatchedPeerMatches`)
+- **WHEN** a developer creates a function that retrieves a pending merge decision for a Fusion identity
+- **THEN** the function SHALL be named `getFusionMergeDecision`, not `getFusionAssignmentDecision`
+
 #### Scenario: Type naming follows ubiquitous language (updated)
+
 - **WHEN** a developer defines a type, enum, or class for match outcomes
 - **THEN** the type SHALL reference `MatchingService`, not `ScoringService`
-... [lean-ctx: omitted 1 lines]
+- **WHEN** a developer defines a type, enum, or class for a domain concept
 - **THEN** the type name SHALL use canonical terms (e.g., `MatchCandidateType.Deferred`, not `NewUnmatched`; `ManagedAccountMatchingRunner`, not `ManagedAccountPassRunner`)
+- **WHEN** a developer defines a report decision wire value for joining an existing identity
+- **THEN** the value SHALL be `merge-existing-identity`, not `assign-existing-identity`
 
 ### Requirement: Configuration uses canonical terms
 Connector configuration (`connector-spec.json`, settings definitions, and UI labels) SHALL use canonical terms for field names, labels, help text, and option values.
@@ -52,11 +65,16 @@ Connector configuration (`connector-spec.json`, settings definitions, and UI lab
 - **THEN** the help text SHALL use canonical terms consistently
 
 ### Requirement: Documentation uses canonical terms
-All documentation (`docs/`, `README.md`, inline comments) SHALL use canonical terms consistently. Retired terms (such as `consolidated account`, `raw account`, `pass`, or `new-unmatched`) SHALL be replaced with their canonical successors.
+
+All documentation (`docs/`, `README.md`, inline comments) SHALL use canonical terms consistently. Retired terms (such as `consolidated account`, `raw account`, `pass`, `new-unmatched`, `automatic assignment`, or `link to existing identity` in Match-outcome context) SHALL be replaced with their canonical successors.
+
 #### Scenario: Guide documentation
+
 - **WHEN** a guide explains a concept or process
-- **THEN** the guide SHALL use canonical terms (e.g., "Fusion account", not "consolidated account"; "deferred candidate", not "new-unmatched peer")
+- **THEN** the guide SHALL use canonical terms (e.g., "Fusion account", not "consolidated account"; "deferred candidate", not "new-unmatched peer"; "automatic merge", not "automatic assignment")
+
 #### Scenario: Operation documentation
+
 - **WHEN** an operation is documented
 - **THEN** the documentation SHALL use canonical terms for inputs, outputs, phases, sweeps, and behavior
 
@@ -162,6 +180,39 @@ The canonical glossary table under Operations, phases, and sweeps SHALL include 
 - **WHEN** they search for heartbeat delta vocabulary
 - **THEN** rows for **Pipeline progress delta** and **API queue completed delta** SHALL be present
 
+### Requirement: Glossary defines Match merge terms
+
+The ubiquitous-language glossary SHALL define **Merge**, **Manual merge**, and **Automatic merge** as canonical terms for Match outcomes that combine a managed source account with an existing Fusion identity.
+
+#### Scenario: Merge entry in glossary
+
+- **GIVEN** a reader consults the ubiquitous-language glossary
+- **WHEN** they look up Match outcomes that join an existing Fusion identity
+- **THEN** a **Merge** entry SHALL define it as the Match outcome where a provisional or managed account is combined with an existing Fusion identity rather than creating a new identity
+
+#### Scenario: Manual merge entry in glossary
+
+- **GIVEN** a reader consults the glossary
+- **WHEN** they look up reviewer-driven merge outcomes
+- **THEN** a **Manual merge** entry SHALL state it is a merge decided on a review form and sets the `authorized` status entitlement
+
+#### Scenario: Automatic merge entry in glossary
+
+- **GIVEN** a reader consults the glossary
+- **WHEN** they look up threshold-driven merge outcomes
+- **THEN** an **Automatic merge** entry SHALL state it is a merge applied without review when the combined score meets the automatic merge threshold and sets the `auto` status entitlement
+
+### Requirement: Glossary distinguishes merge from blend and correlation
+
+The ubiquitous-language spec SHALL state that **Merge** is a Match decision/outcome, **Blend** is the structural absorption of a managed account into a Fusion account, and **Correlation** is the ISC platform operation to link account records. Documentation SHALL NOT use merge as a synonym for blend or correlation.
+
+#### Scenario: Merge versus blend
+
+- **GIVEN** documentation describes a Match outcome joining an existing Fusion identity
+- **WHEN** the prose refers to the decision
+- **THEN** it SHALL use **merge** (or **manual merge** / **automatic merge**)
+- **AND** it SHALL use **blend** only when describing structural managed-account absorption
+
 ## Canonical Terms
 ### Account taxonomy
 | Term | Definition |
@@ -195,7 +246,7 @@ The connector refers to an ISC identity and to the Fusion account itself through
 | Term | Definition |
 ... [lean-ctx: omitted 2 lines]
 | **Define** | Computing new attributes (normal attributes) and generating persistent unique attributes (UUIDs, counters, disambiguated values) using Apache Velocity templates. |
-| **Match** | The product step that determines whether a Fusion account corresponds to an existing identity, using scoring and optional automatic assignment or manual review. |
+| **Match** | The product step that determines whether a Fusion account corresponds to an existing identity, using scoring and optional automatic merge or manual review. |
 ### Services
 | Term | Definition |
 ... [lean-ctx: omitted 2 lines]
@@ -207,8 +258,10 @@ The connector refers to an ISC identity and to the Fusion account itself through
 ... [lean-ctx: omitted 3 lines]
 | **Combined match score** | The weighted mean of evaluated rule similarities used to decide whether a candidate is a potential match. |
 ... [lean-ctx: omitted 1 lines]
-| **Automatic assignment** | The decision to link a matched Fusion account to a specific identity without manual review when the combined score meets the automatic assignment threshold. |
-| **Match outcome dispatch** | The routing of a scored managed source account to one of four outcomes — exact match, partial match, deferred match, or non-match — and the application of the resulting action (automatic assignment, review-form creation, deferred claim, or non-match registration). Implemented by `MatchOutcomeDispatcher` inside `src/services/matchingService/`. |
+| **Merge** | The Match outcome where a managed source account (via its provisional Fusion account) is combined with an existing Fusion identity rather than creating a new identity. |
+| **Manual merge** | A merge decided by a reviewer on a review form. Sets the `authorized` status entitlement. |
+| **Automatic merge** | A merge applied without review when the combined score meets the automatic merge threshold. Sets the `auto` status entitlement. |
+| **Match outcome dispatch** | The routing of a scored managed source account to one of four outcomes — exact match, partial match, deferred match, or non-match — and the application of the resulting action (automatic merge, review-form creation, deferred claim, or non-match registration). Implemented by `MatchOutcomeDispatcher` inside `src/services/matchingService/`. |
 ### Candidate types
 | Term | Definition |
 ... [lean-ctx: omitted 1 lines]
@@ -246,7 +299,7 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 | **Baseline** | `baseline` | The identity existed before this Fusion source aggregation and is included as a comparison point during Match. |
 | **Non-matched** | `nonMatched` | A managed source account completed the Match step without finding any acceptable identity candidate. |
 ... [lean-ctx: omitted 1 lines]
-| **Authorized** | `authorized` | A managed source account was manually correlated to an identity by a reviewer. |
+| **Authorized** | `authorized` | Status after a **manual merge** by a reviewer. |
 ... [lean-ctx: omitted 2 lines]
 | **Reviewer** | `reviewer` | The identity is a Match reviewer for one or more managed sources. Set alongside the `reviewer:<sourceId>` action entitlement. |
 ... [lean-ctx: omitted 1 lines]
@@ -255,9 +308,9 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 ### Review and decision domain
 | Term | Definition |
 ... [lean-ctx: omitted 1 lines]
-| **Reviewer** | A person who reviews identity candidates presented in a Fusion review form and decides whether a Fusion account should link to an existing identity or create a new one. A reviewer's Fusion identity carries the `reviewer` status entitlement and one or more `reviewer:<sourceId>` action entitlements. |
+| **Reviewer** | A person who reviews identity candidates presented in a Fusion review form and decides whether a Fusion account should merge with an existing identity or create a new one. A reviewer's Fusion identity carries the `reviewer` status entitlement and one or more `reviewer:<sourceId>` action entitlements. |
 ... [lean-ctx: omitted 1 lines]
-| **FusionDecision** | A reviewer's decision on a review form. Contains the chosen outcome (link to existing identity or create new identity), the submitter, comments, and whether the decision is finished. |
+| **FusionDecision** | A reviewer's decision on a review form. Contains the chosen outcome (merge with existing identity or create new identity), the submitter, comments, whether the decision is finished, and whether it was an automatic merge. |
 | **Manual review workflow** | The process flow: potential matches are identified → review forms are created with top candidates → reviewers evaluate and decide → decisions are applied by the connector on the next account aggregation. |
 | **Global reviewer** | A reviewer automatically added to all review forms regardless of source. Controlled by **Owners are global reviewers?** in Review Settings. When enabled, Fusion source owners and members of the source governance group are added as reviewers on every form. |
 ... [lean-ctx: omitted 2 lines]
@@ -269,7 +322,7 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 ... [lean-ctx: omitted 1 lines]
 | **Skip match if threshold not met** | When enabled on a matching rule, the rule contributes a zero-weighted score but does not disqualify the candidate if its individual threshold is not met. |
 ... [lean-ctx: omitted 1 lines]
-| **Automatic assignment match score** | The minimum combined match score (0–100) above which a candidate is automatically linked to an identity without manual review. Requires **Enable automatic assignment** to be on. |
+| **Automatic merge match score** | The minimum combined match score (0–100) above which a candidate is automatically merged into an existing Fusion identity without manual review. Requires **Enable automatic merge** to be on. |
 ... [lean-ctx: omitted 1 lines]
 ### Matching algorithms
 | Term | Definition |
@@ -305,7 +358,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Normal Attribute Definitions** | The section defining Velocity expressions that compute Fusion account attributes. Runs on every aggregation; supports static (one-time) or refreshable evaluation. |
 | **Unique Attribute Definitions** | The section defining Velocity expressions that generate values guaranteed unique across all Fusion accounts. Uses collision-based disambiguation or incremental counters. |
 ... [lean-ctx: omitted 1 lines]
-| **Matching Settings** | The section configuring per-attribute matching rules (algorithm, threshold, weight, mandatory, skip flags), the manual review score threshold, and automatic assignment. |
+| **Matching Settings** | The section configuring per-attribute matching rules (algorithm, threshold, weight, mandatory, skip flags), the manual review score threshold, and automatic merge. |
 | **Review Settings** | The section configuring the manual review workflow: form attributes, form expiration, maximum candidates per form, and global reviewer behavior. |
 ... [lean-ctx: omitted 2 lines]
 | **Advanced Connection Settings** | The section for API communication tuning: request rate limiting, retry behavior, and external logging configuration. |
@@ -355,4 +408,14 @@ The following terms are retired and SHALL NOT be used in new code, configuration
 | `attribute-service` (spec) | `mapping-service` + `definition-service` |
 ... [lean-ctx: omitted 1 lines]
 | `custom:dryrun` | dry-run mode of the accountList operation |
+| `automatic assignment` / `Automatic assignment` | automatic merge / **Automatic merge** (Match outcome) |
+| `assign-existing-identity` | `merge-existing-identity` |
+| `link to existing identity` | merge with existing identity |
+| `automaticAssignment` | `automaticMerge` |
+| `fusionAssignmentDecisionMap` | `fusionMergeDecisionMap` |
+| `authorizedLinkDecision` | `mergeDecision` |
+| `fusionEnableAutoAssignment` | `fusionEnableAutoMerge` |
+| `fusionAutoAssignmentScore` | `fusionAutoMergeScore` |
+| `autoAssignedIdentityIds` / `markAutoAssigned` | `autoMergedIdentityIds` / `markAutoMerged` |
+
 

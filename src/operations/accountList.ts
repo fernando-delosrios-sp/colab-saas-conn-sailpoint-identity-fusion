@@ -77,7 +77,7 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
 
             log.phaseStart(5, 'Output')
             outputCount = await outputPhase(serviceRegistry, options)
-            timer.phase('PHASE 5: Output (JIT attributes, serialize & clean up memory)', 'info', 'Output')
+            timer.phase('PHASE 5: Output (unique attributes, serialize & clean up memory)', 'info', 'Output')
         } catch (error) {
             runError = error
             log.warn(`Pipeline failed — running report epilogue before propagating: ${(error as Error).message}`)

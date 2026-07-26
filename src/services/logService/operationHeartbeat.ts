@@ -1,6 +1,6 @@
 import { QueuedItemInfo, QueueStats } from '../clientService/types'
 import { LogService, PhaseTimer } from './logService'
-import { EventCounters, OperationPhase, OperationRunContext } from './operationRunContext'
+import { EventCounters, OperationPhase, OperationRunContext, CumulativeOutcomes } from './operationRunContext'
 
 type FusionPendingSnapshot = {
     disableOps: number
@@ -50,6 +50,11 @@ export function formatDeltaSuffix(
     return `(Δ${delta >= 0 ? '+' : ''}${delta}/${Math.round(intervalMs / 1000)}s)`
 }
 
+/** Formats an interval-scoped event count (EVENT_SUMMARY), distinct from cumulative STATUS totals. */
+function formatIntervalDeltaCount(count: number, intervalMs: number): string {
+    return `+${count}/${Math.round(intervalMs / 1000)}s`
+}
+
 function formatProgressSegment(
     done: number,
     total: number,
@@ -63,6 +68,20 @@ function formatProgressSegment(
         return `progress=${fraction} ${unit}${deltaSuffix}`
     }
     return `progress=${fraction}${deltaSuffix}`
+}
+
+export function formatMatchOutcomesSegment(outcomes: CumulativeOutcomes, includeTotal = false): string {
+    const { nonMatch, formsQueued, autoMerged } = outcomes
+    const segment = `matches(${nonMatch}n/${formsQueued}m/${autoMerged}a)`
+    if (!includeTotal) return segment
+    return `${segment.slice(0, -1)} total=${nonMatch + formsQueued + autoMerged})`
+}
+
+function shouldShowMatchOutcomesInStatus(runContext: OperationRunContext): boolean {
+    if (runContext.phase !== 'Process') return false
+    if (runContext.step === 'uncorrelated-sweep') return true
+    const { nonMatch, formsQueued, autoMerged } = runContext.getCumulativeOutcomes()
+    return nonMatch + formsQueued + autoMerged > 0
 }
 
 function isApiQueueIdle(queueStats: QueueStats): boolean {
@@ -98,6 +117,14 @@ export function formatStatusLine(
         parts.push(formatProgressSegment(done, total, unit, previousProgressDone, intervalMs))
     }
 
+    if (shouldShowMatchOutcomesInStatus(runContext)) {
+        parts.push(formatMatchOutcomesSegment(runContext.getCumulativeOutcomes()))
+    }
+
+    if (runContext.phase === 'Refresh') {
+        parts.push(`refreshed(${runContext.refreshedCount})`)
+    }
+
     parts.push(`elapsed=${PhaseTimer.formatElapsed(Date.now() - runContext.operationStartedAt)}`)
 
     if (queueStats) {
@@ -131,29 +158,29 @@ export function formatStatusLine(
 
 export function formatEventSummaryLines(
     events: EventCounters,
-    phase: OperationPhase | null = null
+    phase: OperationPhase | null = null,
+    intervalMs: number
 ): string[] {
     const lines: string[] = []
     const inProcessPhase = phase === 'Process'
 
     if (inProcessPhase) {
         const matchParts: string[] = []
-        if (events.matchExact > 0) matchParts.push(`exact=${events.matchExact}`)
-        if (events.matchPartial > 0) matchParts.push(`partial=${events.matchPartial}`)
-        if (events.matchDeferred > 0) matchParts.push(`deferred=${events.matchDeferred}`)
+        if (events.nonMatch > 0) {
+            matchParts.push(`non-matched=${formatIntervalDeltaCount(events.nonMatch, intervalMs)}`)
+        }
+        if (events.formsQueued > 0) {
+            matchParts.push(`manual=${formatIntervalDeltaCount(events.formsQueued, intervalMs)}`)
+        }
+        if (events.autoMerged > 0) {
+            matchParts.push(`auto=${formatIntervalDeltaCount(events.autoMerged, intervalMs)}`)
+        }
         if (matchParts.length > 0) {
             lines.push(`EVENT_SUMMARY matches ${matchParts.join(' ')}`)
         }
 
-        const outcomeParts: string[] = []
-        if (events.nonMatch > 0) outcomeParts.push(`unmatched=${events.nonMatch}`)
-        if (events.autoAssigned > 0) outcomeParts.push(`auto=${events.autoAssigned}`)
-        if (events.formsQueued > 0) outcomeParts.push(`manual=${events.formsQueued}`)
-        if (events.recordUniqueRegistered > 0) {
-            outcomeParts.push(`recordUniqueRegistered=${events.recordUniqueRegistered}`)
-        }
-        if (outcomeParts.length > 0) {
-            lines.push(`EVENT_SUMMARY outcomes ${outcomeParts.join(' ')}`)
+        if (events.newIdentityAssignment > 0) {
+            lines.push(`EVENT_SUMMARY forms new-identity-assignment=${events.newIdentityAssignment}`)
         }
     }
 
@@ -277,7 +304,7 @@ export class OperationHeartbeat {
         }
 
         const events = runContext.flushEventCounters()
-        for (const line of formatEventSummaryLines(events, runContext.phase)) {
+        for (const line of formatEventSummaryLines(events, runContext.phase, snapshot.intervalMs)) {
             this.log.info(line)
         }
 
@@ -291,6 +318,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 

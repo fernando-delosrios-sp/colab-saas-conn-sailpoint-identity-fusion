@@ -354,7 +354,7 @@ The connector configuration parser SHALL read `resetAccounts` and `resetForms` a
 
 ### Requirement: Dry-run mode runs the full accountList pipeline
 
-In dry-run mode, the account-list operation SHALL execute the same Setup, Fetch, Refresh, Process, and Output phases as a persistent aggregation. Dry-run SHALL NOT skip Match outcomes (auto-assign, review forms), correlation logic, orphan disable queuing, or account output streaming. Write side effects to the ISC tenant SHALL be inhibited at the client API adapter boundary rather than by skipping business logic.
+In dry-run mode, the account-list operation SHALL execute the same Setup, Fetch, Refresh, Process, and Output phases as a persistent aggregation. Dry-run SHALL NOT skip Match outcomes (automatic merge, review forms), correlation logic, orphan disable queuing, or account output streaming. Write side effects to the ISC tenant SHALL be inhibited at the client API adapter boundary rather than by skipping business logic.
 
 #### Scenario: Dry-run executes output streaming
 
@@ -403,4 +403,5 @@ In dry-run mode, incremental unique-attribute counters MAY advance in-memory dur
 - **THEN** no `updateSource` PATCH for fusion state or batch cumulative counts SHALL reach the ISC tenant
 
 ---
+
 

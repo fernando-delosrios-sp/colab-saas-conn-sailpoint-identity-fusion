@@ -512,7 +512,7 @@ describe('FusionService', () => {
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            vi.spyOn(mockForms, 'getFusionAssignmentDecision').mockReturnValue({
+            vi.spyOn(mockForms, 'getFusionMergeDecision').mockReturnValue({
                 submitter: { id: 'reviewer-1', email: 'r@example.com', name: 'fernando.delosrios' },
                 account: {
                     id: managedKey,
@@ -531,7 +531,7 @@ describe('FusionService', () => {
             const result = await fusionService.processFusionAccount(historicalAccount)
 
             expect(result.accountIds).toContain(managedKey)
-            expect(result.history.some((h) => h.includes('as authorized by fernando.delosrios'))).toBe(true)
+            expect(result.history.some((h) => h.includes('into existing identity by fernando.delosrios'))).toBe(true)
             expect(
                 result.history.some((h) => h.includes('Associated managed account Managed Account New [Source A]'))
             ).toBe(false)
@@ -1713,7 +1713,7 @@ describe('FusionService', () => {
                 name: 'Jane Doe',
                 attributes: { displayName: 'Jane Q. Doe' },
             } as IdentityDocument)
-            vi.spyOn(mockForms, 'getFusionAssignmentDecision').mockReturnValue(undefined)
+            vi.spyOn(mockForms, 'getFusionMergeDecision').mockReturnValue(undefined)
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
@@ -2331,7 +2331,7 @@ describe('FusionService', () => {
                 },
                 newIdentity: false,
                 identityId: 'identity-1',
-                comments: 'Assign to existing identity',
+                comments: 'Assign into existing identity',
                 finished: true,
                 sourceType: 'authoritative',
             } as any
@@ -2343,13 +2343,13 @@ describe('FusionService', () => {
             expect(result?.statuses).toContain('authorized')
             expect(result?.statuses).not.toContain('auto')
             expect(result?.statuses).not.toContain('nonMatched')
-            expect(result?.history.some((h) => h.includes('as authorized by Reviewer'))).toBe(true)
+            expect(result?.history.some((h) => h.includes('into existing identity by Reviewer'))).toBe(true)
             expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
             expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(existingFusionAccount, [managedKey])
             expect(fusionService.getFusionIdentity('identity-1')).toBe(existingFusionAccount)
         })
 
-        it('writes auto-assignment history for system automatic-assignment decisions', async () => {
+        it('writes auto-merge history for system automatic-assignment decisions', async () => {
             const existingIdentity = {
                 id: 'identity-2',
                 name: 'Existing Identity Two',
@@ -2385,7 +2385,7 @@ describe('FusionService', () => {
             } as any)
 
             const decision = {
-                submitter: { id: 'system', email: '', name: 'System (automatic assignment)' },
+                submitter: { id: 'system', email: '', name: 'System (automatic merge)' },
                 account: {
                     id: managedKeyAuto,
                     name: 'LH2 User',
@@ -2398,20 +2398,20 @@ describe('FusionService', () => {
                 comments: 'Automatically assigned: exact attribute match (all rules 100, none skipped)',
                 finished: true,
                 sourceType: 'authoritative',
-                automaticAssignment: true,
+                automaticMerge: true,
             } as any
 
             const result = await fusionService.processFusionIdentityDecision(decision)
             expect(result?.statuses).toContain('auto')
             expect(result?.statuses).not.toContain('authorized')
-            expect(result?.history.some((h) => h.includes('Auto-assigned LH2 User [LH2] to existing identity'))).toBe(
+            expect(result?.history.some((h) => h.includes('Auto-merged LH2 User [LH2] into existing identity'))).toBe(
                 true
             )
             expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
             expect(mockIdentities.correlateAccounts).not.toHaveBeenCalled()
         })
 
-        it('system automatic assignment still PATCHes accounts when source correlationMode is correlate', async () => {
+        it('system automatic merge still PATCHes accounts when source correlationMode is correlate', async () => {
             const existingIdentity = {
                 id: 'identity-auto-corr',
                 name: 'Identity Auto Corr',
@@ -2447,7 +2447,7 @@ describe('FusionService', () => {
             } as any)
 
             const decision = {
-                submitter: { id: 'system', email: '', name: 'System (automatic assignment)' },
+                submitter: { id: 'system', email: '', name: 'System (automatic merge)' },
                 account: {
                     id: managedKeyAutoCorr,
                     name: 'User',
@@ -2460,7 +2460,7 @@ describe('FusionService', () => {
                 comments: 'Automatically assigned: exact attribute match (all rules 100, none skipped)',
                 finished: true,
                 sourceType: 'authoritative',
-                automaticAssignment: true,
+                automaticMerge: true,
             } as any
 
             await fusionService.processFusionIdentityDecision(decision)
@@ -2499,13 +2499,13 @@ describe('FusionService', () => {
                 },
                 newIdentity: false,
                 identityId: undefined,
-                comments: 'Assign to existing identity',
+                comments: 'Assign into existing identity',
                 finished: true,
                 sourceType: 'authoritative',
             } as any
 
             const result = await fusionService.processFusionIdentityDecision(decision)
-            expect(result?.history.some((h) => h.includes('as authorized by Reviewer'))).toBe(true)
+            expect(result?.history.some((h) => h.includes('into existing identity by Reviewer'))).toBe(true)
             expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
         })
 
@@ -2552,7 +2552,7 @@ describe('FusionService', () => {
                 },
                 newIdentity: false,
                 identityId: 'identity-1',
-                comments: 'Assign to existing identity',
+                comments: 'Assign into existing identity',
                 finished: true,
                 sourceType: 'authoritative',
             } as any
@@ -2753,7 +2753,7 @@ describe('FusionService', () => {
                     nativeIdentity: 'hist-fallback',
                 },
                 newIdentity: false,
-                comments: 'Assign to existing identity',
+                comments: 'Assign into existing identity',
                 finished: true,
                 sourceType: 'authoritative',
             } as any
@@ -2761,7 +2761,7 @@ describe('FusionService', () => {
             const result = await fusionService.processFusionIdentityDecision(decision)
             expect(
                 result?.history.some((h) =>
-                    h.includes('Set Unknown account [Unknown source] as authorized by Unknown reviewer')
+                    h.includes('Merged Unknown account [Unknown source] into existing identity by Unknown reviewer')
                 )
             ).toBe(true)
         })

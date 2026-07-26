@@ -110,14 +110,14 @@ describe('ReportService', () => {
             accountUrl: 'https://example.identitynow.com/ui/a/admin/accounts-management/human-accounts/acc-1',
             accountSource: 'Source Alpha',
             sourceType: SourceType.Authoritative,
-            decision: 'assign-existing-identity',
-            decisionLabel: 'Assigned to existing identity',
+            decision: 'merge-existing-identity',
+            decisionLabel: 'Merged into existing identity',
             selectedIdentityId: 'id-100',
             selectedIdentityName: 'Target Identity',
             selectedIdentityUrl: 'https://example.identitynow.com/ui/a/admin/identities/id-100/details/attributes',
             comments: undefined,
             formUrl: undefined,
-            automaticAssignment: undefined,
+            automaticMerge: undefined,
         })
     })
 
@@ -153,7 +153,7 @@ describe('ReportService', () => {
         expect(decisions[0].accountName).toBe('Human Account Display Name')
     })
 
-    it('prefers correlated identity display name over managed account name fallback for assign-existing decisions', () => {
+    it('prefers correlated identity display name over managed account name fallback for merge-existing decisions', () => {
         const managedAccountInventory = new Map<string, any>([
             ['key-1', { id: 'key-1', name: 'Raw Managed Name' }],
         ])

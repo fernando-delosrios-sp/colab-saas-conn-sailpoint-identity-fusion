@@ -1,5 +1,6 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { PhaseTimer } from '../../services/logService'
+import { formatMatchOutcomesSegment } from '../../services/logService/operationHeartbeat'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
 import { AggregationStats } from '../../services/fusionService/types'
@@ -277,7 +278,10 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
     log.stepStart('form-reconcile')
     fusion.reconcilePendingFormState()
     log.stepEnd('form-reconcile', { remaining: sources.run.managedAccountsById.size })
-    log.info(`Process phase complete - ${sources.run.managedAccountsById.size} unprocessed account(s) remaining`)
+    const matchOutcomes = formatMatchOutcomesSegment(log.getCumulativeOutcomes(), true)
+    log.info(
+        `Process phase complete - ${sources.run.managedAccountsById.size} unprocessed account(s) remaining ${matchOutcomes}`
+    )
 }
 
 export async function outputPhase(serviceRegistry: ServiceRegistry, options: PhaseOptions): Promise<number> {

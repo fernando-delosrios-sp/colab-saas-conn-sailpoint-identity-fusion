@@ -7,7 +7,7 @@ import { AggregationTracker } from '../../../model/aggregationTracker'
 import { AccountAssembly } from '../../accountAssembly'
 import { MatchingService } from '../matchingService'
 import { MatchOutcomeDispatcher } from '../matchOutcomeDispatcher'
-import { createAutomaticAssignmentDecision } from '../../formService/helpers'
+import { createAutomaticMergeDecision } from '../../formService/helpers'
 import type { SourceInfo } from '../../sourceService'
 
 describe('MatchOutcomeDispatcher', () => {
@@ -78,7 +78,7 @@ describe('MatchOutcomeDispatcher', () => {
                 newReviewInstancesQueued: 1,
             }),
             registerFinishedDecision: vi.fn(),
-            createAutomaticAssignmentDecision,
+            createAutomaticMergeDecision,
         } as any
         const correlationManager = { applyPerSourceCorrelationIfNeeded: vi.fn().mockResolvedValue(undefined) } as any
         const decisionProcessor = { processFusionIdentityDecision: vi.fn().mockResolvedValue(undefined) }
@@ -157,10 +157,10 @@ describe('MatchOutcomeDispatcher', () => {
     }
 
     describe('runMatchSweep', () => {
-        it('dispatches an exact match to automatic assignment when the combined score meets the threshold', async () => {
+        it('dispatches an exact match to automatic merge when the combined score meets the threshold', async () => {
             const { dispatcher, matchingService, forms, decisionProcessor, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
-                configOverrides: { fusionEnableAutoAssignment: true, fusionAutoAssignmentScore: 100 },
+                configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 100 },
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
             const identity = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Identity One', attributes: {} } as any)
@@ -190,14 +190,14 @@ describe('MatchOutcomeDispatcher', () => {
                 expect.objectContaining({
                     newIdentity: false,
                     identityId: 'identity-1',
-                    automaticAssignment: true,
+                    automaticMerge: true,
                 })
             )
             expect(decisionProcessor.processFusionIdentityDecision).toHaveBeenCalled()
-            expect(run.autoAssignedIdentityIds.has('identity-1')).toBe(true)
+            expect(run.autoMergedIdentityIds.has('identity-1')).toBe(true)
         })
 
-        it('dispatches a partial match to a review form when auto-assignment is disabled', async () => {
+        it('dispatches a partial match to a review form when auto-merge is disabled', async () => {
             const { dispatcher, matchingService, forms, log, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
@@ -548,7 +548,7 @@ describe('MatchOutcomeDispatcher', () => {
         it('does not auto-assign when the combined score row is missing', async () => {
             const { dispatcher, matchingService, forms, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
-                configOverrides: { fusionEnableAutoAssignment: true, fusionAutoAssignmentScore: 100 },
+                configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 100 },
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
             run.reviewersBySourceId.set(SOURCE_ID, new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)]))
@@ -595,7 +595,7 @@ describe('MatchOutcomeDispatcher', () => {
         it('uses operation context to qualify account-list mode for exact matches', async () => {
             const { dispatcher, matchingService, forms, decisionProcessor, run } = createDispatcher({
                 isAggregationMode: true,
-                configOverrides: { fusionEnableAutoAssignment: true, fusionAutoAssignmentScore: 100 },
+                configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 100 },
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
 

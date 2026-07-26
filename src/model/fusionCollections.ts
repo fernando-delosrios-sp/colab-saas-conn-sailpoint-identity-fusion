@@ -174,16 +174,16 @@ export class FusionCollections {
             return `Set ${accountInfo} as new account by ${submitterName}`
         }
 
-        if (decision.automaticAssignment === true) {
-            return `Auto-assigned ${accountInfo} to existing identity`
+        if (decision.automaticMerge === true) {
+            return `Auto-merged ${accountInfo} into existing identity`
         }
         if (sourceType === SourceType.Record) {
-            return `Assigned record ${accountInfo} to existing identity by ${submitterName}`
+            return `Merged record ${accountInfo} into existing identity by ${submitterName}`
         }
         if (sourceType === SourceType.Orphan) {
-            return `Assigned orphan account ${accountInfo} to existing identity by ${submitterName}`
+            return `Merged orphan account ${accountInfo} into existing identity by ${submitterName}`
         }
-        return `Set ${accountInfo} as authorized by ${submitterName}`
+        return `Merged ${accountInfo} into existing identity by ${submitterName}`
     }
 
     private _addToSet<T>(set: Set<T>, item: T, message?: string): boolean {
@@ -280,7 +280,7 @@ export class FusionCollections {
         },
         setAuthorized: (decision: FusionDecision): void => {
             this._statuses.delete(StatusEntitlement.NonMatched)
-            if (decision.automaticAssignment === true) {
+            if (decision.automaticMerge === true) {
                 this._statuses.add(StatusEntitlement.Auto)
             } else {
                 this._statuses.add(StatusEntitlement.Authorized)
@@ -419,3 +419,4 @@ export class FusionCollections {
         if (identityId) bag[FusionAttribute.IdentityId] = identityId
     }
 }
+

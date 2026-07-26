@@ -24,8 +24,8 @@ export interface FusionReportState {
     reportAttributes: string[]
     fusionIdentityComparisonsByAccount: WeakMap<FusionAccount, number>
     sources: SourceService
-    fusionEnableAutoAssignment: boolean
-    fusionAutoAssignmentScore?: number
+    fusionEnableAutoMerge: boolean
+    fusionAutoMergeScore?: number
 }
 
 export function buildFusionReport(
@@ -70,9 +70,9 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
             )
             const score = combinedReport?.score ?? 0
             const auto =
-                state.fusionEnableAutoAssignment &&
-                state.fusionAutoAssignmentScore !== undefined &&
-                score >= state.fusionAutoAssignmentScore
+                state.fusionEnableAutoMerge &&
+                state.fusionAutoMergeScore !== undefined &&
+                score >= state.fusionAutoMergeScore
 
             return {
                 ...fusionReportMatchCandidateAccountFields(match),

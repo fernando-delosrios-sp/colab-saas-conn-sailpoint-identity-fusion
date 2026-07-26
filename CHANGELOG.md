@@ -2,6 +2,7 @@
 
 ## 2.2.0
 
+- (2026-07-26) **Breaking:** Align Match-outcome vocabulary on **merge** — renamed config keys (`fusionEnableAutoMerge`, `fusionAutoMergeScore`), report wire value `merge-existing-identity`, `FusionDecision.automaticMerge`, run state `autoMergedIdentityIds`, and user-facing form/history strings. Retired assign/link/automatic-assignment synonyms for Match outcomes. Status wire values `authorized` and `auto` unchanged. One-time config read migration from legacy keys. `ubiquitous-language`, `matching-service`, `fusion-run`, and `log-service` specs updated.
 - (2026-07-26) **Enhancement:** Dry-run mode on `std:account:list` now runs the full account-list pipeline and streams identical `StdAccountListOutput` rows (including JIT unique attributes). ISC write calls are inhibited at `DryRunApiAdapter` instead of skipping Match, Correlation, and Output logic; `rowsSent` reflects the number of streamed accounts. Dry-run is mutually exclusive with record/replay mode. Supersedes the 2026-07-23 dry-run correlation suppression via `setPersistentRun`. `account-list-operation`, `client-service`, and `fusion-service` specs updated.
 - (2026-07-25) **Observability:** Account-list Process and Output phases now emit STEP boundaries for **managed account initialization** (`managed-account-init`, trigram and linked-account key index build before the correlated sweep) and **clear managed accounts** (`clear-managed-accounts`, non-record mode only, with account counts on START/END). Closes hidden wall-time gaps in phase timing reports where ~2 minutes of Process phase and Output phase work was previously unattributed. `account-list-operation` spec updated.
 - (2026-07-25) **Enhancement:** Split Developer Settings reset into independent **Reset accounts?** (`resetAccounts`) and **Reset forms?** (`resetForms`) toggles — both default to off and auto-disable after one persistent aggregation. Account reset clears fusion state and emits zero accounts without deleting review forms unless **Reset forms?** is also enabled. Form reset deletes all Fusion review form definitions and allows aggregation to continue. Legacy connector attribute `reset` still maps to `resetAccounts` on read; disable clears both keys. `account-list-operation` and `fusion-service` specs updated.
@@ -91,7 +92,7 @@
 - (2026-06-24) Added cascade aggregation and localization settings to the connector specification.
 - (2026-06-24) Added a localization guide and documented the cascade aggregation process.
 - (2026-06-24) Added parent key and value constraints to the automatic assignment match score field.
-- (2026-06-24) Made `fusionAutoAssignmentScore` mandatory and enforced strict threshold validation against the manual review score.
+- (2026-06-24) Made `fusionAutoMergeScore` mandatory and enforced strict threshold validation against the manual review score.
 - (2026-06-24) Consolidated Fusion account identity-name resolution: `IdentityInfo` now exposes distinct `id`, alias `name`, and human-readable `displayName` chains; `FusionAccount.name` resolves to the source title only; `fusionDisplayAttribute` and `fusionIdentityAttribute` are now immutable once set (with a UUID fallback for missing identity attributes); identity decisions use mapping/definition config for display resolution. The Fusion Review Decisions card now renders human-readable account names and links the "Created new identity" entry to the ISC account page.
 - (2026-06-26) Added an optional **Skip match if threshold not met** toggle on Fusion attribute match rules. When enabled, non-mandatory rules whose computed similarity is below their configured minimum are excluded from the weighted combined match score, so weak signals no longer drag the combined score down. Mandatory rules are always evaluated regardless of this toggle. Documented in the matching guide and the README matching rules reference.
 - (2026-06-26) Added a new **Binary (Exact Match)** algorithm to Fusion attribute match configuration. It returns a score of 100 only when the two values are identical strings (case- and whitespace-sensitive) and 0 otherwise, making threshold configuration trivial for stable identifiers (employee IDs, UUIDs, pre-normalized emails). Forgiving comparison can still be achieved by pre-normalizing values in **Define** before applying Binary.
@@ -122,6 +123,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 

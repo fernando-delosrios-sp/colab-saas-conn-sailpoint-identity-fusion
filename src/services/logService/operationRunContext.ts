@@ -9,9 +9,17 @@ export type EventCounters = {
     correlationTriggers: number
     correlationAccounts: number
     nonMatch: number
-    autoAssigned: number
+    autoMerged: number
     formsQueued: number
+    newIdentityAssignment: number
     recordUniqueRegistered: number
+}
+
+/** Cumulative match outcomes for STATUS lines (not reset on heartbeat flush). */
+export type CumulativeOutcomes = {
+    nonMatch: number
+    autoMerged: number
+    formsQueued: number
 }
 
 type ProgressSnapshot = {
@@ -28,10 +36,15 @@ export function createEmptyEventCounters(): EventCounters {
         correlationTriggers: 0,
         correlationAccounts: 0,
         nonMatch: 0,
-        autoAssigned: 0,
+        autoMerged: 0,
         formsQueued: 0,
+        newIdentityAssignment: 0,
         recordUniqueRegistered: 0,
     }
+}
+
+function createEmptyCumulativeOutcomes(): CumulativeOutcomes {
+    return { nonMatch: 0, autoMerged: 0, formsQueued: 0 }
 }
 
 /**
@@ -43,7 +56,10 @@ export class OperationRunContext {
     step: string | null = null
     progress?: ProgressSnapshot
     stepStartedAt?: number
+    /** Cumulative fusion accounts with needsRefresh during the Refresh phase. */
+    refreshedCount = 0
     private events: EventCounters = createEmptyEventCounters()
+    private cumulativeOutcomes: CumulativeOutcomes = createEmptyCumulativeOutcomes()
 
     constructor(startedAt: number = Date.now()) {
         this.operationStartedAt = startedAt
@@ -68,12 +84,18 @@ export class OperationRunContext {
             }
             case 'nonMatch':
                 this.events.nonMatch++
+                this.cumulativeOutcomes.nonMatch++
                 break
-            case 'autoAssigned':
-                this.events.autoAssigned++
+            case 'autoMerged':
+                this.events.autoMerged++
+                this.cumulativeOutcomes.autoMerged++
                 break
             case 'formsQueued':
                 this.events.formsQueued++
+                this.cumulativeOutcomes.formsQueued++
+                break
+            case 'newIdentityAssignment':
+                this.events.newIdentityAssignment++
                 break
             case 'recordUniqueRegistered': {
                 const count = detail?.count
@@ -97,5 +119,18 @@ export class OperationRunContext {
     peekEventCounters(): EventCounters {
         return { ...this.events }
     }
+
+    getCumulativeOutcomes(): CumulativeOutcomes {
+        return { ...this.cumulativeOutcomes }
+    }
+
+    resetCumulativeOutcomes(): void {
+        this.cumulativeOutcomes = createEmptyCumulativeOutcomes()
+    }
+
+    incrementRefreshedCount(): void {
+        this.refreshedCount++
+    }
 }
+
 

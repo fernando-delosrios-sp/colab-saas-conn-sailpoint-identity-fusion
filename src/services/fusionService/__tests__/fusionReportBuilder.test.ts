@@ -8,7 +8,7 @@ beforeEach(() => {
 })
 
 function buildReportState(
-    overrides: Partial<Pick<FusionReportState, 'fusionEnableAutoAssignment' | 'fusionAutoAssignmentScore'>>
+    overrides: Partial<Pick<FusionReportState, 'fusionEnableAutoMerge' | 'fusionAutoMergeScore'>>
 ): FusionReportState {
     const fusionAccount = FusionAccount.fromManagedAccount({
         id: 'acct-1',
@@ -47,17 +47,17 @@ function buildReportState(
         reportAttributes: [],
         fusionIdentityComparisonsByAccount: new WeakMap(),
         sources: {} as any,
-        fusionEnableAutoAssignment: false,
+        fusionEnableAutoMerge: false,
         ...overrides,
     }
 }
 
 describe('buildFusionReport', () => {
-    it('does not mark matches as auto when automatic assignment is disabled', () => {
+    it('does not mark matches as auto when automatic merge is disabled', () => {
         const report = buildFusionReport(
             buildReportState({
-                fusionEnableAutoAssignment: false,
-                fusionAutoAssignmentScore: 90,
+                fusionEnableAutoMerge: false,
+                fusionAutoMergeScore: 90,
             })
         )
 
@@ -65,11 +65,11 @@ describe('buildFusionReport', () => {
         expect(report.accounts[0].matches[0].manual).toBe(true)
     })
 
-    it('marks matches as auto when automatic assignment is enabled and score meets threshold', () => {
+    it('marks matches as auto when automatic merge is enabled and score meets threshold', () => {
         const report = buildFusionReport(
             buildReportState({
-                fusionEnableAutoAssignment: true,
-                fusionAutoAssignmentScore: 90,
+                fusionEnableAutoMerge: true,
+                fusionAutoMergeScore: 90,
             })
         )
 
@@ -77,11 +77,11 @@ describe('buildFusionReport', () => {
         expect(report.accounts[0].matches[0].manual).toBe(false)
     })
 
-    it('marks matches as manual when automatic assignment is enabled but score is below threshold', () => {
+    it('marks matches as manual when automatic merge is enabled but score is below threshold', () => {
         const report = buildFusionReport(
             buildReportState({
-                fusionEnableAutoAssignment: true,
-                fusionAutoAssignmentScore: 96,
+                fusionEnableAutoMerge: true,
+                fusionAutoMergeScore: 96,
             })
         )
 

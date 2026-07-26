@@ -229,11 +229,11 @@ export const buildFormFields = (
     if (topSectionElements.length > 0) {
         const sectionDescriptions: Record<SourceType, string> = {
             [SourceType.Authoritative]:
-                'A potential matching identity has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or choose to create a new identity.',
+                'A potential matching identity has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or choose to create a new identity.',
             [SourceType.Record]:
-                'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
+                'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
             [SourceType.Orphan]:
-                'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to link this account to, or confirm there is no match.',
+                'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
         }
 
         formFields.push({

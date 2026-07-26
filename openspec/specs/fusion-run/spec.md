@@ -30,7 +30,7 @@ FusionRun SHALL contain maps, sets, and state fields for all data loaded and pro
 - **WHEN** fusion accounts are processed
 - **THEN** run.fusionAccountMap SHALL contain all fusion accounts
 - **AND** run.fusionIdentityMap SHALL contain identity-linked fusion accounts
-- **AND** run.autoAssignedIdentityIds SHALL track automatically assigned identities
+- **AND** run.autoMergedIdentityIds SHALL track automatically merged identities
 - **AND** run.sourcesByName SHALL map managed source names to SourceInfo
 - **AND** run.currentRunNonMatchedKeysBySource SHALL track non-matched account keys per source
 
@@ -83,7 +83,7 @@ FusionRun SHALL expose a `snapshot()` method that returns a complete serializabl
 
 #### Scenario: Snapshot captures complete state
 - **WHEN** run.snapshot() is called during a run
-- **THEN** the returned snapshot SHALL contain: managedAccounts, managedAccountInventory, fusionAccounts, identities, formDecisions, fusionIdentityDecisions, pendingCandidateIdentityIds, pendingReviewUrlsByReviewerId, pendingReviewUrlsByCandidateId, sourcesByName, currentRunNonMatchedKeysBySource, fusionBlends, autoAssignedIds, matchScoringMs, phaseTimings, formCounters, formDeleteQueue, managedAccountProcessing, trigramIndexBuilt
+- **THEN** the returned snapshot SHALL contain: managedAccounts, managedAccountInventory, fusionAccounts, identities, formDecisions, fusionIdentityDecisions, pendingCandidateIdentityIds, pendingReviewUrlsByReviewerId, pendingReviewUrlsByCandidateId, sourcesByName, currentRunNonMatchedKeysBySource, fusionBlends, autoMergedIds, matchScoringMs, phaseTimings, formCounters, formDeleteQueue, managedAccountProcessing, trigramIndexBuilt
 - **AND** the snapshot SHALL be JSON-serializable
 
 #### Scenario: Restore reconstructs identical state
@@ -139,15 +139,15 @@ FusionRun SHALL expose methods for identity cache mutations: addIdentity, remove
 
 ### Requirement: FusionRun encapsulates scoring state
 
-FusionRun SHALL expose methods for scoring state mutations: markAutoAssigned, isAutoAssigned, and resetScoringState. External code SHALL NOT directly mutate autoAssignedIdentityIds or matchScoringMs.
+FusionRun SHALL expose methods for scoring state mutations: markAutoMerged, isAutoMerged, and resetScoringState. External code SHALL NOT directly mutate autoMergedIdentityIds or matchScoringMs.
 
-#### Scenario: Recording an auto-assignment
-- **WHEN** the match engine auto-assigns an identity
-- **THEN** it SHALL call run.markAutoAssigned(identityId) rather than run.autoAssignedIdentityIds.add(identityId)
+#### Scenario: Recording an automatic merge
+- **WHEN** the match engine automatically merges an identity
+- **THEN** it SHALL call run.markAutoMerged(identityId) rather than run.autoMergedIdentityIds.add(identityId)
 
 #### Scenario: Resetting scoring state for a new run
 - **WHEN** a new managed account processing phase starts
-- **THEN** the orchestrator SHALL call run.resetScoringState() rather than manually clearing autoAssignedIdentityIds and resetting matchScoringMs
+- **THEN** the orchestrator SHALL call run.resetScoringState() rather than manually clearing autoMergedIdentityIds and resetting matchScoringMs
 
 ### Requirement: RecordingService snapshots FusionRun directly
 

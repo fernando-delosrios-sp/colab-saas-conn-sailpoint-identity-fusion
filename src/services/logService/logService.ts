@@ -237,6 +237,9 @@ export class LogService {
     phaseStart(phaseNumber: number, phase: OperationPhase): void {
         if (this.runContext) {
             this.runContext.phase = phase
+            if (phase === 'Process') {
+                this.runContext.resetCumulativeOutcomes()
+            }
         }
         this.info(`PHASE ${phaseNumber} ${phase} START`)
     }
@@ -265,8 +268,18 @@ export class LogService {
         }
     }
 
+    recordRefreshedAccount(): void {
+        if (this.runContext?.phase === 'Refresh') {
+            this.runContext.incrementRefreshedCount()
+        }
+    }
+
     recordEvent(category: string, detail?: Record<string, unknown>): void {
         this.runContext?.recordEvent(category, detail)
+    }
+
+    getCumulativeOutcomes() {
+        return this.runContext?.getCumulativeOutcomes() ?? { nonMatch: 0, autoMerged: 0, formsQueued: 0 }
     }
 
     startOperationHeartbeat(getSnapshot: () => HeartbeatSnapshot): void {
@@ -617,5 +630,6 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+
 
 

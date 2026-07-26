@@ -195,7 +195,7 @@ FusionService SHALL delegate all managed account matching to MatchingService. Fu
 
 ### Requirement: FusionService receives state via FusionRun
 
-FusionService SHALL access all shared run state through FusionRun at construction time. Internal state previously held on FusionService (`_tracker`, `_managedAccountProcessingState`, `_managedAccountProcessingStartedAt`, `_managedAccountProcessingBatchSize`) SHALL live on FusionRun. Pass-through getters (`sourcesByName`, `_reviewersBySourceId`, `_sourcesWithoutReviewers`, `autoAssignedIdentityIds`) SHALL NOT exist — callers SHALL access FusionRun directly.
+FusionService SHALL access all shared run state through FusionRun at construction time. Internal state previously held on FusionService (`_tracker`, `_managedAccountProcessingState`, `_managedAccountProcessingStartedAt`, `_managedAccountProcessingBatchSize`) SHALL live on FusionRun. Pass-through getters (`sourcesByName`, `_reviewersBySourceId`, `_sourcesWithoutReviewers`, `autoMergedIdentityIds`) SHALL NOT exist — callers SHALL access FusionRun directly.
 
 #### Scenario: FusionService reads fusion accounts from FusionRun
 - **WHEN** FusionService needs to iterate fusion accounts
@@ -323,4 +323,5 @@ FusionService SHALL provide `disableResetAccounts()` and `disableResetForms()` m
 - **WHEN** `disableResetForms()` is called on a persistent run
 - **THEN** the connector SHALL patch `resetForms` to `false`
 - **AND** the connector SHALL NOT modify `resetAccounts` or legacy `reset`
+
 

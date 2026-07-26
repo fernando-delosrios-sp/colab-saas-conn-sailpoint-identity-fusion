@@ -140,6 +140,10 @@ export class DecisionProcessor {
     public async processFusionIdentityDecision(fusionDecision: FusionDecision): Promise<FusionAccount | undefined> {
         const sourceType = fusionDecision.sourceType ?? SourceType.Authoritative
 
+        if (fusionDecision.newIdentity) {
+            this.log.recordEvent('newIdentityAssignment')
+        }
+
         // Enrich submitter and selected identity display names for user-facing output.
         await this.enrichDecisionSubmitter(fusionDecision)
         let selectedIdentity = await this.enrichDecisionIdentityName(fusionDecision)
@@ -264,5 +268,6 @@ export class DecisionProcessor {
         }
     }
 }
+
 
 

@@ -4,6 +4,7 @@ import {
     formatApiQueueSegment,
     formatDeltaSuffix,
     formatEventSummaryLines,
+    formatMatchOutcomesSegment,
     formatStatusLine,
     formatStallWarning,
     groupActiveLabels,
@@ -54,6 +55,10 @@ describe('operation heartbeat formatters', () => {
         runContext.phase = 'Process'
         runContext.step = 'uncorrelated-sweep'
         runContext.progress = { done: 537, total: 800, unit: 'analyzed' }
+        runContext.recordEvent('nonMatch')
+        runContext.recordEvent('nonMatch')
+        runContext.recordEvent('formsQueued')
+        runContext.recordEvent('autoMerged')
 
         vi.advanceTimersByTime(5_000)
         const line = formatStatusLine(
@@ -79,9 +84,28 @@ describe('operation heartbeat formatters', () => {
         expect(line).toContain('phase=Process')
         expect(line).toContain('step=uncorrelated-sweep')
         expect(line).toContain('progress=537/800 analyzed(Δ+87/30s)')
+        expect(line).toContain('matches(2n/1m/1a)')
         expect(line).toContain('api=10a/97q/537c(Δ+0/30s)')
         expect(line).toContain('mem=482.00MB(100%)')
         vi.useRealTimers()
+    })
+
+    it('formatMatchOutcomesSegment includes total when requested', () => {
+        expect(formatMatchOutcomesSegment({ nonMatch: 58, formsQueued: 30, autoMerged: 4 })).toBe(
+            'matches(58n/30m/4a)'
+        )
+        expect(formatMatchOutcomesSegment({ nonMatch: 58, formsQueued: 30, autoMerged: 4 }, true)).toBe(
+            'matches(58n/30m/4a total=92)'
+        )
+    })
+
+    it('omits match outcomes from STATUS outside Process phase', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Fetch'
+        runContext.recordEvent('nonMatch')
+
+        const line = formatStatusLine({ runContext, intervalMs: 10_000 }, {}, 10_000)
+        expect(line).not.toContain('matches(')
     })
 
     it('omits progress and api-queue deltas on first STATUS tick', () => {
@@ -200,12 +224,12 @@ describe('operation heartbeat formatters', () => {
             correlationTriggers: 14,
             correlationAccounts: 18,
             nonMatch: 0,
-            autoAssigned: 0,
+            autoMerged: 0,
             formsQueued: 0,
+            newIdentityAssignment: 0,
             recordUniqueRegistered: 0,
         }
-        expect(formatEventSummaryLines(events, 'Process')).toEqual([
-            'EVENT_SUMMARY matches exact=2 partial=12 deferred=3',
+        expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
             'EVENT_SUMMARY correlations triggered=14 accounts=18',
         ])
     })
@@ -218,16 +242,17 @@ describe('operation heartbeat formatters', () => {
             correlationTriggers: 2,
             correlationAccounts: 3,
             nonMatch: 5,
-            autoAssigned: 4,
+            autoMerged: 4,
             formsQueued: 2,
+            newIdentityAssignment: 1,
             recordUniqueRegistered: 0,
         }
-        expect(formatEventSummaryLines(events, 'Refresh')).toEqual([
+        expect(formatEventSummaryLines(events, 'Refresh', 10_000)).toEqual([
             'EVENT_SUMMARY correlations triggered=2 accounts=3',
         ])
-        expect(formatEventSummaryLines(events, 'Process')).toEqual([
-            'EVENT_SUMMARY matches exact=1',
-            'EVENT_SUMMARY outcomes unmatched=5 auto=4 manual=2',
+        expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
+            'EVENT_SUMMARY matches non-matched=+5/10s manual=+2/10s auto=+4/10s',
+            'EVENT_SUMMARY forms new-identity-assignment=1',
             'EVENT_SUMMARY correlations triggered=2 accounts=3',
         ])
     })
@@ -291,6 +316,7 @@ describe('OperationHeartbeat timing', () => {
         const runContext = new OperationRunContext()
         runContext.phase = 'Refresh'
         runContext.progress = { done: 7596, total: 18495, unit: 'processed' }
+        runContext.refreshedCount = 280
 
         const heartbeat = new OperationHeartbeat(log, () => ({
             runContext,
@@ -309,16 +335,55 @@ describe('OperationHeartbeat timing', () => {
         heartbeat.start()
         vi.advanceTimersByTime(10_000)
         runContext.progress = { done: 10296, total: 18495, unit: 'processed' }
+        runContext.refreshedCount = 390
         vi.advanceTimersByTime(10_000)
         runContext.progress = { done: 13008, total: 18495, unit: 'processed' }
+        runContext.refreshedCount = 500
         vi.advanceTimersByTime(10_000)
 
         expect(warn).not.toHaveBeenCalled()
         expect(info.mock.calls[2][0]).toContain('progress=13008/18495 processed(Δ+2712/10s)')
+        expect(info.mock.calls[2][0]).toContain('refreshed(500)')
         expect(info.mock.calls[2][0]).not.toContain('api=')
 
         heartbeat.stop()
         vi.useRealTimers()
+    })
+
+    it('shows cumulative refreshed count during Refresh phase STATUS', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Refresh'
+        runContext.progress = { done: 13548, total: 18811, unit: 'processed' }
+        runContext.refreshedCount = 500
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                memory: { rss: 642_777_088, heapUsed: 353_370_112, heapTotal: 419_430_400, external: 0, arrayBuffers: 0 },
+                intervalMs: 10_000,
+            },
+            { previousProgressDone: 7296 },
+            10_000
+        )
+
+        expect(line).toContain('phase=Refresh')
+        expect(line).toContain('progress=13548/18811 processed(Δ+6252/10s)')
+        expect(line).toContain('refreshed(500)')
+    })
+
+    it('omits refreshed segment outside Refresh phase', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Process'
+        runContext.progress = { done: 100, total: 200, unit: 'processed' }
+        runContext.refreshedCount = 50
+
+        const line = formatStatusLine(
+            { runContext, intervalMs: 10_000 },
+            {},
+            10_000
+        )
+
+        expect(line).not.toContain('refreshed(')
     })
 
     it('formats Fetch phase STATUS with fetched progress delta', () => {
@@ -422,6 +487,7 @@ describe('OperationHeartbeat timing', () => {
         vi.useRealTimers()
     })
 })
+
 
 
 

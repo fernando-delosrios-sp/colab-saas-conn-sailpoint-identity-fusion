@@ -207,6 +207,7 @@ export class ServiceRegistry {
         if (this.clientUsesInjection) {
             return
         }
+        this.run.isDryRunMode = true
         this.client.wrapAdapter((inner) => new DryRunApiAdapter(inner))
         this.log.info('DryRunApiAdapter enabled — ISC write calls inhibited for this run')
     }
@@ -276,6 +277,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

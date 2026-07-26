@@ -46,7 +46,7 @@ export type FusionReportMatch = {
      * @deprecated Use auto or manual instead.
      */
     exact?: boolean
-    /** True when the candidate meets the auto-assignment score threshold. */
+    /** True when the candidate meets the automatic merge score threshold. */
     auto?: boolean
     /** True when the candidate only meets the manual-review score threshold. */
     manual?: boolean
@@ -101,12 +101,12 @@ export type FusionReportDecision = {
     /** Source processing type (authoritative, record, or orphan) */
     sourceType?: SourceType
     /** Canonical decision identifier used by templates */
-    decision: 'assign-existing-identity' | 'create-new-identity' | 'confirm-no-match'
+    decision: 'merge-existing-identity' | 'create-new-identity' | 'confirm-no-match'
     /** Human-friendly decision text */
     decisionLabel: string
-    /** Selected identity ID for assignment decisions */
+    /** Selected identity ID for merge decisions */
     selectedIdentityId?: string
-    /** Selected identity display name for assignment decisions */
+    /** Selected identity display name for merge decisions */
     selectedIdentityName?: string
     /** Direct URL to the selected identity in the ISC UI */
     selectedIdentityUrl?: string
@@ -114,8 +114,8 @@ export type FusionReportDecision = {
     comments?: string
     /** Standalone form URL for traceability */
     formUrl?: string
-    /** True when the connector assigned without a review form (exact match) */
-    automaticAssignment?: boolean
+    /** True when the connector merged without a review form (exact match) */
+    automaticMerge?: boolean
 }
 
 /** Processing statistics included in the fusion report. */
@@ -246,3 +246,4 @@ export type FusionReport = {
     /** Global warnings surfaced during report generation */
     warnings?: FusionReportWarnings
 }
+

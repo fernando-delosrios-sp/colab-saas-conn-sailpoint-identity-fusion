@@ -105,7 +105,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                 {{#if sourceType}}
                 <span style="display:inline-block; margin-left:6px; margin-top:3px; padding:1px 6px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle; white-space:nowrap;">{{sourceTypeLabel sourceType}}</span>
                 {{/if}}
-                {{#if automaticAssignment}}
+                {{#if automaticMerge}}
                 <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:11px; font-weight:700; text-transform:uppercase; vertical-align:middle;">{{i18n "auto"}}</span>
                 {{/if}}
               </div>
@@ -163,9 +163,6 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
             <div style="margin-bottom: 10px; border: 1px solid #e6ebf5; border-radius: 10px; padding: 12px; background: #fbfcff;">
               <div style="font-size:14px; font-weight:900; color:#0f172a; line-height:1.3;">
                 {{i18n "blended"}}
-                {{#if isAutoAssignment}}
-                <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:11px; font-weight:700; text-transform:uppercase; vertical-align:middle;">{{i18n "auto"}}</span>
-                {{/if}}
               </div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px; border-collapse:collapse;">
                 <tr>
@@ -641,14 +638,14 @@ export type FusionReportEmailData = {
         accountUrl?: string
         accountSource: string
         sourceType?: SourceType
-        decision: 'assign-existing-identity' | 'create-new-identity' | 'confirm-no-match'
+        decision: 'merge-existing-identity' | 'create-new-identity' | 'confirm-no-match'
         decisionLabel: string
         selectedIdentityId?: string
         selectedIdentityName?: string
         selectedIdentityUrl?: string
         comments?: string
         formUrl?: string
-        automaticAssignment?: boolean
+        automaticMerge?: boolean
     }>
     stats?: {
         totalFusionAccounts?: number
