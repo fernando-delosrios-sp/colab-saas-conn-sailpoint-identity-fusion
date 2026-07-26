@@ -237,19 +237,8 @@ export class SchemaService {
         const attributes: SchemaAttribute[] = []
         for (const attribute of schema.attributes) {
             const attributeMap = this.attributeMap.get(attribute.name!)
-            if (attributeMap) {
-                if (attributeMap.attributeMerge === AttributeMergeMode.List) {
-                    attribute.multi = true
-                } else {
-                    attribute.multi = false
-                }
-            } else {
-                if (this.attributeMerge === AttributeMergeMode.List) {
-                    attribute.multi = true
-                } else {
-                    attribute.multi = false
-                }
-            }
+            const mergeMode = attributeMap ? attributeMap.attributeMerge : this.attributeMerge
+            attribute.multi = mergeMode === AttributeMergeMode.List
             attribute.description = attribute.description || `${attribute.name} from ${sourceName}`
             attributes.push(attribute)
         }
@@ -261,23 +250,13 @@ export class SchemaService {
     private getAttributeMappingAttributes(): SchemaAttribute[] {
         const attributes: SchemaAttribute[] = []
         for (const attributeMap of this.attributeMap.values()) {
-            if (attributeMap.attributeMerge === AttributeMergeMode.List) {
-                attributes.push({
-                    name: attributeMap.newAttribute,
-                    description: `Created from ${attributeMap.existingAttributes.join(', ')}`,
-                    type: 'string',
-                    multi: true,
-                    entitlement: false,
-                })
-            } else {
-                attributes.push({
-                    name: attributeMap.newAttribute,
-                    description: `Created from ${attributeMap.existingAttributes.join(', ')}`,
-                    type: 'string',
-                    multi: false,
-                    entitlement: false,
-                })
-            }
+            attributes.push({
+                name: attributeMap.newAttribute,
+                description: `Created from ${attributeMap.existingAttributes.join(', ')}`,
+                type: 'string',
+                multi: attributeMap.attributeMerge === AttributeMergeMode.List,
+                entitlement: false,
+            })
         }
 
         return attributes
