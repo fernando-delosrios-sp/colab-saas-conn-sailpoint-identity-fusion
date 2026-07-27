@@ -190,7 +190,14 @@ export class FusionLayers {
             this.collections._internal_accountIds.add(id)
         }
 
-        this._processIdentityMatchedAccounts(workQueue, addBlendHistory, skipBlendHistoryForManagedKeys, onBlend, identityInfo?.id)
+        this._processIdentityMatchedAccounts(
+            workQueue,
+            attributeBag,
+            addBlendHistory,
+            skipBlendHistoryForManagedKeys,
+            onBlend,
+            identityInfo?.id
+        )
         this._processDeclaredAccountIds(
             workQueue,
             attributeBag,
@@ -198,7 +205,13 @@ export class FusionLayers {
             skipBlendHistoryForManagedKeys,
             onBlend
         )
-        this._processPreviousRunMatchedAccounts(workQueue, addBlendHistory, skipBlendHistoryForManagedKeys, onBlend)
+        this._processPreviousRunMatchedAccounts(
+            workQueue,
+            attributeBag,
+            addBlendHistory,
+            skipBlendHistoryForManagedKeys,
+            onBlend
+        )
 
         const inventoryKeys = new Set(workQueue.managedAccountInventory.keys())
 
@@ -280,7 +293,7 @@ export class FusionLayers {
         account: Account,
         addBlendHistory: boolean = true,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
-        attributeBag?: { current: Attributes; sources: Map<string, Attributes[]> },
+        attributeBag?: { sources: Map<string, Attributes[]> },
     ) {
         const accountId = getManagedAccountKeyFromAccount(account)
         if (!accountId) {
@@ -348,6 +361,7 @@ export class FusionLayers {
 
     private _processIdentityMatchedAccounts(
         queue: FusionRun,
+        attributeBag: { sources: Map<string, Attributes[]> },
         addBlendHistory: boolean,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
         onBlend?: (account: Account) => void,
@@ -363,7 +377,12 @@ export class FusionLayers {
             if (account) {
                 this.collections.accounts.add(id)
                 this.collections.accounts.removeMissing(id)
-                const blended = this._setManagedAccount(account, addBlendHistory, skipBlendHistoryForManagedKeys)
+                const blended = this._setManagedAccount(
+                    account,
+                    addBlendHistory,
+                    skipBlendHistoryForManagedKeys,
+                    attributeBag
+                )
                 if (blended && onBlend) onBlend(account)
                 queue.claimAccount(id, account.identityId)
             }
@@ -417,6 +436,7 @@ export class FusionLayers {
 
     private _processPreviousRunMatchedAccounts(
         queue: FusionRun,
+        attributeBag: { sources: Map<string, Attributes[]> },
         addBlendHistory: boolean,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
         onBlend?: (account: Account) => void
@@ -431,7 +451,12 @@ export class FusionLayers {
             this._uncorrelated = true
             this.collections._internal_statuses.add(StatusEntitlement.Uncorrelated)
             this.collections._internal_actions.delete('correlated')
-            const blended = this._setManagedAccount(account, addBlendHistory, skipBlendHistoryForManagedKeys)
+            const blended = this._setManagedAccount(
+                account,
+                addBlendHistory,
+                skipBlendHistoryForManagedKeys,
+                attributeBag
+            )
             if (blended && onBlend) onBlend(account)
             queue.claimAccount(id, account.identityId)
         }
@@ -478,4 +503,5 @@ export class FusionLayers {
         }
     }
 }
+
 
