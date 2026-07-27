@@ -51,6 +51,7 @@ export interface QueueStats {
     averageProcessingTime: number
     queueLength: number
     activeRequests: number
+    rateLimitWaitCount: number
 }
 
 /**
@@ -98,5 +99,6 @@ export class PaginationError extends Error {
         this.name = 'PaginationError'
     }
 }
+
 
 

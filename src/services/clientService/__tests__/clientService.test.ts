@@ -38,6 +38,7 @@ describe('ClientService', () => {
             getStats: vi.fn().mockReturnValue({
                 queueLength: 0,
                 activeRequests: 0,
+                rateLimitWaitCount: 0,
                 totalProcessed: 0,
                 totalFailed: 0,
                 totalRetries: 0,
@@ -126,21 +127,60 @@ describe('ClientService', () => {
         ).rejects.toThrow(error)
     })
 
-    it('passes merged abort signal when provisioning timeout is configured', async () => {
-        mockQueue.enqueue.mockResolvedValue(undefined)
+    it('passes caller abortSignal to queue without merging provisioning timeout', async () => {
+        mockQueue.enqueue.mockImplementation(async (execute) => execute())
         const config = { ...mockConfig, provisioningTimeout: 1 } as FusionConfig
         const client = new ClientService(mockAdapter, mockQueue, config, mockLog)
         activeClients.push(client)
+        const callerController = new AbortController()
 
-        await client.call(() => new Promise(() => {}))
+        await client.call(() => Promise.resolve(), { abortSignal: callerController.signal })
 
         expect(mockQueue.enqueue).toHaveBeenCalledWith(
             expect.any(Function),
-            expect.objectContaining({ abortSignal: expect.any(AbortSignal) })
+            expect.objectContaining({ abortSignal: callerController.signal })
         )
     })
 
-    it('aborts slow queued request when provisioning timeout expires', async () => {
+    it('does not timeout while queued longer than provisioningTimeout when HTTP is fast once execution starts', async () => {
+        vi.useFakeTimers()
+        const realQueue = new ApiQueue({
+            requestsPerSecond: 100,
+            maxConcurrentRequests: 1,
+            maxRetries: 0,
+            enablePriority: true,
+        })
+        const config = { ...mockConfig, provisioningTimeout: 1 } as FusionConfig
+        const client = new ClientService(mockAdapter, realQueue, config, mockLog)
+        activeClients.push(client)
+
+        let blockerResolve: () => void
+        const blocker = new Promise<void>((resolve) => {
+            blockerResolve = resolve
+        })
+        void client.call(() => blocker, { throwOnError: false })
+
+        mockAdapter.accountsApi = {
+            updateAccount: vi.fn(() => Promise.resolve({ id: 'ok' })),
+        } as any
+
+        const promise = client.call(
+            (api: IscApiSurface) => api.accounts.updateAccount({} as any),
+            { throwOnError: true }
+        )
+
+        await vi.advanceTimersByTimeAsync(2000)
+        blockerResolve!()
+        await vi.advanceTimersByTimeAsync(0)
+
+        await expect(promise).resolves.toEqual({ id: 'ok' })
+
+        realQueue.stop()
+        realQueue.clear()
+        vi.useRealTimers()
+    })
+
+    it('aborts slow HTTP after execution start when provisioning timeout expires', async () => {
         vi.useFakeTimers()
         const realQueue = new ApiQueue({
             requestsPerSecond: 100,
@@ -169,6 +209,56 @@ describe('ClientService', () => {
             realQueue.clear()
             vi.useRealTimers()
         }
+    })
+
+    it('gets fresh timeout budget on retry after retryable failure', async () => {
+        vi.useFakeTimers()
+        const realQueue = new ApiQueue({
+            requestsPerSecond: 100,
+            maxConcurrentRequests: 1,
+            maxRetries: 1,
+            enablePriority: true,
+        })
+        const config = { ...mockConfig, provisioningTimeout: 1 } as FusionConfig
+        const client = new ClientService(mockAdapter, realQueue, config, mockLog)
+        activeClients.push(client)
+
+        let blockerResolve: () => void
+        const blocker = new Promise<void>((resolve) => {
+            blockerResolve = resolve
+        })
+        void client.call(() => blocker, { throwOnError: false })
+
+        let attempts = 0
+        mockAdapter.accountsApi = {
+            updateAccount: vi.fn(() => {
+                attempts++
+                if (attempts === 1) {
+                    const err = new Error('429 Too Many Requests') as Error & {
+                        response?: { status: number }
+                    }
+                    err.response = { status: 429 }
+                    return Promise.reject(err)
+                }
+                return Promise.resolve({ id: 'ok' })
+            }),
+        } as any
+
+        const promise = client.call(
+            (api: IscApiSurface) => api.accounts.updateAccount({} as any),
+            { throwOnError: true }
+        )
+
+        await vi.advanceTimersByTimeAsync(2000)
+        blockerResolve!()
+        await vi.runAllTimersAsync()
+
+        await expect(promise).resolves.toEqual({ id: 'ok' })
+        expect(attempts).toBe(2)
+
+        realQueue.stop()
+        realQueue.clear()
+        vi.useRealTimers()
     })
 
     it('passes priority, context, and noRetry from policy via call()', async () => {
@@ -505,6 +595,7 @@ describe('ClientService', () => {
         expect(mockQueue.stop).toHaveBeenCalled()
     })
 })
+
 
 
 

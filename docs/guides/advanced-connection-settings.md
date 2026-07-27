@@ -167,7 +167,7 @@ During long `accountList` aggregations, the connector emits standardized text pr
 
 | Prefix | Level | Purpose |
 | ------ | ----- | ------- |
-| `STATUS` | Info | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, compact `api=Na/Nq/Nc` segment with delta, memory, elapsed time |
+| `STATUS` | Info | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, compact `api=Na/Nq/Nc` segment with delta (`q` = FIFO queue length plus requests waiting for a rate-limit slot), memory, elapsed time |
 | `EVENT_SUMMARY` | Info | Aggregated match/correlation/email counts since the previous heartbeat tick |
 | `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END elapsed=…`) |
 | `DETAIL` | Info | Operational milestones as `key=value` pairs (sources loaded, emails sent, mode) |
@@ -233,7 +233,7 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 
 | Field                              | Default | Range   | Purpose                                                                                                                  |
 | ---------------------------------- | ------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Provisioning timeout (seconds)** | 300     | 60–3600 | Max wait for provisioning operations (enable/disable, create/update)                                                     |
+| **Provisioning timeout (seconds)** | 300     | 60–3600 | Max in-flight HTTP time per queue execution attempt (enable/disable, create/update). Does **not** include time spent waiting in the API queue or for a rate-limit slot. |
 | **Processing wait time (seconds)** | 60      | 0–600   | Interval between keep-alive signals during account list and account update; prevents timeouts on long-running operations |
 | **Heartbeat interval (seconds)**   | 10      | 5+      | How often STATUS and EVENT_SUMMARY lines are emitted during long operations; lower = faster visibility, higher = less log volume |
 
@@ -532,6 +532,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](troubleshooting.md).
+
 
 
 
