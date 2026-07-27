@@ -243,6 +243,9 @@ const OFFSET_LABEL_SUFFIX = /\[(?:page(?: \d+)?, )?offset (\d+)\]$/
 
 const FETCH_ACCOUNTS_LABEL_PREFIX = /^SourceService>fetchAccountsBySourceId(?:Generator)? /
 
+/** Per-account correlation labels share a base prefix; aggregate counts in queue-pending. */
+const CORRELATE_ACCOUNTS_LABEL_PREFIX = /^IdentityService>correlateAccounts(?: .+)?$/
+
 type ParsedQueueLabel =
     | { kind: 'paginated'; base: string; offset: number }
     | { kind: 'plain'; label: string }
@@ -263,6 +266,13 @@ function formatPaginatedGroupBase(base: string): string {
     return base.replace(FETCH_ACCOUNTS_LABEL_PREFIX, '')
 }
 
+function normalizePlainQueueLabel(label: string): string {
+    if (CORRELATE_ACCOUNTS_LABEL_PREFIX.test(label)) {
+        return 'IdentityService>correlateAccounts'
+    }
+    return label
+}
+
 function formatPlainGroupLabel(label: string, count: number): string {
     return count > 1 ? `${label}×${count}` : label
 }
@@ -281,7 +291,8 @@ export function groupActiveLabels(activeItems: QueuedItemInfo[] | undefined, lim
             offsets.push(parsed.offset)
             paginatedOffsets.set(parsed.base, offsets)
         } else {
-            plainCounts.set(parsed.label, (plainCounts.get(parsed.label) ?? 0) + 1)
+            const label = normalizePlainQueueLabel(parsed.label)
+            plainCounts.set(label, (plainCounts.get(label) ?? 0) + 1)
         }
     }
 
@@ -443,6 +454,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 
