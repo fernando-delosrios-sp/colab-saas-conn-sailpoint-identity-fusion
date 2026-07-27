@@ -1,6 +1,8 @@
 import { FusionAccount } from '../model/account'
 import { FusionDecision } from '../model/form'
 import { FusionConfig } from '../model/config'
+import { normalizeCompositeManagedAccountKey } from '../model/managedAccountKey'
+import { trimStr } from '../utils/safeRead'
 import { LogService } from './logService'
 import { IdentityService } from './identityService'
 import { SourceService } from './sourceService'
@@ -50,16 +52,15 @@ export class CorrelationManager {
               })
             : []
 
-        // Recovery path: if decision payload has source context but account metadata is missing
-        // from the managed-account map, still include that assigned key for direct correlation.
+        // Link-to-existing form outcomes: PATCH correlate-mode sources for the assigned
+        // managed account even when assembleAccount already blended it off missing-accounts.
         if (mergeDecision && !mergeDecision.newIdentity && canDirectCorrelate) {
-            const assignedKey = mergeDecision.account.id
+            const rawKey = trimStr(mergeDecision.account.id) ?? ''
+            const assignedKey = normalizeCompositeManagedAccountKey(rawKey) ?? rawKey
             const assignedSource = mergeDecision.account.sourceName
             if (
                 assignedKey &&
                 assignedSource &&
-                missingIds.includes(assignedKey) &&
-                !fusionAccount.getManagedAccountInfo(assignedKey) &&
                 (this.sources.getSourceConfig(assignedSource)?.correlationMode ?? 'none') === 'correlate' &&
                 !directCorrelateIds.includes(assignedKey)
             ) {
@@ -86,7 +87,12 @@ export class CorrelationManager {
         mergeDecision?: FusionDecision
     ): Promise<void> {
         if (!this.isAggregationMode()) return
-        if (fusionAccount.missingAccountIdsSet.size === 0) return
+        const hasMissing = fusionAccount.missingAccountIdsSet.size > 0
+        const hasAuthorizedMerge =
+            mergeDecision != null &&
+            !mergeDecision.newIdentity &&
+            Boolean(trimStr(mergeDecision.account.id))
+        if (!hasMissing && !hasAuthorizedMerge) return
         await this.correlatePerSource(fusionAccount, mergeDecision)
     }
 
@@ -100,4 +106,5 @@ export class CorrelationManager {
         fusionAccount.updateCorrelationStatus()
     }
 }
+
 
