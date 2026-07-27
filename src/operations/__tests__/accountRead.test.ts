@@ -23,7 +23,6 @@ function createRegistry() {
     schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
 
     const fusion = registry.fusion as any
-    fusion.normalizePendingFormStateForOutput = vi.fn().mockResolvedValue(undefined)
     fusion.getISCAccount = vi.fn().mockResolvedValue({ id: 'isc-1' })
 
     const log = registry.log as any
@@ -59,7 +58,6 @@ describe('accountRead', () => {
             }),
             true
         )
-        expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(fusionAccount)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-1' })
     })
@@ -89,3 +87,4 @@ describe('accountRead', () => {
         expect(registry.log.crash).toHaveBeenCalledWith('Failed to read account fusion-1', error)
     })
 })
+

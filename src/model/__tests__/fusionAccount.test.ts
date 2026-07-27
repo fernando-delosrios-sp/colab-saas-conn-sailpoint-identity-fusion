@@ -88,6 +88,8 @@ describe('FusionAccount', () => {
             
             acc.addManagedAccountLayer(run)
             expect(acc.accountIds).toContain('src-a::native-1')
+            expect(acc.sources).toContain('Source A')
+            expect(acc.attributeBag.sources.get('Source A')).toHaveLength(1)
             expect(run.managedAccountsById.size).toBe(0)
         })
 
@@ -487,6 +489,8 @@ describe('FusionAccount', () => {
 
             expect(acc.accountIds).toContain('src-a::native-1')
             expect(acc.missingAccountIds).not.toContain('src-a::native-1')
+            expect(acc.sources).toContain('Source A')
+            expect(acc.attributeBag.sources.get('Source A')).toHaveLength(1)
             expect(run.managedAccountsById.size).toBe(0)
             expect(run.managedAccountsByIdentityId.has('id-1')).toBe(false)
         })

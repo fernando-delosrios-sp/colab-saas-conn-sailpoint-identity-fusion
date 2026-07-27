@@ -277,7 +277,6 @@ export class FusionAccount {
         fa.collections._internal_actions.delete(FusionAction.Correlated)
 
         fa.layers._setManagedAccount(account, false, undefined, {
-            current: fa._attributeBag.current,
             sources: fa._attributeBag.sources,
         })
 
@@ -835,4 +834,5 @@ export class FusionAccount {
         }
     }
 }
+
 
