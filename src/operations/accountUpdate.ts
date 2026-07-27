@@ -4,6 +4,7 @@ import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { FusionAttribute } from '../data/schema'
 import { FusionAction } from '../model/fusionAction'
 import { assert } from '../utils/assert'
+import { trimStr } from '../utils/safeRead'
 import { executeActions } from './actions'
 import { ATTR_OPS_NONE } from '../services/definitionService/types'
 
@@ -25,9 +26,9 @@ import { ATTR_OPS_NONE } from '../services/definitionService/types'
  */
 export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: StdAccountUpdateInput) => {
     const { log, sources, schemas, fusion, res, config, identities } = serviceRegistry
+    let accountLabel = input.identity
 
     try {
-        log.info(`Updating account: ${input.identity}`)
         assert(input.identity, 'Account identity is required')
         assert(input.changes, 'Account changes are required')
         assert(input.changes.length > 0, 'At least one change is required')
@@ -59,7 +60,17 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
             log,
         })
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
-        log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.managedKey}`)
+        const { fusionDisplayAttribute } = schemas
+        accountLabel =
+            trimStr(fusionAccount.name) ??
+            trimStr(
+                fusionDisplayAttribute
+                    ? (fusionAccount.attributes?.[fusionDisplayAttribute] as string | undefined)
+                    : undefined
+            ) ??
+            input.identity
+        log.info(`Updating account: ${accountLabel}`)
+        log.debug(`Found fusion account: ${accountLabel || fusionAccount.managedKey}`)
         timer.phase('Step 2: Rebuilding fusion account with fresh attributes')
 
         log.info(`Processing ${input.changes.length} change(s)`)
@@ -98,9 +109,10 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
         timer.phase('Step 4: Generating updated ISC account')
 
         res.send(iscAccount)
-        timer.end(`✓ Account update completed for ${input.identity}`)
+        timer.end(`✓ Account update completed for ${accountLabel}`)
     } catch (error) {
         if (error instanceof ConnectorError) throw error
-        log.crash(`Failed to update account ${input.identity}`, error)
+        log.crash(`Failed to update account ${accountLabel}`, error)
     }
 }
+

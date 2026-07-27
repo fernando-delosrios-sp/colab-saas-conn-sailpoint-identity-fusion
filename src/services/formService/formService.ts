@@ -20,7 +20,7 @@ import {
     PendingReviewAccountContext,
 } from './types'
 import { defaultFusionMaxCandidatesForForm, internalConfig } from '../../data/config'
-import { createAutomaticMergeDecision, resolveIdentitiesSelectLabel } from './helpers'
+import { createAutomaticMergeDecision, resolveCandidateDisplayName, resolveIdentitiesSelectLabel } from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 import {
     createFusionDecision,
@@ -378,7 +378,14 @@ export class FormService {
         // Single pass: apply both name and email enrichment using the now-cached docs.
         for (const c of candidates) {
             const doc = this.identities.getIdentityById(c.id)
-            c.name = resolveIdentitiesSelectLabel(c.attributes, c.id, doc)
+            const previousName = c.name
+            const resolved = resolveIdentitiesSelectLabel(c.attributes, c.id, doc)
+            c.name =
+                resolved !== c.id
+                    ? resolved
+                    : previousName && previousName !== c.id
+                      ? previousName
+                      : resolved
 
             const existing = normalizeEmail(readUnknown(c.attributes, 'email'))
             if (existing) {
@@ -856,7 +863,7 @@ export class FormService {
             const id = match.fusionIdentity.identityId
             return {
                 id,
-                name: resolveIdentitiesSelectLabel(attrs, id),
+                name: resolveCandidateDisplayName(match, attrs, id),
                 attributes: attrs,
                 scores: match.scores || [],
             }

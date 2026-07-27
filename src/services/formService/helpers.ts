@@ -79,6 +79,22 @@ export const resolveIdentitiesSelectLabel = (
 }
 
 /**
+ * Candidate label for review forms and emails: prefer attributes/search displayName, then
+ * {@link FusionMatch.identityName} from scoring (same chain as dry-run reports).
+ */
+export const resolveCandidateDisplayName = (
+    match: { identityName?: string },
+    fusionAttributes: Record<string, any>,
+    identityId: string
+): string => {
+    const fromAttrs = resolveIdentitiesSelectLabel(fusionAttributes, identityId)
+    if (fromAttrs !== identityId) return fromAttrs
+    const fromMatch = trimStr(match.identityName)
+    if (fromMatch && fromMatch !== identityId) return fromMatch
+    return fromAttrs
+}
+
+/**
  * Sort key for ranking match candidates on review forms: combined match score when present,
  * otherwise the best non-skipped rule score.
  */
@@ -124,7 +140,7 @@ export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: 
         const id = match.fusionIdentity.identityId
         return {
             id,
-            name: resolveIdentitiesSelectLabel(attrs, id),
+            name: resolveCandidateDisplayName(match, attrs, id),
             attributes: attrs,
             scores: match.scores || [],
         }
@@ -160,4 +176,5 @@ export const getFormOwner = (sources: SourceService): OwnerDto => {
     assert(owner, 'Fusion source owner not found')
     return owner
 }
+
 
