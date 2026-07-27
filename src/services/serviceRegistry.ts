@@ -261,6 +261,8 @@ export class ServiceRegistry {
                 deferredCandidates: run.deferredCandidateCount,
                 fusionReviewsFound: run.formsFound,
                 fusionReviewInstancesFound: run.formInstancesFound,
+                formsCreated: run.formsCreated,
+                formInstancesCreated: run.formInstancesCreated,
             },
             memory: process.memoryUsage(),
             intervalMs: this.config.statsLoggingIntervalMs,
@@ -277,6 +279,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

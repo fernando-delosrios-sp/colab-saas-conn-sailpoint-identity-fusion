@@ -41,7 +41,7 @@ export class ClientService {
         // Store pageSize for pagination
         this.pageSize = fusionConfig.pageSize
         this.sailPointListMax = fusionConfig.sailPointListMax
-        const parallelBatchSize = fusionConfig.parallelBatchSize ?? 12
+        const parallelBatchSize = fusionConfig.parallelBatchSize ?? 16
         const maxConcurrentRequests = fusionConfig.maxConcurrentRequests ?? 20
 
         this.parallelBatchSize = parallelBatchSize

@@ -209,7 +209,7 @@ When `client.call()` uses `paginate: { mode: 'parallel' }`, the client service S
 
 ### Requirement: parallelBatchSize MUST NOT be capped to maxConcurrentRequests at construction
 
-`ClientService` SHALL store the configured `parallelBatchSize` (default 12) without applying `Math.min(parallelBatchSize, maxConcurrentRequests)`. The connector-spec help text SHALL describe `parallelBatchSize` as the maximum in-flight parallel pages per pagination stream and `maxConcurrentRequests` as the global concurrent HTTP limit enforced by the shared queue.
+`ClientService` SHALL store the configured `parallelBatchSize` (default 16) without applying `Math.min(parallelBatchSize, maxConcurrentRequests)`. The connector-spec help text SHALL describe `parallelBatchSize` as the maximum in-flight parallel pages per pagination stream and `maxConcurrentRequests` as the global concurrent HTTP limit enforced by the shared queue.
 
 #### Scenario: parallelBatchSize greater than maxConcurrentRequests is preserved
 
@@ -273,4 +273,5 @@ The `call()` method does not support a generator-based searchAfter overload. `id
 ### `createRetriesConfig()` retained in helpers.ts
 
 This function is used by `sdkApiAdapter.ts` to set `retriesConfig.retries = 0` at the axios SDK level. This disables axios-level retry so the `ApiQueue` is the sole retry authority, preventing double-retry. It is not dead code.
+
 

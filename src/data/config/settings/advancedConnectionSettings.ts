@@ -11,7 +11,7 @@ export const connectorSpecInitialValues = {
     maxRetries: 20,
     requestsPerSecond: 10,
     maxConcurrentRequests: 20,
-    parallelBatchSize: 12,
+    parallelBatchSize: 16,
     processingWait: 60,
     heartbeatInterval: 10,
 } as const
@@ -53,3 +53,4 @@ export function readSettings(raw: Record<string, unknown>): AdvancedConnectionSe
         statsLoggingIntervalMs,
     }
 }
+

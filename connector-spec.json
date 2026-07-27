@@ -19,7 +19,6 @@
         "fusionFormExpirationDays": 7,
         "fusionManualReviewScore": 80,
         "provisioningTimeout": 300,
-        "managedAccountsBatchSize": 100,
         "fusionMaxCandidatesForForm": 3,
         "includeIdentities": true,
         "identityScopeQuery": "*",
@@ -28,9 +27,11 @@
         "maxRetries": 20,
         "requestsPerSecond": 10,
         "maxConcurrentRequests": 20,
-        "parallelBatchSize": 12,
+        "parallelBatchSize": 16,
         "processingWait": 60,
+        "heartbeatInterval": 10,
         "externalLoggingLevel": "info",
+        "managedAccountsBatchSize": 100,
         "scoringMaxConcurrency": 12,
         "proxyEnabled": false,
         "proxyUrl": "",
@@ -1115,7 +1116,7 @@
                             "required": false,
                             "min": "1",
                             "max": "16",
-                            "helpKey": "Max in-flight parallel pages per pagination stream. The shared API queue still enforces maximum concurrent requests globally. Default 12."
+                            "helpKey": "Max in-flight parallel pages per pagination stream. The shared API queue still enforces maximum concurrent requests globally. Default 16."
                         },
                         {
                             "key": "requestsPerSecond",

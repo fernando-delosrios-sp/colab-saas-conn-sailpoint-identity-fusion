@@ -55,6 +55,22 @@ describe('accountListPhases step instrumentation', () => {
         expect(log.track).toHaveBeenCalledWith('FusionService.initializeManagedAccountProcessing')
     })
 
+    it('processPhase logs form-reconcile with forms-created and instances-sent', async () => {
+        const registry = createRegistry()
+        const log = registry.log
+        const forms = registry.forms as any
+        vi.spyOn(log, 'stepEnd')
+        Object.defineProperty(forms, 'formsCreated', { value: 12, configurable: true })
+        Object.defineProperty(forms, 'formInstancesCreated', { value: 36, configurable: true })
+
+        await processPhase(registry, { isPersistent: false })
+
+        expect(log.stepEnd).toHaveBeenCalledWith('form-reconcile', {
+            'forms-created': 12,
+            'instances-sent': 36,
+        })
+    })
+
     it('outputPhase logs clear-managed-accounts before form-cleanup when not in record mode', async () => {
         const registry = createRegistry()
         const log = registry.log
@@ -84,3 +100,4 @@ describe('accountListPhases step instrumentation', () => {
         expect(stepStartOrder(log)).not.toContain('clear-managed-accounts')
     })
 })
+

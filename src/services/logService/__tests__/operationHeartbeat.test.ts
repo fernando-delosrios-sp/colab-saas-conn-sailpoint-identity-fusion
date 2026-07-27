@@ -4,6 +4,7 @@ import {
     formatApiQueueSegment,
     formatDeltaSuffix,
     formatEventSummaryLines,
+    formatFormOutcomesSegment,
     formatMatchOutcomesSegment,
     formatStatusLine,
     formatStallWarning,
@@ -100,6 +101,85 @@ describe('operation heartbeat formatters', () => {
         )
     })
 
+    it('formatFormOutcomesSegment renders forms count with instances in parentheses', () => {
+        expect(formatFormOutcomesSegment(12, 36)).toBe('forms=12(36)')
+        expect(formatFormOutcomesSegment(73, 73)).toBe('forms=73(73)')
+    })
+
+    it('includes form outcomes on STATUS during form-reconcile', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Process'
+        runContext.step = 'form-reconcile'
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                fusionPending: {
+                    disableOps: 0,
+                    deferredCandidates: 0,
+                    fusionReviewsFound: 0,
+                    fusionReviewInstancesFound: 0,
+                    formsCreated: 12,
+                    formInstancesCreated: 36,
+                },
+                intervalMs: 10_000,
+            },
+            {},
+            10_000
+        )
+
+        expect(line).toContain('forms=12(36)')
+    })
+
+    it('includes form outcomes on STATUS during Process when forms were created', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Process'
+        runContext.step = 'uncorrelated-sweep'
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                fusionPending: {
+                    disableOps: 0,
+                    deferredCandidates: 0,
+                    fusionReviewsFound: 0,
+                    fusionReviewInstancesFound: 0,
+                    formsCreated: 3,
+                    formInstancesCreated: 9,
+                },
+                intervalMs: 10_000,
+            },
+            {},
+            10_000
+        )
+
+        expect(line).toContain('forms=3(9)')
+    })
+
+    it('omits form outcomes from STATUS outside Process phase', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Fetch'
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                fusionPending: {
+                    disableOps: 0,
+                    deferredCandidates: 0,
+                    fusionReviewsFound: 0,
+                    fusionReviewInstancesFound: 0,
+                    formsCreated: 5,
+                    formInstancesCreated: 10,
+                },
+                intervalMs: 10_000,
+            },
+            {},
+            10_000
+        )
+
+        expect(line).not.toContain('forms=')
+    })
+
     it('omits match outcomes from STATUS outside Process phase', () => {
         const runContext = new OperationRunContext()
         runContext.phase = 'Fetch'
@@ -165,6 +245,8 @@ describe('operation heartbeat formatters', () => {
                     deferredCandidates: 45,
                     fusionReviewsFound: 143,
                     fusionReviewInstancesFound: 187,
+                    formsCreated: 0,
+                    formInstancesCreated: 0,
                 },
                 intervalMs: 30_000,
             },
@@ -186,6 +268,8 @@ describe('operation heartbeat formatters', () => {
             deferredCandidates: 0,
             fusionReviewsFound: 143,
             fusionReviewInstancesFound: 187,
+            formsCreated: 0,
+            formInstancesCreated: 0,
         }
 
         const fetchLine = formatStatusLine({ runContext, fusionPending, intervalMs: 10_000 }, {}, 10_000)
@@ -208,6 +292,8 @@ describe('operation heartbeat formatters', () => {
                     deferredCandidates: 0,
                     fusionReviewsFound: 0,
                     fusionReviewInstancesFound: 0,
+                    formsCreated: 0,
+                    formInstancesCreated: 0,
                 },
                 intervalMs: 30_000,
             },
@@ -549,6 +635,7 @@ describe('OperationHeartbeat timing', () => {
         vi.useRealTimers()
     })
 })
+
 
 
 
