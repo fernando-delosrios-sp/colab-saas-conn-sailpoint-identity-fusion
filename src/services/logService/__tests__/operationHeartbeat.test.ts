@@ -28,6 +28,7 @@ describe('operation heartbeat formatters', () => {
         const queueStats = {
             activeRequests: 16,
             queueLength: 0,
+            rateLimitWaitCount: 0,
             totalProcessed: 398,
             totalFailed: 0,
             totalRetries: 0,
@@ -41,6 +42,7 @@ describe('operation heartbeat formatters', () => {
         const queueStats = {
             activeRequests: 0,
             queueLength: 0,
+            rateLimitWaitCount: 0,
             totalProcessed: 635,
             totalFailed: 0,
             totalRetries: 0,
@@ -49,6 +51,20 @@ describe('operation heartbeat formatters', () => {
         }
         expect(formatApiQueueSegment(queueStats, 635, 10_000, 'Refresh')).toBeUndefined()
         expect(formatApiQueueSegment(queueStats, 635, 10_000, 'Process')).toBe('api=0a/0q/635c(Δ+0/10s)')
+    })
+
+    it('formatApiQueueSegment includes rateLimitWaitCount in q when FIFO is empty', () => {
+        const queueStats = {
+            activeRequests: 0,
+            queueLength: 0,
+            rateLimitWaitCount: 49,
+            totalProcessed: 389,
+            totalFailed: 0,
+            totalRetries: 0,
+            averageWaitTime: 0,
+            averageProcessingTime: 0,
+        }
+        expect(formatApiQueueSegment(queueStats, 389, 10_000, 'Process')).toBe('api=0a/49q/389c(Δ+0/10s)')
     })
 
     it('formats STATUS with phase, step, progress delta, api-queue delta, and memory', () => {
@@ -70,6 +86,7 @@ describe('operation heartbeat formatters', () => {
                 queueStats: {
                     activeRequests: 10,
                     queueLength: 97,
+                    rateLimitWaitCount: 0,
                     totalProcessed: 537,
                     totalFailed: 0,
                     totalRetries: 0,
@@ -201,6 +218,7 @@ describe('operation heartbeat formatters', () => {
                 queueStats: {
                     activeRequests: 2,
                     queueLength: 0,
+                    rateLimitWaitCount: 0,
                     totalProcessed: 12,
                     totalFailed: 0,
                     totalRetries: 0,
@@ -231,6 +249,7 @@ describe('operation heartbeat formatters', () => {
                 queueStats: {
                     activeRequests: 10,
                     queueLength: 97,
+                    rateLimitWaitCount: 0,
                     totalProcessed: 537,
                     totalFailed: 0,
                     totalRetries: 0,
@@ -542,6 +561,7 @@ describe('OperationHeartbeat timing', () => {
             queueStats: {
                 activeRequests: 0,
                 queueLength: 0,
+                rateLimitWaitCount: 0,
                 totalProcessed: 635,
                 totalFailed: 0,
                 totalRetries: 0,
@@ -767,6 +787,7 @@ describe('OperationHeartbeat timing', () => {
                 queueStats: {
                     activeRequests: 4,
                     queueLength: 12,
+                    rateLimitWaitCount: 0,
                     totalProcessed: 80,
                     totalFailed: 0,
                     totalRetries: 0,
@@ -798,6 +819,7 @@ describe('OperationHeartbeat timing', () => {
             queueStats: {
                 activeRequests: 2,
                 queueLength: 3,
+                rateLimitWaitCount: 0,
                 totalProcessed: queueProcessed,
                 totalFailed: 0,
                 totalRetries: 0,
@@ -834,6 +856,7 @@ describe('OperationHeartbeat timing', () => {
             queueStats: {
                 activeRequests: 10,
                 queueLength: 0,
+                rateLimitWaitCount: 0,
                 totalProcessed: 120,
                 totalFailed: 0,
                 totalRetries: 0,

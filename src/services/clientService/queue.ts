@@ -35,6 +35,7 @@ export class ApiQueue {
         averageProcessingTime: 0,
         queueLength: 0,
         activeRequests: 0,
+        rateLimitWaitCount: 0,
     }
     // Circular buffers for rolling wait/processing time windows — O(1) insert + evict.
     // Each buffer is a fixed-size Float64Array with a write index that wraps modulo maxStatsSamples.
@@ -124,7 +125,7 @@ export class ApiQueue {
                 const idx = subQueue.indexOf(item)
                 if (idx !== -1) subQueue.splice(idx, 1)
                 this.stats.queueLength = this.totalQueueLength()
-                item.reject(new Error('Aborted'))
+                item.reject(options.abortSignal.reason ?? new Error('Aborted'))
                 return
             }
 
@@ -135,7 +136,7 @@ export class ApiQueue {
                 if (index !== -1) {
                     subQueue.splice(index, 1)
                     this.stats.queueLength = this.totalQueueLength()
-                    item.reject(new Error('Aborted'))
+                    item.reject(options.abortSignal!.reason ?? new Error('Aborted'))
                 }
             })
 
@@ -186,10 +187,15 @@ export class ApiQueue {
      */
     private async executeRequest<T>(item: QueueItem<T>): Promise<void> {
         try {
-            await this.rateLimiter.waitForSlot(() => this.canContinue())
+            this.stats.rateLimitWaitCount++
+            try {
+                await this.rateLimiter.waitForSlot(() => this.canContinue())
+            } finally {
+                this.stats.rateLimitWaitCount--
+            }
 
             if (item.abortSignal?.aborted) {
-                throw new Error('Aborted')
+                throw item.abortSignal.reason ?? new Error('Aborted')
             }
 
             if (this.activeRequests >= this.config.maxConcurrentRequests) {
@@ -358,6 +364,7 @@ export class ApiQueue {
         this.activeItems.clear()
         this.stats.queueLength = 0
         this.stats.activeRequests = 0
+        this.stats.rateLimitWaitCount = 0
         this.activeRequests = 0
     }
 
@@ -375,4 +382,5 @@ export class ApiQueue {
         return new Promise((resolve) => setTimeout(resolve, ms))
     }
 }
+
 

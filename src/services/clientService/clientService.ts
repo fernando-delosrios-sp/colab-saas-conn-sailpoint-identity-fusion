@@ -405,29 +405,35 @@ export class ClientService {
         throwOnError: boolean = false,
         noRetry?: boolean
     ): Promise<TResponse | undefined> {
-        const timeoutController = this.requestTimeoutMs ? new AbortController() : undefined
-        let timeoutId: ReturnType<typeof setTimeout> | undefined
-
-        if (timeoutController && this.requestTimeoutMs) {
-            timeoutId = setTimeout(() => {
-                timeoutController.abort(new Error(`Request timed out after ${this.requestTimeoutMs}ms`))
-            }, this.requestTimeoutMs)
-        }
-
-        const mergedSignal = mergeAbortSignals([abortSignal, timeoutController?.signal])
-
         const fn = () => {
-            if (mergedSignal?.aborted) {
-                return Promise.reject(mergedSignal.reason ?? new Error('Aborted'))
+            const timeoutController = this.requestTimeoutMs ? new AbortController() : undefined
+            let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+            if (timeoutController && this.requestTimeoutMs) {
+                timeoutId = setTimeout(() => {
+                    timeoutController.abort(new Error(`Request timed out after ${this.requestTimeoutMs}ms`))
+                }, this.requestTimeoutMs)
             }
-            return invokeAbortable(() => runWithRequestAbortSignal(mergedSignal, apiFunction), mergedSignal)
+
+            const mergedSignal = mergeAbortSignals([abortSignal, timeoutController?.signal])
+
+            const run = () => {
+                if (mergedSignal?.aborted) {
+                    return Promise.reject(mergedSignal.reason ?? new Error('Aborted'))
+                }
+                return invokeAbortable(() => runWithRequestAbortSignal(mergedSignal, apiFunction), mergedSignal)
+            }
+
+            return run().finally(() => {
+                if (timeoutId) clearTimeout(timeoutId)
+            })
         }
 
         try {
             if (this.queue) {
                 return await this.queue.enqueue(() => fn(), {
                     priority,
-                    abortSignal: mergedSignal,
+                    abortSignal,
                     label: context,
                     noRetry,
                 })
@@ -454,8 +460,6 @@ export class ClientService {
                 throw error
             }
             return undefined
-        } finally {
-            if (timeoutId) clearTimeout(timeoutId)
         }
     }
 
@@ -702,6 +706,7 @@ export class ClientService {
                 averageProcessingTime: 0,
                 queueLength: 0,
                 activeRequests: 0,
+                rateLimitWaitCount: 0,
             }
         }
         return this.queue.getStats()

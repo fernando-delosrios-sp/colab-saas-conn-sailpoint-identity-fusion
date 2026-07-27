@@ -268,6 +268,32 @@ describe('ApiQueue', () => {
         await Promise.allSettled([...first15, ...next5])
     })
 
+    it('5d. rateLimitWaitCount tracks waiters blocked on rate limit', async () => {
+        queue = new ApiQueue(createConfig({
+            maxConcurrentRequests: 10,
+            rateLimitMaxRequests: 1,
+            rateLimitWindowMs: 100,
+        }))
+
+        const resolves: Array<() => void> = []
+        const slowTask = () => new Promise<void>((resolve) => resolves.push(resolve))
+
+        trackEnqueue(slowTask)
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        expect(queue.getStats().rateLimitWaitCount).toBe(0)
+
+        const waiting = trackEnqueue(slowTask)
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        expect(queue.getStats().rateLimitWaitCount).toBe(1)
+
+        for (const resolve of resolves) resolve()
+        await Promise.race([
+            Promise.allSettled([waiting]),
+            new Promise((resolve) => setTimeout(resolve, 150)),
+        ])
+        expect(queue.getStats().rateLimitWaitCount).toBe(0)
+    })
+
     it('6. Retry on failure — Enqueue a function that fails with 429 on first call, succeeds on second.', async () => {
         queue = new ApiQueue(createConfig());
         
@@ -352,8 +378,32 @@ describe('ApiQueue', () => {
         
         abortController.abort();
         
-        await expect(promise).rejects.toThrow('Aborted');
+        await expect(promise).rejects.toThrow(/aborted/i);
         
+        blockerResolve!();
+        await p1;
+    });
+
+    it('9c. Abort signal — propagates custom abort reason while queued', async () => {
+        queue = new ApiQueue(createConfig({ maxConcurrentRequests: 1 }));
+
+        const abortController = new AbortController();
+        const customReason = new Error('Request timed out after 300000ms');
+
+        let blockerResolve: () => void;
+        const blocker = new Promise<void>((resolve) => {
+            blockerResolve = resolve;
+        });
+        const p1 = trackEnqueue(() => blocker);
+
+        const promise = trackEnqueue(async () => 'should not execute', {
+            abortSignal: abortController.signal,
+        });
+
+        abortController.abort(customReason);
+
+        await expect(promise).rejects.toThrow('Request timed out after 300000ms');
+
         blockerResolve!();
         await p1;
     });
@@ -401,6 +451,7 @@ describe('ApiQueue', () => {
         
         expect(queue.getStats().queueLength).toBe(0);
         expect(queue.getStats().activeRequests).toBe(0);
+        expect(queue.getStats().rateLimitWaitCount).toBe(0);
     });
 
     it('11. stop() — Call stop(), verify processing halts.', async () => {
@@ -474,4 +525,5 @@ describe('ApiQueue', () => {
         await p2;
     });
 });
+
 

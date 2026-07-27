@@ -119,8 +119,12 @@ function shouldShowMatchOutcomesInStatus(runContext: OperationRunContext): boole
     return nonMatch + formsQueued + autoMerged > 0
 }
 
+function pendingQueueCount(queueStats: QueueStats): number {
+    return queueStats.queueLength + (queueStats.rateLimitWaitCount ?? 0)
+}
+
 function isApiQueueIdle(queueStats: QueueStats): boolean {
-    return queueStats.activeRequests === 0 && queueStats.queueLength === 0
+    return queueStats.activeRequests === 0 && pendingQueueCount(queueStats) === 0
 }
 
 export function formatApiQueueSegment(
@@ -133,7 +137,7 @@ export function formatApiQueueSegment(
         return undefined
     }
     const deltaSuffix = formatDeltaSuffix(queueStats.totalProcessed, previousProcessed, intervalMs)
-    return `api=${queueStats.activeRequests}a/${queueStats.queueLength}q/${queueStats.totalProcessed}c${deltaSuffix}`
+    return `api=${queueStats.activeRequests}a/${pendingQueueCount(queueStats)}q/${queueStats.totalProcessed}c${deltaSuffix}`
 }
 
 function shouldShowCorrelationDrainInStatus(
@@ -456,7 +460,7 @@ export class OperationHeartbeat {
         )
         const stallDetected =
             queueStats !== undefined &&
-            (queueStats.activeRequests > 0 || queueStats.queueLength > 0) &&
+            (queueStats.activeRequests > 0 || pendingQueueCount(queueStats) > 0) &&
             this.previousProcessed !== undefined &&
             queueStats.totalProcessed === this.previousProcessed
 
@@ -496,6 +500,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 
