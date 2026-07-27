@@ -1,5 +1,9 @@
 import { LogService } from '../logService'
-import { OperationRunContext, createEmptyEventCounters } from '../operationRunContext'
+import {
+    OperationRunContext,
+    createEmptyEventCounters,
+    createEmptyCorrelationActivityCounters,
+} from '../operationRunContext'
 
 const mockLogger = vi.hoisted(() => ({
     level: 'info',
@@ -29,14 +33,72 @@ describe('OperationRunContext', () => {
         expect(ctx.peekEventCounters()).toEqual(createEmptyEventCounters())
     })
 
-    it('records correlation triggers and account totals', () => {
+    it('records link correlation activity via recordEvent legacy path', () => {
         const ctx = new OperationRunContext()
         ctx.recordEvent('correlation', { accounts: 3 })
         ctx.recordEvent('correlation', { accounts: 2 })
 
         const flushed = ctx.flushEventCounters()
-        expect(flushed.correlationTriggers).toBe(2)
-        expect(flushed.correlationAccounts).toBe(5)
+        expect(flushed.correlation.linkTriggers).toBe(2)
+        expect(flushed.correlation.linkAccounts).toBe(5)
+    })
+
+    it('records link and merge correlation activity separately', () => {
+        const ctx = new OperationRunContext()
+        ctx.recordCorrelationActivity({ kind: 'link', accounts: 3 })
+        ctx.recordCorrelationActivity({ kind: 'merge', accounts: 1 })
+
+        const flushed = ctx.flushEventCounters()
+        expect(flushed.correlation.linkTriggers).toBe(1)
+        expect(flushed.correlation.linkAccounts).toBe(3)
+        expect(flushed.correlation.mergeTriggers).toBe(1)
+        expect(flushed.correlation.mergeAccounts).toBe(1)
+    })
+
+    it('tracks correlated-action grants in interval and phase counters', () => {
+        const ctx = new OperationRunContext()
+        ctx.recordCorrelatedActionGranted()
+        ctx.recordCorrelatedActionGranted()
+
+        const flushed = ctx.flushEventCounters()
+        expect(flushed.correlation.correlatedAction).toBe(2)
+        expect(ctx.getPhaseCorrelationCounters().correlatedAction).toBe(2)
+    })
+
+    it('aggregates correlation skip reasons', () => {
+        const ctx = new OperationRunContext()
+        ctx.recordCorrelationSkipped('noIdentity')
+        ctx.recordCorrelationSkipped('noIscAccountId')
+        ctx.recordCorrelationSkipped('noIscAccountId')
+
+        const flushed = ctx.flushEventCounters()
+        expect(flushed.correlation.skippedNoIdentity).toBe(1)
+        expect(flushed.correlation.skippedNoIscAccountId).toBe(2)
+    })
+
+    it('resets phase correlation counters at phaseStart boundary via LogService', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, operationContext: 'accountList' })
+        const ctx = new OperationRunContext()
+        log.bindRunContext(ctx)
+
+        ctx.recordCorrelationActivity({ kind: 'link', accounts: 2 })
+        log.phaseStart(3, 'Refresh')
+        expect(ctx.getPhaseCorrelationCounters()).toEqual(createEmptyCorrelationActivityCounters())
+    })
+
+    it('flushPhaseCorrelationSummary returns detail and resets phase counters', () => {
+        const ctx = new OperationRunContext()
+        ctx.recordCorrelationActivity({ kind: 'link', accounts: 5 })
+        ctx.recordCorrelatedActionGranted()
+
+        const summary = ctx.flushPhaseCorrelationSummary()
+        expect(summary).toEqual({ correlations: 'link=1/5 correlated-action=1' })
+        expect(ctx.getPhaseCorrelationCounters()).toEqual(createEmptyCorrelationActivityCounters())
+    })
+
+    it('flushPhaseCorrelationSummary returns undefined when no activity', () => {
+        const ctx = new OperationRunContext()
+        expect(ctx.flushPhaseCorrelationSummary()).toBeUndefined()
     })
 
     it('increments refreshedCount', () => {
@@ -81,6 +143,20 @@ describe('LogService operation helpers', () => {
         expect(mockLogger.info).toHaveBeenCalledWith('[accountList] PHASE 4 Process START')
         expect(mockLogger.info).toHaveBeenCalledWith('[accountList] STEP uncorrelated-sweep START accounts=10')
         expect(ctx.progress).toEqual({ done: 3, total: 10, unit: 'analyzed' })
+    })
+
+    it('emits PHASE END with correlation detail suffix', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, operationContext: 'accountList' })
+        const ctx = new OperationRunContext()
+        log.bindRunContext(ctx)
+
+        log.phaseStart(3, 'Refresh')
+        ctx.recordCorrelationActivity({ kind: 'link', accounts: 4 })
+        log.phaseEnd(3, 'Refresh', log.flushPhaseCorrelationSummary())
+
+        expect(mockLogger.info).toHaveBeenCalledWith(
+            expect.stringMatching(/\[accountList\] PHASE 3 Refresh END correlations link=1\/4 elapsed=/)
+        )
     })
 
     it('records refreshed accounts only during Refresh phase', () => {

@@ -791,10 +791,10 @@ export class FusionAccount {
         )
     }
 
-    updateCorrelationStatus(): void {
+    updateCorrelationStatus(onCorrelatedActionGranted?: () => void): void {
         this.correlation.updateStatus((v: boolean) => {
             this.layers.uncorrelated = v
-        })
+        }, onCorrelatedActionGranted)
     }
 
     setCorrelatedAccount(accountId: string, promise?: Promise<unknown>): void {
@@ -834,5 +834,6 @@ export class FusionAccount {
         }
     }
 }
+
 
 

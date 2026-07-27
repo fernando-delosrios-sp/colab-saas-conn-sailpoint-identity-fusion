@@ -3,7 +3,12 @@ import { ApiQueue } from '../clientService/queue'
 import { QueuePriority } from '../clientService/types'
 import { getCallerInfo } from './helpers'
 import { HeartbeatSnapshot, OperationHeartbeat, formatDetailSuffix } from './operationHeartbeat'
-import { OperationPhase, OperationRunContext } from './operationRunContext'
+import {
+    CorrelationSkipReason,
+    OperationPhase,
+    OperationRunContext,
+} from './operationRunContext'
+import { formatPhaseEndDetailSuffix } from './operationHeartbeat'
 
 type Logger = typeof logger
 
@@ -238,6 +243,7 @@ export class LogService {
         if (this.runContext) {
             this.runContext.phase = phase
             this.runContext.phaseStartedAt = Date.now()
+            this.runContext.resetPhaseCorrelationCounters()
             if (phase === 'Process') {
                 this.runContext.resetCumulativeOutcomes()
             }
@@ -249,7 +255,7 @@ export class LogService {
         const startedAt = this.runContext?.phaseStartedAt
         const elapsed =
             startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
-        this.info(`PHASE ${phaseNumber} ${phase} END${formatDetailSuffix(detail)}${elapsed}`)
+        this.info(`PHASE ${phaseNumber} ${phase} END${formatPhaseEndDetailSuffix(detail)}${elapsed}`)
         if (this.runContext) {
             this.runContext.phaseStartedAt = undefined
         }
@@ -309,6 +315,22 @@ export class LogService {
 
     recordEvent(category: string, detail?: Record<string, unknown>): void {
         this.runContext?.recordEvent(category, detail)
+    }
+
+    recordCorrelationActivity(params: { kind: 'link' | 'merge'; accounts: number }): void {
+        this.runContext?.recordCorrelationActivity(params)
+    }
+
+    recordCorrelatedActionGranted(): void {
+        this.runContext?.recordCorrelatedActionGranted()
+    }
+
+    recordCorrelationSkipped(reason: CorrelationSkipReason): void {
+        this.runContext?.recordCorrelationSkipped(reason)
+    }
+
+    flushPhaseCorrelationSummary(): Record<string, unknown> | undefined {
+        return this.runContext?.flushPhaseCorrelationSummary()
     }
 
     getCumulativeOutcomes() {
@@ -663,6 +685,7 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+
 
 
 

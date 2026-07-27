@@ -16,13 +16,18 @@ export class FusionCorrelation {
         this._correlationPromises.push(promise)
     }
 
-    updateStatus(setUncorrelated?: (v: boolean) => void): void {
+    updateStatus(
+        setUncorrelated?: (v: boolean) => void,
+        onCorrelatedActionGranted?: () => void
+    ): void {
+        const hadCorrelated = this.collections._internal_actions.has(FusionAction.Correlated)
         const hasAllAccountsCorrelated = this.collections.missingAccountIds.size === 0
 
         if (hasAllAccountsCorrelated) {
             this.collections._internal_statuses.delete(StatusEntitlement.Uncorrelated)
             this.collections._internal_actions.add(FusionAction.Correlated)
             if (setUncorrelated) setUncorrelated(false)
+            if (!hadCorrelated) onCorrelatedActionGranted?.()
         } else {
             this.collections._internal_statuses.add(StatusEntitlement.Uncorrelated)
             this.collections._internal_actions.delete(FusionAction.Correlated)
@@ -73,3 +78,4 @@ export class FusionCorrelation {
         this.resolvePendingReviewUrls()
     }
 }
+

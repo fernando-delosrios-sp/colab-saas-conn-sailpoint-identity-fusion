@@ -184,7 +184,24 @@ During long `accountList` aggregations, the connector emits standardized text pr
 | `PHASE N: Description (elapsed)` | `PHASE N Name END elapsed=…` |
 | `Epilogue: report generation` | `EPILOGUE report END elapsed=…` |
 | Per-account `MATCH FOUND:` / `Triggering correlation` at Info | `EVENT_SUMMARY` (per-account detail remains at Debug) |
+| `correlations triggered=` in EVENT_SUMMARY / PHASE END | `correlations link=triggers/accounts merge=triggers/accounts` (see examples below) |
 | Free-form `Loaded N managed source(s)` | `DETAIL sources=N` |
+
+**Correlation activity format (`EVENT_SUMMARY` and `PHASE END`):**
+
+- **Link** — correlation-on-aggregation PATCH during Refresh: `correlations link=14/18`
+- **Merge** — merge-decision-driven PATCH during Process: `merge=2/2`
+- **Correlated-action** — entitlement newly granted: `correlated-action=+12/10s` (interval delta) or `correlated-action=5` (phase cumulative on PHASE END)
+- **Skipped** — PATCH not attempted: `skipped=noIdentity=3,noSourceContext=2,noIscAccountId=1`
+
+Example grep targets:
+
+```bash
+grep 'EVENT_SUMMARY correlations' connector.log
+grep 'PHASE 3 Refresh END correlations link=' connector.log
+grep 'correlations merge=' connector.log
+grep 'correlated-action=' connector.log
+```
 
 **Example grep targets:** `STATUS`, `WARN STALL`, `EVENT_SUMMARY`, `PHASE 4 Process START`, `DETAIL`
 
@@ -511,6 +528,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](troubleshooting.md).
+
 
 
 

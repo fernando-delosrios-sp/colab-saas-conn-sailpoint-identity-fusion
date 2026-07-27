@@ -1,6 +1,13 @@
 import { QueuedItemInfo, QueueStats } from '../clientService/types'
 import { LogService, PhaseTimer } from './logService'
-import { EventCounters, OperationPhase, OperationRunContext, CumulativeOutcomes } from './operationRunContext'
+import {
+    EventCounters,
+    OperationPhase,
+    OperationRunContext,
+    CumulativeOutcomes,
+    formatCorrelationSummarySegment,
+    hasCorrelationActivity,
+} from './operationRunContext'
 
 type FusionPendingSnapshot = {
     disableOps: number
@@ -42,6 +49,15 @@ function formatDetailSuffix(detail?: Record<string, unknown>): string {
             .map(([k, v]) => `${k}=${v}`)
             .join(' ')
     )
+}
+
+export function formatPhaseEndDetailSuffix(detail?: Record<string, unknown>): string {
+    if (!detail || Object.keys(detail).length === 0) return ''
+    const parts = Object.entries(detail).map(([k, v]) => {
+        if (k === 'correlations') return `correlations ${v}`
+        return `${k}=${v}`
+    })
+    return ` ${parts.join(' ')}`
 }
 
 export function formatDeltaSuffix(
@@ -144,6 +160,11 @@ export function formatStatusLine(
 
     if (runContext.phase === 'Refresh') {
         parts.push(`refreshed(${runContext.refreshedCount})`)
+        const phaseCorrelation = runContext.getPhaseCorrelationCounters()
+        if (phaseCorrelation.linkTriggers > 0 || phaseCorrelation.mergeTriggers > 0) {
+            const segment = formatCorrelationSummarySegment(phaseCorrelation, { cumulative: true })
+            if (segment) parts.push(segment)
+        }
     }
 
     if (queueStats) {
@@ -209,10 +230,9 @@ export function formatEventSummaryLines(
         }
     }
 
-    if (events.correlationTriggers > 0) {
-        lines.push(
-            `EVENT_SUMMARY correlations triggered=${events.correlationTriggers} accounts=${events.correlationAccounts}`
-        )
+    if (hasCorrelationActivity(events.correlation)) {
+        const segment = formatCorrelationSummarySegment(events.correlation, { intervalMs, cumulative: false })
+        if (segment) lines.push(`EVENT_SUMMARY ${segment}`)
     }
 
     return lines
@@ -423,6 +443,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 

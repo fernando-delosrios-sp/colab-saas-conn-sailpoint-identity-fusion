@@ -2,12 +2,25 @@ export type OperationPhase = 'Setup' | 'Fetch' | 'Refresh' | 'Process' | 'Output
 
 type MatchEventType = 'exact' | 'partial' | 'deferred'
 
+export type CorrelationSkipReason = 'noIdentity' | 'noSourceContext' | 'wrongMode' | 'noIscAccountId'
+
+export type CorrelationActivityCounters = {
+    linkTriggers: number
+    linkAccounts: number
+    mergeTriggers: number
+    mergeAccounts: number
+    correlatedAction: number
+    skippedNoIdentity: number
+    skippedNoSourceContext: number
+    skippedWrongMode: number
+    skippedNoIscAccountId: number
+}
+
 export type EventCounters = {
     matchExact: number
     matchPartial: number
     matchDeferred: number
-    correlationTriggers: number
-    correlationAccounts: number
+    correlation: CorrelationActivityCounters
     nonMatch: number
     autoMerged: number
     formsQueued: number
@@ -29,13 +42,26 @@ type ProgressSnapshot = {
     unit?: string
 }
 
+export function createEmptyCorrelationActivityCounters(): CorrelationActivityCounters {
+    return {
+        linkTriggers: 0,
+        linkAccounts: 0,
+        mergeTriggers: 0,
+        mergeAccounts: 0,
+        correlatedAction: 0,
+        skippedNoIdentity: 0,
+        skippedNoSourceContext: 0,
+        skippedWrongMode: 0,
+        skippedNoIscAccountId: 0,
+    }
+}
+
 export function createEmptyEventCounters(): EventCounters {
     return {
         matchExact: 0,
         matchPartial: 0,
         matchDeferred: 0,
-        correlationTriggers: 0,
-        correlationAccounts: 0,
+        correlation: createEmptyCorrelationActivityCounters(),
         nonMatch: 0,
         autoMerged: 0,
         formsQueued: 0,
@@ -47,6 +73,51 @@ export function createEmptyEventCounters(): EventCounters {
 
 function createEmptyCumulativeOutcomes(): CumulativeOutcomes {
     return { nonMatch: 0, autoMerged: 0, formsQueued: 0 }
+}
+
+function incrementCorrelationActivity(
+    counters: CorrelationActivityCounters,
+    kind: 'link' | 'merge',
+    accounts: number
+): void {
+    if (kind === 'link') {
+        counters.linkTriggers++
+        counters.linkAccounts += accounts
+    } else {
+        counters.mergeTriggers++
+        counters.mergeAccounts += accounts
+    }
+}
+
+function incrementCorrelationSkipped(counters: CorrelationActivityCounters, reason: CorrelationSkipReason): void {
+    switch (reason) {
+        case 'noIdentity':
+            counters.skippedNoIdentity++
+            break
+        case 'noSourceContext':
+            counters.skippedNoSourceContext++
+            break
+        case 'wrongMode':
+            counters.skippedWrongMode++
+            break
+        case 'noIscAccountId':
+            counters.skippedNoIscAccountId++
+            break
+    }
+}
+
+export function hasCorrelationActivity(counters: CorrelationActivityCounters): boolean {
+    return (
+        counters.linkTriggers > 0 ||
+        counters.linkAccounts > 0 ||
+        counters.mergeTriggers > 0 ||
+        counters.mergeAccounts > 0 ||
+        counters.correlatedAction > 0 ||
+        counters.skippedNoIdentity > 0 ||
+        counters.skippedNoSourceContext > 0 ||
+        counters.skippedWrongMode > 0 ||
+        counters.skippedNoIscAccountId > 0
+    )
 }
 
 /**
@@ -64,6 +135,7 @@ export class OperationRunContext {
     refreshedCount = 0
     private events: EventCounters = createEmptyEventCounters()
     private cumulativeOutcomes: CumulativeOutcomes = createEmptyCumulativeOutcomes()
+    private phaseCorrelation: CorrelationActivityCounters = createEmptyCorrelationActivityCounters()
 
     constructor(startedAt: number = Date.now()) {
         this.operationStartedAt = startedAt
@@ -79,11 +151,8 @@ export class OperationRunContext {
                 break
             }
             case 'correlation': {
-                this.events.correlationTriggers++
-                const accounts = detail?.accounts
-                if (typeof accounts === 'number') {
-                    this.events.correlationAccounts += accounts
-                }
+                const accounts = typeof detail?.accounts === 'number' ? detail.accounts : 0
+                this.recordCorrelationActivity({ kind: 'link', accounts })
                 break
             }
             case 'nonMatch':
@@ -116,15 +185,36 @@ export class OperationRunContext {
         }
     }
 
+    recordCorrelationActivity(params: { kind: 'link' | 'merge'; accounts: number }): void {
+        incrementCorrelationActivity(this.events.correlation, params.kind, params.accounts)
+        incrementCorrelationActivity(this.phaseCorrelation, params.kind, params.accounts)
+    }
+
+    recordCorrelatedActionGranted(): void {
+        this.events.correlation.correlatedAction++
+        this.phaseCorrelation.correlatedAction++
+    }
+
+    recordCorrelationSkipped(reason: CorrelationSkipReason): void {
+        incrementCorrelationSkipped(this.events.correlation, reason)
+        incrementCorrelationSkipped(this.phaseCorrelation, reason)
+    }
+
     /** Returns a copy of counters and resets the accumulator for the next heartbeat tick. */
     flushEventCounters(): EventCounters {
-        const snapshot = { ...this.events }
+        const snapshot = {
+            ...this.events,
+            correlation: { ...this.events.correlation },
+        }
         this.events = createEmptyEventCounters()
         return snapshot
     }
 
     peekEventCounters(): EventCounters {
-        return { ...this.events }
+        return {
+            ...this.events,
+            correlation: { ...this.events.correlation },
+        }
     }
 
     getCumulativeOutcomes(): CumulativeOutcomes {
@@ -135,10 +225,72 @@ export class OperationRunContext {
         this.cumulativeOutcomes = createEmptyCumulativeOutcomes()
     }
 
+    getPhaseCorrelationCounters(): CorrelationActivityCounters {
+        return { ...this.phaseCorrelation }
+    }
+
+    resetPhaseCorrelationCounters(): void {
+        this.phaseCorrelation = createEmptyCorrelationActivityCounters()
+    }
+
+    flushPhaseCorrelationSummary(): Record<string, unknown> | undefined {
+        if (!hasCorrelationActivity(this.phaseCorrelation)) return undefined
+        const segment = formatCorrelationSummaryValue(this.phaseCorrelation, { cumulative: true })
+        this.resetPhaseCorrelationCounters()
+        return { correlations: segment }
+    }
+
     incrementRefreshedCount(): void {
         this.refreshedCount++
     }
 }
 
+/** Value portion for PHASE END / DETAIL (without leading `correlations` label). */
+export function formatCorrelationSummaryValue(
+    counters: CorrelationActivityCounters,
+    options?: { intervalMs?: number; cumulative?: boolean }
+): string {
+    const parts: string[] = []
+
+    if (counters.linkTriggers > 0 || counters.linkAccounts > 0) {
+        parts.push(`link=${counters.linkTriggers}/${counters.linkAccounts}`)
+    }
+    if (counters.mergeTriggers > 0 || counters.mergeAccounts > 0) {
+        parts.push(`merge=${counters.mergeTriggers}/${counters.mergeAccounts}`)
+    }
+    if (counters.correlatedAction > 0) {
+        if (options?.intervalMs && !options?.cumulative) {
+            parts.push(
+                `correlated-action=+${counters.correlatedAction}/${Math.round(options.intervalMs / 1000)}s`
+            )
+        } else {
+            parts.push(`correlated-action=${counters.correlatedAction}`)
+        }
+    }
+
+    const skippedParts: string[] = []
+    if (counters.skippedNoIdentity > 0) skippedParts.push(`noIdentity=${counters.skippedNoIdentity}`)
+    if (counters.skippedNoSourceContext > 0) {
+        skippedParts.push(`noSourceContext=${counters.skippedNoSourceContext}`)
+    }
+    if (counters.skippedWrongMode > 0) skippedParts.push(`wrongMode=${counters.skippedWrongMode}`)
+    if (counters.skippedNoIscAccountId > 0) {
+        skippedParts.push(`noIscAccountId=${counters.skippedNoIscAccountId}`)
+    }
+    if (skippedParts.length > 0) {
+        parts.push(`skipped=${skippedParts.join(',')}`)
+    }
+
+    return parts.join(' ')
+}
+
+export function formatCorrelationSummarySegment(
+    counters: CorrelationActivityCounters,
+    options?: { intervalMs?: number; cumulative?: boolean }
+): string {
+    const value = formatCorrelationSummaryValue(counters, options)
+    if (!value) return ''
+    return `correlations ${value}`
+}
 
 

@@ -188,8 +188,12 @@ export class DecisionProcessor {
         await this.deps.accountAssembly.assembleAccount(fusionAccount, { skipBlendHistoryForManagedKeys })
 
         if (isAuthorizedDecision) {
-            await this.deps.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, fusionDecision)
-            fusionAccount.updateCorrelationStatus()
+            await this.deps.correlationManager.applyPerSourceCorrelationIfNeeded(
+                fusionAccount,
+                fusionDecision,
+                'merge'
+            )
+            fusionAccount.updateCorrelationStatus(() => this.log.recordCorrelatedActionGranted())
             this.deps.accountAssembly.registerFusionAccount(fusionAccount)
         }
 
@@ -272,6 +276,7 @@ export class DecisionProcessor {
         }
     }
 }
+
 
 
 
