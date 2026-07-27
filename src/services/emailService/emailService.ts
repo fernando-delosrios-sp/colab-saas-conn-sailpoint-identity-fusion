@@ -9,7 +9,8 @@ import { WorkflowService } from '../workflowService'
 import { assert, softAssert } from '../../utils/assert'
 import { createUrlContext, getUIOriginFromBaseUrl, UrlContext } from '../../utils/url'
 import { pickAttributes } from '../../utils/attributes'
-import { mapScoreReportsForFusionReport } from '../fusionService/helpers'
+import { mapScoreReportsForFusionReport, buildFusionReportMatchesForReviewEmail } from '../fusionService/helpers'
+import type { FusionMatch } from '../matchingService/types'
 import { compileEmailTemplates, renderFusionReviewEmail, FusionReviewEmailData } from './helpers'
 import { registerHandlebarsHelpers } from './messagingHandlebarsRegistration'
 import { normalizeEmailValue, sanitizeRecipients, buildEmailWorkflowTriggerInput } from './email'
@@ -22,12 +23,15 @@ export interface FusionEmailContext {
     accountId?: string
     accountEmail?: string
     accountAttributes: Record<string, any>
-    candidates: Array<{
+    candidates?: Array<{
         id: string
         name: string
         attributes: Record<string, any>
         scores?: any[]
     }>
+    /** Prefer this over `candidates` — same label/score mapping as dry-run reports. */
+    fusionMatches?: FusionMatch[]
+    maxCandidates?: number
 }
 
 export class EmailService {
@@ -133,9 +137,25 @@ export class EmailService {
                 ? (sourceTypeInput as SourceType)
                 : (sourceTypeInput === SourceType.Orphan ? (sourceTypeInput as SourceType) : undefined)
 
+        const reviewMatches =
+            context?.fusionMatches && context.fusionMatches.length > 0
+                ? buildFusionReportMatchesForReviewEmail(
+                      context.fusionMatches,
+                      this.urlContext,
+                      context.maxCandidates
+                  )
+                : candidates.map((candidate: any) => ({
+                      identityName: candidate.name || 'Unknown',
+                      identityId: candidate.id || undefined,
+                      identityUrl: this.urlContext.identity(candidate.id),
+                      isMatch: true,
+                      exact: Boolean(candidate.exact),
+                      scores: mapScoreReportsForFusionReport(candidate.scores || []),
+                  }))
+
         const emailData: FusionReviewEmailData = {
             totalAccounts: 1,
-            matches: candidates.length,
+            matches: reviewMatches.length,
             reportDate: new Date(),
             headerSubtitle: this.buildEmailHeaderSubtitle(),
             accounts: [
@@ -147,14 +167,7 @@ export class EmailService {
                     accountUrl,
                     accountEmail,
                     accountAttributes: pickedAccountAttributes,
-                    matches: candidates.map((candidate: any) => ({
-                        identityName: candidate.name || 'Unknown',
-                        identityId: candidate.id || undefined,
-                        identityUrl: this.urlContext.identity(candidate.id),
-                        isMatch: true,
-                        exact: Boolean(candidate.exact),
-                        scores: mapScoreReportsForFusionReport(candidate.scores || []),
-                    })),
+                    matches: reviewMatches,
                 },
             ],
         }
@@ -401,6 +414,7 @@ export class EmailService {
         )
     }
 }
+
 
 
 

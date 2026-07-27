@@ -40,7 +40,7 @@ const createEmailService = () => {
 }
 
 describe('EmailService.sendFusionEmail', () => {
-    it('maps candidate scores to the same shape as dry-run reports', async () => {
+        it('maps candidate scores to the same shape as dry-run reports', async () => {
         const { service, workflowsApi } = createEmailService()
         const formInstance = {
             id: 'form-1',
@@ -51,11 +51,15 @@ describe('EmailService.sendFusionEmail', () => {
             accountName: '125536',
             accountSource: 'Workday - Employees',
             accountAttributes: { firstname: 'Michael', lastname: 'Eckert' },
-            candidates: [
+            fusionMatches: [
                 {
-                    id: 'candidate-1',
-                    name: 'Jane Candidate',
-                    attributes: {},
+                    identityId: 'd3a1cb345cf34b2ea6fc5f40686cad4c',
+                    identityName: 'd3a1cb345cf34b2ea6fc5f40686cad4c',
+                    fusionIdentity: {
+                        identityId: 'd3a1cb345cf34b2ea6fc5f40686cad4c',
+                        name: 'Michael Eckert',
+                        attributes: {},
+                    },
                     scores: [
                         {
                             attribute: 'firstname',
@@ -68,14 +72,16 @@ describe('EmailService.sendFusionEmail', () => {
                     ],
                 },
             ],
+            maxCandidates: 5,
         })
 
         expect(workflowsApi.testWorkflow).toHaveBeenCalledTimes(1)
         const sentBody = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input.body as string
-        expect(sentBody).toContain('Jane Candidate')
+        expect(sentBody).toContain('Michael Eckert')
         expect(sentBody).toContain('firstname')
         expect(sentBody).toContain('Jaro-Winkler')
         expect(sentBody).toContain('92%')
+        expect(sentBody).not.toContain('>d3a1cb345cf34b2ea6fc5f40686cad4c<')
         expect(sentBody).not.toContain('Unknown')
     })
 
@@ -116,3 +122,4 @@ describe('EmailService.sendFusionEmail', () => {
         expect(html).toContain('92%')
     })
 })
+
