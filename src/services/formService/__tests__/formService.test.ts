@@ -114,6 +114,53 @@ describe('FormService fetchFormInstancesByDefinitionId', () => {
     })
 })
 
+describe('FormService fetchFormInstances logging', () => {
+    it('emits a collapsed summary and metric instead of per-definition debug lines', async () => {
+        const debug = vi.fn()
+        const info = vi.fn()
+        const trackDone = vi.fn()
+        const track = vi.fn(() => ({ done: trackDone }))
+        const setProgress = vi.fn()
+        const forms = [
+            { id: 'form-1', name: 'Fusion Review - 1' },
+            { id: 'form-2', name: 'Fusion Review - 2' },
+        ]
+
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({
+            data: { results: forms },
+        })
+        const searchFormInstancesByTenant = vi
+            .fn()
+            .mockResolvedValueOnce({ data: [{ id: 'inst-1', formDefinitionId: 'form-1' }] })
+            .mockResolvedValueOnce({ data: [{ id: 'inst-2', formDefinitionId: 'form-2' }, { id: 'inst-3', formDefinitionId: 'form-2' }] })
+
+        const customFormsMock = {
+            searchFormDefinitionsByTenant,
+            searchFormInstancesByTenant,
+        }
+
+        const service = new FormService(
+            { fusionFormNamePattern: 'Fusion Review' } as any,
+            { warn: vi.fn(), info, debug, track, setProgress } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+            } as any,
+            {} as any
+        )
+
+        await service.fetchFormInstances()
+
+        expect(debug).not.toHaveBeenCalledWith(expect.stringContaining('Fetching instances for form definition'))
+        expect(debug).not.toHaveBeenCalledWith(expect.stringContaining('Fetched 1 instance(s) for form definition'))
+        expect(debug).toHaveBeenCalledWith('Fetched 3 instance(s) from 2 form definition(s)')
+        expect(track).toHaveBeenCalledWith('FormService.fetchFormInstances')
+        expect(trackDone).toHaveBeenCalledWith({ definitions: 2, instances: 3 })
+        expect(setProgress).toHaveBeenCalledWith(1, 2, 'forms')
+        expect(setProgress).toHaveBeenCalledWith(2, 2, 'forms')
+    })
+})
+
 describe('FormService stale-form cleanup queue', () => {
     it('queues stale forms for deletion and skips instance fetch for those definitions', async () => {
         const now = Date.now()
@@ -138,12 +185,13 @@ describe('FormService stale-form cleanup queue', () => {
         }
 
         const setProgress = vi.fn()
+        const track = vi.fn(() => ({ done: vi.fn() }))
         const service = new FormService(
             {
                 fusionFormNamePattern: 'Fusion',
                 fusionFormExpirationDays: 7,
             } as any,
-            { warn: vi.fn(), info: vi.fn(), debug: vi.fn(), setProgress } as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn(), setProgress, track } as any,
             {
                 customFormsApi: customFormsMock,
                 call: createFormClientCallMock(customFormsMock),
@@ -160,7 +208,7 @@ describe('FormService stale-form cleanup queue', () => {
         expect(searchFormInstancesByTenant).toHaveBeenCalledWith(
             expect.objectContaining({ filters: 'formDefinitionId eq "form-fresh"' })
         )
-        expect(setProgress).not.toHaveBeenCalled()
+        expect(setProgress).toHaveBeenCalledWith(1, 1, 'forms')
         expect(deleteFormDefinition).toHaveBeenCalledTimes(1)
         expect(deleteFormDefinition).toHaveBeenCalledWith({ formDefinitionID: 'form-stale' })
     })
@@ -477,5 +525,6 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
         expect(buildFusionFormDefinition).toHaveBeenCalledTimes(1)
     })
 })
+
 
 
