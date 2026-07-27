@@ -193,7 +193,11 @@ export class DecisionProcessor {
                 fusionDecision,
                 'merge'
             )
-            fusionAccount.updateCorrelationStatus(() => this.log.recordCorrelatedActionGranted())
+            fusionAccount.updateCorrelationStatus(
+                this.deps.accountAssembly.isAggregationAccountListMode()
+                    ? undefined
+                    : () => this.log.recordCorrelatedActionGranted()
+            )
             this.deps.accountAssembly.registerFusionAccount(fusionAccount)
         }
 
@@ -276,6 +280,7 @@ export class DecisionProcessor {
         }
     }
 }
+
 
 
 

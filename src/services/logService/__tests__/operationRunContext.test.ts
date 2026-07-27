@@ -55,6 +55,18 @@ describe('OperationRunContext', () => {
         expect(flushed.correlation.mergeAccounts).toBe(1)
     })
 
+    it('tracks correlation completed counts in interval and phase counters', () => {
+        const ctx = new OperationRunContext()
+        ctx.recordCorrelationCompleted({ kind: 'link' })
+        ctx.recordCorrelationCompleted({ kind: 'merge', count: 2 })
+
+        const flushed = ctx.flushEventCounters()
+        expect(flushed.correlation.linkCompleted).toBe(1)
+        expect(flushed.correlation.mergeCompleted).toBe(2)
+        expect(ctx.getPhaseCorrelationCounters().linkCompleted).toBe(1)
+        expect(ctx.getRunCorrelationCounters().mergeCompleted).toBe(2)
+    })
+
     it('tracks correlated-action grants in interval and phase counters', () => {
         const ctx = new OperationRunContext()
         ctx.recordCorrelatedActionGranted()
@@ -89,11 +101,12 @@ describe('OperationRunContext', () => {
     it('flushPhaseCorrelationSummary returns detail and resets phase counters', () => {
         const ctx = new OperationRunContext()
         ctx.recordCorrelationActivity({ kind: 'link', accounts: 5 })
-        ctx.recordCorrelatedActionGranted()
+        ctx.recordCorrelationCompleted({ kind: 'link', count: 2 })
 
         const summary = ctx.flushPhaseCorrelationSummary()
-        expect(summary).toEqual({ correlations: 'link=1/5 correlated-action=1' })
+        expect(summary).toEqual({ correlations: 'link=1/5 completed=2' })
         expect(ctx.getPhaseCorrelationCounters()).toEqual(createEmptyCorrelationActivityCounters())
+        expect(ctx.getRunCorrelationCounters().linkAccounts).toBe(5)
     })
 
     it('flushPhaseCorrelationSummary returns undefined when no activity', () => {
@@ -174,4 +187,5 @@ describe('LogService operation helpers', () => {
         expect(ctx.refreshedCount).toBe(2)
     })
 })
+
 

@@ -326,6 +326,10 @@ export class LogService {
         this.runContext?.recordCorrelationActivity(params)
     }
 
+    recordCorrelationCompleted(params: { kind: 'link' | 'merge'; count?: number }): void {
+        this.runContext?.recordCorrelationCompleted(params)
+    }
+
     recordCorrelatedActionGranted(): void {
         this.runContext?.recordCorrelatedActionGranted()
     }
@@ -690,6 +694,7 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+
 
 
 

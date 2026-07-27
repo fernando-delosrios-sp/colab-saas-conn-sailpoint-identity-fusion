@@ -9,6 +9,8 @@ export type CorrelationActivityCounters = {
     linkAccounts: number
     mergeTriggers: number
     mergeAccounts: number
+    linkCompleted: number
+    mergeCompleted: number
     correlatedAction: number
     skippedNoIdentity: number
     skippedNoSourceContext: number
@@ -48,6 +50,8 @@ export function createEmptyCorrelationActivityCounters(): CorrelationActivityCou
         linkAccounts: 0,
         mergeTriggers: 0,
         mergeAccounts: 0,
+        linkCompleted: 0,
+        mergeCompleted: 0,
         correlatedAction: 0,
         skippedNoIdentity: 0,
         skippedNoSourceContext: 0,
@@ -89,6 +93,18 @@ function incrementCorrelationActivity(
     }
 }
 
+function incrementCorrelationCompleted(
+    counters: CorrelationActivityCounters,
+    kind: 'link' | 'merge',
+    count: number
+): void {
+    if (kind === 'link') {
+        counters.linkCompleted += count
+    } else {
+        counters.mergeCompleted += count
+    }
+}
+
 function incrementCorrelationSkipped(counters: CorrelationActivityCounters, reason: CorrelationSkipReason): void {
     switch (reason) {
         case 'noIdentity':
@@ -112,6 +128,8 @@ export function hasCorrelationActivity(counters: CorrelationActivityCounters): b
         counters.linkAccounts > 0 ||
         counters.mergeTriggers > 0 ||
         counters.mergeAccounts > 0 ||
+        counters.linkCompleted > 0 ||
+        counters.mergeCompleted > 0 ||
         counters.correlatedAction > 0 ||
         counters.skippedNoIdentity > 0 ||
         counters.skippedNoSourceContext > 0 ||
@@ -136,6 +154,8 @@ export class OperationRunContext {
     private events: EventCounters = createEmptyEventCounters()
     private cumulativeOutcomes: CumulativeOutcomes = createEmptyCumulativeOutcomes()
     private phaseCorrelation: CorrelationActivityCounters = createEmptyCorrelationActivityCounters()
+    /** Run-scoped correlation counters (not reset at phase boundaries). */
+    private runCorrelation: CorrelationActivityCounters = createEmptyCorrelationActivityCounters()
 
     constructor(startedAt: number = Date.now()) {
         this.operationStartedAt = startedAt
@@ -188,6 +208,14 @@ export class OperationRunContext {
     recordCorrelationActivity(params: { kind: 'link' | 'merge'; accounts: number }): void {
         incrementCorrelationActivity(this.events.correlation, params.kind, params.accounts)
         incrementCorrelationActivity(this.phaseCorrelation, params.kind, params.accounts)
+        incrementCorrelationActivity(this.runCorrelation, params.kind, params.accounts)
+    }
+
+    recordCorrelationCompleted(params: { kind: 'link' | 'merge'; count?: number }): void {
+        const count = params.count ?? 1
+        incrementCorrelationCompleted(this.events.correlation, params.kind, count)
+        incrementCorrelationCompleted(this.phaseCorrelation, params.kind, count)
+        incrementCorrelationCompleted(this.runCorrelation, params.kind, count)
     }
 
     recordCorrelatedActionGranted(): void {
@@ -229,6 +257,10 @@ export class OperationRunContext {
         return { ...this.phaseCorrelation }
     }
 
+    getRunCorrelationCounters(): CorrelationActivityCounters {
+        return { ...this.runCorrelation }
+    }
+
     resetPhaseCorrelationCounters(): void {
         this.phaseCorrelation = createEmptyCorrelationActivityCounters()
     }
@@ -257,6 +289,14 @@ export function formatCorrelationSummaryValue(
     }
     if (counters.mergeTriggers > 0 || counters.mergeAccounts > 0) {
         parts.push(`merge=${counters.mergeTriggers}/${counters.mergeAccounts}`)
+    }
+    const totalCompleted = counters.linkCompleted + counters.mergeCompleted
+    if (totalCompleted > 0) {
+        if (options?.intervalMs && !options?.cumulative) {
+            parts.push(`completed=+${totalCompleted}/${Math.round(options.intervalMs / 1000)}s`)
+        } else {
+            parts.push(`completed=${totalCompleted}`)
+        }
     }
     if (counters.correlatedAction > 0) {
         if (options?.intervalMs && !options?.cumulative) {
@@ -292,5 +332,6 @@ export function formatCorrelationSummarySegment(
     if (!value) return ''
     return `correlations ${value}`
 }
+
 
 

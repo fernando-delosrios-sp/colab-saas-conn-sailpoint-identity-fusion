@@ -42,6 +42,7 @@ function makeLog(): LogService {
         assert: vi.fn(),
         getLogLevel: vi.fn().mockReturnValue('info'),
         recordCorrelationActivity: vi.fn(),
+        recordCorrelationCompleted: vi.fn(),
         recordCorrelationSkipped: vi.fn(),
     } as unknown as LogService
 }
@@ -254,6 +255,7 @@ describe('IdentityService.correlateAccounts', () => {
         await service.correlateAccounts(makeFusionAccount(), ['src-hr::acct-1'])
 
         expect(log.recordCorrelationActivity).toHaveBeenCalledWith({ kind: 'link', accounts: 1 })
+        expect(log.recordCorrelationCompleted).toHaveBeenCalledWith({ kind: 'link' })
     })
 
     it('records merge correlation activity when kind is merge', async () => {
@@ -280,3 +282,4 @@ describe('IdentityService.correlateAccounts', () => {
         expect(log.recordCorrelationActivity).toHaveBeenCalledWith({ kind: 'link', accounts: 1 })
     })
 })
+
