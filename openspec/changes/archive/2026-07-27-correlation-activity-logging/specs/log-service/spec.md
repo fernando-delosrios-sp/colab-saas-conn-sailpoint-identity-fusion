@@ -33,6 +33,12 @@ The log service SHALL aggregate account-level events recorded via `recordEvent` 
 - **THEN** the connector host SHALL receive an INFO line containing `EVENT_SUMMARY` with match counts
 - **AND** per-account `MATCH FOUND` lines SHALL NOT have been emitted at INFO level for those events
 
+#### Scenario: Correlation events summarized per tick
+
+- **GIVEN** 14 correlation triggers affecting 18 accounts since the last tick
+- **WHEN** the heartbeat flushes event counters
+- **THEN** the connector host SHALL receive an INFO `EVENT_SUMMARY` line reporting correlation totals
+
 #### Scenario: Correlation link and merge summarized per tick
 
 - **GIVEN** 14 link correlation triggers affecting 18 accounts and 2 merge correlation triggers affecting 2 accounts since the last tick
