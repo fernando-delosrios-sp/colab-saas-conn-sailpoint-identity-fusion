@@ -64,6 +64,13 @@ During account-list execution, per-account match discovery (`MATCH FOUND`, `EXAC
 - **THEN** individual `MATCH FOUND:` INFO lines SHALL NOT appear for each account
 - **AND** EVENT_SUMMARY lines SHALL report aggregate match counts per heartbeat tick
 
+#### Scenario: Correlation triggers summarized
+
+- **GIVEN** correlation is triggered for multiple fusion accounts during Process phase
+- **WHEN** the operation runs with default INFO log level
+- **THEN** individual `Triggering correlation for` INFO lines SHALL NOT appear
+- **AND** EVENT_SUMMARY lines SHALL report aggregate correlation counts
+
 #### Scenario: Link correlation summarized during Refresh
 
 - **GIVEN** correlation-on-aggregation PATCH is triggered for multiple fusion accounts during Refresh phase

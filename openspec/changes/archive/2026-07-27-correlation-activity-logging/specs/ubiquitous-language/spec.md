@@ -27,6 +27,13 @@ The ubiquitous-language glossary SHALL define **Correlation link**, **Correlatio
 
 The ubiquitous-language spec SHALL state that **Merge** is a Match decision/outcome, **Blend** is the structural absorption of a managed account into a Fusion account, and **Correlation** is the ISC platform operation to link account records. For operational logging, **Correlation link** and **Correlation merge** SHALL identify PATCH correlation subtypes in EVENT_SUMMARY and PHASE END lines. Documentation SHALL NOT use merge as a synonym for blend or correlation.
 
+#### Scenario: Merge versus blend
+
+- **GIVEN** documentation describes a Match outcome joining an existing Fusion identity
+- **WHEN** the prose refers to the decision
+- **THEN** it SHALL use **merge** (or **manual merge** / **automatic merge**)
+- **AND** it SHALL use **blend** only when describing structural managed-account absorption
+
 #### Scenario: Merge is not used as a synonym for correlation PATCH in logs
 
 - **GIVEN** documentation describes EVENT_SUMMARY correlation segments
