@@ -1936,7 +1936,7 @@ describe('FusionService', () => {
 
             expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(fusionAccount, [
                 'source-a-id::native-no-meta',
-            ])
+            ], 'link')
         })
 
         it('sets reverse correlation attribute for non-matched authoritative accounts without checking platform prerequisites', async () => {
@@ -2344,7 +2344,7 @@ describe('FusionService', () => {
             expect(result?.statuses).not.toContain('nonMatched')
             expect(result?.history.some((h) => h.includes('into existing identity by Reviewer'))).toBe(true)
             expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(existingFusionAccount, [managedKey])
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(existingFusionAccount, [managedKey], 'merge')
             expect(fusionService.getFusionIdentity('identity-1')).toBe(existingFusionAccount)
         })
 
@@ -2465,7 +2465,7 @@ describe('FusionService', () => {
             await fusionService.processFusionIdentityDecision(decision)
             expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(expect.any(FusionAccount), [
                 managedKeyAutoCorr,
-            ])
+            ], 'merge')
         })
 
         it('suppresses generic association history for authorized decisions without identityId', async () => {
@@ -2559,7 +2559,7 @@ describe('FusionService', () => {
             await fusionService.processFusionIdentityDecision(decision)
 
             expect(mockIdentities.correlateAccounts).toHaveBeenCalledTimes(1)
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(expect.any(FusionAccount), [managedKeyAuthz])
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(expect.any(FusionAccount), [managedKeyAuthz], 'merge')
         })
 
         it('registers unique attributes and skips output for record no-match decisions', async () => {

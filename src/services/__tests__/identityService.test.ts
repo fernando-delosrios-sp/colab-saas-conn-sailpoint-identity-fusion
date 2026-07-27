@@ -40,6 +40,9 @@ function makeLog(): LogService {
         warn: vi.fn(),
         error: vi.fn(),
         assert: vi.fn(),
+        getLogLevel: vi.fn().mockReturnValue('info'),
+        recordCorrelationActivity: vi.fn(),
+        recordCorrelationSkipped: vi.fn(),
     } as unknown as LogService
 }
 
@@ -226,5 +229,54 @@ describe('IdentityService.fetchIdentityProfileById', () => {
         expect(doc?.email).toBe('owner@example.com')
         expect((doc?.attributes as any)?.email).toBe('owner@example.com')
         expect(service.getIdentityById('owner-1')?.email).toBe('owner@example.com')
+    })
+})
+
+describe('IdentityService.correlateAccounts', () => {
+    function makeFusionAccount(overrides: Record<string, unknown> = {}) {
+        return {
+            name: 'Test Fusion',
+            identityId: 'identity-1',
+            missingAccountIds: ['src-hr::acct-1', 'src-hr::acct-2'],
+            setCorrelatedAccount: vi.fn(),
+            addCorrelationPromise: vi.fn(),
+            ...overrides,
+        } as any
+    }
+
+    it('records link correlation activity by default', async () => {
+        const { service, client } = makeService()
+        const log = (service as any).log as LogService
+        const sources = (service as any).sources as SourceServiceStub
+        ;(sources.resolveIscAccountIdForManagedKey as Mock).mockReturnValue('isc-1')
+        ;(client.call as Mock).mockResolvedValue(undefined)
+
+        await service.correlateAccounts(makeFusionAccount(), ['src-hr::acct-1'])
+
+        expect(log.recordCorrelationActivity).toHaveBeenCalledWith({ kind: 'link', accounts: 1 })
+    })
+
+    it('records merge correlation activity when kind is merge', async () => {
+        const { service, client } = makeService()
+        const log = (service as any).log as LogService
+        const sources = (service as any).sources as SourceServiceStub
+        ;(sources.resolveIscAccountIdForManagedKey as Mock).mockReturnValue('isc-1')
+        ;(client.call as Mock).mockResolvedValue(undefined)
+
+        await service.correlateAccounts(makeFusionAccount(), ['src-hr::acct-1'], 'merge')
+
+        expect(log.recordCorrelationActivity).toHaveBeenCalledWith({ kind: 'merge', accounts: 1 })
+    })
+
+    it('records skip when ISC account id is not found', async () => {
+        const { service } = makeService()
+        const log = (service as any).log as LogService
+        const sources = (service as any).sources as SourceServiceStub
+        ;(sources.resolveIscAccountIdForManagedKey as Mock).mockReturnValue(undefined)
+
+        await service.correlateAccounts(makeFusionAccount(), ['src-hr::missing'])
+
+        expect(log.recordCorrelationSkipped).toHaveBeenCalledWith('noIscAccountId')
+        expect(log.recordCorrelationActivity).toHaveBeenCalledWith({ kind: 'link', accounts: 1 })
     })
 })

@@ -41,6 +41,27 @@ describe('FusionCorrelation', () => {
             expect(collections.actionsSet.has('correlated')).toBe(false)
             expect(uncorrelatedFlag).toBe(true)
         })
+
+        it('invokes onCorrelatedActionGranted only on transition into correlated state', () => {
+            let grantCount = 0
+            const onGranted = () => {
+                grantCount++
+            }
+
+            correlation.updateStatus(undefined, onGranted)
+            expect(grantCount).toBe(1)
+
+            correlation.updateStatus(undefined, onGranted)
+            expect(grantCount).toBe(1)
+
+            collections.accounts.addMissing('src-a::missing-1')
+            correlation.updateStatus(undefined, onGranted)
+            expect(grantCount).toBe(1)
+
+            collections.accounts.removeMissing('src-a::missing-1')
+            correlation.updateStatus(undefined, onGranted)
+            expect(grantCount).toBe(2)
+        })
     })
 
     describe('markCorrelated', () => {
@@ -82,3 +103,4 @@ describe('FusionCorrelation', () => {
         })
     })
 })
+

@@ -33,10 +33,27 @@ export class CorrelationManager {
     private async correlatePerSource(
         fusionAccount: FusionAccount,
         mergeDecision?: FusionDecision,
-        forceDirectCorrelation: boolean = false
+        forceDirectCorrelation: boolean = false,
+        kind: 'link' | 'merge' = 'link'
     ): Promise<void> {
         const missingIds = fusionAccount.missingAccountIds
         const canDirectCorrelate = Boolean(fusionAccount.identityId)
+
+        for (const accountId of missingIds) {
+            if (!canDirectCorrelate) {
+                this.log.recordCorrelationSkipped('noIdentity')
+                continue
+            }
+            const info = fusionAccount.getManagedAccountInfo(accountId)
+            if (!info) {
+                this.log.recordCorrelationSkipped('noSourceContext')
+                continue
+            }
+            const sourceConfig = this.sources.getSourceConfig(info.source.name)
+            if ((sourceConfig?.correlationMode ?? 'none') !== 'correlate') {
+                this.log.recordCorrelationSkipped('wrongMode')
+            }
+        }
 
         const directCorrelateIds = canDirectCorrelate
             ? missingIds.filter((accountId) => {
@@ -70,12 +87,12 @@ export class CorrelationManager {
 
         // Direct correlation
         if (directCorrelateIds.length > 0) {
-            await this.identities.correlateAccounts(fusionAccount, directCorrelateIds)
+            await this.identities.correlateAccounts(fusionAccount, directCorrelateIds, kind)
         } else if (forceDirectCorrelation && canDirectCorrelate && missingIds.length > 0) {
             this.log.debug(
                 `No per-source direct-correlation targets for ${fusionAccount.name}; forcing direct correlation for ${missingIds.length} missing account(s) due to explicit correlated action`
             )
-            await this.identities.correlateAccounts(fusionAccount, [...missingIds])
+            await this.identities.correlateAccounts(fusionAccount, [...missingIds], kind)
         }
     }
 
@@ -84,7 +101,8 @@ export class CorrelationManager {
      */
     public async applyPerSourceCorrelationIfNeeded(
         fusionAccount: FusionAccount,
-        mergeDecision?: FusionDecision
+        mergeDecision?: FusionDecision,
+        kind: 'link' | 'merge' = 'link'
     ): Promise<void> {
         if (!this.isAggregationMode()) return
         const hasMissing = fusionAccount.missingAccountIdsSet.size > 0
@@ -93,7 +111,7 @@ export class CorrelationManager {
             !mergeDecision.newIdentity &&
             Boolean(trimStr(mergeDecision.account.id))
         if (!hasMissing && !hasAuthorizedMerge) return
-        await this.correlatePerSource(fusionAccount, mergeDecision)
+        await this.correlatePerSource(fusionAccount, mergeDecision, false, kind)
     }
 
     /**

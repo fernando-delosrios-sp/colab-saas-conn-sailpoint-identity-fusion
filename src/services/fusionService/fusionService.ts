@@ -575,7 +575,7 @@ export class FusionService {
         // setFusionAccount routes the account to the correct map (identity-linked
         // Fusion account map vs fusionAccountMap). Without this, optimistic correlations from
         // correlatePerSource leave _uncorrelated stale.
-        fusionAccount.updateCorrelationStatus()
+        fusionAccount.updateCorrelationStatus(() => this.log.recordCorrelatedActionGranted())
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
@@ -978,7 +978,7 @@ export class FusionService {
         // Update correlation status/action based on whatever correlations have resolved so far.
         // accountUpdate may skip this to preserve explicit entitlement removals in the immediate response.
         if (recomputeCorrelationStatus) {
-            fusionAccount.updateCorrelationStatus()
+            fusionAccount.updateCorrelationStatus(() => this.log.recordCorrelatedActionGranted())
         }
         // Match forms: ensure this exact row reflects FormService pending state at output time.
         // Global reconcile runs during aggregation, but accountRead and edge paths only guarantee

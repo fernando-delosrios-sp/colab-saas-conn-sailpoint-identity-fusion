@@ -1,6 +1,7 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { PhaseTimer } from '../../services/logService'
 import { formatFormOutcomesSegment, formatMatchOutcomesSegment } from '../../services/logService/operationHeartbeat'
+import { formatCorrelationSummaryValue } from '../../services/logService/operationRunContext'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
 import { AggregationStats } from '../../services/fusionService/types'
@@ -288,10 +289,15 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
     })
     const matchOutcomes = formatMatchOutcomesSegment(log.getCumulativeOutcomes(), true)
     const formOutcomes = formatFormOutcomesSegment(forms.formsCreated, forms.formInstancesCreated)
+    const phaseCorrelation = log.getRunContext()?.getPhaseCorrelationCounters()
+    const correlationSegment = phaseCorrelation
+        ? formatCorrelationSummaryValue(phaseCorrelation, { cumulative: true })
+        : ''
     log.detail({
         action: 'process phase complete',
         matches: matchOutcomes,
         forms: formOutcomes,
+        ...(correlationSegment ? { correlations: correlationSegment } : {}),
     })
 }
 
@@ -456,6 +462,7 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+
 
 
 

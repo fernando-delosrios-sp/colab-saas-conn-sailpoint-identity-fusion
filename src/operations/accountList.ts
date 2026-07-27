@@ -63,31 +63,31 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
             log.phaseStart(1, 'Setup')
             if (!(await setupPhase(serviceRegistry, input.schema, options))) return
             timer.recordElapsed('Setup', Date.now() - phaseStarted)
-            log.phaseEnd(1, 'Setup')
+            log.phaseEnd(1, 'Setup', log.flushPhaseCorrelationSummary())
 
             phaseStarted = Date.now()
             log.phaseStart(2, 'Fetch')
             fetchResult = await fetchPhase(serviceRegistry, options)
             timer.recordElapsed('Fetch', Date.now() - phaseStarted)
-            log.phaseEnd(2, 'Fetch')
+            log.phaseEnd(2, 'Fetch', log.flushPhaseCorrelationSummary())
 
             phaseStarted = Date.now()
             log.phaseStart(3, 'Refresh')
             await refreshPhase(serviceRegistry)
             timer.recordElapsed('Refresh', Date.now() - phaseStarted)
-            log.phaseEnd(3, 'Refresh')
+            log.phaseEnd(3, 'Refresh', log.flushPhaseCorrelationSummary())
 
             phaseStarted = Date.now()
             log.phaseStart(4, 'Process')
             await processPhase(serviceRegistry, options)
             timer.recordElapsed('Process', Date.now() - phaseStarted)
-            log.phaseEnd(4, 'Process')
+            log.phaseEnd(4, 'Process', log.flushPhaseCorrelationSummary())
 
             phaseStarted = Date.now()
             log.phaseStart(5, 'Output')
             outputCount = await outputPhase(serviceRegistry, options)
             timer.recordElapsed('Output', Date.now() - phaseStarted)
-            log.phaseEnd(5, 'Output')
+            log.phaseEnd(5, 'Output', log.flushPhaseCorrelationSummary())
         } catch (error) {
             runError = error
             log.warn(`Pipeline failed — running report epilogue before propagating: ${(error as Error).message}`)
@@ -127,3 +127,4 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         }
     }
 }
+

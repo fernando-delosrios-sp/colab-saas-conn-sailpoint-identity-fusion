@@ -324,7 +324,11 @@ export class IdentityService {
      *   (used for per-source correlation where only a subset should be directly correlated)
      * @returns true if correlation was initiated, false if no identity ID is available
      */
-    public async correlateAccounts(fusionAccount: FusionAccount, accountIdFilter?: string[]): Promise<boolean> {
+    public async correlateAccounts(
+        fusionAccount: FusionAccount,
+        accountIdFilter?: string[],
+        kind: 'link' | 'merge' = 'link'
+    ): Promise<boolean> {
         const { identityId } = fusionAccount
 
         if (!identityId) {
@@ -339,7 +343,7 @@ export class IdentityService {
             return true
         }
 
-        this.log.recordEvent('correlation', { accounts: targetIds.length })
+        this.log.recordCorrelationActivity({ kind, accounts: targetIds.length })
         if (this.log.getLogLevel() === 'debug') {
             this.log.debug(
                 `Triggering correlation for ${targetIds.length} account(s) for fusion account ${fusionAccount.name}`
@@ -360,6 +364,7 @@ export class IdentityService {
     ): Promise<void> {
         const iscAccountId = this.sources.resolveIscAccountIdForManagedKey(accountId)
         if (!iscAccountId) {
+            this.log.recordCorrelationSkipped('noIscAccountId')
             this.log.warn(
                 `Skipping correlation for managed key "${accountId}": ISC account id not found in loaded source data`
             )
@@ -471,4 +476,5 @@ export class IdentityService {
             })
     }
 }
+
 

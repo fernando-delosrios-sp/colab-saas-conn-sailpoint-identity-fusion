@@ -2,6 +2,7 @@
 
 ## 2.2.0
 
+- (2026-07-27) **Observability:** Correlation activity logging now distinguishes **link** (correlation-on-aggregation during Refresh), **merge** (merge-decision-driven PATCH during Process), and **correlated-action** (entitlement newly granted when all missing accounts clear). `EVENT_SUMMARY` and `PHASE END` lines use `correlations link=triggers/accounts merge=triggers/accounts correlated-action=… skipped=…` instead of the legacy `correlations triggered=N accounts=M` format. Refresh `STATUS` lines include a cumulative correlation segment when link or merge activity occurred. Skip buckets aggregate silent non-PATCH reasons (`noIdentity`, `noSourceContext`, `wrongMode`, `noIscAccountId`). Log monitors should migrate grep patterns from `correlations triggered=` to `correlations link=`. `log-service`, `account-list-operation`, and `ubiquitous-language` specs updated.
 - (2026-07-27) **Enhancement:** ISC account output omits nullish attribute keys — `SchemaService.getFusionAttributeSubset` no longer emits explicit `"attr": null` entries for sparse mapped attributes; empty arrays and populated values unchanged. Internal attribute bags are not mutated. `schema-service` spec updated.
 - (2026-07-27) **Fix:** Authorized link-to-existing form decisions again PATCH-correlate managed accounts when the source uses `correlationMode: correlate`, even after `assembleAccount` blends the row off `missing-accounts`.
 - (2026-07-27) **Observability:** Unified structured log format across all connector operations — every host-visible INFO line now follows `[context] KIND payload`. Account-list phases emit paired `PHASE N Name START` / `PHASE N Name END elapsed=` boundaries (colon-style `PHASE N: Description (elapsed)` host lines removed). The report terminal block uses `EPILOGUE report START` / `EPILOGUE report END elapsed=`. New **`DETAIL`** kind for operational milestones (`sources=3`, `action=email sent`, workflow resolution, fusion sweep progress). Config bootstrap messages use `[config] DETAIL` via `bootstrapLog`. Non-accountList operations (`accountCreate`, `accountEnable`/`Disable`, `accountRead`/`Update`, `testConnection`, `entitlementList`, `accountDiscoverSchema`) emit `STEP slug START` / `STEP slug END elapsed=` instead of PhaseTimer prose. Email sends log one `DETAIL` line per invocation; batch activity surfaces via `EVENT_SUMMARY email=+N/interval` during Process phase. Log monitors should grep `PHASE`, `STEP`, `EPILOGUE`, `DETAIL`, and `STATUS` prefixes. `log-service`, `account-list-operation`, and `ubiquitous-language` specs updated.
@@ -126,6 +127,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 

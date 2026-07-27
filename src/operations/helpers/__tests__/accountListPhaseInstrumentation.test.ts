@@ -1,4 +1,5 @@
 import { FusionRun } from '../../../model/fusionRun'
+import { OperationRunContext } from '../../../services/logService/operationRunContext'
 import { createOperationTestRegistry } from '../../__tests__/harness/operationTestRegistry'
 import { outputPhase, processPhase } from '../accountListPhases'
 
@@ -71,6 +72,23 @@ describe('accountListPhases step instrumentation', () => {
         })
     })
 
+    it('processPhase completion DETAIL includes correlation segment when activity recorded', async () => {
+        const registry = createRegistry()
+        const log = registry.log
+        log.bindRunContext(new OperationRunContext())
+        vi.spyOn(log, 'detail')
+        log.recordCorrelationActivity({ kind: 'merge', accounts: 2 })
+
+        await processPhase(registry, { isPersistent: false })
+
+        expect(log.detail).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: 'process phase complete',
+                correlations: 'merge=1/2',
+            })
+        )
+    })
+
     it('outputPhase logs clear-managed-accounts before form-cleanup when not in record mode', async () => {
         const registry = createRegistry()
         const log = registry.log
@@ -100,4 +118,5 @@ describe('accountListPhases step instrumentation', () => {
         expect(stepStartOrder(log)).not.toContain('clear-managed-accounts')
     })
 })
+
 

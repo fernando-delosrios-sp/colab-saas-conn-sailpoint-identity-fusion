@@ -1,4 +1,4 @@
-import { OperationRunContext } from '../operationRunContext'
+import { OperationRunContext, formatCorrelationSummarySegment } from '../operationRunContext'
 import {
     OperationHeartbeat,
     formatApiQueueSegment,
@@ -6,6 +6,7 @@ import {
     formatEventSummaryLines,
     formatFormOutcomesSegment,
     formatMatchOutcomesSegment,
+    formatPhaseEndDetailSuffix,
     formatStatusLine,
     formatStallWarning,
     groupActiveLabels,
@@ -308,8 +309,17 @@ describe('operation heartbeat formatters', () => {
             matchExact: 2,
             matchPartial: 12,
             matchDeferred: 3,
-            correlationTriggers: 14,
-            correlationAccounts: 18,
+            correlation: {
+                linkTriggers: 14,
+                linkAccounts: 18,
+                mergeTriggers: 0,
+                mergeAccounts: 0,
+                correlatedAction: 0,
+                skippedNoIdentity: 0,
+                skippedNoSourceContext: 0,
+                skippedWrongMode: 0,
+                skippedNoIscAccountId: 0,
+            },
             nonMatch: 0,
             autoMerged: 0,
             formsQueued: 0,
@@ -318,7 +328,7 @@ describe('operation heartbeat formatters', () => {
             emailSent: 0,
         }
         expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
-            'EVENT_SUMMARY correlations triggered=14 accounts=18',
+            'EVENT_SUMMARY correlations link=14/18',
         ])
     })
 
@@ -327,8 +337,17 @@ describe('operation heartbeat formatters', () => {
             matchExact: 0,
             matchPartial: 0,
             matchDeferred: 0,
-            correlationTriggers: 0,
-            correlationAccounts: 0,
+            correlation: {
+                linkTriggers: 0,
+                linkAccounts: 0,
+                mergeTriggers: 0,
+                mergeAccounts: 0,
+                correlatedAction: 0,
+                skippedNoIdentity: 0,
+                skippedNoSourceContext: 0,
+                skippedWrongMode: 0,
+                skippedNoIscAccountId: 0,
+            },
             nonMatch: 0,
             autoMerged: 0,
             formsQueued: 0,
@@ -345,8 +364,17 @@ describe('operation heartbeat formatters', () => {
             matchExact: 1,
             matchPartial: 0,
             matchDeferred: 0,
-            correlationTriggers: 2,
-            correlationAccounts: 3,
+            correlation: {
+                linkTriggers: 2,
+                linkAccounts: 3,
+                mergeTriggers: 0,
+                mergeAccounts: 0,
+                correlatedAction: 0,
+                skippedNoIdentity: 0,
+                skippedNoSourceContext: 0,
+                skippedWrongMode: 0,
+                skippedNoIscAccountId: 0,
+            },
             nonMatch: 5,
             autoMerged: 4,
             formsQueued: 2,
@@ -355,12 +383,12 @@ describe('operation heartbeat formatters', () => {
             emailSent: 0,
         }
         expect(formatEventSummaryLines(events, 'Refresh', 10_000)).toEqual([
-            'EVENT_SUMMARY correlations triggered=2 accounts=3',
+            'EVENT_SUMMARY correlations link=2/3',
         ])
         expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
             'EVENT_SUMMARY matches non-matched=+5/10s manual=+2/10s auto=+4/10s',
             'EVENT_SUMMARY forms new-identity-assignment=1',
-            'EVENT_SUMMARY correlations triggered=2 accounts=3',
+            'EVENT_SUMMARY correlations link=2/3',
         ])
     })
 
@@ -539,6 +567,51 @@ describe('OperationHeartbeat timing', () => {
         expect(line).toContain('refreshed(500)')
     })
 
+    it('includes correlation segment on Refresh STATUS when link activity occurred', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Refresh'
+        runContext.refreshedCount = 120
+        runContext.recordCorrelationActivity({ kind: 'link', accounts: 8 })
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                intervalMs: 10_000,
+            },
+            {},
+            10_000
+        )
+
+        expect(line).toContain('refreshed(120)')
+        expect(line).toContain('correlations link=1/8')
+    })
+
+    it('formatCorrelationSummarySegment emits link, merge, correlated-action, and skipped segments', () => {
+        const segment = formatCorrelationSummarySegment(
+            {
+                linkTriggers: 14,
+                linkAccounts: 18,
+                mergeTriggers: 2,
+                mergeAccounts: 2,
+                correlatedAction: 12,
+                skippedNoIdentity: 0,
+                skippedNoSourceContext: 0,
+                skippedWrongMode: 0,
+                skippedNoIscAccountId: 3,
+            },
+            { intervalMs: 10_000, cumulative: false }
+        )
+        expect(segment).toBe(
+            'correlations link=14/18 merge=2/2 correlated-action=+12/10s skipped=noIscAccountId=3'
+        )
+    })
+
+    it('formatPhaseEndDetailSuffix renders correlations without key=value prefix', () => {
+        expect(formatPhaseEndDetailSuffix({ correlations: 'link=42/56 merge=2/2' })).toBe(
+            ' correlations link=42/56 merge=2/2'
+        )
+    })
+
     it('omits refreshed segment outside Refresh phase', () => {
         const runContext = new OperationRunContext()
         runContext.phase = 'Process'
@@ -655,6 +728,7 @@ describe('OperationHeartbeat timing', () => {
         vi.useRealTimers()
     })
 })
+
 
 
 
