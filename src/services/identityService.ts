@@ -392,7 +392,7 @@ export class IdentityService {
 
         return this.client.call(
             (api: any) => api.accounts.updateAccount(requestParameters).then((r: any) => r.data),
-            { priority: QueuePriority.LOW, context: `IdentityService>correlateAccounts ${accountId}` }
+            { priority: QueuePriority.LOW, context: 'IdentityService>correlateAccounts' }
         )
             .then(() => {
                 this.log.debug(
@@ -476,5 +476,6 @@ export class IdentityService {
             })
     }
 }
+
 
 

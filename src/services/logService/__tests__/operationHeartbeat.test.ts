@@ -402,6 +402,22 @@ describe('operation heartbeat formatters', () => {
         expect(grouped).toContain('MatchingService>score')
     })
 
+    it('aggregates correlateAccounts labels with per-account suffixes', () => {
+        const item = {
+            priority: 1,
+            createdAt: 0,
+            retryCount: 0,
+            maxRetries: 3,
+            waitTimeMs: 100,
+        }
+        const grouped = groupActiveLabels([
+            { ...item, id: '1', label: 'IdentityService>correlateAccounts 768daab640cd4c51b2ebe5441b76fda8::SF0000950' },
+            { ...item, id: '2', label: 'IdentityService>correlateAccounts 768daab640cd4c51b2ebe5441b76fda8::SF0001005' },
+            { ...item, id: '3', label: 'IdentityService>correlateAccounts 768daab640cd4c51b2ebe5441b76fda8::SF0000748' },
+        ] as any)
+        expect(grouped).toBe('IdentityService>correlateAccounts×3')
+    })
+
     it('groups paginated queue labels by source with offsets instead of ×1', () => {
         const item = {
             priority: 1,

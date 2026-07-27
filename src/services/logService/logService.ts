@@ -258,6 +258,8 @@ export class LogService {
         this.info(`PHASE ${phaseNumber} ${phase} END${formatPhaseEndDetailSuffix(detail)}${elapsed}`)
         if (this.runContext) {
             this.runContext.phaseStartedAt = undefined
+            this.runContext.step = null
+            this.runContext.progress = undefined
         }
     }
 
@@ -268,6 +270,8 @@ export class LogService {
     epilogueStart(block: string): void {
         if (this.runContext) {
             this.runContext.phase = 'Epilogue'
+            this.runContext.step = null
+            this.runContext.progress = undefined
             this.runContext.epilogueStartedAt = Date.now()
         }
         this.info(`EPILOGUE ${block} START`)
@@ -297,6 +301,7 @@ export class LogService {
             startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
         this.info(`STEP ${step} END${formatDetailSuffix(detail)}${elapsed}`)
         if (this.runContext) {
+            this.runContext.step = null
             this.runContext.stepStartedAt = undefined
         }
     }
@@ -685,6 +690,7 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+
 
 
 

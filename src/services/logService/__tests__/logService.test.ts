@@ -236,14 +236,28 @@ describe('LogService step boundaries', () => {
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const log = new LogService({ spConnDebugLoggingEnabled: false })
-        log.bindRunContext(new OperationRunContext())
+        const runContext = new OperationRunContext()
+        log.bindRunContext(runContext)
         log.stepStart('process-identities')
         vi.advanceTimersByTime(42)
         log.stepEnd('process-identities', { count: 0 })
         expect(mockLogger.info).toHaveBeenLastCalledWith(
             expect.stringContaining('STEP process-identities END count=0 elapsed=42MS')
         )
+        expect(runContext.step).toBeNull()
         vi.useRealTimers()
+    })
+
+    it('epilogueStart clears step and progress from run context', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const runContext = new OperationRunContext()
+        log.bindRunContext(runContext)
+        runContext.step = 'await-form-deletes'
+        runContext.progress = { done: 2000, total: 2000, unit: 'sent' }
+        log.epilogueStart('report')
+        expect(runContext.phase).toBe('Epilogue')
+        expect(runContext.step).toBeNull()
+        expect(runContext.progress).toBeUndefined()
     })
 })
 
@@ -283,4 +297,5 @@ describe('LogService phase and detail boundaries', () => {
         vi.useRealTimers()
     })
 })
+
 
