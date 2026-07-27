@@ -206,7 +206,6 @@ const merged = {
     fusionFormExpirationDays: review.fusionFormExpirationDays,
     fusionManualReviewScore: matching.fusionManualReviewScore,
     provisioningTimeout: advancedConnection.provisioningTimeout,
-    managedAccountsBatchSize: advancedConnection.managedAccountsBatchSize,
     fusionMaxCandidatesForForm: review.fusionMaxCandidatesForForm,
     ...scope,
     ...processing,
@@ -216,7 +215,7 @@ const merged = {
     maxConcurrentRequests: advancedConnection.maxConcurrentRequests,
     parallelBatchSize: advancedConnection.parallelBatchSize,
     processingWait: advancedConnection.processingWait,
-    batchSize: advancedConnection.batchSize,
+    heartbeatInterval: advancedConnection.heartbeatInterval,
     ...developer,
     ...proxy,
     ...uniqueDefs,
@@ -229,4 +228,5 @@ const merged = {
 const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'))
 spec.sourceConfigInitialValues = merged
 fs.writeFileSync(specPath, JSON.stringify(spec, null, 4) + '\n', 'utf8')
+
 

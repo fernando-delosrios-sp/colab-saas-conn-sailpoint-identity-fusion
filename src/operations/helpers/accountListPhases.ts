@@ -1,6 +1,6 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { PhaseTimer } from '../../services/logService'
-import { formatMatchOutcomesSegment } from '../../services/logService/operationHeartbeat'
+import { formatFormOutcomesSegment, formatMatchOutcomesSegment } from '../../services/logService/operationHeartbeat'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
 import { AggregationStats } from '../../services/fusionService/types'
@@ -215,7 +215,7 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<vo
 }
 
 export async function processPhase(serviceRegistry: ServiceRegistry, _options: PhaseOptions): Promise<void> {
-    const { log, fusion, identities, sources } = serviceRegistry
+    const { log, fusion, identities, sources, forms } = serviceRegistry
 
     log.stepStart('process-identities')
     const identitiesOp = log.track('FusionService.processIdentities')
@@ -279,9 +279,13 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
 
     log.stepStart('form-reconcile')
     fusion.reconcilePendingFormState()
-    log.stepEnd('form-reconcile', { remaining: sources.run.managedAccountsById.size })
+    log.stepEnd('form-reconcile', {
+        'forms-created': forms.formsCreated,
+        'instances-sent': forms.formInstancesCreated,
+    })
     const matchOutcomes = formatMatchOutcomesSegment(log.getCumulativeOutcomes(), true)
-    log.info(`Process phase complete - ${matchOutcomes}`)
+    const formOutcomes = formatFormOutcomesSegment(forms.formsCreated, forms.formInstancesCreated)
+    log.info(`Process phase complete - ${matchOutcomes} ${formOutcomes}`)
 }
 
 export async function outputPhase(serviceRegistry: ServiceRegistry, options: PhaseOptions): Promise<number> {
@@ -440,6 +444,7 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+
 
 
 

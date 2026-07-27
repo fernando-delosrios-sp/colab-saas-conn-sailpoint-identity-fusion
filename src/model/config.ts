@@ -400,7 +400,7 @@ export interface AdvancedConnectionSettingsSection {
 
     /**
      * Maximum in-flight parallel page requests per pagination stream (sliding window).
-     * Defaults to 12 when unset. Independent from maxConcurrentRequests — the shared
+     * Defaults to 16 when unset. Independent from maxConcurrentRequests — the shared
      * ApiQueue still enforces global HTTP concurrency and rate-window limits.
      */
     parallelBatchSize?: number
@@ -520,6 +520,7 @@ export interface FusionConfig
         InternalConfig {
     recording?: RecordingConfig
 }
+
 
 
 

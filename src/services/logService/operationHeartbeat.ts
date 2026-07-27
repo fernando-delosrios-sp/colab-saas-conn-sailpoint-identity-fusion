@@ -9,6 +9,10 @@ type FusionPendingSnapshot = {
     fusionReviewsFound: number
     /** Fusion review form instances fetched this run (report: Fusion Review Instances Found). */
     fusionReviewInstancesFound: number
+    /** Fusion review form definitions created this run. */
+    formsCreated: number
+    /** Fusion review form instances (reviewer assignments) created this run. */
+    formInstancesCreated: number
 }
 
 export type HeartbeatSnapshot = {
@@ -77,6 +81,19 @@ export function formatMatchOutcomesSegment(outcomes: CumulativeOutcomes, include
     return `${segment.slice(0, -1)} total=${nonMatch + formsQueued + autoMerged})`
 }
 
+export function formatFormOutcomesSegment(formsCreated: number, formInstancesCreated: number): string {
+    return `forms=${formsCreated}(${formInstancesCreated})`
+}
+
+function shouldShowFormOutcomesInStatus(
+    runContext: OperationRunContext,
+    pending: FusionPendingSnapshot | undefined
+): boolean {
+    if (runContext.phase !== 'Process' || !pending) return false
+    if (runContext.step === 'form-reconcile') return true
+    return pending.formsCreated > 0 || pending.formInstancesCreated > 0
+}
+
 function shouldShowMatchOutcomesInStatus(runContext: OperationRunContext): boolean {
     if (runContext.phase !== 'Process') return false
     if (runContext.step === 'uncorrelated-sweep') return true
@@ -119,6 +136,10 @@ export function formatStatusLine(
 
     if (shouldShowMatchOutcomesInStatus(runContext)) {
         parts.push(formatMatchOutcomesSegment(runContext.getCumulativeOutcomes()))
+    }
+
+    if (shouldShowFormOutcomesInStatus(runContext, fusionPending)) {
+        parts.push(formatFormOutcomesSegment(fusionPending!.formsCreated, fusionPending!.formInstancesCreated))
     }
 
     if (runContext.phase === 'Refresh') {
@@ -398,6 +419,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 
