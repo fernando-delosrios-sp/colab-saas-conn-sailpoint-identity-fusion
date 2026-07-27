@@ -130,19 +130,28 @@ export class FormService {
 
         // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
         // to prevent API rate limiting issues when iterating over a large number of forms
-        let instancesFetched = 0
-        const reportInstanceFetchProgress = (delta: number) => {
-            if (delta <= 0) return
-            instancesFetched += delta
-            this.log.setProgress(instancesFetched, instancesFetched, 'fetched')
+        if (activeForms.length === 0) {
+            this._fetchedFormInstances = []
+            this.log.debug('Fetched 0 instance(s) from 0 form definition(s)')
+            return
         }
 
+        const fetchInstancesOp = this.log.track('FormService.fetchFormInstances')
+        let formsProcessed = 0
+        let instanceCount = 0
+
         this._fetchedFormInstances = await promiseAllBatched(activeForms, async (form) => {
-            this.log.debug(`Fetching instances for form definition: ${form.id} (${form.name || 'unknown'})`)
-            const instances = await this.fetchFormInstancesByDefinitionId(form.id, reportInstanceFetchProgress)
-            this.log.debug(`Fetched ${instances.length} instance(s) for form definition: ${form.id}`)
+            const instances = await this.fetchFormInstancesByDefinitionId(form.id)
+            formsProcessed++
+            instanceCount += instances.length
+            this.log.setProgress(formsProcessed, activeForms.length, 'forms')
             return instances
         })
+
+        this.log.debug(
+            `Fetched ${instanceCount} instance(s) from ${activeForms.length} form definition(s)`
+        )
+        fetchInstancesOp.done({ definitions: activeForms.length, instances: instanceCount })
     }
 
     /**
