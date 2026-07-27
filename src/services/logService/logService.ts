@@ -237,11 +237,44 @@ export class LogService {
     phaseStart(phaseNumber: number, phase: OperationPhase): void {
         if (this.runContext) {
             this.runContext.phase = phase
+            this.runContext.phaseStartedAt = Date.now()
             if (phase === 'Process') {
                 this.runContext.resetCumulativeOutcomes()
             }
         }
         this.info(`PHASE ${phaseNumber} ${phase} START`)
+    }
+
+    phaseEnd(phaseNumber: number, phase: OperationPhase, detail?: Record<string, unknown>): void {
+        const startedAt = this.runContext?.phaseStartedAt
+        const elapsed =
+            startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
+        this.info(`PHASE ${phaseNumber} ${phase} END${formatDetailSuffix(detail)}${elapsed}`)
+        if (this.runContext) {
+            this.runContext.phaseStartedAt = undefined
+        }
+    }
+
+    detail(data: Record<string, unknown>): void {
+        this.info(`DETAIL${formatDetailSuffix(data)}`)
+    }
+
+    epilogueStart(block: string): void {
+        if (this.runContext) {
+            this.runContext.phase = 'Epilogue'
+            this.runContext.epilogueStartedAt = Date.now()
+        }
+        this.info(`EPILOGUE ${block} START`)
+    }
+
+    epilogueEnd(block: string, detail?: Record<string, unknown>): void {
+        const startedAt = this.runContext?.epilogueStartedAt
+        const elapsed =
+            startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
+        this.info(`EPILOGUE ${block} END${formatDetailSuffix(detail)}${elapsed}`)
+        if (this.runContext) {
+            this.runContext.epilogueStartedAt = undefined
+        }
     }
 
     stepStart(step: string, detail?: Record<string, unknown>): void {
@@ -630,6 +663,7 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+
 
 
 

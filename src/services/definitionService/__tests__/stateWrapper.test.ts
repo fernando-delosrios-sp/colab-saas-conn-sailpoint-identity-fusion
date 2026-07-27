@@ -1,12 +1,23 @@
 import { StateWrapper } from '../stateWrapper'
-import { logger } from '@sailpoint/connector-sdk'
+import { bootstrapLog } from '../../logService/bootstrapLog'
 
-vi.mock('@sailpoint/connector-sdk', () => ({
-    logger: {
-        info: vi.fn(),
+vi.mock('../../logService/bootstrapLog', () => ({
+    bootstrapLog: {
+        detail: vi.fn(),
         debug: vi.fn(),
         error: vi.fn(),
     },
+}))
+
+vi.mock('../../serviceRegistry', () => ({
+    ServiceRegistry: {
+        getCurrent: vi.fn(() => {
+            throw new Error('No active operation')
+        }),
+    },
+}))
+
+vi.mock('@sailpoint/connector-sdk', () => ({
     ConnectorError: class ConnectorError extends Error {
         type: string
         constructor(message: string, type: string) {
@@ -25,7 +36,6 @@ describe('StateWrapper', () => {
 
     beforeAll(() => {
         originalStringify = JSON.stringify
-        // Mock JSON.stringify to prevent throwing on line 17 before the try-catch block
         JSON.stringify = vi.fn().mockImplementation((val) => {
             try {
                 return originalStringify(val)
@@ -45,7 +55,6 @@ describe('StateWrapper', () => {
 
     describe('constructor initialization', () => {
         it('should handle state object conversion failure and initialize with an empty Map', () => {
-            // Create an object that will throw an error when Object.keys() is called
             const invalidState = new Proxy(
                 { a: 1 },
                 {
@@ -57,14 +66,14 @@ describe('StateWrapper', () => {
 
             const wrapper = new StateWrapper(invalidState)
 
-            expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Failed to convert state object to Map'))
+            expect(bootstrapLog.error).toHaveBeenCalledWith(expect.stringContaining('Failed to convert state object to Map'))
             expect((wrapper as any).state).toBeInstanceOf(Map)
             expect((wrapper as any).state.size).toBe(0)
         })
 
         it('should initialize with an empty Map when no state is provided', () => {
             const wrapper = new StateWrapper()
-            expect(logger.debug).toHaveBeenCalledWith('Initializing with empty state (no previous counter values)')
+            expect(bootstrapLog.debug).toHaveBeenCalledWith('Initializing with empty state (no previous counter values)')
             expect((wrapper as any).state).toBeInstanceOf(Map)
             expect((wrapper as any).state.size).toBe(0)
         })
@@ -73,7 +82,7 @@ describe('StateWrapper', () => {
             const validState = { counter1: 5, counter2: 10 }
             const wrapper = new StateWrapper(validState)
 
-            expect(logger.debug).toHaveBeenCalledWith('Loaded 2 counter values from state')
+            expect(bootstrapLog.debug).toHaveBeenCalledWith('Loaded 2 counter values from state')
             expect((wrapper as any).state).toBeInstanceOf(Map)
             expect((wrapper as any).state.size).toBe(2)
             expect((wrapper as any).state.get('counter1')).toBe(5)

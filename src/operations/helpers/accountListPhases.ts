@@ -94,7 +94,7 @@ export async function setupPhase(
     if (tracker) fusion.setTracker(tracker)
 
     await sources.fetchAllSources(isPersistent)
-    log.info(`Loaded ${sources.managedSources.length} managed source(s)`)
+    log.detail({ sources: sources.managedSources.length })
     if (!sources.hasFusionSource) {
         throw new Error(
             'Fusion source not found. The connector instance could not locate its own source in ISC. Verify the connector is properly deployed.'
@@ -104,18 +104,18 @@ export async function setupPhase(
     if (isPersistent) await sources.setProcessLock()
 
     if (isPersistent && fusion.isResetForms()) {
-        log.info('Reset forms flag detected, deleting fusion review forms')
+        log.detail({ action: 'reset forms flag detected, deleting fusion review forms' })
         await applyFusionFormsReset(serviceRegistry)
     }
 
     if (fusion.isResetAccounts()) {
-        log.info('Reset accounts flag detected, clearing state and exiting')
+        log.detail({ action: 'reset accounts flag detected, clearing state and exiting' })
         if (isPersistent) await applyFusionAccountReset(serviceRegistry)
         return false
     }
 
     if (forceAttributeRefresh) {
-        log.info('Force attribute refresh flag detected, disabling flag for next run')
+        log.detail({ action: 'force attribute refresh flag detected, disabling flag for next run' })
         await fusion.disableForceAttributeRefresh()
     }
 
@@ -123,9 +123,9 @@ export async function setupPhase(
         await schemas.setFusionAccountSchema(schema)
     } else {
         await schemas.loadFusionAccountSchemaFromSource()
-        log.info('Input schema not provided; loaded fusion account schema from source')
+        log.detail({ action: 'input schema not provided; loaded fusion account schema from source' })
     }
-    log.info('Fusion account schema set successfully')
+    log.detail({ action: 'fusion account schema set successfully' })
 
     sources.clearReverseCorrelationReadinessCache()
     const reverseCorrelationOp = log.track('reverseCorrelationSetup')
@@ -134,16 +134,16 @@ export async function setupPhase(
     if (reverseCorrelationCount > 0) {
         await schemas.setFusionAccountSchema(undefined)
         log.debug('Fusion account schema refreshed after reverse correlation setup')
-        log.info(`Reverse correlation setup completed for ${reverseCorrelationCount} source(s)`)
+        log.detail({ action: 'reverse correlation setup completed', sources: reverseCorrelationCount })
         reverseCorrelationOp.done({ sources: reverseCorrelationCount })
     }
     const aggregateManagedSourcesOp = log.track('aggregateManagedSources')
     await sources.aggregateManagedSources()
-    log.info('Managed sources aggregated')
+    log.detail({ action: 'managed sources aggregated' })
     aggregateManagedSourcesOp.done({ sources: sources.managedSources.length })
 
     await definition.initializeCounters()
-    log.info('Attribute counters initialized')
+    log.detail({ action: 'attribute counters initialized' })
     return true
 }
 
@@ -172,7 +172,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
         ? fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer
         : false
 
-    log.info('Fetching identities, managed accounts, and dependencies')
+    log.detail({ action: 'fetching identities, managed accounts, and dependencies' })
 
     const ownerIdsPromise = ownerIncluded ? sources.fetchGlobalOwnerIdentityIds() : Promise.resolve([])
 
@@ -190,28 +190,31 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
     await Promise.all(fetchTasks)
     fetchAllOp.done({ taskCount: fetchTasks.length })
 
-    log.info('Processing fetched form data')
+    log.detail({ action: 'processing fetched form data' })
     const processFormDataOp = log.track('fetchPhase.processFormData')
     await forms.processFetchedFormData()
     processFormDataOp.done()
-    log.info(
-        `Fusion reviews found: ${forms.formsFound}, Fusion review instances found: ${forms.formInstancesFound}`
-    )
+    log.detail({
+        'fusion-reviews': forms.formsFound,
+        'fusion-review-instances': forms.formInstancesFound,
+    })
 
     const counts = countManagedAccountsByType(sources)
-    log.info(
-        `Loaded ${sources.fusionAccountCount} fusion account(s), ${identities.identityCount} identities, ${counts.managedAccountsFound} managed account(s)`
-    )
+    log.detail({
+        'fusion-accounts': sources.fusionAccountCount,
+        identities: identities.identityCount,
+        'managed-accounts': counts.managedAccountsFound,
+    })
     return { ...counts, identitiesFound: identities.identityCount }
 }
 
 export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<void> {
-    const { log, fusion, sources } = serviceRegistry
-    log.info('Refreshing Fusion accounts')
+    const { log, fusion } = serviceRegistry
+    log.detail({ action: 'refreshing fusion accounts' })
     const refreshOp = log.track('refreshPhase.processFusionAccounts')
     const processedFusionAccounts = await fusion.processFusionAccounts()
     refreshOp.done({ count: processedFusionAccounts.length })
-    log.info('Refresh phase complete')
+    log.detail({ action: 'refresh phase complete' })
 }
 
 export async function processPhase(serviceRegistry: ServiceRegistry, _options: PhaseOptions): Promise<void> {
@@ -231,9 +234,9 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
 
     if (!sources.run.isRecordMode) {
         identities.clear()
-        log.info('Identities cache cleared from memory')
+        log.detail({ action: 'identities cache cleared from memory' })
     } else {
-        log.info('Identities cache retained for recording')
+        log.detail({ cache: 'identities retained for recording' })
     }
 
     log.stepStart('managed-account-init')
@@ -247,7 +250,7 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
         managedAccounts: sources.run.managedAccountsById.values(),
         hydrateMissingIdentitiesById: (ids) => identities.hydrateMissingIdentitiesById(ids),
     })
-    log.info(`Hydrated ${hydrationResult.hydrated} orphan correlated identity/identities`)
+    log.detail({ hydrated: hydrationResult.hydrated, action: 'orphan correlated identities hydrated' })
     log.stepEnd('orphan-identity-hydration', { hydrated: hydrationResult.hydrated })
 
     log.stepStart('correlated-sweep')
@@ -285,7 +288,11 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
     })
     const matchOutcomes = formatMatchOutcomesSegment(log.getCumulativeOutcomes(), true)
     const formOutcomes = formatFormOutcomesSegment(forms.formsCreated, forms.formInstancesCreated)
-    log.info(`Process phase complete - ${matchOutcomes} ${formOutcomes}`)
+    log.detail({
+        action: 'process phase complete',
+        matches: matchOutcomes,
+        forms: formOutcomes,
+    })
 }
 
 export async function outputPhase(serviceRegistry: ServiceRegistry, options: PhaseOptions): Promise<number> {
@@ -300,7 +307,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
         clearOp.done()
         log.stepEnd('clear-managed-accounts', { cleared: managedAccountCount })
     } else {
-        log.info('Managed accounts cache retained for recording')
+        log.detail({ cache: 'managed accounts retained for recording' })
     }
 
     log.stepStart('send-accounts')
@@ -314,7 +321,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
     )
     sendAccountsOp.done({ sent, eligible })
     log.stepEnd('send-accounts', { sent, eligible })
-    log.info(`Sent ${sent} account(s) to platform`)
+    log.detail({ sent, action: 'accounts sent to platform' })
 
     if (!isPersistent) {
         return sent
@@ -342,7 +349,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
     log.stepStart('await-form-deletes')
     await forms.awaitPendingDeleteOperations()
     log.stepEnd('await-form-deletes')
-    log.info('Queued form deletions completed')
+    log.detail({ action: 'queued form deletions completed' })
     return sent
 }
 
@@ -363,12 +370,12 @@ export async function reportEpilogue(
     const { isPersistent, dryRun, fetchResult, outputCount, timer } = options
     let deferredError: unknown
 
-    serviceRegistry.runContext.phase = 'Epilogue'
-    log.info('EPILOGUE report START')
+    log.epilogueStart('report')
+    const epilogueStartedAt = log.getRunContext()?.epilogueStartedAt ?? Date.now()
 
     if (isPersistent && fetchResult && fusion.fusionReportOnAggregation) {
         try {
-            log.info('Generating aggregation report')
+            log.detail({ action: 'generating aggregation report' })
             const reportOp = log.track('reportPhase.generateReport')
             await generateReport(
                 false,
@@ -394,7 +401,7 @@ export async function reportEpilogue(
                     sendEmail: dryRun.sendEmail,
                 })
                 if (reportHtmlOutputPath) {
-                    log.info(`Dry-run HTML report written to ${reportHtmlOutputPath}`)
+                    log.detail({ action: 'dry-run HTML report written', path: reportHtmlOutputPath })
                 }
             } catch (error) {
                 log.warn(`Report epilogue: dry-run report failed: ${(error as Error).message}`)
@@ -410,7 +417,8 @@ export async function reportEpilogue(
         }
     }
 
-    timer.phase('Epilogue: report generation', 'info', 'Report')
+    timer.recordElapsed('Report', Date.now() - epilogueStartedAt)
+    log.epilogueEnd('report')
     return deferredError
 }
 
@@ -427,23 +435,28 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
     const timer = log.timer()
     const options: PhaseOptions = { isPersistent: false }
 
+    let phaseStarted = Date.now()
     const shouldContinue = await setupPhase(serviceRegistry, undefined, options)
+    timer.recordElapsed('Setup', Date.now() - phaseStarted)
     if (!shouldContinue) {
         return { fetchResult: createEmptyFetchResult(), timer }
     }
-    timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
 
+    phaseStarted = Date.now()
     const fetchResult = await fetchPhase(serviceRegistry, options)
-    timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
+    timer.recordElapsed('Fetch', Date.now() - phaseStarted)
 
+    phaseStarted = Date.now()
     await refreshPhase(serviceRegistry)
-    timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
+    timer.recordElapsed('Refresh', Date.now() - phaseStarted)
 
+    phaseStarted = Date.now()
     await processPhase(serviceRegistry, options)
-    timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
+    timer.recordElapsed('Process', Date.now() - phaseStarted)
 
     return { fetchResult, timer }
 }
+
 
 
 

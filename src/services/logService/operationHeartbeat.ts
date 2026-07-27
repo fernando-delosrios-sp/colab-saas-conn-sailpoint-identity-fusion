@@ -203,6 +203,10 @@ export function formatEventSummaryLines(
         if (events.newIdentityAssignment > 0) {
             lines.push(`EVENT_SUMMARY forms new-identity-assignment=${events.newIdentityAssignment}`)
         }
+
+        if (events.emailSent > 0) {
+            lines.push(`EVENT_SUMMARY email=${formatIntervalDeltaCount(events.emailSent, intervalMs)}`)
+        }
     }
 
     if (events.correlationTriggers > 0) {
@@ -419,6 +423,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 

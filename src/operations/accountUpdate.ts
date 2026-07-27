@@ -38,6 +38,7 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
         const reverseCorrelationSnapshot = new Map<string, { exists: boolean; value: unknown }>()
         const timer = log.timer()
 
+        log.stepStart('load-sources-schema')
         await sources.fetchAllSources()
         if (reverseCorrelationAttributes.length > 0) {
             await sources.fetchFusionAccount(input.identity)
@@ -51,8 +52,9 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
             }
         }
         await schemas.setFusionAccountSchema(input.schema)
-        timer.phase('Step 1: Loading sources and schema')
+        log.stepEnd('load-sources-schema')
 
+        log.stepStart('rebuild-fusion-account')
         const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_NONE, {
             fusion,
             identities,
@@ -69,11 +71,11 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
                     : undefined
             ) ??
             input.identity
-        log.info(`Updating account: ${accountLabel}`)
+        log.detail({ account: accountLabel, action: 'updating account' })
         log.debug(`Found fusion account: ${accountLabel || fusionAccount.managedKey}`)
-        timer.phase('Step 2: Rebuilding fusion account with fresh attributes')
+        log.stepEnd('rebuild-fusion-account')
 
-        log.info(`Processing ${input.changes.length} change(s)`)
+        log.stepStart('process-changes', { count: input.changes.length })
         let shouldRecomputeCorrelationStatus = true
         for (const change of input.changes) {
             assert(change.attribute, 'Change attribute is required')
@@ -91,7 +93,7 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
                 log.crash(`Unsupported entitlement change: ${change.attribute}`)
             }
         }
-        timer.phase(`Step 3: Processing ${input.changes.length} change(s)`)
+        log.stepEnd('process-changes', { count: input.changes.length })
 
         if (reverseCorrelationSnapshot.size > 0) {
             for (const [attributeName, snapshot] of reverseCorrelationSnapshot.entries()) {
@@ -103,10 +105,10 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
             }
         }
 
+        log.stepStart('generate-account')
         const iscAccount = await fusion.getISCAccount(fusionAccount, true, shouldRecomputeCorrelationStatus)
         assert(iscAccount, 'Failed to generate ISC account from fusion account')
-
-        timer.phase('Step 4: Generating updated ISC account')
+        log.stepEnd('generate-account')
 
         res.send(iscAccount)
         timer.end(`✓ Account update completed for ${accountLabel}`)
@@ -115,4 +117,5 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
         log.crash(`Failed to update account ${accountLabel}`, error)
     }
 }
+
 

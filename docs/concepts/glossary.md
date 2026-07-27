@@ -34,7 +34,8 @@ This page defines the canonical terms used throughout the connector, its configu
 | **Epilogue** | The always-runs terminal block of the account-list operation that emits reports and summaries after the pipeline phases complete, regardless of pipeline success. Ordered most-durable-first (report file, report email, summary send). |
 | **Operation heartbeat** | A periodic logging interval (default 10s, configurable via **Heartbeat interval**) during long-running operations that emits **STATUS line** and **EVENT_SUMMARY line** text to explain phase, step, pipeline progress, api-queue state, and aggregated account activity. |
 | **Heartbeat interval** | Advanced Connection Settings field (`heartbeatInterval`, seconds) controlling how often the operation heartbeat emits STATUS and EVENT_SUMMARY lines. Converted to `statsLoggingIntervalMs` at runtime. Default 10 seconds. |
-| **STATUS line** | The primary situational text line emitted by the operation heartbeat: phase, step, pipeline `progress=` (with optional unit and delta), `api-queue completed=` (with delta), memory, and elapsed time (grep prefix `STATUS`). |
+| **STATUS line** | The primary situational text line emitted by the operation heartbeat: phase, step, pipeline `progress=` (with optional unit and delta), compact `api=Na/Nq/Nc` (with delta), memory, and elapsed time (grep prefix `STATUS`). |
+| **DETAIL line** | Structured operational milestone log (grep prefix `DETAIL`) using `key=value` pairs. Prefixed with `[operationContext]` during operations or `[config]` during bootstrap. |
 | **Pipeline progress delta** | Change in enumerable pipeline work (`progress.done`) since the previous STATUS tick — for example fusion refresh batches, fetch pages, or accounts sent during Output. |
 | **API queue completed delta** | Change in HTTP requests completed through ApiQueue since the previous STATUS tick. Used for stall detection; distinct from pipeline progress. |
 | **EVENT_SUMMARY line** | A heartbeat text line aggregating account-level activity (matches, correlations, outcomes) recorded since the previous tick (grep prefix `EVENT_SUMMARY`). |
@@ -246,6 +247,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Golden artifact** | A pre-validated expected output file (e.g., `output.sweep1.expected.json`) used as the reference for automated test comparison. Generated artifacts are compared against golden artifacts to detect regressions. |
 | **Sweep** (testing) | A single aggregation run within a test scenario. Multi-sweep scenarios (sweep 1, sweep 2) validate stateful behavior across sequential aggregations. |
 | **Side effects** | Non-account changes produced during an aggregation run (e.g., form creation, correlation API calls). Captured in side-effect files for test validation. |
+
 
 
 

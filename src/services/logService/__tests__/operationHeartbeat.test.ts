@@ -315,10 +315,29 @@ describe('operation heartbeat formatters', () => {
             formsQueued: 0,
             newIdentityAssignment: 0,
             recordUniqueRegistered: 0,
+            emailSent: 0,
         }
         expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
             'EVENT_SUMMARY correlations triggered=14 accounts=18',
         ])
+    })
+
+    it('formats EVENT_SUMMARY line for email sends during Process phase', () => {
+        const events = {
+            matchExact: 0,
+            matchPartial: 0,
+            matchDeferred: 0,
+            correlationTriggers: 0,
+            correlationAccounts: 0,
+            nonMatch: 0,
+            autoMerged: 0,
+            formsQueued: 0,
+            newIdentityAssignment: 0,
+            recordUniqueRegistered: 0,
+            emailSent: 3,
+        }
+        expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual(['EVENT_SUMMARY email=+3/10s'])
+        expect(formatEventSummaryLines(events, 'Refresh', 10_000)).toEqual([])
     })
 
     it('emits match and outcome EVENT_SUMMARY only during Process phase', () => {
@@ -333,6 +352,7 @@ describe('operation heartbeat formatters', () => {
             formsQueued: 2,
             newIdentityAssignment: 1,
             recordUniqueRegistered: 0,
+            emailSent: 0,
         }
         expect(formatEventSummaryLines(events, 'Refresh', 10_000)).toEqual([
             'EVENT_SUMMARY correlations triggered=2 accounts=3',
@@ -635,6 +655,7 @@ describe('OperationHeartbeat timing', () => {
         vi.useRealTimers()
     })
 })
+
 
 
 

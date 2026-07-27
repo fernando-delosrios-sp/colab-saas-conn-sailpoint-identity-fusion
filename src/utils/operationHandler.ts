@@ -96,7 +96,7 @@ export function createOperationHandler(
             const { runMode, isProxyServer } = resolveRunMode(context, serviceRegistry.proxy, operationName)
             interval = scheduleKeepAlive(options, config, runMode, isProxyServer, res)
 
-            logger.info(`Running ${operationName} in ${runMode} mode`)
+            serviceRegistry.log.detail({ mode: runMode })
             serviceRegistry.recording?.startOperation(
                 operationName,
                 input,
@@ -123,4 +123,5 @@ export function createOperationHandler(
         }
     }
 }
+
 

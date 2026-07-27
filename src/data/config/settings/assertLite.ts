@@ -7,19 +7,21 @@
  * do not interact with the registry — sufficient for the settings-layer
  * validation that runs before any operation starts.
  */
-import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
+import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
+import { bootstrapLog } from '../../../services/logService'
 
 export function assert(condition: unknown, message: string): asserts condition {
     if (!condition) {
-        logger.error(message)
+        bootstrapLog.error(message)
         throw new ConnectorError(message, ConnectorErrorType.Generic)
     }
 }
 
 export function softAssert(condition: unknown, message: string, _level: 'warn' | 'error' = 'warn'): boolean {
     if (!condition) {
-        logger.warn(message)
+        bootstrapLog.warn(message)
         return false
     }
     return true
 }
+

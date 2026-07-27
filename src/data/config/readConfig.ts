@@ -1,5 +1,6 @@
-import { readConfig, logger } from '@sailpoint/connector-sdk'
+import { readConfig } from '@sailpoint/connector-sdk'
 import type { FusionConfig } from '../../model/config'
+import { bootstrapLog } from '../../services/logService'
 import { getInternalConfigFlat } from './internal'
 import * as advancedConnectionSettings from './settings/advancedConnectionSettings'
 import * as attributeMappingDefinitionsSettings from './settings/attributeMappingDefinitionsSettings'
@@ -33,7 +34,7 @@ const settingsPipeline = [
  * (`getInternalConfigFlat()`, from per-service `internalConfig`), then applies per-settings modules.
  */
 export const safeReadConfig = async (): Promise<FusionConfig> => {
-    logger.debug('Reading connector configuration')
+    bootstrapLog.debug('Reading connector configuration')
     const sourceConfig = await readConfig()
     if (!sourceConfig) {
         throw new Error('Failed to read source configuration')
@@ -46,7 +47,7 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
 
     const connectionFragment = connectionSettings.readSettings(rawConfig)
 
-    logger.debug('Configuration loaded, applying defaults')
+    bootstrapLog.debug('Configuration loaded, applying defaults')
 
     const fragments = settingsPipeline.map((read) => read(rawConfig))
 
@@ -54,3 +55,4 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
 
     return config
 }
+

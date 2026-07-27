@@ -8,6 +8,11 @@ vi.mock('../../services/serviceRegistry', () => {
     const serviceRegistryMock = vi.fn().mockImplementation((_config, _context, res, _operationName) => {
         return {
             res,
+            log: {
+                detail: vi.fn(),
+                info: vi.fn(),
+                error: vi.fn(),
+            },
             proxy: {
                 isProxyService: vi.fn().mockReturnValue(false),
                 isProxyMode: vi.fn().mockReturnValue(false),
@@ -95,6 +100,7 @@ describe('createOperationHandler', () => {
         it('should run in Proxy mode when proxy client', async () => {
             ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
                 res,
+                log: { detail: vi.fn(), info: vi.fn(), error: vi.fn() },
                 proxy: {
                     isProxyService: vi.fn().mockReturnValue(false),
                     isProxyMode: vi.fn().mockReturnValue(true),
@@ -191,6 +197,7 @@ describe('createOperationHandler', () => {
         it('should not start simple keepAlive if run mode is Proxy', async () => {
             ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
                 res,
+                log: { detail: vi.fn(), info: vi.fn(), error: vi.fn() },
                 proxy: {
                     isProxyService: vi.fn().mockReturnValue(false),
                     isProxyMode: vi.fn().mockReturnValue(true),
@@ -215,6 +222,7 @@ describe('createOperationHandler', () => {
         it('should not start memory keepAlive if proxy server', async () => {
             ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
                 res,
+                log: { detail: vi.fn(), info: vi.fn(), error: vi.fn() },
                 proxy: {
                     isProxyService: vi.fn().mockReturnValue(true),
                     isProxyMode: vi.fn().mockReturnValue(false),
@@ -311,4 +319,5 @@ describe('createOperationHandler', () => {
 
 
 })
+
 

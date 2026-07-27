@@ -32,24 +32,25 @@ export const accountEnable = async (serviceRegistry: ServiceRegistry, input: Std
     const { log, fusion, sources, schemas, definition, res, identities } = serviceRegistry
 
     try {
-        log.info(`Enabling account: ${input.identity}`)
+        log.detail({ identity: input.identity, action: 'enabling account' })
         assert(input.identity, 'Account identity is required')
         const timer = log.timer()
 
+        log.stepStart('load-sources-schema')
         await definition.initializeCounters()
         await sources.fetchAllSources()
         await schemas.setFusionAccountSchema(input.schema)
-        timer.phase('Step 1: Loading sources and schema')
+        log.stepEnd('load-sources-schema')
 
+        log.stepStart('preprocess-fusion-accounts')
         await sources.fetchFusionAccounts()
-        // Bulk-register unique values directly from managed source accounts (lightweight, no FusionAccount hydration)
         definition.registerUniqueValuesFromManagedSourceAccounts(sources.fusionAccounts)
-        // Still need preProcessFusionAccounts to populate the identity-linked Fusion account map
         const preProcessOp = log.track('FusionService.preProcessFusionAccounts')
         const preProcessedAccounts = await fusion.preProcessFusionAccounts()
         preProcessOp.done({ count: preProcessedAccounts.length })
-        timer.phase('Step 2: Pre-processing all fusion accounts to collect unique values')
+        log.stepEnd('preprocess-fusion-accounts', { count: preProcessedAccounts.length })
 
+        log.stepStart('rebuild-fusion-account')
         const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_RESET, {
             fusion,
             identities,
@@ -60,15 +61,17 @@ export const accountEnable = async (serviceRegistry: ServiceRegistry, input: Std
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.managedKey}`)
 
         await definition.refreshUniqueAttributes(fusionAccount)
-        timer.phase('Step 3: Rebuilding target fusion account with fresh attributes')
+        log.stepEnd('rebuild-fusion-account')
 
+        log.stepStart('enable-fusion-account')
         fusionAccount.enable()
-        timer.phase('Step 4: Enabling fusion account')
+        log.stepEnd('enable-fusion-account')
 
+        log.stepStart('generate-account')
         await fusion.normalizePendingFormStateForOutput()
         const iscAccount = await fusion.getISCAccount(fusionAccount)
         assert(iscAccount, 'Failed to generate ISC account from fusion account')
-        timer.phase('Step 5: Generating ISC account')
+        log.stepEnd('generate-account')
 
         res.send(iscAccount)
         timer.end(`✓ Account enable completed for ${input.identity}`)

@@ -39,27 +39,25 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
         identityName = resolveIdentityNameFromCreateInput(input, fusionDisplayAttribute)
         assert(identityName, 'Identity name is required for account creation')
 
-        log.info(`Creating account for identity: ${identityName}`)
+        log.detail({ identity: identityName, action: 'creating account' })
         const timer = log.timer()
 
-        // 1. Fetch Identity first to get the authoritative ID
+        log.stepStart('fetch-identity')
         const identity = await identities.fetchIdentityByName(identityName)
         assert(identity, `Identity not found: ${identityName}`)
         assert(identity.id, `Identity ID is missing for: ${identityName}`)
-        timer.phase('Step 1: Fetching identity information')
+        log.stepEnd('fetch-identity')
 
-        // 2. Fetch all fusion accounts and register unique attribute values
+        log.stepStart('load-fusion-accounts')
         await sources.fetchFusionAccounts()
         await definition.initializeCounters()
-        // Bulk-register unique values directly from managed source accounts (lightweight, no FusionAccount hydration)
         definition.registerUniqueValuesFromManagedSourceAccounts(sources.fusionAccounts)
-        // Still need preProcessFusionAccounts to populate the identity-linked Fusion account map for duplicate checking
         const preProcessOp = log.track('FusionService.preProcessFusionAccounts')
         const preProcessedAccounts = await fusion.preProcessFusionAccounts()
         preProcessOp.done({ count: preProcessedAccounts.length })
-        timer.phase('Step 2: Loading fusion accounts and registering unique values')
+        log.stepEnd('load-fusion-accounts', { count: preProcessedAccounts.length })
 
-        // 3. Process the identity and refresh unique attributes
+        log.stepStart('process-identity')
         await fusion.processIdentity(identity)
 
         const fusionIdentity = fusion.getFusionIdentity(identity.id)
@@ -68,11 +66,10 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
         fusionIdentity.addStatus(StatusEntitlement.Requested, 'Status set by accountCreate operation')
 
         await definition.refreshUniqueAttributes(fusionIdentity)
-        timer.phase('Step 3: Processing identity')
+        log.stepEnd('process-identity')
 
         const actions = normalizeActionTokens(input.attributes.actions)
-        log.info(`Processing ${actions.length} action(s)`)
-
+        log.stepStart('execute-actions', { count: actions.length })
         for (const action of actions) {
             await executeActions(
                 fusionIdentity,
@@ -80,12 +77,13 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
                 serviceRegistry
             )
         }
-        timer.phase(`Step 3: Processing ${actions.length} action(s)`)
+        log.stepEnd('execute-actions', { count: actions.length })
 
+        log.stepStart('generate-account')
         await fusion.normalizePendingFormStateForOutput()
         const iscAccount = await fusion.getISCAccount(fusionIdentity)
         assert(iscAccount, 'Failed to generate ISC account from fusion identity')
-        timer.phase('Step 4: Generating ISC account')
+        log.stepEnd('generate-account')
 
         res.send(iscAccount)
         timer.end(`✓ Account creation completed for ${identityName}`)

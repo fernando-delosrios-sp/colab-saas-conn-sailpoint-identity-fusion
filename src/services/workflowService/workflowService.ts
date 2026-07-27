@@ -74,9 +74,9 @@ export class WorkflowService {
                     type: 'IDENTITY',
                 })
                 workflow = await this.createWorkflow(workflowTemplate as CreateWorkflowRequestV2025)
-                this.log.info(`Created workflow: ${workflowName} (ID: ${workflow.id})`)
+                this.log.detail({ action: 'workflow create', name: workflowName, id: workflow.id })
             } else {
-                this.log.info(`Using existing workflow: ${workflowName} (ID: ${workflow.id})`)
+                this.log.detail({ action: 'workflow existing', name: workflowName, id: workflow.id })
             }
 
             this.emailWorkflow = workflow
@@ -330,3 +330,4 @@ export class WorkflowService {
         return response
     }
 }
+

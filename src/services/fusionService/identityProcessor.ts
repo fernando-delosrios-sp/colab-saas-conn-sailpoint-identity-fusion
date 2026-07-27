@@ -43,13 +43,15 @@ export class IdentityProcessor {
         const { identities } = this.deps.identities
         const tracker = this.deps.getTracker()
         if (tracker) tracker.identitiesProcessedCount = identities.length
-        this.log.info(
-            `Processing identity documents: creating or merging fusion accounts for ${identities.length} ISC identity document(s)`
-        )
+        this.log.detail({
+            action: 'processing identity documents',
+            count: identities.length,
+        })
         const results = await batchProcess(identities, 'Identity documents', (x) => this.processIdentity(x), this.config, this.log)
-        this.log.info(
-            `Identity documents phase finished: ${identities.length} identity document(s) processed (fusion accounts created or updated from identities)`
-        )
+        this.log.detail({
+            action: 'identity documents phase finished',
+            count: identities.length,
+        })
         return compact(results)
     }
 
@@ -111,3 +113,4 @@ export class IdentityProcessor {
         return undefined
     }
 }
+

@@ -22,14 +22,16 @@ export const accountRead = async (serviceRegistry: ServiceRegistry, input: StdAc
     const { log, fusion, schemas, sources, res, identities } = serviceRegistry
 
     try {
-        log.info(`Reading account: ${input.identity}`)
+        log.detail({ identity: input.identity, action: 'reading account' })
         assert(input.identity, 'Account identity is required')
         const timer = log.timer()
 
+        log.stepStart('load-sources-schema')
         await sources.fetchAllSources()
         await schemas.setFusionAccountSchema(input.schema)
-        timer.phase('Step 1: Loading sources and schema')
+        log.stepEnd('load-sources-schema')
 
+        log.stepStart('rebuild-fusion-account')
         const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_REFRESH, {
             fusion,
             identities,
@@ -38,12 +40,13 @@ export const accountRead = async (serviceRegistry: ServiceRegistry, input: StdAc
         }, true)
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.managedKey}`)
-        timer.phase('Step 2: Rebuilding fusion account with fresh attributes')
+        log.stepEnd('rebuild-fusion-account')
 
+        log.stepStart('generate-account')
         await fusion.normalizePendingFormStateForOutput()
         const iscAccount = await fusion.getISCAccount(fusionAccount)
         assert(iscAccount, 'Failed to generate ISC account from fusion account')
-        timer.phase('Step 3: Generating ISC account')
+        log.stepEnd('generate-account')
 
         res.send(iscAccount)
         timer.end(`✓ Account read completed for ${input.identity}`)

@@ -13,7 +13,7 @@ export const accountDiscoverSchema = async (serviceRegistry: ServiceRegistry) =>
     const { log, schemas, sources, res } = serviceRegistry
 
     try {
-        log.info('Discovering account schema')
+        log.detail({ action: 'discovering account schema' })
         const timer = log.timer()
 
         await sources.fetchAllSources()
@@ -26,3 +26,4 @@ export const accountDiscoverSchema = async (serviceRegistry: ServiceRegistry) =>
         log.crash('Failed to discover account schema', error)
     }
 }
+

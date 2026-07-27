@@ -34,6 +34,8 @@ const createEmailService = (workflowPayload?: { padding?: string }) => {
         info: vi.fn(),
         warn: vi.fn(),
         error: vi.fn(),
+        detail: vi.fn(),
+        recordEvent: vi.fn(),
     } as any
     const config = {
         workflowName: 'Fusion Email Sender',
@@ -89,3 +91,4 @@ describe('EmailService.getRecipientEmails', () => {
         expect(identities.fetchIdentityProfileById).toHaveBeenCalledWith('owner-1')
     })
 })
+
