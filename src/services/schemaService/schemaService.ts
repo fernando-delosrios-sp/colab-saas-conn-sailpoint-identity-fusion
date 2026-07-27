@@ -55,8 +55,11 @@ export class SchemaService {
      * Filters an attribute bag down to only the attributes defined in the fusion account schema,
      * casting each value to match its schema-defined type and cardinality.
      *
+     * Nullish cast values (`null` / `undefined`) are omitted from the returned object so platform
+     * output stays sparse. The input attribute bag is never mutated.
+     *
      * @param attributes - The full attribute bag to filter, or null
-     * @returns A new object containing only schema-defined attributes with properly cast values
+     * @returns A new object containing schema-defined attributes with non-nullish cast values
      */
     public getFusionAttributeSubset(attributes: Attributes | null): Attributes {
         if (!attributes) return {}
@@ -64,8 +67,11 @@ export class SchemaService {
         const fusionAttributes: Attributes = {}
         for (const attribute of this._fusionSchemaAttributeNames) {
             const value = attributes?.[attribute]
+            if (value === null || value === undefined) continue
             const schemaDef = this._fusionSchemaAttributeMap.get(attribute)
-            fusionAttributes[attribute] = schemaDef ? this.castAttributeValue(value, schemaDef) : value
+            const casted = schemaDef ? this.castAttributeValue(value, schemaDef) : value
+            if (casted === null || casted === undefined) continue
+            fusionAttributes[attribute] = casted
         }
         return fusionAttributes
     }
@@ -453,3 +459,4 @@ export class SchemaService {
         return schema
     }
 }
+

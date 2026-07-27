@@ -84,4 +84,73 @@ describe('SchemaService', () => {
             expect(schema.attributes.length).toBeGreaterThan(0) // Has static/fusion attributes
         })
     })
+
+    describe('getFusionAttributeSubset', () => {
+        beforeEach(async () => {
+            await schemaService.setFusionAccountSchema({
+                displayAttribute: 'name',
+                identityAttribute: 'id',
+                attributes: [
+                    { name: 'id', type: 'string', required: true },
+                    { name: 'name', type: 'string', required: true },
+                    { name: 'department', type: 'string', multi: false },
+                    { name: 'reviews', type: 'string', multi: true },
+                ],
+            })
+        })
+
+        it('omits null or absent schema attributes from platform output', () => {
+            const resultWithNull = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                department: null,
+            })
+
+            expect(resultWithNull).toMatchObject({ id: '1', name: 'Ada Wong' })
+            expect(resultWithNull).not.toHaveProperty('department')
+
+            const resultWithAbsent = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+            })
+
+            expect(resultWithAbsent).not.toHaveProperty('department')
+        })
+
+        it('retains populated attribute values', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+            })
+
+            expect(result.name).toBe('Ada Wong')
+        })
+
+        it('retains empty multi-valued arrays', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                reviews: [],
+            })
+
+            expect(result.reviews).toEqual([])
+        })
+
+        it('does not mutate the input attribute bag', () => {
+            const input = {
+                id: '1',
+                name: 'Ada Wong',
+                department: null,
+            }
+
+            schemaService.getFusionAttributeSubset(input)
+
+            expect(input).toEqual({
+                id: '1',
+                name: 'Ada Wong',
+                department: null,
+            })
+        })
+    })
 })
+
