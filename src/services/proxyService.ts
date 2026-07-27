@@ -69,14 +69,8 @@ export class ProxyService {
             const serverPassword = process.env.PROXY_PASSWORD || ''
             const clientPassword = this.config.proxyPassword || ''
 
-            const expectedHash = crypto
-                .createHash('sha256')
-                .update(serverPassword)
-                .digest()
-            const actualHash = crypto
-                .createHash('sha256')
-                .update(clientPassword)
-                .digest()
+            const expectedHash = crypto.createHash('sha256').update(serverPassword).digest()
+            const actualHash = crypto.createHash('sha256').update(clientPassword).digest()
             const isMatch = crypto.timingSafeEqual(expectedHash, actualHash)
             assert(isMatch, 'Proxy password mismatch')
 
@@ -228,16 +222,11 @@ export class ProxyService {
                 }
                 this.log.info(`Proxy sent ${sentCount} valid objects from array`)
                 return true
-            } else {
-                if (parsed === null || parsed === undefined) {
-                    this.log.debug(`Skipping null/undefined single object`)
-                    return true
-                }
-
-                this.log.debug(`Sending single object: ${JSON.stringify(parsed).substring(0, 200)}`)
-                this.res.send(parsed)
-                return true
             }
+
+            this.log.debug(`Sending single object: ${JSON.stringify(parsed).substring(0, 200)}`)
+            this.res.send(parsed)
+            return true
         } catch {
             return false
         }
