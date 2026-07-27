@@ -122,8 +122,18 @@ export class ProxyService {
             throw new ConnectorError('Proxy mode is not enabled or proxy URL is missing')
         }
         const { proxyUrl } = this.config
-        if (!proxyUrl.toLowerCase().startsWith('http://') && !proxyUrl.toLowerCase().startsWith('https://')) {
+        let parsedUrl: URL
+        try {
+            parsedUrl = new URL(proxyUrl)
+        } catch {
+            throw new ConnectorError('Proxy URL is invalid')
+        }
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
             throw new ConnectorError('Proxy URL must use http or https protocol')
+        }
+        const invalidHosts = ['localhost', '127.0.0.1', '169.254.169.254', '::1', '[::1]', '0.0.0.0']
+        if (invalidHosts.includes(parsedUrl.hostname) || parsedUrl.hostname.endsWith('.internal')) {
+            throw new ConnectorError('Proxy URL targets restricted host')
         }
         const externalConfig = { ...this.config, isProxy: true }
         const body = {

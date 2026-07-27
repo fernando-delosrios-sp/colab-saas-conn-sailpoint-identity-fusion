@@ -287,7 +287,17 @@ export class LogService {
         }
 
         const url = this.externalLoggingUrl
-        if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
+        let parsedUrl: URL
+        try {
+            parsedUrl = new URL(url)
+        } catch {
+            return
+        }
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+            return
+        }
+        const invalidHosts = ['localhost', '127.0.0.1', '169.254.169.254', '::1', '[::1]', '0.0.0.0']
+        if (invalidHosts.includes(parsedUrl.hostname) || parsedUrl.hostname.endsWith('.internal')) {
             return
         }
         const doFetch = () =>
