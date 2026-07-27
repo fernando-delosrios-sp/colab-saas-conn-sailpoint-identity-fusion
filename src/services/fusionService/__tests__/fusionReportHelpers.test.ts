@@ -5,6 +5,7 @@ import {
     getFusionReportAccountLabel,
     buildMinimalFusionReportAccount,
     buildIdentityConflictWarningsFromMap,
+    buildFusionReportMatchesForReviewEmail,
 } from '../helpers'
 import { UrlContext } from '../../../utils/url'
 import { SourceType } from '../../../model/config'
@@ -129,6 +130,41 @@ describe('fusionReportHelpers', () => {
                 accountId: undefined,
                 accountName: 'Match Name',
             })
+        })
+    })
+
+    describe('buildFusionReportMatchesForReviewEmail', () => {
+        const urlContext = { identity: (id: string) => `https://tenant.identitynow.com/ui/a/admin/identities/${id}/details` } as UrlContext
+
+        it('uses fusion account name when match.identityName is the identity id', () => {
+            const matches = buildFusionReportMatchesForReviewEmail(
+                [
+                    {
+                        identityId: 'd3a1cb345cf34b2ea6fc5f40686cad4c',
+                        identityName: 'd3a1cb345cf34b2ea6fc5f40686cad4c',
+                        fusionIdentity: {
+                            identityId: 'd3a1cb345cf34b2ea6fc5f40686cad4c',
+                            name: 'Michael Eckert',
+                            attributes: {},
+                        },
+                        scores: [
+                            {
+                                attribute: 'firstname',
+                                algorithm: 'jaro-winkler',
+                                score: 92,
+                                weightedScore: 46,
+                                fusionScore: 50,
+                                isMatch: true,
+                            },
+                        ],
+                    } as any,
+                ],
+                urlContext,
+                5
+            )
+
+            expect(matches[0].identityName).toBe('Michael Eckert')
+            expect(matches[0].scores?.[0]).toMatchObject({ attribute: 'firstname', score: 92 })
         })
     })
 
@@ -267,3 +303,4 @@ describe('fusionReportHelpers', () => {
         })
     })
 })
+

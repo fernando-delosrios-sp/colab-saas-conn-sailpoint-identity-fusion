@@ -635,12 +635,8 @@ export class FormService {
                 accountId: reportAccountId,
                 accountEmail: fusionAccount.email,
                 accountAttributes: fusionAccount.attributes as any,
-                candidates: candidates.map((c) => ({
-                    id: c.id,
-                    name: c.name,
-                    attributes: c.attributes,
-                    scores: c.scores,
-                })),
+                fusionMatches: fusionAccount.fusionMatches,
+                maxCandidates: this.fusionMaxCandidatesForForm,
             })
             this.log.debug(`Email notification sent for form ${formInstance.id}`)
         } catch (error) {

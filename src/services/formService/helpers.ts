@@ -5,6 +5,7 @@ import { logger } from '@sailpoint/connector-sdk'
 import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { getFusionReportAccountLabel } from '../fusionService/helpers'
 import { FusionMatch } from '../matchingService/types'
 import { Candidate } from './types'
 import { internalConfig } from '../../data/config'
@@ -83,14 +84,22 @@ export const resolveIdentitiesSelectLabel = (
  * {@link FusionMatch.identityName} from scoring (same chain as dry-run reports).
  */
 export const resolveCandidateDisplayName = (
-    match: { identityName?: string },
+    match: { identityName?: string; fusionIdentity?: FusionAccount },
     fusionAttributes: Record<string, any>,
     identityId: string
 ): string => {
+    const fi = match.fusionIdentity
+    if (fi) {
+        const fromFusionAccount = trimStr(getFusionReportAccountLabel(fi))
+        if (fromFusionAccount && fromFusionAccount !== identityId) return fromFusionAccount
+    }
+
     const fromAttrs = resolveIdentitiesSelectLabel(fusionAttributes, identityId)
     if (fromAttrs !== identityId) return fromAttrs
+
     const fromMatch = trimStr(match.identityName)
     if (fromMatch && fromMatch !== identityId) return fromMatch
+
     return fromAttrs
 }
 
@@ -176,5 +185,6 @@ export const getFormOwner = (sources: SourceService): OwnerDto => {
     assert(owner, 'Fusion source owner not found')
     return owner
 }
+
 
 

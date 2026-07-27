@@ -4,7 +4,7 @@ import { pickAttributes } from '../../utils/attributes'
 import { trimStr } from '../../utils/safeRead'
 import { roundMetric2 } from '../../utils/numbers'
 import { UrlContext } from '../../utils/url'
-import type { ScoreReport } from '../matchingService/types'
+import type { FusionMatch, ScoreReport } from '../matchingService/types'
 import { isCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import {
     FusionReportAccount,
@@ -13,7 +13,7 @@ import {
     FusionReportScore,
     FusionReportWarnings,
 } from './types'
-import type { FusionMatch } from '../matchingService/types'
+import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
 
 
 /**
@@ -31,6 +31,57 @@ export function mapScoreReportsForFusionReport(scoreReports: ScoreReport[]): Fus
         skipped: row.skipped,
         comment: row.comment,
     }))
+}
+
+/** Rank identity match candidates for review surfaces (forms, emails) — highest combined score first. */
+export function rankFusionMatchesForReview(matches: FusionMatch[]): FusionMatch[] {
+    const rankScore = (match: FusionMatch): number => {
+        const combined = match.scores?.find(
+            (s) =>
+                s.algorithm === 'weighted-mean' ||
+                s.attribute === 'Combined score' ||
+                s.attribute === 'Combined match score'
+        )
+        if (combined) return combined.score
+        const scored = match.scores?.filter((s) => !s.skipped) ?? []
+        if (scored.length === 0) return 0
+        return Math.max(...scored.map((s) => s.score))
+    }
+
+    return [...matches].sort((a, b) => {
+        const delta = rankScore(b) - rankScore(a)
+        if (delta !== 0) return delta
+        const ida = String(a.fusionIdentity?.identityId ?? a.identityId ?? '')
+        const idb = String(b.fusionIdentity?.identityId ?? b.identityId ?? '')
+        return ida.localeCompare(idb)
+    })
+}
+
+/**
+ * Build review-email match rows using the same label and score mapping as dry-run reports.
+ */
+export function buildFusionReportMatchesForReviewEmail(
+    matches: FusionMatch[],
+    urlContext: UrlContext,
+    maxCandidates?: number
+): FusionReportMatch[] {
+    const ordered = maxCandidates ? rankFusionMatchesForReview(matches).slice(0, maxCandidates) : rankFusionMatchesForReview(matches)
+
+    return ordered.map((match) => {
+        const fields = fusionReportMatchCandidateAccountFields(match)
+        const identityId = trimStr(match.identityId ?? match.fusionIdentity?.identityId) ?? undefined
+        const identityName = fields.accountName || trimStr(match.identityName) || identityId || 'Unknown'
+
+        return {
+            ...fields,
+            identityName,
+            identityId,
+            identityUrl: identityId ? urlContext.identity(identityId) : undefined,
+            isMatch: true,
+            exact: isExactAttributeMatchScores(match.scores),
+            scores: mapScoreReportsForFusionReport(match.scores),
+        }
+    })
 }
 
 /**
@@ -141,4 +192,5 @@ export function buildIdentityConflictWarningsFromMap(
         },
     }
 }
+
 
