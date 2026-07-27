@@ -9,6 +9,7 @@ import { WorkflowService } from '../workflowService'
 import { assert, softAssert } from '../../utils/assert'
 import { createUrlContext, getUIOriginFromBaseUrl, UrlContext } from '../../utils/url'
 import { pickAttributes } from '../../utils/attributes'
+import { mapScoreReportsForFusionReport } from '../fusionService/helpers'
 import { compileEmailTemplates, renderFusionReviewEmail, FusionReviewEmailData } from './helpers'
 import { registerHandlebarsHelpers } from './messagingHandlebarsRegistration'
 import { normalizeEmailValue, sanitizeRecipients, buildEmailWorkflowTriggerInput } from './email'
@@ -152,15 +153,7 @@ export class EmailService {
                         identityUrl: this.urlContext.identity(candidate.id),
                         isMatch: true,
                         exact: Boolean(candidate.exact),
-                        scores: (candidate.scores || []).map((s: any) => ({
-                            name: s.name || s.attributeName || 'Unknown',
-                            matched: Boolean(s.matched),
-                            type: s.type,
-                            weight: s.weight,
-                            sourceValue: s.sourceValue,
-                            targetValue: s.targetValue,
-                            exact: Boolean(s.exact),
-                        })),
+                        scores: mapScoreReportsForFusionReport(candidate.scores || []),
                     })),
                 },
             ],
@@ -408,6 +401,7 @@ export class EmailService {
         )
     }
 }
+
 
 
 

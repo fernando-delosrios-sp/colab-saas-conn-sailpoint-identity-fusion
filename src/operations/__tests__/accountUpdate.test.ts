@@ -28,6 +28,7 @@ function createRegistry() {
 
     const schemas = registry.schemas as any
     schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(schemas, 'fusionDisplayAttribute', { value: 'name', writable: true, configurable: true })
 
     const fusion = registry.fusion as any
     fusion.normalizePendingFormStateForOutput = vi.fn().mockResolvedValue(undefined)
@@ -139,3 +140,4 @@ describe('accountUpdate', () => {
         expect(fusionAccount.attributes.reverseNativeIdentity).toBe('native-before-update')
     })
 })
+

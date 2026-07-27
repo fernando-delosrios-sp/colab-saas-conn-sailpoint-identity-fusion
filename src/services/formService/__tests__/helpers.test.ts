@@ -3,6 +3,7 @@ import {
     buildFormName,
     calculateExpirationDate,
     getFormOwner,
+    resolveCandidateDisplayName,
     resolveIdentitiesSelectLabel,
 } from '../helpers'
 import { countIdentityCandidateFusionMatches } from '../../matchingService/matchingHelpers'
@@ -55,6 +56,42 @@ describe('formService helpers', () => {
         it('falls back to identity id when displayName is missing everywhere', () => {
             const label = resolveIdentitiesSelectLabel({}, 'fallback-id')
             expect(label).toBe('fallback-id')
+        })
+    })
+
+    describe('resolveCandidateDisplayName', () => {
+        it('uses match.identityName when fusion attributes lack displayName', () => {
+            const label = resolveCandidateDisplayName(
+                { identityName: 'Michael Eckert' },
+                {},
+                'd3a1cb345cf34b2ea6fc5f40686cad4c'
+            )
+            expect(label).toBe('Michael Eckert')
+        })
+
+        it('prefers attributes.displayName over match.identityName', () => {
+            const label = resolveCandidateDisplayName(
+                { identityName: 'Stale Name' },
+                { displayName: 'From Attributes' },
+                'id-1'
+            )
+            expect(label).toBe('From Attributes')
+        })
+
+        it('buildCandidateList uses match.identityName when attributes lack displayName', () => {
+            const fusionAccount = {
+                fusionMatches: [
+                    {
+                        identityId: 'id-1',
+                        identityName: 'Jane Doe',
+                        fusionIdentity: { identityId: 'id-1', attributes: {} },
+                        scores: [{ attribute: 'Combined score', score: 90 }],
+                    },
+                ],
+            } as any
+
+            const candidates = buildCandidateList(fusionAccount, 1)
+            expect(candidates[0].name).toBe('Jane Doe')
         })
     })
 
@@ -236,3 +273,4 @@ describe('formService helpers', () => {
         })
     })
 })
+
