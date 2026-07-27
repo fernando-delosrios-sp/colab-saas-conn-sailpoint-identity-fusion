@@ -15,6 +15,7 @@ import {
 } from './managedAccountKey'
 import { IDENTITIES_SOURCE_NAME } from './fusionAccount'
 import { FusionMatch } from '../services/matchingService'
+import { getManagedAccountSnapshotKey } from '../utils/velocityAccountSnapshot'
 import type { FusionCollections } from './fusionCollections'
 import type { FusionRun, ManagedAccountInfo } from './fusionRun'
 import type { IdentityInfo } from './fusionAccountTypes'
@@ -190,6 +191,13 @@ export class FusionLayers {
         }
 
         this._processIdentityMatchedAccounts(workQueue, addBlendHistory, skipBlendHistoryForManagedKeys, onBlend, identityInfo?.id)
+        this._processDeclaredAccountIds(
+            workQueue,
+            attributeBag,
+            addBlendHistory,
+            skipBlendHistoryForManagedKeys,
+            onBlend
+        )
         this._processPreviousRunMatchedAccounts(workQueue, addBlendHistory, skipBlendHistoryForManagedKeys, onBlend)
 
         const inventoryKeys = new Set(workQueue.managedAccountInventory.keys())
@@ -363,6 +371,50 @@ export class FusionLayers {
         queue.claimAccountsForIdentity(identityId)
     }
 
+    /**
+     * Blends managed accounts already listed on the fusion row (e.g. from
+     * {@link addIdentityLayer} identity.accounts links) when they exist in the
+     * work queue but were not reached by the identity-id index or previous-run paths.
+     */
+    private _processDeclaredAccountIds(
+        queue: FusionRun,
+        attributeBag: { sources: Map<string, Attributes[]> },
+        addBlendHistory: boolean,
+        skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
+        onBlend?: (account: Account) => void
+    ): void {
+        if (this.collections.accountIds.size === 0) return
+
+        for (const accountId of this.collections.accountIds) {
+            if (this._hasSourceSnapshot(accountId, attributeBag.sources)) continue
+
+            const account = queue.get(accountId)
+            if (!account) continue
+
+            this.collections.accounts.add(accountId)
+            this.collections.accounts.removeMissing(accountId)
+            const blended = this._setManagedAccount(
+                account,
+                addBlendHistory,
+                skipBlendHistoryForManagedKeys,
+                attributeBag
+            )
+            if (blended && onBlend) onBlend(account)
+            queue.claimAccount(accountId, account.identityId)
+        }
+    }
+
+    private _hasSourceSnapshot(accountId: string, sources: Map<string, Attributes[]>): boolean {
+        for (const snapshots of sources.values()) {
+            for (const snapshot of snapshots) {
+                if (getManagedAccountSnapshotKey(snapshot) === accountId) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     private _processPreviousRunMatchedAccounts(
         queue: FusionRun,
         addBlendHistory: boolean,
@@ -426,3 +478,4 @@ export class FusionLayers {
         }
     }
 }
+

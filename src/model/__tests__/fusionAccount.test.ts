@@ -491,6 +491,51 @@ describe('FusionAccount', () => {
             expect(run.managedAccountsByIdentityId.has('id-1')).toBe(false)
         })
 
+        it('blends identity.accounts links in work queue when not indexed by identityId', () => {
+            const WORKDAY_SOURCE_ID = '355fb49e084e4f35adb755410affe0c8'
+            const managedKey = `${WORKDAY_SOURCE_ID}::126791`
+
+            const identity: IdentityDocument = {
+                id: 'id-1',
+                name: 'test-identity',
+                attributes: {},
+                accounts: [
+                    {
+                        source: { name: 'Source A', id: 'src-a' },
+                        nativeIdentity: 'native-1',
+                    } as any,
+                ],
+            } as any
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Fusion Row',
+                sourceName: 'Identity Fusion NG',
+                identityId: 'id-1',
+                attributes: { accounts: [managedKey] },
+            } as unknown as Account)
+
+            acc.addIdentityLayer(identity)
+
+            const account: Account = {
+                id: 'isc-acc-1',
+                sourceId: 'src-a',
+                nativeIdentity: 'native-1',
+                sourceName: 'Source A',
+                attributes: { POSITION: 'Engineer' },
+            } as any
+            const run = new FusionRun()
+            run.managedAccountsById.set('src-a::native-1', account)
+
+            acc.addManagedAccountLayer(run)
+
+            const snapshots = acc.attributeBag.sources.get('Source A')
+            expect(snapshots).toHaveLength(1)
+            expect(snapshots![0].POSITION).toBe('Engineer')
+            expect(acc.accountIds).toContain('src-a::native-1')
+            expect(acc.missingAccountIds).not.toContain('src-a::native-1')
+        })
+
         it('claims accounts from previous run via previousAccountIds', () => {
             const acc = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-1',
