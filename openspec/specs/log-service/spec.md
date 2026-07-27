@@ -28,6 +28,8 @@ Pipeline progress and API queue completion are independent metrics. The pipeline
 
 When `OperationRunContext.progress.unit` is set, the STATUS line SHALL render the unit immediately after the fraction before the delta suffix (for example `progress=450/800 analyzed(Δ+120/10s)`).
 
+When correlation PATCH activity has occurred in the run and the API queue has pending `IdentityService>correlateAccounts` items, STATUS lines during Output or Epilogue phase SHALL include a correlation drain segment with cumulative `completed=` and snapshot `pending=` counts alongside existing link/merge segments when non-zero.
+
 #### Scenario: STATUS line during account-list Process phase
 
 - **GIVEN** an account-list operation in Process phase with step `uncorrelated-sweep` and progress 537/800 analyzed
@@ -58,13 +60,22 @@ When `OperationRunContext.progress.unit` is set, the STATUS line SHALL render th
 
 #### Scenario: Default 10 second heartbeat interval
 
-- **GIVEN** a source configuration with default Advanced Connection Settings (no explicit `heartbeatInterval`)
-- **WHEN** an account-list operation runs longer than 10 seconds
-- **THEN** at least one STATUS line SHALL be emitted within the first 10 seconds of the operation heartbeat
+- **GIVEN** a source configuration with default Advanced Connection Settings
+- **WHEN** a persistent account-list aggregation runs for more than 10 seconds
+- **THEN** at least one STATUS heartbeat line SHALL appear within the first 10 seconds
+
+#### Scenario: STATUS during Output shows correlation drain while queue pending
+
+- **GIVEN** an account-list operation in Output or Epilogue phase with 2000 link PATCHes enqueued and 147 completed
+- **AND** 1853 correlation PATCH jobs remain pending in the API queue
+- **WHEN** the next STATUS heartbeat fires
+- **THEN** the STATUS line SHALL include `completed=147` and `pending=1853` in the correlation segment
+
+---
 
 ### Requirement: Operation heartbeat emits EVENT_SUMMARY lines
 
-The log service SHALL aggregate account-level events recorded via `recordEvent` and correlation activity helpers between heartbeat ticks and emit one or more `EVENT_SUMMARY` text lines at each tick. Counters SHALL reset after each flush. Multiple summary lines MAY be used when a single line would be excessively long. Correlation activity SHALL appear in `EVENT_SUMMARY` lines using subtype segments `link=triggers/accounts` and `merge=triggers/accounts` when non-zero, plus `correlated-action=` with interval delta when non-zero, and aggregated `skipped=` counts when non-zero.
+The log service SHALL aggregate account-level events recorded via `recordEvent` and correlation activity helpers between heartbeat ticks and emit one or more `EVENT_SUMMARY` text lines at each tick. Counters SHALL reset after each flush. Multiple summary lines MAY be used when a single line would be excessively long. Correlation activity SHALL appear in `EVENT_SUMMARY` lines using subtype segments `link=triggers/accounts` and `merge=triggers/accounts` when non-zero, plus `completed=` with interval delta when non-zero (summed across link and merge completions), and aggregated `skipped=` counts when non-zero. During account-list aggregation (`isAggregationMode`), correlation `EVENT_SUMMARY` segments SHALL NOT include `correlated-action=`.
 
 #### Scenario: Match events summarized per tick
 
@@ -88,9 +99,22 @@ The log service SHALL aggregate account-level events recorded via `recordEvent` 
 
 #### Scenario: Correlated-action grants summarized per tick
 
-- **GIVEN** 12 correlated-action grants since the last heartbeat tick
+- **GIVEN** 12 correlated-action grants since the last heartbeat tick during a non-aggregation operation
 - **WHEN** the heartbeat flushes event counters
 - **THEN** the connector host SHALL receive an INFO `EVENT_SUMMARY` line containing a correlated-action count with interval delta
+- **AND** account-list aggregation EVENT_SUMMARY segments SHALL NOT contain `correlated-action=`
+
+#### Scenario: Correlation completed summarized per tick
+
+- **GIVEN** 147 correlation PATCHes completed successfully since the last heartbeat tick
+- **WHEN** the heartbeat flushes event counters
+- **THEN** the connector host SHALL receive an INFO `EVENT_SUMMARY` line containing `completed=+147/` with interval seconds suffix
+
+#### Scenario: Account-list aggregation excludes correlated-action from EVENT_SUMMARY
+
+- **GIVEN** an account-list operation in aggregation mode with fusion accounts becoming fully correlated in output
+- **WHEN** the heartbeat flushes correlation event counters
+- **THEN** the `EVENT_SUMMARY` correlation segment SHALL NOT contain `correlated-action=`
 
 ---
 
@@ -209,7 +233,7 @@ The log service SHALL provide a `detail()` helper that emits INFO lines with pre
 
 ### Requirement: Log service emits PHASE END and EPILOGUE END boundaries
 
-The log service SHALL provide `phaseEnd(phaseNumber, phase, detail?)` that emits `PHASE {N} {Phase} END` with optional detail suffix and mandatory `elapsed=` duration since the matching `phaseStart`. When correlation activity occurred during the phase, the detail suffix SHALL include cumulative correlation totals using the same `link=`, `merge=`, `correlated-action=`, and `skipped=` segments as EVENT_SUMMARY. The service SHALL provide `epilogueEnd(block, detail?)` that emits `EPILOGUE {block} END` with `elapsed=` duration since the matching epilogue START. Phase elapsed timing for HTML report breakdowns SHALL be captured via internal PhaseTimer recording without emitting colon-style `PHASE N: Description (elapsed)` host lines.
+The log service SHALL provide `phaseEnd(phaseNumber, phase, detail?)` that emits `PHASE {N} {Phase} END` with optional detail suffix and mandatory `elapsed=` duration since the matching `phaseStart`. When correlation activity occurred during the phase, the detail suffix SHALL include cumulative correlation totals using `link=`, `merge=`, `completed=`, and `skipped=` segments as applicable. During account-list aggregation, phase END correlation detail SHALL NOT include `correlated-action=`. The service SHALL provide `epilogueEnd(block, detail?)` that emits `EPILOGUE {block} END` with `elapsed=` duration since the matching epilogue START. Phase elapsed timing for HTML report breakdowns SHALL be captured via internal PhaseTimer recording without emitting colon-style `PHASE N: Description (elapsed)` host lines.
 
 #### Scenario: Phase end logged after setup completes
 
@@ -224,6 +248,12 @@ The log service SHALL provide `phaseEnd(phaseNumber, phase, detail?)` that emits
 - **WHEN** `phaseEnd(3, 'Refresh', detail)` is called with flushed correlation summary
 - **THEN** the connector host SHALL receive `[accountList] PHASE 3 Refresh END correlations link=42/56 … elapsed=`
 - **AND** the detail SHALL include cumulative phase totals not interval deltas
+
+#### Scenario: Process phase end includes completed drain totals
+
+- **GIVEN** Process phase enqueued 2000 link PATCHes and 147 completed before phase end
+- **WHEN** `phaseEnd(4, 'Process', detail)` is called with flushed correlation summary
+- **THEN** the phase END detail SHALL include `link=…` enqueue totals and `completed=147` when non-zero
 
 #### Scenario: Epilogue end logged after report generation
 
@@ -249,7 +279,7 @@ Operations other than accountList (including accountCreate, accountEnable, accou
 
 ### Requirement: OperationRunContext tracks correlation activity counters
 
-The service registry SHALL expose correlation activity counters on `OperationRunContext` updated via log service helpers `recordCorrelationActivity`, `recordCorrelatedActionGranted`, and `recordCorrelationSkipped`. Counters SHALL track PATCH subtypes **link** (correlation-on-aggregation) and **merge** (merge-decision-driven) separately, each with trigger count and account count. A **correlated-action** counter SHALL increment when the correlated action entitlement is newly granted. Skip counters SHALL aggregate reasons: `noIdentity`, `noSourceContext`, `wrongMode`, `noIscAccountId`. The context SHALL maintain both interval counters (reset each heartbeat flush) and phase cumulative counters (reset at `phaseStart`, readable via `flushPhaseCorrelationSummary`).
+The service registry SHALL expose correlation activity counters on `OperationRunContext` updated via log service helpers `recordCorrelationActivity`, `recordCorrelationCompleted`, `recordCorrelatedActionGranted`, and `recordCorrelationSkipped`. Counters SHALL track PATCH subtypes **link** (correlation-on-aggregation) and **merge** (merge-decision-driven) separately, each with trigger count and account count. Counters SHALL track **linkCompleted** and **mergeCompleted** counts incremented when correlation PATCH promises resolve successfully. A **correlated-action** counter SHALL increment when the correlated action entitlement is newly granted during non-aggregation operations only; it SHALL NOT increment during account-list aggregation mode. Skip counters SHALL aggregate reasons: `noIdentity`, `noSourceContext`, `wrongMode`, `noIscAccountId`. The context SHALL maintain both interval counters (reset each heartbeat flush) and phase cumulative counters (reset at `phaseStart`, readable via `flushPhaseCorrelationSummary`).
 
 #### Scenario: Link correlation activity recorded during Refresh
 
@@ -258,12 +288,35 @@ The service registry SHALL expose correlation activity counters on `OperationRun
 - **THEN** interval and phase cumulative link trigger counts SHALL increment by 1
 - **AND** interval and phase cumulative link account counts SHALL increment by 3
 
+#### Scenario: Correlation completed recorded on PATCH resolve
+
+- **GIVEN** a link correlation PATCH for one managed account resolves successfully
+- **WHEN** `recordCorrelationCompleted({ kind: 'link' })` is invoked
+- **THEN** interval and phase cumulative linkCompleted counts SHALL increment by 1
+
+#### Scenario: Correlated-action grant suppressed during aggregation
+
+- **GIVEN** an account-list operation in aggregation mode
+- **WHEN** a fusion account transitions to fully correlated output state via `updateCorrelationStatus`
+- **THEN** correlated-action counters SHALL NOT increment
+- **AND** output state update SHALL still occur
+
 #### Scenario: Correlated-action grant recorded on transition
 
-- **GIVEN** a fusion account transitions from having missing accounts to fully correlated
-- **WHEN** `FusionAction.Correlated` is newly added to the account actions
-- **THEN** `recordCorrelatedActionGranted()` SHALL increment correlated-action counters
+- **GIVEN** a non-aggregation operation where a fusion account transitions from having missing accounts to fully correlated
+- **WHEN** `FusionAction.Correlated` is newly added and `recordCorrelatedActionGranted()` is invoked
+- **THEN** correlated-action counters SHALL increment
 - **AND** idempotent status recomputation without state change SHALL NOT increment the counter again
 
 ---
+
+### Requirement: Heartbeat snapshot includes correlation queue pending count
+
+The service registry heartbeat snapshot SHALL include a `correlationQueuePending` count derived from pending API queue items whose label matches the `IdentityService>correlateAccounts` prefix. The operation heartbeat SHALL use this count for STATUS `pending=` segments.
+
+#### Scenario: Pending count reflects queued correlation PATCHes
+
+- **GIVEN** the API queue has 1853 pending items labeled `IdentityService>correlateAccounts`
+- **WHEN** `getHeartbeatSnapshot()` is called
+- **THEN** `correlationQueuePending` SHALL be 1853
 

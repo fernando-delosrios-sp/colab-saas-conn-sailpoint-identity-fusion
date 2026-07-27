@@ -6,6 +6,7 @@ import {
     OperationRunContext,
     CumulativeOutcomes,
     formatCorrelationSummarySegment,
+    formatCorrelationSummaryValue,
     hasCorrelationActivity,
 } from './operationRunContext'
 
@@ -27,6 +28,7 @@ export type HeartbeatSnapshot = {
     queueStats?: QueueStats
     activeItems?: QueuedItemInfo[]
     pendingItems?: QueuedItemInfo[]
+    correlationQueuePending?: number
     fusionPending?: FusionPendingSnapshot
     memory?: NodeJS.MemoryUsage
     intervalMs: number
@@ -134,12 +136,42 @@ export function formatApiQueueSegment(
     return `api=${queueStats.activeRequests}a/${queueStats.queueLength}q/${queueStats.totalProcessed}c${deltaSuffix}`
 }
 
+function shouldShowCorrelationDrainInStatus(
+    runContext: OperationRunContext,
+    correlationQueuePending: number | undefined
+): boolean {
+    if (runContext.phase !== 'Output' && runContext.phase !== 'Epilogue') return false
+    const runCorrelation = runContext.getRunCorrelationCounters()
+    const hasEnqueue =
+        runCorrelation.linkAccounts > 0 ||
+        runCorrelation.mergeAccounts > 0 ||
+        runCorrelation.linkTriggers > 0 ||
+        runCorrelation.mergeTriggers > 0
+    return hasEnqueue || (correlationQueuePending ?? 0) > 0
+}
+
+function formatCorrelationDrainSegment(
+    runContext: OperationRunContext,
+    correlationQueuePending: number | undefined
+): string | undefined {
+    const runCorrelation = runContext.getRunCorrelationCounters()
+    const value = formatCorrelationSummaryValue(runCorrelation, { cumulative: true })
+    const pending = correlationQueuePending ?? 0
+    if (!value && pending === 0) return undefined
+    const parts = value ? [value] : []
+    if (pending > 0) {
+        parts.push(`pending=${pending}`)
+    }
+    if (parts.length === 0) return undefined
+    return `correlations ${parts.join(' ')}`
+}
+
 export function formatStatusLine(
     snapshot: HeartbeatSnapshot,
     baselines: StatusLineBaselines,
     intervalMs: number
 ): string {
-    const { runContext, queueStats, memory, pendingItems, fusionPending } = snapshot
+    const { runContext, queueStats, memory, pendingItems, fusionPending, correlationQueuePending } = snapshot
     const { previousProcessed, previousProgressDone } = baselines
     const parts: string[] = ['STATUS']
 
@@ -165,6 +197,11 @@ export function formatStatusLine(
             const segment = formatCorrelationSummarySegment(phaseCorrelation, { cumulative: true })
             if (segment) parts.push(segment)
         }
+    }
+
+    if (shouldShowCorrelationDrainInStatus(runContext, correlationQueuePending)) {
+        const drainSegment = formatCorrelationDrainSegment(runContext, correlationQueuePending)
+        if (drainSegment) parts.push(drainSegment)
     }
 
     if (queueStats) {
@@ -245,6 +282,11 @@ const FETCH_ACCOUNTS_LABEL_PREFIX = /^SourceService>fetchAccountsBySourceId(?:Ge
 
 /** Per-account correlation labels share a base prefix; aggregate counts in queue-pending. */
 const CORRELATE_ACCOUNTS_LABEL_PREFIX = /^IdentityService>correlateAccounts(?: .+)?$/
+
+export function countCorrelationQueuePending(pendingItems: QueuedItemInfo[] | undefined): number {
+    if (!pendingItems || pendingItems.length === 0) return 0
+    return pendingItems.filter((item) => CORRELATE_ACCOUNTS_LABEL_PREFIX.test(item.label)).length
+}
 
 type ParsedQueueLabel =
     | { kind: 'paginated'; base: string; offset: number }
@@ -454,6 +496,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 

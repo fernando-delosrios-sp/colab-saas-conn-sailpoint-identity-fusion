@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { Context, ConnectorError, ConnectorErrorType, Response, StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
-import { HeartbeatSnapshot } from './logService/operationHeartbeat'
+import { HeartbeatSnapshot, countCorrelationQueuePending } from './logService/operationHeartbeat'
 import { OperationRunContext } from './logService/operationRunContext'
 import { InMemoryLockService } from './lockService'
 import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
@@ -256,6 +256,7 @@ export class ServiceRegistry {
             queueStats: this.client.getQueueStats(),
             activeItems: queueItems.active,
             pendingItems: queueItems.pending,
+            correlationQueuePending: countCorrelationQueuePending(queueItems.pending),
             fusionPending: {
                 disableOps: run.pendingDisableOperationsCount,
                 deferredCandidates: run.deferredCandidateCount,
@@ -279,6 +280,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

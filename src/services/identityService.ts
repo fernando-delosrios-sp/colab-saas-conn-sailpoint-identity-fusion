@@ -351,7 +351,7 @@ export class IdentityService {
         }
 
         await Promise.all(
-            targetIds.map((accountId) => this.correlateSingleAccount(fusionAccount, accountId, identityId))
+            targetIds.map((accountId) => this.correlateSingleAccount(fusionAccount, accountId, identityId, kind))
         )
 
         return true
@@ -360,7 +360,8 @@ export class IdentityService {
     private async correlateSingleAccount(
         fusionAccount: FusionAccount,
         accountId: string,
-        identityId: string
+        identityId: string,
+        kind: 'link' | 'merge'
     ): Promise<void> {
         const iscAccountId = this.sources.resolveIscAccountIdForManagedKey(accountId)
         if (!iscAccountId) {
@@ -376,14 +377,15 @@ export class IdentityService {
         // If the API call fails, the next aggregation will re-detect it as uncorrelated.
         fusionAccount.setCorrelatedAccount(accountId)
 
-        const correlationPromise = this.buildCorrelationPromise(accountId, iscAccountId, identityId)
+        const correlationPromise = this.buildCorrelationPromise(accountId, iscAccountId, identityId, kind)
         fusionAccount.addCorrelationPromise(accountId, correlationPromise)
     }
 
     private buildCorrelationPromise(
         accountId: string,
         iscAccountId: string,
-        identityId: string
+        identityId: string,
+        kind: 'link' | 'merge'
     ): Promise<void> {
         const requestParameters: AccountsApiUpdateAccountRequest = {
             id: iscAccountId,
@@ -395,6 +397,7 @@ export class IdentityService {
             { priority: QueuePriority.LOW, context: 'IdentityService>correlateAccounts' }
         )
             .then(() => {
+                this.log.recordCorrelationCompleted({ kind })
                 this.log.debug(
                     `Successfully correlated managed key ${accountId} (ISC id ${iscAccountId}) to identity ${identityId}`
                 )
@@ -476,6 +479,7 @@ export class IdentityService {
             })
     }
 }
+
 
 
 

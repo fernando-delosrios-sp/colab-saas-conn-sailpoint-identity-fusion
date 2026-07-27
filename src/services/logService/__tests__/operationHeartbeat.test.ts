@@ -1,6 +1,7 @@
 import { OperationRunContext, formatCorrelationSummarySegment } from '../operationRunContext'
 import {
     OperationHeartbeat,
+    countCorrelationQueuePending,
     formatApiQueueSegment,
     formatDeltaSuffix,
     formatEventSummaryLines,
@@ -314,6 +315,8 @@ describe('operation heartbeat formatters', () => {
                 linkAccounts: 18,
                 mergeTriggers: 0,
                 mergeAccounts: 0,
+                linkCompleted: 0,
+                mergeCompleted: 0,
                 correlatedAction: 0,
                 skippedNoIdentity: 0,
                 skippedNoSourceContext: 0,
@@ -342,6 +345,8 @@ describe('operation heartbeat formatters', () => {
                 linkAccounts: 0,
                 mergeTriggers: 0,
                 mergeAccounts: 0,
+                linkCompleted: 0,
+                mergeCompleted: 0,
                 correlatedAction: 0,
                 skippedNoIdentity: 0,
                 skippedNoSourceContext: 0,
@@ -369,6 +374,8 @@ describe('operation heartbeat formatters', () => {
                 linkAccounts: 3,
                 mergeTriggers: 0,
                 mergeAccounts: 0,
+                linkCompleted: 0,
+                mergeCompleted: 0,
                 correlatedAction: 0,
                 skippedNoIdentity: 0,
                 skippedNoSourceContext: 0,
@@ -602,13 +609,15 @@ describe('OperationHeartbeat timing', () => {
         expect(line).toContain('correlations link=1/8')
     })
 
-    it('formatCorrelationSummarySegment emits link, merge, correlated-action, and skipped segments', () => {
+    it('formatCorrelationSummarySegment emits link, merge, completed, correlated-action, and skipped segments', () => {
         const segment = formatCorrelationSummarySegment(
             {
                 linkTriggers: 14,
                 linkAccounts: 18,
                 mergeTriggers: 2,
                 mergeAccounts: 2,
+                linkCompleted: 10,
+                mergeCompleted: 2,
                 correlatedAction: 12,
                 skippedNoIdentity: 0,
                 skippedNoSourceContext: 0,
@@ -618,8 +627,112 @@ describe('OperationHeartbeat timing', () => {
             { intervalMs: 10_000, cumulative: false }
         )
         expect(segment).toBe(
-            'correlations link=14/18 merge=2/2 correlated-action=+12/10s skipped=noIscAccountId=3'
+            'correlations link=14/18 merge=2/2 completed=+12/10s correlated-action=+12/10s skipped=noIscAccountId=3'
         )
+    })
+
+    it('includes correlation drain segment on Output STATUS when PATCHes are pending', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Output'
+        runContext.recordCorrelationActivity({ kind: 'link', accounts: 2000 })
+        runContext.recordCorrelationCompleted({ kind: 'link', count: 147 })
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                correlationQueuePending: 1853,
+                intervalMs: 10_000,
+            },
+            {},
+            10_000
+        )
+
+        expect(line).toContain('correlations link=1/2000 completed=147 pending=1853')
+    })
+
+    it('includes correlation drain segment on Epilogue STATUS when PATCHes are pending', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Epilogue'
+        runContext.recordCorrelationActivity({ kind: 'link', accounts: 2000 })
+        runContext.recordCorrelationCompleted({ kind: 'link', count: 147 })
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                correlationQueuePending: 1853,
+                intervalMs: 10_000,
+            },
+            {},
+            10_000
+        )
+
+        expect(line).toContain('phase=Epilogue')
+        expect(line).toContain('correlations link=1/2000 completed=147 pending=1853')
+    })
+
+    it('omits correlation drain segment outside Output and Epilogue phases', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Process'
+        runContext.recordCorrelationActivity({ kind: 'link', accounts: 2000 })
+        runContext.recordCorrelationCompleted({ kind: 'link', count: 147 })
+
+        const line = formatStatusLine(
+            {
+                runContext,
+                correlationQueuePending: 1853,
+                intervalMs: 10_000,
+            },
+            {},
+            10_000
+        )
+
+        expect(line).not.toContain('pending=1853')
+        expect(line).not.toContain('completed=147')
+    })
+
+    it('countCorrelationQueuePending counts correlateAccounts labels only', () => {
+        const pendingItems = [
+            { id: '1', priority: 1, label: 'IdentityService>correlateAccounts', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 0 },
+            { id: '2', priority: 1, label: 'IdentityService>correlateAccounts acct-1', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 0 },
+            { id: '3', priority: 1, label: 'MatchingService>score', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 0 },
+        ] as any
+
+        expect(countCorrelationQueuePending(pendingItems)).toBe(2)
+        expect(countCorrelationQueuePending(undefined)).toBe(0)
+        expect(countCorrelationQueuePending([])).toBe(0)
+    })
+
+    it('EVENT_SUMMARY includes completed interval delta for correlation PATCHes', () => {
+        const lines = formatEventSummaryLines(
+            {
+                matchExact: 0,
+                matchPartial: 0,
+                matchDeferred: 0,
+                correlation: {
+                    linkTriggers: 0,
+                    linkAccounts: 0,
+                    mergeTriggers: 0,
+                    mergeAccounts: 0,
+                    linkCompleted: 147,
+                    mergeCompleted: 0,
+                    correlatedAction: 0,
+                    skippedNoIdentity: 0,
+                    skippedNoSourceContext: 0,
+                    skippedWrongMode: 0,
+                    skippedNoIscAccountId: 0,
+                },
+                nonMatch: 0,
+                autoMerged: 0,
+                formsQueued: 0,
+                newIdentityAssignment: 0,
+                recordUniqueRegistered: 0,
+                emailSent: 0,
+            },
+            'Output',
+            10_000
+        )
+
+        expect(lines).toContain('EVENT_SUMMARY correlations completed=+147/10s')
     })
 
     it('formatPhaseEndDetailSuffix renders correlations without key=value prefix', () => {

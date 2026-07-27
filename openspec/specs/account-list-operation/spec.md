@@ -193,7 +193,7 @@ The account-list operation SHALL start an operation heartbeat at the beginning o
 
 ### Requirement: Account-list pipeline logs phase and step boundaries
 
-The account-list operation SHALL emit PHASE START and PHASE END lines at each major phase boundary (Setup, Fetch, Refresh, Process, Output) and STEP START/END lines at named sub-steps within Process and Output (including identity processing, **managed account initialization**, **orphan identity hydration**, correlated sweep, **record unique registration**, uncorrelated sweep, await-disable-ops, form reconciliation, **clear managed accounts** (Output, non-record mode only), form cleanup, send-accounts, save-state, schedule-aggregations, await-form-deletes). PHASE END lines SHALL include `elapsed=` duration and SHALL include correlation activity detail suffix when link, merge, correlated-action, or skip counters are non-zero for that phase. Phase timing data for HTML report breakdowns SHALL be captured internally without emitting colon-style `PHASE N: Description (elapsed)` host lines.
+The account-list operation SHALL emit PHASE START and PHASE END lines at each major phase boundary (Setup, Fetch, Refresh, Process, Output) and STEP START/END lines at named sub-steps within Process and Output (including identity processing, **managed account initialization**, **orphan identity hydration**, correlated sweep, **record unique registration**, uncorrelated sweep, await-disable-ops, form reconciliation, **clear managed accounts** (Output, non-record mode only), form cleanup, send-accounts, save-state, schedule-aggregations, await-form-deletes). PHASE END lines SHALL include `elapsed=` duration and SHALL include correlation activity detail suffix when link, merge, completed, or skip counters are non-zero for that phase. Correlation detail on account-list PHASE END lines SHALL NOT include `correlated-action=`. Phase timing data for HTML report breakdowns SHALL be captured internally without emitting colon-style `PHASE N: Description (elapsed)` host lines.
 
 #### Scenario: Process phase visible during long matching run
 
@@ -214,6 +214,13 @@ The account-list operation SHALL emit PHASE START and PHASE END lines at each ma
 - **GIVEN** correlation-on-aggregation PATCH ran during Refresh for multiple fusion accounts
 - **WHEN** Refresh phase completes
 - **THEN** a `PHASE 3 Refresh END` line SHALL include cumulative link correlation totals in its detail suffix
+
+#### Scenario: Process phase end reports bulk link enqueue on first run
+
+- **GIVEN** a first account-list run after reset with no existing fusion rows
+- **WHEN** Process phase completes after enqueuing link PATCHes for managed accounts
+- **THEN** a `PHASE 4 Process END` line SHALL include cumulative `link=` enqueue totals
+- **AND** the detail SHALL NOT include `correlated-action=`
 
 #### Scenario: Record unique registration step visible during bulk registration
 
@@ -257,7 +264,7 @@ The account-list Process phase SHALL run record unique registration after the co
 
 ### Requirement: Account-list aggregates match and correlation logs at INFO
 
-During account-list execution, per-account match discovery (`MATCH FOUND`, `EXACT MATCH FOUND`, deferred variants) and correlation trigger messages SHALL NOT be emitted at INFO level. Instead, callers SHALL record events into `OperationRunContext` via `recordEvent` and correlation activity helpers, and the heartbeat SHALL summarize them in `EVENT_SUMMARY` lines. Correlation PATCH activity SHALL be classified as **link** (correlation-on-aggregation) or **merge** (merge-decision-driven). Correlated-action entitlement grants SHALL be recorded when newly assigned. Immediate `warn` and `error` lines for matching and correlation failures SHALL remain unchanged.
+During account-list execution, per-account match discovery (`MATCH FOUND`, `EXACT MATCH FOUND`, deferred variants) and correlation trigger messages SHALL NOT be emitted at INFO level. Instead, callers SHALL record events into `OperationRunContext` via `recordEvent` and correlation activity helpers, and the heartbeat SHALL summarize them in `EVENT_SUMMARY` lines. Correlation PATCH activity SHALL be classified as **link** (correlation-on-aggregation) or **merge** (merge-decision-driven). Correlation PATCH completion SHALL be recorded via `recordCorrelationCompleted`. Correlated-action entitlement grants SHALL NOT be recorded or reported during account-list aggregation. Immediate `warn` and `error` lines for matching and correlation failures SHALL remain unchanged.
 
 #### Scenario: Match discovery summarized not streamed
 
@@ -271,7 +278,7 @@ During account-list execution, per-account match discovery (`MATCH FOUND`, `EXAC
 - **GIVEN** correlation is triggered for multiple fusion accounts during Process phase
 - **WHEN** the operation runs with default INFO log level
 - **THEN** individual `Triggering correlation for` INFO lines SHALL NOT appear
-- **AND** EVENT_SUMMARY lines SHALL report aggregate correlation counts
+- **AND** EVENT_SUMMARY lines SHALL report aggregate correlation link counts
 
 #### Scenario: Link correlation summarized during Refresh
 
@@ -289,9 +296,18 @@ During account-list execution, per-account match discovery (`MATCH FOUND`, `EXAC
 
 #### Scenario: Correlated-action grants visible at INFO
 
-- **GIVEN** multiple fusion accounts become fully correlated and receive the correlated action entitlement during an aggregation
+- **GIVEN** multiple fusion accounts become fully correlated during an account-list aggregation
 - **WHEN** the operation runs with default INFO log level
-- **THEN** EVENT_SUMMARY and phase END lines SHALL report correlated-action grant totals
+- **THEN** EVENT_SUMMARY and phase END lines SHALL NOT report correlated-action grant totals
+
+#### Scenario: Correlation drain visible during Output and Epilogue
+
+- **GIVEN** Process phase enqueued 2000 link PATCHes and Output phase begins while PATCHes remain pending
+- **WHEN** the operation runs with default INFO log level
+- **THEN** STATUS lines during Output or Epilogue SHALL report `completed=` and `pending=` correlation drain segments
+- **AND** EVENT_SUMMARY and phase END lines SHALL NOT report `correlated-action=`
+
+---
 
 ### Requirement: Account-list process phase hydrates orphan correlated identities before correlated sweep
 

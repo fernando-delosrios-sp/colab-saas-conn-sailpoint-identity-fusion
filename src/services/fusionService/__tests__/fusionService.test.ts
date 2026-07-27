@@ -218,6 +218,22 @@ describe('FusionService', () => {
         })
     })
 
+    describe('correlation logging during aggregation', () => {
+        it('does not record correlated-action grants during accountList output', async () => {
+            const grantSpy = vi.spyOn(mockLog, 'recordCorrelatedActionGranted')
+            const account = FusionAccount.fromIdentity({
+                id: 'identity-1',
+                name: 'Identity One',
+                attributes: { id: 'identity-1', name: 'Identity One' },
+            } as any)
+            account.setCorrelatedAccount('src-a::acct-1')
+
+            await fusionService.getISCAccount(account, false)
+
+            expect(grantSpy).not.toHaveBeenCalled()
+        })
+    })
+
     describe('reset flags', () => {
         beforeEach(() => {
             mockSources.patchSourceConfig = vi.fn().mockResolvedValue(undefined)
