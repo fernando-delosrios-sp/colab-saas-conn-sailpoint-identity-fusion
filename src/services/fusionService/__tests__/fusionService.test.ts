@@ -1549,11 +1549,10 @@ describe('FusionService', () => {
             await fusionService.processManagedAccounts()
 
             // Verify log called or side effects
-            expect(mockLog.info).toHaveBeenCalledWith(
-                expect.stringContaining(
-                    'Processing 1 managed account(s): analyzing uncorrelated work-queue entries (matching and scoring vs identities)'
-                )
-            )
+            expect(mockLog.detail).toHaveBeenCalledWith({
+                action: 'processing uncorrelated managed accounts',
+                count: 1,
+            })
         })
 
         it('should set reverse correlation attribute for first-run non-matched authoritative accounts', async () => {

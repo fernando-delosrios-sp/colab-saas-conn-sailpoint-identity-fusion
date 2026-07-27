@@ -427,19 +427,18 @@ describe('accountList report epilogue', () => {
 
         const messages = logSpy.mock.calls.map((call) => String(call[0]))
         expect(messages.some((msg) => msg.includes('PHASE 1 Setup START'))).toBe(true)
+        expect(messages.some((msg) => msg.includes('PHASE 1 Setup END elapsed='))).toBe(true)
         expect(messages.some((msg) => msg.includes('EPILOGUE report START'))).toBe(true)
+        expect(messages.some((msg) => msg.includes('EPILOGUE report END elapsed='))).toBe(true)
         expect(messages.some((msg) => msg.includes('Queue Stats:'))).toBe(false)
         expect(messages.some((msg) => msg.includes('Memory usage'))).toBe(false)
-
-        const phaseMessages = messages.filter((msg) => /\b(?:PHASE [1-7]|Epilogue):/.test(msg))
-        expect(phaseMessages.length).toBeGreaterThan(0)
-        expect(phaseMessages.some((msg) => msg.startsWith('Epilogue: report generation'))).toBe(true)
-        expect(phaseMessages.some((msg) => /PHASE [67]:/.test(msg))).toBe(false)
-        expect(phaseMessages.some((msg) => /PHASE [1-5]:/.test(msg))).toBe(true)
+        expect(messages.some((msg) => /\bPHASE [1-5]:/.test(msg))).toBe(false)
+        expect(messages.some((msg) => msg.startsWith('Epilogue: report generation'))).toBe(false)
 
         logSpy.mockRestore()
     })
 })
+
 
 
 

@@ -16,7 +16,7 @@ const createEmailService = () => {
         workflowsApi,
         call: vi.fn(async (fn: (api: any) => Promise<any>) => fn({ workflows: workflowsApi })),
     } as any
-    const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+    const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), detail: vi.fn(), recordEvent: vi.fn() } as any
     const config = {
         workflowName: 'Fusion Email Sender',
         delayedAggregationWorkflowName: 'Fusion Delayed Aggregation',
@@ -122,4 +122,5 @@ describe('EmailService.sendFusionEmail', () => {
         expect(html).toContain('92%')
     })
 })
+
 

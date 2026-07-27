@@ -1,7 +1,7 @@
 /**
  * connector-spec.json -> Advanced Settings -> Developer Settings
  */
-import { logger } from '@sailpoint/connector-sdk'
+import { bootstrapLog } from '../../../services/logService'
 import { assert } from './assertLite'
 import { extractBoolean } from '../../../utils/attributes'
 import type { DeveloperSettingsSection } from '../../../model/config'
@@ -41,7 +41,7 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
         )
     }
 
-    logger.info('Configuration validation completed successfully')
+    bootstrapLog.detail({ validation: 'success' })
 
     return {
         resetAccounts:
@@ -58,4 +58,5 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
         externalLoggingLevel,
     }
 }
+
 

@@ -343,16 +343,20 @@ export class FusionService {
      */
     public async preProcessFusionAccounts(): Promise<FusionAccount[]> {
         const { fusionAccounts } = this.sources
-        this.log.info(
-            `Pre-processing fusion accounts: loading ${fusionAccounts.length} fusion account record(s) from sources and registering them for fusion`
-        )
+        this.log.detail({
+            action: 'pre-processing fusion accounts',
+            count: fusionAccounts.length,
+        })
         const results: FusionAccount[] = []
         await forEachBatched(fusionAccounts, async (x: Account) => {
             const fusionAccount = FusionAccount.fromFusionAccount(x)
             this.setFusionAccount(fusionAccount)
             results.push(fusionAccount)
         })
-        this.log.info(`Fusion account pre-process finished: ${results.length} account(s) loaded and registered`)
+        this.log.detail({
+            action: 'fusion account pre-process finished',
+            count: results.length,
+        })
         return results
     }
 
@@ -378,15 +382,17 @@ export class FusionService {
      */
     public async processFusionAccounts(): Promise<FusionAccount[]> {
         const { fusionAccounts } = this.sources
-        this.log.info(
-            `Processing Fusion accounts: for each of ${fusionAccounts.length} fusion account(s), match managed accounts from the work queue and build fusion layers`
-        )
+        this.log.detail({
+            action: 'processing fusion accounts',
+            count: fusionAccounts.length,
+        })
         const results = await batchProcess(fusionAccounts, 'Fusion accounts', async (x: Account) => {
             return await this.processFusionAccount(x)
         }, this.config, this.log)
-        this.log.info(
-            `Fusion accounts phase finished: ${results.length} fusion account(s) processed (managed accounts matched and layered)`
-        )
+        this.log.detail({
+            action: 'fusion accounts phase finished',
+            count: results.length,
+        })
         return results
     }
 
@@ -687,7 +693,10 @@ export class FusionService {
         await this.processCorrelatedManagedAccounts()
         await this.processRecordUniqueRegistration()
         const { processed } = await this.processUncorrelatedManagedAccounts()
-        this.log.info(`Managed accounts phase finished: ${processed} analyzed (matching workflow complete)`)
+        this.log.detail({
+            action: 'managed accounts phase finished',
+            processed,
+        })
     }
 
     private validateManagedSourceReviewers(): void {
@@ -727,9 +736,10 @@ export class FusionService {
             return
         }
 
-        this.log.info(
-            `Correlated account sweep: resolving ${correlatedAccounts.length} correlated managed account(s) before uncorrelated scoring`
-        )
+        this.log.detail({
+            action: 'correlated account sweep',
+            count: correlatedAccounts.length,
+        })
         await batchProcess(
             correlatedAccounts,
             'Correlated managed accounts',
@@ -738,7 +748,10 @@ export class FusionService {
             this.log,
             this.run.managedAccountProcessingBatchSize
         )
-        this.log.info(`Correlated account sweep complete: ${map.size} uncorrelated account(s) queued for scoring`)
+        this.log.detail({
+            action: 'correlated account sweep complete',
+            queued: map.size,
+        })
     }
 
     /**
@@ -763,9 +776,12 @@ export class FusionService {
             return
         }
 
-        this.log.info(`Waiting for ${this.run.pendingDisableOperationsCount} pending disable operation(s)`)
+        this.log.detail({
+            action: 'waiting for pending disable operations',
+            count: this.run.pendingDisableOperationsCount,
+        })
         await this.run.awaitPendingDisableOperations()
-        this.log.info('Pending disable operations completed')
+        this.log.detail({ action: 'pending disable operations completed' })
     }
 
     /**
@@ -1061,7 +1077,12 @@ export class FusionService {
         if (account.disabled) {
             return
         }
-        this.log.info(`Firing low-priority disable for account: ${account.name} [${account.sourceName}] (${accountId})`)
+        this.log.detail({
+            action: 'firing low-priority disable',
+            account: account.name,
+            source: account.sourceName,
+            accountId,
+        })
         await this.sources.fireDisableAccount(accountId)
     }
 
@@ -1227,9 +1248,10 @@ export class FusionService {
             return { registered: 0 }
         }
 
-        this.log.info(
-            `Registering unique attribute values for ${eligible.length} record managed account(s) with match disabled`
-        )
+        this.log.detail({
+            action: 'registering unique attribute values',
+            count: eligible.length,
+        })
 
         const registered = await this.definitionService.registerUniqueValuesFromRecordManagedAccounts(
             eligible,
@@ -1248,7 +1270,10 @@ export class FusionService {
         }
 
         this.log.recordEvent('recordUniqueRegistered', { count: registered })
-        this.log.info(`Record unique registration complete: ${registered} account(s) processed`)
+        this.log.detail({
+            action: 'record unique registration complete',
+            registered,
+        })
         return { registered }
     }
 
@@ -1268,9 +1293,10 @@ export class FusionService {
         const map = this.run.managedAccountsById
         const queuedAccounts = [...map.values()]
         const initialQueueSize = queuedAccounts.length
-        this.log.info(
-            `Processing ${initialQueueSize} managed account(s): analyzing uncorrelated work-queue entries (matching and scoring vs identities)`
-        )
+        this.log.detail({
+            action: 'processing uncorrelated managed accounts',
+            count: initialQueueSize,
+        })
         const processed = await this.runUncorrelatedManagedAccountSweep(
             queuedAccounts,
             this.run.managedAccountProcessingBatchSize,

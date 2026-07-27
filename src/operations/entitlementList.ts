@@ -15,7 +15,7 @@ export const entitlementList = async (serviceRegistry: ServiceRegistry, input: S
     const { log, sources, entitlements, res } = serviceRegistry
 
     try {
-        log.info(`Listing entitlements for type: ${input.type}`)
+        log.detail({ type: input.type, action: 'listing entitlements' })
         const timer = log.timer()
 
         switch (input.type) {
@@ -36,3 +36,4 @@ export const entitlementList = async (serviceRegistry: ServiceRegistry, input: S
         log.crash(`Failed to list entitlements for type ${input.type}`, error)
     }
 }
+

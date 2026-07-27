@@ -178,8 +178,7 @@ export class EmailService {
         const body = renderFusionReviewEmail(this.templates, emailData)
         const subject = `${accountName} (${accountSource}) - Review candidate identity match`
 
-        await this.sendEmail(recipients, subject, body)
-        this.log.info(`Sent fusion review email to ${recipients.length} recipient(s) for form ${formInstance.id}`)
+        await this.sendEmail(recipients, subject, body, { formId: formInstance.id })
     }
 
     /**
@@ -208,7 +207,12 @@ export class EmailService {
     /**
      * Send email to recipients via workflow execution.
      */
-    public async sendEmail(recipients: string[], subject: string, body: string): Promise<void> {
+    public async sendEmail(
+        recipients: string[],
+        subject: string,
+        body: string,
+        options?: { formId?: string }
+    ): Promise<void> {
         assert(recipients && recipients.length > 0, 'Email recipients are required')
         assert(subject, 'Email subject is required')
         assert(body, 'Email body is required')
@@ -245,7 +249,13 @@ export class EmailService {
                 `Failed to send email workflow - received status ${response.status}${responseDetail}`,
                 'error'
             )
-            this.log.info(`Sent email "${subject}" to ${validRecipients.length} recipient(s)`)
+            this.log.detail({
+                action: 'email sent',
+                subject,
+                recipients: validRecipients.length,
+                ...(options?.formId ? { formId: options.formId } : {}),
+            })
+            this.log.recordEvent('emailSent')
         } catch (e) {
             const errStr = e instanceof Error ? e.toString() : String(e)
             this.log.error(
@@ -414,6 +424,7 @@ export class EmailService {
         )
     }
 }
+
 
 
 

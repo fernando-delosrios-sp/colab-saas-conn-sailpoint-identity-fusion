@@ -27,6 +27,8 @@ const createEmailService = (workflowPayload?: { padding?: string }) => {
         info: vi.fn(),
         warn: vi.fn(),
         error: vi.fn(),
+        detail: vi.fn(),
+        recordEvent: vi.fn(),
     } as any
     const config = {
         workflowName: 'Fusion Email Sender',
@@ -142,5 +144,6 @@ describe('EmailService report size limits', () => {
         expect(sentInput.body).toContain('Report content was truncated to fit ISC workflow input size limits')
     })
 })
+
 
 

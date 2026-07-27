@@ -247,5 +247,40 @@ describe('LogService step boundaries', () => {
     })
 })
 
+describe('LogService phase and detail boundaries', () => {
+    beforeEach(() => {
+        mockLogger.level = 'info'
+        mockLogger.info.mockClear()
+    })
 
+    it('phaseEnd emits END with elapsed after phaseStart', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false, operationContext: 'accountList' })
+        log.bindRunContext(new OperationRunContext())
+        log.phaseStart(1, 'Setup')
+        vi.advanceTimersByTime(26400)
+        log.phaseEnd(1, 'Setup')
+        expect(mockLogger.info).toHaveBeenLastCalledWith('[accountList] PHASE 1 Setup END elapsed=26.4S')
+        vi.useRealTimers()
+    })
+
+    it('detail emits DETAIL key=value pairs', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, operationContext: 'accountList' })
+        log.detail({ sources: 3 })
+        expect(mockLogger.info).toHaveBeenCalledWith('[accountList] DETAIL sources=3')
+    })
+
+    it('epilogueEnd emits END with elapsed after epilogueStart', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false, operationContext: 'accountList' })
+        log.bindRunContext(new OperationRunContext())
+        log.epilogueStart('report')
+        vi.advanceTimersByTime(1500)
+        log.epilogueEnd('report')
+        expect(mockLogger.info).toHaveBeenLastCalledWith('[accountList] EPILOGUE report END elapsed=1.5S')
+        vi.useRealTimers()
+    })
+})
 

@@ -163,26 +163,30 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 
 ### Operation log line kinds (`accountList`)
 
-During long `accountList` aggregations, the connector emits standardized text prefixes in log messages (prefixed with `[accountList]`). Use these for monitoring and alerting instead of legacy patterns.
+During long `accountList` aggregations, the connector emits standardized text prefixes in log messages (prefixed with `[accountList]`). Config bootstrap messages use `[config]`. Use these for monitoring and alerting instead of legacy patterns.
 
 | Prefix | Level | Purpose |
 | ------ | ----- | ------- |
-| `STATUS` | Info | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, `api-queue completed` delta, memory, elapsed time |
-| `EVENT_SUMMARY` | Info | Aggregated match/correlation counts since the previous heartbeat tick |
-| `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END`) |
+| `STATUS` | Info | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, compact `api=Na/Nq/Nc` segment with delta, memory, elapsed time |
+| `EVENT_SUMMARY` | Info | Aggregated match/correlation/email counts since the previous heartbeat tick |
+| `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END elapsed=…`) |
+| `DETAIL` | Info | Operational milestones as `key=value` pairs (sources loaded, emails sent, mode) |
 | `WARN STALL` | Warn | API queue stopped completing requests for two consecutive heartbeat ticks; includes active request labels |
-| `EPILOGUE` | Info | Report epilogue start (not a numbered phase) |
+| `EPILOGUE` | Info | Report epilogue (`START` / `END elapsed=…`; not a numbered phase) |
 | `METRIC` | Info | Phase/step timing metrics |
 
 **Log monitor migration:**
 
 | Legacy pattern (removed) | Replace with |
 | ------------------------ | ------------ |
-| `Queue Stats:` | `STATUS` (`api-queue completed=` appears inside STATUS lines) |
+| `Queue Stats:` | `STATUS` (`api=` segment inside STATUS lines) |
 | `Memory usage` | `STATUS` (RSS/heap appear inside STATUS lines) |
+| `PHASE N: Description (elapsed)` | `PHASE N Name END elapsed=…` |
+| `Epilogue: report generation` | `EPILOGUE report END elapsed=…` |
 | Per-account `MATCH FOUND:` / `Triggering correlation` at Info | `EVENT_SUMMARY` (per-account detail remains at Debug) |
+| Free-form `Loaded N managed source(s)` | `DETAIL sources=N` |
 
-**Example grep targets:** `STATUS`, `WARN STALL`, `EVENT_SUMMARY`, `PHASE 4 Process START`
+**Example grep targets:** `STATUS`, `WARN STALL`, `EVENT_SUMMARY`, `PHASE 4 Process START`, `DETAIL`
 
 ---
 
@@ -507,6 +511,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](troubleshooting.md).
+
 
 
 

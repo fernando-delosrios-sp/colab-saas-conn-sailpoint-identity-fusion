@@ -12,6 +12,8 @@ const createEmailService = (baseurl: string, getFusionSourceReturnValue: any = {
         info: vi.fn(),
         warn: vi.fn(),
         error: vi.fn(),
+        detail: vi.fn(),
+        recordEvent: vi.fn(),
     } as any
     const config = {
         workflowName: 'Fusion Email Sender',
@@ -48,3 +50,4 @@ describe('EmailService email header subtitle', () => {
         expect(subtitle).toBe('tenant.identitynow.com - Fusion source')
     })
 })
+

@@ -14,31 +14,32 @@ export const testConnection = async (serviceRegistry: ServiceRegistry, _input: a
     const { log, sources, schemas, workflows, res } = serviceRegistry
 
     try {
-        log.info('Testing connection')
-        const timer = log.timer()
+        log.detail({ action: 'testing connection' })
 
-        // Verify access to the Fusion source and that configured managed sources exist
+        log.stepStart('verify-sources')
         await sources.fetchAllSources()
-        timer.phase('Verified Fusion source and managed sources')
+        log.stepEnd('verify-sources')
 
+        log.stepStart('validate-jmespath')
         sources.validateAccountJmespathFilters()
-        timer.phase('Validated Accounts JMESPath filters')
+        log.stepEnd('validate-jmespath')
 
         if (sources.isEmailWorkflowConfigured()) {
+            log.stepStart('validate-email-workflow')
             await workflows.fetchSender()
-            log.info('Email workflow verified')
-            timer.phase('Validated email sender workflow')
+            log.stepEnd('validate-email-workflow')
         }
 
         const delayedAggregationSources = sources.delayedAggregationSources
         if (delayedAggregationSources.length > 0) {
+            log.stepStart('validate-delayed-aggregation-workflow')
             await workflows.fetchDelayedAggregationSender()
-            log.info(`Delayed aggregation workflow validated for ${delayedAggregationSources.length} source(s)`)
-            timer.phase('Validated delayed aggregation workflow')
+            log.stepEnd('validate-delayed-aggregation-workflow', { sources: delayedAggregationSources.length })
         }
 
         const reverseCorrelationSources = sources.reverseCorrelationSources
         if (reverseCorrelationSources.length > 0) {
+            log.stepStart('validate-reverse-correlation')
             const schemaAttrNames = await schemas.getManagedSourceSchemaAttributeNames()
             for (const sc of reverseCorrelationSources) {
                 try {
@@ -52,8 +53,7 @@ export const testConnection = async (serviceRegistry: ServiceRegistry, _input: a
                     throw error
                 }
             }
-            log.info(`Reverse correlation setup validated for ${reverseCorrelationSources.length} source(s)`)
-            timer.phase('Validated reverse correlation setup')
+            log.stepEnd('validate-reverse-correlation', { sources: reverseCorrelationSources.length })
         }
 
         res.send({})

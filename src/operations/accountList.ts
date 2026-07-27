@@ -55,29 +55,39 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
 
     try {
         try {
-            log.info(dryRun ? 'Starting dry-run analysis' : 'Starting aggregation')
+            log.detail({ action: dryRun ? 'start dry-run analysis' : 'start aggregation' })
 
             const options: PhaseOptions = { isPersistent, tracker, streamProgress }
 
+            let phaseStarted = Date.now()
             log.phaseStart(1, 'Setup')
             if (!(await setupPhase(serviceRegistry, input.schema, options))) return
-            timer.phase('PHASE 1: Setup and initialization', 'info', 'Setup')
+            timer.recordElapsed('Setup', Date.now() - phaseStarted)
+            log.phaseEnd(1, 'Setup')
 
+            phaseStarted = Date.now()
             log.phaseStart(2, 'Fetch')
             fetchResult = await fetchPhase(serviceRegistry, options)
-            timer.phase('PHASE 2: Fetching data in parallel', 'info', 'Fetch')
+            timer.recordElapsed('Fetch', Date.now() - phaseStarted)
+            log.phaseEnd(2, 'Fetch')
 
+            phaseStarted = Date.now()
             log.phaseStart(3, 'Refresh')
             await refreshPhase(serviceRegistry)
-            timer.phase('PHASE 3: Refresh (fusion accounts)', 'info', 'Refresh')
+            timer.recordElapsed('Refresh', Date.now() - phaseStarted)
+            log.phaseEnd(3, 'Refresh')
 
+            phaseStarted = Date.now()
             log.phaseStart(4, 'Process')
             await processPhase(serviceRegistry, options)
-            timer.phase('PHASE 4: Process (identities, managed accounts, form reconciliation)', 'info', 'Process')
+            timer.recordElapsed('Process', Date.now() - phaseStarted)
+            log.phaseEnd(4, 'Process')
 
+            phaseStarted = Date.now()
             log.phaseStart(5, 'Output')
             outputCount = await outputPhase(serviceRegistry, options)
-            timer.phase('PHASE 5: Output (unique attributes, serialize & clean up memory)', 'info', 'Output')
+            timer.recordElapsed('Output', Date.now() - phaseStarted)
+            log.phaseEnd(5, 'Output')
         } catch (error) {
             runError = error
             log.warn(`Pipeline failed — running report epilogue before propagating: ${(error as Error).message}`)
@@ -96,9 +106,9 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         if (!sources.run.isRecordMode) {
             sources.clearFusionAccounts()
         } else {
-            log.info('Fusion accounts cache retained for recording')
+            log.detail({ cache: 'fusion accounts retained for recording' })
         }
-        log.info('Account caches cleared from memory')
+        log.detail({ action: 'account caches cleared from memory' })
 
         if (runError) {
             if (runError instanceof ConnectorError) throw runError
@@ -117,4 +127,3 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         }
     }
 }
-

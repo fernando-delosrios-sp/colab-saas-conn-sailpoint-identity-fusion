@@ -1,7 +1,7 @@
 /**
  * connector-spec.json -> Attribute Matching Settings -> Matching Settings
  */
-import { logger } from '@sailpoint/connector-sdk'
+import { bootstrapLog } from '../../../services/logService'
 import { assert, softAssert } from './assertLite'
 import { extractBoolean } from '../../../utils/attributes'
 import { migrateConfigKey } from '../migration'
@@ -70,9 +70,10 @@ export function readSettings(raw: Record<string, unknown>): MatchingSettingsSect
         }
     }
 
-    logger.info(
-        `Minimum score for manual review: ${fusionManualReviewScore}; per-attribute thresholds mapped: ${fusionScoreMap.size}`
-    )
+    bootstrapLog.detail({
+        manualReviewScore: fusionManualReviewScore,
+        thresholdCount: fusionScoreMap.size,
+    })
 
     return {
         matchingConfigs,

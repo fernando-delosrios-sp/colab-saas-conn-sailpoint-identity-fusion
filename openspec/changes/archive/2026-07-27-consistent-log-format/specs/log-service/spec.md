@@ -1,9 +1,54 @@
-# log-service Spec
+## ADDED Requirements
 
-## Purpose
+### Requirement: Log service emits DETAIL lines for operational milestones
 
-The log service (`src/services/logService/`) is the connector's logging facade. It defines the `LogService` interface, the SDK adapter that writes to the connector host, and the helper utilities used elsewhere in the codebase to log structured events, known operation function names, and a small set of standardized debug/warn patterns. This spec defines the contract for what the rest of the connector can assume about the log surface (level, structured fields, redaction) and what the host receives.
-## Requirements
+The log service SHALL provide a `detail()` helper that emits INFO lines with prefix `DETAIL` followed by space-separated `key=value` pairs. Values containing spaces SHALL be quoted. During an operation with `operationContext`, DETAIL lines SHALL be prefixed with `[operationContext]`. During config bootstrap (before ServiceRegistry exists), DETAIL lines SHALL be prefixed with `[config]`.
+
+#### Scenario: Detail line during account-list setup
+
+- **GIVEN** the account-list operation is in Setup phase
+- **WHEN** a caller invokes `log.detail({ sources: 3 })`
+- **THEN** the connector host SHALL receive an INFO line `[accountList] DETAIL sources=3`
+
+#### Scenario: Detail line during config bootstrap
+
+- **GIVEN** configuration validation completes before any operation starts
+- **WHEN** bootstrap logging records validation success
+- **THEN** the connector host SHALL receive an INFO line prefixed with `[config] DETAIL`
+
+### Requirement: Log service emits PHASE END and EPILOGUE END boundaries
+
+The log service SHALL provide `phaseEnd(phaseNumber, phase, detail?)` that emits `PHASE {N} {Phase} END` with optional detail suffix and mandatory `elapsed=` duration since the matching `phaseStart`. The service SHALL provide `epilogueEnd(block, detail?)` that emits `EPILOGUE {block} END` with `elapsed=` duration since the matching epilogue START. Phase elapsed timing for HTML report breakdowns SHALL be captured via internal PhaseTimer recording without emitting colon-style `PHASE N: Description (elapsed)` host lines.
+
+#### Scenario: Phase end logged after setup completes
+
+- **GIVEN** Setup phase began with `PHASE 1 Setup START`
+- **WHEN** Setup work completes and `phaseEnd(1, 'Setup')` is called
+- **THEN** the connector host SHALL receive `[accountList] PHASE 1 Setup END elapsed=` with a duration suffix
+- **AND** the connector host SHALL NOT receive a colon-style line matching `PHASE 1:`
+
+#### Scenario: Epilogue end logged after report generation
+
+- **GIVEN** the epilogue began with `EPILOGUE report START`
+- **WHEN** report generation completes
+- **THEN** the connector host SHALL receive `[accountList] EPILOGUE report END elapsed=`
+- **AND** the connector host SHALL NOT receive a line starting with `Epilogue: report generation`
+
+### Requirement: Non-accountList operations use STEP boundaries
+
+Operations other than accountList (including accountCreate, accountEnable, accountDisable, accountRead, accountUpdate, testConnection, entitlementList, accountDiscoverSchema) SHALL emit `STEP {slug} START` and `STEP {slug} END elapsed=` lines at pipeline boundaries instead of colon-style PhaseTimer phase messages.
+
+#### Scenario: Account create uses STEP lines
+
+- **GIVEN** an accountCreate operation runs
+- **WHEN** identity fetch completes
+- **THEN** the connector host SHALL receive `STEP fetch-identity END elapsed=`
+- **AND** the connector host SHALL NOT receive a line matching `Step 1:`
+
+---
+
+## MODIFIED Requirements
+
 ### Requirement: The log service MUST expose a stable, structured log surface
 
 The log service MUST expose a `LogService` interface with the standard levels (`debug`, `info`, `warn`, `error`). The SDK adapter MUST forward every call to the connector host as a plain text message without lossy transformation. For operations with an `operationContext` (for example `accountList`), messages SHALL be prefixed with `[operationContext]`. During config bootstrap before any operation starts, messages emitted via the bootstrap logger SHALL be prefixed with `[config]`. Structured metadata MAY be passed as optional arguments for message formatting, but the host-visible contract for operational visibility SHALL be standardized text line kinds (`STATUS`, `EVENT_SUMMARY`, `PHASE`, `STEP`, `METRIC`, `WARN STALL`, `EPILOGUE`, `DETAIL`) rather than host-indexed structured fields.
@@ -62,44 +107,6 @@ When `OperationRunContext.progress.unit` is set, the STATUS line SHALL render th
 - **WHEN** an account-list operation runs longer than 10 seconds
 - **THEN** at least one STATUS line SHALL be emitted within the first 10 seconds of the operation heartbeat
 
-### Requirement: Operation heartbeat emits EVENT_SUMMARY lines
-
-The log service SHALL aggregate account-level events recorded via `recordEvent` between heartbeat ticks and emit one or more `EVENT_SUMMARY` text lines at each tick. Counters SHALL reset after each flush. Multiple summary lines MAY be used when a single line would be excessively long.
-
-#### Scenario: Match events summarized per tick
-
-- **GIVEN** 12 partial matches and 2 exact matches recorded since the last heartbeat tick
-- **WHEN** the heartbeat flushes event counters
-- **THEN** the connector host SHALL receive an INFO line containing `EVENT_SUMMARY` with match counts
-- **AND** per-account `MATCH FOUND` lines SHALL NOT have been emitted at INFO level for those events
-
-#### Scenario: Correlation events summarized per tick
-
-- **GIVEN** 14 correlation triggers affecting 18 accounts since the last tick
-- **WHEN** the heartbeat flushes event counters
-- **THEN** the connector host SHALL receive an INFO `EVENT_SUMMARY` line reporting correlation totals
-
-### Requirement: Operation heartbeat detects and warns on queue stall
-
-When the API queue `totalProcessed` (reported in STATUS as `api-queue completed`) count does not increase for two consecutive STATUS ticks while the queue has active or queued items, the heartbeat SHALL emit a `WARN STALL` line listing the top active queue item labels grouped by count. Pipeline progress delta SHALL NOT influence stall detection.
-
-#### Scenario: Stall warning after flat api-queue completed count
-
-- **GIVEN** api-queue stats show active or queued items
-- **AND** `completed` count is unchanged across two consecutive STATUS ticks
-- **WHEN** the second STATUS tick completes
-- **THEN** the connector host SHALL receive a WARN line containing `STALL`
-- **AND** the line SHALL name the most frequent active queue labels
-
-#### Scenario: No stall when pipeline advances but api-queue is idle
-
-- **GIVEN** Refresh phase pipeline progress increases each STATUS tick
-- **AND** api-queue active and queued counts are zero with unchanged completed count
-- **WHEN** multiple STATUS ticks occur
-- **THEN** the connector host SHALL NOT receive a `WARN STALL` line solely because api-queue completed delta is zero
-
----
-
 ### Requirement: Phase and step boundaries use standardized text prefixes
 
 The log service SHALL emit `PHASE` and `STEP` text lines at operation pipeline boundaries. Each line SHALL use `START` or `END` with optional detail suffix and mandatory `elapsed=` on END. Phase names SHALL use canonical labels: Setup, Fetch, Refresh, Process, Output. The report terminal block SHALL use `EPILOGUE` (not a phase number) with `START` and `END` lines. Colon-style phase timing lines (for example `PHASE 1: Setup and initialization (26.4S)`) SHALL NOT be emitted to the host.
@@ -149,73 +156,6 @@ The service registry SHALL expose an `OperationRunContext` updated by log servic
 
 ---
 
-### Requirement: Heartbeat interval is configurable in Advanced Connection Settings
+## REMOVED Requirements
 
-The connector SHALL expose a **Heartbeat interval (seconds)** setting (`heartbeatInterval`) in Advanced Connection Settings. The setting SHALL default to 10 seconds when unset. At runtime the connector SHALL convert the configured value to milliseconds and expose it as `statsLoggingIntervalMs` on `FusionConfig` for operation heartbeat consumption.
-
-#### Scenario: Default heartbeat interval when setting omitted
-
-- **GIVEN** a source configuration with no `heartbeatInterval` value
-- **WHEN** `safeReadConfig` completes
-- **THEN** `statsLoggingIntervalMs` SHALL be 10000
-
-#### Scenario: Custom heartbeat interval from advanced settings
-
-- **GIVEN** a source configuration with `heartbeatInterval` set to 30
-- **WHEN** `safeReadConfig` completes
-- **THEN** `statsLoggingIntervalMs` SHALL be 30000
-
-#### Scenario: Setting appears in connector-spec Advanced Connection Settings
-
-- **GIVEN** an operator views Advanced Connection Settings in the connector UI
-- **WHEN** the section renders
-- **THEN** a **Heartbeat interval (seconds)** field keyed `heartbeatInterval` SHALL be present
-- **AND** the documented default SHALL be 10 seconds
-
-### Requirement: Log service emits DETAIL lines for operational milestones
-
-The log service SHALL provide a `detail()` helper that emits INFO lines with prefix `DETAIL` followed by space-separated `key=value` pairs. Values containing spaces SHALL be quoted. During an operation with `operationContext`, DETAIL lines SHALL be prefixed with `[operationContext]`. During config bootstrap (before ServiceRegistry exists), DETAIL lines SHALL be prefixed with `[config]`.
-
-#### Scenario: Detail line during account-list setup
-
-- **GIVEN** the account-list operation is in Setup phase
-- **WHEN** a caller invokes `log.detail({ sources: 3 })`
-- **THEN** the connector host SHALL receive an INFO line `[accountList] DETAIL sources=3`
-
-#### Scenario: Detail line during config bootstrap
-
-- **GIVEN** configuration validation completes before any operation starts
-- **WHEN** bootstrap logging records validation success
-- **THEN** the connector host SHALL receive an INFO line prefixed with `[config] DETAIL`
-
-### Requirement: Log service emits PHASE END and EPILOGUE END boundaries
-
-The log service SHALL provide `phaseEnd(phaseNumber, phase, detail?)` that emits `PHASE {N} {Phase} END` with optional detail suffix and mandatory `elapsed=` duration since the matching `phaseStart`. The service SHALL provide `epilogueEnd(block, detail?)` that emits `EPILOGUE {block} END` with `elapsed=` duration since the matching epilogue START. Phase elapsed timing for HTML report breakdowns SHALL be captured via internal PhaseTimer recording without emitting colon-style `PHASE N: Description (elapsed)` host lines.
-
-#### Scenario: Phase end logged after setup completes
-
-- **GIVEN** Setup phase began with `PHASE 1 Setup START`
-- **WHEN** Setup work completes and `phaseEnd(1, 'Setup')` is called
-- **THEN** the connector host SHALL receive `[accountList] PHASE 1 Setup END elapsed=` with a duration suffix
-- **AND** the connector host SHALL NOT receive a colon-style line matching `PHASE 1:`
-
-#### Scenario: Epilogue end logged after report generation
-
-- **GIVEN** the epilogue began with `EPILOGUE report START`
-- **WHEN** report generation completes
-- **THEN** the connector host SHALL receive `[accountList] EPILOGUE report END elapsed=`
-- **AND** the connector host SHALL NOT receive a line starting with `Epilogue: report generation`
-
-### Requirement: Non-accountList operations use STEP boundaries
-
-Operations other than accountList (including accountCreate, accountEnable, accountDisable, accountRead, accountUpdate, testConnection, entitlementList, accountDiscoverSchema) SHALL emit `STEP {slug} START` and `STEP {slug} END elapsed=` lines at pipeline boundaries instead of colon-style PhaseTimer phase messages.
-
-#### Scenario: Account create uses STEP lines
-
-- **GIVEN** an accountCreate operation runs
-- **WHEN** identity fetch completes
-- **THEN** the connector host SHALL receive `STEP fetch-identity END elapsed=`
-- **AND** the connector host SHALL NOT receive a line matching `Step 1:`
-
----
-
+_(none)_

@@ -104,7 +104,7 @@ export class DecisionProcessor {
      *    so the serialized output only references the account being returned.
      */
     public async normalizePendingFormStateForOutput(): Promise<void> {
-        this.log.info('Normalizing pending form state for output (candidates + reviewer links)')
+        this.log.detail({ action: 'normalizing pending form state for output' })
         await this.deps.forms.fetchFormData()
         this.reconcilePendingFormState()
     }
@@ -118,14 +118,18 @@ export class DecisionProcessor {
      */
     public async processFusionIdentityDecisions(): Promise<FusionAccount[]> {
         const fusionIdentityDecisions = [...this.run.fusionIdentityDecisions]
-        this.log.info(
-            `Processing fusion identity decisions: applying ${fusionIdentityDecisions.length} reviewer form decision(s) (new identity or merge into existing)`
-        )
+        this.log.detail({
+            action: 'processing fusion identity decisions',
+            count: fusionIdentityDecisions.length,
+        })
 
         const results = await batchProcess(fusionIdentityDecisions, 'Fusion identity decisions', (x) =>
             this.processFusionIdentityDecision(x), this.config, this.log
         )
-        this.log.info(`Fusion identity decisions phase finished: ${fusionIdentityDecisions.length} decision(s) applied`)
+        this.log.detail({
+            action: 'fusion identity decisions phase finished',
+            count: fusionIdentityDecisions.length,
+        })
         return compact(results)
     }
 
@@ -268,6 +272,7 @@ export class DecisionProcessor {
         }
     }
 }
+
 
 
 

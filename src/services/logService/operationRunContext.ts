@@ -13,6 +13,7 @@ export type EventCounters = {
     formsQueued: number
     newIdentityAssignment: number
     recordUniqueRegistered: number
+    emailSent: number
 }
 
 /** Cumulative match outcomes for STATUS lines (not reset on heartbeat flush). */
@@ -40,6 +41,7 @@ export function createEmptyEventCounters(): EventCounters {
         formsQueued: 0,
         newIdentityAssignment: 0,
         recordUniqueRegistered: 0,
+        emailSent: 0,
     }
 }
 
@@ -56,6 +58,8 @@ export class OperationRunContext {
     step: string | null = null
     progress?: ProgressSnapshot
     stepStartedAt?: number
+    phaseStartedAt?: number
+    epilogueStartedAt?: number
     /** Cumulative fusion accounts with needsRefresh during the Refresh phase. */
     refreshedCount = 0
     private events: EventCounters = createEmptyEventCounters()
@@ -104,6 +108,9 @@ export class OperationRunContext {
                 }
                 break
             }
+            case 'emailSent':
+                this.events.emailSent++
+                break
             default:
                 break
         }
@@ -132,5 +139,6 @@ export class OperationRunContext {
         this.refreshedCount++
     }
 }
+
 
 
