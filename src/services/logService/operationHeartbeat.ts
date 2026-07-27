@@ -289,7 +289,7 @@ const CORRELATE_ACCOUNTS_LABEL_PREFIX = /^IdentityService>correlateAccounts(?: .
 
 export function countCorrelationQueuePending(pendingItems: QueuedItemInfo[] | undefined): number {
     if (!pendingItems || pendingItems.length === 0) return 0
-    return pendingItems.filter((item) => CORRELATE_ACCOUNTS_LABEL_PREFIX.test(item.label)).length
+    return pendingItems.filter((item) => item.label != null && CORRELATE_ACCOUNTS_LABEL_PREFIX.test(item.label)).length
 }
 
 type ParsedQueueLabel =
@@ -500,6 +500,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 
