@@ -87,6 +87,15 @@ export class IdentityService {
     }
 
     /**
+     * Total non-protected identities loaded from ISC during this run.
+     * Unlike {@link identityCount}, this survives {@link clear} and includes
+     * identities fetched after the fetch phase (e.g. global reviewer owners).
+     */
+    public get identitiesLoadedCount(): number {
+        return this.run.identitiesLoadedCount
+    }
+
+    /**
      * Returns an iterator over cached identity documents.
      * Avoids creating a temporary array when only iteration is needed.
      */
@@ -521,6 +530,7 @@ export class IdentityService {
             })
     }
 }
+
 
 
 
