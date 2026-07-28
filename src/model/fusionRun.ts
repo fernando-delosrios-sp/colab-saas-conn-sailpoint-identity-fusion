@@ -83,6 +83,8 @@ export class FusionRun {
     private readonly _fusionAccountMap = new Map<string, FusionAccount>()
     private readonly _fusionIdentityMap = new Map<string, FusionAccount>()
     private readonly _identityMap = new Map<string, IdentityDocument>()
+    /** Non-protected identity IDs loaded from ISC during this run (survives cache clears). */
+    private readonly _identitiesLoadedIds = new Set<string>()
     readonly sourcesByName = new Map<string, SourceInfo>()
     private readonly _autoMergedIdentityIds = new Set<string>()
     private readonly _currentRunNonMatchedKeysBySource = new Map<string, Set<string>>()
@@ -139,6 +141,11 @@ export class FusionRun {
 
     get identityCount(): number {
         return this._identityMap.size
+    }
+
+    /** Total non-protected identities loaded from ISC during this run. */
+    get identitiesLoadedCount(): number {
+        return this._identitiesLoadedIds.size
     }
 
     get allIdentities(): IdentityDocument[] {
@@ -497,6 +504,9 @@ export class FusionRun {
 
     addIdentity(id: string, doc: IdentityDocument): void {
         this._identityMap.set(id, doc)
+        if (id && !doc.protected) {
+            this._identitiesLoadedIds.add(id)
+        }
     }
 
     removeIdentity(id: string): void {

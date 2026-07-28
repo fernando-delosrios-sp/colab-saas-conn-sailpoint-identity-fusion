@@ -393,6 +393,43 @@ describe('MatchOutcomeDispatcher', () => {
             expect(run.managedAccountsById.has('source-a-id::nat-b')).toBe(false)
         })
 
+        it('records non-match outcomes for pending peers promoted during deferred match', async () => {
+            const { dispatcher, matchingService, log, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+
+            const firstAccount = managedAccount({ id: 'acct-first', nativeIdentity: 'native-first', name: 'Taylor Jordan' })
+            const secondAccount = managedAccount({ id: 'acct-second', nativeIdentity: 'native-second', name: 'Taylor Jordan' })
+            const thirdAccount = managedAccount({ id: 'acct-third', nativeIdentity: 'native-third', name: 'Taylor Jordan' })
+            run.managedAccountsById.set('source-a-id::native-first', firstAccount)
+            run.managedAccountsById.set('source-a-id::native-second', secondAccount)
+            run.managedAccountsById.set('source-a-id::native-third', thirdAccount)
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, pool, candidateType) => {
+                if (candidateType !== 'deferred') return 0
+                const candidateList = Array.from(pool)
+                if (fusionAccount.managedAccountId === 'source-a-id::native-second') {
+                    const peer = candidateList.find(
+                        (candidate) => candidate.managedAccountId === 'source-a-id::native-third'
+                    )
+                    if (peer) {
+                        fusionAccount.addFusionMatch(deferredMatch({ fusionIdentity: peer }))
+                    }
+                }
+                return candidateList.length
+            })
+
+            const result = await dispatcher.runMatchSweep([firstAccount, secondAccount, thirdAccount], 3)
+
+            expect(result.nonMatch).toBe(2)
+            expect(result.deferred).toBe(1)
+            expect(log.recordEvent).toHaveBeenCalledWith('nonMatch')
+            expect(run.getFusionAccountByManagedKey('source-a-id::native-first')).toBeDefined()
+            expect(run.getFusionAccountByManagedKey('source-a-id::native-third')).toBeDefined()
+            expect(run.managedAccountsById.has('source-a-id::native-second')).toBe(false)
+        })
+
 
         it('dispatches a non-match by registering an authoritative fusion account', async () => {
             const { dispatcher, matchingService, log, run } = createDispatcher({

@@ -20,6 +20,7 @@ describe('FusionRun', () => {
         expect(run.fusionIdentityMap.size).toBe(0)
         expect(run.identityMap).toBeInstanceOf(Map)
         expect(run.identityMap.size).toBe(0)
+        expect(run.identitiesLoadedCount).toBe(0)
         expect(run.sourcesByName).toBeInstanceOf(Map)
         expect(run.sourcesByName.size).toBe(0)
         expect(run.autoMergedIdentityIds).toBeInstanceOf(Set)
@@ -29,6 +30,31 @@ describe('FusionRun', () => {
         expect(run.matchScoringMs).toBe(0)
         expect(run.fullScanFallbackCount).toBe(0)
         expect(run.pendingDisableOperationsCount).toBe(0)
+    })
+
+    describe('identitiesLoadedCount', () => {
+        it('tracks non-protected identities loaded and survives cache clear', () => {
+            const run = new FusionRun()
+            run.addIdentity('identity-1', { id: 'identity-1', protected: false } as any)
+            run.addIdentity('identity-2', { id: 'identity-2', protected: false } as any)
+
+            expect(run.identityCount).toBe(2)
+            expect(run.identitiesLoadedCount).toBe(2)
+
+            run.clearIdentities()
+
+            expect(run.identityCount).toBe(0)
+            expect(run.identitiesLoadedCount).toBe(2)
+        })
+
+        it('does not count protected identities toward identitiesLoadedCount', () => {
+            const run = new FusionRun()
+            run.addIdentity('protected-1', { id: 'protected-1', protected: true } as any)
+            run.addIdentity('identity-1', { id: 'identity-1', protected: false } as any)
+
+            expect(run.identityCount).toBe(2)
+            expect(run.identitiesLoadedCount).toBe(1)
+        })
     })
 
     describe('isRecordMode from config', () => {
@@ -330,6 +356,7 @@ function makeMockRecorder(options: { tracker: AggregationTracker; run?: FusionRu
     }
     return recorder
 }
+
 
 
 

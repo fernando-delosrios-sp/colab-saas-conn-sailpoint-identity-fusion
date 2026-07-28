@@ -322,7 +322,7 @@ export class MatchOutcomeDispatcher {
      */
     private async runDeferredDrainForSource(
         sorted: ManagedAccountAnalysisContext[],
-        options?: { analysisOnly?: boolean }
+        options?: { analysisOnly?: boolean; sweepResult?: MatchSweepResult }
     ): Promise<{ scored: ManagedAccountMatchingResult[]; resolved: ResolvedMatch[]; diag: DeferredDrainDiag }> {
         const remainingInQueue = new Map<string, ManagedAccountAnalysisContext>()
         for (const analysis of sorted) {
@@ -345,6 +345,7 @@ export class MatchOutcomeDispatcher {
             const key = analysis.fusionAccount.managedKey
             if (key && materializedEarly.has(key)) continue
 
+            let promotedNonMatches = 0
             await scoreDeferredForAccount(analysis, scoringDeps, diag, remainingInQueue, materializedEarly)
 
             const resolution = options?.analysisOnly
@@ -372,11 +373,12 @@ export class MatchOutcomeDispatcher {
                 })
             } else {
                 if (resolution === 'deferred-match') {
-                    await this.handleDeferredMatch(
+                    promotedNonMatches = await this.handleDeferredMatch(
                         analysis.fusionAccount,
                         analysis.account,
                         remainingInQueue,
-                        materializedEarly
+                        materializedEarly,
+                        options?.sweepResult
                     )
                     if (this.deps.run.analysisRecorder) {
                         this.deps.run.analysisRecorder.recordAnalysis(analysis)
@@ -405,8 +407,12 @@ export class MatchOutcomeDispatcher {
             }
 
             if (key) remainingInQueue.delete(key)
-            if (resolution === 'deferred-match') diag.deferredMatched++
-            else diag.nonMatch++
+            if (resolution === 'deferred-match') {
+                diag.deferredMatched++
+                diag.nonMatch += promotedNonMatches
+            } else {
+                diag.nonMatch++
+            }
         }
 
         return { scored, resolved, diag }
@@ -418,7 +424,7 @@ export class MatchOutcomeDispatcher {
      */
     private async runDeferredDrain(
         pending: ManagedAccountAnalysisContext[],
-        options?: { analysisOnly?: boolean }
+        options?: { analysisOnly?: boolean; sweepResult?: MatchSweepResult }
     ): Promise<{ scored: ManagedAccountMatchingResult[]; resolved: ResolvedMatch[] }> {
         if (pending.length === 0) return { scored: [], resolved: [] }
 
@@ -598,7 +604,9 @@ export class MatchOutcomeDispatcher {
                 }
             }
 
-            const { resolved: drainResolved } = await this.runDeferredDrain(pendingDeferred)
+            const { resolved: drainResolved } = await this.runDeferredDrain(pendingDeferred, {
+                sweepResult: result,
+            })
             for (const match of drainResolved) {
                 processedCount++
                 updateProgress()
@@ -759,10 +767,17 @@ export class MatchOutcomeDispatcher {
         fusionAccount: FusionAccount,
         account: Account,
         remainingInQueue?: Map<string, ManagedAccountAnalysisContext>,
-        materializedEarly?: Set<string>
-    ): Promise<void> {
+        materializedEarly?: Set<string>,
+        sweepResult?: MatchSweepResult
+    ): Promise<number> {
+        let promotedNonMatches = 0
         if (remainingInQueue && materializedEarly) {
-            await this.materializeMatchedPendingCandidates(fusionAccount, remainingInQueue, materializedEarly)
+            promotedNonMatches = await this.materializeMatchedPendingCandidates(
+                fusionAccount,
+                remainingInQueue,
+                materializedEarly,
+                sweepResult
+            )
         }
 
         const deferredMatches = anchorDeferredMatches(fusionAccount, this.deps.run)
@@ -774,13 +789,16 @@ export class MatchOutcomeDispatcher {
             )
         }
         this.deps.run.claimAccount(getManagedAccountKeyFromAccount(account)!, account.identityId)
+        return promotedNonMatches
     }
 
     private async materializeMatchedPendingCandidates(
         fusionAccount: FusionAccount,
         remainingInQueue: Map<string, ManagedAccountAnalysisContext>,
-        materializedEarly: Set<string>
-    ): Promise<void> {
+        materializedEarly: Set<string>,
+        sweepResult?: MatchSweepResult
+    ): Promise<number> {
+        let promotedNonMatches = 0
         for (const match of fusionAccount.fusionMatches) {
             if (match.candidateType !== 'deferred') continue
             const candidate = match.fusionIdentity
@@ -797,9 +815,12 @@ export class MatchOutcomeDispatcher {
             const pendingAnalysis = remainingInQueue.get(candidateKey)
             const accountToMaterialize = pendingAnalysis?.fusionAccount ?? candidate
             await this.finalizeAuthoritativeNonMatch(accountToMaterialize)
+            this.recordNonMatchOutcome(sweepResult)
+            promotedNonMatches++
             materializedEarly.add(candidateKey)
             remainingInQueue.delete(candidateKey)
         }
+        return promotedNonMatches
     }
 
     private async handleNonMatch(
@@ -828,9 +849,13 @@ export class MatchOutcomeDispatcher {
         return fusionAccount
     }
 
-    private bumpNonMatch(result: MatchSweepResult): void {
-        result.nonMatch++
+    private recordNonMatchOutcome(sweepResult?: MatchSweepResult): void {
+        if (sweepResult) sweepResult.nonMatch++
         this.deps.log.recordEvent('nonMatch')
+    }
+
+    private bumpNonMatch(result: MatchSweepResult): void {
+        this.recordNonMatchOutcome(result)
     }
 
     private getBestAutoAssignMatch(

@@ -5,8 +5,9 @@ import { formatCorrelationSummaryValue } from '../../services/logService/operati
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
 import { AggregationStats } from '../../services/fusionService/types'
+import { IdentityService } from '../../services/identityService'
 import { generateReport } from './generateReport'
-import { buildTerminalSummary, DryRunInput } from './accountListHelpers'
+import { buildTerminalSummary, DryRunInput, resolveIdentitiesFound } from './accountListHelpers'
 
 export interface PhaseOptions {
     isPersistent: boolean
@@ -35,10 +36,13 @@ function createEmptyFetchResult(): FetchResult {
 export function fetchResultToAggregationStats(
     fetchResult: FetchResult,
     timer: ReturnType<ServiceRegistry['log']['timer']>,
-    options?: { fusionAccountsReturned?: number }
+    options?: {
+        fusionAccountsReturned?: number
+        identities?: Pick<IdentityService, 'identitiesLoadedCount'>
+    }
 ): AggregationStats {
     return {
-        identitiesFound: fetchResult.identitiesFound,
+        identitiesFound: resolveIdentitiesFound(fetchResult, options?.identities),
         managedAccountsFound: fetchResult.managedAccountsFound,
         managedAccountsFoundAuthoritative: fetchResult.managedAccountsFoundAuthoritative,
         managedAccountsFoundRecord: fetchResult.managedAccountsFoundRecord,
@@ -387,7 +391,10 @@ export async function reportEpilogue(
             await generateReport(
                 false,
                 serviceRegistry,
-                fetchResultToAggregationStats(fetchResult, timer, { fusionAccountsReturned: outputCount })
+                fetchResultToAggregationStats(fetchResult, timer, {
+                    fusionAccountsReturned: outputCount,
+                    identities: serviceRegistry.identities,
+                })
             )
             reportOp.done()
         } catch (error) {
@@ -402,6 +409,7 @@ export async function reportEpilogue(
                 const { reportHtmlOutputPath } = await reports.generateDryRunReport({
                     aggregationStats: fetchResultToAggregationStats(fetchResult, timer, {
                         fusionAccountsReturned: outputCount,
+                        identities: serviceRegistry.identities,
                     }),
                     reportPhaseStartedAt,
                     saveFile: dryRun.saveFile,
@@ -463,6 +471,7 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+
 
 
 

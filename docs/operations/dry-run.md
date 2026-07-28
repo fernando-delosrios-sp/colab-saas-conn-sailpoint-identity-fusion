@@ -95,7 +95,7 @@ The final `res.send` call is a summary object:
 | Field | Description |
 | ----- | ----------- |
 | `rowsSent` | Number of account rows streamed before the summary |
-| `identitiesFound` | Identities loaded during fetch |
+| `identitiesFound` | Identities loaded during the run (scope fetch plus supplemental loads such as global reviewer or report-target owners) |
 | `managedAccountsFound` | Managed accounts loaded during fetch |
 | `totalProcessingTime` | Total elapsed time for the run |
 | `phaseTiming` | Per-phase elapsed breakdown |
@@ -161,3 +161,4 @@ See [Proxy mode](../guides/proxy-mode.md) for architecture and setup.
 - [Match guide](../guides/match.md) — tuning thresholds; includes a dry-run workflow note
 - [Matching algorithms](../guides/matching-algorithms.md) — recommended testing approach
 - [Glossary: dry-run mode](../concepts/glossary.md) — canonical term definition
+
