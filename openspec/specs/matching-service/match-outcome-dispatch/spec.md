@@ -57,10 +57,13 @@ The connector SHALL provide a `MatchOutcomeDispatcher` module in `src/services/m
 #### Scenario: Deferred match defers identity creation
 - **WHEN** the best candidate for a managed account is a deferred candidate from the same source
 - **THEN** `MatchOutcomeDispatcher` SHALL claim the managed account for later comparison and log the deferred matches
+- **AND** for each matched candidate that is still pending in the current sweep, SHALL register that candidate as a non-match Fusion account and remove it from the pending queue and deferred candidate pool
+- **AND** SHALL NOT re-materialize persisted fusion anchors from prior runs
 
 #### Scenario: Non-match registers a new Fusion account
-- **WHEN** a managed account has no acceptable identity or deferred candidates
-- **THEN** `MatchOutcomeDispatcher` SHALL register the provisional Fusion account in `FusionRun` and, for authoritative sources, register it as a deferred candidate if deferred matching is enabled
+- **WHEN** a managed account has no acceptable identity or deferred candidates against the current pool
+- **THEN** `MatchOutcomeDispatcher` SHALL register the provisional Fusion account in `FusionRun`
+- **AND** for authoritative deferred-enabled sources, SHALL register it as an anchor deferred candidate for subsequent pending accounts in the same sweep
 
 ---
 
@@ -103,13 +106,19 @@ The connector SHALL provide a `MatchOutcomeDispatcher` module in `src/services/m
 
 ### Requirement: Deferred-phase scoring uses the same concurrency cap
 
-The deferred-candidate scoring sweep in `scoreManagedAccounts` SHALL use the same effective concurrency limit as the identity-phase scoring sweep for each batch.
+The deferred-candidate drain SHALL evaluate pending accounts sequentially within each managed source. Identity-phase scoring SHALL continue to use the effective concurrency limit `max(1, min(batchSize, scoringMaxConcurrency))`. Deferred drain MAY run concurrently across different managed sources.
 
 #### Scenario: Deferred scoring respects scoringMaxConcurrency
-- **GIVEN** pending deferred accounts are scored in a batch larger than `scoringMaxConcurrency`
-- **WHEN** deferred-phase scoring runs
-- **THEN** at most `scoringMaxConcurrency` deferred scoring operations SHALL run concurrently at any time
-- **AND** all pending deferred accounts in the batch SHALL be scored
+- **GIVEN** identity-phase scoring runs for a batch larger than `scoringMaxConcurrency`
+- **WHEN** identity-phase scoring runs
+- **THEN** at most `scoringMaxConcurrency` identity scoring operations SHALL run concurrently at any time
+- **AND** all accounts in the batch SHALL be scored before the batch completes
+
+#### Scenario: Deferred drain is sequential within a source
+- **GIVEN** multiple pending accounts for the same deferred-enabled source
+- **WHEN** the deferred drain executes
+- **THEN** accounts SHALL be scored and dispatched one at a time in deterministic order
+- **AND** the candidate pool SHALL reflect outcomes from earlier accounts before the next account is scored
 
 ---
 
@@ -146,5 +155,6 @@ When `MatchOutcomeDispatcher.handlePartialMatch` successfully creates or reuses 
 - **GIVEN** `createFusionForm` returns `formDefinitionReady: false` or throws
 - **WHEN** partial match handling completes
 - **THEN** `run.claimAccount` SHALL NOT be invoked for that account solely due to partial-match dispatch
+
 
 
