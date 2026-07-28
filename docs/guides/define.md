@@ -286,6 +286,19 @@ $Normalize.ascii("José García")
 ## "jose garcia"
 ```
 
+#### $MD5 (hashing)
+
+Compute a lowercase hex MD5 digest of a string: `$MD5($email)`.
+
+Returns an empty string for null, undefined, non-string, or whitespace-only input (the attribute value is not written).
+
+> **Note:** Use `$MD5` for deterministic identifiers compatible with downstream systems — not for password or secret hashing. MD5 is cryptographically weak and unsuitable for security-sensitive use.
+
+```velocity
+$MD5($email)
+## "b58996c504c5638798eb6b511e6f49af" when $email is "user@example.com"
+```
+
 ---
 
 ## Order of operations
@@ -337,3 +350,4 @@ One can purposely generate an **empty** `nativeIdentity` in conjunction with the
   $email
 #end
 ```
+

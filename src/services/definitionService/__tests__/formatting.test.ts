@@ -869,6 +869,54 @@ $earliestAssignment.start_date
     })
 
     // ========================================================================
+    // MD5 - hashing
+    // ========================================================================
+
+    describe('MD5()', () => {
+        it('should hash a known email to lowercase hex MD5', () => {
+            const context = { email: 'user@example.com' }
+            const result = evaluateVelocityTemplate('$MD5($email)', context)
+            expect(result).toBe('b58996c504c5638798eb6b511e6f49af')
+        })
+
+        it('should yield no output for missing context value', () => {
+            const result = evaluateVelocityTemplate('$MD5($missing)', {})
+            expect(result).toBeUndefined()
+        })
+
+        it('should yield no output for non-string input', () => {
+            const context = { n: 123 }
+            const result = evaluateVelocityTemplate('$MD5($n)', context)
+            expect(result).toBeUndefined()
+        })
+
+        it('should yield no output for whitespace-only input', () => {
+            const context = { value: '   ' }
+            const result = evaluateVelocityTemplate('$MD5($value)', context)
+            expect(result).toBeUndefined()
+        })
+
+        it('should yield no output for null context value', () => {
+            const context = { value: null as unknown as string }
+            const result = evaluateVelocityTemplate('$MD5($value)', context)
+            expect(result).toBeUndefined()
+        })
+
+        it('should hash a simple string to a 32-character hex digest', () => {
+            const context = { value: 'test' }
+            const result = evaluateVelocityTemplate('$MD5($value)', context)
+            expect(result).toBe('098f6bcd4621d373cade4e832627b4f6')
+            expect(result).toMatch(/^[0-9a-f]{32}$/)
+        })
+
+        it('should trim input before hashing', () => {
+            const context = { email: '  user@example.com  ' }
+            const result = evaluateVelocityTemplate('$MD5($email)', context)
+            expect(result).toBe('b58996c504c5638798eb6b511e6f49af')
+        })
+    })
+
+    // ========================================================================
     // maxLength - Truncation
     // ========================================================================
 

@@ -2,6 +2,7 @@
 
 ## 2.2.0
 
+- (2026-07-28) **Enhancement:** Added `$MD5(input)` Velocity context helper for lowercase hex MD5 digests in Normal and Unique attribute definitions — use `$MD5($email)` for deterministic identifiers compatible with downstream systems. Returns empty string for null, non-string, or whitespace-only input. Documented in the define guide and connector-spec UI help. `definition-service` spec updated.
 - (2026-07-27) **Fix:** Provisioning timeout now starts when each queued API call begins HTTP execution, not when it is enqueued — FIFO queue wait and rate-limit slot wait no longer consume the timeout budget. Retry attempts receive a fresh timeout per attempt. Fixes background correlation PATCHes aborting with generic `Aborted` after ~300s wall time while still waiting in queue during Output/Epilogue. `ApiQueue` propagates `abortSignal.reason` on rejection (timeout messages preserved). STATUS `api=` segment `q` now includes rate-limiter wait (`queueLength + rateLimitWaitCount`) so operators see pending work during drain. Advanced connection settings guide and `client-service` / `log-service` specs updated.
 - (2026-07-27) **Observability:** Account-list correlation logs no longer report `correlated-action=` (that counter is for non-aggregation entitlement grants such as `accountUpdate`). `EVENT_SUMMARY`, `PHASE END`, and Output/Epilogue `STATUS` lines now include **completed** (PATCH resolved) and **pending** (queue snapshot) drain segments alongside `link=` and `merge=` enqueue totals — for example `correlations link=2000/2000 completed=147 pending=1853`. Log monitors should grep `completed=` and `pending=` instead of `correlated-action=` during accountList. `log-service` and `account-list-operation` specs updated.
 - (2026-07-27) **Observability:** Correlation activity logging now distinguishes **link** (correlation-on-aggregation during Refresh), **merge** (merge-decision-driven PATCH during Process), and **correlated-action** (entitlement newly granted when all missing accounts clear). `EVENT_SUMMARY` and `PHASE END` lines use `correlations link=triggers/accounts merge=triggers/accounts correlated-action=… skipped=…` instead of the legacy `correlations triggered=N accounts=M` format. Refresh `STATUS` lines include a cumulative correlation segment when link or merge activity occurred. Skip buckets aggregate silent non-PATCH reasons (`noIdentity`, `noSourceContext`, `wrongMode`, `noIscAccountId`). Log monitors should migrate grep patterns from `correlations triggered=` to `correlations link=`. `log-service`, `account-list-operation`, and `ubiquitous-language` specs updated.
@@ -129,6 +130,7 @@
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 
