@@ -382,6 +382,13 @@ export class FusionCollections {
                 ;(match as { fusionIdentity?: unknown }).fusionIdentity = undefined
             }
         },
+        removeDeferred: (): void => {
+            for (let i = this._fusionMatches.length - 1; i >= 0; i--) {
+                if (this._fusionMatches[i].candidateType === 'deferred') {
+                    this._fusionMatches.splice(i, 1)
+                }
+            }
+        },
     }
 
     readonly historyOps = {
@@ -419,4 +426,5 @@ export class FusionCollections {
         if (identityId) bag[FusionAttribute.IdentityId] = identityId
     }
 }
+
 

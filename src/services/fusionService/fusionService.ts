@@ -1,5 +1,6 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { StdAccountListOutput, StandardCommand } from '@sailpoint/connector-sdk'
+import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { FusionConfig, SourceType } from '../../model/config'
 import { LogService } from '../logService'
 import { FormService } from '../formService'
@@ -13,7 +14,7 @@ import {
     hasIdentityCandidateMatches as checkHasIdentityCandidateMatches,
     hasDeferredCandidateMatches as checkHasDeferredCandidateMatches,
     formatFusionMatchDiscoveryLog,
-    anchorDeferredMatches,
+    anchorDeferredMatchesForReview,
     isRecordMatchingEnabledForSource,
 } from '../matchingService/matchingHelpers'
 import { assert } from '../../utils/assert'
@@ -79,6 +80,8 @@ export class FusionService {
     /** Cached set of configured source names — built once in the constructor (config is immutable). */
     public readonly configSourceNames: Set<string>
     public readonly fusionOwnerIsGlobalReviewer: boolean
+    /** Owner ids resolved once per aggregation; shared by fetch, refresh, and reviewer setup. */
+    private globalOwnerIdentityIdsCache: string[] | undefined
     public readonly fusionReportOnAggregation: boolean
     public readonly commandType?: StandardCommand
     /** When true, report data should be captured even during aggregation (e.g. custom:dryrun). */
@@ -839,7 +842,8 @@ export class FusionService {
                 !checkHasIdentityCandidateMatches(fusionAccount) &&
                 checkHasDeferredCandidateMatches(fusionAccount)
             ) {
-                const deferredMatches = anchorDeferredMatches(fusionAccount, this.run)
+                const maxCandidates = this.config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
+                const deferredMatches = anchorDeferredMatchesForReview(fusionAccount, this.run, maxCandidates)
                 const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
                 this.log.recordEvent('match', { type: 'deferred' })
                 if (this.log.getLogLevel() === 'debug') {
@@ -1160,6 +1164,41 @@ export class FusionService {
      * Build the sources-by-name lookup and, when the fusion owner acts as a global reviewer,
      * register every managed source as a reviewer source and populate pending reviews.
      */
+
+    /**
+     * Hydrate fusion source owners and mark them in aggregation scope before persisted
+     * identity-origin fusion accounts are processed. Without this, a global reviewer row
+     * from a prior run can be marked orphan when the owner sits outside identityScopeQuery.
+     */
+    public cacheGlobalOwnerIdentityIds(ids: string[]): void {
+        this.globalOwnerIdentityIdsCache = ids
+    }
+
+    private async resolveGlobalOwnerIdentityIds(): Promise<string[]> {
+        if (this.globalOwnerIdentityIdsCache !== undefined) {
+            return this.globalOwnerIdentityIdsCache
+        }
+        const ids = await this.sources.fetchGlobalOwnerIdentityIds()
+        this.globalOwnerIdentityIdsCache = ids
+        return ids
+    }
+
+    public async ensureGlobalReviewerOwnersInScope(): Promise<void> {
+        if (!this.fusionOwnerIsGlobalReviewer) {
+            return
+        }
+
+        const globalOwnerIds = await this.resolveGlobalOwnerIdentityIds()
+        if (globalOwnerIds.length === 0) {
+            return
+        }
+
+        for (const ownerId of globalOwnerIds) {
+            await this.identities.ensureIdentityById(ownerId)
+            this.identities.markIdentityInScope(ownerId)
+        }
+    }
+
     public async initializeSourceReviewers(): Promise<void> {
         this.run.sourcesByName.clear()
         for (const source of this.sources.managedSources) {
@@ -1170,7 +1209,7 @@ export class FusionService {
             return
         }
 
-        const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
+        const globalOwnerIds = await this.resolveGlobalOwnerIdentityIds()
         if (globalOwnerIds.length === 0) {
             this.log.warn(
                 'Owners are global reviewers is enabled but no Fusion source owner identity IDs were resolved. ' +
@@ -1422,6 +1461,7 @@ export class FusionService {
                 sources: this.sources,
                 fusionEnableAutoMerge: this.config.fusionEnableAutoMerge,
                 fusionAutoMergeScore: this.config.fusionAutoMergeScore,
+                fusionMaxCandidatesForForm: this.config.fusionMaxCandidatesForForm,
             },
             includeNonMatches,
             stats

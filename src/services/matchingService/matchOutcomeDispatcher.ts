@@ -11,18 +11,20 @@ import { MatchingService, COMBINED_SCORE_ROW_ATTRIBUTE } from './matchingService
 import {
     formatFusionMatchDiscoveryLog,
     anchorDeferredMatches,
+    anchorDeferredMatchesForReview,
     hasActionableDeferredAnchorMatch,
     hasDeferredCandidateMatches,
     isDeferredMatchingEnabledForSource,
     isRecordMatchingEnabledForSource,
 } from './matchingHelpers'
-import { ManagedAccountAnalysisContext, ManagedAccountMatchingResult, MatchCandidateType } from './types'
+import { ManagedAccountAnalysisContext, ManagedAccountMatchingResult, MatchCandidateType, FusionMatch } from './types'
 import { AccountAssembly } from '../accountAssembly'
 import { CorrelationManager } from '../correlationManager'
 import { DefinitionService } from '../definitionService'
 import { MappingService } from '../mappingService'
 import { assert } from '../../utils/assert'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { trimStr } from '../../utils/safeRead'
 import { isManagedAccountLinkedInFusion } from '../../model/managedAccountLink'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { defaultFusionMaxCandidatesForForm } from '../../data/config'
@@ -170,6 +172,7 @@ async function scoreIdentityCandidates(
         )
     }
 
+
     return {
         account,
         fusionAccount,
@@ -215,6 +218,7 @@ async function scoreDeferredForAccount(
         MatchCandidateType.Deferred
     )
     run.matchScoringMs += Date.now() - scoringStarted
+
 }
 
 /** Deterministic order within a single source: managedKey sort. */
@@ -373,21 +377,36 @@ export class MatchOutcomeDispatcher {
                 })
             } else {
                 if (resolution === 'deferred-match') {
-                    promotedNonMatches = await this.handleDeferredMatch(
+                    const assigned = await this.tryAutoMergeIntoDeferredAnchor(
                         analysis.fusionAccount,
-                        analysis.account,
-                        remainingInQueue,
-                        materializedEarly,
-                        options?.sweepResult
+                        analysis.account
                     )
-                    if (this.deps.run.analysisRecorder) {
-                        this.deps.run.analysisRecorder.recordAnalysis(analysis)
+                    if (assigned) {
+                        if (this.deps.run.analysisRecorder) {
+                            this.deps.run.analysisRecorder.recordAnalysis(analysis)
+                        }
+                        resolved.push({
+                            account: analysis.account,
+                            fusionAccount: assigned,
+                            resolution: 'exact-match',
+                        })
+                    } else {
+                        promotedNonMatches = await this.handleDeferredMatch(
+                            analysis.fusionAccount,
+                            analysis.account,
+                            remainingInQueue,
+                            materializedEarly,
+                            options?.sweepResult
+                        )
+                        if (this.deps.run.analysisRecorder) {
+                            this.deps.run.analysisRecorder.recordAnalysis(analysis)
+                        }
+                        resolved.push({
+                            account: analysis.account,
+                            fusionAccount: analysis.fusionAccount,
+                            resolution: 'deferred-match',
+                        })
                     }
-                    resolved.push({
-                        account: analysis.account,
-                        fusionAccount: analysis.fusionAccount,
-                        resolution: 'deferred-match',
-                    })
                 } else {
                     const nonMatchAccount = await this.handleNonMatch(
                         analysis.fusionAccount,
@@ -687,15 +706,24 @@ export class MatchOutcomeDispatcher {
                 fusionAccount.clearFusionIdentityReferences()
                 return { account, fusionAccount, resolution: 'partial-match' }
             }
-            const bestMatch = this.getBestAutoAssignMatch(fusionAccount.fusionMatches)
-            if (this.deps.config.fusionEnableAutoMerge && bestMatch?.identityId) {
-                const assigned = await this.handleExactMatch(fusionAccount, account, bestMatch.identityId)
+            let mergeTargetId: string | undefined
+            if (this.deps.config.fusionEnableAutoMerge) {
+                await this.scorePersistedAnchorsForAutoMerge(fusionAccount, account)
+                const bestMatch = this.getBestAutoAssignMatch(fusionAccount.fusionMatches)
+                mergeTargetId = this.resolveAutoMergeTargetId(bestMatch)
+                fusionAccount.removeDeferredFusionMatches()
+            } else {
+                const bestMatch = this.getBestAutoAssignMatch(fusionAccount.fusionMatches)
+                mergeTargetId = this.resolveAutoMergeTargetId(bestMatch)
+            }
+            if (this.deps.config.fusionEnableAutoMerge && mergeTargetId) {
+                const assigned = await this.handleExactMatch(fusionAccount, account, mergeTargetId)
                 return assigned
                     ? {
                           account,
                           fusionAccount: assigned,
                           resolution: 'exact-match',
-                          identityId: bestMatch.identityId,
+                          identityId: mergeTargetId,
                       }
                     : undefined
             }
@@ -704,12 +732,54 @@ export class MatchOutcomeDispatcher {
         }
 
         if (scored.resolution === 'deferred-match') {
+            const assigned = await this.tryAutoMergeIntoDeferredAnchor(fusionAccount, account)
+            if (assigned) {
+                return {
+                    account,
+                    fusionAccount: assigned,
+                    resolution: 'exact-match',
+                    identityId: this.resolveAutoMergeTargetId(
+                        this.getBestAutoAssignMatch(anchorDeferredMatches(fusionAccount, this.deps.run))
+                    ),
+                }
+            }
             await this.handleDeferredMatch(fusionAccount, account)
             return { account, fusionAccount, resolution: 'deferred-match' }
         }
 
         const nonMatchAccount = await this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
         return { account, fusionAccount: nonMatchAccount ?? fusionAccount, resolution: 'non-match' }
+    }
+
+    private async tryAutoMergeIntoDeferredAnchor(
+        fusionAccount: FusionAccount,
+        account: Account
+    ): Promise<FusionAccount | undefined> {
+        if (!this.deps.accountAssembly.isAggregationAccountListMode()) return undefined
+        const bestAnchorMatch = this.getBestAutoAssignMatch(anchorDeferredMatches(fusionAccount, this.deps.run))
+        const mergeTargetId = this.resolveAutoMergeTargetId(bestAnchorMatch)
+        if (!this.deps.config.fusionEnableAutoMerge || !mergeTargetId) return undefined
+        return this.handleExactMatch(fusionAccount, account, mergeTargetId)
+    }
+
+    /**
+     * Score persisted fusion anchors for identity-match accounts so automatic merge can
+     * prefer a prior-run anchor (e.g. run-1 id=10) even when ISC identity candidates exist.
+     */
+    private async scorePersistedAnchorsForAutoMerge(
+        fusionAccount: FusionAccount,
+        account: Account
+    ): Promise<void> {
+        const selfKey = fusionAccount.managedKey
+        const pool: FusionAccount[] = []
+        for (const candidate of this.deps.run.currentRunDeferredCandidatesForSource(account.sourceName)) {
+            if (this.deps.run.getDeferredCandidateTier(candidate) !== 'persisted') continue
+            const key = candidate.managedKey
+            if (!key || key === selfKey) continue
+            pool.push(candidate)
+        }
+        if (pool.length === 0) return
+        await this.deps.matchingService.scoreFusionAccount(fusionAccount, pool, MatchCandidateType.Deferred)
     }
 
     private async handleExactMatch(
@@ -780,7 +850,8 @@ export class MatchOutcomeDispatcher {
             )
         }
 
-        const deferredMatches = anchorDeferredMatches(fusionAccount, this.deps.run)
+        const maxForm = this.deps.config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
+        const deferredMatches = anchorDeferredMatchesForReview(fusionAccount, this.deps.run, maxForm)
         const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
         this.deps.log.recordEvent('match', { type: 'deferred' })
         if (this.deps.log.getLogLevel() === 'debug') {
@@ -859,10 +930,10 @@ export class MatchOutcomeDispatcher {
     }
 
     private getBestAutoAssignMatch(
-        matches: import('./types').FusionMatch[]
-    ): import('./types').FusionMatch | undefined {
+        matches: FusionMatch[]
+    ): FusionMatch | undefined {
         if (this.deps.config.fusionAutoMergeScore === undefined) return undefined
-        let bestMatch: import('./types').FusionMatch | undefined
+        let bestMatch: FusionMatch | undefined
         let highestScore = -1
         for (const m of matches) {
             const combinedReport = m.scores.find((s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE)
@@ -873,6 +944,18 @@ export class MatchOutcomeDispatcher {
             }
         }
         return bestMatch
+    }
+
+    /** ISC identity id, Fusion native id, or persisted anchor origin account key for automatic merge. */
+    private resolveAutoMergeTargetId(bestMatch?: FusionMatch): string | undefined {
+        if (!bestMatch) return undefined
+        const identityId = trimStr(bestMatch.identityId ?? bestMatch.fusionIdentity?.identityId)
+        if (identityId) return identityId
+        const managedKey = trimStr(
+            bestMatch.fusionIdentity?.managedKeyOrUndefined ?? bestMatch.fusionIdentity?.managedKey
+        )
+        if (managedKey) return managedKey
+        return trimStr(bestMatch.fusionIdentity?.originAccountId)
     }
 }
 

@@ -811,6 +811,43 @@ describe('FusionService', () => {
             expect(run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
         })
 
+
+        it('keeps persisted global reviewer out of orphan when owner is hydrated before processFusionAccount', async () => {
+            const globalOwnerId = 'global-owner-persisted'
+            ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
+            mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([globalOwnerId])
+            mockIdentities.ensureIdentityById = vi.fn().mockResolvedValue({
+                id: globalOwnerId,
+                name: 'fernando.delosrios',
+            } as IdentityDocument)
+            mockIdentities.markIdentityInScope = vi.fn()
+            mockIdentities.hasIdentityInScope = vi.fn((id?: string) => id === globalOwnerId)
+            mockIdentities.getIdentityById = vi.fn((id?: string) =>
+                id === globalOwnerId
+                    ? ({ id: globalOwnerId, name: 'fernando.delosrios' } as IdentityDocument)
+                    : undefined
+            )
+
+            const persisted = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'NG000025',
+                name: 'fernando.delosrios',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                identityId: globalOwnerId,
+                attributes: {
+                    originSource: 'Identities',
+                    originAccount: globalOwnerId,
+                    statuses: ['baseline', 'reviewer'],
+                },
+            } as unknown as Account)
+
+            await fusionService.ensureGlobalReviewerOwnersInScope()
+            expect(mockIdentities.markIdentityInScope).toHaveBeenCalledWith(globalOwnerId)
+
+            const processed = await fusionService.processFusionAccount(persisted)
+            expect(processed.isOrphan()).toBe(false)
+        })
+
         it('warns when global reviewer is enabled but no owner identity IDs resolve', async () => {
             ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
             mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([])
