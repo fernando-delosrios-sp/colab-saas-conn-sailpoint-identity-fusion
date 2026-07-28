@@ -169,9 +169,10 @@ function countManagedAccountsByType(sources: ServiceRegistry['sources']) {
 export async function fetchPhase(serviceRegistry: ServiceRegistry, options: PhaseOptions): Promise<FetchResult> {
     const { log, identities, sources, forms, fusion, workflows } = serviceRegistry
     const { isPersistent } = options
-    const ownerIncluded = isPersistent
-        ? fusion.fusionReportOnAggregation || fusion.fusionOwnerIsGlobalReviewer
-        : false
+    // Global reviewers must be hydrated during dry-run too so reviewer validation succeeds.
+    // Report-on-aggregation owners are only needed for persistent runs (email delivery).
+    const ownerIncluded =
+        fusion.fusionOwnerIsGlobalReviewer || (isPersistent && fusion.fusionReportOnAggregation)
 
     log.detail({ action: 'fetching identities, managed accounts, and dependencies' })
 
@@ -462,6 +463,7 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+
 
 
 

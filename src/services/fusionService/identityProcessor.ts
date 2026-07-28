@@ -8,11 +8,13 @@ import { batchProcess } from './collections'
 import type { IdentityService } from '../identityService'
 import type { AggregationTracker } from './aggregationTracker'
 import { AccountAssembly } from '../accountAssembly'
+import { CorrelationManager } from '../correlationManager'
 
 export interface IdentityProcessorDeps {
     identities: IdentityService
     configSourceNames: Set<string>
     accountAssembly: AccountAssembly
+    correlationManager: CorrelationManager
     getTracker(): AggregationTracker | undefined
 }
 
@@ -106,6 +108,7 @@ export class IdentityProcessor {
             fusionAccount.setOriginIdentityInScope(true)
 
             await this.deps.accountAssembly.assembleAccount(fusionAccount)
+            await this.deps.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount)
             this.deps.accountAssembly.registerFusionAccount(fusionAccount)
             this.log.debug(`Registered identity as fusion account: ${identity.name} (${identityId})`)
             return fusionAccount
@@ -113,4 +116,5 @@ export class IdentityProcessor {
         return undefined
     }
 }
+
 

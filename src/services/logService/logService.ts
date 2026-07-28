@@ -343,7 +343,7 @@ export class LogService {
     }
 
     getCumulativeOutcomes() {
-        return this.runContext?.getCumulativeOutcomes() ?? { nonMatch: 0, autoMerged: 0, formsQueued: 0 }
+        return this.runContext?.getCumulativeOutcomes() ?? { nonMatch: 0, autoMerged: 0, formsQueued: 0, deferred: 0 }
     }
 
     startOperationHeartbeat(getSnapshot: () => HeartbeatSnapshot): void {
@@ -694,6 +694,7 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+
 
 
 

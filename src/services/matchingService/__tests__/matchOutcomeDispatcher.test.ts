@@ -322,6 +322,75 @@ describe('MatchOutcomeDispatcher', () => {
             expect(log.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
+        it('uses current-run non-match from the same sweep as a deferred candidate without fusionAccountMap pre-registration', async () => {
+            const { dispatcher, matchingService, log, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, candidates, candidateType) => {
+                if (candidateType === 'identity') return 0
+                const candidateList = Array.from(candidates)
+                const hasPriorNonMatch = candidateList.some(
+                    (candidate) => candidate.managedAccountId === 'source-a-id::native-first'
+                )
+                if (
+                    hasPriorNonMatch &&
+                    fusionAccount.managedAccountId === 'source-a-id::native-second'
+                ) {
+                    fusionAccount.addFusionMatch(deferredMatch())
+                }
+                return candidateList.length
+            })
+
+            const firstAccount = managedAccount({ id: 'acct-first', nativeIdentity: 'native-first', name: 'Taylor Jordan' })
+            const secondAccount = managedAccount({ id: 'acct-second', nativeIdentity: 'native-second', name: 'Taylor Jordan' })
+            run.managedAccountsById.set('source-a-id::native-first', firstAccount)
+            run.managedAccountsById.set('source-a-id::native-second', secondAccount)
+
+            const result = await dispatcher.runMatchSweep([firstAccount, secondAccount], 2)
+
+            expect(result.deferred).toBe(1)
+            expect(result.nonMatch).toBe(1)
+            expect(log.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
+        })
+
+        it('materializes a matched pending peer when deferred match references an unprocessed queue account', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+
+            const firstAccount = managedAccount({ id: 'acct-a', nativeIdentity: 'nat-a', name: 'Peer A' })
+            const secondAccount = managedAccount({ id: 'acct-b', nativeIdentity: 'nat-b', name: 'Peer B' })
+            run.managedAccountsById.set('source-a-id::nat-a', firstAccount)
+            run.managedAccountsById.set('source-a-id::nat-b', secondAccount)
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType !== 'deferred') return 0
+                if (fusionAccount.managedAccountId === 'source-a-id::nat-a') {
+                    const peer = FusionAccount.fromManagedAccount({
+                        id: 'acct-b',
+                        nativeIdentity: 'nat-b',
+                        name: 'Peer B',
+                        sourceId: SOURCE_ID,
+                        sourceName: SOURCE_NAME,
+                        attributes: {},
+                    } as any)
+                    fusionAccount.addFusionMatch({ ...deferredMatch(), fusionIdentity: peer })
+                }
+                return 1
+            })
+
+            const result = await dispatcher.runMatchSweep([firstAccount, secondAccount], 2)
+
+            expect(result.deferred).toBe(1)
+            expect(result.nonMatch).toBe(0)
+            expect(run.getFusionAccountByManagedKey('source-a-id::nat-b')).toBeDefined()
+            expect(run.managedAccountsById.has('source-a-id::nat-a')).toBe(false)
+        })
+
+
         it('dispatches a non-match by registering an authoritative fusion account', async () => {
             const { dispatcher, matchingService, log, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
@@ -678,7 +747,7 @@ describe('MatchOutcomeDispatcher', () => {
             expect(maxConcurrent()).toBeLessThanOrEqual(3)
         })
 
-        it('caps deferred-phase scoring concurrency', async () => {
+        it('drains deferred candidates sequentially within a source', async () => {
             const { dispatcher, matchingService, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
                 configOverrides: { scoringMaxConcurrency: 5 },
@@ -697,7 +766,48 @@ describe('MatchOutcomeDispatcher', () => {
             const result = await dispatcher.runMatchSweep(accounts, 20)
 
             expect(result.processed).toBe(20)
-            expect(maxDeferredConcurrent()).toBeLessThanOrEqual(5)
+            expect(maxDeferredConcurrent()).toBeLessThanOrEqual(1)
+        })
+
+        it('drains deferred candidates in parallel across sources while staying sequential within each source', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: true } }))
+            run.sourcesByName.set('Source B', sourceInfo({ id: 'source-b-id', name: 'Source B', config: { deferredMatching: true } }))
+
+            const inFlightBySource = new Map<string, number>()
+            const maxInFlightBySource = new Map<string, number>()
+            let totalDeferredInFlight = 0
+            let maxTotalDeferredInFlight = 0
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType !== 'deferred') return 0
+                const source = fusionAccount.sourceName ?? ''
+                inFlightBySource.set(source, (inFlightBySource.get(source) ?? 0) + 1)
+                maxInFlightBySource.set(source, Math.max(maxInFlightBySource.get(source) ?? 0, inFlightBySource.get(source)!))
+                totalDeferredInFlight += 1
+                maxTotalDeferredInFlight = Math.max(maxTotalDeferredInFlight, totalDeferredInFlight)
+                await new Promise((resolve) => setTimeout(resolve, 10))
+                inFlightBySource.set(source, (inFlightBySource.get(source) ?? 1) - 1)
+                totalDeferredInFlight -= 1
+                return 0
+            })
+
+            const sourceAAccounts = [
+                managedAccount({ id: 'a1', nativeIdentity: 'a1', name: 'A1' }),
+                managedAccount({ id: 'a2', nativeIdentity: 'a2', name: 'A2' }),
+            ]
+            const sourceBAccounts = [
+                managedAccount({ sourceId: 'source-b-id', sourceName: 'Source B', id: 'b1', nativeIdentity: 'b1', name: 'B1' }),
+                managedAccount({ sourceId: 'source-b-id', sourceName: 'Source B', id: 'b2', nativeIdentity: 'b2', name: 'B2' }),
+            ]
+
+            await dispatcher.runMatchSweep([...sourceAAccounts, ...sourceBAccounts], 4)
+
+            expect(maxInFlightBySource.get('Source A')).toBeLessThanOrEqual(1)
+            expect(maxInFlightBySource.get('Source B')).toBeLessThanOrEqual(1)
+            expect(maxTotalDeferredInFlight).toBeGreaterThan(1)
         })
 
         it('only includes deferred candidates from the same source', async () => {
@@ -719,11 +829,26 @@ describe('MatchOutcomeDispatcher', () => {
             run.registerFusionAccount(sourceACandidate)
             run.registerDeferredCandidate(sourceACandidate)
 
-            const deferredSizes: number[] = []
+            const sourceBCandidate = FusionAccount.fromManagedAccount({
+                id: 'acct-b-candidate',
+                nativeIdentity: 'native-b-candidate',
+                name: 'Source B Candidate',
+                sourceId: 'source-b-id',
+                sourceName: 'Source B',
+                attributes: {},
+            } as any)
+            sourceBCandidate.setNonMatched()
+            run.registerFusionAccount(sourceBCandidate)
+            run.registerFinalizedDeferredCandidate(sourceBCandidate)
+
+            const deferredCandidateSources: string[][] = []
             vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (_account, candidates, candidateType) => {
-                const n = Array.from(candidates).length
-                if (candidateType === 'deferred') deferredSizes.push(n)
-                return n
+                if (candidateType === 'deferred') {
+                    deferredCandidateSources.push(
+                        Array.from(candidates).map((candidate) => candidate.sourceName ?? '')
+                    )
+                }
+                return Array.from(candidates).length
             })
 
             await dispatcher.runMatchSweep(
@@ -731,7 +856,7 @@ describe('MatchOutcomeDispatcher', () => {
                 1
             )
 
-            expect(deferredSizes).toEqual([0])
+            expect(deferredCandidateSources).toEqual([['Source B']])
         })
     })
 

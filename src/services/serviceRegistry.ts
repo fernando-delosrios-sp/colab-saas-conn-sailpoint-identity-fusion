@@ -258,8 +258,6 @@ export class ServiceRegistry {
             pendingItems: queueItems.pending,
             correlationQueuePending: countCorrelationQueuePending(queueItems.pending),
             fusionPending: {
-                disableOps: run.pendingDisableOperationsCount,
-                deferredCandidates: run.deferredCandidateCount,
                 fusionReviewsFound: run.formsFound,
                 fusionReviewInstancesFound: run.formInstancesFound,
                 formsCreated: run.formsCreated,
@@ -280,6 +278,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

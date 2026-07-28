@@ -310,6 +310,48 @@ export class IdentityService {
         })
     }
 
+    /**
+     * Load an identity into the run cache when absent, using search hydration and direct API fallbacks.
+     * Used for global reviewers and other identities that may sit outside the configured scope query.
+     */
+    public async ensureIdentityById(id: string): Promise<IdentityDocument | undefined> {
+        if (!id) return undefined
+
+        let identity = this.getIdentityById(id)
+        if (identity) return identity
+
+        await this.hydrateMissingIdentitiesById([id])
+        identity = this.getIdentityById(id)
+        if (identity) return identity
+
+        try {
+            identity = await this.fetchIdentityById(id)
+            if (identity) return identity
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err)
+            this.log.debug(`ensureIdentityById search fetch failed for ${id}: ${detail}`)
+        }
+
+        try {
+            identity = await this.fetchIdentityProfileById(id)
+            if (identity) return identity
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err)
+            this.log.debug(`ensureIdentityById profile fetch failed for ${id}: ${detail}`)
+        }
+
+        return undefined
+    }
+
+    /** Mark an identity as in-scope for this aggregation run (e.g. global reviewer owners). */
+    public markIdentityInScope(id: string): void {
+        if (!id) return
+        const identity = this.getIdentityById(id)
+        if (identity && !identity.protected) {
+            this.identityIdsInScope.add(id)
+        }
+    }
+
     // ------------------------------------------------------------------------
     // Public Correlation Methods
     // ------------------------------------------------------------------------
@@ -479,6 +521,7 @@ export class IdentityService {
             })
     }
 }
+
 
 
 

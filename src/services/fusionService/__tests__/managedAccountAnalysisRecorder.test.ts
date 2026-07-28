@@ -82,6 +82,42 @@ describe('ManagedAccountAnalysisRecorder', () => {
         expect(tracker.deferredMatchReportData[0].deferred).toBe(true)
     })
 
+    it('uses managed account url for deferred match candidates instead of identity url', () => {
+        const { recorder, tracker, urlContext, sources } = makeRecorder()
+        sources.resolveIscAccountIdForManagedKey.mockReturnValue('isc-managed-456')
+        const fusionAccount = {
+            name: 'acct',
+            sourceName: 'HR',
+            isMatch: true,
+            fusionMatches: [
+                {
+                    candidateType: MatchCandidateType.Deferred,
+                    identityName: 'Jane Candidate',
+                    fusionIdentity: {
+                        identityId: 'identity-999',
+                        managedAccountId: 'source-a-id::native-candidate',
+                        managedKeyOrUndefined: 'source-a-id::native-candidate',
+                        name: 'Jane Candidate',
+                    },
+                    scores: [],
+                },
+            ],
+        } as any
+        recorder.recordAnalysis({
+            account: { name: 'acct', sourceName: 'HR' } as any,
+            fusionAccount,
+            sourceInfo: undefined,
+            sourceType: SourceType.Authoritative,
+            hasIdentityCandidateMatches: false,
+            fusionIdentityComparisons: 2,
+        })
+        const matchRow = tracker.deferredMatchReportData[0].matches[0]
+        expect(matchRow.accountId).toBe('source-a-id::native-candidate')
+        expect(matchRow.identityUrl).toBe('human-url')
+        expect(urlContext.humanAccount).toHaveBeenCalledWith('isc-managed-456')
+        expect(urlContext.identity).not.toHaveBeenCalled()
+    })
+
     it('skips non-match data for authoritative deferred sources', () => {
         const sourcesByName = new Map([
             ['HR', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } }],
@@ -106,4 +142,5 @@ describe('ManagedAccountAnalysisRecorder', () => {
         expect(tracker.failedMatchingAccounts.length).toBe(1)
     })
 })
+
 

@@ -104,7 +104,7 @@ describe('operation heartbeat formatters', () => {
         expect(line).toContain('phase=Process')
         expect(line).toContain('step=uncorrelated-sweep')
         expect(line).toContain('progress=537/800 analyzed(Δ+87/30s)')
-        expect(line).toContain('matches(2n/1m/1a)')
+        expect(line).toContain('matches(2n/1m/1a/0d)')
         expect(line).toContain('api=10a/97q/537c(Δ+0/30s)')
         expect(line).toContain('mem=482.00MB(100%)')
         expect(line.endsWith(' elapsed=5.0S')).toBe(true)
@@ -112,11 +112,11 @@ describe('operation heartbeat formatters', () => {
     })
 
     it('formatMatchOutcomesSegment includes total when requested', () => {
-        expect(formatMatchOutcomesSegment({ nonMatch: 58, formsQueued: 30, autoMerged: 4 })).toBe(
-            'matches(58n/30m/4a)'
+        expect(formatMatchOutcomesSegment({ nonMatch: 58, formsQueued: 30, autoMerged: 4, deferred: 12 })).toBe(
+            'matches(58n/30m/4a/12d)'
         )
-        expect(formatMatchOutcomesSegment({ nonMatch: 58, formsQueued: 30, autoMerged: 4 }, true)).toBe(
-            'matches(58n/30m/4a total=92)'
+        expect(formatMatchOutcomesSegment({ nonMatch: 58, formsQueued: 30, autoMerged: 4, deferred: 12 }, true)).toBe(
+            'matches(58n/30m/4a/12d total=104)'
         )
     })
 
@@ -134,8 +134,6 @@ describe('operation heartbeat formatters', () => {
             {
                 runContext,
                 fusionPending: {
-                    disableOps: 0,
-                    deferredCandidates: 0,
                     fusionReviewsFound: 0,
                     fusionReviewInstancesFound: 0,
                     formsCreated: 12,
@@ -159,8 +157,6 @@ describe('operation heartbeat formatters', () => {
             {
                 runContext,
                 fusionPending: {
-                    disableOps: 0,
-                    deferredCandidates: 0,
                     fusionReviewsFound: 0,
                     fusionReviewInstancesFound: 0,
                     formsCreated: 3,
@@ -183,8 +179,6 @@ describe('operation heartbeat formatters', () => {
             {
                 runContext,
                 fusionPending: {
-                    disableOps: 0,
-                    deferredCandidates: 0,
                     fusionReviewsFound: 0,
                     fusionReviewInstancesFound: 0,
                     formsCreated: 5,
@@ -237,7 +231,7 @@ describe('operation heartbeat formatters', () => {
         expect(line).not.toContain('api=2a/0q/12c(Δ')
     })
 
-    it('formats STATUS with queue-pending labels and work-pending counts', () => {
+    it('formats STATUS with queue-pending labels', () => {
         vi.useFakeTimers()
         vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
         const runContext = new OperationRunContext()
@@ -262,8 +256,6 @@ describe('operation heartbeat formatters', () => {
                     { id: '3', priority: 1, label: 'MatchingService>score', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
                 ] as any,
                 fusionPending: {
-                    disableOps: 2,
-                    deferredCandidates: 45,
                     fusionReviewsFound: 143,
                     fusionReviewInstancesFound: 187,
                     formsCreated: 0,
@@ -277,7 +269,7 @@ describe('operation heartbeat formatters', () => {
 
         expect(line).toContain('queue-pending=IdentityService>correlate×2, MatchingService>score')
         expect(line).not.toContain('fusion-reviews=')
-        expect(line).toContain('work-pending disable=2 deferred=45')
+        expect(line).not.toContain('work-pending')
         vi.useRealTimers()
     })
 
@@ -285,8 +277,6 @@ describe('operation heartbeat formatters', () => {
         const runContext = new OperationRunContext()
         runContext.phase = 'Fetch'
         const fusionPending = {
-            disableOps: 0,
-            deferredCandidates: 0,
             fusionReviewsFound: 143,
             fusionReviewInstancesFound: 187,
             formsCreated: 0,
@@ -301,27 +291,6 @@ describe('operation heartbeat formatters', () => {
         expect(refreshLine).not.toContain('fusion-reviews=')
         expect(refreshLine).not.toContain('fusion-review-instances=')
         expect(refreshLine).not.toContain('api=')
-    })
-
-    it('omits work-pending when all fusion counts are zero', () => {
-        const runContext = new OperationRunContext()
-        const line = formatStatusLine(
-            {
-                runContext,
-                fusionPending: {
-                    disableOps: 0,
-                    deferredCandidates: 0,
-                    fusionReviewsFound: 0,
-                    fusionReviewInstancesFound: 0,
-                    formsCreated: 0,
-                    formInstancesCreated: 0,
-                },
-                intervalMs: 30_000,
-            },
-            {},
-            30_000
-        )
-        expect(line).not.toContain('work-pending')
     })
 
     it('formats EVENT_SUMMARY lines for matches and correlations', () => {
@@ -350,6 +319,7 @@ describe('operation heartbeat formatters', () => {
             emailSent: 0,
         }
         expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
+            'EVENT_SUMMARY matches deferred=+3/10s',
             'EVENT_SUMMARY correlations link=14/18',
         ])
     })
@@ -387,7 +357,7 @@ describe('operation heartbeat formatters', () => {
         const events = {
             matchExact: 1,
             matchPartial: 0,
-            matchDeferred: 0,
+            matchDeferred: 3,
             correlation: {
                 linkTriggers: 2,
                 linkAccounts: 3,
@@ -412,7 +382,7 @@ describe('operation heartbeat formatters', () => {
             'EVENT_SUMMARY correlations link=2/3',
         ])
         expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
-            'EVENT_SUMMARY matches non-matched=+5/10s manual=+2/10s auto=+4/10s',
+            'EVENT_SUMMARY matches non-matched=+5/10s manual=+2/10s auto=+4/10s deferred=+3/10s',
             'EVENT_SUMMARY forms new-identity-assignment=1',
             'EVENT_SUMMARY correlations link=2/3',
         ])

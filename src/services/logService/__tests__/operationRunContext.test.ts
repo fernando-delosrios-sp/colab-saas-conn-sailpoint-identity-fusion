@@ -30,6 +30,7 @@ describe('OperationRunContext', () => {
         expect(flushed.matchExact).toBe(1)
         expect(flushed.matchPartial).toBe(1)
         expect(flushed.matchDeferred).toBe(1)
+        expect(ctx.getCumulativeOutcomes().deferred).toBe(1)
         expect(ctx.peekEventCounters()).toEqual(createEmptyEventCounters())
     })
 
@@ -132,10 +133,10 @@ describe('OperationRunContext', () => {
         expect(flushed.nonMatch).toBe(1)
         expect(flushed.autoMerged).toBe(1)
         expect(flushed.formsQueued).toBe(1)
-        expect(ctx.getCumulativeOutcomes()).toEqual({ nonMatch: 1, autoMerged: 1, formsQueued: 1 })
+        expect(ctx.getCumulativeOutcomes()).toEqual({ nonMatch: 1, autoMerged: 1, formsQueued: 1, deferred: 0 })
 
         ctx.resetCumulativeOutcomes()
-        expect(ctx.getCumulativeOutcomes()).toEqual({ nonMatch: 0, autoMerged: 0, formsQueued: 0 })
+        expect(ctx.getCumulativeOutcomes()).toEqual({ nonMatch: 0, autoMerged: 0, formsQueued: 0, deferred: 0 })
     })
 })
 
@@ -187,5 +188,6 @@ describe('LogService operation helpers', () => {
         expect(ctx.refreshedCount).toBe(2)
     })
 })
+
 
 

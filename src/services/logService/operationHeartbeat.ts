@@ -11,8 +11,6 @@ import {
 } from './operationRunContext'
 
 type FusionPendingSnapshot = {
-    disableOps: number
-    deferredCandidates: number
     /** Active Fusion review form definitions fetched this run (report: Fusion Reviews Found). */
     fusionReviewsFound: number
     /** Fusion review form instances fetched this run (report: Fusion Review Instances Found). */
@@ -93,10 +91,10 @@ function formatProgressSegment(
 }
 
 export function formatMatchOutcomesSegment(outcomes: CumulativeOutcomes, includeTotal = false): string {
-    const { nonMatch, formsQueued, autoMerged } = outcomes
-    const segment = `matches(${nonMatch}n/${formsQueued}m/${autoMerged}a)`
+    const { nonMatch, formsQueued, autoMerged, deferred } = outcomes
+    const segment = `matches(${nonMatch}n/${formsQueued}m/${autoMerged}a/${deferred}d)`
     if (!includeTotal) return segment
-    return `${segment.slice(0, -1)} total=${nonMatch + formsQueued + autoMerged})`
+    return `${segment.slice(0, -1)} total=${nonMatch + formsQueued + autoMerged + deferred})`
 }
 
 export function formatFormOutcomesSegment(formsCreated: number, formInstancesCreated: number): string {
@@ -115,8 +113,8 @@ function shouldShowFormOutcomesInStatus(
 function shouldShowMatchOutcomesInStatus(runContext: OperationRunContext): boolean {
     if (runContext.phase !== 'Process') return false
     if (runContext.step === 'uncorrelated-sweep') return true
-    const { nonMatch, formsQueued, autoMerged } = runContext.getCumulativeOutcomes()
-    return nonMatch + formsQueued + autoMerged > 0
+    const { nonMatch, formsQueued, autoMerged, deferred } = runContext.getCumulativeOutcomes()
+    return nonMatch + formsQueued + autoMerged + deferred > 0
 }
 
 function pendingQueueCount(queueStats: QueueStats): number {
@@ -226,9 +224,6 @@ export function formatStatusLine(
     const fusionReviewInventory = formatFusionReviewInventory(fusionPending, runContext.phase)
     if (fusionReviewInventory) parts.push(fusionReviewInventory)
 
-    const workPending = formatFusionWorkPending(fusionPending)
-    if (workPending) parts.push(workPending)
-
     if (memory) {
         const heapPct = Math.round((memory.heapUsed / memory.rss) * 100)
         parts.push(`mem=${formatMb(memory.rss)}MB(${heapPct}%)`)
@@ -257,6 +252,9 @@ export function formatEventSummaryLines(
         }
         if (events.autoMerged > 0) {
             matchParts.push(`auto=${formatIntervalDeltaCount(events.autoMerged, intervalMs)}`)
+        }
+        if (events.matchDeferred > 0) {
+            matchParts.push(`deferred=${formatIntervalDeltaCount(events.matchDeferred, intervalMs)}`)
         }
         if (matchParts.length > 0) {
             lines.push(`EVENT_SUMMARY matches ${matchParts.join(' ')}`)
@@ -378,15 +376,6 @@ function formatFusionReviewInventory(
     return parts.join(' ')
 }
 
-function formatFusionWorkPending(pending: FusionPendingSnapshot | undefined): string {
-    if (!pending) return ''
-    const parts: string[] = []
-    if (pending.disableOps > 0) parts.push(`disable=${pending.disableOps}`)
-    if (pending.deferredCandidates > 0) parts.push(`deferred=${pending.deferredCandidates}`)
-    if (parts.length === 0) return ''
-    return `work-pending ${parts.join(' ')}`
-}
-
 export function formatStallWarning(
     unchangedMs: number,
     activeItems: QueuedItemInfo[] | undefined,
@@ -500,6 +489,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 

@@ -6,7 +6,7 @@ import { UrlContext } from '../../utils/url'
 import { AggregationTracker } from '../../model/aggregationTracker'
 import {
     buildMinimalFusionReportAccount,
-    fusionReportMatchCandidateAccountFields,
+    fusionReportDeferredMatchCandidateFields,
     mapScoreReportsForFusionReport,
 } from './helpers'
 import { formatFusionMatchDiscoveryLog, isDeferredMatchingEnabledForSource } from '../matchingService/matchingHelpers'
@@ -66,15 +66,16 @@ export class ManagedAccountAnalysisRecorder {
             const deferredMatches = fusionAccount.fusionMatches
                 .filter((match) => match.candidateType === MatchCandidateType.Deferred)
                 .map((match) => {
-                    const fields = fusionReportMatchCandidateAccountFields(match)
+                    const fields = fusionReportDeferredMatchCandidateFields(match)
                     const fi = match.fusionIdentity
                     const deferredCandidateIdentityId = fi?.identityId
-                    const deferredCandidateManagedAccountReportId = resolveReportAccountIdValue(fi?.managedAccountId, sources)
-                    const candidateAccountReportId = resolveReportAccountIdValue(fields.accountId, sources)
-                    const identityUrl =
-                        (deferredCandidateIdentityId ? urlContext.identity(deferredCandidateIdentityId) : undefined) ??
-                        (deferredCandidateManagedAccountReportId ? urlContext.humanAccount(deferredCandidateManagedAccountReportId) : undefined) ??
-                        (candidateAccountReportId ? urlContext.humanAccount(candidateAccountReportId) : undefined)
+                    const managedKey = fi?.managedKeyOrUndefined ?? fi?.managedAccountId ?? fields.accountId
+                    const managedAccountReportId = resolveReportAccountIdValue(managedKey, sources)
+                    const identityUrl = managedAccountReportId
+                        ? urlContext.humanAccount(managedAccountReportId)
+                        : deferredCandidateIdentityId
+                          ? urlContext.identity(deferredCandidateIdentityId)
+                          : undefined
                     return {
                         ...fields,
                         identityName: match.identityName,
@@ -140,4 +141,5 @@ export class ManagedAccountAnalysisRecorder {
         })
     }
 }
+
 

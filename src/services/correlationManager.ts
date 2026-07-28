@@ -1,4 +1,5 @@
 import { FusionAccount } from '../model/account'
+import { FusionAccountKind } from '../model/fusionAccountTypes'
 import { FusionDecision } from '../model/form'
 import { FusionConfig } from '../model/config'
 import { normalizeCompositeManagedAccountKey } from '../model/managedAccountKey'
@@ -15,6 +16,22 @@ export class CorrelationManager {
         private identities: IdentityService,
         private isAggregationMode: () => boolean
     ) {}
+
+    private hasAnyCorrelateSource(): boolean {
+        return this.config.sources.some((sc) => sc.correlationMode === 'correlate')
+    }
+
+    /**
+     * Correlation-on-aggregation (link) applies only to established Fusion identities —
+     * persisted fusion rows and identity-origin baselines — not provisional managed-origin
+     * non-match accounts created during the current run.
+     */
+    private isLinkCorrelationEligible(fusionAccount: FusionAccount): boolean {
+        if (fusionAccount.isManaged || fusionAccount.type === FusionAccountKind.Decision) {
+            return false
+        }
+        return fusionAccount.fromIdentity || fusionAccount.type === FusionAccountKind.Fusion
+    }
 
     /**
      * Apply per-source correlation logic for missing accounts on a fusion account.
@@ -105,6 +122,10 @@ export class CorrelationManager {
         kind: 'link' | 'merge' = 'link'
     ): Promise<void> {
         if (!this.isAggregationMode()) return
+        if (kind === 'link') {
+            if (!this.hasAnyCorrelateSource()) return
+            if (!this.isLinkCorrelationEligible(fusionAccount)) return
+        }
         const hasMissing = fusionAccount.missingAccountIdsSet.size > 0
         const hasAuthorizedMerge =
             mergeDecision != null &&
@@ -124,5 +145,6 @@ export class CorrelationManager {
         fusionAccount.updateCorrelationStatus()
     }
 }
+
 
 
