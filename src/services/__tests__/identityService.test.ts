@@ -120,6 +120,37 @@ describe('IdentityService.fetchIdentities with identityScopeQuery', () => {
     })
 })
 
+
+describe('IdentityService.ensureIdentityById', () => {
+    it('returns cached identity without API calls', async () => {
+        const owner = makeIdentity('owner-cached')
+        const { service, client } = makeService()
+        service.run.addIdentity(owner.id!, owner)
+
+        const result = await service.ensureIdentityById('owner-cached')
+
+        expect(result).toBe(owner)
+        expect(client.call).not.toHaveBeenCalled()
+    })
+
+    it('falls back to profile fetch when search hydration returns nothing', async () => {
+        const owner = makeIdentity('owner-profile')
+        const { service, client } = makeService()
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            const context = policy?.context ?? ''
+            if (context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return { id: owner.id, name: owner.name, emailAddress: 'owner@example.com', attributes: {} }
+            }
+            return []
+        })
+
+        const result = await service.ensureIdentityById('owner-profile')
+
+        expect(result?.id).toBe('owner-profile')
+        expect(service.getIdentityById('owner-profile')).toBeDefined()
+    })
+})
+
 describe('IdentityService.fetchIdentities with additionalIdentityIds (global reviewer / source owner)', () => {
     it('marks hydrated additional ids as in-scope for the current aggregation', async () => {
         const owner = makeIdentity('owner-1')

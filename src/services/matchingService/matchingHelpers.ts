@@ -1,4 +1,5 @@
 import { FusionAccount } from '../../model/account'
+import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
 import { SourceType } from '../../model/config'
 import { SourceInfo } from '../sourceService'
 import { coerceBoolean } from '../../utils/safeRead'
@@ -42,6 +43,7 @@ export function hasDeferredCandidateMatches(fusionAccount: FusionAccount): boole
     return fusionAccount.fusionMatches.some((match) => match.candidateType === 'deferred')
 }
 
+
 /** Matches counted toward the review-form cap (excludes same-operation deferred candidates). */
 export const countIdentityCandidateFusionMatches = (matches: readonly FusionMatch[] | undefined): number => {
     if (!matches) return 0
@@ -52,6 +54,19 @@ export const countIdentityCandidateFusionMatches = (matches: readonly FusionMatc
         }
     }
     return n
+}
+
+/**
+ * Managed source name used to bucket deferred-match candidates.
+ * Persisted fusion rows use the Fusion connector as `sourceName`; the managed source is `originSource`.
+ */
+export function deferredMatchSourceName(fusionAccount: FusionAccount): string | undefined {
+    const originSource = fusionAccount.originSource?.trim()
+    if (originSource && originSource !== IDENTITIES_SOURCE_NAME) {
+        return originSource
+    }
+    const sourceName = fusionAccount.sourceName?.trim()
+    return sourceName || undefined
 }
 
 export function isDeferredMatchingEnabledForSource(

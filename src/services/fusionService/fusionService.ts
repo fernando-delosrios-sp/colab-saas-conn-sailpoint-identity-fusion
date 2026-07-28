@@ -31,16 +31,16 @@ import {
 } from './collections'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { buildFusionReport } from './fusionReportBuilder'
-import { resolveReportAccountId as resolveReportAccountIdFn, resolveReportAccountIdValue as resolveReportAccountIdValueFn } from './reportAccountResolver'
+import {
+    resolveReportAccountId as resolveReportAccountIdFn,
+    resolveReportAccountIdValue as resolveReportAccountIdValueFn,
+} from './reportAccountResolver'
 import { ManagedAccountAnalysisRecorder } from './managedAccountAnalysisRecorder'
 import { AggregationTracker } from './aggregationTracker'
 
 import { AttributeOperations } from '../definitionService/types'
 import { getManagedAccountKeyFromAccount, normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
-import {
-    addFusionAccountLinkedKeysToIndex,
-    isManagedAccountLinkedInFusion,
-} from '../../model/managedAccountLink'
+import { addFusionAccountLinkedKeysToIndex, isManagedAccountLinkedInFusion } from '../../model/managedAccountLink'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 import { trimStr } from '../../utils/safeRead'
 import { IdentityProcessor } from './identityProcessor'
@@ -130,37 +130,24 @@ export class FusionService {
             buildFusionBlend: (fa, account) => this.buildFusionBlend(fa, account),
             getTracker: () => this.run.getTracker(),
         })
-        this.correlationManager = new CorrelationManager(
-            config,
-            log,
-            this.sources,
-            this.identities,
-            () => this.accountAssembly.isAggregationAccountListMode()
+        this.correlationManager = new CorrelationManager(config, log, this.sources, this.identities, () =>
+            this.accountAssembly.isAggregationAccountListMode()
         )
-        this.identityProcessor = new IdentityProcessor(
-            config,
-            log,
-            this.run,
-            {
-                identities: this.identities,
-                configSourceNames: this.configSourceNames,
-                accountAssembly: this.accountAssembly,
-                getTracker: () => this.run.getTracker(),
-            }
-        )
-        this.decisionProcessor = new DecisionProcessor(
-            config,
-            log,
-            this.run,
-            {
-                forms: this.forms,
-                identities: this.identities,
-                correlationManager: this.correlationManager,
-                definitionService: this.definitionService,
-                mappingService: this.mappingService,
-                accountAssembly: this.accountAssembly,
-            }
-        )
+        this.identityProcessor = new IdentityProcessor(config, log, this.run, {
+            identities: this.identities,
+            configSourceNames: this.configSourceNames,
+            accountAssembly: this.accountAssembly,
+            correlationManager: this.correlationManager,
+            getTracker: () => this.run.getTracker(),
+        })
+        this.decisionProcessor = new DecisionProcessor(config, log, this.run, {
+            forms: this.forms,
+            identities: this.identities,
+            correlationManager: this.correlationManager,
+            definitionService: this.definitionService,
+            mappingService: this.mappingService,
+            accountAssembly: this.accountAssembly,
+        })
         this.resetAccounts = config.resetAccounts
         this.resetForms = config.resetForms
         this.fusionOwnerIsGlobalReviewer = config.fusionOwnerIsGlobalReviewer ?? false
@@ -386,9 +373,15 @@ export class FusionService {
             action: 'processing fusion accounts',
             count: fusionAccounts.length,
         })
-        const results = await batchProcess(fusionAccounts, 'Fusion accounts', async (x: Account) => {
-            return await this.processFusionAccount(x)
-        }, this.config, this.log)
+        const results = await batchProcess(
+            fusionAccounts,
+            'Fusion accounts',
+            async (x: Account) => {
+                return await this.processFusionAccount(x)
+            },
+            this.config,
+            this.log
+        )
         this.log.detail({
             action: 'fusion accounts phase finished',
             count: results.length,
@@ -484,7 +477,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${fusionAccount.managedKey}), ` +
-            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.run.managedAccountsById, 'Managed accounts have not been loaded')
@@ -539,8 +532,8 @@ export class FusionService {
                 originIdentityId && originIdentityInScope !== undefined
                     ? originIdentityInScope
                     : originIdentityId
-                        ? this.identities.hasIdentityInScope(originIdentityId)
-                        : false
+                      ? this.identities.hasIdentityInScope(originIdentityId)
+                      : false
             fusionAccount.setOriginIdentityInScope(inScope)
         }
 
@@ -583,7 +576,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.accountAssembly.registerFusionAccount(fusionAccount)
@@ -711,7 +704,7 @@ export class FusionService {
                 this.run.sourcesWithoutReviewers.add(source.name)
                 this.log.error(
                     `No valid reviewer configured for source "${source.name}". ` +
-                    `Managed accounts from this source will be treated as NonMatched.`
+                        `Managed accounts from this source will be treated as NonMatched.`
                 )
             }
         }
@@ -898,7 +891,13 @@ export class FusionService {
         const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
         const eligible = this.deleteEmpty ? allAccounts.filter((account) => !account.isOrphan()) : allAccounts
 
-        const results = await batchProcess(eligible, 'ISC accounts', (x) => this.getISCAccount(x), this.config, this.log)
+        const results = await batchProcess(
+            eligible,
+            'ISC accounts',
+            (x) => this.getISCAccount(x),
+            this.config,
+            this.log
+        )
         return compact(results)
     }
 
@@ -983,10 +982,10 @@ export class FusionService {
         // accountUpdate may skip this to preserve explicit entitlement removals in the immediate response.
         if (recomputeCorrelationStatus) {
             fusionAccount.updateCorrelationStatus(
-            this.accountAssembly.isAggregationAccountListMode()
-                ? undefined
-                : () => this.log.recordCorrelatedActionGranted()
-        )
+                this.accountAssembly.isAggregationAccountListMode()
+                    ? undefined
+                    : () => this.log.recordCorrelatedActionGranted()
+            )
         }
         // Match forms: ensure this exact row reflects FormService pending state at output time.
         // Global reconcile runs during aggregation, but accountRead and edge paths only guarantee
@@ -1094,6 +1093,41 @@ export class FusionService {
         await this.sources.fireDisableAccount(accountId)
     }
 
+    /** Resolve a reviewer fusion account by ISC identity id (identity map or managed-key index). */
+    private findFusionAccountForReviewerIdentity(identityId: string): FusionAccount | undefined {
+        const fromIdentityMap = this.run.getFusionIdentity(identityId)
+        if (fromIdentityMap) return fromIdentityMap
+        for (const account of this.run.fusionAccountsIterable()) {
+            if (account.identityId === identityId) return account
+        }
+        return undefined
+    }
+
+    /**
+     * Resolve or create an identity-origin Fusion account for a global reviewer.
+     * Global owners often sit outside the configured identity scope, so this path
+     * fetches the ISC identity directly and materializes a Fusion account when needed.
+     */
+    private async resolveGlobalReviewerFusionAccount(reviewerId: string): Promise<FusionAccount | undefined> {
+        let reviewer = this.findFusionAccountForReviewerIdentity(reviewerId)
+        if (reviewer) return reviewer
+
+        const identity = await this.identities.ensureIdentityById(reviewerId)
+        if (!identity) return undefined
+        if (identity.protected) {
+            this.log.warn(`Global reviewer identity ${reviewerId} is protected; skipping reviewer registration.`)
+            return undefined
+        }
+
+        this.identities.markIdentityInScope(reviewerId)
+
+        reviewer = this.findFusionAccountForReviewerIdentity(reviewerId)
+        if (reviewer) return reviewer
+
+        const processed = await this.processIdentity(identity)
+        return processed ?? this.findFusionAccountForReviewerIdentity(reviewerId)
+    }
+
     /**
      * Set a reviewer for a specific source.
      *
@@ -1138,9 +1172,21 @@ export class FusionService {
         }
 
         const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
+        if (globalOwnerIds.length === 0) {
+            this.log.warn(
+                'Owners are global reviewers is enabled but no Fusion source owner identity IDs were resolved. ' +
+                    'Configure a Fusion source owner (or governance group) or assign per-source reviewer entitlements.'
+            )
+            return
+        }
+
         for (const reviewerId of globalOwnerIds) {
-            const reviewer = this.run.getFusionIdentity(reviewerId)
+            const reviewer = await this.resolveGlobalReviewerFusionAccount(reviewerId)
             if (!reviewer) {
+                this.log.warn(
+                    `Global reviewer identity ${reviewerId} is not available as a Fusion identity; ` +
+                        'skipping global reviewer registration for this identity.'
+                )
                 continue
             }
             for (const source of this.sources.managedSources) {
@@ -1219,7 +1265,10 @@ export class FusionService {
         this.run.resetScoringState()
 
         for (const fusionAccount of this.run.fusionAccountMap.values()) {
-            this.run.registerDeferredCandidate(fusionAccount)
+            this.run.registerPersistedDeferredCandidate(fusionAccount)
+        }
+        for (const fusionAccount of this.run.allFusionIdentities) {
+            this.run.registerPersistedDeferredCandidate(fusionAccount)
         }
 
         this.validateManagedSourceReviewers()

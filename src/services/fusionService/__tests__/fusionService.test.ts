@@ -29,7 +29,6 @@ vi.mock('../../definitionService')
 vi.mock('../../matchingService')
 vi.mock('../../schemaService')
 
-
 function seedRunInventory(run: FusionRun, accounts: Map<string, Account>): void {
     run.managedAccountInventory.clear()
     for (const [key, account] of accounts.entries()) {
@@ -113,20 +112,14 @@ describe('FusionService', () => {
         ) as Mocked<FormService>
         const mockLocks = {} as any
         mockSchemas = new SchemaService(mockConfig, mockLog, mockSources, mockClient) as Mocked<SchemaService>
-        mockMappingService = new MappingService(
-            mockConfig,
-            mockLog
-        ) as Mocked<MappingService>
+        mockMappingService = new MappingService(mockConfig, mockLog) as Mocked<MappingService>
         mockDefinitionService = new DefinitionService(
             mockConfig,
             mockSchemas,
             mockLog,
             mockLocks
         ) as Mocked<DefinitionService>
-        mockMatchingService = new MatchingService(
-            mockConfig,
-            mockLog
-        ) as Mocked<MatchingService>
+        mockMatchingService = new MatchingService(mockConfig, mockLog) as Mocked<MatchingService>
 
         // Mock specific properties/methods needed for initialization
         Object.defineProperty(mockSources, 'managedAccountsById', {
@@ -170,9 +163,7 @@ describe('FusionService', () => {
             const work = mockSources.managedAccountsById as unknown as Map<string, Account> | undefined
             const acc =
                 (work instanceof Map ? work.get(managedKey) : undefined) ??
-                (run.getManagedAccountInfo(managedKey)
-                    ? { id: run.getManagedAccountInfo(managedKey)!.id }
-                    : undefined)
+                (run.getManagedAccountInfo(managedKey) ? { id: run.getManagedAccountInfo(managedKey)!.id } : undefined)
             const raw = acc?.id
             if (hasValue(raw)) return trimStr(raw) ?? ''
             // Tests without composite map entries: treat non-composite keys as ISC account ids
@@ -509,7 +500,9 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
                 new Map([['identity-1', new Set([managedKey])]])
             )
-            seedRunInventory(run, new Map([
+            seedRunInventory(
+                run,
+                new Map([
                     [
                         managedKey,
                         {
@@ -731,6 +724,106 @@ describe('FusionService', () => {
         })
     })
 
+    describe('initializeSourceReviewers', () => {
+        const SOURCE_ID = 'umbrella-id'
+        const SOURCE_NAME = 'Umbrella Corporation'
+
+        function managedSource() {
+            return {
+                id: SOURCE_ID,
+                name: SOURCE_NAME,
+                isManaged: true,
+                sourceType: 'authoritative',
+                config: {},
+            }
+        }
+
+        beforeEach(() => {
+            Object.defineProperty(mockSources, 'managedSources', {
+                get: vi.fn(() => [managedSource()]),
+                configurable: true,
+            })
+            mockMappingService.mapAttributes.mockImplementation((account) => account)
+            mockDefinitionService.refreshNormalAttributes.mockResolvedValue(undefined)
+        })
+
+        it('registers global owners as reviewers when owner identity is hydrated but not yet a fusion identity', async () => {
+            const globalOwner = {
+                id: 'global-owner-1',
+                name: 'Global Owner',
+            } as IdentityDocument
+
+            ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
+            mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(['global-owner-1'])
+            mockIdentities.ensureIdentityById = vi.fn(async (id: string) => run.getIdentity(id))
+            mockIdentities.markIdentityInScope = vi.fn()
+            run.addIdentity('global-owner-1', globalOwner)
+
+            await fusionService.initializeSourceReviewers()
+
+            expect(run.reviewersBySourceId.get(SOURCE_ID)?.size).toBe(1)
+            ;(fusionService as any).validateManagedSourceReviewers()
+            expect(run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
+        })
+
+        it('registers global owners already loaded as managed-key fusion accounts', async () => {
+            const globalOwnerId = 'global-owner-managed-key'
+            const existingReviewer = FusionAccount.fromManagedAccount({
+                id: 'fusion::global-owner',
+                nativeIdentity: 'global-owner',
+                name: 'Global Owner',
+                sourceId: 'fusion-src',
+                sourceName: 'Identity Fusion',
+                identityId: globalOwnerId,
+                attributes: {},
+            } as any)
+            run.registerFusionAccount(existingReviewer)
+
+            ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
+            mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([globalOwnerId])
+            await fusionService.initializeSourceReviewers()
+
+            expect(run.reviewersBySourceId.get(SOURCE_ID)?.has(existingReviewer)).toBe(true)
+            ;(fusionService as any).validateManagedSourceReviewers()
+            expect(run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
+        })
+
+
+        it('creates an identity-origin fusion account when the global owner is outside identity scope', async () => {
+            const globalOwner = {
+                id: 'global-owner-out-of-scope',
+                name: 'Global Owner',
+                attributes: { email: 'owner@example.com' },
+            } as IdentityDocument
+
+            ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
+            mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(['global-owner-out-of-scope'])
+            mockIdentities.ensureIdentityById = vi.fn().mockResolvedValue(globalOwner)
+            mockIdentities.markIdentityInScope = vi.fn()
+
+            await fusionService.initializeSourceReviewers()
+
+            expect(mockIdentities.ensureIdentityById).toHaveBeenCalledWith('global-owner-out-of-scope')
+            expect(mockIdentities.markIdentityInScope).toHaveBeenCalledWith('global-owner-out-of-scope')
+            expect(run.reviewersBySourceId.get(SOURCE_ID)?.size).toBe(1)
+            expect(run.getFusionIdentity('global-owner-out-of-scope')).toBeDefined()
+            ;(fusionService as any).validateManagedSourceReviewers()
+            expect(run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
+        })
+
+        it('warns when global reviewer is enabled but no owner identity IDs resolve', async () => {
+            ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
+            mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([])
+            const warnSpy = vi.spyOn(mockLog, 'warn')
+
+            await fusionService.initializeSourceReviewers()
+
+            expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no Fusion source owner identity IDs'))
+            ;(fusionService as any).validateManagedSourceReviewers()
+            expect(run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(true)
+        })
+    })
+
     describe('processManagedAccounts', () => {
         beforeEach(() => {
             mockDefinitionService.refreshReverseCorrelationAttributes.mockImplementation((fusionAccount) => {
@@ -788,6 +881,17 @@ describe('FusionService', () => {
 
         it('uses current-run non-matched managed source accounts as deferred candidates for subsequent managed accounts', async () => {
             fusionService.config.managedAccountsBatchSize = 1
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: { deferredMatching: true },
+            })
+            ;(fusionService as any).run.reviewersBySourceId.set(
+                'source-a-id',
+                new Set([{ identityId: 'reviewer-1' } as any])
+            )
+
             const firstAccount = {
                 id: 'acct-seq-1',
                 nativeIdentity: 'native-seq-1',
@@ -820,7 +924,10 @@ describe('FusionService', () => {
             mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
                 if (candidateType !== 'deferred') return candidateList.length
-                if (candidateList.length > 0) {
+                const hasPriorNonMatch = candidateList.some(
+                    (candidate) => candidate.managedAccountId === 'source-a-id::native-seq-1'
+                )
+                if (hasPriorNonMatch && account.managedAccountId === 'source-a-id::native-seq-2') {
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Current operation non-match',
@@ -831,11 +938,6 @@ describe('FusionService', () => {
                 return candidateList.length
             })
 
-            // Pre-register first account in fusionAccountMap so queryForSource can find it as a deferred candidate
-            const preFirst = FusionAccount.fromManagedAccount(firstAccount)
-            preFirst.setNonMatched()
-            ;(fusionService as any).setFusionAccount(preFirst)
-
             await fusionService.processManagedAccounts()
 
             expect(fusionService.fusionAccounts).toHaveLength(1)
@@ -845,6 +947,17 @@ describe('FusionService', () => {
 
         it('keeps deferred candidate visibility within a managed-account batch', async () => {
             fusionService.config.managedAccountsBatchSize = 2
+            ;(fusionService as any).run.sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: { deferredMatching: true },
+            })
+            ;(fusionService as any).run.reviewersBySourceId.set(
+                'source-a-id',
+                new Set([{ identityId: 'reviewer-1' } as any])
+            )
+
             const firstAccount = {
                 id: 'acct-batch-def-1',
                 nativeIdentity: 'native-batch-def-1',
@@ -880,7 +993,10 @@ describe('FusionService', () => {
                 }
                 const candidateList = Array.from(candidates)
                 if (candidateType !== 'deferred') return candidateList.length
-                if (candidateList.length > 0) {
+                const hasPriorNonMatch = candidateList.some(
+                    (candidate) => candidate.managedAccountId === 'source-a-id::native-batch-def-1'
+                )
+                if (hasPriorNonMatch && account.managedAccountId === 'source-a-id::native-batch-def-2') {
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Current operation non-match',
@@ -891,11 +1007,6 @@ describe('FusionService', () => {
                 return candidateList.length
             })
 
-            // Pre-register first account in fusionAccountMap so queryForSource can find it as a deferred candidate
-            const preFirst = FusionAccount.fromManagedAccount(firstAccount)
-            preFirst.setNonMatched()
-            ;(fusionService as any).setFusionAccount(preFirst)
-
             await fusionService.processManagedAccounts()
 
             expect(fusionService.fusionAccounts).toHaveLength(1)
@@ -903,7 +1014,7 @@ describe('FusionService', () => {
             expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
-        it('runs deferred source identity phase in parallel while deferred candidate scoring stays batched', async () => {
+        it('runs deferred source identity phase in parallel while deferred drain stays sequential per source', async () => {
             fusionService.config.managedAccountsBatchSize = 2
             const accountA1 = {
                 id: 'acct-par-a-1',
@@ -978,41 +1089,43 @@ describe('FusionService', () => {
             let maxInFlightIdentityB = 0
             let inFlightDeferredB = 0
             let maxInFlightDeferredB = 0
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (fusionAccount, candidates, candidateType) => {
-                const candidateList = Array.from(candidates)
-                if (candidateType === 'identity') {
-                    if (fusionAccount.sourceName === 'Source A') {
-                        inFlightIdentityA += 1
-                        maxInFlightIdentityA = Math.max(maxInFlightIdentityA, inFlightIdentityA)
-                    } else if (fusionAccount.sourceName === 'Source B') {
-                        inFlightIdentityB += 1
-                        maxInFlightIdentityB = Math.max(maxInFlightIdentityB, inFlightIdentityB)
+            mockMatchingService.scoreFusionAccount.mockImplementation(
+                async (fusionAccount, candidates, candidateType) => {
+                    const candidateList = Array.from(candidates)
+                    if (candidateType === 'identity') {
+                        if (fusionAccount.sourceName === 'Source A') {
+                            inFlightIdentityA += 1
+                            maxInFlightIdentityA = Math.max(maxInFlightIdentityA, inFlightIdentityA)
+                        } else if (fusionAccount.sourceName === 'Source B') {
+                            inFlightIdentityB += 1
+                            maxInFlightIdentityB = Math.max(maxInFlightIdentityB, inFlightIdentityB)
+                        }
+                        await new Promise((resolve) => setTimeout(resolve, 5))
+                        if (fusionAccount.sourceName === 'Source A') {
+                            inFlightIdentityA -= 1
+                        } else if (fusionAccount.sourceName === 'Source B') {
+                            inFlightIdentityB -= 1
+                        }
+                        return candidateList.length
                     }
+                    if (candidateType !== 'deferred') {
+                        return candidateList.length
+                    }
+                    inFlightDeferredB += 1
+                    maxInFlightDeferredB = Math.max(maxInFlightDeferredB, inFlightDeferredB)
                     await new Promise((resolve) => setTimeout(resolve, 5))
-                    if (fusionAccount.sourceName === 'Source A') {
-                        inFlightIdentityA -= 1
-                    } else if (fusionAccount.sourceName === 'Source B') {
-                        inFlightIdentityB -= 1
+                    if (fusionAccount.sourceName === 'Source B' && candidateList.length > 0) {
+                        fusionAccount.addFusionMatch({
+                            identityId: '',
+                            identityName: 'Current operation non-match source B',
+                            candidateType: 'deferred',
+                            scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
+                        } as any)
                     }
+                    inFlightDeferredB -= 1
                     return candidateList.length
                 }
-                if (candidateType !== 'deferred') {
-                    return candidateList.length
-                }
-                inFlightDeferredB += 1
-                maxInFlightDeferredB = Math.max(maxInFlightDeferredB, inFlightDeferredB)
-                await new Promise((resolve) => setTimeout(resolve, 5))
-                if (fusionAccount.sourceName === 'Source B' && candidateList.length > 0) {
-                    fusionAccount.addFusionMatch({
-                        identityId: '',
-                        identityName: 'Current operation non-match source B',
-                        candidateType: 'deferred',
-                        scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
-                    } as any)
-                }
-                inFlightDeferredB -= 1
-                return candidateList.length
-            })
+            )
 
             // Pre-register a Source B non-match candidate for deferred candidate visibility
             const preB = FusionAccount.fromManagedAccount({
@@ -1030,7 +1143,7 @@ describe('FusionService', () => {
 
             expect(maxInFlightIdentityA).toBeGreaterThan(1)
             expect(maxInFlightIdentityB).toBeGreaterThan(1)
-            expect(maxInFlightDeferredB).toBeGreaterThan(1)
+            expect(maxInFlightDeferredB).toBeLessThanOrEqual(1)
             expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
@@ -1045,6 +1158,17 @@ describe('FusionService', () => {
             } as any)
             sourceAAccount.setNonMatched()
             fusionService.setFusionAccount(sourceAAccount)
+            const sourceBCandidate = FusionAccount.fromManagedAccount({
+                id: 'acct-b-candidate',
+                nativeIdentity: 'native-b-candidate',
+                name: 'Source B Candidate',
+                sourceId: 'source-b-id',
+                sourceName: 'Source B',
+                attributes: {},
+            } as any)
+            sourceBCandidate.setNonMatched()
+            fusionService.setFusionAccount(sourceBCandidate)
+            ;(fusionService as any).run.registerFinalizedDeferredCandidate(sourceBCandidate)
             ;(fusionService as any).run.sourcesByName.set('Source B', {
                 id: 'source-b-id',
                 name: 'Source B',
@@ -1054,11 +1178,14 @@ describe('FusionService', () => {
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            const sourceBDeferredCandidateSizes: number[] = []
+            const sourceBDeferredCandidateSources: string[][] = []
             mockMatchingService.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
-                const n = Array.from(candidates).length
-                if (candidateType === 'deferred') sourceBDeferredCandidateSizes.push(n)
-                return n
+                if (candidateType === 'deferred') {
+                    sourceBDeferredCandidateSources.push(
+                        Array.from(candidates).map((candidate) => candidate.sourceName ?? '')
+                    )
+                }
+                return Array.from(candidates).length
             })
 
             await fusionService.processManagedAccount({
@@ -1071,7 +1198,7 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account)
 
-            expect(sourceBDeferredCandidateSizes).toEqual([0])
+            expect(sourceBDeferredCandidateSources).toEqual([['Source B']])
         })
 
         it('resolves all correlated accounts in the correlated account sweep before uncorrelated batch processing', async () => {
@@ -1464,9 +1591,7 @@ describe('FusionService', () => {
             customReportFusion.setTracker(tracker)
             await customReportFusion.processManagedAccount(mockManagedAccount)
             const report = customReportFusion.generateReport(tracker, true)
-            expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-run-def')).toBe(
-                true
-            )
+            expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-run-def')).toBe(true)
         })
 
         it('records only non-match history when creating a new authoritative non-match fusion account', async () => {
@@ -1688,7 +1813,9 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([
+            seedRunInventory(
+                run,
+                new Map([
                     [
                         'source-a-id::native-missing-1',
                         {
@@ -1774,7 +1901,9 @@ describe('FusionService', () => {
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
                 new Map([['identity-1', new Set(['source-a-id::native-new-2'])]])
             )
-            seedRunInventory(run, new Map([
+            seedRunInventory(
+                run,
+                new Map([
                     [
                         'source-a-id::native-new-2',
                         {
@@ -1833,7 +1962,9 @@ describe('FusionService', () => {
                 ])
             )
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([
+            seedRunInventory(
+                run,
+                new Map([
                     [
                         'source-a-id::native-existing-1',
                         {
@@ -1950,9 +2081,11 @@ describe('FusionService', () => {
 
             await (fusionService as any).correlationManager.correlatePerSource(fusionAccount, linkDecision)
 
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(fusionAccount, [
-                'source-a-id::native-no-meta',
-            ], 'link')
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(
+                fusionAccount,
+                ['source-a-id::native-no-meta'],
+                'link'
+            )
         })
 
         it('sets reverse correlation attribute for non-matched authoritative accounts without checking platform prerequisites', async () => {
@@ -2036,11 +2169,6 @@ describe('FusionService', () => {
                 return candidateList.length
             })
 
-            // Pre-register first account in fusionAccountMap for deferred candidate visibility
-            const preFirst = FusionAccount.fromManagedAccount(firstAccount)
-            preFirst.setNonMatched()
-            ;(fusionService as any).setFusionAccount(preFirst)
-
             const analyzed = await fusionService.analyzeUncorrelatedAccounts()
 
             expect(analyzed).toHaveLength(2)
@@ -2049,13 +2177,17 @@ describe('FusionService', () => {
         })
 
         it('makes previously-persisted non-match accounts visible as deferred candidates', async () => {
-            const persistedNonMatch = FusionAccount.fromManagedAccount({
-                id: 'acct-persisted-nonmatch',
+            FusionAccount.configure(mockConfig)
+            const persistedNonMatch = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'native-persisted-nonmatch',
                 name: 'Previously Persisted Non-Match',
-                sourceId: 'source-a-id',
-                sourceName: 'Source A',
-                attributes: {},
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: true,
+                attributes: {
+                    originSource: 'Source A',
+                    originAccount: 'source-a-id::native-persisted-nonmatch',
+                    statuses: ['nonMatched', 'uncorrelated'],
+                },
             } as any)
             persistedNonMatch.setNonMatched()
             fusionService.setFusionAccount(persistedNonMatch)
@@ -2094,9 +2226,7 @@ describe('FusionService', () => {
                             identityId: '',
                             identityName: 'Previously Persisted Non-Match',
                             candidateType: 'deferred',
-                            scores: [
-                                { attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any,
-                            ],
+                            scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any],
                         } as any)
                     }
                 }
@@ -2232,10 +2362,7 @@ describe('FusionService', () => {
             expect(conflictWarnings?.occurrences).toHaveLength(1)
             expect(conflictWarnings?.occurrences[0].identityId).toBe('identity-duplicate')
             expect(conflictWarnings?.occurrences[0].accountCount).toBe(2)
-            expect(conflictWarnings?.occurrences[0].managedKeys).toEqual([
-                `fusion-a`,
-                `fusion-b`,
-            ])
+            expect(conflictWarnings?.occurrences[0].managedKeys).toEqual([`fusion-a`, `fusion-b`])
         })
 
         it('does not warn when the same correlated account key is updated', () => {
@@ -2323,8 +2450,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKey, managedAccount]])
-            )
+            seedRunInventory(run, new Map([[managedKey, managedAccount]]))
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
@@ -2387,8 +2513,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKeyAuto, managedAccount]])
-            )
+            seedRunInventory(run, new Map([[managedKeyAuto, managedAccount]]))
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
@@ -2449,8 +2574,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKeyAutoCorr, managedAccount]])
-            )
+            seedRunInventory(run, new Map([[managedKeyAutoCorr, managedAccount]]))
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
@@ -2479,9 +2603,11 @@ describe('FusionService', () => {
             } as any
 
             await fusionService.processFusionIdentityDecision(decision)
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(expect.any(FusionAccount), [
-                managedKeyAutoCorr,
-            ], 'merge')
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(
+                expect.any(FusionAccount),
+                [managedKeyAutoCorr],
+                'merge'
+            )
         })
 
         it('suppresses generic association history for authorized decisions without identityId', async () => {
@@ -2498,8 +2624,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKeyNoId, managedAccount]])
-            )
+            seedRunInventory(run, new Map([[managedKeyNoId, managedAccount]]))
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
@@ -2538,8 +2663,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKeyAuthz, managedAccount]])
-            )
+            seedRunInventory(run, new Map([[managedKeyAuthz, managedAccount]]))
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             mockIdentities.getIdentityById.mockReturnValue(undefined as any)
@@ -2575,7 +2699,11 @@ describe('FusionService', () => {
             await fusionService.processFusionIdentityDecision(decision)
 
             expect(mockIdentities.correlateAccounts).toHaveBeenCalledTimes(1)
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(expect.any(FusionAccount), [managedKeyAuthz], 'merge')
+            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(
+                expect.any(FusionAccount),
+                [managedKeyAuthz],
+                'merge'
+            )
         })
 
         it('registers unique attributes and skips output for record no-match decisions', async () => {
@@ -2650,9 +2778,7 @@ describe('FusionService', () => {
                 config: { disableNonMatchingAccounts: true },
             })
 
-            const queueDisableSpy = vi
-                .spyOn(fusionService.run, 'queueDisableOperation')
-                .mockImplementation(() => {})
+            const queueDisableSpy = vi.spyOn(fusionService.run, 'queueDisableOperation').mockImplementation(() => {})
             const decision = {
                 submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
                 account: {
@@ -2753,8 +2879,7 @@ describe('FusionService', () => {
 
             vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
             vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[histKey, managedAccount]])
-            )
+            seedRunInventory(run, new Map([[histKey, managedAccount]]))
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 

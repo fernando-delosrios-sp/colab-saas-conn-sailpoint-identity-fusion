@@ -113,6 +113,22 @@ export function fusionReportMatchCandidateAccountFields(
     }
 }
 
+/** Deferred-match candidate fields prefer the managed account key over any linked identity id. */
+export function fusionReportDeferredMatchCandidateFields(
+    match: FusionMatch
+): Pick<FusionReportMatch, 'accountId' | 'accountName'> {
+    const fi = match.fusionIdentity
+    if (fi) {
+        const accountId = trimStr(fi.managedKeyOrUndefined ?? fi.managedAccountId)
+        return { accountId, accountName: getFusionReportAccountLabel(fi) }
+    }
+    const id = trimStr(match.identityId) ?? ''
+    return {
+        accountId: id || undefined,
+        accountName: match.identityName,
+    }
+}
+
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {
     const displayLabel = trimStr(fusionAccount.identityAlias) ?? ''
     if (displayLabel) return displayLabel
@@ -192,5 +208,6 @@ export function buildIdentityConflictWarningsFromMap(
         },
     }
 }
+
 
 

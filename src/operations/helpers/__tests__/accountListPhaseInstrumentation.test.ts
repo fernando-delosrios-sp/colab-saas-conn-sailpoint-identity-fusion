@@ -1,7 +1,7 @@
 import { FusionRun } from '../../../model/fusionRun'
 import { OperationRunContext } from '../../../services/logService/operationRunContext'
 import { createOperationTestRegistry } from '../../__tests__/harness/operationTestRegistry'
-import { outputPhase, processPhase } from '../accountListPhases'
+import { outputPhase, processPhase, fetchPhase } from '../accountListPhases'
 
 describe('accountListPhases step instrumentation', () => {
     afterEach(() => {
@@ -116,6 +116,41 @@ describe('accountListPhases step instrumentation', () => {
 
         expect(sources.clearManagedAccounts).not.toHaveBeenCalled()
         expect(stepStartOrder(log)).not.toContain('clear-managed-accounts')
+    })
+})
+
+describe('fetchPhase global reviewer hydration', () => {
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('includes fusion source owners during dry-run when global reviewer is enabled', async () => {
+        const registry = createOperationTestRegistry()
+        const { identities, sources, fusion } = registry
+        const globalOwnerIds = ['global-owner-1']
+
+        ;(fusion as any).fusionOwnerIsGlobalReviewer = true
+        ;(fusion as any).fusionReportOnAggregation = false
+        ;(sources as any).fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(globalOwnerIds)
+
+        await fetchPhase(registry, { isPersistent: false })
+
+        expect((sources as any).fetchGlobalOwnerIdentityIds).toHaveBeenCalledTimes(1)
+        expect(identities.fetchIdentities).toHaveBeenCalledWith(globalOwnerIds)
+    })
+
+    it('skips owner hydration during dry-run when global reviewer is disabled', async () => {
+        const registry = createOperationTestRegistry()
+        const { identities, sources, fusion } = registry
+
+        ;(fusion as any).fusionOwnerIsGlobalReviewer = false
+        ;(fusion as any).fusionReportOnAggregation = true
+        ;(sources as any).fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(['owner-1'])
+
+        await fetchPhase(registry, { isPersistent: false })
+
+        expect((sources as any).fetchGlobalOwnerIdentityIds).not.toHaveBeenCalled()
+        expect(identities.fetchIdentities).toHaveBeenCalledWith([])
     })
 })
 

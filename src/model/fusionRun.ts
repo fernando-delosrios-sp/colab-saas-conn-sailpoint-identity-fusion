@@ -386,7 +386,34 @@ export class FusionRun {
      * State is kept run-local so the Match module remains stateless.
      */
     registerDeferredCandidate(fusionAccount: FusionAccount): void {
-        this._candidateRegistry.register(fusionAccount)
+        this._candidateRegistry.registerPending(fusionAccount)
+    }
+
+    registerPersistedDeferredCandidate(fusionAccount: FusionAccount): void {
+        this._candidateRegistry.registerPersisted(fusionAccount)
+    }
+
+    registerFinalizedDeferredCandidate(fusionAccount: FusionAccount): void {
+        this._candidateRegistry.registerFinalized(fusionAccount)
+    }
+
+    /** Alias for {@link registerFinalizedDeferredCandidate} — anchor terminology from ubiquitous language. */
+    registerAnchorDeferredCandidate(fusionAccount: FusionAccount): void {
+        this.registerFinalizedDeferredCandidate(fusionAccount)
+    }
+
+    unregisterDeferredCandidate(fusionAccount: FusionAccount): void {
+        this._candidateRegistry.unregister(fusionAccount)
+    }
+
+    hasPersistedDeferredCandidates(): boolean {
+        return this._candidateRegistry.hasPersistedCandidates()
+    }
+
+    getDeferredCandidateTier(
+        fusionAccount: FusionAccount
+    ): import('../services/matchingService/candidateRegistry').DeferredCandidateTier | undefined {
+        return this._candidateRegistry.getCandidateTier(fusionAccount)
     }
 
     /**

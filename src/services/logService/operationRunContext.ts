@@ -36,6 +36,7 @@ export type CumulativeOutcomes = {
     nonMatch: number
     autoMerged: number
     formsQueued: number
+    deferred: number
 }
 
 type ProgressSnapshot = {
@@ -76,7 +77,7 @@ export function createEmptyEventCounters(): EventCounters {
 }
 
 function createEmptyCumulativeOutcomes(): CumulativeOutcomes {
-    return { nonMatch: 0, autoMerged: 0, formsQueued: 0 }
+    return { nonMatch: 0, autoMerged: 0, formsQueued: 0, deferred: 0 }
 }
 
 function incrementCorrelationActivity(
@@ -166,8 +167,10 @@ export class OperationRunContext {
             case 'match': {
                 const type = detail?.type as MatchEventType | undefined
                 if (type === 'exact') this.events.matchExact++
-                else if (type === 'deferred') this.events.matchDeferred++
-                else this.events.matchPartial++
+                else if (type === 'deferred') {
+                    this.events.matchDeferred++
+                    this.cumulativeOutcomes.deferred++
+                } else this.events.matchPartial++
                 break
             }
             case 'correlation': {
@@ -332,6 +335,7 @@ export function formatCorrelationSummarySegment(
     if (!value) return ''
     return `correlations ${value}`
 }
+
 
 
 

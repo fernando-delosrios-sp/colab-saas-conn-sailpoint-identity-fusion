@@ -154,6 +154,20 @@ describe('accountList setup phase', () => {
         expect(identities.fetchIdentities).toHaveBeenCalledWith(globalOwnerIds)
     })
 
+    it('passes global owner ids to fetchIdentities during dry-run when fusionOwnerIsGlobalReviewer', async () => {
+        const { registry, sources, identities, fusion } = createMockRegistry([])
+        const input = { dryRun: { enabled: true }, schema: { attributes: [] } } as any
+
+        ;(fusion as any).fusionOwnerIsGlobalReviewer = true
+        const globalOwnerIds = ['global-owner-1']
+        ;(sources as any).fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(globalOwnerIds)
+
+        await accountList(registry, input)
+
+        expect((sources as any).fetchGlobalOwnerIdentityIds).toHaveBeenCalledTimes(1)
+        expect(identities.fetchIdentities).toHaveBeenCalledWith(globalOwnerIds)
+    })
+
     it('schedules delayed aggregation via workflow callback path', async () => {
         const delayedSource = {
             name: 'HR Source',
@@ -438,6 +452,7 @@ describe('accountList report epilogue', () => {
         logSpy.mockRestore()
     })
 })
+
 
 
 
