@@ -3,8 +3,10 @@ import { AggregationTracker } from '../aggregationTracker'
 import { ManagedAccountAnalysisRecorder } from '../managedAccountAnalysisRecorder'
 import { SourceType } from '../../../model/config'
 import { MatchCandidateType } from '../../matchingService/types'
+import { FusionRun } from '../../../model/fusionRun'
 
 function makeRecorder(overrides: Record<string, any> = {}) {
+    const run = overrides.run ?? new FusionRun({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), recordEvent: vi.fn(), getLogLevel: vi.fn().mockReturnValue('info') } as any)
     const log = {
         debug: vi.fn(),
         info: vi.fn(),
@@ -20,6 +22,7 @@ function makeRecorder(overrides: Record<string, any> = {}) {
     } as any
     const sources = { resolveIscAccountIdForManagedKey: vi.fn(() => 'isc-123') } as any
     return {
+        run,
         recorder: new ManagedAccountAnalysisRecorder({
             log,
             tracker: () => tracker,
@@ -28,6 +31,7 @@ function makeRecorder(overrides: Record<string, any> = {}) {
             sourcesByName: new Map(),
             config: { fusionReportOnAggregation: true } as any,
             sources,
+            run,
             shouldCaptureReportData: () => true,
             ...overrides,
         }),
@@ -61,13 +65,28 @@ describe('ManagedAccountAnalysisRecorder', () => {
     })
 
     it('records a deferred match account', () => {
-        const { recorder, tracker } = makeRecorder()
+        const anchor = {
+            managedKey: 'source-a-id::anchor',
+            sourceName: 'HR',
+            name: 'Jane',
+        } as any
+        const { recorder, tracker, run } = makeRecorder({
+            sourcesByName: new Map([
+                ['HR', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } }],
+            ]),
+        })
+        run.registerFinalizedDeferredCandidate(anchor)
         const fusionAccount = {
             name: 'acct',
             sourceName: 'HR',
             isMatch: true,
             fusionMatches: [
-                { candidateType: MatchCandidateType.Deferred, identityName: 'Jane', scores: [] },
+                {
+                    candidateType: MatchCandidateType.Deferred,
+                    identityName: 'Jane',
+                    fusionIdentity: anchor,
+                    scores: [],
+                },
             ],
         } as any
         recorder.recordAnalysis({
@@ -83,8 +102,21 @@ describe('ManagedAccountAnalysisRecorder', () => {
     })
 
     it('uses managed account url for deferred match candidates instead of identity url', () => {
-        const { recorder, tracker, urlContext, sources } = makeRecorder()
+        const { recorder, tracker, urlContext, sources, run } = makeRecorder({
+            sourcesByName: new Map([
+                ['HR', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } }],
+            ]),
+        })
         sources.resolveIscAccountIdForManagedKey.mockReturnValue('isc-managed-456')
+        const anchorIdentity = {
+            identityId: 'identity-999',
+            managedAccountId: 'source-a-id::native-candidate',
+            managedKeyOrUndefined: 'source-a-id::native-candidate',
+            managedKey: 'source-a-id::native-candidate',
+            name: 'Jane Candidate',
+            sourceName: 'HR',
+        } as any
+        run.registerFinalizedDeferredCandidate(anchorIdentity)
         const fusionAccount = {
             name: 'acct',
             sourceName: 'HR',
@@ -93,12 +125,7 @@ describe('ManagedAccountAnalysisRecorder', () => {
                 {
                     candidateType: MatchCandidateType.Deferred,
                     identityName: 'Jane Candidate',
-                    fusionIdentity: {
-                        identityId: 'identity-999',
-                        managedAccountId: 'source-a-id::native-candidate',
-                        managedKeyOrUndefined: 'source-a-id::native-candidate',
-                        name: 'Jane Candidate',
-                    },
+                    fusionIdentity: anchorIdentity,
                     scores: [],
                 },
             ],
@@ -116,6 +143,55 @@ describe('ManagedAccountAnalysisRecorder', () => {
         expect(matchRow.identityUrl).toBe('human-url')
         expect(urlContext.humanAccount).toHaveBeenCalledWith('isc-managed-456')
         expect(urlContext.identity).not.toHaveBeenCalled()
+    })
+
+
+    it('excludes pending peer matches from deferred report candidates', () => {
+        const peer = {
+            managedKey: 'source-a-id::peer',
+            sourceName: 'HR',
+            name: 'Peer',
+        } as any
+        const anchor = {
+            managedKey: 'source-a-id::anchor',
+            sourceName: 'HR',
+            name: 'Anchor',
+        } as any
+        const { recorder, tracker, run } = makeRecorder({
+            sourcesByName: new Map([
+                ['HR', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } }],
+            ]),
+        })
+        run.registerFinalizedDeferredCandidate(anchor)
+        const fusionAccount = {
+            name: 'acct',
+            sourceName: 'HR',
+            isMatch: true,
+            fusionMatches: [
+                {
+                    candidateType: MatchCandidateType.Deferred,
+                    identityName: 'Anchor',
+                    fusionIdentity: anchor,
+                    scores: [],
+                },
+                {
+                    candidateType: MatchCandidateType.Deferred,
+                    identityName: 'Peer',
+                    fusionIdentity: peer,
+                    scores: [],
+                },
+            ],
+        } as any
+        recorder.recordAnalysis({
+            account: { name: 'acct', sourceName: 'HR' } as any,
+            fusionAccount,
+            sourceInfo: undefined,
+            sourceType: SourceType.Authoritative,
+            hasIdentityCandidateMatches: false,
+            fusionIdentityComparisons: 2,
+        })
+        expect(tracker.deferredMatchReportData[0].matches).toHaveLength(1)
+        expect(tracker.deferredMatchReportData[0].matches[0].identityName).toBe('Anchor')
     })
 
     it('skips non-match data for authoritative deferred sources', () => {
@@ -142,5 +218,6 @@ describe('ManagedAccountAnalysisRecorder', () => {
         expect(tracker.failedMatchingAccounts.length).toBe(1)
     })
 })
+
 
 

@@ -40,9 +40,8 @@ If there are failed items, list their id + issues:
 
 | Capability | Sync State | Notes |
 |---|---|---|
-| `matching-service` | ✗ To be synced | MODIFIED: deferred matching, two-sweep runner, CandidateRegistry |
-| `matching-service/match-outcome-dispatch` | ✗ To be synced | MODIFIED: four outcomes, deferred drain concurrency |
-| `ubiquitous-language` | ✗ To be synced | ADDED: Deferred drain, Anchor deferred candidate |
+| `matching-service` | ✓ Synced | MODIFIED: deferred matching, two-sweep runner, CandidateRegistry, MatchOutcomeDispatcher four outcomes, deferred drain concurrency |
+| `ubiquitous-language` | ✓ Synced | ADDED: Deferred drain, Anchor deferred candidate |
 
 ---
 
@@ -50,7 +49,7 @@ If there are failed items, list their id + issues:
 
 | Spot Check Item | design description | specs correspondence | Gap |
 |---|---|---|---|
-| D1 Sequential drain per source | Replace frozen parallel Pass 2 | `runDeferredDrain`, `scoreIdentityPhase` in match-outcome-dispatch spec | None |
+| D1 Sequential drain per source | Replace frozen parallel Pass 2 | `runDeferredDrain`, `scoreIdentityPhase` in matching-service spec | None |
 | D2 Materialize matched pending | All matched pending on deferred match | `materializeMatchedPendingCandidates` | No dedicated test (see §7) |
 | D3 Persisted never re-materialized | Skip persisted/finalized in materialization | Tier guard in `materializeMatchedPendingCandidates:717-718` | None |
 | D4 originAccount keying | Registry keys prefer originAccount | `candidateRegistry.candidateKey` | Covered in `candidateRegistry.test.ts` |
@@ -121,3 +120,4 @@ plan.md has no `[~]` rows. Task 4.2 is unchecked manual verification:
 1. Commit implementation changes.
 2. Optionally run task 4.2 manual dry-run or mark `[~]` deferred with documented equivalence (already in §7).
 3. Proceed to `/opsx:archive` to sync delta specs and move change folder.
+

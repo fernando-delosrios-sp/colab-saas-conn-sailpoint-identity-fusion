@@ -928,10 +928,14 @@ describe('FusionService', () => {
                     (candidate) => candidate.managedAccountId === 'source-a-id::native-seq-1'
                 )
                 if (hasPriorNonMatch && account.managedAccountId === 'source-a-id::native-seq-2') {
+                    const anchor = candidateList.find(
+                        (candidate) => candidate.managedAccountId === 'source-a-id::native-seq-1'
+                    )
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Current operation non-match',
                         candidateType: 'deferred',
+                        fusionIdentity: anchor,
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any],
                     } as any)
                 }
@@ -997,10 +1001,14 @@ describe('FusionService', () => {
                     (candidate) => candidate.managedAccountId === 'source-a-id::native-batch-def-1'
                 )
                 if (hasPriorNonMatch && account.managedAccountId === 'source-a-id::native-batch-def-2') {
+                    const anchor = candidateList.find(
+                        (candidate) => candidate.managedAccountId === 'source-a-id::native-batch-def-1'
+                    )
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Current operation non-match',
                         candidateType: 'deferred',
+                        fusionIdentity: anchor,
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 94, isMatch: true } as any],
                     } as any)
                 }
@@ -1119,6 +1127,7 @@ describe('FusionService', () => {
                             identityId: '',
                             identityName: 'Current operation non-match source B',
                             candidateType: 'deferred',
+                            fusionIdentity: candidateList[0],
                             scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                         } as any)
                     }
@@ -1138,6 +1147,7 @@ describe('FusionService', () => {
             } as any)
             preB.setNonMatched()
             fusionService.setFusionAccount(preB)
+            ;(fusionService as any).run.registerFinalizedDeferredCandidate(preB)
 
             await fusionService.processManagedAccounts()
 
@@ -1442,21 +1452,25 @@ describe('FusionService', () => {
             } as any)
             nonMatchedCandidate.setNonMatched()
             fusionService.setFusionAccount(nonMatchedCandidate)
+            const run = (fusionService as any).run
 
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
-                const n = Array.from(_candidates).length
+            run.registerFinalizedDeferredCandidate(nonMatchedCandidate)
+
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
+                const candidateList = Array.from(candidates)
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Non-matched Candidate',
                         candidateType: 'deferred',
+                        fusionIdentity: nonMatchedCandidate,
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                     } as any)
                 }
-                return n
+                return candidateList.length
             })
 
             const workQueue = new Map([['source-a-id::native-deferred-1', mockManagedAccount]])
@@ -1499,21 +1513,25 @@ describe('FusionService', () => {
             } as any)
             nonMatchedCandidate.setNonMatched()
             fusionService.setFusionAccount(nonMatchedCandidate)
+            const run = (fusionService as any).run
 
             mockMappingService.mapAttributes.mockImplementation((account) => account)
             mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
-                const n = Array.from(_candidates).length
+            run.registerFinalizedDeferredCandidate(nonMatchedCandidate)
+
+            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
+                const candidateList = Array.from(candidates)
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
                         identityId: '',
                         identityName: 'Non-matched Candidate',
                         candidateType: 'deferred',
+                        fusionIdentity: nonMatchedCandidate,
                         scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
                     } as any)
                 }
-                return n
+                return candidateList.length
             })
 
             const tracker = new AggregationTracker()

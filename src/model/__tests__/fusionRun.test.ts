@@ -305,11 +305,12 @@ describe('FusionRun', () => {
     })
 })
 
-function makeMockRecorder(options: { tracker: AggregationTracker }) {
+function makeMockRecorder(options: { tracker: AggregationTracker; run?: FusionRun }) {
     const urlContext = {
         humanAccount: vi.fn().mockReturnValue(''),
         identity: vi.fn().mockReturnValue(''),
     }
+    const run = options.run ?? new FusionRun({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any)
     const recorder = new ManagedAccountAnalysisRecorder({
         log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn(), assert: vi.fn(), crash: vi.fn() } as any,
         tracker: () => options.tracker,
@@ -317,8 +318,8 @@ function makeMockRecorder(options: { tracker: AggregationTracker }) {
         reportAttributes: [],
         sourcesByName: new Map(),
         config: {} as any,
-        analyzer: {} as any,
         sources: { managedAccountInventory: new Map() } as any,
+        run,
         shouldCaptureReportData: () => true,
     })
     ;(recorder as any).trackFailedCalls = []
@@ -329,5 +330,6 @@ function makeMockRecorder(options: { tracker: AggregationTracker }) {
     }
     return recorder
 }
+
 
 

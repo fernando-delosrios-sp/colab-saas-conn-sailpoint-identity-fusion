@@ -4,12 +4,17 @@ import { LogService } from '../logService'
 import { SourceInfo, SourceService } from '../sourceService'
 import { UrlContext } from '../../utils/url'
 import { AggregationTracker } from '../../model/aggregationTracker'
+import { FusionRun } from '../../model/fusionRun'
 import {
     buildMinimalFusionReportAccount,
     fusionReportDeferredMatchCandidateFields,
     mapScoreReportsForFusionReport,
 } from './helpers'
-import { formatFusionMatchDiscoveryLog, isDeferredMatchingEnabledForSource } from '../matchingService/matchingHelpers'
+import {
+    anchorDeferredMatches,
+    formatFusionMatchDiscoveryLog,
+    isDeferredMatchingEnabledForSource,
+} from '../matchingService/matchingHelpers'
 import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
 import { ManagedAccountAnalysisContext, MatchCandidateType } from '../matchingService/types'
 import { resolveReportAccountId, resolveReportAccountIdValue } from './reportAccountResolver'
@@ -22,6 +27,7 @@ export interface ManagedAccountAnalysisRecorderDeps {
     sourcesByName: Map<string, SourceInfo>
     config: FusionConfig
     sources: SourceService
+    run: FusionRun
     shouldCaptureReportData: () => boolean
 }
 
@@ -63,9 +69,7 @@ export class ManagedAccountAnalysisRecorder {
                 return
             }
             const sourceTypeValue = sourcesByName.get(fusionAccount.sourceName)?.sourceType
-            const deferredMatches = fusionAccount.fusionMatches
-                .filter((match) => match.candidateType === MatchCandidateType.Deferred)
-                .map((match) => {
+            const deferredMatches = anchorDeferredMatches(fusionAccount, this.deps.run).map((match) => {
                     const fields = fusionReportDeferredMatchCandidateFields(match)
                     const fi = match.fusionIdentity
                     const deferredCandidateIdentityId = fi?.identityId
@@ -141,5 +145,6 @@ export class ManagedAccountAnalysisRecorder {
         })
     }
 }
+
 
 
