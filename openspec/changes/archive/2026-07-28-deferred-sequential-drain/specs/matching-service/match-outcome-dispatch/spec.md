@@ -12,10 +12,9 @@
 - **WHEN** a managed account scores above the manual review threshold but below automatic merge
 - **THEN** `MatchOutcomeDispatcher` SHALL create a Fusion review form via `FormService` with merge-with-existing-identity and create-new-identity options and clear the candidate references
 
-#### Scenario: Deferred match defers incoming and materializes pending candidates
-- **WHEN** a managed account scores deferred-candidate matches
-- **THEN** `MatchOutcomeDispatcher` SHALL claim the incoming managed account for later comparison
-- **AND** SHALL log the deferred matches
+#### Scenario: Deferred match defers identity creation
+- **WHEN** the best candidate for a managed account is a deferred candidate from the same source
+- **THEN** `MatchOutcomeDispatcher` SHALL claim the managed account for later comparison and log the deferred matches
 - **AND** for each matched candidate that is still pending in the current sweep, SHALL register that candidate as a non-match Fusion account and remove it from the pending queue and deferred candidate pool
 - **AND** SHALL NOT re-materialize persisted fusion anchors from prior runs
 
@@ -28,10 +27,11 @@
 
 The deferred-candidate drain SHALL evaluate pending accounts sequentially within each managed source. Identity-phase scoring SHALL continue to use the effective concurrency limit `max(1, min(batchSize, scoringMaxConcurrency))`. Deferred drain MAY run concurrently across different managed sources.
 
-#### Scenario: Identity scoring respects scoringMaxConcurrency
+#### Scenario: Deferred scoring respects scoringMaxConcurrency
 - **GIVEN** identity-phase scoring runs for a batch larger than `scoringMaxConcurrency`
 - **WHEN** identity-phase scoring runs
 - **THEN** at most `scoringMaxConcurrency` identity scoring operations SHALL run concurrently at any time
+- **AND** all accounts in the batch SHALL be scored before the batch completes
 
 #### Scenario: Deferred drain is sequential within a source
 - **GIVEN** multiple pending accounts for the same deferred-enabled source

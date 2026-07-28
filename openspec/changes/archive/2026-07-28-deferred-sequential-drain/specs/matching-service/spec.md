@@ -4,7 +4,7 @@
 
 When scoring produces deferred-candidate matches, MatchingService SHALL defer identity creation for the incoming managed account by not producing a new Fusion account for that account in the current run. When the incoming account matches only persisted fusion anchors from prior runs, MatchingService SHALL likewise defer the incoming account without re-materializing those anchors. When the incoming account deferred-matches a pending managed account from the same sweep that has not yet been materialized, MatchOutcomeDispatcher SHALL register that pending account as a non-match Fusion account and remove it from the pending sweep queue.
 
-#### Scenario: Deferred match skips incoming account
+#### Scenario: Deferred match skips account
 - **GIVEN** a managed account with deferred-candidate matches against candidates in the current deferred pool
 - **WHEN** MatchOutcomeDispatcher handles the outcome
 - **THEN** the incoming managed account SHALL be removed from the work queue
@@ -32,7 +32,7 @@ MatchingService SHALL orchestrate the two-sweep matching lifecycle (identity sco
 - **THEN** MatchOutcomeDispatcher SHALL execute identity-phase scoring for all accounts (parallel batches permitted)
 - **AND** results SHALL be classified as identity-match or deferred-pending
 
-#### Scenario: Runner executes deferred drain sequentially per source
+#### Scenario: Runner executes deferred scoring sweep
 - **WHEN** the identity sweep completes with deferred-pending accounts for a source
 - **THEN** MatchOutcomeDispatcher SHALL evaluate each pending account one at a time against the current per-source candidate pool
 - **AND** the pool SHALL include persisted fusion anchors plus materialized non-match anchors from earlier steps in the same drain
@@ -41,6 +41,11 @@ MatchingService SHALL orchestrate the two-sweep matching lifecycle (identity sco
 ### Requirement: MatchingService owns the CandidateRegistry
 
 MatchingService SHALL create and manage the CandidateRegistry for per-source deferred candidate tracking across analysis sweeps. Persisted fusion accounts from prior runs SHALL be seeded into the registry before the deferred drain begins. Pending managed accounts SHALL NOT be bulk-registered before scoring; only materialized anchors and persisted seeds SHALL appear in the pool during drain.
+
+#### Scenario: Candidates registered during identity sweep
+- **WHEN** an authoritative account from a deferred-enabled source has no identity match during identity phase
+- **THEN** the account SHALL be classified as deferred-pending
+- **AND** it SHALL NOT be bulk-registered in CandidateRegistry before the deferred drain
 
 #### Scenario: Persisted anchors seeded at sweep start
 - **WHEN** managed account processing initializes for a deferred-enabled source with existing fusion accounts
