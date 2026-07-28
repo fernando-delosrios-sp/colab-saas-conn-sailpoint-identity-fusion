@@ -402,7 +402,7 @@ The documentation site is built with MkDocs and published from the `main` branch
 
 ## Changelog
 
-- (2026-07-17) Refactored `FusionAccount` internals into a `FusionAccountState` data container and focused rule modules; no public API or behavior changed.
+- (2026-07-28) Added `$MD5(input)` Velocity helper for lowercase hex MD5 digests in attribute definition templates.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
