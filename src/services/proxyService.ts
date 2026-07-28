@@ -125,6 +125,17 @@ export class ProxyService {
         if (!proxyUrl.toLowerCase().startsWith('http://') && !proxyUrl.toLowerCase().startsWith('https://')) {
             throw new ConnectorError('Proxy URL must use http or https protocol')
         }
+
+        try {
+            const parsedUrl = new URL(proxyUrl)
+            const hostname = parsedUrl.hostname
+            if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '169.254.169.254') {
+                throw new Error('Forbidden host')
+            }
+        } catch {
+            throw new ConnectorError('Proxy URL is invalid or points to a forbidden host')
+        }
+
         const externalConfig = { ...this.config, isProxy: true }
         const body = {
             type: this.commandType,
