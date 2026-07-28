@@ -773,13 +773,7 @@ export class AttributeService {
     }
 
     private hostingIdentityName(fusionAccount: FusionAccount): string | undefined {
-        const identityBag = fusionAccount.attributeBag.identity as Record<string, unknown> | undefined
-        if (fusionAccount.fromIdentity) {
-            return (
-                trimStr(fusionAccount.name) ?? trimStr(identityBag?.name) ?? trimStr(fusionAccount.identityDisplayName)
-            )
-        }
-        return trimStr(fusionAccount.identityDisplayName) ?? trimStr(identityBag?.name) ?? trimStr(fusionAccount.name)
+        return trimStr(fusionAccount.name)
     }
 
     private hostingIdentityId(fusionAccount: FusionAccount, identity: Record<string, unknown>): string | undefined {
@@ -869,21 +863,7 @@ export class AttributeService {
         }
 
         let value = evaluateVelocityTemplate(expression, context)
-        if (!value) {
-            this.log.error(`Failed to evaluate velocity template for attribute ${definition.name}`)
-            return undefined
-        }
-
-        // Compare to expression without trailing $counter (UniqueAttributeDefinition may auto-append it)
-        const exprWithoutCounter = expression.replace(COUNTER_SUFFIX_RE, '')
-        const outputMatchesExpression =
-            value === expression || (exprWithoutCounter !== expression && value === exprWithoutCounter)
-        if (outputMatchesExpression && this.hasVelocityVariableReference(exprWithoutCounter || expression)) {
-            this.log.warn(
-                `Velocity template for attribute ${definition.name} returned unresolved variable expression: ${value}`
-            )
-            return undefined
-        }
+        if (!value) return undefined
 
         if (definition.trim) value = value.trim()
         if (definition.case) value = switchCase(value, definition.case)
@@ -1183,8 +1163,7 @@ export class AttributeService {
         const hasValue = isValidAttributeValue(existingValue)
         const isFusionIdentityAttribute = name === fusionIdentityAttribute
         const isFusionDisplayAttribute = name === fusionDisplayAttribute
-        const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
-        const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
+        const isExistingIdentity = fusionAccount.isIdentity
 
         const prevIsUnique = context.isUnique
         context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value, context)
