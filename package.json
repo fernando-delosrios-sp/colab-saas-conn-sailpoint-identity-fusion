@@ -1,6 +1,6 @@
 {
     "name": "identity-fusion",
-    "version": "2.1.8",
+    "version": "2.1.9",
     "main": "dist/index.js",
     "scripts": {
         "clean": "shx rm -rf ./dist",
@@ -87,6 +87,6 @@
     "allowScripts": {
         "@fission-ai/openspec": true,
         "fsevents": true,
-        "unrs-resolver": true
+        "unrs-resolver@1.12.2": true
     }
 }
