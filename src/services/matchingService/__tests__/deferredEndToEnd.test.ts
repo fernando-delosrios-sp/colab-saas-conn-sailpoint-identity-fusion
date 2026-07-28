@@ -183,7 +183,7 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
             await dispatcher.runMatchSweep(accounts, 10)
 
             expect(tracker.deferredMatchReportData.length).toBe(1)
-            expect(tracker.deferredMatchReportData[0].matches.length).toBe(4)
+            expect(tracker.deferredMatchReportData[0].matches.length).toBe(3)
         })
 
         it('detects a deferred match between two similar accounts in the same sweep', async () => {

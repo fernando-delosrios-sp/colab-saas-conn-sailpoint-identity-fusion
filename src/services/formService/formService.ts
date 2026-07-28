@@ -531,6 +531,7 @@ export class FormService {
         existingRecipientIds: Set<string>
     ): Promise<number> {
         let newReviewInstancesQueued = 0
+        const reviewPromises: Promise<string | undefined>[] = []
         for (const reviewer of reviewers) {
             const reviewerId = reviewer.identityId
             if (!reviewerId) {
@@ -557,6 +558,10 @@ export class FormService {
             )
 
             reviewer.addReviewPromise(reviewPromise)
+            reviewPromises.push(reviewPromise)
+        }
+        if (reviewPromises.length > 0) {
+            await Promise.allSettled(reviewPromises)
         }
         return newReviewInstancesQueued
     }

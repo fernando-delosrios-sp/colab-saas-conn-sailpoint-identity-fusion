@@ -486,6 +486,86 @@ describe('FormService processFetchedFormData pending review queue depletion', ()
     })
 })
 
+describe('FormService createFusionForm', () => {
+    it('awaits form instance creation before returning so run counters stay aligned', async () => {
+        FusionAccount.configure({ sources: ['Source A'] } as any)
+
+        const createFormDefinition = vi.fn().mockResolvedValue({ data: { id: 'form-def-1', name: 'Fusion Review' } })
+        const createFormInstance = vi.fn().mockImplementation(
+            () =>
+                new Promise((resolve) => {
+                    setTimeout(
+                        () => resolve({ data: { id: 'inst-1', standAloneFormUrl: 'https://review/1' } }),
+                        30
+                    )
+                })
+        )
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({ data: { results: [] } })
+        const searchFormInstancesByTenant = vi.fn().mockResolvedValue({ data: [] })
+
+        const customFormsMock = {
+            createFormDefinition,
+            createFormInstance,
+            searchFormDefinitionsByTenant,
+            searchFormInstancesByTenant,
+        }
+
+        const run = new FusionRun()
+        const sources = {
+            fusionSourceId: 'fusion-src',
+            fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
+            getSourceByNameSafe: vi.fn().mockReturnValue({ sourceType: 'Authoritative' }),
+        }
+
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'acct-1',
+            nativeIdentity: 'native-1',
+            name: 'Test User',
+            sourceId: 'source-a-id',
+            sourceName: 'Source A',
+            attributes: { email: 'user@example.com' },
+        } as any)
+        fusionAccount.addFusionMatch({
+            fusionIdentity: {
+                identityId: 'candidate-1',
+                attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },
+            },
+            scores: [{ attribute: 'email', algorithm: 'lig3', score: 85, fusionScore: 50 }],
+        } as any)
+
+        const reviewer = FusionAccount.fromIdentity({
+            id: 'reviewer-1',
+            name: 'Reviewer',
+            attributes: { email: 'reviewer@example.com' },
+        } as any)
+
+        const service = new FormService(
+            {
+                fusionFormNamePattern: 'Fusion Review',
+                fusionFormExpirationDays: 7,
+                fusionFormAttributes: ['Email'],
+                fusionMaxCandidatesForForm: 10,
+            } as any,
+            { warn: vi.fn(), debug: vi.fn(), info: vi.fn() } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+            } as any,
+            sources as any,
+            undefined,
+            undefined,
+            run
+        )
+
+        const outcome = await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        expect(outcome).toEqual({ formDefinitionReady: true, newReviewInstancesQueued: 1 })
+        expect(run.formsCreated).toBe(1)
+        expect(run.formInstancesCreated).toBe(1)
+        expect(createFormInstance).toHaveBeenCalledTimes(1)
+    })
+})
+
 describe('FormService getOrCreateFormDefinition conflict recovery', () => {
     it('reuses existing definition after duplicate-name create conflict', async () => {
         FusionAccount.configure({ sources: [] } as any)
@@ -525,6 +605,7 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
         expect(buildFusionFormDefinition).toHaveBeenCalledTimes(1)
     })
 })
+
 
 
 

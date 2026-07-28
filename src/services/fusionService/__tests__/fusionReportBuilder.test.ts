@@ -88,4 +88,39 @@ describe('buildFusionReport', () => {
         expect(report.accounts[0].matches[0].auto).toBe(false)
         expect(report.accounts[0].matches[0].manual).toBe(true)
     })
+
+    it('lists only identity candidates for identity-match rows (not transient deferred anchor scoring)', () => {
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'acct-1',
+            nativeIdentity: 'native-12',
+            name: 'A. Ashford',
+            sourceId: 'source-a',
+            sourceName: 'Source A',
+            attributes: { displayName: 'A. Ashford' },
+        } as any)
+
+        fusionAccount.addFusionMatch({
+            identityId: 'isc-alexia',
+            identityName: 'Alexia Ashford',
+            candidateType: 'identity',
+            scores: [{ attribute: COMBINED_SCORE_ROW_ATTRIBUTE, algorithm: 'weighted', score: 85, isMatch: true } as any],
+        } as any)
+        fusionAccount.addFusionMatch({
+            identityId: undefined,
+            identityName: 'A. Ashford anchor',
+            candidateType: 'deferred',
+            scores: [{ attribute: COMBINED_SCORE_ROW_ATTRIBUTE, algorithm: 'weighted', score: 97, isMatch: true } as any],
+        } as any)
+
+        const report = buildFusionReport({
+            ...buildReportState({}),
+            matchAccounts: [fusionAccount],
+            fusionMaxCandidatesForForm: 3,
+        })
+
+        expect(report.accounts[0].matches).toHaveLength(1)
+        expect(report.accounts[0].matches[0].candidateType).toBe('identity')
+        expect(report.accounts[0].matches[0].identityId).toBe('isc-alexia')
+    })
 })
+

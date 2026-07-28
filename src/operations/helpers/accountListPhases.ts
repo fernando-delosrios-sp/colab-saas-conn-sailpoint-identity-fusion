@@ -183,7 +183,10 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
     const ownerIdsPromise = ownerIncluded ? sources.fetchGlobalOwnerIdentityIds() : Promise.resolve([])
 
     const fetchTasks: Array<Promise<void>> = [
-        ownerIdsPromise.then((ownerIds) => identities.fetchIdentities(ownerIds)),
+        ownerIdsPromise.then(async (ownerIds) => {
+            fusion.cacheGlobalOwnerIdentityIds(ownerIds)
+            await identities.fetchIdentities(ownerIds)
+        }),
         sources.fetchManagedAccounts(),
         sources.fetchFusionAccounts(),
         forms.fetchFormInstances(isPersistent),
@@ -217,6 +220,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
 export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<void> {
     const { log, fusion } = serviceRegistry
     log.detail({ action: 'refreshing fusion accounts' })
+    await fusion.ensureGlobalReviewerOwnersInScope()
     const refreshOp = log.track('refreshPhase.processFusionAccounts')
     const processedFusionAccounts = await fusion.processFusionAccounts()
     refreshOp.done({ count: processedFusionAccounts.length })
@@ -471,6 +475,7 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+
 
 
 

@@ -155,7 +155,7 @@ export class DecisionProcessor {
         const isAuthorizedDecision = !fusionDecision.newIdentity
         const existingIdentityAccount =
             isAuthorizedDecision && fusionDecision.identityId
-                ? this.run.getFusionIdentity(fusionDecision.identityId)
+                ? this.resolveAuthorizedMergeTarget(fusionDecision.identityId)
                 : undefined
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
         this.log.debug(
@@ -267,6 +267,28 @@ export class DecisionProcessor {
     }
 
     /**
+     * Resolve the Fusion account that receives an authorized/automatic merge decision.
+     * Supports ISC identity ids and persisted Fusion anchor managed keys from prior runs.
+     */
+    private resolveAuthorizedMergeTarget(targetId: string): FusionAccount | undefined {
+        const trimmed = trimStr(targetId)
+        if (!trimmed) return undefined
+
+        const fromIdentityMap = this.run.getFusionIdentity(trimmed)
+        if (fromIdentityMap) return fromIdentityMap
+
+        const fromManagedKey = this.run.getFusionAccountByManagedKey(trimmed)
+        if (fromManagedKey) return fromManagedKey
+
+        const normalized = normalizeCompositeManagedAccountKey(trimmed)
+        if (normalized) {
+            return this.run.getFusionAccountByManagedKey(normalized)
+        }
+
+        return undefined
+    }
+
+    /**
      * Resolve an identity by ID: returns the cached document if available, otherwise
      * makes a live API call only during aggregation (non-aggregation modes are read-only).
      */
@@ -280,6 +302,7 @@ export class DecisionProcessor {
         }
     }
 }
+
 
 
 

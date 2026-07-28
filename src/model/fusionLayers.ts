@@ -285,6 +285,10 @@ export class FusionLayers {
         this.collections.matches.clearRefs()
     }
 
+    removeDeferredFusionMatches(): void {
+        this.collections.matches.removeDeferred()
+    }
+
     // ============================================================================
     // Private: setManagedAccount
     // ============================================================================
@@ -503,5 +507,6 @@ export class FusionLayers {
         }
     }
 }
+
 
 

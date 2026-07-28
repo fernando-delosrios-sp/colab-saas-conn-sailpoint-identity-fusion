@@ -11,12 +11,13 @@ import {
     mapScoreReportsForFusionReport,
 } from './helpers'
 import {
-    anchorDeferredMatches,
+    anchorDeferredMatchesForReview,
     formatFusionMatchDiscoveryLog,
     isDeferredMatchingEnabledForSource,
 } from '../matchingService/matchingHelpers'
 import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
 import { ManagedAccountAnalysisContext, MatchCandidateType } from '../matchingService/types'
+import { defaultFusionMaxCandidatesForForm } from '../../data/config'
 import { resolveReportAccountId, resolveReportAccountIdValue } from './reportAccountResolver'
 
 export interface ManagedAccountAnalysisRecorderDeps {
@@ -69,7 +70,8 @@ export class ManagedAccountAnalysisRecorder {
                 return
             }
             const sourceTypeValue = sourcesByName.get(fusionAccount.sourceName)?.sourceType
-            const deferredMatches = anchorDeferredMatches(fusionAccount, this.deps.run).map((match) => {
+            const maxCandidates = this.deps.config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
+            const deferredMatches = anchorDeferredMatchesForReview(fusionAccount, this.deps.run, maxCandidates).map((match) => {
                     const fields = fusionReportDeferredMatchCandidateFields(match)
                     const fi = match.fusionIdentity
                     const deferredCandidateIdentityId = fi?.identityId

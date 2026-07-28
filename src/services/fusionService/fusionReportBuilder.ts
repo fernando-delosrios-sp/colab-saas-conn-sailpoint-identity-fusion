@@ -7,10 +7,13 @@ import {
 } from './helpers'
 import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
 import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchingService/matchingService'
+import { identityMatchesForReview } from '../matchingService/matchingHelpers'
 import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
 import { UrlContext } from '../../utils/url'
 import { SourceInfo, SourceService } from '../sourceService'
 import { resolveReportAccountId } from './reportAccountResolver'
+import { defaultFusionMaxCandidatesForForm } from '../../data/config'
+import { MatchCandidateType } from '../matchingService/types'
 
 export interface FusionReportState {
     conflictingFusionIdentityAccounts: Map<string, Map<string, string>>
@@ -26,6 +29,7 @@ export interface FusionReportState {
     sources: SourceService
     fusionEnableAutoMerge: boolean
     fusionAutoMergeScore?: number
+    fusionMaxCandidatesForForm?: number
 }
 
 export function buildFusionReport(
@@ -61,8 +65,9 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
     const accounts: FusionReportAccount[] = []
 
     for (const fusionAccount of state.matchAccounts) {
-        const fusionMatches = fusionAccount.fusionMatches
-        if (!fusionMatches || fusionMatches.length === 0) continue
+        const maxCandidates = state.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
+        const fusionMatches = identityMatchesForReview(fusionAccount, maxCandidates)
+        if (fusionMatches.length === 0) continue
 
         const matches = fusionMatches.map((match) => {
             const combinedReport = match.scores.find(
@@ -80,7 +85,7 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
                 identityId: match.identityId,
                 identityUrl: state.urlContext.identity(match.identityId),
                 isMatch: true,
-                candidateType: match.candidateType,
+                candidateType: match.candidateType ?? MatchCandidateType.Identity,
                 exact: isExactAttributeMatchScores(match.scores),
                 auto,
                 manual: !auto,
@@ -132,4 +137,5 @@ function buildNonMatchAccounts(state: FusionReportState): FusionReportAccount[] 
     nonMatchAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
     return nonMatchAccounts
 }
+
 

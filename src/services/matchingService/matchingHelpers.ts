@@ -1,11 +1,13 @@
 import { FusionAccount } from '../../model/account'
 import { FusionRun } from '../../model/fusionRun'
 import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
-import { SourceType } from '../../model/config'
+import { MatchingConfig, SourceType } from '../../model/config'
 import { SourceInfo } from '../sourceService'
 import { coerceBoolean } from '../../utils/safeRead'
+import { rankFusionMatchesForReview } from '../fusionService/helpers'
 import { isExactAttributeMatchScores } from './exactMatch'
-import { FusionMatch, MatchCandidateType } from './types'
+import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
+
 
 /**
  * Builds info-log headline and "- N candidate(s), M partial(s)" suffix from match scores.
@@ -71,6 +73,28 @@ export function anchorDeferredMatches(fusionAccount: FusionAccount, run: FusionR
     })
 }
 
+/** Rank and optionally cap match rows for review surfaces (forms, reports, logs). */
+function capFusionMatchesForReview(matches: FusionMatch[], maxCandidates?: number): FusionMatch[] {
+    const ordered = rankFusionMatchesForReview(matches)
+    return maxCandidates ? ordered.slice(0, maxCandidates) : ordered
+}
+
+/** Persisted/finalized deferred anchors, ranked and capped like identity review candidates. */
+export function anchorDeferredMatchesForReview(
+    fusionAccount: FusionAccount,
+    run: FusionRun,
+    maxCandidates?: number
+): FusionMatch[] {
+    return capFusionMatchesForReview(anchorDeferredMatches(fusionAccount, run), maxCandidates)
+}
+
+/** ISC identity candidates, ranked and capped for review surfaces (forms, reports). */
+export function identityMatchesForReview(fusionAccount: FusionAccount, maxCandidates?: number): FusionMatch[] {
+    const identityMatches = fusionAccount.fusionMatches.filter(
+        (match) => (match.candidateType ?? MatchCandidateType.Identity) === MatchCandidateType.Identity
+    )
+    return capFusionMatchesForReview(identityMatches, maxCandidates)
+}
 
 /** Matches counted toward the review-form cap (excludes same-operation deferred candidates). */
 export const countIdentityCandidateFusionMatches = (matches: readonly FusionMatch[] | undefined): number => {
@@ -83,6 +107,7 @@ export const countIdentityCandidateFusionMatches = (matches: readonly FusionMatc
     }
     return n
 }
+
 
 /**
  * Managed source name used to bucket deferred-match candidates.
@@ -121,4 +146,5 @@ export function isRecordMatchingEnabledForSource(
     }
     return coerceBoolean(info?.config?.includeRecordAccountsForMatching) ?? true
 }
+
 

@@ -748,6 +748,11 @@ export class FusionAccount {
         this.layers.clearFusionIdentityReferences()
     }
 
+    /** Drop deferred anchor rows added transiently for automatic-merge scoring on identity-match accounts. */
+    removeDeferredFusionMatches(): void {
+        this.layers.removeDeferredFusionMatches()
+    }
+
     importHistory(history: string[]): void {
         this.collections.historyOps.importFromArray(history)
     }
@@ -834,6 +839,7 @@ export class FusionAccount {
         }
     }
 }
+
 
 
 
