@@ -1,4 +1,5 @@
 import { FusionAccount } from '../../model/account'
+import { FusionRun } from '../../model/fusionRun'
 import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
 import { SourceType } from '../../model/config'
 import { SourceInfo } from '../sourceService'
@@ -41,6 +42,33 @@ export function hasIdentityCandidateMatches(fusionAccount: FusionAccount): boole
 
 export function hasDeferredCandidateMatches(fusionAccount: FusionAccount): boolean {
     return fusionAccount.fusionMatches.some((match) => match.candidateType === 'deferred')
+}
+
+/**
+ * True when at least one deferred match is against a persisted or finalized anchor in the registry.
+ * Peer-only deferred matches (pending queue accounts not yet materialized) do not defer the incoming
+ * account — the first clique member must become a non-match anchor when no registry anchors exist yet.
+ */
+export function hasActionableDeferredAnchorMatch(fusionAccount: FusionAccount, run: FusionRun): boolean {
+    for (const match of fusionAccount.fusionMatches) {
+        if (match.candidateType !== MatchCandidateType.Deferred) continue
+        const candidate = match.fusionIdentity
+        if (!candidate) continue
+        const tier = run.getDeferredCandidateTier(candidate)
+        if (tier === 'persisted' || tier === 'finalized') return true
+    }
+    return false
+}
+
+/** Deferred matches against persisted or finalized anchors — excludes pending peer queue accounts. */
+export function anchorDeferredMatches(fusionAccount: FusionAccount, run: FusionRun): FusionMatch[] {
+    return fusionAccount.fusionMatches.filter((match) => {
+        if (match.candidateType !== MatchCandidateType.Deferred) return false
+        const candidate = match.fusionIdentity
+        if (!candidate) return false
+        const tier = run.getDeferredCandidateTier(candidate)
+        return tier === 'persisted' || tier === 'finalized'
+    })
 }
 
 
@@ -93,3 +121,4 @@ export function isRecordMatchingEnabledForSource(
     }
     return coerceBoolean(info?.config?.includeRecordAccountsForMatching) ?? true
 }
+

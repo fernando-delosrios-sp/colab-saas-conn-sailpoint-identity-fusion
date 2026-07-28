@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Node.js, Vitest.
 
-**Specs:** [`specs/matching-service/spec.md`](specs/matching-service/spec.md), [`specs/matching-service/match-outcome-dispatch/spec.md`](specs/matching-service/match-outcome-dispatch/spec.md)
+**Specs:** [`specs/matching-service/spec.md`](specs/matching-service/spec.md) (includes MatchOutcomeDispatcher outcome and deferred-drain concurrency deltas)
 
 **Design:** [`design.md`](design.md)
 
@@ -47,3 +47,4 @@
 - [ ] **Step 1:** Add two-run scenario test with persisted non-match seed + peer cluster.
 - [ ] **Step 2:** Run full `npm test` and `npm run lint`.
 - [ ] **Step 3:** Manual dry-run verification with user's 36-account dataset (optional if tests cover behavior).
+

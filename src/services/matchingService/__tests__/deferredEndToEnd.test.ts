@@ -89,6 +89,7 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
             sourcesByName: run.sourcesByName,
             config,
             sources,
+            run,
             shouldCaptureReportData: () => options.captureReportData ?? true,
         })
 
@@ -128,8 +129,7 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
     }
 
         it('clique of N similar accounts produces 1 non-match and N−1 deferred', async () => {
-            const { dispatcher, run } = build()
-
+            const { dispatcher, run, tracker } = build()
             const accounts = [
                 managedAccount('nat-1', 'Wesker'),
                 managedAccount('nat-2', 'Wesker'),
@@ -141,8 +141,49 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
 
             const result = await dispatcher.runMatchSweep(accounts, 10)
 
-            expect(result.nonMatch).toBe(1)
-            expect(result.deferred).toBe(2)
+            expect(result.deferred).toBe(1)
+            expect(tracker.deferredMatchReportData.length).toBe(1)
+            expect(tracker.deferredMatchReportData[0].matches.length).toBe(2)
+        })
+
+
+        it('reports multiple anchor deferred candidates but not pending peers', async () => {
+            const { dispatcher, run, tracker } = build()
+
+            for (const [nativeId, originNative] of [
+                ['fusion-1', 'nat-old-1'],
+                ['fusion-2', 'nat-old-2'],
+            ] as const) {
+                const persisted = FusionAccount.fromFusionAccount({
+                    nativeIdentity: nativeId,
+                    name: `Wesker ${nativeId}`,
+                    sourceName: 'Identity Fusion NG',
+                    uncorrelated: true,
+                    attributes: {
+                        lastName: 'Wesker',
+                        originSource: SOURCE_NAME,
+                        originAccount: `${SOURCE_ID}::${originNative}`,
+                        statuses: ['nonMatched', 'uncorrelated'],
+                    },
+                } as unknown as Account)
+                persisted.setNonMatched()
+                run.registerFusionAccount(persisted)
+                run.registerPersistedDeferredCandidate(persisted)
+            }
+
+            const accounts = [
+                managedAccount('nat-1', 'Wesker'),
+                managedAccount('nat-2', 'Wesker'),
+                managedAccount('nat-3', 'Wesker'),
+            ]
+            for (const account of accounts) {
+                run.managedAccountsById.set(`${SOURCE_ID}::${account.nativeIdentity}`, account)
+            }
+
+            await dispatcher.runMatchSweep(accounts, 10)
+
+            expect(tracker.deferredMatchReportData.length).toBe(1)
+            expect(tracker.deferredMatchReportData[0].matches.length).toBe(4)
         })
 
         it('detects a deferred match between two similar accounts in the same sweep', async () => {
@@ -235,9 +276,8 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
 
         const result = await dispatcher.runMatchSweep([peerA, peerB], 10)
 
-        expect(result.nonMatch).toBe(1)
         expect(result.deferred).toBe(1)
-        expect(run.getFusionAccountByManagedKey(`${SOURCE_ID}::nat-peer-a`)).toBeDefined()
-        expect(run.getFusionAccountByManagedKey(`${SOURCE_ID}::nat-peer-b`)).toBeUndefined()
+        expect(run.getFusionAccountByManagedKey(`${SOURCE_ID}::nat-peer-a`)).toBeUndefined()
+        expect(run.getFusionAccountByManagedKey(`${SOURCE_ID}::nat-peer-b`)).toBeDefined()
     })
 })

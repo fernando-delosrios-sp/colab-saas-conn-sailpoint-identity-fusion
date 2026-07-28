@@ -77,26 +77,21 @@ When no identity candidates meet the threshold, MatchingService SHALL apply sour
 
 ### Requirement: MatchingService handles deferred candidate matching
 
-When scoring produces deferred-candidate matches, MatchingService SHALL defer identity creation for the incoming managed account by not producing a new Fusion account for that account in the current run. When the incoming account matches only persisted fusion anchors from prior runs, MatchingService SHALL likewise defer the incoming account without re-materializing those anchors. When the incoming account deferred-matches a pending managed account from the same sweep that has not yet been materialized, MatchOutcomeDispatcher SHALL register that pending account as a non-match Fusion account and remove it from the pending sweep queue.
+When scoring produces deferred-candidate matches, MatchingService SHALL defer identity creation for the incoming managed account by not producing a new Fusion account for that account in the current run. Pending accounts in the deferred drain SHALL be scored against both finalized candidates (persisted fusion anchors from prior runs and materialized non-match anchors from the current sweep) and remaining pending queue peers. When a deferred match includes pending queue peers among its candidates, those peers SHALL be promoted to non-match Fusion accounts and removed from the pending queue.
 
-#### Scenario: Deferred match skips account
-- **GIVEN** a managed account with deferred-candidate matches against candidates in the current deferred pool
-- **WHEN** MatchOutcomeDispatcher handles the outcome
+#### Scenario: Deferred match skips the incoming account and promotes matched peers
+- **GIVEN** a managed account with deferred-candidate matches against candidates in the pool (persisted, finalized, or pending)
+- **WHEN** MatchOutcomeDispatcher handles the deferred outcome
 - **THEN** the incoming managed account SHALL be removed from the work queue
 - **AND** no Fusion account SHALL be created for the incoming account in this run
+- **AND** any matched pending peers SHALL be promoted to non-match Fusion accounts and removed from the pending queue
 
-#### Scenario: Deferred match materializes matched pending candidates
-- **GIVEN** a managed account A that deferred-matches pending managed account B in the same sweep (B not yet materialized)
-- **WHEN** MatchOutcomeDispatcher handles the deferred outcome for A
-- **THEN** B SHALL be registered as a non-match Fusion account
-- **AND** B SHALL be removed from the pending sweep queue and deferred candidate pool
-- **AND** B SHALL not be evaluated again in this sweep
-
-#### Scenario: Clique produces one anchor not all deferred
+#### Scenario: Clique produces one deferred match with multiple promoted candidates
 - **GIVEN** N managed accounts from the same deferred-enabled source with no persisted anchors and mutual deferred-match scores
 - **WHEN** the deferred drain completes for that source
-- **THEN** exactly one account SHALL become a non-match Fusion account anchor
-- **AND** the remaining N−1 accounts SHALL be deferred
+- **THEN** exactly one account SHALL be held back as a deferred match
+- **AND** the remaining N−1 matched accounts SHALL be promoted to non-match Fusion account anchors
+- **AND** the deferred match SHALL report all promoted candidates
 
 ### Requirement: MatchingService owns the two-sweep matching runner
 

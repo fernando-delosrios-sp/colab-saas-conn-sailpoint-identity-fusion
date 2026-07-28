@@ -133,12 +133,13 @@ describe('MatchOutcomeDispatcher', () => {
         }
     }
 
-    function deferredMatch(scores: any[] = []): any {
+    function deferredMatch(overrides: Record<string, unknown> = {}, scores: any[] = []): any {
         return {
             identityId: '',
             identityName: 'Current operation non-match',
             candidateType: 'deferred',
             scores: scores.length > 0 ? scores : [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true }],
+            ...overrides,
         }
     }
 
@@ -302,12 +303,12 @@ describe('MatchOutcomeDispatcher', () => {
             } as any)
             previousNonMatch.setNonMatched()
             run.registerFusionAccount(previousNonMatch)
-            run.registerDeferredCandidate(previousNonMatch)
+            run.registerFinalizedDeferredCandidate(previousNonMatch)
 
             vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
                 if (candidateType === 'identity') return 0
                 if (candidateType === 'deferred') {
-                    fusionAccount.addFusionMatch(deferredMatch())
+                    fusionAccount.addFusionMatch(deferredMatch({ fusionIdentity: previousNonMatch }))
                 }
                 return 1
             })
@@ -338,7 +339,10 @@ describe('MatchOutcomeDispatcher', () => {
                     hasPriorNonMatch &&
                     fusionAccount.managedAccountId === 'source-a-id::native-second'
                 ) {
-                    fusionAccount.addFusionMatch(deferredMatch())
+                    const anchor = candidateList.find(
+                        (candidate) => candidate.managedAccountId === 'source-a-id::native-first'
+                    )
+                    fusionAccount.addFusionMatch(deferredMatch({ fusionIdentity: anchor }))
                 }
                 return candidateList.length
             })
@@ -355,7 +359,7 @@ describe('MatchOutcomeDispatcher', () => {
             expect(log.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
-        it('materializes a matched pending peer when deferred match references an unprocessed queue account', async () => {
+        it('scores deferred accounts sequentially against only finalized candidates in the same sweep', async () => {
             const { dispatcher, matchingService, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
@@ -363,31 +367,30 @@ describe('MatchOutcomeDispatcher', () => {
 
             const firstAccount = managedAccount({ id: 'acct-a', nativeIdentity: 'nat-a', name: 'Peer A' })
             const secondAccount = managedAccount({ id: 'acct-b', nativeIdentity: 'nat-b', name: 'Peer B' })
+            const thirdAccount = managedAccount({ id: 'acct-c', nativeIdentity: 'nat-c', name: 'Peer C' })
             run.managedAccountsById.set('source-a-id::nat-a', firstAccount)
             run.managedAccountsById.set('source-a-id::nat-b', secondAccount)
+            run.managedAccountsById.set('source-a-id::nat-c', thirdAccount)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, pool, candidateType) => {
                 if (candidateType !== 'deferred') return 0
-                if (fusionAccount.managedAccountId === 'source-a-id::nat-a') {
-                    const peer = FusionAccount.fromManagedAccount({
-                        id: 'acct-b',
-                        nativeIdentity: 'nat-b',
-                        name: 'Peer B',
-                        sourceId: SOURCE_ID,
-                        sourceName: SOURCE_NAME,
-                        attributes: {},
-                    } as any)
-                    fusionAccount.addFusionMatch({ ...deferredMatch(), fusionIdentity: peer })
+                const candidateList = Array.from(pool)
+                if (fusionAccount.managedAccountId !== 'source-a-id::nat-b') return candidateList.length
+                for (const candidate of candidateList) {
+                    if (run.getDeferredCandidateTier(candidate) === 'finalized') {
+                        fusionAccount.addFusionMatch(deferredMatch({ fusionIdentity: candidate }))
+                    }
                 }
-                return 1
+                return candidateList.length
             })
 
-            const result = await dispatcher.runMatchSweep([firstAccount, secondAccount], 2)
+            const result = await dispatcher.runMatchSweep([firstAccount, secondAccount, thirdAccount], 3)
 
             expect(result.deferred).toBe(1)
-            expect(result.nonMatch).toBe(0)
-            expect(run.getFusionAccountByManagedKey('source-a-id::nat-b')).toBeDefined()
-            expect(run.managedAccountsById.has('source-a-id::nat-a')).toBe(false)
+            expect(result.nonMatch).toBe(2)
+            expect(run.getFusionAccountByManagedKey('source-a-id::nat-a')).toBeDefined()
+            expect(run.getFusionAccountByManagedKey('source-a-id::nat-c')).toBeDefined()
+            expect(run.managedAccountsById.has('source-a-id::nat-b')).toBe(false)
         })
 
 
@@ -877,11 +880,11 @@ describe('MatchOutcomeDispatcher', () => {
             } as any)
             previousNonMatch.setNonMatched()
             run.registerFusionAccount(previousNonMatch)
-            run.registerDeferredCandidate(previousNonMatch)
+            run.registerFinalizedDeferredCandidate(previousNonMatch)
 
             vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
                 if (candidateType === 'deferred') {
-                    fusionAccount.addFusionMatch(deferredMatch())
+                    fusionAccount.addFusionMatch(deferredMatch({ fusionIdentity: previousNonMatch }))
                 }
                 return 1
             })

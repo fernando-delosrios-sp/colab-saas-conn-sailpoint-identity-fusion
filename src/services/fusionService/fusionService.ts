@@ -9,11 +9,11 @@ import { FusionAccount } from '../../model/account'
 import { MappingService } from '../mappingService'
 import { DefinitionService } from '../definitionService'
 import { MatchingService } from '../matchingService'
-import { MatchCandidateType, FusionMatch } from '../matchingService/types'
 import {
     hasIdentityCandidateMatches as checkHasIdentityCandidateMatches,
     hasDeferredCandidateMatches as checkHasDeferredCandidateMatches,
     formatFusionMatchDiscoveryLog,
+    anchorDeferredMatches,
     isRecordMatchingEnabledForSource,
 } from '../matchingService/matchingHelpers'
 import { assert } from '../../utils/assert'
@@ -162,6 +162,7 @@ export class FusionService {
             sourcesByName: this.run.sourcesByName,
             config: this.config,
             sources: this.sources,
+            run: this.run,
             shouldCaptureReportData: () => this.shouldCaptureManagedAccountReportData(),
         })
         this.commandType = commandType
@@ -838,9 +839,7 @@ export class FusionService {
                 !checkHasIdentityCandidateMatches(fusionAccount) &&
                 checkHasDeferredCandidateMatches(fusionAccount)
             ) {
-                const deferredMatches = fusionAccount.fusionMatches.filter(
-                    (m: FusionMatch) => m.candidateType === MatchCandidateType.Deferred
-                )
+                const deferredMatches = anchorDeferredMatches(fusionAccount, this.run)
                 const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
                 this.log.recordEvent('match', { type: 'deferred' })
                 if (this.log.getLogLevel() === 'debug') {

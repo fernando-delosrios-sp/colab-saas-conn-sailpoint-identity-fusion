@@ -10,6 +10,8 @@ import { FormService } from '../formService'
 import { MatchingService, COMBINED_SCORE_ROW_ATTRIBUTE } from './matchingService'
 import {
     formatFusionMatchDiscoveryLog,
+    anchorDeferredMatches,
+    hasActionableDeferredAnchorMatch,
     hasDeferredCandidateMatches,
     isDeferredMatchingEnabledForSource,
     isRecordMatchingEnabledForSource,
@@ -181,11 +183,29 @@ async function scoreIdentityCandidates(
 async function scoreDeferredForAccount(
     analysis: ManagedAccountAnalysisContext,
     deps: ScoreManagedAccountsDeps,
-    diag: DeferredDrainDiag
+    diag: DeferredDrainDiag,
+    remainingInQueue: Map<string, ManagedAccountAnalysisContext>,
+    materializedEarly: ReadonlySet<string>
 ): Promise<void> {
     const { run, matchingService } = deps
     const scoringStarted = Date.now()
-    const pool = Array.from(run.currentRunDeferredCandidatesForSource(analysis.account.sourceName))
+    const selfKey = analysis.fusionAccount.managedKey
+    const seen = new Set<string>()
+    const pool: FusionAccount[] = []
+
+    for (const candidate of run.currentRunDeferredCandidatesForSource(analysis.account.sourceName)) {
+        const key = candidate.managedKey
+        if (!key || key === selfKey || seen.has(key) || materializedEarly.has(key)) continue
+        seen.add(key)
+        pool.push(candidate)
+    }
+
+    for (const [key, pending] of remainingInQueue) {
+        if (key === selfKey || seen.has(key) || materializedEarly.has(key)) continue
+        seen.add(key)
+        pool.push(pending.fusionAccount)
+    }
+
     diag.poolSizeTotal += pool.length
     diag.poolQueries++
     if (pool.length === 0) diag.emptyPools++
@@ -298,6 +318,7 @@ export class MatchOutcomeDispatcher {
 
     /**
      * Sequential deferred drain within one source; sources run concurrently via {@link runDeferredDrain}.
+     * Each pending account is scored against finalized candidates plus remaining queue peers.
      */
     private async runDeferredDrainForSource(
         sorted: ManagedAccountAnalysisContext[],
@@ -324,13 +345,22 @@ export class MatchOutcomeDispatcher {
             const key = analysis.fusionAccount.managedKey
             if (key && materializedEarly.has(key)) continue
 
-            await scoreDeferredForAccount(analysis, scoringDeps, diag)
+            await scoreDeferredForAccount(analysis, scoringDeps, diag, remainingInQueue, materializedEarly)
 
-            const resolution = hasDeferredCandidateMatches(analysis.fusionAccount) ? 'deferred-match' : 'non-match'
+            const resolution = options?.analysisOnly
+                ? hasActionableDeferredAnchorMatch(analysis.fusionAccount, this.deps.run)
+                    ? 'deferred-match'
+                    : 'non-match'
+                : hasDeferredCandidateMatches(analysis.fusionAccount)
+                    ? 'deferred-match'
+                    : 'non-match'
             const scoredResult: ManagedAccountMatchingResult = { analysis, resolution }
             scored.push(scoredResult)
 
             if (options?.analysisOnly) {
+                if (this.deps.run.analysisRecorder) {
+                    this.deps.run.analysisRecorder.recordAnalysis(analysis)
+                }
                 if (resolution === 'non-match') {
                     this.registerPoolAnchorForAnalysis(analysis.fusionAccount)
                 }
@@ -341,9 +371,6 @@ export class MatchOutcomeDispatcher {
                     analysis,
                 })
             } else {
-                if (this.deps.run.analysisRecorder) {
-                    this.deps.run.analysisRecorder.recordAnalysis(analysis)
-                }
                 if (resolution === 'deferred-match') {
                     await this.handleDeferredMatch(
                         analysis.fusionAccount,
@@ -351,6 +378,9 @@ export class MatchOutcomeDispatcher {
                         remainingInQueue,
                         materializedEarly
                     )
+                    if (this.deps.run.analysisRecorder) {
+                        this.deps.run.analysisRecorder.recordAnalysis(analysis)
+                    }
                     resolved.push({
                         account: analysis.account,
                         fusionAccount: analysis.fusionAccount,
@@ -363,6 +393,9 @@ export class MatchOutcomeDispatcher {
                         analysis.sourceType,
                         analysis.sourceInfo
                     )
+                    if (this.deps.run.analysisRecorder) {
+                        this.deps.run.analysisRecorder.recordAnalysis(analysis)
+                    }
                     resolved.push({
                         account: analysis.account,
                         fusionAccount: nonMatchAccount ?? analysis.fusionAccount,
@@ -732,7 +765,7 @@ export class MatchOutcomeDispatcher {
             await this.materializeMatchedPendingCandidates(fusionAccount, remainingInQueue, materializedEarly)
         }
 
-        const deferredMatches = fusionAccount.fusionMatches.filter((m) => m.candidateType === 'deferred')
+        const deferredMatches = anchorDeferredMatches(fusionAccount, this.deps.run)
         const { headline, summary } = formatFusionMatchDiscoveryLog(deferredMatches, true)
         this.deps.log.recordEvent('match', { type: 'deferred' })
         if (this.deps.log.getLogLevel() === 'debug') {
@@ -766,7 +799,6 @@ export class MatchOutcomeDispatcher {
             await this.finalizeAuthoritativeNonMatch(accountToMaterialize)
             materializedEarly.add(candidateKey)
             remainingInQueue.delete(candidateKey)
-            this.deps.run.unregisterDeferredCandidate(accountToMaterialize)
         }
     }
 

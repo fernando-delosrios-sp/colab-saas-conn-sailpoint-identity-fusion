@@ -54,11 +54,12 @@ The connector SHALL provide a `MatchOutcomeDispatcher` module in `src/services/m
 - **WHEN** a managed account scores above the manual review threshold but below automatic merge
 - **THEN** `MatchOutcomeDispatcher` SHALL create a Fusion review form via `FormService` with merge-with-existing-identity and create-new-identity options and clear the candidate references
 
-#### Scenario: Deferred match defers identity creation
-- **WHEN** the best candidate for a managed account is a deferred candidate from the same source
+#### Scenario: Deferred match defers identity creation and promotes matched peers
+- **WHEN** the best candidate for a managed account is a deferred candidate from the pool
 - **THEN** `MatchOutcomeDispatcher` SHALL claim the managed account for later comparison and log the deferred matches
 - **AND** for each matched candidate that is still pending in the current sweep, SHALL register that candidate as a non-match Fusion account and remove it from the pending queue and deferred candidate pool
 - **AND** SHALL NOT re-materialize persisted fusion anchors from prior runs
+- **AND** SHALL NOT register a new Fusion account for the incoming account in this run
 
 #### Scenario: Non-match registers a new Fusion account
 - **WHEN** a managed account has no acceptable identity or deferred candidates against the current pool
@@ -106,7 +107,7 @@ The connector SHALL provide a `MatchOutcomeDispatcher` module in `src/services/m
 
 ### Requirement: Deferred-phase scoring uses the same concurrency cap
 
-The deferred-candidate drain SHALL evaluate pending accounts sequentially within each managed source. Identity-phase scoring SHALL continue to use the effective concurrency limit `max(1, min(batchSize, scoringMaxConcurrency))`. Deferred drain MAY run concurrently across different managed sources.
+The deferred-candidate drain SHALL evaluate pending accounts sequentially within each managed source in deterministic order, mutating the candidate pool after each account. Deferred drain MAY run concurrently across different managed sources. Pending accounts SHALL score against both finalized candidates (persisted and current-run anchors) and remaining pending queue peers. When a deferred match includes pending peers, those peers SHALL be promoted to non-match Fusion accounts. In analysis-only mode, pending peers SHALL NOT count toward deferred-match resolution since promotion is not applied.
 
 #### Scenario: Deferred scoring respects scoringMaxConcurrency
 - **GIVEN** identity-phase scoring runs for a batch larger than `scoringMaxConcurrency`
@@ -118,6 +119,7 @@ The deferred-candidate drain SHALL evaluate pending accounts sequentially within
 - **GIVEN** multiple pending accounts for the same deferred-enabled source
 - **WHEN** the deferred drain executes
 - **THEN** accounts SHALL be scored and dispatched one at a time in deterministic order
+- **AND** the candidate pool SHALL include both finalized registry candidates and remaining pending queue peers
 - **AND** the candidate pool SHALL reflect outcomes from earlier accounts before the next account is scored
 
 ---

@@ -30,8 +30,7 @@ None.
 
 ### Modified Capabilities
 
-- `matching-service`: Deferred sweep lifecycle, candidate registry registration timing, and anchor materialization rules.
-- `matching-service/match-outcome-dispatch`: Deferred match outcome application (materialize pending candidates) and deferred-phase concurrency semantics.
+- `matching-service`: Deferred sweep lifecycle, candidate registry registration timing, anchor materialization rules, MatchOutcomeDispatcher four-outcome dispatch, and deferred-phase concurrency semantics.
 
 ## Impact
 
@@ -39,3 +38,4 @@ None.
 - **Tests:** `matchOutcomeDispatcher.test.ts`, `deferredEndToEnd.test.ts`, `candidateRegistry.test.ts`; add clique and two-run scenarios.
 - **APIs:** No connector-facing configuration or operation contract changes.
 - **Performance:** Deferred drain is O(n) sequential per source; pool shrinks as anchors materialize. Identity scoring remains batched-parallel.
+
