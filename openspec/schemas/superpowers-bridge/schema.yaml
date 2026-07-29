@@ -156,10 +156,36 @@ artifacts:
       - Each task MUST be a checkbox: `- [ ] X.Y Task description`
       - Tasks should be small enough to complete in one session
       - Order tasks by dependency (what must be done first?)
-      - **CRITICAL**: Always include specific tasks to update user-facing documentation, READMEs, API docs, or comments reflecting the changes.
+      - Every spec scenario SHOULD map to at least one implementation or
+        test task — apply will block if scenarios lack automated coverage
 
       Reference specs for what needs to be built and design.md for
       how to build it (architecture decisions, trade-offs, migration).
+
+      **MANDATORY closing sections** — always append these as the final
+      two ## groups (renumber to follow your implementation groups).
+      Apply treats them as blocking; do not omit or fold into other groups.
+
+      ## N. Documentation
+
+      List concrete files from the proposal Impact section and affected
+      public APIs. One checkbox per doc surface that changes behavior:
+
+      - [ ] N.1 Update README / getting-started for user-visible changes
+      - [ ] N.2 Update API / connector docs for contract or behavior changes
+      - [ ] N.3 Update inline docs (JSDoc, config examples, CLI --help)
+            for changed public surfaces
+
+      Add or remove N.x rows so every affected doc surface has a task.
+      If a row truly does not apply, keep it and mark `[x]` with reason
+      in the task text (e.g. "N/A — no public API change").
+
+      ## N+1. Changelog
+
+      - [ ] N+1.1 Create or update the project changelog entry for this
+            change (apply will invoke **changelog-generator** if available)
+      - [ ] N+1.2 Confirm the entry covers user-visible behavior changes
+            from the proposal Capabilities section
     requires:
       - specs
       - design
@@ -199,19 +225,18 @@ artifacts:
     description: Post-implementation verification against specs, design, and tasks
     template: verify.md
     instruction: |
-      PRECHECK — implementation evidence:
-      Before producing verify.md, run BOTH commands. If either
-      returns 0, STOP and tell the user that apply phase has not
-      yet produced reviewable changes.
+      PRECHECK — apply completion gate (apply MUST have passed these
+      before verify runs; if any fail, STOP and return to apply):
 
-      1. Commit evidence (must return > 0):
-         git log --oneline $(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD origin/master 2>/dev/null)..HEAD | wc -l
+      1. No unchecked tasks:
+         ! grep -q '^- \[ \]' openspec/changes/<change-name>/tasks.md
 
-      2. Task progress (must return > 0):
-         grep -c '^- \[x\]' openspec/changes/<change-name>/tasks.md
+      2. Tests green (use the canonical command from plan.md):
+         <project test command> — exit code 0
 
-      Only after BOTH return positive numbers, proceed to invoke
-      the verification skill below.
+      Do NOT re-check git status, commit counts, or delta-spec sync
+      state here — apply enforces a clean tree; archive handles spec
+      sync. Verify focuses on correctness vs specs, not housekeeping.
 
       Use the Skill tool to invoke **openspec-verify-change** (the
       `/opsx:verify` slash command is its user-facing equivalent).
@@ -223,59 +248,35 @@ artifacts:
         verification step MUST run on a completed implementation.
 
       The verify step MUST perform the following checks and record
-      results in verify.md using the template:
+      results in verify.md using the template. With a strict apply
+      phase, most checks should PASS cleanly — repeated warnings mean
+      apply gates need tightening, not verify relaxation.
 
       1. **Structural validation**: Run `openspec validate --all --json`
          in the repository root and confirm every item returns
          `"valid": true`. If any item fails, record the issues and
-         return to fix the underlying artifact before proceeding.
+         return to apply to fix before re-running verify.
 
-      2. **Task completion**: Confirm every checkbox in tasks.md is
-         `- [x]`. For any `- [ ]` remaining, document the reason
-         (e.g. manual / out-of-scope / blocked) and whether it blocks
-         archive.
+      2. **Task completion sanity check**: Confirm every checkbox in
+         tasks.md is `- [x]`. This SHOULD always pass if apply's
+         completion gate ran — any `- [ ]` is FAIL (return to apply).
 
-      3. **Delta spec sync state**: For each directory under
-         `openspec/changes/<name>/specs/`, compare against the
-         corresponding `openspec/specs/<capability>/spec.md` and
-         record one of:
-         - ✓ Already synced
-         - ✗ Needs sync (list the capabilities)
-         - N/A (no delta specs produced)
+      3. **Spec scenario test coverage**: For each `#### Scenario:` in
+         this change's delta specs, confirm an automated test exists
+         that exercises the GIVEN/WHEN/THEN assertions. Map scenario →
+         test file/name. Missing coverage is FAIL — return to apply to
+         add tests, not a verify warning.
 
       4. **Design/specs coherence**: Spot-check that design.md
-         decisions reference or align with the requirements listed
-         in specs/. Record any drift as a warning (non-blocking).
+         decisions are reflected in specs/ requirements. Material drift
+         (decision with no corresponding requirement or scenario) is
+         FAIL. Cosmetic wording differences are OK.
 
-      5. **Implementation signal**: Confirm all code changes are
-         committed (no unstaged files in the working directory). Cite the
-         commit range if known.
-
-      6. **Front-door routing leak detector** (warning, non-blocking):
-
-         For projects using superpowers-bridge, design output
-         should never land in `docs/superpowers/specs/` — the
-         brainstorm artifact's output redirection (see this
-         schema's brainstorm.instruction) routes it to
-         `openspec/changes/<name>/brainstorm.md`. Run:
-
-           ls docs/superpowers/specs/*.md 2>/dev/null
-
-         If any files exist, record a WARNING: "Front-door routing
-         leak — design output found at docs/superpowers/specs/...;
-         these belong in openspec/changes/<name>/brainstorm.md or
-         design.md. Move/delete after confirming content is captured
-         in the change directory."
-
-         Non-blocking — adopters may have legitimate non-schema use
-         of that directory predating schema install. Surfaces the
-         leak so the user can decide whether to clean up.
-
-      7. **Deferred dogfood vs automated-test equivalence**:
+      5. **Deferred dogfood vs automated-test equivalence**:
 
          If plan.md has any tasks marked `[~]` deferred (manual smoke /
          dogfood / live-environment checks that weren't run in this
-         cycle), enumerate each in verify.md §7 and identify the
+         cycle), enumerate each in verify.md §5 and identify the
          equivalent automated test that covers the same assertions.
 
          If no equivalent automated test exists for a deferred manual
@@ -283,15 +284,9 @@ artifacts:
          retrospective Misses with a follow-up plan, not silently
          deferred.
 
-         The decision table makes "deferred-but-covered" vs "deferred-
-         and-gapped" visible at archive time, so reviewers can audit
-         completeness without re-deriving the rationale from plan +
-         test files.
-
-         Non-blocking on its own — Overall Decision remains PASS even
-         with identified gaps, provided they're recorded as follow-up.
-         Blocks only if §7 is empty AND plan.md has `[~]` rows (means
-         the gap analysis was skipped, not that gaps don't exist).
+         Blocks only if §5 is empty AND plan.md has `[~]` rows (gap
+         analysis skipped). Identified gaps with follow-ups may still
+         PASS.
 
       Verify MAY be re-run multiple times as the implementation is
       refined — each run overwrites verify.md with current state.
@@ -314,11 +309,12 @@ artifacts:
       1. verify.md exists:
          test -f openspec/changes/<change-name>/verify.md
 
-      2. verify.md's Overall Decision is NOT marked as FAIL.
-         The verify.md template has 3 mutually-exclusive checkboxes
-         in its "Overall Decision" section: "✅ PASS", "⚠️ PASS WITH
-         WARNINGS", "❌ FAIL". Only "❌ FAIL" being checked is blocking:
+      2. verify.md's Overall Decision is PASS (not FAIL):
+         The verify.md template has mutually-exclusive checkboxes:
+         "✅ PASS" and "❌ FAIL". Only "❌ FAIL" being checked is
+         blocking:
          ! grep -q '^- \[x\] ❌ FAIL' openspec/changes/<change-name>/verify.md
+         grep -q '^- \[x\] ✅ PASS' openspec/changes/<change-name>/verify.md
 
       Only after both succeed, proceed.
 
@@ -463,9 +459,8 @@ apply:
   instruction: |
     Before implementing, set up an isolated workspace and executor:
 
-    0. **Pre-flight — verify required Superpowers skills**:
+    0. **Pre-flight — verify required skills**:
 
-       This schema's apply phase requires the following skills.
        Confirm each appears in your available skills list before
        proceeding:
 
@@ -474,7 +469,11 @@ apply:
                         requesting-code-review)
        - finishing-a-development-branch
 
-       If any required skill is missing, STOP and inform the user —
+       Optional but recommended (apply invokes when present):
+       - git-commit — conventional commits during apply and archive
+       - changelog-generator — changelog task in tasks.md
+
+       If any **required** skill is missing, STOP and inform the user —
        do NOT proceed and do NOT silently fall back to manual
        implementation. The user can install the Superpowers plugin,
        or explicitly opt into the manual fallback path described at
@@ -484,9 +483,8 @@ apply:
        on PATH. The exact list depends on the project — read
        plan.md and surface any tool mentioned (e.g., `mvn`/`mvnw`,
        `docker`, `python3`, `jq`, `glab`/`gh`, `node`/`npm`). If
-       a tool is missing, surface as WARNING (not STOP) — the user
-       may have a fallback. Print the missing list once at apply
-       start so the user isn't surprised mid-cycle.
+       a tool is missing, STOP — do not start apply with missing
+       tooling.
 
     1. **Executor — subagent-driven-development**:
 
@@ -498,6 +496,10 @@ apply:
        - Read plan.md in this change directory for micro-tasks
        - Update tasks.md checkboxes as coarse tasks complete
        - Work within the current branch
+       - Do NOT mark a task `[x]` until its tests pass and lint is
+         clean for files touched by that task
+       - Complete Documentation and Changelog task groups last —
+         they depend on final behavior
 
        IMPORTANT — transitive skill activation:
        subagent-driven-development internally enforces the
@@ -519,10 +521,29 @@ apply:
        If your platform lacks subagent support, use the built-in
        `spec-driven` schema instead of this one.
 
-    2. **Verification**: When all tasks are done, produce the
-       `verify` artifact by invoking **openspec-verify-change**
-       to check completeness, correctness, and coherence.
-       Re-run verify until all blocking issues are resolved.
+    1b. **Apply completion gate** (BLOCKING — do not proceed to
+        verify until ALL pass; loop back to step 1 if any fail):
+
+       - **Tasks**: Every `- [ ]` in tasks.md is `- [x]`, including
+         Documentation and Changelog sections.
+       - **Tests**: Run the canonical test command from plan.md.
+         Exit code 0. Every `#### Scenario:` in delta specs has a
+         passing automated test — add missing tests before proceeding.
+       - **Lint/format**: Run project lint/format commands from
+         plan.md. Fix all auto-fixable issues; zero new warnings
+         introduced by this change.
+       - **Documentation**: Doc tasks reflect actual behavior;
+         connector/API docs updated when contract or usage changed.
+       - **Changelog**: Invoke **changelog-generator** if available
+         to create/update the changelog entry; otherwise update the
+         project's changelog file manually per the changelog task.
+       - **Commits**: Stage and commit all work. Use **git-commit**
+         if available; otherwise use conventional commits. Working
+         tree MUST be clean (`git status --porcelain` empty).
+
+    2. **Verification**: When the completion gate passes, produce
+       the `verify` artifact by invoking **openspec-verify-change**.
+       Re-run apply + verify until verify shows ✅ PASS.
 
     3. **Retrospective (write while context is hot)**:
 
@@ -536,18 +557,34 @@ apply:
        PR merge produces a separate trailing commit and loses the
        hot context (running tests, fresh fix memory).
 
-    4. **Archive (sync spec delta + move folder)**:
+    4. **Archive (complete artifacts → sync specs → commit)**:
 
-       After retrospective.md is written, run `openspec archive -y`
-       (or invoke `/opsx:archive`). This:
-       - syncs delta specs from `openspec/changes/<name>/specs/`
-         into `openspec/specs/<capability>/spec.md`
-       - moves the change folder to
-         `openspec/changes/archive/YYYY-MM-DD-<name>/`
+       `/opsx:archive` and apply step 4 follow this sequence:
+
+       a. **Backfill missing artifacts**: Run `openspec status
+          --change <name> --json` and produce any artifact not yet
+          on disk (verify.md, retrospective.md, etc.) by invoking
+          each artifact's instruction. Do NOT archive with gaps.
+
+       b. **Front-door cleanup** (if applicable): Move any stray
+          files in `docs/superpowers/specs/` into this change's
+          brainstorm.md or design.md, then delete the stray files.
+
+       c. **Sync and move**: Run `openspec archive -y` (or invoke
+          `/opsx:archive`). This syncs delta specs from
+          `openspec/changes/<name>/specs/` into
+          `openspec/specs/<capability>/spec.md` and moves the
+          change folder to
+          `openspec/changes/archive/YYYY-MM-DD-<name>/`.
+
+       d. **Commit archive output**: Stage synced specs, archived
+          change folder, and any artifact updates. Use **git-commit**
+          if available; otherwise conventional commit on the
+          current branch (do NOT open a PR before this commit).
 
        The PR diff after archive contains the COMPLETE cycle state:
-       all 8 artifacts done, spec synced into main specs, change
-       under archive/.
+       all artifacts done, spec synced into main specs, change
+       under archive/, committed on the branch.
 
     5. **Completion (PR is the LAST step)**:
 
@@ -561,6 +598,3 @@ apply:
        This is the canonical opening sequence for the PR — do NOT
        reorder.
 
-    Enforce a changelog update for each spec change applied using the `changelog-generator` skill. Follow the `openspec-git-discipline` skill when making commits.
-
-    Always keep documentation up-to-date for any spec change introduced.
