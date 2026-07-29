@@ -5,10 +5,7 @@ import { FusionRun } from '../model/fusionRun'
 import { FusionConfig, RecordingConfig } from '../model/config'
 import { ApiLogEntry } from './clientService/recordingApiAdapter'
 
-function sanitizeForJson(value: unknown): unknown {
-    if (value === undefined || value === null) return value
-    return JSON.parse(JSON.stringify(value))
-}
+import { sanitizeForJson } from '../utils/sanitizeForJson'
 
 interface RecordedStep {
     stepId: string
@@ -245,4 +242,5 @@ export class RecordingService {
         }
     }
 }
+
 

@@ -1,6 +1,5 @@
 import { createFusionServiceTestContext, seedRunInventory, type FusionServiceTestContext } from './fusionService.testFixtures'
 import { FusionAccount } from '../../../model/account'
-import { StatusEntitlement } from '../../../model/statusEntitlement'
 import { AggregationTracker } from '../aggregationTracker'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionService } from '../fusionService'
@@ -1301,7 +1300,7 @@ describe('FusionService — aggregation', () => {
             } as any)
             nonMatchedCandidate.setNonMatched()
             ctx.fusionService.setFusionAccount(nonMatchedCandidate)
-            const run = (ctx.fusionService as any).run
+            void (ctx.fusionService as any).run
 
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
@@ -1362,7 +1361,7 @@ describe('FusionService — aggregation', () => {
             } as any)
             nonMatchedCandidate.setNonMatched()
             ctx.fusionService.setFusionAccount(nonMatchedCandidate)
-            const run = (ctx.fusionService as any).run
+            void (ctx.fusionService as any).run
 
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()

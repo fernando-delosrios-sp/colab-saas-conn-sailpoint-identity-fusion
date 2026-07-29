@@ -9,10 +9,7 @@ export interface ApiLogEntry {
     timestamp: string
 }
 
-function sanitizeForJson(value: unknown): unknown {
-    if (value === undefined || value === null) return value
-    return JSON.parse(JSON.stringify(value))
-}
+import { sanitizeForJson } from '../../utils/sanitizeForJson'
 
 export class RecordingApiAdapter implements IscApiAdapter {
     public readonly config: Configuration
@@ -62,3 +59,4 @@ export class RecordingApiAdapter implements IscApiAdapter {
     get identityProfilesApi() { return this.createApiProxy('identityProfiles', this.inner.identityProfilesApi) }
     get identityAttributesApi() { return this.createApiProxy('identityAttributes', this.inner.identityAttributesApi) }
 }
+

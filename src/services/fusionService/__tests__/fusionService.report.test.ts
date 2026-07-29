@@ -1,4 +1,4 @@
-import { createFusionServiceTestContext, seedRunInventory, type FusionServiceTestContext } from './fusionService.testFixtures'
+import { createFusionServiceTestContext, type FusionServiceTestContext } from './fusionService.testFixtures'
 import { FusionAccount } from '../../../model/account'
 import { AggregationTracker } from '../aggregationTracker'
 import { FusionRun } from '../../../model/fusionRun'
