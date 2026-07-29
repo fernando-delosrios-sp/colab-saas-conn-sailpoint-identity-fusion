@@ -449,6 +449,14 @@ artifacts:
          capturing what was known and reasoned at a specific point.
          Rewriting it removes that audit trail.
 
+      5. **Next step — archive + commit (do not skip)**
+
+         After retrospective.md is written, proceed immediately to
+         apply step 4 (Archive). Archive is NOT complete until the
+         post-commit gate (step 4e) passes — even if the change was
+         archived in a prior session. Prefer **git-commit** when
+         installed; otherwise commit manually. See apply step 4.
+
       Write output to retrospective.md using the template structure.
     requires:
       - verify
@@ -469,8 +477,8 @@ apply:
                         requesting-code-review)
        - finishing-a-development-branch
 
-       Optional but recommended (apply invokes when present):
-       - git-commit — conventional commits during apply and archive
+       Optional (use when present):
+       - git-commit — preferred for commits during apply and archive
        - changelog-generator — changelog task in tasks.md
 
        If any **required** skill is missing, STOP and inform the user —
@@ -537,9 +545,9 @@ apply:
        - **Changelog**: Invoke **changelog-generator** if available
          to create/update the changelog entry; otherwise update the
          project's changelog file manually per the changelog task.
-       - **Commits**: Stage and commit all work. Use **git-commit**
-         if available; otherwise use conventional commits. Working
-         tree MUST be clean (`git status --porcelain` empty).
+       - **Commits**: Stage and commit all work. Prefer **git-commit**
+         via Skill tool when installed; otherwise conventional commit.
+         Working tree MUST be clean (`git status --porcelain` empty).
 
     2. **Verification**: When the completion gate passes, produce
        the `verify` artifact by invoking **openspec-verify-change**.
@@ -559,7 +567,10 @@ apply:
 
     4. **Archive (complete artifacts → sync specs → commit)**:
 
-       `/opsx:archive` and apply step 4 follow this sequence:
+       `/opsx:archive` MUST run this full sequence — not just
+       `openspec archive -y`. Archive is NOT complete until step (e)
+       passes, including when re-running on a change archived in a
+       prior session with uncommitted openspec files still on disk.
 
        a. **Backfill missing artifacts**: Run `openspec status
           --change <name> --json` and produce any artifact not yet
@@ -570,23 +581,63 @@ apply:
           files in `docs/superpowers/specs/` into this change's
           brainstorm.md or design.md, then delete the stray files.
 
-       c. **Sync and move**: Run `openspec archive -y` (or invoke
-          `/opsx:archive`). This syncs delta specs from
-          `openspec/changes/<name>/specs/` into
-          `openspec/specs/<capability>/spec.md` and moves the
-          change folder to
-          `openspec/changes/archive/YYYY-MM-DD-<name>/`.
+       c. **Sync and move**: If the change folder is still under
+          `openspec/changes/<name>/`, run `openspec archive -y`.
+          If it is already under
+          `openspec/changes/archive/YYYY-MM-DD-<name>/`, skip (c)
+          — sync/move already happened; proceed to (d).
 
-       d. **Commit archive output**: Stage synced specs, archived
-          change folder, and any artifact updates. Use **git-commit**
-          if available; otherwise conventional commit on the
-          current branch (do NOT open a PR before this commit).
+       d. **Commit archive output (REQUIRED default — always run)**:
+
+          `openspec archive -y` does NOT commit. You MUST commit
+          before reporting archive complete or proceeding to step 5.
+
+          1. Run `git status --porcelain`.
+          2. If output is empty, proceed to (e) — nothing to commit.
+          3. If output is non-empty, stage all openspec-related paths:
+             `git add openspec/specs/ openspec/changes/`
+             plus any paths touched in (a) or (b).
+          4. Create the commit (default behavior — do not skip):
+             - **Preferred**: if `git-commit` is in your skills list,
+               invoke it via the Skill tool (change name, spec sync,
+               archive path in the message context).
+             - **Fallback**: conventional commit manually, e.g.
+               `docs(openspec): archive <change-name> and sync specs`
+          5. Do NOT open a PR or call step 5 until (e) passes.
+
+       e. **Post-commit gate (BLOCKING — archive incomplete until pass)**:
+
+          Run both checks. Failure means return to (d), not done:
+
+          ```
+          test -z "$(git status --porcelain)"
+          ```
+
+          If step (c) ran OR `openspec/changes/archive/` contains this
+          change, confirm the latest commit includes the synced specs
+          and archived change folder:
+
+          ```
+          git log -1 --name-only -- openspec/specs/ openspec/changes/archive/
+          ```
+
+          If (c) was skipped (already archived) but porcelain was
+          non-empty before (d), the commit from (d) must have cleared
+          porcelain — re-run (d) if not.
+
+          Do NOT proceed to step 5 until this gate passes.
 
        The PR diff after archive contains the COMPLETE cycle state:
        all artifacts done, spec synced into main specs, change
        under archive/, committed on the branch.
 
     5. **Completion (PR is the LAST step)**:
+
+       PRECHECK — archive commit gate:
+       Before invoking finishing-a-development-branch, confirm step 4e
+       passed (`git status --porcelain` empty). If openspec paths are
+       still modified or untracked, STOP — return to step 4 (d) and
+       commit before opening a PR.
 
        After retrospective + archive are all done, use the Skill
        tool to invoke **finishing-a-development-branch** from the original branch.
@@ -597,4 +648,5 @@ apply:
 
        This is the canonical opening sequence for the PR — do NOT
        reorder.
+
 
