@@ -6,25 +6,31 @@ The Account List operation is the main entry point for identity fusion. It perfo
 
 ## Process Flow
 
+The operation runs as **five numbered phases** (matching `PHASE N` log lines), plus a report **epilogue** that always runs:
+
 ```mermaid
 flowchart TD
-    Start([Account List Starts]) --> Init[1. Setup & Init]
-    Init --> Fetch[2. Fetch Data in Parallel<br>Identities, Accounts, Forms]
-    Fetch --> Exist[3. Process Existing Fusion Accounts]
-    Exist --> NewId[4. Process Identities]
-    NewId --> Reviews[5. Process New Identity Decisions]
-    Reviews --> Match[6. Match Remaining Managed Accounts]
-    Match --> Forms[7. Form & Entitlement Reconciliation]
-    Forms --> Unique[8. Global Unique Attribute Refresh]
-    Unique --> Report[9. Reporting]
-    Report --> Clean[10. Cleanup Caches]
-    Clean --> Output[11. Output Accounts to ISC]
-    Output --> State[12. Save State & Final Cleanup]
-    State --> Delayed[13. Schedule Delayed Aggregation]
-    Delayed --> End([End])
+    Start([Account List Starts]) --> P1["PHASE 1 Setup"]
+    P1 --> P2["PHASE 2 Fetch"]
+    P2 --> P3["PHASE 3 Refresh"]
+    P3 --> P4["PHASE 4 Process"]
+    P4 --> P5["PHASE 5 Output"]
+    P5 --> Epilogue["EPILOGUE report"]
+    Epilogue --> End([End])
 ```
 
-1.  **Setup & Initialization**:
+| Phase | Log prefix | Code | Summary |
+| ----- | ---------- | ---- | ------- |
+| 1 | `PHASE 1 Setup` | `setupPhase` | Sources, lock, reset flags, schema, reverse correlation |
+| 2 | `PHASE 2 Fetch` | `fetchPhase` | Parallel fetch of identities, accounts, forms |
+| 3 | `PHASE 3 Refresh` | `refreshPhase` | Existing fusion account processing |
+| 4 | `PHASE 4 Process` | `processPhase` | Identities, decisions, managed-account sweeps, forms |
+| 5 | `PHASE 5 Output` | `outputPhase` | Stream accounts, save state, schedule delayed aggregations |
+| — | `EPILOGUE report` | `reportEpilogue` | Aggregation report, dry-run artifacts (always runs) |
+
+Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identities` → `process-decisions` → `managed-account-init` → `orphan-identity-hydration` → `correlated-sweep` → `record-unique-registration` → `uncorrelated-sweep` → `await-disable-ops` → `form-reconcile`.
+
+### Phase 1 — Setup & Initialization
     - Loads all managed sources.
     - Acquires a **process lock** to prevent concurrent aggregations.
     - Checks for **Reset forms?**; when enabled, deletes all Fusion review form definitions and auto-disables the flag (aggregation continues unless account reset is also set).
@@ -35,7 +41,7 @@ flowchart TD
     - Aggregates managed sources enabled for aggregation if they were not aggregated after the latest Fusion aggregation.
     - Initializes attribute counters.
 
-2.  **Data Fetching (Parallel)**:
+### Phase 2 — Data Fetching (Parallel)
     - Fetches the following data in parallel to optimize performance:
         - Existing fusion accounts.
         - Identities (from ISC).
@@ -47,7 +53,7 @@ flowchart TD
     - A warning is logged with discarded machine-account counts (per source and total).
     - If `fusionReportOnAggregation` is enabled and the fusion owner identity was not loaded in the parallel fetch, it is fetched separately.
 
-3.  **Fusion Account Processing** (attribute mapping + normal definitions):
+### Phase 3 — Fusion Account Processing (Refresh)
     - Processes all _existing_ fusion accounts. This step "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
     - For each account:
         - Identity layer is applied to match collected identities with Fusion accounts.
@@ -56,28 +62,28 @@ flowchart TD
         - Attribute mapping is applied first, then **normal** attribute definitions are evaluated. Normal attribute values feed into the Velocity context and are available for Fusion matching/scoring.
     - **Optimistic correlation**: For sources configured with **Correlation mode = Correlate missing accounts on aggregation** (`correlationMode: correlate`), missing accounts are marked as correlated _immediately_ before the API call is enqueued, so the account output reflects a successful correlation without waiting for the queue to drain. Correlation API calls proceed as fire-and-forget in the background; any failures are logged and will be re-detected on the next aggregation.
 
-4.  **Identity Processing** (attribute mapping + normal definitions):
-    - Processes all identities. This creates new fusion identities for identities that don't yet have a fusion account but should. This step also "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
-    - For each identity:
-        - Managed account layer is applied to match collected managed accounts with Fusion accounts.
-        - Same attribute mapping + normal definition evaluation as step 3.
-    - Clears the identity cache to free up memory as it's no longer needed.
+### Phase 4 — Process (identities, matching, forms)
 
-5.  **New Identity Decisions**:
-    - Processes Fusion reviews that resulted in new identities.
+Sub-steps map to `STEP` log markers inside `PHASE 4 Process`:
 
-6.  **Managed Account Processing (Matching)**:
-    - Processes any remaining managed accounts in the work queue.
-    - These are accounts that were _not_ matched to an existing fusion account or an identity.
-    - **Source Type Check**: Behavior changes based on the account's Source Type:
-        - **Record**: Registers unique attributes but drops the account from ISC output.
-        - **Orphan**: Drops the account entirely (and optionally triggers a background disable operation).
-        - **Identity**: Proceeds to matching pipeline.
-    - **Reviewer validation**: Before scoring begins, each managed source is checked for valid reviewers. Sources without a configured reviewer are logged once as an error and their accounts bypass scoring entirely, being added as non-matched directly.
-    - For sources with valid reviewers, the full matching pipeline executes: scoring, automatic merge on threshold match (when enabled and combined score meets or exceeds threshold), review form creation (for partial matches), or non-matched addition.
+#### STEP `process-identities` — Identity Processing
+
+- Processes all identities. Creates new fusion identities for identities that don't yet have a fusion account but should. Depletes matching managed accounts from the work queue.
+- For each identity: managed account layer matching, attribute mapping + normal definition evaluation.
+- Clears the identity cache to free memory when not in recording mode.
+
+#### STEP `process-decisions` — New Identity Decisions
+
+- Processes Fusion reviews that resulted in new identities.
+
+#### STEPs `managed-account-init` through `uncorrelated-sweep` — Managed Account Processing (Matching)
+
+- Processes remaining managed accounts in the work queue (not matched to an existing fusion account or identity).
+- **Source Type Check**: Record registers unique attributes and drops from output; Orphan drops entirely; Identity proceeds to matching.
+- **Reviewer validation**: Sources without a valid reviewer bypass scoring and are added as non-matched.
 
 <details>
-<summary><b>View Graphic: Managed Account Processing (Step 6)</b></summary>
+<summary><b>View Graphic: Managed Account Processing (uncorrelated-sweep)</b></summary>
 
 ```mermaid
 flowchart TD
@@ -96,23 +102,34 @@ flowchart TD
 
 </details>
 
-7.  **Form & Entitlement Reconciliation**:
-    - Updates processed Fusion accounts with review information.
-    - Fusion identities involved in ongoing Fusion reviews are flagged as candidates.
-    - Reviewer identities are updated with their corresponding pending Fusion reviews URL.
+#### STEP `form-reconcile` — Form & Entitlement Reconciliation
 
-    !!! warning "Upgrade note: Fusion review form definitions"
-        Candidate identities receive the `candidate` status from data stored on pending form instances. The connector declares a `candidates` field on the form definition so that value round-trips from ISC across aggregations. **Existing** form definitions that were created before that field existed are not updated automatically; they keep their old shape until removed. After upgrading the connector, delete stale fusion review form definitions (or use a reset that clears forms) so new definitions are created with the full input set, or candidate-related entitlements may not persist correctly for in-flight reviews until those forms are replaced.
+- Updates processed Fusion accounts with review information.
+- Fusion identities involved in ongoing Fusion reviews are flagged as candidates.
+- Reviewer identities are updated with their corresponding pending Fusion reviews URL.
 
-    - Review form names include the account identifier suffix (`<pattern> - <name> [<source>] (<nativeIdentity>)`), so reviewers can disambiguate forms when several Fusion accounts share the same display name and source. Existing forms keep their original names until replaced.
+!!! warning "Upgrade note: Fusion review form definitions"
+    Candidate identities receive the `candidate` status from data stored on pending form instances. The connector declares a `candidates` field on the form definition so that value round-trips from ISC across aggregations. **Existing** form definitions that were created before that field existed are not updated automatically; they keep their old shape until removed. After upgrading the connector, delete stale fusion review form definitions (or use a reset that clears forms) so new definitions are created with the full input set, or candidate-related entitlements may not persist correctly for in-flight reviews until those forms are replaced.
 
-8.  **Unique Attribute Refresh** (unique definitions — runs after all matching):
-    - Performs a batched global refresh of **unique** attributes for all fusion accounts (both existing and newly created).
-    - Unique definitions run _after_ Fusion matching has completed, so they can reference normal attribute values produced in steps 3–6.
-    - Ensures uniqueness constraints are met across the entire dataset.
+- Review form names include the account identifier suffix (`<pattern> - <name> [<source>] (<nativeIdentity>)`), so reviewers can disambiguate forms when several Fusion accounts share the same display name and source. Existing forms keep their original names until replaced.
 
-9.  **Reporting (Conditional)**:
-    - If `fusionReportOnAggregation` is enabled, generates a fusion report for the fusion owner.
+Unique attribute refresh (unique definitions) runs after all matching completes, ensuring uniqueness constraints are met across the entire dataset.
+
+### Phase 5 — Output
+
+Sub-steps map to `STEP` log markers inside `PHASE 5 Output`:
+
+- **`send-accounts`**: Iterates through all processed fusion accounts and sends them to ISC. Accounts whose fusion identity attribute is empty are omitted when "Skip accounts with a missing identifier" is enabled (see Behavior Notes).
+- **`clear-managed-accounts`**: Clears managed account caches before streaming (skipped in recording mode).
+- **`form-cleanup`**, **`save-state`**, **`schedule-aggregations`**, **`await-form-deletes`**: Persistent-run only — form cleanup, attribute counter persistence, batch cumulative counts, delayed aggregation scheduling, and pending form deletion drain. State is saved _after_ output generation so that a failure during transmission prevents stale state from being persisted.
+
+After Phase 5, fusion account caches are cleared from memory and the process lock is released in a `finally` block (also on failure).
+
+### Epilogue — Reporting (Conditional)
+
+Runs as `EPILOGUE report` after phases complete (including on pipeline failure):
+
+- If `fusionReportOnAggregation` is enabled, generates a fusion report for the fusion owner.
 
 ### Report contents (what is included)
 
@@ -149,24 +166,6 @@ To reduce email/report payload growth:
 - Sample lists are capped and messages are truncated
 - Full verbose log streams are not embedded in the report
 
-10. **Cleanup & Memory Reclamation**:
-    - Clears analyzed account caches and managed account caches.
-    - Manages form cleanup.
-
-11. **Output Generation**:
-    - Iterates through all processed fusion accounts and sends them to ISC.
-    - Accounts whose fusion identity attribute is empty are omitted when "Skip accounts with a missing identifier" is enabled (see Behavior Notes).
-
-12. **State Saving & Final Cleanup**:
-    - Saves attribute definition state (counters).
-    - Saves batch cumulative counts.
-    - State is saved _after_ output generation so that a failure during transmission prevents stale state from being persisted.
-    - Clears fusion account caches from memory.
-    - Releases the process lock. The lock is released in a `finally` block, so it is also released if the operation fails after acquisition.
-
-13. **Schedule Delayed Aggregation**:
-    - Triggers the delayed aggregation workflow for any managed sources configured with delayed aggregation mode.
-
 ## Dry-run mode
 
 The account list operation supports an optional **dry-run mode** for non-persistent analysis. Pass `{ dryRun: { enabled: true } }` on the input to run the full pipeline with `DryRunApiAdapter` write inhibition: account rows stream identically to persistent aggregation, while ISC PATCH/POST/DELETE calls are suppressed. Process lock acquisition and delayed-aggregation scheduling remain skipped in dry-run.
@@ -179,7 +178,7 @@ See [Dry-run mode](dry-run.md) for the full contract, adapter-based write suppre
 
 ### Attribute evaluation order
 
-Normal attributes are created **before** Fusion matching occurs (steps 3–6). Unique attributes are evaluated **after** all matching is complete (step 8). Attribute definitions can access previously defined attributes via the shared Velocity context, so definition order matters. Unique attributes can reference normal attribute values, but normal attributes cannot reference unique attributes because of the order in which they are calculated.
+Normal attributes are created **before** Fusion matching occurs (Phase 4 Process). Unique attributes are evaluated **after** all matching is complete. Attribute definitions can access previously defined attributes via the shared Velocity context, so definition order matters.
 When the Fusion schema attribute `mainAccount` is populated with a valid managed account key (`sourceId::nativeIdentity`), that managed account is evaluated first for mapping/definition context (including `$accounts[0]`); if not set or invalid, managed-source order is used.
 
 ### Attribute mapping and unique definition synergy
@@ -201,6 +200,7 @@ Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion
 ### Preventing Fusion account creation (empty nativeIdentity skip pattern)
 
 One can purposely generate an empty `nativeIdentity` (by designing attribute definitions that produce an empty fusion identity attribute) in conjunction with the "Skip accounts with a missing identifier" processing option. When the fusion identity attribute evaluates to empty and the skip option is enabled, the account is omitted from the output, effectively preventing specific managed accounts or identities from generating Fusion accounts.
+
 
 
 

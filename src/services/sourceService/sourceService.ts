@@ -786,7 +786,7 @@ export class SourceService {
     }
 
     private async ensureIdentityAttribute(attributeName: string, displayName: string): Promise<void> {
-        return ensureIdentityAttributeImpl(this.reverseCorrelationCoreDeps, attributeName, displayName)
+        return ensureIdentityAttributeImpl(this.reverseCorrelationDeps, attributeName, displayName)
     }
 
     private async ensureIdentityProfileMapping(attributeName: string, sourceConfig: SourceConfig): Promise<void> {
@@ -804,7 +804,7 @@ export class SourceService {
         fusionSourceId: string
     ): Promise<boolean> {
         return waitForIdentityProfileMappingImpl(
-            this.reverseCorrelationCoreDeps,
+            this.reverseCorrelationDeps,
             profileId,
             attributeName,
             fusionSourceName,

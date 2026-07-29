@@ -4,8 +4,8 @@ import { AggregationStats } from '../../services/fusionService/types'
 /**
  * Builds and sends a fusion report email.
  *
- * Callers that need to self-fetch should call {@link buildReportContext} first
- * and pass the returned stats as `aggregationStats`.
+ * Callers that need to self-fetch should call {@link buildReportContext} from
+ * `./accountListOrchestration` first and pass the returned stats as `aggregationStats`.
  *
  * Aggregation and account-action reports use `includeNonMatches: false` so non-matched managed
  * accounts are not listed per row; {@link FusionReportStats} still carries consolidated counters.
@@ -23,3 +23,4 @@ export const generateReport = async (
     const { reports } = serviceRegistry
     await reports.generateAndSendFusionReport(includeNonMatches, aggregationStats)
 }
+

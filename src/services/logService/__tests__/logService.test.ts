@@ -248,6 +248,44 @@ describe('LogService step boundaries', () => {
         vi.useRealTimers()
     })
 
+    it('runStep emits STEP START, METRIC, and STEP END in order', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        log.bindRunContext(new OperationRunContext())
+
+        const promise = log.runStep('process-identities', async () => {
+            vi.advanceTimersByTime(100)
+            return { count: 5 }
+        }, {
+            track: 'FusionService.processIdentities',
+            trackDone: (result) => ({ count: result.count }),
+            endDetail: (result) => ({ count: result.count }),
+        })
+
+        await vi.runAllTimersAsync()
+        await promise
+
+        const messages = mockLogger.info.mock.calls.map(([msg]) => String(msg))
+        expect(messages.some((m) => m.includes('STEP process-identities START'))).toBe(true)
+        expect(messages.some((m) => m.includes('METRIC FusionService.processIdentities count=5'))).toBe(true)
+        expect(messages.some((m) => m.includes('STEP process-identities END count=5 elapsed=100MS'))).toBe(true)
+        vi.useRealTimers()
+    })
+
+    it('runStep emits STEP END without detail when fn throws', async () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        log.bindRunContext(new OperationRunContext())
+
+        await expect(
+            log.runStep('failing-step', async () => {
+                throw new Error('boom')
+            })
+        ).rejects.toThrow('boom')
+
+        expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('STEP failing-step END'))
+    })
+
     it('epilogueStart clears step and progress from run context', () => {
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const runContext = new OperationRunContext()
@@ -297,5 +335,6 @@ describe('LogService phase and detail boundaries', () => {
         vi.useRealTimers()
     })
 })
+
 
 

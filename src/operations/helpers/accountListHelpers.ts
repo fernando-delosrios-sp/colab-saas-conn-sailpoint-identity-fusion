@@ -3,7 +3,25 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 import { readBoolean, readUnknown } from '../../utils/safeRead'
 import { normalizeEmailValue, sanitizeRecipients } from '../../services/emailService/email'
 import { IdentityService } from '../../services/identityService'
-import type { FetchResult } from './accountListPhases'
+import { AggregationStats } from '../../services/fusionService/types'
+
+export interface FetchResult {
+    identitiesFound: number
+    managedAccountsFound: number
+    managedAccountsFoundAuthoritative: number
+    managedAccountsFoundRecord: number
+    managedAccountsFoundOrphan: number
+}
+
+export function createEmptyFetchResult(): FetchResult {
+    return {
+        identitiesFound: 0,
+        managedAccountsFound: 0,
+        managedAccountsFoundAuthoritative: 0,
+        managedAccountsFoundRecord: 0,
+        managedAccountsFoundOrphan: 0,
+    }
+}
 
 export function resolveIdentitiesFound(
     fetchResult: FetchResult | undefined,
@@ -12,6 +30,38 @@ export function resolveIdentitiesFound(
     const fetchCount = fetchResult?.identitiesFound ?? 0
     const loadedCount = identities?.identitiesLoadedCount ?? fetchCount
     return Math.max(fetchCount, loadedCount)
+}
+
+function fetchResultToAggregationStats(
+    fetchResult: FetchResult,
+    timer: ReturnType<ServiceRegistry['log']['timer']>,
+    options?: {
+        fusionAccountsReturned?: number
+        identities?: Pick<IdentityService, 'identitiesLoadedCount'>
+    }
+): AggregationStats {
+    return {
+        identitiesFound: resolveIdentitiesFound(fetchResult, options?.identities),
+        managedAccountsFound: fetchResult.managedAccountsFound,
+        managedAccountsFoundAuthoritative: fetchResult.managedAccountsFoundAuthoritative,
+        managedAccountsFoundRecord: fetchResult.managedAccountsFoundRecord,
+        managedAccountsFoundOrphan: fetchResult.managedAccountsFoundOrphan,
+        fusionAccountsReturned: options?.fusionAccountsReturned,
+        totalProcessingTime: timer.totalElapsed(),
+        phaseTiming: timer.getPhaseBreakdown(),
+    }
+}
+
+export function buildReportAggregationStats(
+    fetchResult: FetchResult,
+    timer: ReturnType<ServiceRegistry['log']['timer']>,
+    identities: ServiceRegistry['identities'],
+    outputCount?: number
+): AggregationStats {
+    return fetchResultToAggregationStats(fetchResult, timer, {
+        fusionAccountsReturned: outputCount,
+        identities,
+    })
 }
 
 export interface DryRunInput {
@@ -47,5 +97,6 @@ export function buildTerminalSummary(
         options: { saveFile: dryRun.saveFile ?? false, sendEmail: Boolean(dryRun.sendEmail) },
     }
 }
+
 
 
