@@ -183,7 +183,14 @@ export class SourceService {
     // ------------------------------------------------------------------------
 
     public async fetchAllSources(requireFusionSource = true): Promise<void> {
-        return fetchAllSourcesImpl(this.discoveryDeps, requireFusionSource)
+        const deps = this.discoveryDeps
+        await fetchAllSourcesImpl(deps, requireFusionSource)
+        const { state } = deps
+        this._allSources = state.allSources
+        this._fusionSourceId = state.fusionSourceId
+        this._fusionSourceOwner = state.fusionSourceOwner
+        this._fusionSourceManagementWorkgroupId = state.fusionSourceManagementWorkgroupId
+        this.sourcesById = state.sourcesById
     }
 
     // ------------------------------------------------------------------------

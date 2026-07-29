@@ -198,6 +198,75 @@ describe('MatchOutcomeDispatcher', () => {
             expect(run.autoMergedIdentityIds.has('identity-1')).toBe(true)
         })
 
+        it('auto-merges into a persisted anchor when it outscores an ISC identity candidate', async () => {
+            const { dispatcher, matchingService, forms, decisionProcessor, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 80 },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: true } }))
+
+            const anchor = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'NG000010',
+                name: 'Anchor Account [Source A]',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: true,
+                attributes: {
+                    originSource: SOURCE_NAME,
+                    originAccount: `${SOURCE_ID}::10`,
+                },
+            } as unknown as Account)
+            anchor.setNonMatched()
+            run.registerFusionAccount(anchor)
+            run.registerPersistedDeferredCandidate(anchor)
+
+            const identity = FusionAccount.fromIdentity({
+                id: 'isc-identity-1',
+                name: 'ISC Identity',
+                attributes: {},
+            } as any)
+            run.registerFusionAccount(identity)
+
+            const assigned = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'NG000010',
+                name: 'Anchor Account [Source A]',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: true,
+                attributes: {},
+            } as unknown as Account)
+            decisionProcessor.processFusionIdentityDecision.mockResolvedValue(assigned)
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.addFusionMatch({
+                        identityId: 'isc-identity-1',
+                        identityName: 'ISC Identity',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 90, isMatch: true }],
+                    })
+                }
+                if (candidateType === 'deferred') {
+                    fusionAccount.addFusionMatch({
+                        identityId: '',
+                        identityName: 'Persisted anchor',
+                        candidateType: 'deferred',
+                        fusionIdentity: anchor,
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 95, isMatch: true }],
+                    })
+                }
+                return 1
+            })
+
+            const account = managedAccount({ nativeIdentity: '12' })
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(result.exact).toBe(1)
+            expect(result.resolved[0].resolution).toBe('exact-match')
+            expect(result.resolved[0].identityId).toBe('NG000010')
+            expect(forms.registerFinishedDecision).toHaveBeenCalledWith(
+                expect.objectContaining({ identityId: 'NG000010', automaticMerge: true })
+            )
+        })
+
         it('dispatches a partial match to a review form when auto-merge is disabled', async () => {
             const { dispatcher, matchingService, forms, log, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
