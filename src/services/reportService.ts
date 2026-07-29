@@ -503,6 +503,20 @@ export class ReportService {
         this.identities.clear()
     }
 
+    /** Builds aggregation report payload without sending (for local recording artifacts). */
+    public async buildAggregationReportSnapshot(
+        includeNonMatches: boolean,
+        aggregationStats: AggregationStats
+    ): Promise<Record<string, unknown>> {
+        await this.hydrateIdentitiesForReportDecisions()
+        const stats = this.buildFusionReportStats(aggregationStats)
+        const tracker = this.fusion.tracker
+        const report = this.fusion.generateReport(tracker, includeNonMatches, stats)
+        report.fusionReviewDecisions = this.buildFusionReviewDecisions()
+        report.stats = stats
+        return report as Record<string, unknown>
+    }
+
     /** Map fetch-phase counters into AggregationStats for dry-run report rendering. */
     private aggregationStatsFromFetchResult(args: {
         fetchResult?: FetchResultLike
@@ -621,6 +635,7 @@ export class ReportService {
         }
     }
 }
+
 
 
 

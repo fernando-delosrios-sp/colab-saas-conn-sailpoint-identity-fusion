@@ -198,6 +198,12 @@ export class LogService {
     private static readonly ISSUE_MESSAGE_MAX_LENGTH = 180
     private runContext: OperationRunContext | null = null
     private operationHeartbeat: OperationHeartbeat | null = null
+    private phaseRecordingHook?: (
+        phaseNumber: number,
+        phase: OperationPhase,
+        detail: Record<string, unknown> | undefined,
+        elapsedMs: number | undefined
+    ) => void
 
     /**
      * @param config - Logging configuration including level, debug flag, and external logging settings
@@ -235,6 +241,17 @@ export class LogService {
         this.runContext = context
     }
 
+    setPhaseRecordingHook(
+        hook: (
+            phaseNumber: number,
+            phase: OperationPhase,
+            detail: Record<string, unknown> | undefined,
+            elapsedMs: number | undefined
+        ) => void
+    ): void {
+        this.phaseRecordingHook = hook
+    }
+
     getRunContext(): OperationRunContext | null {
         return this.runContext
     }
@@ -253,9 +270,10 @@ export class LogService {
 
     phaseEnd(phaseNumber: number, phase: OperationPhase, detail?: Record<string, unknown>): void {
         const startedAt = this.runContext?.phaseStartedAt
-        const elapsed =
-            startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
+        const elapsedMs = startedAt !== undefined ? Date.now() - startedAt : undefined
+        const elapsed = elapsedMs !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(elapsedMs)}` : ''
         this.info(`PHASE ${phaseNumber} ${phase} END${formatPhaseEndDetailSuffix(detail)}${elapsed}`)
+        this.phaseRecordingHook?.(phaseNumber, phase, detail, elapsedMs)
         if (this.runContext) {
             this.runContext.phaseStartedAt = undefined
             this.runContext.step = null
@@ -726,6 +744,7 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+
 
 
 

@@ -208,13 +208,7 @@ export class FusionRun {
     }
 
     constructor(public log?: LogService, config?: FusionConfig) {
-        if (config?.recording?.mode) {
-            this.isRecordMode = config.recording.mode === 'record'
-        } else if (process.env.RECORD_MODE === 'true') {
-            this.isRecordMode = true
-        } else {
-            this.isRecordMode = false
-        }
+        this.isRecordMode = config?.recording?.mode === 'record'
         this._candidateRegistry = new CandidateRegistry({
             getFusionAccount: (key: string) => this.getFusionAccountByManagedKey(key),
             sourcesByName: this.sourcesByName,

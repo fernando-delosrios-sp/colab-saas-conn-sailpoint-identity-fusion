@@ -131,4 +131,44 @@ describe('loadApiLog', () => {
             fs.unlinkSync(tmpFile)
         }
     })
+
+    it('loads from chain directory via manifest', () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'replay-dir-'))
+        const apiLogPath = path.join(tmpDir, 'api-log.ndjson')
+        fs.writeFileSync(
+            apiLogPath,
+            JSON.stringify({
+                api: 'sources',
+                method: 'listSources',
+                args: [{}],
+                response: [],
+                timestamp: 't1',
+            }) + '\n'
+        )
+        fs.writeFileSync(
+            path.join(tmpDir, 'manifest.json'),
+            JSON.stringify({
+                version: '1.0.0',
+                store: 'ndjson',
+                chainName: 'chain',
+                recordedAt: new Date().toISOString(),
+                apiLogPath: path.relative(process.cwd(), apiLogPath),
+                apiLogEntryCount: 1,
+                stepsPath: 'steps.ndjson',
+                stepCount: 0,
+                phaseCount: 0,
+                scenarioPath: 'scenario.json',
+                artifactPaths: [],
+            })
+        )
+
+        try {
+            const result = loadApiLog(tmpDir)
+            expect(result).toHaveLength(1)
+            expect(result[0].api).toBe('sources')
+        } finally {
+            fs.rmSync(tmpDir, { recursive: true, force: true })
+        }
+    })
 })
+

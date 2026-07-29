@@ -2,31 +2,17 @@ import { RecordingService } from '../recordingService'
 import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
 import { FusionRun } from '../../model/fusionRun'
+import * as fs from 'fs'
+import * as path from 'path'
+import { NdjsonRecordingStore } from '../recordingService/ndjsonRecordingStore'
 
 describe('RecordingService', () => {
-    const config = {
-        recording: { chainName: 'unit-test-chain' },
-    } as FusionConfig
-
-    afterEach(() => {
-        ;(RecordingService as any).instance = undefined
-    })
-
-    it('returns singleton via init', () => {
-        const log = new LogService({ spConnDebugLoggingEnabled: false })
-        const a = RecordingService.init(log, config)
-        const b = RecordingService.getInstance()
-        expect(a).toBe(b)
-        expect(a.getName()).toBe('unit-test-chain')
-    })
-
     it('records operation steps via startOperation/endOperation', () => {
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const uniqueConfig = {
-            recording: { chainName: `unit-test-chain-${Date.now()}` },
+            recording: { mode: 'record' as const, chainName: `unit-test-chain-${Date.now()}`, store: 'ndjson' as const },
         } as FusionConfig
-        ;(RecordingService as any).instance = undefined
-        const service = RecordingService.init(log, uniqueConfig)
+        const service = new RecordingService(log, uniqueConfig)
         const run = new FusionRun()
         run.log = log
         const sent: unknown[] = []
@@ -38,5 +24,157 @@ describe('RecordingService', () => {
 
         expect(service.getStepCount()).toBe(1)
         expect(service.getSteps()[0].output).toEqual([{ key: 'acct-1' }])
+    })
+
+    it('finalizeOnce writes scenario.json and manifest.json and retains steps.ndjson', async () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const chainName = `finalize-test-${Date.now()}`
+        const config = {
+            recording: { mode: 'record' as const, chainName, store: 'ndjson' as const },
+        } as FusionConfig
+        const service = new RecordingService(log, config)
+        const run = new FusionRun(undefined, config)
+        run.log = log
+        const res = { send: (_value: unknown) => undefined }
+
+        service.startOperation('testConnection', {}, res, run)
+        service.endOperation(run)
+        service.onApiCall({
+            api: 'accounts',
+            method: 'listAccounts',
+            args: [{ limit: 1 }],
+            response: { data: [] },
+            timestamp: new Date().toISOString(),
+        })
+
+        const scenarioPath = await service.finalizeOnce()
+        const dir = service.getRecordingDir()
+        const stepsPath = path.join(dir, 'steps.ndjson')
+        const manifestPath = path.join(dir, 'manifest.json')
+
+        expect(scenarioPath).toContain('scenario.json')
+        expect(fs.existsSync(stepsPath)).toBe(true)
+        expect(fs.existsSync(manifestPath)).toBe(true)
+
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
+        expect(manifest.store).toBe('ndjson')
+        expect(manifest.apiLogEntryCount).toBe(1)
+        expect(manifest.stepCount).toBe(1)
+
+        const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf-8'))
+        expect(scenario.apiLogPath).toContain('api-log.ndjson')
+        expect(scenario.chainName).toBe(chainName)
+
+        fs.rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('finalizeOnce is idempotent per chain', async () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const chainName = `idempotent-${Date.now()}`
+        const config = {
+            recording: { mode: 'record' as const, chainName, store: 'ndjson' as const },
+        } as FusionConfig
+        const service = new RecordingService(log, config)
+
+        const first = await service.finalizeOnce()
+        const second = await service.finalizeOnce()
+
+        expect(first).toContain('scenario.json')
+        expect(second).toBe('')
+
+        fs.rmSync(service.getRecordingDir(), { recursive: true, force: true })
+    })
+
+    it('accumulates steps across reloaded instances and finalizeOnce writes combined scenario', async () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const chainName = `reload-${Date.now()}`
+        const config = {
+            recording: { mode: 'record' as const, chainName, store: 'ndjson' as const },
+        } as FusionConfig
+        const run = new FusionRun(undefined, config)
+        run.log = log
+        const res = { send: (_value: unknown) => undefined }
+
+        const first = new RecordingService(log, config)
+        first.startOperation('testConnection', {}, res, run)
+        first.endOperation(run)
+
+        const second = new RecordingService(log, config)
+        second.startOperation('accountList', {}, res, run)
+        second.endOperation(run)
+
+        expect(second.getStepCount()).toBe(2)
+
+        const scenarioPath = await second.finalizeOnce()
+        const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf-8'))
+        expect(scenario.steps).toHaveLength(2)
+        expect(scenario.steps[0].operation).toBe('testConnection')
+        expect(scenario.steps[1].operation).toBe('accountList')
+
+        fs.rmSync(first.getRecordingDir(), { recursive: true, force: true })
+    })
+
+    it('recordPhaseEnd appends to phases.ndjson', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const chainName = `phases-${Date.now()}`
+        const config = {
+            recording: { mode: 'record' as const, chainName, store: 'ndjson' as const },
+        } as FusionConfig
+        const service = new RecordingService(log, config)
+
+        service.recordPhaseEnd({
+            phaseNumber: 1,
+            phase: 'Setup',
+            elapsedMs: 42,
+            timestamp: new Date().toISOString(),
+            managedAccounts: 3,
+            fusionAccounts: 1,
+            apiCalls: 5,
+        })
+
+        const phasesPath = path.join(service.getRecordingDir(), 'phases.ndjson')
+        expect(fs.existsSync(phasesPath)).toBe(true)
+        const lines = fs.readFileSync(phasesPath, 'utf-8').trim().split('\n')
+        expect(lines).toHaveLength(1)
+        expect(JSON.parse(lines[0]).phase).toBe('Setup')
+
+        fs.rmSync(service.getRecordingDir(), { recursive: true, force: true })
+    })
+})
+
+describe('NdjsonRecordingStore', () => {
+    it('append/load api-log and manifest', () => {
+        const chainName = `ndjson-${Date.now()}`
+        const store = new NdjsonRecordingStore(chainName)
+
+        store.appendApiCall({
+            api: 'search',
+            method: 'search',
+            args: [{ query: 'test' }],
+            response: { results: [] },
+            timestamp: '2026-01-01T00:00:00.000Z',
+        })
+
+        const loaded = store.loadApiLog()
+        expect(loaded).toHaveLength(1)
+        expect(loaded[0].api).toBe('search')
+        expect(store.getApiLogEntryCount()).toBe(1)
+
+        store.writeManifest({
+            version: '1.0.0',
+            store: 'ndjson',
+            chainName,
+            recordedAt: new Date().toISOString(),
+            apiLogPath: 'api-log.ndjson',
+            apiLogEntryCount: 1,
+            stepsPath: 'steps.ndjson',
+            stepCount: 0,
+            phaseCount: 0,
+            scenarioPath: 'scenario.json',
+            artifactPaths: [],
+        })
+
+        expect(fs.existsSync(path.join(store.getRecordingDir(), 'manifest.json'))).toBe(true)
+        fs.rmSync(store.getRecordingDir(), { recursive: true, force: true })
     })
 })

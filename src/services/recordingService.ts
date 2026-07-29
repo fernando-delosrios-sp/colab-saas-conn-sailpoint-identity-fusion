@@ -4,8 +4,8 @@ import { LogService } from './logService'
 import { FusionRun } from '../model/fusionRun'
 import { FusionConfig, RecordingConfig } from '../model/config'
 import { ApiLogEntry } from './clientService/recordingApiAdapter'
-
 import { sanitizeForJson } from '../utils/sanitizeForJson'
+import { createRecordingStore, RecordingManifest, RecordingStore } from './recordingService/recordingStore'
 
 interface RecordedStep {
     stepId: string
@@ -18,41 +18,73 @@ interface RecordedStep {
     duration: number
 }
 
-export class RecordingService {
-    private static instance?: RecordingService
+export interface PhaseRecord {
+    phaseNumber: number
+    phase: string
+    detail?: Record<string, unknown>
+    elapsedMs?: number
+    timestamp: string
+    managedAccounts?: number
+    fusionAccounts?: number
+    apiCalls?: number
+}
 
+const finalizedChains = new Set<string>()
+let exitHandlersRegistered = false
+const activeRecordingServices = new Set<RecordingService>()
+
+function shouldRegisterExitHandlers(): boolean {
+    return process.env.VITEST !== 'true' && process.env.VITEST !== '1'
+}
+
+function registerExitHandlersOnce(): void {
+    if (exitHandlersRegistered || !shouldRegisterExitHandlers()) return
+    exitHandlersRegistered = true
+
+    const finalizeAll = async (): Promise<void> => {
+        for (const service of activeRecordingServices) {
+            await service.finalizeOnce()
+        }
+    }
+
+    process.on('SIGINT', async () => {
+        await finalizeAll()
+        process.exit(0)
+    })
+    process.on('SIGTERM', async () => {
+        await finalizeAll()
+        process.exit(0)
+    })
+    process.on('beforeExit', () => {
+        void finalizeAll()
+    })
+}
+
+/** Captures ISC API calls and operation steps for chain replay scenarios. */
+export class RecordingService {
     private readonly chainName: string
-    private readonly recordingDir: string
-    private readonly apiLogPath: string
+    private readonly store: RecordingStore
     private readonly steps: RecordedStep[] = []
     private currentStep: RecordedStep | null = null
     private stepIndex = 0
-    private finalized = false
+    private reportsPath?: string
 
-    private constructor(
+    constructor(
         private readonly log: LogService,
         private readonly config: FusionConfig
     ) {
-        const recConfig: RecordingConfig | undefined = config.recording
-        this.chainName = recConfig?.chainName ?? `recording-${Date.now()}`
-        this.recordingDir = path.resolve('test-data', 'recordings', this.chainName)
-        this.apiLogPath = path.join(this.recordingDir, 'api-log.ndjson')
+        const recConfig: RecordingConfig = config.recording ?? { mode: 'off', store: 'ndjson' }
+        this.chainName = recConfig.chainName ?? `recording-${Date.now()}`
+        this.store = createRecordingStore(recConfig, this.chainName)
         this.log.info(`RecordingService initialized — chain "${this.chainName}"`)
 
         this.reloadSteps()
-
-        process.on('SIGINT', async () => {
-            await this.finalize()
-            process.exit(0)
-        })
-        process.on('SIGTERM', async () => {
-            await this.finalize()
-            process.exit(0)
-        })
+        activeRecordingServices.add(this)
+        registerExitHandlersOnce()
     }
 
     private reloadSteps(): void {
-        const stepsFile = path.join(this.recordingDir, 'steps.ndjson')
+        const stepsFile = path.join(this.store.getRecordingDir(), 'steps.ndjson')
         if (!fs.existsSync(stepsFile)) return
 
         try {
@@ -74,39 +106,32 @@ export class RecordingService {
         }
     }
 
-    private persistStep(step: RecordedStep): void {
-        fs.mkdirSync(this.recordingDir, { recursive: true })
-        const stepsFile = path.join(this.recordingDir, 'steps.ndjson')
-        fs.appendFileSync(stepsFile, JSON.stringify(step) + '\n')
-    }
-
-    static init(log: LogService, config: FusionConfig): RecordingService {
-        if (!RecordingService.instance) {
-            RecordingService.instance = new RecordingService(log, config)
-        }
-        return RecordingService.instance
-    }
-
-    static getInstance(): RecordingService | undefined {
-        return RecordingService.instance
+    getStore(): RecordingStore {
+        return this.store
     }
 
     getName(): string {
         return this.chainName
     }
 
+    getRecordingDir(): string {
+        return this.store.getRecordingDir()
+    }
+
     onApiCall(entry: ApiLogEntry): void {
-        fs.mkdirSync(this.recordingDir, { recursive: true })
-        fs.appendFileSync(
-            this.apiLogPath,
-            JSON.stringify({
-                api: entry.api,
-                method: entry.method,
-                args: entry.args,
-                response: entry.response,
-                timestamp: entry.timestamp,
-            }) + '\n'
-        )
+        this.store.appendApiCall(entry)
+    }
+
+    recordPhaseEnd(record: PhaseRecord): void {
+        this.store.append('phases', record)
+    }
+
+    writeAggregationReport(report: unknown): void {
+        const reportsDir = path.join(this.store.getRecordingDir(), 'reports')
+        fs.mkdirSync(reportsDir, { recursive: true })
+        const reportPath = path.join(reportsDir, 'aggregation.json')
+        fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n')
+        this.reportsPath = reportPath
     }
 
     getStepCount(): number {
@@ -154,40 +179,67 @@ export class RecordingService {
         this.currentStep.stateAfter = run.snapshot() as any
         this.currentStep.duration = Date.now() - new Date(this.currentStep.timestamp).getTime()
         this.steps.push({ ...this.currentStep })
-        this.persistStep(this.currentStep)
+        this.store.append('steps', this.currentStep)
 
         this.log.debug(
             `Recorded step ${this.currentStep.stepId} — ${this.currentStep.output.length} output(s), ${this.currentStep.duration}ms`
         )
         if (this.config.recording?.verbose === true) {
             const sweepInfo = this.currentStep.sweep ? ` (sweep ${this.currentStep.sweep})` : ''
-            console.log(`[Recording] ← ${this.currentStep.operation}${sweepInfo} completed — ${this.currentStep.duration}ms, ${this.currentStep.output.length} outputs`)
+            console.log(
+                `[Recording] ← ${this.currentStep.operation}${sweepInfo} completed — ${this.currentStep.duration}ms, ${this.currentStep.output.length} outputs`
+            )
         }
         this.currentStep = null
     }
 
+    /** Writes scenario.json and manifest.json once per chain; retains steps.ndjson. */
+    async finalizeOnce(): Promise<string> {
+        if (finalizedChains.has(this.chainName)) return ''
+        finalizedChains.add(this.chainName)
 
-
-    async finalize(): Promise<string> {
-        if (this.finalized) return ''
-        this.finalized = true
-
-        const dir = path.resolve('test-data', 'recordings', this.chainName)
+        const dir = this.store.getRecordingDir()
         fs.mkdirSync(dir, { recursive: true })
 
         const scenario = this.buildScenario()
-        const filePath = path.join(dir, 'scenario.json')
-        fs.writeFileSync(filePath, JSON.stringify(scenario, null, 2) + '\n')
+        const scenarioPath = path.join(dir, 'scenario.json')
+        fs.writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2) + '\n')
 
-        const stepsFile = path.join(dir, 'steps.ndjson')
-        try {
-            fs.unlinkSync(stepsFile)
-        } catch {
-            /* best-effort */
+        const apiLogPath = this.store.getApiLogPath()
+        const stepsPath = path.join(dir, 'steps.ndjson')
+        const phasesPath = path.join(dir, 'phases.ndjson')
+        const artifactPaths = [
+            path.relative(process.cwd(), scenarioPath),
+            path.relative(process.cwd(), apiLogPath),
+            path.relative(process.cwd(), stepsPath),
+        ]
+        if (fs.existsSync(phasesPath)) {
+            artifactPaths.push(path.relative(process.cwd(), phasesPath))
+        }
+        if (this.reportsPath) {
+            artifactPaths.push(path.relative(process.cwd(), this.reportsPath))
         }
 
-        this.log.info(`Recording "${this.chainName}" finalized — ${this.steps.length} steps → ${filePath}`)
-        return filePath
+        const manifest: RecordingManifest = {
+            version: '1.0.0',
+            store: this.config.recording?.store ?? 'ndjson',
+            chainName: this.chainName,
+            recordedAt: new Date().toISOString(),
+            apiLogPath: path.relative(process.cwd(), apiLogPath),
+            apiLogEntryCount: this.store.getApiLogEntryCount(),
+            stepsPath: path.relative(process.cwd(), stepsPath),
+            stepCount: this.steps.length,
+            phasesPath: fs.existsSync(phasesPath) ? path.relative(process.cwd(), phasesPath) : undefined,
+            phaseCount: this.store.getPhaseCount(),
+            scenarioPath: path.relative(process.cwd(), scenarioPath),
+            reportsPath: this.reportsPath ? path.relative(process.cwd(), this.reportsPath) : undefined,
+            artifactPaths,
+        }
+        this.store.writeManifest(manifest)
+        this.store.close()
+
+        this.log.info(`Recording "${this.chainName}" finalized — ${this.steps.length} steps → ${scenarioPath}`)
+        return scenarioPath
     }
 
     private buildScenario(): Record<string, unknown> {
@@ -238,9 +290,7 @@ export class RecordingService {
             initialState,
             steps: scenarioSteps,
             referenceValues,
-            apiLogPath: path.relative(process.cwd(), this.apiLogPath),
+            apiLogPath: path.relative(process.cwd(), this.store.getApiLogPath()),
         }
     }
 }
-
-

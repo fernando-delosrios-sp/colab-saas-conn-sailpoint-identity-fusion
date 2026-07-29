@@ -394,6 +394,31 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
 
 ---
 
+## Chain recording (dev/CI)
+
+Record ISC API interactions for offline chain replay tests:
+
+```bash
+npm run build
+npm run record
+```
+
+Enter a chain name when prompted. The connector runs in record mode and writes artifacts under `test-data/recordings/{chainName}/`:
+
+| File | Purpose |
+| --- | --- |
+| `api-log.ndjson` | Append-only ISC API request/response pairs |
+| `steps.ndjson` | Per-operation inputs, outputs, and state snapshots |
+| `phases.ndjson` | Phase boundary summaries (when account-list runs) |
+| `scenario.json` | Compiled replay scenario (written on process exit) |
+| `manifest.json` | Store type, artifact paths, and entry counts |
+| `reports/aggregation.json` | Local aggregation report snapshot (when generated) |
+| `connector.log` | Stdout/stderr capture from `record-chain.js` |
+
+Recording is dev-only. Set `RECORD_MODE`, `RECORD_CHAIN_NAME`, and `VERBOSE_RECORDING` env vars (used by `npm run record`) or configure `FusionConfig.recording` explicitly. Explicit config wins over env vars.
+
+---
+
 ## Documentation site (MkDocs)
 
 The documentation site is built with MkDocs and published from the `main` branch by GitHub Actions (`.github/workflows/deploy-docs-pages.yml`).
