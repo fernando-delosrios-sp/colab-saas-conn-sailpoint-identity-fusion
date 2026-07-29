@@ -12,6 +12,12 @@ export enum MatchCandidateType {
     Deferred = 'deferred',
 }
 
+/** Run-scoped scoring behavior for identity-candidate comparisons. */
+export interface ScoringOptions {
+    /** When true, identity-sweep comparisons always build full score breakdowns (e.g. report capture). */
+    captureBreakdown?: boolean
+}
+
 /**
  * Result of scoring a single attribute comparison. Extends the matching config
  * with the calculated score and match result.
@@ -68,3 +74,4 @@ export interface ManagedAccountMatchingResult {
     analysis: ManagedAccountAnalysisContext
     resolution: 'identity-match' | 'deferred-match' | 'non-match'
 }
+

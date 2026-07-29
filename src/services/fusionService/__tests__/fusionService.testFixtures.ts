@@ -162,19 +162,19 @@ export function createFusionServiceTestContext(): FusionServiceTestContext {
         })
     }
 
-    const fusionService = new FusionService(
-        mockConfig,
-        mockLog,
-        mockIdentities,
-        mockSources,
-        mockForms,
-        mockMappingService,
-        mockDefinitionService,
-        mockMatchingService,
-        mockSchemas,
+    const fusionService = new FusionService({
+        config: mockConfig,
+        log: mockLog,
+        identities: mockIdentities,
+        sources: mockSources,
+        forms: mockForms,
+        mappingService: mockMappingService,
+        definitionService: mockDefinitionService,
+        matchingService: mockMatchingService,
+        schemas: mockSchemas,
         run,
-        StandardCommand.StdAccountList
-    )
+        commandType: StandardCommand.StdAccountList,
+    })
     fusionService.matchOutcomeDispatcher = createDispatcherFor(fusionService)
     fusionService.setTracker(new AggregationTracker())
 
@@ -206,3 +206,4 @@ export function createFusionServiceTestContext(): FusionServiceTestContext {
         createDispatcherFor,
     }
 }
+

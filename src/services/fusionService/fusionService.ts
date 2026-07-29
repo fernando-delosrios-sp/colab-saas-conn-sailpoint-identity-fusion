@@ -29,10 +29,6 @@ import {
 } from './collections'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { buildFusionReport } from './fusionReportBuilder'
-import {
-    resolveReportAccountId as resolveReportAccountIdFn,
-    resolveReportAccountIdValue as resolveReportAccountIdValueFn,
-} from './reportAccountResolver'
 import { skipBlendHistoryKeysForDecisionAccountId } from './helpers'
 import { ManagedAccountAnalysisRecorder } from './managedAccountAnalysisRecorder'
 import { AggregationTracker } from './aggregationTracker'
@@ -45,13 +41,29 @@ import { trimStr } from '../../utils/safeRead'
 import { IdentityProcessor } from './identityProcessor'
 import { CorrelationManager } from '../correlationManager'
 import { DecisionProcessor } from './decisionProcessor'
-import { MatchOutcomeDispatcher } from '../matchingService/matchOutcomeDispatcher'
+import { MatchOutcomeDispatcher, MatchSweepMode } from '../matchingService/matchOutcomeDispatcher'
 import { AccountAssembly } from '../accountAssembly'
 import { FusionRun } from '../../model/fusionRun'
 
 // ============================================================================
 // FusionService Class
 // ============================================================================
+
+export interface FusionServiceDeps {
+    readonly config: FusionConfig
+    readonly log: LogService
+    readonly identities: IdentityService
+    readonly sources: SourceService
+    readonly forms: FormService
+    readonly mappingService: MappingService
+    readonly definitionService: DefinitionService
+    readonly matchingService: MatchingService
+    readonly schemas: SchemaService
+    readonly run: FusionRun
+    readonly commandType?: StandardCommand
+    readonly shouldCaptureReportData?: boolean
+    readonly isAggregationMode?: boolean
+}
 
 /**
  * Service for identity fusion logic.
@@ -64,6 +76,16 @@ export class FusionService {
     public decisionProcessor: DecisionProcessor
     public matchOutcomeDispatcher!: MatchOutcomeDispatcher
     public accountAssembly: AccountAssembly
+    public config: FusionConfig
+    public log: LogService
+    public identities: IdentityService
+    public sources: SourceService
+    public forms: FormService
+    private mappingService: MappingService
+    private definitionService: DefinitionService
+    public matchingService: MatchingService
+    public schemas: SchemaService
+    public run: FusionRun
 
     private get dispatcher(): MatchOutcomeDispatcher {
         assert(this.matchOutcomeDispatcher, 'MatchOutcomeDispatcher has not been wired to FusionService')
@@ -90,33 +112,34 @@ export class FusionService {
     // ------------------------------------------------------------------------
 
     /**
-     * @param config - Fusion configuration
-     * @param log - Logger instance
-     * @param identities - Identity service for identity lookups and correlation
-     * @param sources - Source service for accessing source accounts and config
-     * @param forms - Form service for creating and managing review forms
-     * @param mappingService - Map service for attribute mapping from source accounts
-     * @param definitionService - Define service for attribute definition and generation
-     * @param matchingService - Match service for identity matching and scoring
-     * @param schemas - Schema service for attribute schema lookups
-     * @param commandType - The current SDK command type (e.g. StdAccountList)
-     * @param shouldCaptureReportData - When true, report data is captured even during aggregation (e.g. custom:dryrun)
+     * @param deps - Collaborators and run context for fusion operations
      */
-    constructor(
-        public config: FusionConfig,
-        public log: LogService,
-        public identities: IdentityService,
-        public sources: SourceService,
-        public forms: FormService,
-        private mappingService: MappingService,
-        private definitionService: DefinitionService,
-        public matchingService: MatchingService,
-        public schemas: SchemaService,
-        public run: FusionRun,
-        commandType?: StandardCommand,
-        shouldCaptureReportData?: boolean,
-        isAggregationMode?: boolean
-    ) {
+    constructor(deps: FusionServiceDeps) {
+        const {
+            config,
+            log,
+            identities,
+            sources,
+            forms,
+            mappingService,
+            definitionService,
+            matchingService,
+            schemas,
+            run,
+            commandType,
+            shouldCaptureReportData,
+            isAggregationMode,
+        } = deps
+        this.config = config
+        this.log = log
+        this.identities = identities
+        this.sources = sources
+        this.forms = forms
+        this.mappingService = mappingService
+        this.definitionService = definitionService
+        this.matchingService = matchingService
+        this.schemas = schemas
+        this.run = run
         FusionAccount.configure(config)
         this.configSourceNames = new Set(config.sources.map((s) => s.name))
         this.accountAssembly = new AccountAssembly({
@@ -814,7 +837,7 @@ export class FusionService {
         const sweepResult = await this.dispatcher.runMatchSweep(
             accounts,
             this.run.managedAccountProcessingBatchSize || 1,
-            { analysisOnly: true }
+            { mode: MatchSweepMode.AnalysisOnly }
         )
 
         let processed = 0
@@ -840,22 +863,6 @@ export class FusionService {
             }
         }
         return results
-    }
-
-    /**
-     * Reports should link to the ISC account id (not managed key).
-     * Prefers the account's stored ISC id; falls back to source cache lookup.
-     */
-    private resolveReportAccountId(fusionAccount: FusionAccount): string | undefined {
-        return resolveReportAccountIdFn(fusionAccount, this.sources)
-    }
-
-    /**
-     * Report links should prefer ISC account id. Inputs may already be ISC ids or managed keys.
-     * Returns undefined if the account can't be resolved to an ISC id.
-     */
-    private resolveReportAccountIdValue(accountId?: string): string | undefined {
-        return resolveReportAccountIdValueFn(accountId, this.sources)
     }
 
     // ------------------------------------------------------------------------
@@ -1300,7 +1307,7 @@ export class FusionService {
         this.matchingService.buildTrigramIndex(this.fusionIdentities)
 
         this.buildLinkedAccountKeyIndex()
-        this.matchingService.setCaptureBreakdown(this.shouldCaptureReportData)
+        this.matchingService.configureScoring({ captureBreakdown: this.shouldCaptureReportData })
     }
 
     /** Correlated account sweep: resolve linked/correlated managed accounts before uncorrelated scoring. */

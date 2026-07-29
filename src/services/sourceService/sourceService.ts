@@ -1,43 +1,52 @@
-import { Search, AccountV2025 as Account, AccountsApiListAccountsRequest, SearchApiSearchPostRequest, SourcesV2025ApiImportAccountsRequest, TaskManagementV2025ApiGetTaskStatusRequest, Source, SchemaV2025, SourcesV2025ApiGetSourceSchemasRequest, SourcesV2025ApiPutSourceSchemaRequest, SourcesV2025ApiGetCorrelationConfigRequest, SourcesV2025ApiPutCorrelationConfigRequest, OwnerDto, JsonPatchOperationV2025OpV2025, CorrelationConfigV2025, AttributeDefinitionV2025, AttributeDefinitionTypeV2025 } from 'sailpoint-api-client'
+import { AccountV2025 as Account, AccountsApiListAccountsRequest, Source, SchemaV2025, SourcesV2025ApiGetSourceSchemasRequest, OwnerDto } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
-import { BaseConfig, FusionConfig, SourceConfig, SourceType } from '../../model/config'
+import { FusionConfig, SourceConfig } from '../../model/config'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
 import { assert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
-import { getDateFromISOString } from '../../utils/date'
-import { coerceBoolean, readPathString, trimStr } from '../../utils/safeRead'
+import { trimStr } from '../../utils/safeRead'
 import { buildSourceConfigPatch } from './helpers'
-import {
-    buildIdentityAttributeCreateErrorMessage,
-    buildIdentityProfileUpsertErrorMessage,
-    IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
-} from './sourceReverseCorrelationErrors'
 import { SourceInfo } from './types'
-import {
-    CompiledAccountJmespathFilter,
-    compileAccountPageJmespathFilter,
-    buildIscAccountsQueryFilter,
-} from './accountFilters'
-import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { buildIscAccountsQueryFilter } from './accountFilters'
 import { FusionRun } from '../../model/fusionRun'
-
-
-type ReverseCorrelationArtifact =
-    | 'fusion_schema_attribute'
-    | 'identity_attribute'
-    | 'identity_profile_mapping'
-    | 'managed_source_correlation'
-
-interface ReverseCorrelationSetupStatus {
-    isConsistent: boolean
-    missingArtifacts: ReverseCorrelationArtifact[]
-}
-
-/** Authoritative sources need fusion schema + identity profile mapping for reverse correlation; record/orphan only identity attribute + managed-source correlation. */
-function requiresFullReverseCorrelationArtifacts(sourceConfig: SourceConfig): boolean {
-    return (sourceConfig.sourceType ?? SourceType.Authoritative) === SourceType.Authoritative
-}
+import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import {
+    fetchAllSources as fetchAllSourcesImpl,
+    validateAccountJmespathFilters as validateAccountJmespathFiltersImpl,
+    type SourceDiscoveryDeps,
+} from './sourceDiscovery'
+import {
+    fetchManagedAccounts as fetchManagedAccountsImpl,
+    filterManagedMachineAccounts,
+    isMachineManagedAccount,
+    matchesManagedJmespathFilter,
+    type ManagedAccountFetcherDeps,
+} from './managedAccountFetcher'
+import {
+    aggregateDelayedSources as aggregateDelayedSourcesImpl,
+    aggregateManagedSource as aggregateManagedSourceImpl,
+    aggregateManagedSources as aggregateManagedSourcesImpl,
+    getLatestAggregationDate as getLatestAggregationDateImpl,
+    type SourceAggregationTaskDeps,
+    type SourceAggregatorDeps,
+} from './sourceAggregator'
+import {
+    clearReverseCorrelationReadinessCache as clearReverseCorrelationReadinessCacheImpl,
+    ensureFusionSchemaAttribute as ensureFusionSchemaAttributeImpl,
+    ensureIdentityAttribute as ensureIdentityAttributeImpl,
+    ensureIdentityProfileMapping as ensureIdentityProfileMappingImpl,
+    ensureManagedSourceCorrelation as ensureManagedSourceCorrelationImpl,
+    getReverseCorrelationSetupStatus as getReverseCorrelationSetupStatusImpl,
+    runAssertReverseCorrelationReady,
+    runEnsureReverseCorrelationSetup,
+    requiresFullReverseCorrelationArtifacts,
+    setupReverseCorrelationSources as setupReverseCorrelationSourcesImpl,
+    validateNoAttributeOverlap as validateNoAttributeOverlapImpl,
+    waitForIdentityProfileMapping as waitForIdentityProfileMappingImpl,
+    type ReverseCorrelationDeps,
+    type ReverseCorrelationSetupStatus,
+} from './reverseCorrelationArtifacts'
 
 // ============================================================================
 // SourceService Class
@@ -67,12 +76,6 @@ export class SourceService {
 
     /**
      * Clear managed accounts cache to free memory after processing.
-     *
-     * Memory Optimization:
-     * Called at the end of accountList operation after all accounts have been
-     * sent to the platform. This releases potentially thousands of account objects
-     * from memory. The work queue pattern means most accounts have already been
-     * deleted during processing, but this ensures any remaining references are cleared.
      */
     public clearManagedAccounts(): void {
         this.run.clearManagedAccountState()
@@ -81,11 +84,6 @@ export class SourceService {
 
     /**
      * Clear fusion accounts cache to free memory after processing.
-     *
-     * Memory Optimization:
-     * Called at the end of accountList operation after all accounts have been
-     * sent to the platform. Fusion accounts are loaded once and referenced throughout
-     * processing, so clearing this cache at the end frees significant memory.
      */
     public clearFusionAccounts(): void {
         if (this.fusionAccountsByNativeIdentity) {
@@ -99,23 +97,13 @@ export class SourceService {
     private readonly sources: SourceConfig[]
     private readonly spConnectorInstanceId: string
     private readonly concurrencyCheckEnabled: boolean
-    private readonly accountJmespathFiltersBySourceName: Map<string, CompiledAccountJmespathFilter> = new Map()
+    private readonly accountJmespathFiltersBySourceName = new Map<string, import('./accountFilters').CompiledAccountJmespathFilter>()
 
     // Sources configured for batch mode (`accountLimit` defined)
     private readonly batchLimitedSourceNames: Set<string>
     // Batch mode cumulative count per source (persisted across runs)
     private batchCumulativeCount: Record<string, number>
 
-    // ------------------------------------------------------------------------
-    // Constructor
-    // ------------------------------------------------------------------------
-
-    /**
-     * @param config - Fusion configuration containing source definitions and aggregation settings
-     * @param log - Logger instance
-     * @param client - API client for ISC source and account operations
-     * @param run - Per-run state container for managed accounts
-     */
     constructor(
         config: FusionConfig,
         private log: LogService,
@@ -132,7 +120,6 @@ export class SourceService {
                 .map((source) => source.name)
         )
 
-        // Read persisted batch cumulative count (may be undefined, false, or an object)
         const raw = config.batchCumulativeCount
         const persistedCount =
             raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, number>) : {}
@@ -147,17 +134,11 @@ export class SourceService {
     // Public Properties/Getters
     // ------------------------------------------------------------------------
 
-    /**
-     * Get fusion source ID
-     */
     public get fusionSourceId(): string {
         assert(this._fusionSourceId, 'Fusion source not found')
         return this._fusionSourceId
     }
 
-    /**
-     * Get all managed sources
-     */
     public get managedSources(): SourceInfo[] {
         assert(this._allSources, 'Sources have not been loaded')
         if (!this._fusionSourceId) {
@@ -166,70 +147,33 @@ export class SourceService {
         return this._allSources.filter((s) => s.id !== this.fusionSourceId)
     }
 
-    /**
-     * Get all sources (managed + fusion)
-     */
     public get allSources(): SourceInfo[] {
         assert(this._allSources, 'Sources have not been loaded')
         return this._allSources
     }
 
-    /**
-     * Get all managed accounts as an array.
-     *
-     * Work Queue Pattern:
-     * This getter returns the current state of the work queue. As processing phases
-     * complete (fetchFormData → processFusionAccounts → processIdentities), accounts
-     * are deleted from managedAccountsById. By the time processManagedAccounts calls
-     * this getter, it returns ONLY the uncorrelated accounts that remain in the queue.
-     *
-     * This is intentional and critical for correct operation:
-     * - No snapshot or copy is made
-     * - Returns live view of the depleted queue
-     * - Ensures no duplicate processing
-     *
-     * Note: Creates a new array on each access. Use managedAccountCount for size checks.
-     *
-     * @returns Array of accounts currently in the work queue
-     */
     public get managedAccounts(): Account[] {
         assert(this.run.managedAccountsById, 'Managed accounts have not been loaded')
         return Array.from(this.run.managedAccountsById.values())
     }
 
-    /**
-     * Get the number of managed accounts in the work queue without creating an array.
-     */
     public get managedAccountCount(): number {
         return this.run.managedAccountsById.size
     }
 
-    /**
-     * Get all fusion accounts as an array.
-     * Note: Creates a new array on each access. Use fusionAccountCount for size checks.
-     */
     public get fusionAccounts(): Account[] {
         assert(this.fusionAccountsByNativeIdentity, 'Fusion accounts have not been loaded')
         return Array.from(this.fusionAccountsByNativeIdentity.values())
     }
 
-    /**
-     * How many fusion accounts are loaded for this run.
-     */
     public get fusionAccountCount(): number {
         return this.fusionAccountsByNativeIdentity?.size ?? 0
     }
 
-    /**
-     * Whether a Fusion source has been discovered for this run.
-     */
     public get hasFusionSource(): boolean {
         return !!this._fusionSourceId
     }
 
-    /**
-     * Whether cascade aggregation is enabled globally.
-     */
     public get isCascadeAggregationEnabled(): boolean {
         return this.config.cascadeAggregationEnabled ?? false
     }
@@ -238,116 +182,18 @@ export class SourceService {
     // Public Source Fetch Methods
     // ------------------------------------------------------------------------
 
-    /**
-     * Fetch all sources (managed and fusion) and cache them
-     */
     public async fetchAllSources(requireFusionSource = true): Promise<void> {
-        this.log.debug('Fetching all sources')
-
-        const apiSources = await wrapConnectorError(
-            () =>
-                this.client.call<any>(
-                    (api: any, params: any) => api.sources.listSources(params),
-                    { paginate: { mode: 'sequential', baseParams: {} }, priority: QueuePriority.HIGH, context: 'SourceService>fetchAllSources listSources' }
-                ),
-            'Failed to fetch sources from ISC. Please verify your connector configuration and API credentials'
-        )
-        assert(
-            apiSources.length > 0,
-            'No sources found in ISC. Please verify that the configured sources exist and the connector has access to them.'
-        )
-
-        // Build a Map for O(1) lookups instead of O(n) find() operations
-        const apiSourcesByName = new Map(apiSources.map((s) => [s.name!, s]))
-
-        // Build unified source info from SourceConfig + API IDs
-        const resolvedSources: SourceInfo[] = []
-
-        // Add managed sources (from config.sources)
-        for (const sourceConfig of this.sources) {
-            const apiSource = apiSourcesByName.get(sourceConfig.name)
-            assert(
-                apiSource,
-                `Unable to find managed source "${sourceConfig.name}" in ISC. Please verify the source name is correct in the connector configuration.`
-            )
-            resolvedSources.push({
-                id: apiSource.id!,
-                name: apiSource.name!,
-                isManaged: true,
-                sourceType: sourceConfig.sourceType ?? SourceType.Authoritative,
-                config: sourceConfig,
-            })
-        }
-
-        // Find and add fusion source
-        const fusionSource = apiSources.find(
-            (x) => (x.connectorAttributes as BaseConfig).spConnectorInstanceId === this.spConnectorInstanceId
-        )
-        if (fusionSource) {
-            assert(
-                fusionSource.owner,
-                'Fusion source owner not found. The fusion source must have an owner configured in ISC.'
-            )
-            this._fusionSourceId = fusionSource.id!
-            this._fusionSourceOwner = {
-                id: fusionSource.owner.id!,
-                type: (fusionSource.owner.type ?? 'IDENTITY') as OwnerDto['type'],
-            }
-            this._fusionSourceManagementWorkgroupId = readPathString(fusionSource, ['managementWorkgroup', 'id'])
-            this._workgroupMemberIdsByWorkgroupId.clear()
-
-            resolvedSources.push({
-                id: fusionSource.id!,
-                name: fusionSource.name!,
-                isManaged: false,
-                sourceType: SourceType.Authoritative,
-                config: undefined,
-                owner: this._fusionSourceOwner,
-            })
-        } else if (requireFusionSource) {
-            assert(
-                fusionSource,
-                'Fusion source not found. The connector instance could not locate its own source in ISC. Verify the connector is properly deployed.'
-            )
-        } else {
-            this._fusionSourceId = undefined
-            this._fusionSourceOwner = undefined
-            this._fusionSourceManagementWorkgroupId = undefined
-            this._workgroupMemberIdsByWorkgroupId.clear()
-            this.log.warn(
-                'Fusion source not found for this run. Continuing with managed sources only (custom report mode).'
-            )
-        }
-
-        this._allSources = resolvedSources
-        this.sourcesById = new Map(resolvedSources.map((x) => [x.id, x]))
-        this.run.sourcesByName.clear()
-        for (const source of resolvedSources) {
-            this.run.sourcesByName.set(source.name, source)
-        }
-
-        const managedCount = resolvedSources.filter((s) => s.isManaged).length
-        if (fusionSource) {
-            this.log.debug(`Found ${managedCount} managed source(s) and fusion source: ${fusionSource.name}`)
-        } else {
-            this.log.debug(`Found ${managedCount} managed source(s); no fusion source resolved`)
-        }
+        return fetchAllSourcesImpl(this.discoveryDeps, requireFusionSource)
     }
 
     // ------------------------------------------------------------------------
     // Public Source Lookup Methods
     // ------------------------------------------------------------------------
 
-    /**
-     * Get fusion source info
-     */
     public getFusionSource(): SourceInfo | undefined {
         return Array.from(this.sourcesById.values()).find((s) => !s.isManaged)
     }
 
-    /**
-     * Get fusion source owner
-     */
     public get fusionSourceOwner(): OwnerDto {
         assert(this._fusionSourceOwner, 'Fusion source owner not found')
         return this._fusionSourceOwner
@@ -357,18 +203,10 @@ export class SourceService {
         return Boolean(this.config.workflowName)
     }
 
-    /**
-     * Returns the deduplicated list of identity IDs that act as global owners for this fusion
-     * source: the direct source owner plus all members of the assigned management workgroup
-     * (if one is configured). Result is cached after the first API call.
-     */
     public async fetchGlobalOwnerIdentityIds(): Promise<string[]> {
         const ownerIdSet = new Set<string>()
 
         let owner: OwnerDto
-        // Only swallow the specific "owner not found" error; rethrow unexpected errors
-        // so callers can distinguish between a missing owner (expected empty result) and
-        // other failures (propagate upward).
         try {
             owner = this.fusionSourceOwner
         } catch (error) {
@@ -396,7 +234,6 @@ export class SourceService {
         return Array.from(ownerIdSet)
     }
 
-    /** Resolve governance-group membership to identity IDs for report/reviewer delivery. */
     private async listWorkgroupMemberIdentityIds(workgroupId: string): Promise<string[]> {
         const cached = this._workgroupMemberIdsByWorkgroupId.get(workgroupId)
         if (cached) return cached
@@ -411,24 +248,14 @@ export class SourceService {
         return memberIds
     }
 
-    /**
-     * Get source info by ID
-     */
     public getSourceById(id: string): SourceInfo | undefined {
         return this.sourcesById.get(id)
     }
 
-    /**
-     * Get source info by exact name.
-     */
     public getSourceByName(name: string): SourceInfo | undefined {
         return this.run.sourcesByName.get(name)
     }
 
-    /**
-     * Get source info by optional name.
-     * Missing or blank source names are treated as unresolved.
-     */
     public getSourceByNameSafe(name?: string | null): SourceInfo | undefined {
         if (!name?.trim()) return undefined
         return this.getSourceByName(name)
@@ -438,49 +265,27 @@ export class SourceService {
     // Public Source Configuration Methods
     // ------------------------------------------------------------------------
 
-    /**
-     * Get source configuration by source name (only for managed sources)
-     */
     public getSourceConfig(sourceName: string): SourceConfig | undefined {
         const sourceInfo = this.run.sourcesByName.get(sourceName)
         return sourceInfo?.config ?? this.sources.find((sc) => sc.name === sourceName)
     }
 
-    /**
-     * Get account filter for a source
-     */
     public getAccountFilter(sourceName: string): string | undefined {
         return this.getSourceConfig(sourceName)?.accountFilter
     }
 
-    /**
-     * Sources configured for delayed aggregation mode.
-     */
     public get delayedAggregationSources(): SourceConfig[] {
         return this.sources.filter((sc) => sc.aggregationMode === 'delayed')
     }
 
-    /**
-     * Sources configured for reverse correlation mode.
-     */
     public get reverseCorrelationSources(): SourceConfig[] {
         return this.sources.filter((sc) => sc.correlationMode === 'reverse')
     }
 
-    /**
-     * Compile/validate configured Accounts JMESPath filters for managed sources.
-     * Throws ConnectorError when any expression is invalid.
-     */
     public validateAccountJmespathFilters(): void {
-        for (const source of this.managedSources) {
-            this.getCompiledAccountJmespathFilter(source)
-        }
+        validateAccountJmespathFiltersImpl(this.discoveryDeps)
     }
 
-    /**
-     * Disable an ISC account by its ID and wait for completion.
-     * Uses low queue priority to avoid starving higher-priority work.
-     */
     public async fireDisableAccount(accountId: string): Promise<void> {
         const accessToken = await this.resolveApiAccessToken()
         const tenantBaseUrl = this.config.baseurl.replace(/\/+$/, '')
@@ -533,16 +338,11 @@ export class SourceService {
     // Public Account Fetch Methods (Bulk)
     // ------------------------------------------------------------------------
 
-    /**
-     * Fetch all accounts for a given source ID, applying SourceConfig.accountFilter if present (for managed sources).
-     */
     public async fetchAccountsBySourceId(sourceId: string, limit?: number): Promise<Account[]> {
         const sourceInfo = this.sourcesById.get(sourceId)
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
         const filters = buildIscAccountsQueryFilter(sourceInfo)
-        // Use a stable unique sorter to avoid offset boundary drift when many records
-        // share the same created timestamp.
         const sorters = 'id'
 
         const requestParameters: AccountsApiListAccountsRequest = {
@@ -559,7 +359,7 @@ export class SourceService {
         if (!sourceInfo.isManaged) {
             return accounts
         }
-        const { filteredAccounts, discardedMachineCount } = this.filterManagedMachineAccounts(accounts)
+        const { filteredAccounts, discardedMachineCount } = filterManagedMachineAccounts(accounts)
         if (discardedMachineCount > 0) {
             this.log.warn(
                 `Source ${sourceInfo.name}: discarded ${discardedMachineCount} managed machine account(s) where isMachine=true`
@@ -568,10 +368,6 @@ export class SourceService {
         return filteredAccounts
     }
 
-    /**
-     * Fetch accounts as an async generator using parallel pagination.
-     * @param limit - When provided, only the pages needed to reach this count are requested.
-     */
     public async *fetchAccountsBySourceIdGenerator(
         sourceId: string,
         abortSignal?: AbortSignal,
@@ -582,8 +378,6 @@ export class SourceService {
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
         const filters = buildIscAccountsQueryFilter(sourceInfo)
-        // Use a stable unique sorter to avoid offset boundary drift when many records
-        // share the same created timestamp.
         const sorters = 'id'
 
         const requestParameters: AccountsApiListAccountsRequest = {
@@ -604,10 +398,6 @@ export class SourceService {
         )
     }
 
-    /**
-     * Fetch and cache fusion accounts.
-     * Uses parallel pagination (paginateParallel) for faster loading on large tenants.
-     */
     public async fetchFusionAccounts(): Promise<void> {
         this.log.debug('Fetching fusion accounts')
         await wrapConnectorError(async () => {
@@ -625,105 +415,14 @@ export class SourceService {
         }, 'Failed to fetch fusion accounts from the fusion source')
     }
 
-    /**
-     * Fetch and cache managed accounts from all managed sources.
-     *
-     * Batch Mode (cumulative):
-     * When a source has an `accountLimit`, the effective limit grows across runs
-     * so that previously fetched accounts are always included in subsequent runs.
-     * The effective limit is `batchCumulativeCount[sourceName] + accountLimit`.
-     * After fetching, the actual number of accounts retrieved is stored as the
-     * new cumulative count for that source.
-     */
     public async fetchManagedAccounts(abortSignal?: AbortSignal): Promise<void> {
-        this.log.debug(`Fetching managed accounts from ${this.managedSources.length} source(s)`)
-
-        // Compute effective limits per source
-        const sourcesWithLimits = this.managedSources.map((s) => {
-            const baseLimit = s.config?.accountLimit
-            let effectiveLimit: number | undefined
-            if (typeof baseLimit === 'number' && Number.isFinite(baseLimit)) {
-                const cumulativeCount = this.batchCumulativeCount[s.name] ?? 0
-                effectiveLimit = cumulativeCount + baseLimit
-                this.log.debug(`Source ${s.name}: effectiveLimit=${effectiveLimit}`)
-            }
-            return { source: s, effectiveLimit }
-        })
-
-        await wrapConnectorError(async () => {
-            const sourceProgress = new Map<string, { loaded: number; total?: number }>()
-            const reportAggregateFetchProgress = () => {
-                let sumLoaded = 0
-                let sumTotal = 0
-                let allTotalsKnown = true
-                for (const { loaded, total } of sourceProgress.values()) {
-                    sumLoaded += loaded
-                    if (total !== undefined) sumTotal += total
-                    else allTotalsKnown = false
-                }
-                this.log.setProgress(sumLoaded, allTotalsKnown ? sumTotal : sumLoaded, 'fetched')
-            }
-
-            await Promise.all(
-                sourcesWithLimits.map(async ({ source, effectiveLimit }) => {
-                    this.log.info(`Fetching accounts from source: ${source.name}`)
-                    let collectedCount = 0
-                    let discardedMachineCount = 0
-
-                    for await (const batch of this.fetchAccountsBySourceIdGenerator(
-                        source.id,
-                        abortSignal,
-                        effectiveLimit,
-                        (loaded, total) => {
-                            sourceProgress.set(source.id, { loaded, total })
-                            reportAggregateFetchProgress()
-                        }
-                    )) {
-                        const filteredBatch = this.applyManagedJmespathFilter(source, batch)
-                        for (const account of filteredBatch) {
-                            if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
-                            if (this.isMachineManagedAccount(account)) {
-                                discardedMachineCount++
-                                continue
-                            }
-
-                            const accountKey = getManagedAccountKeyFromAccount(account)
-                            if (!accountKey) {
-                                continue
-                            }
-                            this.run.setManagedAccount(accountKey, account)
-                            collectedCount++
-                        }
-                        if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) {
-                            this.log.info(`Source ${source.name}: reached effectiveLimit of ${effectiveLimit}, stopping`)
-                            break
-                        }
-                    }
-
-                    this.log.info(`Source ${source.name}: collected ${collectedCount} account(s)`)
-                    if (discardedMachineCount > 0) {
-                        this.log.warn(
-                            `Source ${source.name}: discarded ${discardedMachineCount} managed machine account(s) where isMachine=true`
-                        )
-                    }
-
-                    if (this.batchLimitedSourceNames.has(source.name)) {
-                        this.batchCumulativeCount[source.name] = collectedCount
-                        this.log.debug(`Source ${source.name}: updated cumulative count to ${collectedCount}`)
-                    }
-                })
-            )
-            this.log.debug(`Total managed accounts loaded: ${this.run.managedAccountsById.size}`)
-        }, 'Failed to fetch managed accounts')
+        return fetchManagedAccountsImpl(this.managedAccountFetcherDeps, abortSignal)
     }
 
     // ------------------------------------------------------------------------
     // Public Account Fetch Methods (Single)
     // ------------------------------------------------------------------------
 
-    /**
-     * Fetch and cache a single fusion account by nativeIdentity
-     */
     public async fetchFusionAccount(nativeIdentity: string, mustExist = true): Promise<void> {
         this.log.debug('Fetching fusion account')
         const fusionAccount = await this.fetchSourceAccountByNativeIdentity(this.fusionSourceId, nativeIdentity)
@@ -745,11 +444,6 @@ export class SourceService {
         this.log.debug(`Fetched fusion account: ${fusionAccount.name}`)
     }
 
-    /**
-     * Fetch and cache a single managed account by source id and native identity.
-     * Uses one filtered `executeListAccounts` call (ISC accountFilter + sourceId + nativeIdentity), then
-     * Accounts JMESPath filter and machine-account guard — same rules as bulk fetch.
-     */
     public async fetchManagedAccount(sourceId: string, nativeIdentity: string): Promise<void> {
         const sourceInfo = this.sourcesById.get(sourceId)
         if (!sourceInfo?.isManaged) {
@@ -774,10 +468,6 @@ export class SourceService {
         this.run.setManagedAccount(accountKey, managedAccount)
     }
 
-    /**
-     * ISC Accounts API expects the platform account id. Internal maps and fusion state use the
-     * composite key (sourceId::nativeIdentity); resolve the loaded Account to obtain `id`.
-     */
     public resolveIscAccountIdForManagedKey(managedKey: string): string | undefined {
         const key = trimStr(managedKey)
         if (key === undefined) return undefined
@@ -788,9 +478,6 @@ export class SourceService {
         return trimStr(this.run.getManagedAccountInfo(key)?.id)
     }
 
-    /**
-     * Fetch a single account for a given source ID and nativeIdentity, applying SourceConfig.accountFilter if present (for managed sources).
-     */
     public async fetchSourceAccountByNativeIdentity(
         sourceId: string,
         nativeIdentity: string
@@ -810,13 +497,13 @@ export class SourceService {
             { priority: QueuePriority.HIGH, context: 'SourceService>fetchSourceAccountByNativeIdentity' }
         )
         const candidate = accounts?.[0]
-        if (sourceInfo.isManaged && candidate && !this.matchesManagedJmespathFilter(sourceInfo, candidate)) {
+        if (sourceInfo.isManaged && candidate && !matchesManagedJmespathFilter(sourceInfo, candidate, this.accountJmespathFiltersBySourceName)) {
             this.log.warn(
                 `Discarded managed account for native identity "${nativeIdentity}" on source "${sourceInfo.name}" due to Accounts JMESPath filter`
             )
             return undefined
         }
-        if (sourceInfo.isManaged && candidate && this.isMachineManagedAccount(candidate)) {
+        if (sourceInfo.isManaged && candidate && isMachineManagedAccount(candidate)) {
             this.log.warn(
                 `Discarded managed machine account for native identity "${nativeIdentity}" on source "${sourceInfo.name}" where isMachine=true`
             )
@@ -829,50 +516,10 @@ export class SourceService {
     // Public Aggregation Methods
     // ------------------------------------------------------------------------
 
-    /**
-     * Aggregate managed sources configured with `aggregationMode: 'before'`.
-     * Sources with `'delayed'` or `'none'` modes are skipped here.
-     */
     public async aggregateManagedSources(): Promise<void> {
-        const managedSources = this.managedSources
-        this.log.debug(`Checking aggregation control for ${managedSources.length} managed source(s)`)
-
-        const fusionLatestAggregationDate = await this.getLatestAggregationDate(this.fusionSourceId)
-
-        const aggregationChecks = await Promise.all(
-            managedSources.map(async (source) => {
-                const mode = source.config?.aggregationMode ?? 'none'
-
-                if (mode !== 'before') {
-                    this.log.debug(`Source ${source.name}: aggregationMode=${mode}, skipping pre-processing aggregation`)
-                    return { source, shouldAggregate: false }
-                }
-
-                assert(source.isManaged, 'Only managed sources can be aggregated')
-                const latestSourceDate = await this.getLatestAggregationDate(source.id)
-                const shouldAggregate = fusionLatestAggregationDate > latestSourceDate
-
-                return { source, shouldAggregate }
-            })
-        )
-
-        const disableOptimization = (source: SourceInfo) => coerceBoolean(source.config?.optimizedAggregation) === false
-
-        await Promise.all(
-            aggregationChecks
-                .filter(({ shouldAggregate }) => shouldAggregate)
-                .map(({ source }) => {
-                    this.log.info(`Aggregating source before processing: ${source.name}`)
-                    return this.aggregateManagedSource(source.id, disableOptimization(source))
-                })
-        )
-        this.log.debug('Pre-processing source aggregation completed')
+        return aggregateManagedSourcesImpl(this.aggregatorDeps)
     }
 
-    /**
-     * Aggregate sources configured with `aggregationMode: 'delayed'`.
-     * Each source is scheduled via the provided callback and runs out-of-band.
-     */
     public async aggregateDelayedSources(
         scheduleAggregation: (args: {
             sourceId: string
@@ -880,86 +527,25 @@ export class SourceService {
             disableOptimization: boolean
         }) => Promise<void>
     ): Promise<void> {
-        assert(scheduleAggregation, 'Delayed aggregation scheduler is required')
-        const delayedSources = this.managedSources.filter((s) => s.config?.aggregationMode === 'delayed')
-
-        if (delayedSources.length === 0) {
-            return
-        }
-
-        this.log.info(`Scheduling delayed aggregation for ${delayedSources.length} source(s)`)
-
-        await Promise.all(
-            delayedSources.map(async (source) => {
-                const delayMinutes = source.config?.aggregationDelay ?? 5
-                const disableOpt = coerceBoolean(source.config?.optimizedAggregation) === false
-
-                this.log.info(
-                    `Source ${source.name}: scheduling delayed aggregation in ${delayMinutes} minute(s), disableOptimization=${disableOpt}`
-                )
-
-                try {
-                    await scheduleAggregation({
-                        sourceId: source.id,
-                        delayMinutes,
-                        disableOptimization: disableOpt,
-                    })
-                } catch (err) {
-                    this.log.error(
-                        `Failed to schedule delayed aggregation for source ${source.name}: ${err instanceof Error ? err.message : String(err)
-                        }`
-                    )
-                }
-            })
-        )
+        return aggregateDelayedSourcesImpl(this.aggregatorDeps, scheduleAggregation)
     }
 
-    /**
-     * Get latest aggregation date for a source (only for managed sources)
-     */
     public async getLatestAggregationDate(sourceId: string): Promise<Date> {
-        const cached = this.aggregationDateCache.get(sourceId)
-        if (cached) {
-            return cached
-        }
+        return getLatestAggregationDateImpl(this.aggregatorDeps, sourceId)
+    }
 
-        const fetchPromise = (async () => {
-            const source = this.sourcesById.get(sourceId)
-            assert(source, 'Source not found')
-            const sourceName = source.name
-
-            const search: Search = {
-                indices: ['events'],
-                query: {
-                    query: `operation:AGGREGATE AND status:PASSED AND objects:ACCOUNT AND target.name.exact:/${sourceName} \\[source.*\\]/`,
-                },
-                sort: ['-created'],
-            }
-
-            const requestParameters: SearchApiSearchPostRequest = { search, limit: 1 }
-            const aggregations = await this.client.call(
-                (api) => api.search.searchPost(requestParameters).then((r) => r.data ?? []),
-                { priority: QueuePriority.HIGH, context: 'SourceService>getLatestAggregationDate' }
-            )
-
-            return getDateFromISOString(aggregations?.[0]?.created)
-        })()
-
-        this.aggregationDateCache.set(sourceId, fetchPromise)
-
-        // Clear cache entry on failure to allow retry
-        fetchPromise.catch(() => this.aggregationDateCache.delete(sourceId))
-
-        return fetchPromise
+    public async aggregateManagedSource(
+        id: string,
+        disableOptimization?: boolean,
+        awaitTaskStatus: boolean = true
+    ): Promise<void> {
+        return aggregateManagedSourceImpl(this.aggregationTaskDeps, id, disableOptimization, awaitTaskStatus)
     }
 
     // ------------------------------------------------------------------------
     // Public Schema Methods
     // ------------------------------------------------------------------------
 
-    /**
-     * List schemas for a source
-     */
     public async listSourceSchemas(sourceId: string): Promise<SchemaV2025[]> {
         const cachedSchemas = this.sourceSchemasCache.get(sourceId)
         if (cachedSchemas) {
@@ -988,13 +574,6 @@ export class SourceService {
     // Public Configuration Methods
     // ------------------------------------------------------------------------
 
-    // Public Configuration Methods
-    // ------------------------------------------------------------------------
-
-    /**
-     * Update source configuration
-     * @param context - Optional hint for error logs (e.g. "SourceService>saveBatchCumulativeCount")
-     */
     public async patchSourceConfig(
         sourceId: string,
         path: string,
@@ -1013,25 +592,6 @@ export class SourceService {
     // Public Process Lock Methods
     // ------------------------------------------------------------------------
 
-    // Public Process Lock Methods
-    // ------------------------------------------------------------------------
-
-    /**
-     * Set the processing lock on the fusion source to prevent concurrent aggregations.
-     *
-     * Gated by the `concurrencyCheckEnabled` developer setting.
-     * When the setting is disabled, this method is a no-op.
-     *
-     * When enabled (default), this method sets a `processing` flag on the fusion
-     * source's connector attributes. If another aggregation is already in progress
-     * (the flag is already `true`), it **resets the flag** back to `false` and throws
-     * a `ConnectorError`, asking the user to verify there is no ongoing aggregation
-     * before retrying. This self-healing approach means a stuck flag from a prior
-     * crash is automatically cleared on the next attempt, so the subsequent retry
-     * will succeed.
-     *
-     * @throws {ConnectorError} if the processing flag is already active
-     */
     public async setProcessLock(): Promise<void> {
         if (!this.concurrencyCheckEnabled) {
             this.log.debug('Concurrency check is disabled, skipping processing lock.')
@@ -1049,8 +609,6 @@ export class SourceService {
         const processing = (currentSource!.connectorAttributes as any)?.processing
         if (processing === 'true' || processing === true) {
             this.log.warn('Processing flag is active. Aborting this run.')
-            // Reset the flag so the next attempt can proceed
-            // await this.releaseProcessLock()
             throw new ConnectorError(
                 'An account aggregation is already in progress or the previous one did not finish cleanly. ' +
                 'Please verify no other aggregation is running and try again.',
@@ -1068,16 +626,6 @@ export class SourceService {
         this._processLockAcquired = true
     }
 
-    /**
-     * Release the processing lock on the fusion source.
-     *
-     * Gated by the `concurrencyCheckEnabled` developer setting.
-     * When the setting is disabled, this method is a no-op.
-     *
-     * Called in `finally` blocks to ensure the lock is always released after an aggregation
-     * completes (whether successfully or with an error). Errors during release are logged
-     * but not re-thrown, since this occurs during cleanup.
-     */
     public async releaseProcessLock(): Promise<void> {
         if (!this.concurrencyCheckEnabled || !this._processLockAcquired) {
             return
@@ -1097,7 +645,6 @@ export class SourceService {
             this.log.error(
                 `Failed to release processing lock: ${error instanceof Error ? error.message : String(error)}`
             )
-            // Don't throw here as this is typically called in cleanup
         }
     }
 
@@ -1105,13 +652,6 @@ export class SourceService {
     // Public Batch Cumulative Count Methods
     // ------------------------------------------------------------------------
 
-    /**
-     * Persist the current batch cumulative count to the fusion source configuration.
-     *
-     * Called at the end of a successful account list operation so that the next run
-     * knows how many accounts were previously fetched per source. Only writes to the
-     * API when at least one source has an `accountLimit` (i.e. batch mode is active).
-     */
     public async saveBatchCumulativeCount(): Promise<void> {
         if (Object.keys(this.batchCumulativeCount).length === 0) {
             return
@@ -1127,14 +667,6 @@ export class SourceService {
         )
     }
 
-    /**
-     * Clear the persisted batch cumulative count from the fusion source configuration.
-     *
-     * Called during a reset operation so that the next run starts fresh with no
-     * cumulative offset, effectively re-fetching only the base `accountLimit`
-     * number of accounts per source. No-op when batch mode was never active
-     * (no persisted cumulative counts exist).
-     */
     public async resetBatchCumulativeCount(): Promise<void> {
         if (Object.keys(this.batchCumulativeCount).length === 0) {
             return
@@ -1155,164 +687,40 @@ export class SourceService {
     // Public Reverse Correlation Setup Methods
     // ------------------------------------------------------------------------
 
-    /**
-     * Validate that a reverse correlation attribute name does not overlap with
-     * existing attribute mappings, normal/unique definitions, or source schema attributes.
-     */
     public validateNoAttributeOverlap(attributeName: string, schemaAttributeNames: Set<string>): void {
-        const lowerName = attributeName.toLowerCase()
-
-        for (const attrMap of this.config.attributeMaps ?? []) {
-            if (attrMap.newAttribute.toLowerCase() === lowerName) {
-                throw new ConnectorError(
-                    `Reverse correlation attribute "${attributeName}" conflicts with attribute mapping "${attrMap.newAttribute}".`,
-                    ConnectorErrorType.Generic
-                )
-            }
-        }
-
-        for (const def of this.config.normalAttributeDefinitions ?? []) {
-            if (def.name.toLowerCase() === lowerName) {
-                throw new ConnectorError(
-                    `Reverse correlation attribute "${attributeName}" conflicts with normal attribute definition "${def.name}".`,
-                    ConnectorErrorType.Generic
-                )
-            }
-        }
-
-        for (const def of this.config.uniqueAttributeDefinitions ?? []) {
-            if (def.name.toLowerCase() === lowerName) {
-                throw new ConnectorError(
-                    `Reverse correlation attribute "${attributeName}" conflicts with unique attribute definition "${def.name}".`,
-                    ConnectorErrorType.Generic
-                )
-            }
-        }
-
-        if (schemaAttributeNames.has(lowerName)) {
-            throw new ConnectorError(
-                `Reverse correlation attribute "${attributeName}" conflicts with an existing source account schema attribute.`,
-                ConnectorErrorType.Generic
-            )
-        }
+        validateNoAttributeOverlapImpl(this.config, attributeName, schemaAttributeNames)
     }
 
-    /**
-     * Ensure all ISC entities for reverse correlation are properly configured.
-     * Called once per source with `correlationMode === 'reverse'` during aggregation setup.
-     */
     public async ensureReverseCorrelationSetup(
         sourceConfig: SourceConfig,
         schemaAttributeNames: Set<string>
     ): Promise<void> {
-        const { correlationAttribute, correlationDisplayName, name: sourceName } = sourceConfig
-        assert(correlationAttribute, `Reverse correlation attribute name is required for source "${sourceName}"`)
-        assert(correlationDisplayName, `Reverse correlation display name is required for source "${sourceName}"`)
-
-        this.validateNoAttributeOverlap(correlationAttribute, schemaAttributeNames)
-
-        const sourceInfo = this.run.sourcesByName.get(sourceName)
-        assert(sourceInfo, `Source "${sourceName}" not found`)
-
-        const scope = requiresFullReverseCorrelationArtifacts(sourceConfig) ? 'full' : 'minimal'
-        this.log.info(
-            `Setting up reverse correlation for source "${sourceName}" (${scope}): attribute="${correlationAttribute}", displayName="${correlationDisplayName}"`
-        )
-
-        await this.ensureReverseCorrelationSetupPhases(
-            correlationAttribute,
-            correlationDisplayName,
-            sourceInfo.id,
-            sourceConfig
-        )
-
-        const initialStatus = await this.getReverseCorrelationSetupStatus(
-            correlationAttribute,
-            sourceInfo.id,
-            sourceConfig
-        )
-        if (initialStatus.isConsistent) {
-            this.reverseCorrelationReadinessBySourceName.add(sourceName)
-            return
-        }
-
-        this.log.warn(
-            `Reverse correlation setup verification failed for source "${sourceName}" (missing: ${initialStatus.missingArtifacts.join(', ')}). Attempting one auto-repair pass.`
-        )
-        await this.repairReverseCorrelationSetup(
-            correlationAttribute,
-            correlationDisplayName,
-            sourceInfo.id,
-            initialStatus,
-            sourceConfig
-        )
-
-        const repairedStatus = await this.getReverseCorrelationSetupStatus(
-            correlationAttribute,
-            sourceInfo.id,
-            sourceConfig
-        )
-        if (!repairedStatus.isConsistent) {
-            throw new ConnectorError(
-                `Reverse correlation setup is inconsistent for source "${sourceName}" after auto-repair. Missing artifacts: ${repairedStatus.missingArtifacts.join(', ')}.`,
-                ConnectorErrorType.Generic
-            )
-        }
-        this.reverseCorrelationReadinessBySourceName.add(sourceName)
-        this.log.info(`Reverse correlation setup verified for source "${sourceName}"`)
+        return runEnsureReverseCorrelationSetup(this.reverseCorrelationDeps, sourceConfig, schemaAttributeNames, {
+            ensureReverseCorrelationSetupPhases: (...args) => this.ensureReverseCorrelationSetupPhases(...args),
+            getReverseCorrelationSetupStatus: (...args) => this.getReverseCorrelationSetupStatus(...args),
+            repairReverseCorrelationSetup: (...args) => this.repairReverseCorrelationSetup(...args),
+        })
     }
 
-    /**
-     * Reset reverse-correlation readiness cache (e.g. at account-list aggregation start).
-     * Allows {@link ensureReverseCorrelationSetup} to re-verify each run before per-account processing.
-     */
     public clearReverseCorrelationReadinessCache(): void {
-        this.reverseCorrelationReadinessBySourceName.clear()
+        clearReverseCorrelationReadinessCacheImpl(this.reverseCorrelationDeps)
     }
 
-    /**
-     * Set up reverse correlation for multiple sources sequentially.
-     * Kept serial to preserve deterministic ordering and avoid cross-source readiness races.
-     */
     public async setupReverseCorrelationSources(schemaAttrNames: Set<string>): Promise<number> {
-        const reverseCorrelationSources = this.sources.filter((sc) => sc.correlationMode === 'reverse')
-        if (reverseCorrelationSources.length === 0) {
-            return 0
-        }
-        for (const sc of reverseCorrelationSources) {
-            try {
-                await this.ensureReverseCorrelationSetup(sc, schemaAttrNames)
-            } catch (error) {
-                this.log.error(
-                    `Reverse correlation setup failed for source "${sc.name}" (attribute="${sc.correlationAttribute ?? 'unset'}"): ${error instanceof Error ? error.message : String(error)
-                    }`
-                )
-                throw error
-            }
-        }
-        return reverseCorrelationSources.length
+        return setupReverseCorrelationSourcesImpl(
+            this.reverseCorrelationDeps,
+            this.sources,
+            schemaAttrNames,
+            (sourceConfig, schemaAttributeNames) => this.ensureReverseCorrelationSetup(sourceConfig, schemaAttributeNames)
+        )
     }
 
-    /**
-     * Validate reverse-correlation prerequisites for runtime operations.
-     * Throws when setup is incomplete.
-     */
     public async assertReverseCorrelationReady(sourceConfig: SourceConfig): Promise<void> {
-        const { correlationAttribute, name: sourceName } = sourceConfig
-        assert(correlationAttribute, `Reverse correlation attribute name is required for source "${sourceName}"`)
-        if (this.reverseCorrelationReadinessBySourceName.has(sourceName)) {
-            return
-        }
-        const sourceInfo = this.run.sourcesByName.get(sourceName)
-        assert(sourceInfo, `Source "${sourceName}" not found`)
-        const status = await this.getReverseCorrelationSetupStatus(correlationAttribute, sourceInfo.id, sourceConfig)
-        if (!status.isConsistent) {
-            throw new ConnectorError(
-                `Reverse correlation prerequisites are not ready for source "${sourceName}". Missing artifacts: ${status.missingArtifacts.join(', ')}.`,
-                ConnectorErrorType.Generic
-            )
-        }
-        this.reverseCorrelationReadinessBySourceName.add(sourceName)
+        return runAssertReverseCorrelationReady(
+            this.reverseCorrelationDeps,
+            sourceConfig,
+            (...args) => this.getReverseCorrelationSetupStatus(...args)
+        )
     }
 
     private async ensureReverseCorrelationSetupPhases(
@@ -1365,446 +773,28 @@ export class SourceService {
         managedSourceId: string,
         sourceConfig: SourceConfig
     ): Promise<ReverseCorrelationSetupStatus> {
-        const missingArtifacts: ReverseCorrelationArtifact[] = []
-        const full = requiresFullReverseCorrelationArtifacts(sourceConfig)
-
-        const [fusionSchemaReady, identityAttributeReady, identityProfileReady, managedCorrelationReady] =
-            await Promise.all([
-                full ? this.hasFusionSchemaAttribute(correlationAttribute) : Promise.resolve(true),
-                this.hasSearchableIdentityAttribute(correlationAttribute),
-                full ? this.hasIdentityProfileMapping(correlationAttribute, sourceConfig) : Promise.resolve(true),
-                this.hasManagedSourceCorrelation(correlationAttribute, managedSourceId),
-            ])
-
-        if (full && !fusionSchemaReady) {
-            missingArtifacts.push('fusion_schema_attribute')
-        }
-
-        if (!identityAttributeReady) {
-            missingArtifacts.push('identity_attribute')
-        }
-
-        if (full && !identityProfileReady) {
-            missingArtifacts.push('identity_profile_mapping')
-        }
-
-        if (!managedCorrelationReady) {
-            missingArtifacts.push('managed_source_correlation')
-        }
-
-        return {
-            isConsistent: missingArtifacts.length === 0,
-            missingArtifacts,
-        }
+        return getReverseCorrelationSetupStatusImpl(
+            this.reverseCorrelationDeps,
+            correlationAttribute,
+            managedSourceId,
+            sourceConfig
+        )
     }
 
-    /**
-     * Ensure the dedicated reverse correlation attribute exists in the Fusion source's account schema.
-     */
     private async ensureFusionSchemaAttribute(attributeName: string, displayName: string): Promise<void> {
-        const fusionSourceId = this.fusionSourceId
-        const schemas = await this.listSourceSchemas(fusionSourceId)
-        const accountSchema = schemas.find((s) => s.name === 'account')
-        assert(accountSchema, 'Fusion source account schema not found')
-
-        const existingAttr = accountSchema.attributes?.find(
-            (a) => a.name?.toLowerCase() === attributeName.toLowerCase()
-        )
-        if (existingAttr) {
-            this.log.debug(`Fusion schema attribute "${attributeName}" already exists`)
-            return
-        }
-
-        const newAttr: AttributeDefinitionV2025 = {
-            name: attributeName,
-            description: displayName,
-            type: AttributeDefinitionTypeV2025.String,
-            isMulti: false,
-            isEntitlement: false,
-            isGroup: false,
-        }
-
-        const updatedAttributes: AttributeDefinitionV2025[] = [...(accountSchema.attributes ?? []), newAttr]
-
-        const updatedSchema: SchemaV2025 = {
-            ...accountSchema,
-            attributes: updatedAttributes,
-        }
-
-        const requestParameters: SourcesV2025ApiPutSourceSchemaRequest = {
-            sourceId: fusionSourceId,
-            schemaId: accountSchema.id!,
-            schemaV2025: updatedSchema,
-        }
-
-        const updated = await this.client.call(
-            (api: any) => api.sources.putSourceSchema(requestParameters).then((r: any) => r.data),
-            { priority: QueuePriority.HIGH, context: `SourceService>ensureFusionSchemaAttribute ${attributeName}` }
-        )
-        if (!updated) {
-            throw new ConnectorError(
-                `Failed to add reverse correlation attribute "${attributeName}" to Fusion source schema.`,
-                ConnectorErrorType.Generic
-            )
-        }
-
-        this.sourceSchemasCache.delete(fusionSourceId)
-
-        this.log.info(`Added reverse correlation attribute "${attributeName}" to Fusion source schema`)
+        return ensureFusionSchemaAttributeImpl(this.reverseCorrelationDeps, attributeName, displayName)
     }
 
-    private buildSearchableIdentityAttributePayload(
-        name: string,
-        displayName: string
-    ): { name: string; displayName: string; searchable: true; type: 'string'; multi: false; standard: false; system: false } {
-        return {
-            name,
-            displayName,
-            searchable: true,
-            type: 'string',
-            multi: false,
-            standard: false,
-            system: false,
-        }
-    }
-
-    /**
-     * Ensure the ISC identity attribute exists and is searchable.
-     */
     private async ensureIdentityAttribute(attributeName: string, displayName: string): Promise<void> {
-        const existing = await this.client.call<any>(
-            (api: any) => api.identityAttributes.getIdentityAttribute({ name: attributeName }).then((r: any) => r.data),
-            { priority: QueuePriority.HIGH, context: `SourceService>ensureIdentityAttribute get ${attributeName}` }
-        )
-
-        if (existing) {
-            if (existing.searchable) {
-                this.log.debug(`Identity attribute "${attributeName}" already exists and is searchable`)
-                return
-            }
-            const updated = await this.client.call(
-                (api: any) =>
-                    api.identityAttributes
-                        .putIdentityAttribute({
-                            name: attributeName,
-                            identityAttributeV2025: this.buildSearchableIdentityAttributePayload(attributeName, displayName),
-                        })
-                        .then((r: any) => r.data),
-                { priority: QueuePriority.HIGH, context: `SourceService>ensureIdentityAttribute update ${attributeName}` }
-            )
-            if (!updated) {
-                throw new ConnectorError(
-                    `Failed to update identity attribute "${attributeName}" to searchable.`,
-                    ConnectorErrorType.Generic
-                )
-            }
-            this.log.info(`Updated identity attribute "${attributeName}" to be searchable`)
-            return
-        }
-
-        const createPayload = {
-            identityAttributeV2025: this.buildSearchableIdentityAttributePayload(attributeName, displayName),
-        }
-        let created: any
-        try {
-            created = await this.client.call(
-                (api: any) => api.identityAttributes.createIdentityAttribute(createPayload).then((r: any) => r.data),
-                { priority: QueuePriority.HIGH, context: `SourceService>ensureIdentityAttribute create ${attributeName}`, throwOnError: true }
-            )
-        } catch (error: any) {
-            if (this.isIdentityAttributeAlreadyExistsError(error)) {
-                this.log.warn(
-                    `Create reported existing identity attribute "${attributeName}". Retrying as idempotent update to searchable=true.`
-                )
-                const updated = await this.client.call(
-                    (api: any) =>
-                        api.identityAttributes
-                            .putIdentityAttribute({
-                                name: attributeName,
-                                identityAttributeV2025: this.buildSearchableIdentityAttributePayload(attributeName, displayName),
-                            })
-                            .then((r: any) => r.data),
-                    { priority: QueuePriority.HIGH, context: `SourceService>ensureIdentityAttribute update-after-conflict ${attributeName}` }
-                )
-                if (updated) {
-                    this.log.info(
-                        `Updated existing identity attribute "${attributeName}" to be searchable after create conflict`
-                    )
-                    return
-                }
-            }
-            throw new ConnectorError(
-                buildIdentityAttributeCreateErrorMessage(attributeName, error),
-                ConnectorErrorType.Generic
-            )
-        }
-        if (!created) {
-            throw new ConnectorError(
-                `Failed to create searchable identity attribute "${attributeName}".`,
-                ConnectorErrorType.Generic
-            )
-        }
-        this.log.info(`Created searchable identity attribute "${attributeName}"`)
+        return ensureIdentityAttributeImpl(this.reverseCorrelationCoreDeps, attributeName, displayName)
     }
 
-    private isIdentityAttributeAlreadyExistsError(error: any): boolean {
-        const detailCode = String(error?.response?.data?.detailCode ?? '').toLowerCase()
-        const detailMessage = String(error?.response?.data?.detailMessage ?? '').toLowerCase()
-        const message = error instanceof Error ? error.message.toLowerCase() : String(error ?? '').toLowerCase()
-        const apiMessages = Array.isArray(error?.response?.data?.messages)
-            ? error.response.data.messages.map((m: any) => String(m?.text ?? '').toLowerCase()).join(' | ')
-            : ''
-        const combined = `${detailCode} ${detailMessage} ${message} ${apiMessages}`
-        return combined.includes('already exists') || combined.includes('duplicate')
-    }
-
-    /**
-     * Ensure the Identity Fusion NG source's identity profile has a mapping from the
-     * Fusion account attribute to the identity attribute.
-     */
     private async ensureIdentityProfileMapping(attributeName: string, sourceConfig: SourceConfig): Promise<void> {
-        const fusionSourceId = this.fusionSourceId
-        const fusionSource = this.getFusionSource()
-
-        const matchingProfiles = await this.getMatchingIdentityProfiles(fusionSourceId)
-        if (matchingProfiles.length === 0) {
-            if (!requiresFullReverseCorrelationArtifacts(sourceConfig)) {
-                this.log.warn(
-                    `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}" while configuring reverse correlation attribute "${attributeName}". ` +
-                    'Skipping identity profile mapping (non-authoritative source).'
-                )
-                return
-            }
-            throw new ConnectorError(
-                `No identity profile found with authoritative source "${fusionSource?.name ?? fusionSourceId}" while configuring reverse correlation attribute "${attributeName}". ` +
-                IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
-                ConnectorErrorType.Generic
-            )
-        }
-        this.log.info(
-            `Found ${matchingProfiles.length} identity profile(s) for fusion source "${fusionSource?.name ?? fusionSourceId}": ${matchingProfiles.map((p: any) => p.id).join(', ')}`
-        )
-
-        assert(fusionSource, 'Fusion source not found')
-
-        for (const profile of matchingProfiles) {
-            await this.upsertIdentityProfileTransform(profile, attributeName, fusionSourceId, fusionSource.name)
-        }
+        return ensureIdentityProfileMappingImpl(this.reverseCorrelationDeps, attributeName, sourceConfig)
     }
 
-    private async getMatchingIdentityProfiles(fusionSourceId: string): Promise<any[]> {
-        const profiles = await this.client.call(
-            (api: any, params: any) => api.identityProfiles.listIdentityProfiles(params),
-            { priority: QueuePriority.HIGH, context: 'SourceService>ensureIdentityProfileMapping listProfiles', paginate: { mode: 'sequential' } }
-        )
-
-        return profiles.filter(
-            (p: any) => p.authoritativeSource?.id === fusionSourceId || p.source?.id === fusionSourceId
-        )
-    }
-
-    private async upsertIdentityProfileTransform(
-        profile: any,
-        attributeName: string,
-        fusionSourceId: string,
-        fusionSourceName: string
-    ): Promise<void> {
-        const newTransform = {
-            identityAttributeName: attributeName,
-            transformDefinition: {
-                type: 'accountAttribute',
-                attributes: {
-                    sourceId: fusionSourceId,
-                    sourceName: fusionSourceName,
-                    attributeName,
-                },
-            },
-        }
-
-        const transforms = profile.identityAttributeConfig?.attributeTransforms ?? []
-        const existingIndex = transforms.findIndex((t: any) => t.identityAttributeName === attributeName)
-
-        if (existingIndex >= 0) {
-            const existing = transforms[existingIndex]
-            if (this.isDesiredIdentityProfileTransform(existing, attributeName, fusionSourceName, fusionSourceId)) {
-                this.log.info(
-                    `Identity profile ${profile.id} already maps "${attributeName}" from source "${fusionSourceName}"`
-                )
-            } else {
-                this.log.info(
-                    `Identity profile ${profile.id} already defines a mapping for identity attribute "${attributeName}"; ` +
-                    'leaving it unchanged so a custom transform is not overwritten.'
-                )
-            }
-            return
-        }
-
-        const nextTransforms = [...transforms, newTransform]
-        const hasIdentityAttributeConfig = !!profile.identityAttributeConfig
-        const jsonPatchOperationV2025 = hasIdentityAttributeConfig
-            ? [
-                {
-                    op: 'replace' as JsonPatchOperationV2025OpV2025,
-                    path: '/identityAttributeConfig/attributeTransforms',
-                    value: nextTransforms,
-                },
-            ]
-            : [
-                {
-                    op: 'add' as JsonPatchOperationV2025OpV2025,
-                    path: '/identityAttributeConfig',
-                    value: {
-                        attributeTransforms: nextTransforms,
-                    },
-                },
-            ]
-
-        let updatedProfile: any
-        try {
-            updatedProfile = await this.client.call(
-                (api) => api.identityProfiles.updateIdentityProfile({
-                    identityProfileId: profile.id!,
-                    jsonPatchOperationV2025,
-                }).then((r) => r.data),
-                { priority: QueuePriority.HIGH, context: `SourceService>ensureIdentityProfileMapping upsert ${attributeName} profile=${profile.id}`, throwOnError: true }
-            )
-        } catch (error: any) {
-            throw new ConnectorError(
-                buildIdentityProfileUpsertErrorMessage(profile.id!, attributeName, error),
-                ConnectorErrorType.Generic
-            )
-        }
-        if (!updatedProfile) {
-            throw new ConnectorError(
-                `Failed to update identity profile ${profile.id} for reverse correlation attribute "${attributeName}". ` +
-                IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
-                ConnectorErrorType.Generic
-            )
-        }
-        this.log.info(`Added identity profile mapping for attribute "${attributeName}" on profile ${profile.id}`)
-
-        const verified = await this.waitForIdentityProfileMapping(
-            profile.id!,
-            attributeName,
-            fusionSourceName,
-            fusionSourceId
-        )
-        if (!verified) {
-            throw new ConnectorError(
-                `Identity profile mapping verification failed for profile ${profile.id} and attribute "${attributeName}". ` +
-                IDENTITY_PROFILE_PENDING_OPERATIONS_HINT,
-                ConnectorErrorType.Generic
-            )
-        }
-        this.log.info(`Verified identity profile mapping for profile ${profile.id} and attribute "${attributeName}"`)
-    }
-
-    /**
-     * Ensure the managed source's correlation config includes a rule mapping the
-     * account's identity attribute (schema ID) to the reverse correlation identity attribute.
-     */
     private async ensureManagedSourceCorrelation(attributeName: string, managedSourceId: string): Promise<void> {
-        const schemas = await this.listSourceSchemas(managedSourceId)
-        const accountSchema = schemas.find((s) => s.name === 'account')
-        assert(accountSchema, `Managed source ${managedSourceId} account schema not found`)
-        const accountIdAttribute = accountSchema.identityAttribute
-        assert(
-            accountIdAttribute,
-            `Managed source ${managedSourceId} account schema has no identity attribute (ID) defined`
-        )
-
-        const correlationConfig = await this.client.call<CorrelationConfigV2025>(
-            (api: any) =>
-                api.sources
-                    .getCorrelationConfig({
-                        id: managedSourceId,
-                    } as SourcesV2025ApiGetCorrelationConfigRequest)
-                    .then((r: any) => r.data),
-            { priority: QueuePriority.HIGH, context: `SourceService>ensureManagedSourceCorrelation get ${managedSourceId}` }
-        )
-
-        const assignments = correlationConfig?.attributeAssignments ?? []
-        const alreadyExists = assignments.some((a: any) => a.property === attributeName && a.value === accountIdAttribute)
-        if (alreadyExists) {
-            this.log.debug(
-                `Managed source ${managedSourceId} already has correlation rule for "${attributeName}" -> "${accountIdAttribute}"`
-            )
-            return
-        }
-
-        const updatedConfig: CorrelationConfigV2025 = {
-            ...correlationConfig,
-            attributeAssignments: [
-                ...assignments,
-                {
-                    property: attributeName,
-                    value: accountIdAttribute,
-                    operation: 'EQ' as any,
-                    complex: false,
-                    ignoreCase: false,
-                    matchMode: undefined,
-                    filterString: undefined,
-                },
-            ],
-        }
-
-        const updated = await this.client.call(
-            (api: any) =>
-                api.sources
-                    .putCorrelationConfig({
-                        id: managedSourceId,
-                        correlationConfigV2025: updatedConfig,
-                    } as SourcesV2025ApiPutCorrelationConfigRequest)
-                    .then((r: any) => r.data),
-            { priority: QueuePriority.HIGH, context: `SourceService>ensureManagedSourceCorrelation put ${managedSourceId}` }
-        )
-        if (!updated) {
-            throw new ConnectorError(
-                `Failed to update managed source correlation config for source ${managedSourceId} and attribute "${attributeName}".`,
-                ConnectorErrorType.Generic
-            )
-        }
-        this.log.info(
-            `Added correlation rule "${attributeName}" -> "${accountIdAttribute}" to managed source ${managedSourceId}`
-        )
-    }
-
-    private async hasFusionSchemaAttribute(attributeName: string): Promise<boolean> {
-        const schemas = await this.listSourceSchemas(this.fusionSourceId)
-        const accountSchema = schemas.find((s) => s.name === 'account')
-        assert(accountSchema, 'Fusion source account schema not found')
-        return (accountSchema.attributes ?? []).some((a) => a.name?.toLowerCase() === attributeName.toLowerCase())
-    }
-
-    private async hasSearchableIdentityAttribute(attributeName: string): Promise<boolean> {
-        const existing = await this.client.call<any>(
-            (api: any) => api.identityAttributes.getIdentityAttribute({ name: attributeName }).then((r: any) => r.data),
-            { priority: QueuePriority.HIGH, context: `SourceService>hasSearchableIdentityAttribute get ${attributeName}` }
-        )
-        return !!existing?.searchable
-    }
-
-    private async hasIdentityProfileMapping(attributeName: string, sourceConfig: SourceConfig): Promise<boolean> {
-        if (!requiresFullReverseCorrelationArtifacts(sourceConfig)) {
-            return true
-        }
-
-        const fusionSource = this.getFusionSource()
-        const fusionSourceId = this.fusionSourceId
-        assert(fusionSource, 'Fusion source not found')
-        const profiles = await this.client.call(
-            (api: any, params: any) => api.identityProfiles.listIdentityProfiles(params),
-            { priority: QueuePriority.HIGH, context: `SourceService>hasIdentityProfileMapping listProfiles ${attributeName}`, paginate: { mode: 'sequential' } }
-        )
-        const matchingProfiles = profiles.filter(
-            (p: any) => p.authoritativeSource?.id === fusionSourceId || p.source?.id === fusionSourceId
-        )
-        if (matchingProfiles.length === 0) {
-            return false
-        }
-        return matchingProfiles.every((profile: any) =>
-            this.profileHasIdentityAttributeTransform(profile, attributeName)
-        )
+        return ensureManagedSourceCorrelationImpl(this.reverseCorrelationDeps, attributeName, managedSourceId)
     }
 
     private async waitForIdentityProfileMapping(
@@ -1813,255 +803,88 @@ export class SourceService {
         fusionSourceName: string,
         fusionSourceId: string
     ): Promise<boolean> {
-        const maxAttempts = 3
-        const waitMs = 1500
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            const profiles = await this.fetchIdentityProfiles(
-                `SourceService>waitForIdentityProfileMapping ${attributeName} profile=${profileId} attempt=${attempt}`
-            )
-            const profile = profiles.find((p: any) => p.id === profileId)
-            const transforms = profile?.identityAttributeConfig?.attributeTransforms ?? []
-            const verified = transforms.some((t: any) =>
-                this.isDesiredIdentityProfileTransform(t, attributeName, fusionSourceName, fusionSourceId)
-            )
-            if (verified) {
-                return true
-            }
-            if (attempt < maxAttempts) {
-                await this.sleep(waitMs)
-            }
-        }
-        return false
-    }
-
-    private async fetchIdentityProfiles(context: string): Promise<any[]> {
-        return this.client.call(
-            (api: any, params: any) => api.identityProfiles.listIdentityProfiles(params),
-            { priority: QueuePriority.HIGH, context, paginate: { mode: 'sequential' } }
+        return waitForIdentityProfileMappingImpl(
+            this.reverseCorrelationCoreDeps,
+            profileId,
+            attributeName,
+            fusionSourceName,
+            fusionSourceId
         )
-    }
-
-    /** True if the profile defines any transform for this identity attribute (custom or default). */
-    private profileHasIdentityAttributeTransform(profile: any, attributeName: string): boolean {
-        const transforms = profile?.identityAttributeConfig?.attributeTransforms ?? []
-        return transforms.some((t: any) => t?.identityAttributeName === attributeName)
-    }
-
-    private isDesiredIdentityProfileTransform(
-        transform: any,
-        attributeName: string,
-        fusionSourceName: string,
-        fusionSourceId: string
-    ): boolean {
-        if (transform?.identityAttributeName !== attributeName) {
-            return false
-        }
-        if (transform?.transformDefinition?.type !== 'accountAttribute') {
-            return false
-        }
-        const transformAttrs = transform?.transformDefinition?.attributes ?? {}
-        const sourceMatches =
-            transformAttrs.sourceName === fusionSourceName || transformAttrs.sourceId === fusionSourceId
-        return sourceMatches && transformAttrs.attributeName === attributeName
-    }
-
-    private async sleep(ms: number): Promise<void> {
-        await new Promise((resolve) => setTimeout(resolve, ms))
-    }
-
-    private async hasManagedSourceCorrelation(attributeName: string, managedSourceId: string): Promise<boolean> {
-        const schemas = await this.listSourceSchemas(managedSourceId)
-        const accountSchema = schemas.find((s) => s.name === 'account')
-        assert(accountSchema, `Managed source ${managedSourceId} account schema not found`)
-        const accountIdAttribute = accountSchema.identityAttribute
-        if (!accountIdAttribute) {
-            return false
-        }
-
-        const correlationConfig = await this.client.call<CorrelationConfigV2025>(
-            (api: any) =>
-                api.sources
-                    .getCorrelationConfig({
-                        id: managedSourceId,
-                    } as SourcesV2025ApiGetCorrelationConfigRequest)
-                    .then((r: any) => r.data),
-            { priority: QueuePriority.HIGH, context: `SourceService>hasManagedSourceCorrelation get ${managedSourceId}` }
-        )
-        const assignments = correlationConfig?.attributeAssignments ?? []
-        return assignments.some((a: any) => a.property === attributeName && a.value === accountIdAttribute)
     }
 
     // ------------------------------------------------------------------------
-    // Private Helper Methods
+    // Module dependency builders
     // ------------------------------------------------------------------------
 
-    /**
-     * Lazily compile and cache per-source Accounts JMESPath filters.
-     */
-    private getCompiledAccountJmespathFilter(sourceInfo: SourceInfo): CompiledAccountJmespathFilter | undefined {
-        if (!sourceInfo.isManaged) {
-            return undefined
+    private get aggregationTaskDeps(): SourceAggregationTaskDeps {
+        return {
+            log: this.log,
+            client: this.client,
+            sourcesById: this.sourcesById,
         }
-
-        const expression = sourceInfo.config?.accountJmespathFilter
-        if (!expression || expression.trim().length === 0) {
-            this.accountJmespathFiltersBySourceName.delete(sourceInfo.name)
-            return undefined
-        }
-
-        const cached = this.accountJmespathFiltersBySourceName.get(sourceInfo.name)
-        if (cached && cached.expression === expression) {
-            return cached
-        }
-
-        const compiled = compileAccountPageJmespathFilter(sourceInfo.name, expression)
-        if (!compiled) {
-            this.accountJmespathFiltersBySourceName.delete(sourceInfo.name)
-            return undefined
-        }
-
-        this.accountJmespathFiltersBySourceName.set(sourceInfo.name, compiled)
-        return compiled
     }
 
-    /**
-     * Applies Accounts JMESPath filter on a paginated batch represented as { accounts: [...] }.
-     */
-    private applyManagedJmespathFilter(sourceInfo: SourceInfo, accounts: Account[]): Account[] {
-        const compiled = this.getCompiledAccountJmespathFilter(sourceInfo)
-        if (!compiled) {
-            return accounts
+    private get discoveryDeps(): SourceDiscoveryDeps {
+        return {
+            log: this.log,
+            client: this.client,
+            run: this.run,
+            state: {
+                sources: this.sources,
+                spConnectorInstanceId: this.spConnectorInstanceId,
+                allSources: this._allSources,
+                fusionSourceId: this._fusionSourceId,
+                fusionSourceOwner: this._fusionSourceOwner,
+                fusionSourceManagementWorkgroupId: this._fusionSourceManagementWorkgroupId,
+                sourcesById: this.sourcesById,
+                workgroupMemberIdsByWorkgroupId: this._workgroupMemberIdsByWorkgroupId,
+                accountJmespathFiltersBySourceName: this.accountJmespathFiltersBySourceName,
+            },
         }
-        return compiled.filterAccountPage(accounts)
     }
 
-    private matchesManagedJmespathFilter(sourceInfo: SourceInfo, account: Account): boolean {
-        if (!sourceInfo.isManaged) {
-            return true
+    private get managedAccountFetcherDeps(): ManagedAccountFetcherDeps {
+        return {
+            log: this.log,
+            run: this.run,
+            managedSources: this.managedSources,
+            batchLimitedSourceNames: this.batchLimitedSourceNames,
+            batchCumulativeCount: this.batchCumulativeCount,
+            accountJmespathFiltersBySourceName: this.accountJmespathFiltersBySourceName,
+            fetchAccountsBySourceIdGenerator: this.fetchAccountsBySourceIdGenerator.bind(this),
         }
-        return this.applyManagedJmespathFilter(sourceInfo, [account]).length > 0
     }
 
-    /**
-     * Client-side machine account check. This cannot be done via ISC account filters.
-     */
-    private isMachineManagedAccount(account: Account): boolean {
-        return account.isMachine === true
+    private get aggregatorDeps(): SourceAggregatorDeps {
+        return {
+            ...this.aggregationTaskDeps,
+            fusionSourceId: this.fusionSourceId,
+            managedSources: this.managedSources,
+            aggregationDateCache: this.aggregationDateCache,
+        }
     }
 
-    /**
-     * Remove machine accounts from managed-source batches before further processing.
-     */
-    private filterManagedMachineAccounts(accounts: Account[]): {
-        filteredAccounts: Account[]
-        discardedMachineCount: number
-    } {
-        const filteredAccounts: Account[] = []
-        let discardedMachineCount = 0
-
-        for (const account of accounts) {
-            if (this.isMachineManagedAccount(account)) {
-                discardedMachineCount++
-                continue
-            }
-            filteredAccounts.push(account)
+    private get reverseCorrelationCoreDeps(): Omit<ReverseCorrelationDeps, 'waitForIdentityProfileMapping'> {
+        return {
+            log: this.log,
+            client: this.client,
+            config: this.config,
+            run: this.run,
+            getFusionSourceId: () => this.fusionSourceId,
+            getFusionSource: () => this.getFusionSource(),
+            listSourceSchemas: (sourceId) => this.listSourceSchemas(sourceId),
+            invalidateSourceSchemasCache: (sourceId) => {
+                this.sourceSchemasCache.delete(sourceId)
+            },
+            reverseCorrelationReadinessBySourceName: this.reverseCorrelationReadinessBySourceName,
         }
-
-        return { filteredAccounts, discardedMachineCount }
     }
 
-    /**
-     * Check if a managed source should be aggregated based on fusion aggregation date
-     */
-    private async shouldAggregateSource(source: SourceInfo): Promise<boolean> {
-        assert(source.isManaged, 'Only managed sources can be aggregated')
-        const fusionLatestAggregationDate = await this.getLatestAggregationDate(this.fusionSourceId)
-        const latestSourceDate = await this.getLatestAggregationDate(source.id)
-
-        return fusionLatestAggregationDate > latestSourceDate
-    }
-
-    /**
-     * Aggregate managed source
-     */
-    public async aggregateManagedSource(
-        id: string,
-        disableOptimization?: boolean,
-        awaitTaskStatus: boolean = true
-    ): Promise<void> {
-        let completed = false
-        const sourceInfo = this.sourcesById.get(id)
-        const sourceName = sourceInfo?.name ?? id
-        const requestParameters: SourcesV2025ApiImportAccountsRequest = {
-            id,
-            disableOptimization: disableOptimization ? 'true' : undefined,
-        }
-        const loadAccountsTask = await this.client.call(
-            (api) => api.sources.importAccounts(requestParameters).then((r) => r.data),
-            { priority: QueuePriority.HIGH, context: 'SourceService>aggregateManagedSource executeImportAccounts' }
-        )
-        if (!loadAccountsTask) {
-            this.log.warn(
-                `Failed to trigger account aggregation for source ${sourceName} (${id}). The API call returned no data.`
-            )
-            return
-        }
-
-        if (!awaitTaskStatus) {
-            const taskId = loadAccountsTask?.task?.id ?? 'unknown'
-            this.log.info(
-                `Triggered managed source aggregation for ${sourceName} (${id}) with taskId=${taskId} (status polling skipped)`
-            )
-            return
-        }
-
-        const timeoutMinutes = sourceInfo?.config?.aggregationTimeout ?? 10
-        const pollIntervalMs = 30_000
-        const deadlineMs = Date.now() + timeoutMinutes * 60_000
-        const taskId = loadAccountsTask?.task?.id
-        let pollsExecuted = 0
-        let lastTaskStatus: any = undefined
-
-        if (!taskId) {
-            this.log.warn(`Aggregation task ID not found for source ${sourceName} (${id})`)
-        }
-
-        let firstPoll = true
-        while (!completed && taskId && (firstPoll || Date.now() < deadlineMs)) {
-            firstPoll = false
-            const requestParameters: TaskManagementV2025ApiGetTaskStatusRequest = {
-                id: taskId,
-            }
-            const taskStatus = await this.client.call(
-                (api) => api.taskManagement.getTaskStatus(requestParameters).then((r) => r.data),
-                { priority: QueuePriority.HIGH, context: 'SourceService>aggregateManagedSource executeGetTaskStatus' }
-            )
-            pollsExecuted++
-            lastTaskStatus = taskStatus
-
-            if (taskStatus?.completed) {
-                completed = true
-                break
-            }
-            const remainingMs = deadlineMs - Date.now()
-            if (remainingMs <= 0) {
-                break
-            }
-            await new Promise((resolve) => setTimeout(resolve, Math.min(pollIntervalMs, remainingMs)))
-        }
-        if (!completed) {
-            const lastStatusSummary = lastTaskStatus
-                ? JSON.stringify({
-                    completed: lastTaskStatus.completed,
-                    completionStatus: lastTaskStatus.completionStatus,
-                    type: lastTaskStatus.type,
-                    description: lastTaskStatus.description,
-                    messages: lastTaskStatus.messages,
-                })
-                : 'none'
-            this.log.warn(
-                `Failed to aggregate managed accounts for source ${sourceName} (${id}). taskId=${taskId ?? 'unknown'}, timeoutMinutes=${timeoutMinutes}, pollIntervalMs=${pollIntervalMs}, pollsExecuted=${pollsExecuted}, lastTaskStatus=${lastStatusSummary}`
-            )
+    private get reverseCorrelationDeps(): ReverseCorrelationDeps {
+        return {
+            ...this.reverseCorrelationCoreDeps,
+            waitForIdentityProfileMapping: (profileId, attributeName, fusionSourceName, fusionSourceId) =>
+                this.waitForIdentityProfileMapping(profileId, attributeName, fusionSourceName, fusionSourceId),
         }
     }
 }

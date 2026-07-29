@@ -11,6 +11,7 @@ import { hasValue, readString, trimStr } from '../utils/safeRead'
 import { assert } from '../utils/assert'
 import { buildManagedAccountKey } from './managedAccountKey'
 import { CandidateRegistry } from '../services/matchingService/candidateRegistry'
+import { resolveFusionAccountNameOrDisplayName } from './fusionAccountUtils'
 
 export type ManagedAccountInfo = {
     id: string
@@ -618,8 +619,8 @@ export class FusionRun {
             tracker.conflictingFusionIdentityAccounts.set(identityId, accounts)
         }
 
-        accounts.set(existingKey, existingAccount.name || existingAccount.displayName || existingKey)
-        accounts.set(incomingKey, newAccount.name || newAccount.displayName || incomingKey)
+        accounts.set(existingKey, resolveFusionAccountNameOrDisplayName(existingAccount, existingKey))
+        accounts.set(incomingKey, resolveFusionAccountNameOrDisplayName(newAccount, incomingKey))
 
         const accountLabels = Array.from(accounts.entries()).map(
             ([managedKey, name]) => `${name} (${managedKey})`
@@ -636,7 +637,7 @@ export class FusionRun {
         if (trimmedManagedKey) {
             return trimmedManagedKey
         }
-        const name = fa.name || fa.displayName || 'unknown'
+        const name = resolveFusionAccountNameOrDisplayName(fa, 'unknown')
         return `name:${name}`
     }
 

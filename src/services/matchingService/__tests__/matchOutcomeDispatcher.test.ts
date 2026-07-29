@@ -6,7 +6,7 @@ import { FusionRun } from '../../../model/fusionRun'
 import { AggregationTracker } from '../../../model/aggregationTracker'
 import { AccountAssembly } from '../../accountAssembly'
 import { MatchingService } from '../matchingService'
-import { MatchOutcomeDispatcher } from '../matchOutcomeDispatcher'
+import { MatchOutcomeDispatcher, MatchSweepMode } from '../matchOutcomeDispatcher'
 import { createAutomaticMergeDecision } from '../../formService/helpers'
 import type { SourceInfo } from '../../sourceService'
 
@@ -927,7 +927,7 @@ describe('MatchOutcomeDispatcher', () => {
             })
 
             const account = managedAccount()
-            const result = await dispatcher.runMatchSweep([account], 1, { analysisOnly: true })
+            const result = await dispatcher.runMatchSweep([account], 1, { mode: MatchSweepMode.AnalysisOnly })
 
             expect(result.resolved).toHaveLength(1)
             expect(result.resolved[0].resolution).toBe('deferred-match')

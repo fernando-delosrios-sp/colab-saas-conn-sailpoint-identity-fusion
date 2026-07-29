@@ -1,4 +1,5 @@
 import { FusionAccount, IDENTITIES_SOURCE_NAME } from '../fusionAccount'
+import { resolveFusionAccountNameOrDisplayName } from '../fusionAccountUtils'
 import { FusionConfig, SourceType } from '../config'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionDecision } from '../form'
@@ -319,6 +320,19 @@ describe('FusionAccount', () => {
         it('builds identity info', () => {
             const info = FusionAccount.buildIdentityInfo({ id: 'id-1', name: 'Name', displayName: 'Display Name' } as any)
             expect(info).toEqual({ id: 'id-1', name: 'Name', displayName: 'Display Name' })
+        })
+    })
+
+    describe('13b. resolveFusionAccountNameOrDisplayName', () => {
+        it('prefers name over displayName', () => {
+            expect(resolveFusionAccountNameOrDisplayName({ name: 'Name', displayName: 'Display' }, 'fallback')).toBe(
+                'Name'
+            )
+        })
+
+        it('falls back to displayName then explicit fallback', () => {
+            expect(resolveFusionAccountNameOrDisplayName({ displayName: 'Display' }, 'fallback')).toBe('Display')
+            expect(resolveFusionAccountNameOrDisplayName({}, 'fallback')).toBe('fallback')
         })
     })
 

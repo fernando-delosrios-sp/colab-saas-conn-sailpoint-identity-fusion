@@ -122,6 +122,160 @@ function getToggleConfig(sourceType: SourceType): ToggleConfig {
 }
 
 // ============================================================================
+// Per-Candidate Builders
+// ============================================================================
+
+/**
+ * Build form elements for a single candidate (attributes and score details).
+ */
+export const buildCandidateFields = (
+    candidate: Candidate,
+    _index: number,
+    fusionFormAttributes?: string[]
+): FormElementV2025[] => {
+    if (!candidate?.id || !candidate.name) return []
+
+    const candidateId = candidate.id
+    const candidateElements: FormElementV2025[] = []
+
+    fusionFormAttributes?.forEach((attrName) => {
+        const attrKey = lowerFirst(attrName)
+        candidateElements.push({
+            id: `${candidateId}.${attrKey}`,
+            key: `${candidateId}.${attrKey}`,
+            elementType: 'TEXT',
+            config: {
+                label: capitalizeFirst(attrName),
+                default: getAttrValue(candidate.attributes, attrName),
+            },
+            validations: [],
+        })
+    })
+
+    if (candidate.scores.length > 0) {
+        candidateElements.push({
+            id: `${candidateId}.scoreDetailsHeader`,
+            key: `${candidateId}.scoreDetailsHeader`,
+            elementType: 'DESCRIPTION',
+            config: {
+                description:
+                    '<p style="text-align: center;"><span style="font-size: 18pt;"><strong>Fusion Score details</strong></span></p>',
+                label: 'Fusion Score Details',
+                showLabel: false,
+            },
+            validations: [],
+        })
+
+        for (const score of candidate.scores) {
+            if (!score.attribute || score.score === undefined) continue
+            const attrName = String(score.attribute)
+            const attrKey = lowerFirst(attrName)
+            const algorithmKey = String(score.algorithm ?? 'unknown')
+            const algorithm = ALGORITHM_LABELS[algorithmKey] ?? algorithmKey
+
+            candidateElements.push({
+                id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
+                key: `${candidateId}.${attrKey}.${algorithmKey}.score`,
+                elementType: 'TEXT',
+                config: {
+                    label: capitalizeFirst(attrName),
+                    helpText: algorithm,
+                    default: formatScoreDisplay(score),
+                },
+                validations: [],
+            })
+        }
+    }
+
+    return candidateElements
+}
+
+/**
+ * Build show/hide and disable conditions for a single candidate section.
+ */
+export const buildCandidateConditions = (
+    candidate: Candidate,
+    _index: number,
+    fusionFormAttributes?: string[]
+): FormCondition[] => {
+    if (!candidate?.id || !candidate.name) return []
+    if (!hasRenderableCandidateElements(candidate, fusionFormAttributes)) return []
+
+    const selectionSectionId = `${candidate.id}.selectionsection`
+
+    return [
+        {
+            ruleOperator: 'AND',
+            rules: [
+                {
+                    sourceType: 'ELEMENT',
+                    source: 'newIdentity',
+                    operator: 'EQ',
+                    valueType: 'BOOLEAN',
+                    value: 'true',
+                },
+            ],
+            effects: [
+                {
+                    effectType: 'DISABLE',
+                    config: { element: selectionSectionId },
+                },
+            ],
+        },
+        {
+            ruleOperator: 'OR',
+            rules: [
+                {
+                    sourceType: 'ELEMENT',
+                    source: 'newIdentity',
+                    operator: 'EQ',
+                    valueType: 'BOOLEAN',
+                    value: 'true',
+                },
+                {
+                    sourceType: 'ELEMENT',
+                    source: 'identities',
+                    operator: 'NE',
+                    valueType: 'STRING',
+                    value: candidate.name,
+                },
+            ],
+            effects: [
+                {
+                    effectType: 'HIDE',
+                    config: { element: selectionSectionId },
+                },
+            ],
+        },
+    ]
+}
+
+/**
+ * Collect attribute and score element IDs for a candidate (used by NOT_EM disable conditions).
+ */
+const collectCandidateAttributeElementIds = (candidate: Candidate, fusionFormAttributes?: string[]): string[] => {
+    if (!candidate?.id || !candidate.name) return []
+    if (!hasRenderableCandidateElements(candidate, fusionFormAttributes)) return []
+
+    const candidateId = candidate.id
+    const elementIds: string[] = []
+
+    fusionFormAttributes?.forEach((attrName) => {
+        elementIds.push(`${candidateId}.${lowerFirst(attrName)}`)
+    })
+
+    for (const score of candidate.scores) {
+        if (score.attribute) {
+            const attrKey = lowerFirst(String(score.attribute))
+            const algorithmKey = String(score.algorithm ?? 'unknown')
+            elementIds.push(`${candidateId}.${attrKey}.${algorithmKey}.score`)
+        }
+    }
+
+    return elementIds
+}
+
+// ============================================================================
 // Form Building Functions
 // ============================================================================
 
@@ -323,66 +477,14 @@ export const buildFormFields = (
     })
 
     // Candidate sections: one per candidate
-    for (const candidate of candidates) {
-        if (!candidate?.id || !candidate.name) continue
-        const candidateId = candidate.id
-        const candidateElements: FormElementV2025[] = []
-
-        fusionFormAttributes?.forEach((attrName) => {
-            const attrKey = lowerFirst(attrName)
-            candidateElements.push({
-                id: `${candidateId}.${attrKey}`,
-                key: `${candidateId}.${attrKey}`,
-                elementType: 'TEXT',
-                config: {
-                    label: capitalizeFirst(attrName),
-                    default: getAttrValue(candidate.attributes, attrName),
-                },
-                validations: [],
-            })
-        })
-
-        // Add score details header and individual score display fields per check
-        // Each field shows: label = "AttributeName", helpText = "Algorithm", value = "Score: X [Y]"
-        if (candidate.scores.length > 0) {
-            candidateElements.push({
-                id: `${candidateId}.scoreDetailsHeader`,
-                key: `${candidateId}.scoreDetailsHeader`,
-                elementType: 'DESCRIPTION',
-                config: {
-                    description:
-                        '<p style="text-align: center;"><span style="font-size: 18pt;"><strong>Fusion Score details</strong></span></p>',
-                    label: 'Fusion Score Details',
-                    showLabel: false,
-                },
-                validations: [],
-            })
-
-            for (const score of candidate.scores) {
-                if (!score.attribute || score.score === undefined) continue
-                const attrName = String(score.attribute)
-                const attrKey = lowerFirst(attrName)
-                const algorithmKey = String(score.algorithm ?? 'unknown')
-                const algorithm = ALGORITHM_LABELS[algorithmKey] ?? algorithmKey
-
-                candidateElements.push({
-                    id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
-                    key: `${candidateId}.${attrKey}.${algorithmKey}.score`,
-                    elementType: 'TEXT',
-                    config: {
-                        label: capitalizeFirst(attrName),
-                        helpText: algorithm,
-                        default: formatScoreDisplay(score),
-                    },
-                    validations: [],
-                })
-            }
-        }
+    candidates.forEach((candidate, index) => {
+        if (!candidate?.id || !candidate.name) return
+        const candidateElements = buildCandidateFields(candidate, index, fusionFormAttributes)
 
         if (candidateElements.length > 0) {
             formFields.push({
-                id: `${candidateId}.selectionsection`,
-                key: `${candidateId}.selectionsection`,
+                id: `${candidate.id}.selectionsection`,
+                key: `${candidate.id}.selectionsection`,
                 elementType: 'SECTION',
                 config: {
                     alignment: 'CENTER',
@@ -394,7 +496,7 @@ export const buildFormFields = (
                 validations: [],
             })
         }
-    }
+    })
 
     return formFields
 }
@@ -411,60 +513,9 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
 
     const formConditions: FormCondition[] = []
 
-    for (const candidate of candidates) {
-        if (!candidate?.id || !candidate.name) continue
-        if (!hasRenderableCandidateElements(candidate, fusionFormAttributes)) continue
-        const selectionSectionId = `${candidate.id}.selectionsection`
-
-        // When "New identity" is selected, disable this candidate's details section
-        formConditions.push({
-            ruleOperator: 'AND',
-            rules: [
-                {
-                    sourceType: 'ELEMENT',
-                    source: 'newIdentity',
-                    operator: 'EQ',
-                    valueType: 'BOOLEAN',
-                    value: 'true',
-                },
-            ],
-            effects: [
-                {
-                    effectType: 'DISABLE',
-                    config: { element: selectionSectionId },
-                },
-            ],
-        })
-
-        // Hide this candidate's section when new identity is selected OR a different identity is chosen.
-        // In ISC custom forms, condition comparison for SEARCH_V2-backed SELECT behaves against the
-        // displayed label value (`attributes.displayName`), same as `resolveIdentitiesSelectLabel` / candidate.name.
-        formConditions.push({
-            ruleOperator: 'OR',
-            rules: [
-                {
-                    sourceType: 'ELEMENT',
-                    source: 'newIdentity',
-                    operator: 'EQ',
-                    valueType: 'BOOLEAN',
-                    value: 'true',
-                },
-                {
-                    sourceType: 'ELEMENT',
-                    source: 'identities',
-                    operator: 'NE',
-                    valueType: 'STRING',
-                    value: candidate.name,
-                },
-            ],
-            effects: [
-                {
-                    effectType: 'HIDE',
-                    config: { element: selectionSectionId },
-                },
-            ],
-        })
-    }
+    candidates.forEach((candidate, index) => {
+        formConditions.push(...buildCandidateConditions(candidate, index, fusionFormAttributes))
+    })
 
     // Disable every element (except newIdentity and identities) if it is not empty.
     // Each element gets a self-referencing condition: if element X is NOT_EM → disable element X.
@@ -477,21 +528,7 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
 
     // Collect candidate attribute and score fields
     for (const candidate of candidates) {
-        if (!candidate?.id || !candidate.name) continue
-        if (!hasRenderableCandidateElements(candidate, fusionFormAttributes)) continue
-        const candidateId = candidate.id
-
-        fusionFormAttributes?.forEach((attrName) => {
-            allAttributeElements.push(`${candidateId}.${lowerFirst(attrName)}`)
-        })
-
-        for (const score of candidate.scores) {
-            if (score.attribute) {
-                const attrKey = lowerFirst(String(score.attribute))
-                const algorithmKey = String(score.algorithm ?? 'unknown')
-                allAttributeElements.push(`${candidateId}.${attrKey}.${algorithmKey}.score`)
-            }
-        }
+        allAttributeElements.push(...collectCandidateAttributeElementIds(candidate, fusionFormAttributes))
     }
 
     // For each element: if it has a value, disable it
@@ -627,3 +664,4 @@ export const buildFormInputs = (
 
     return formInputs
 }
+

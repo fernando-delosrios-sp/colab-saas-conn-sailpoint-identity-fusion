@@ -3,6 +3,14 @@ import { FusionDecision } from './form'
 import type { IdentityInfo } from './fusionAccountTypes'
 import { trimStr } from '../utils/safeRead'
 
+/** Primary display label from fusion account name fields, with fallback. */
+export function resolveFusionAccountNameOrDisplayName(
+    account: { name?: string; displayName?: string },
+    fallback: string
+): string {
+    return account.name || account.displayName || fallback
+}
+
 /** Identity-side display label: identity.attributes.displayName || identity.name. */
 function identityDisplayNameFromIdentity(identity: IdentityDocument): string | undefined {
     const fromAttrs = (identity.attributes as Record<string, unknown> | undefined)?.displayName as
@@ -72,4 +80,5 @@ export function buildIdentityInfo(
         displayName: displayName ?? name ?? '',
     }
 }
+
 

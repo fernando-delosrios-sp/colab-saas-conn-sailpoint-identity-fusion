@@ -30,6 +30,21 @@ import { isManagedAccountLinkedInFusion } from '../../model/managedAccountLink'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { resolveFusionMaxCandidatesForForm } from '../../data/config'
 import { promiseAllBatched, getScoringMaxConcurrency } from '../fusionService/collections'
+import { resolveAccountBeforeScoring } from './preScoreGate'
+import { resolveIdentityMatchOutcome } from './identityMatchResolution'
+import {
+    resolveLiveDeferredMatchOutcome,
+    tryAutoMergeFromMatches,
+} from './deferredMatchResolution'
+import {
+    applyResolutionToSweepResult,
+    recordNonMatchOutcome,
+    resolutionCountKey,
+    toPublicMatchResolution,
+} from './sweepCounters'
+import type { PreScoreGateCallbacks } from './preScoreGate'
+import type { IdentityMatchResolutionCallbacks } from './identityMatchResolution'
+import type { AutoMergeCallbacks, DeferredMatchResolutionCallbacks } from './deferredMatchResolution'
 
 /**
  * Narrow seam for the service that applies a FusionDecision to an identity.
@@ -43,7 +58,7 @@ interface DecisionProcessor {
 // Public types
 // ============================================================================
 
-type MatchResolution = 'exact-match' | 'partial-match' | 'deferred-match' | 'non-match'
+export type MatchResolution = 'exact-match' | 'partial-match' | 'deferred-match' | 'non-match'
 
 export interface ResolvedMatch {
     account: Account
@@ -64,6 +79,17 @@ export interface MatchSweepResult {
     resolved: ResolvedMatch[]
 }
 
+/** Controls whether a match sweep dispatches outcomes or scores for analysis only. */
+export enum MatchSweepMode {
+    Dispatch = 'dispatch',
+    AnalysisOnly = 'analysis-only',
+}
+
+export interface MatchSweepOptions {
+    mode?: MatchSweepMode
+    sweepResult?: MatchSweepResult
+}
+
 // ============================================================================
 // Scoring seam
 // ============================================================================
@@ -81,12 +107,12 @@ interface IdentityPhaseResult {
     pendingDeferred: ManagedAccountAnalysisContext[]
 }
 
-type PreScoreOutcome =
+export type PreScoreOutcome =
     | { action: 'enqueue' }
     | { action: 'skip-linked' }
     | { action: 'non-match'; resolved: ResolvedMatch }
 
-interface DeferredMatchDrainContext {
+export interface DeferredMatchDrainContext {
     remainingInQueue: Map<string, ManagedAccountAnalysisContext>
     materializedEarly: Set<string>
     sweepResult?: MatchSweepResult
@@ -104,12 +130,16 @@ function createEmptyDeferredDrainDiag(): DeferredDrainDiag {
     return { poolQueries: 0, poolSizeTotal: 0, emptyPools: 0, deferredMatched: 0, nonMatch: 0 }
 }
 
+function isAnalysisOnlyMode(mode?: MatchSweepMode): boolean {
+    return mode === MatchSweepMode.AnalysisOnly
+}
+
 function resolveDeferredDrainResolution(
     analysis: ManagedAccountAnalysisContext,
     run: FusionRun,
-    analysisOnly: boolean
+    mode?: MatchSweepMode
 ): 'deferred-match' | 'non-match' {
-    if (analysisOnly) {
+    if (isAnalysisOnlyMode(mode)) {
         return hasActionableDeferredAnchorMatch(analysis.fusionAccount, run) ? 'deferred-match' : 'non-match'
     }
     return hasDeferredCandidateMatches(analysis.fusionAccount) ? 'deferred-match' : 'non-match'
@@ -347,13 +377,59 @@ export class MatchOutcomeDispatcher {
         }
     }
 
+    private preScoreCallbacks(): PreScoreGateCallbacks {
+        return {
+            isCorrelatedManagedAccountLinkedInFusion: (account) =>
+                this.isCorrelatedManagedAccountLinkedInFusion(account),
+            handleNoReviewerAccount: (fusionAccount, sourceType, sourceInfo, account) =>
+                this.handleNoReviewerAccount(fusionAccount, sourceType, sourceInfo, account),
+            handleNonMatch: (fusionAccount, account, sourceType, sourceInfo) =>
+                this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo),
+        }
+    }
+
+    private autoMergeCallbacks(): AutoMergeCallbacks {
+        return {
+            handleExactMatch: (fusionAccount, account, identityId) =>
+                this.handleExactMatch(fusionAccount, account, identityId),
+            getBestAutoAssignMatch: (matches) => this.getBestAutoAssignMatch(matches),
+            resolveAutoMergeTargetId: (bestMatch) => this.resolveAutoMergeTargetId(bestMatch),
+        }
+    }
+
+    private identityResolutionCallbacks(): IdentityMatchResolutionCallbacks {
+        return {
+            ...this.autoMergeCallbacks(),
+            scorePersistedAnchorsForAutoMerge: (fusionAccount, account) =>
+                this.scorePersistedAnchorsForAutoMerge(fusionAccount, account),
+            handlePartialMatch: (fusionAccount, sourceInfo, account) =>
+                this.handlePartialMatch(fusionAccount, sourceInfo, account),
+        }
+    }
+
+    private deferredResolutionCallbacks(): DeferredMatchResolutionCallbacks {
+        return {
+            ...this.autoMergeCallbacks(),
+            tryAutoMergeIntoDeferredAnchor: (fusionAccount, account) =>
+                this.tryAutoMergeIntoDeferredAnchor(fusionAccount, account),
+            handleDeferredMatch: (fusionAccount, account, remainingInQueue, materializedEarly, sweepResult) =>
+                this.handleDeferredMatch(
+                    fusionAccount,
+                    account,
+                    remainingInQueue,
+                    materializedEarly,
+                    sweepResult
+                ),
+        }
+    }
+
     /**
      * Sequential deferred drain within one source; sources run concurrently via {@link runDeferredDrain}.
      * Each pending account is scored against finalized candidates plus remaining queue peers.
      */
     private async runDeferredDrainForSource(
         sorted: ManagedAccountAnalysisContext[],
-        options?: { analysisOnly?: boolean; sweepResult?: MatchSweepResult }
+        options?: MatchSweepOptions
     ): Promise<{ scored: ManagedAccountMatchingResult[]; resolved: ResolvedMatch[]; diag: DeferredDrainDiag }> {
         const remainingInQueue = new Map<string, ManagedAccountAnalysisContext>()
         for (const analysis of sorted) {
@@ -373,11 +449,11 @@ export class MatchOutcomeDispatcher {
             let promotedNonMatches = 0
             await scoreDeferredForAccount(analysis, scoringDeps, diag, remainingInQueue, materializedEarly)
 
-            const resolution = resolveDeferredDrainResolution(analysis, this.deps.run, Boolean(options?.analysisOnly))
+            const resolution = resolveDeferredDrainResolution(analysis, this.deps.run, options?.mode)
             const scoredResult: ManagedAccountMatchingResult = { analysis, resolution }
             scored.push(scoredResult)
 
-            if (options?.analysisOnly) {
+            if (isAnalysisOnlyMode(options?.mode)) {
                 if (resolution === 'non-match') {
                     this.registerPoolAnchorForAnalysis(analysis.fusionAccount)
                 }
@@ -388,9 +464,10 @@ export class MatchOutcomeDispatcher {
                     analysis,
                 })
             } else if (resolution === 'deferred-match') {
-                const outcome = await this.resolveLiveDeferredMatchOutcome(
+                const outcome = await resolveLiveDeferredMatchOutcome(
                     analysis.fusionAccount,
                     analysis.account,
+                    this.deferredResolutionCallbacks(),
                     { remainingInQueue, materializedEarly, sweepResult: options?.sweepResult }
                 )
                 promotedNonMatches = outcome.promotedNonMatches
@@ -429,7 +506,7 @@ export class MatchOutcomeDispatcher {
      */
     private async runDeferredDrain(
         pending: ManagedAccountAnalysisContext[],
-        options?: { analysisOnly?: boolean; sweepResult?: MatchSweepResult }
+        options?: MatchSweepOptions
     ): Promise<{ scored: ManagedAccountMatchingResult[]; resolved: ResolvedMatch[] }> {
         if (pending.length === 0) return { scored: [], resolved: [] }
 
@@ -473,15 +550,16 @@ export class MatchOutcomeDispatcher {
      *
      * @param accounts - Managed source accounts to score and dispatch
      * @param batchSize - How many accounts to score concurrently within each phase
-     * @param options - When `analysisOnly` is true, scoring runs but outcomes are not applied.
+     * @param options - When `mode` is `AnalysisOnly`, scoring runs but outcomes are not applied.
      * @returns A summary of processed accounts and their resolutions
      */
     public async runMatchSweep(
         accounts: Account[],
         batchSize: number,
-        options?: { analysisOnly?: boolean }
+        options?: Pick<MatchSweepOptions, 'mode'>
     ): Promise<MatchSweepResult> {
-        if (options?.analysisOnly) {
+        const mode = options?.mode ?? MatchSweepMode.Dispatch
+        if (mode === MatchSweepMode.AnalysisOnly) {
             return this.runAnalysisOnly(accounts, batchSize)
         }
 
@@ -513,7 +591,7 @@ export class MatchOutcomeDispatcher {
         const toScore: PendingScore[] = []
 
         for (const account of accounts) {
-            const preScore = await this.resolveAccountBeforeScoring(account)
+            const preScore = await resolveAccountBeforeScoring(account, this.deps, this.preScoreCallbacks())
             if (preScore.action === 'skip-linked') {
                 processedCount++
                 updateProgress()
@@ -546,7 +624,7 @@ export class MatchOutcomeDispatcher {
                 updateProgress()
                 if (resolved) {
                     result.resolved.push(resolved)
-                    this.applyResolutionToSweepResult(result, resolved.resolution)
+                    applyResolutionToSweepResult(this.deps.log, result, resolved.resolution)
                 }
             }
 
@@ -557,7 +635,7 @@ export class MatchOutcomeDispatcher {
                 processedCount++
                 updateProgress()
                 result.resolved.push(match)
-                this.applyResolutionToSweepResult(result, match.resolution)
+                applyResolutionToSweepResult(this.deps.log, result, match.resolution)
             }
         }
 
@@ -582,7 +660,9 @@ export class MatchOutcomeDispatcher {
         }
 
         const { identityResults, pendingDeferred } = await scoreIdentityPhase(accounts, batchSize, this.scoringDeps())
-        const { scored: drainScored } = await this.runDeferredDrain(pendingDeferred, { analysisOnly: true })
+        const { scored: drainScored } = await this.runDeferredDrain(pendingDeferred, {
+            mode: MatchSweepMode.AnalysisOnly,
+        })
 
         for (const scored of [...identityResults, ...drainScored]) {
             const resolution = toPublicMatchResolution(scored.resolution)
@@ -623,11 +703,21 @@ export class MatchOutcomeDispatcher {
         const { fusionAccount, account, sourceInfo, sourceType } = analysis
 
         if (scored.resolution === 'identity-match') {
-            return this.resolveIdentityMatchOutcome(fusionAccount, account, sourceInfo)
+            return resolveIdentityMatchOutcome(
+                fusionAccount,
+                account,
+                sourceInfo,
+                this.deps,
+                this.identityResolutionCallbacks()
+            )
         }
 
         if (scored.resolution === 'deferred-match') {
-            const outcome = await this.resolveLiveDeferredMatchOutcome(fusionAccount, account)
+            const outcome = await resolveLiveDeferredMatchOutcome(
+                fusionAccount,
+                account,
+                this.deferredResolutionCallbacks()
+            )
             if (outcome.resolved.resolution === 'exact-match') {
                 return {
                     ...outcome.resolved,
@@ -643,59 +733,16 @@ export class MatchOutcomeDispatcher {
         return { account, fusionAccount: nonMatchAccount ?? fusionAccount, resolution: 'non-match' }
     }
 
-    private async resolveIdentityMatchOutcome(
-        fusionAccount: FusionAccount,
-        account: Account,
-        sourceInfo: SourceInfo | undefined
-    ): Promise<ResolvedMatch | undefined> {
-        if (!this.deps.accountAssembly.isAggregationAccountListMode()) {
-            fusionAccount.clearFusionIdentityReferences()
-            return { account, fusionAccount, resolution: 'partial-match' }
-        }
-        if (this.deps.config.fusionEnableAutoMerge) {
-            await this.scorePersistedAnchorsForAutoMerge(fusionAccount, account)
-            fusionAccount.removeDeferredFusionMatches()
-        }
-        const autoMerge = await this.tryAutoMergeFromMatches(fusionAccount, account, fusionAccount.fusionMatches)
-        if (autoMerge) {
-            return {
-                account,
-                fusionAccount: autoMerge.assigned,
-                resolution: 'exact-match',
-                identityId: autoMerge.mergeTargetId,
-            }
-        }
-        if (
-            this.deps.config.fusionEnableAutoMerge &&
-            this.resolveAutoMergeTargetId(this.getBestAutoAssignMatch(fusionAccount.fusionMatches))
-        ) {
-            return undefined
-        }
-        await this.handlePartialMatch(fusionAccount, sourceInfo, account)
-        return { account, fusionAccount, resolution: 'partial-match' }
-    }
-
-    private async tryAutoMergeFromMatches(
-        fusionAccount: FusionAccount,
-        account: Account,
-        matches: FusionMatch[]
-    ): Promise<{ assigned: FusionAccount; mergeTargetId: string } | undefined> {
-        if (!this.deps.accountAssembly.isAggregationAccountListMode()) return undefined
-        if (!this.deps.config.fusionEnableAutoMerge) return undefined
-        const mergeTargetId = this.resolveAutoMergeTargetId(this.getBestAutoAssignMatch(matches))
-        if (!mergeTargetId) return undefined
-        const assigned = await this.handleExactMatch(fusionAccount, account, mergeTargetId)
-        return assigned ? { assigned, mergeTargetId } : undefined
-    }
-
     private async tryAutoMergeIntoDeferredAnchor(
         fusionAccount: FusionAccount,
         account: Account
     ): Promise<FusionAccount | undefined> {
-        const autoMerge = await this.tryAutoMergeFromMatches(
+        const autoMerge = await tryAutoMergeFromMatches(
             fusionAccount,
             account,
-            anchorDeferredMatches(fusionAccount, this.deps.run)
+            anchorDeferredMatches(fusionAccount, this.deps.run),
+            this.deps,
+            this.autoMergeCallbacks()
         )
         return autoMerge?.assigned
     }
@@ -858,111 +905,12 @@ export class MatchOutcomeDispatcher {
         return fusionAccount
     }
 
-    private async resolveAccountBeforeScoring(account: Account): Promise<PreScoreOutcome> {
-        const { run, log, accountAssembly } = this.deps
-        const managedAccountKey = getManagedAccountKeyFromAccount(account)
-
-        if (this.isCorrelatedManagedAccountLinkedInFusion(account)) {
-            log.info(
-                `Dropping managed account already linked in Fusion from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
-            )
-            run.claimAccount(managedAccountKey!, account.identityId)
-            return { action: 'skip-linked' }
-        }
-
-        const sourceInfo = account.sourceName ? run.sourcesByName.get(account.sourceName) : undefined
-        const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
-
-        if (account.sourceName && run.sourcesWithoutReviewers.has(account.sourceName)) {
-            const fusionAccount = await accountAssembly.assembleManagedAccount(account)
-            const nonMatchAccount = await this.handleNoReviewerAccount(fusionAccount, sourceType, sourceInfo, account)
-            return {
-                action: 'non-match',
-                resolved: {
-                    account,
-                    fusionAccount: nonMatchAccount ?? fusionAccount,
-                    resolution: 'non-match',
-                },
-            }
-        }
-
-        if (account.uncorrelated === false) {
-            log.info(
-                `Correlated managed account not linked to Fusion; treating as non-match: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
-            )
-            const fusionAccount = await accountAssembly.assembleManagedAccount(account)
-            const orphanIdentityId = account.identityId
-            if (orphanIdentityId) {
-                const identity = run.getIdentity(orphanIdentityId)
-                if (identity && !identity.protected) {
-                    fusionAccount.addIdentityLayer(identity)
-                }
-            }
-            run.claimAccount(managedAccountKey!, account.identityId)
-            const nonMatchAccount = await this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
-            return {
-                action: 'non-match',
-                resolved: {
-                    account,
-                    fusionAccount: nonMatchAccount ?? fusionAccount,
-                    resolution: 'non-match',
-                },
-            }
-        }
-
-        return { action: 'enqueue' }
-    }
-
-    private async resolveLiveDeferredMatchOutcome(
-        fusionAccount: FusionAccount,
-        account: Account,
-        drainContext?: DeferredMatchDrainContext
-    ): Promise<{ resolved: ResolvedMatch; promotedNonMatches: number }> {
-        const assigned = await this.tryAutoMergeIntoDeferredAnchor(fusionAccount, account)
-        if (assigned) {
-            return {
-                resolved: {
-                    account,
-                    fusionAccount: assigned,
-                    resolution: 'exact-match',
-                },
-                promotedNonMatches: 0,
-            }
-        }
-
-        const promotedNonMatches = await this.handleDeferredMatch(
-            fusionAccount,
-            account,
-            drainContext?.remainingInQueue,
-            drainContext?.materializedEarly,
-            drainContext?.sweepResult
-        )
-        return {
-            resolved: {
-                account,
-                fusionAccount,
-                resolution: 'deferred-match',
-            },
-            promotedNonMatches,
-        }
-    }
-
     private recordAnalysisIfPresent(analysis: ManagedAccountAnalysisContext): void {
         this.deps.run.analysisRecorder?.recordAnalysis(analysis)
     }
 
     private recordNonMatchOutcome(sweepResult?: MatchSweepResult): void {
-        if (sweepResult) sweepResult.nonMatch++
-        this.deps.log.recordEvent('nonMatch')
-    }
-
-    private applyResolutionToSweepResult(result: MatchSweepResult, resolution: MatchResolution): void {
-        const countKey = resolutionCountKey(resolution)
-        if (countKey === 'nonMatch') {
-            this.recordNonMatchOutcome(result)
-        } else {
-            result[countKey]++
-        }
+        recordNonMatchOutcome(this.deps.log, sweepResult)
     }
 
     private getBestAutoAssignMatch(
@@ -992,27 +940,6 @@ export class MatchOutcomeDispatcher {
         )
         if (managedKey) return managedKey
         return trimStr(bestMatch.fusionIdentity?.originAccountId)
-    }
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function toPublicMatchResolution(resolution: ManagedAccountMatchingResult['resolution']): MatchResolution {
-    return resolution === 'identity-match' ? 'partial-match' : resolution
-}
-
-function resolutionCountKey(resolution: MatchResolution): 'exact' | 'partial' | 'deferred' | 'nonMatch' {
-    switch (resolution) {
-        case 'exact-match':
-            return 'exact'
-        case 'partial-match':
-            return 'partial'
-        case 'deferred-match':
-            return 'deferred'
-        case 'non-match':
-            return 'nonMatch'
     }
 }
 

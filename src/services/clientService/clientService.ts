@@ -154,7 +154,7 @@ export class ClientService {
     public call<T>(fn: (api: IscApiSurface, ...args: any[]) => Promise<any>, policy?: CallPolicy): any {
         const paginate = (policy as PaginatePolicy)?.paginate
         if (!paginate) {
-            return this.execute<T>(() => fn(this._apiSurface), policy?.priority, policy?.context, policy?.abortSignal, policy?.throwOnError, policy?.noRetry)
+            return this.execute<T>(() => fn(this._apiSurface), policy ?? {})
         }
         switch (paginate.mode) {
             case 'sequential': return this._paginateSequential<T>(fn as any, paginate, policy!)
@@ -181,6 +181,60 @@ export class ClientService {
         }
     }
 
+    private async _fetchSequentialOffsetPages<T>(
+        fetchPage: (limit: number, offset: number) => Promise<T[] | undefined>,
+        config: {
+            effectivePageSize: number
+            baseLimit?: number | null
+            paginateLimit?: number
+            context?: string
+            onProgress?: (loaded: number, total?: number) => void
+        }
+    ): Promise<T[]> {
+        const { effectivePageSize: eps, baseLimit: bl, paginateLimit: ol, context, onProgress } = config
+        const hasExplicitBaseLimit = bl != null
+        const initialLimit = hasExplicitBaseLimit && bl! < eps ? bl! : eps
+        const all: T[] = []
+
+        const firstPage = await fetchPage(initialLimit, 0)
+        if (firstPage === undefined) {
+            throw new PaginationError(`Pagination failed on initial page (${context ?? 'paginate'}).`, 0)
+        }
+        all.push(...firstPage)
+
+        const effectiveLimit = ol ?? (hasExplicitBaseLimit ? bl! : undefined)
+        const reportProgress = () => onProgress?.(all.length, effectiveLimit)
+        reportProgress()
+        if (firstPage.length < initialLimit || (effectiveLimit != null && all.length >= effectiveLimit)) {
+            return effectiveLimit != null && all.length > effectiveLimit ? all.slice(0, effectiveLimit) : all
+        }
+
+        let offset = firstPage.length
+        while (true) {
+            if (effectiveLimit != null && all.length >= effectiveLimit) {
+                if (all.length > effectiveLimit) all.splice(effectiveLimit)
+                break
+            }
+            const remainingLimit = effectiveLimit != null ? effectiveLimit - all.length : undefined
+            const requestLimit = remainingLimit != null && remainingLimit < eps ? remainingLimit : eps
+            const pageData = await fetchPage(requestLimit, offset)
+            if (pageData === undefined) {
+                throw new PaginationError(
+                    `Pagination failed at offset ${offset} (${context ?? 'paginate'}). ${all.length} item(s) collected before failure.`,
+                    all.length
+                )
+            }
+            if (!pageData.length) break
+            all.push(...pageData)
+            reportProgress()
+            if (pageData.length < requestLimit) break
+            offset += requestLimit
+        }
+        if (effectiveLimit != null && all.length > effectiveLimit) all.splice(effectiveLimit)
+        reportProgress()
+        return all
+    }
+
     private async _paginateSequential<T>(
         fn: (api: IscApiSurface, params: any) => Promise<{ data: T[] }>,
         paginate: { baseParams?: Record<string, unknown>; limit?: number },
@@ -189,42 +243,57 @@ export class ClientService {
         const api = this._apiSurface
         const eps = Math.min(this.pageSize, this.sailPointListMax)
         const bp = paginate.baseParams ?? {}
-        const bl = readNumber(bp, 'limit')
-        const hel = bl != null
-        const il = hel && bl < eps ? bl : eps
-        const ol = paginate.limit
-        const ctx = (s: string) => policy.context ? `${policy.context} ${s}` : s
-        const all: T[] = []
+        const ctx = (suffix: string) => (policy.context ? `${policy.context} ${suffix}` : suffix)
 
-        const r1 = await this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit: il, offset: 0 }), policy.priority, ctx('[page 1, offset 0]'), policy.abortSignal)
-        if (!r1) throw new PaginationError(`Pagination failed on initial page (${policy.context ?? 'paginate'}).`, 0)
-        const p1 = r1.data || []
-        all.push(...p1)
+        return this._fetchSequentialOffsetPages<T>(
+            async (limit, offset) => {
+                const response = await this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit, offset }), {
+                    priority: policy.priority,
+                    context: ctx(offset === 0 ? '[page 1, offset 0]' : `[page, offset ${offset}]`),
+                    abortSignal: policy.abortSignal,
+                })
+                return response?.data
+            },
+            {
+                effectivePageSize: eps,
+                baseLimit: readNumber(bp, 'limit'),
+                paginateLimit: paginate.limit,
+                context: policy.context,
+                onProgress: policy.onPageProgress,
+            }
+        )
+    }
 
-        const effL = ol ?? (hel ? bl : undefined)
-        const reportProgress = () => policy.onPageProgress?.(all.length, effL)
-        reportProgress()
-        if (p1.length < il || (effL != null && all.length >= effL)) {
-            return effL != null && all.length > effL ? all.slice(0, effL) : all
+    private async *_yieldParallelOffsetPages<T>(
+        initialItems: T[],
+        totalCount: number,
+        fetchCeiling: number,
+        effectivePageSize: number,
+        batchSize: number,
+        fetchPageAtOffset: (offset: number) => Promise<T[] | undefined>,
+        fail: (offset: number, loadedBeforeFailure: number) => PaginationError,
+        onPageComplete: (loaded: number, total?: number) => void,
+        abortSignal?: AbortSignal
+    ): AsyncGenerator<T[], void, unknown> {
+        if (!totalCount || totalCount <= initialItems.length) {
+            return
         }
 
-        let offset = p1.length
-        while (true) {
-            if (effL != null && all.length >= effL) { if (all.length > effL) all.splice(effL); break }
-            const rl = effL != null ? effL - all.length : undefined
-            const rq = rl != null && rl < eps ? rl : eps
-            const rp = await this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit: rq, offset }), policy.priority, ctx(`[page, offset ${offset}]`), policy.abortSignal)
-            if (!rp) throw new PaginationError(`Pagination failed at offset ${offset} (${policy.context ?? 'paginate'}). ${all.length} item(s) collected before failure.`, all.length)
-            const pd = rp.data || []
-            if (!pd.length) break
-            all.push(...pd)
-            reportProgress()
-            if (pd.length < rq) break
-            offset += rq
+        const offsets: number[] = []
+        for (let offset = initialItems.length; offset < fetchCeiling; offset += effectivePageSize) {
+            offsets.push(offset)
         }
-        if (effL != null && all.length > effL) all.splice(effL)
-        reportProgress()
-        return all
+
+        yield* this._runParallelOffsetWindow(
+            offsets,
+            batchSize,
+            initialItems.length,
+            fetchCeiling,
+            fetchPageAtOffset,
+            fail,
+            onPageComplete,
+            abortSignal
+        )
     }
 
     private async *_paginateParallel<T>(
@@ -237,39 +306,41 @@ export class ClientService {
         const bs = paginate.batchSize ?? this.parallelBatchSize
         const bp = paginate.baseParams ?? {}
         const limit = paginate.limit
-        const ctx = (s: string) => policy.context ? `${policy.context} ${s}` : s
+        const ctx = (suffix: string) => (policy.context ? `${policy.context} ${suffix}` : suffix)
 
-        const r1 = await this.execute<{ data: T[]; headers?: any }>(() => fn(api, { ...bp, limit: eps, offset: 0, count: true }), policy.priority, ctx('[parallel-init]'), policy.abortSignal)
-        if (!r1) throw new PaginationError(`Pagination failed on initial page (${policy.context ?? 'paginate'}).`, 0)
-        const i1 = r1.data || []
-        yield i1
-        if (limit != null && i1.length >= limit) {
-            policy.onPageProgress?.(Math.min(i1.length, limit), limit)
+        const initialResponse = await this.execute<{ data: T[]; headers?: any }>(() => fn(api, { ...bp, limit: eps, offset: 0, count: true }), {
+            priority: policy.priority,
+            context: ctx('[parallel-init]'),
+            abortSignal: policy.abortSignal,
+        })
+        if (!initialResponse) {
+            throw new PaginationError(`Pagination failed on initial page (${policy.context ?? 'paginate'}).`, 0)
+        }
+
+        const initialItems = initialResponse.data || []
+        yield initialItems
+        if (limit != null && initialItems.length >= limit) {
+            policy.onPageProgress?.(Math.min(initialItems.length, limit), limit)
             return
         }
-        const tc = parseInt(r1.headers?.['x-total-count'] || '0', 10)
-        const fc = limit != null ? Math.min(tc, limit) : tc
-        policy.onPageProgress?.(i1.length, tc > 0 ? fc : undefined)
-        if (!tc || tc <= i1.length) return
-        const offs: number[] = []
-        for (let o = i1.length; o < fc; o += eps) offs.push(o)
 
-        yield* this._runParallelOffsetWindow(
-            offs,
+        const totalCount = parseInt(initialResponse.headers?.['x-total-count'] || '0', 10)
+        const fetchCeiling = limit != null ? Math.min(totalCount, limit) : totalCount
+        policy.onPageProgress?.(initialItems.length, totalCount > 0 ? fetchCeiling : undefined)
+
+        yield* this._yieldParallelOffsetPages(
+            initialItems,
+            totalCount,
+            fetchCeiling,
+            eps,
             bs,
-            i1.length,
-            fc,
             async (offset) => {
-                const response = await this.execute<{ data: T[] }>(
-                    () => fn(api, { ...bp, limit: eps, offset }),
-                    policy.priority,
-                    ctx(`[offset ${offset}]`),
-                    policy.abortSignal
-                )
-                if (!response) {
-                    return undefined
-                }
-                return response.data || []
+                const response = await this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit: eps, offset }), {
+                    priority: policy.priority,
+                    context: ctx(`[offset ${offset}]`),
+                    abortSignal: policy.abortSignal,
+                })
+                return response?.data
             },
             (offset, loaded) =>
                 new PaginationError(
@@ -370,7 +441,7 @@ export class ClientService {
         while (more) {
             if (policy.abortSignal?.aborted) break
             const pc = policy.context ? `${policy.context} [page ${pn}]` : `search [page ${pn}]`
-            const r = await this.execute<{ data: unknown[] }>(() => fn(api, { search: sa ? { ...bs, searchAfter: sa } : bs, limit: ps, count: first ? true : undefined }), policy.priority, pc, policy.abortSignal)
+            const r = await this.execute<{ data: unknown[] }>(() => fn(api, { search: sa ? { ...bs, searchAfter: sa } : bs, limit: ps, count: first ? true : undefined }), { priority: policy.priority, context: pc, abortSignal: policy.abortSignal })
             if (!r) throw new PaginationError(`Search pagination failed at page ${pn} (${policy.context ?? 'search'}). ${all.length} item(s) collected before failure.`, all.length)
             const items = (r.data ?? []) as T[]
             if (items.length) all.push(...items)
@@ -389,22 +460,13 @@ export class ClientService {
      * Execute a single API function, optionally through the queue depending on configuration.
      * Returns the result directly as returned by the function (queue preserves the return type).
      * Returns undefined and logs the error if the API call fails.
-     *
-     * @param apiFunction - Async function that performs the API call
-     * @param priority - Queue priority when queue is enabled
-     * @param context - Optional hint for error logs (e.g. "SourceService>saveBatchCumulativeCount")
-     * @param abortSignal - Optional signal to abort the request
-     * @param throwOnError - Whether to rethrow on failure instead of returning undefined
-     * @param noRetry - When true, the request is never retried on failure
      */
     private async execute<TResponse>(
         apiFunction: () => Promise<TResponse>,
-        priority: QueuePriority = QueuePriority.MEDIUM,
-        context?: string,
-        abortSignal?: AbortSignal,
-        throwOnError: boolean = false,
-        noRetry?: boolean
+        policy: CallPolicy = {}
     ): Promise<TResponse | undefined> {
+        const priority = policy.priority ?? QueuePriority.MEDIUM
+        const { context, abortSignal, throwOnError = false, noRetry } = policy
         const fn = () => {
             const timeoutController = this.requestTimeoutMs ? new AbortController() : undefined
             let timeoutId: ReturnType<typeof setTimeout> | undefined
@@ -490,108 +552,40 @@ export class ClientService {
         priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string
     ): Promise<T[]> {
-        const pageSize = this.pageSize
-        // SailPoint list endpoints (e.g. list-accounts) max 250/request; always pass explicit limit
-        // to avoid API-default behavior that can stop pagination early (e.g. cap at 500).
-        const effectivePageSize = Math.min(pageSize, this.sailPointListMax)
+        const effectivePageSize = Math.min(this.pageSize, this.sailPointListMax)
+        const pageContext = (offset: number) =>
+            context
+                ? `${context} ${offset === 0 ? '[page 1, offset 0]' : `[page, offset ${offset}]`}`
+                : offset === 0
+                  ? 'list [page 1, offset 0]'
+                  : `list [page, offset ${offset}]`
 
-        const allItems: T[] = []
-        const baseLimit = readNumber(baseParameters, 'limit')
-        const hasExplicitLimit = baseLimit !== undefined && baseLimit !== null
-        const initialLimit = hasExplicitLimit && baseLimit < effectivePageSize ? baseLimit : effectivePageSize
-
-        // Build initial params - always pass explicit limit for consistent pagination
-        const initialParams = {
-            ...baseParameters,
-            limit: initialLimit,
-            offset: 0,
-        } as TRequestParams
-
-        const initialResponse = await this.execute<{ data: T[] }>(
-            () => callFunction(initialParams),
-            priority,
-            context ? `${context} [page 1, offset 0]` : 'list [page 1, offset 0]'
-        )
-        if (!initialResponse) {
-            const ctx = context ?? 'paginate'
-            throw new Error(`Pagination failed on initial page (${ctx}). The API call returned no data.`)
-        }
-        const initialPage = initialResponse.data || []
-        allItems.push(...initialPage)
-
-        // If the first page is smaller than requested, we already have all data
-        // Or if we have an explicit limit and we've reached it
-        if (initialPage.length < initialLimit || (hasExplicitLimit && allItems.length >= baseLimit)) {
-            // If we have an explicit limit, trim to that limit
-            if (hasExplicitLimit && allItems.length > baseLimit) {
-                return allItems.slice(0, baseLimit)
-            }
-            return allItems
-        }
-
-        // Start with offset after the first page
-        let offset = initialPage.length
-
-        // Continue fetching pages sequentially until no more data
-        // We use sequential fetching to ensure we correctly detect when we've reached the end
-        while (true) {
-            // Check if we've reached the explicit limit
-            if (hasExplicitLimit && allItems.length >= baseLimit) {
-                // Trim to the limit if we've exceeded it
-                if (allItems.length > baseLimit) {
-                    allItems.splice(baseLimit)
+        try {
+            return await this._fetchSequentialOffsetPages<T>(
+                async (limit, offset) => {
+                    const params = { ...baseParameters, limit, offset } as TRequestParams
+                    const response = await this.execute<{ data: T[] }>(() => callFunction(params), {
+                        priority,
+                        context: pageContext(offset),
+                    })
+                    return response?.data
+                },
+                {
+                    effectivePageSize,
+                    baseLimit: readNumber(baseParameters, 'limit'),
+                    context,
                 }
-                break
-            }
-
-            // Calculate how many items we still need
-            const remainingLimit = hasExplicitLimit ? baseLimit - allItems.length : undefined
-            const requestLimit =
-                remainingLimit !== undefined && remainingLimit < effectivePageSize ? remainingLimit : effectivePageSize
-
-            // Build page params - always pass explicit limit for consistent pagination
-            const pageParams = {
-                ...baseParameters,
-                limit: requestLimit,
-                offset,
-            } as TRequestParams
-
-            const pageResponse = await this.execute<{ data: T[] }>(
-                () => callFunction(pageParams),
-                priority,
-                context ? `${context} [page, offset ${offset}]` : `list [page, offset ${offset}]`
             )
-            if (!pageResponse) {
+        } catch (error) {
+            if (error instanceof PaginationError) {
                 const ctx = context ?? 'paginate'
-                throw new Error(
-                    `Pagination failed at offset ${offset} (${ctx}). ` +
-                        `${allItems.length} item(s) collected before failure.`
-                )
+                if (error.itemsCollected === 0) {
+                    throw new Error(`Pagination failed on initial page (${ctx}). The API call returned no data.`, { cause: error })
+                }
+                throw new Error(error.message, { cause: error })
             }
-            const pageData = pageResponse.data || []
-
-            // If we get an empty page, we've reached the end
-            if (pageData.length === 0) {
-                break
-            }
-
-            allItems.push(...pageData)
-
-            // If the page has fewer items than requested, it's the last page
-            if (pageData.length < requestLimit) {
-                break
-            }
-
-            // Move to next page
-            offset += requestLimit
+            throw error
         }
-
-        // Final trim to explicit limit if we have one
-        if (hasExplicitLimit && allItems.length > baseLimit) {
-            allItems.splice(baseLimit)
-        }
-
-        return allItems
     }
 
     /**
@@ -667,9 +661,7 @@ export class ClientService {
                         limit: pageSize,
                         count: isFirstPage ? true : undefined,
                     }),
-                priority,
-                pageContext,
-                abortSignal
+                { priority, context: pageContext, abortSignal }
             )
 
             const items = (response?.data ?? []) as T[]
@@ -762,73 +754,49 @@ export class ClientService {
         abortSignal?: AbortSignal,
         limit?: number
     ): AsyncGenerator<T[], void, unknown> {
-        const pageSize = this.pageSize
-        const effectivePageSize = Math.min(pageSize, this.sailPointListMax)
-        const batchSize = this.parallelBatchSize // Concurrent page requests (configurable)
-
-        // Initial request to get total count
-        const initialParams = {
-            ...baseParameters,
-            limit: effectivePageSize,
-            offset: 0,
-            count: true,
-        } as TRequestParams
-
+        const effectivePageSize = Math.min(this.pageSize, this.sailPointListMax)
+        const batchSize = this.parallelBatchSize
         const initialCtx = context ? `${context} [parallel-init]` : 'list [parallel-init]'
+
         const initialResponse = await this.execute<{ data: T[]; headers?: any }>(
-            () => callFunction(initialParams),
-            priority,
-            initialCtx,
-            abortSignal
+            () =>
+                callFunction({
+                    ...baseParameters,
+                    limit: effectivePageSize,
+                    offset: 0,
+                    count: true,
+                } as TRequestParams),
+            { priority, context: initialCtx, abortSignal }
         )
 
-        if (!initialResponse) return
+        if (!initialResponse) {
+            return
+        }
 
         const initialItems = initialResponse.data || []
         yield initialItems
-
-        // Stop early if consumer limit already satisfied by the first page
         if (limit !== undefined && initialItems.length >= limit) {
             return
         }
 
         const totalCount = parseInt(initialResponse.headers?.['x-total-count'] || '0', 10)
-        // If no total count or total <= page size, we are done
-        if (!totalCount || totalCount <= initialItems.length) {
-            return
-        }
-
-        // Cap the fetch ceiling at the consumer's limit (when provided)
         const fetchCeiling = limit !== undefined ? Math.min(totalCount, limit) : totalCount
 
-        // Calculate offsets for remaining pages
-        const offsets: number[] = []
-        for (let offset = initialItems.length; offset < fetchCeiling; offset += effectivePageSize) {
-            offsets.push(offset)
-        }
-
-        yield* this._runParallelOffsetWindow(
-            offsets,
-            batchSize,
-            initialItems.length,
+        yield* this._yieldParallelOffsetPages(
+            initialItems,
+            totalCount,
             fetchCeiling,
+            effectivePageSize,
+            batchSize,
             async (offset) => {
-                const params = {
-                    ...baseParameters,
-                    limit: effectivePageSize,
-                    offset,
-                } as TRequestParams
+                const params = { ...baseParameters, limit: effectivePageSize, offset } as TRequestParams
                 const pageCtx = context ? `${context} [offset ${offset}]` : `list [offset ${offset}]`
-                const response = await this.execute<{ data: T[] }>(
-                    () => callFunction(params),
+                const response = await this.execute<{ data: T[] }>(() => callFunction(params), {
                     priority,
-                    pageCtx,
-                    abortSignal
-                )
-                if (!response) {
-                    return undefined
-                }
-                return response.data || []
+                    context: pageCtx,
+                    abortSignal,
+                })
+                return response?.data
             },
             (offset, loaded) =>
                 new PaginationError(

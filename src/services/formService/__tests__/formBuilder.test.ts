@@ -1,4 +1,4 @@
-import { buildFormConditions, buildFormInput, buildFormInputs } from '../formBuilder'
+import { buildCandidateConditions, buildCandidateFields, buildFormConditions, buildFormInput, buildFormInputs } from '../formBuilder'
 import { buildCandidateList } from '../helpers'
 
 describe('formBuilder conditions', () => {
@@ -37,6 +37,33 @@ describe('formBuilder conditions', () => {
 
         const conditions = buildFormConditions(candidates)
         expect(conditions).toHaveLength(0)
+    })
+
+    it('buildCandidateConditions returns disable and hide rules per candidate', () => {
+        const candidate = {
+            id: 'identity-456',
+            name: 'Bob Smith',
+            attributes: { email: 'bob@example.com' },
+            scores: [{ attribute: 'email', algorithm: 'lig3', score: 90 }],
+        } as any
+
+        const conditions = buildCandidateConditions(candidate, 0, ['Email'])
+        expect(conditions).toHaveLength(2)
+        expect(conditions[0].effects[0].effectType).toBe('DISABLE')
+        expect(conditions[1].effects[0].effectType).toBe('HIDE')
+    })
+
+    it('buildCandidateFields includes attribute and score elements', () => {
+        const candidate = {
+            id: 'identity-789',
+            name: 'Carol Jones',
+            attributes: { email: 'carol@example.com' },
+            scores: [{ attribute: 'email', algorithm: 'lig3', score: 88, fusionScore: 55 }],
+        } as any
+
+        const fields = buildCandidateFields(candidate, 0, ['Email'])
+        expect(fields.some((f) => f.id === 'identity-789.email')).toBe(true)
+        expect(fields.some((f) => f.id === 'identity-789.email.lig3.score')).toBe(true)
     })
 })
 

@@ -38,7 +38,6 @@ export function mapScoreReportsForFusionReport(scoreReports: ScoreReport[]): Fus
     }))
 }
 
-export { rankFusionMatchesForReview } from '../matchingService/matchPresentation'
 
 /**
  * Build review-email match rows using the same label and score mapping as dry-run reports.

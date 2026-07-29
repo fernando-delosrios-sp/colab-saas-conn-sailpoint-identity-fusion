@@ -39,7 +39,7 @@ describe('MatchingService', () => {
                 { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.setCaptureBreakdown(false)
+            service.configureScoring({ captureBreakdown: false })
 
             const managed = FusionAccount.fromManagedAccount({
                 sourceId: 'src-1',
@@ -61,7 +61,7 @@ describe('MatchingService', () => {
                 { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.setCaptureBreakdown(false)
+            service.configureScoring({ captureBreakdown: false })
 
             const managed = FusionAccount.fromManagedAccount({
                 sourceId: 'src-1',
@@ -89,7 +89,7 @@ describe('MatchingService', () => {
                 { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.setCaptureBreakdown(false)
+            service.configureScoring({ captureBreakdown: false })
 
             const managed = FusionAccount.fromManagedAccount({
                 sourceId: 'src-1',
@@ -111,7 +111,7 @@ describe('MatchingService', () => {
                 { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.setCaptureBreakdown(false)
+            service.configureScoring({ captureBreakdown: false })
             const fastPathSpy = vi.spyOn(service as any, 'evaluateCombinedScorePass')
 
             const managed = FusionAccount.fromManagedAccount({
@@ -134,7 +134,7 @@ describe('MatchingService', () => {
                 { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.setCaptureBreakdown(true)
+            service.configureScoring({ captureBreakdown: true })
             const fastPathSpy = vi.spyOn(service as any, 'evaluateCombinedScorePass')
 
             const managed = FusionAccount.fromManagedAccount({
@@ -157,7 +157,7 @@ describe('MatchingService', () => {
                 { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.setCaptureBreakdown(false)
+            service.configureScoring({ captureBreakdown: false })
             const fastPathSpy = vi.spyOn(service as any, 'evaluateCombinedScorePass')
 
             const managed = FusionAccount.fromManagedAccount({

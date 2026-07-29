@@ -152,21 +152,21 @@ export class ServiceRegistry {
         // Initialize FusionService last (depends on multiple services)
         this.fusion =
             context.fusionService ??
-            new FusionService(
-                this.config,
-                this.log,
-                this.identities,
-                this.sources,
-                this.forms,
-                this.mapping,
-                this.definition,
-                this.matching,
-                this.schemas,
-                this.run,
+            new FusionService({
+                config: this.config,
+                log: this.log,
+                identities: this.identities,
+                sources: this.sources,
+                forms: this.forms,
+                mappingService: this.mapping,
+                definitionService: this.definition,
+                matchingService: this.matching,
+                schemas: this.schemas,
+                run: this.run,
                 commandType,
-                operationContext === 'custom:dryrun',
-                operationContext === 'accountList'
-            )
+                shouldCaptureReportData: operationContext === 'custom:dryrun',
+                isAggregationMode: operationContext === 'accountList',
+            })
 
         // Wire the MatchOutcomeDispatcher through the registry using real collaborators already
         // owned by FusionService. This keeps the dispatcher free of closures over FusionService.
@@ -278,6 +278,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 
