@@ -1,217 +1,29 @@
-import type { Mocked } from 'vitest'
-import { FusionService } from '../fusionService'
-import { AggregationTracker } from '../aggregationTracker'
-import { MatchOutcomeDispatcher } from '../../matchingService/matchOutcomeDispatcher'
-import { LogService } from '../../logService'
-import { IdentityService } from '../../identityService'
-import { SourceService } from '../../sourceService'
-import { FormService } from '../../formService'
-import { MappingService } from '../../mappingService'
-import { DefinitionService } from '../../definitionService'
-import { MatchingService } from '../../matchingService'
-import { SchemaService } from '../../schemaService'
-import { ServiceRegistry } from '../../serviceRegistry'
-import { FusionConfig } from '../../../model/config'
-import { FusionRun, toManagedAccountInfo } from '../../../model/fusionRun'
-import { StandardCommand } from '@sailpoint/connector-sdk'
-import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
+import { createFusionServiceTestContext, seedRunInventory, type FusionServiceTestContext } from './fusionService.testFixtures'
 import { FusionAccount } from '../../../model/account'
 import { StatusEntitlement } from '../../../model/statusEntitlement'
-import { hasValue, trimStr } from '../../../utils/safeRead'
+import { AggregationTracker } from '../aggregationTracker'
+import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
+import { FusionService } from '../fusionService'
+import { StandardCommand } from '@sailpoint/connector-sdk'
 
-// Mock dependencies
-vi.mock('../../logService')
-vi.mock('../../identityService')
-vi.mock('../../sourceService')
-vi.mock('../../formService')
-vi.mock('../../mappingService')
-vi.mock('../../definitionService')
-vi.mock('../../matchingService')
-vi.mock('../../schemaService')
-
-function seedRunInventory(run: FusionRun, accounts: Map<string, Account>): void {
-    run.managedAccountInventory.clear()
-    for (const [key, account] of accounts.entries()) {
-        run.managedAccountInventory.set(key, toManagedAccountInfo(account))
-    }
-}
-
-describe('FusionService', () => {
-    const FUSION_SOURCE_ID = 'fusion-src'
-
-    let fusionService: FusionService
-    let run: FusionRun
-    let mockLog: Mocked<LogService>
-    let mockIdentities: Mocked<IdentityService>
-    let mockSources: Mocked<SourceService>
-    let mockForms: Mocked<FormService>
-    let mockMappingService: Mocked<MappingService>
-    let mockDefinitionService: Mocked<DefinitionService>
-    let mockMatchingService: Mocked<MatchingService>
-    let mockSchemas: Mocked<SchemaService>
-    let mockConfig: FusionConfig
-
-    function createDispatcherFor(fusionService: FusionService): MatchOutcomeDispatcher {
-        return new MatchOutcomeDispatcher({
-            config: fusionService.config,
-            log: fusionService.log,
-            run: fusionService.run,
-            matchingService: fusionService.matchingService,
-            correlationManager: fusionService.correlationManager,
-            definitionService: mockDefinitionService,
-            mappingService: mockMappingService,
-            accountAssembly: fusionService.accountAssembly,
-            forms: fusionService.forms,
-            decisionProcessor: fusionService.decisionProcessor,
-            commandType: fusionService.commandType,
-        })
-    }
+describe('FusionService — aggregation', () => {
+    let ctx: FusionServiceTestContext
 
     beforeEach(() => {
-        run = new FusionRun()
-
-        // Mock config with Type assertion
-        mockConfig = {
-            resetAccounts: false,
-            resetForms: false,
-            fusionOwnerIsGlobalReviewer: false,
-            fusionReportOnAggregation: false,
-            fusionFormAttributes: ['email', 'firstName', 'lastName'],
-            baseurl: 'https://example.identitynow.com',
-            k8sCluster: false,
-            managedAccountsBatchSize: 50,
-            deleteEmpty: false,
-            sources: [],
-        } as unknown as FusionConfig
-
-        // Reset mocks
-        mockLog = new LogService({ spConnDebugLoggingEnabled: false }) as Mocked<LogService>
-        run.log = mockLog
-        const mockClient = {} as any
-        mockSources = new SourceService(mockConfig, mockLog, mockClient, run) as Mocked<SourceService>
-        ;(mockSources as any)._fusionSourceId = FUSION_SOURCE_ID
-        Object.defineProperty(mockSources, 'fusionSourceId', {
-            get: vi.fn(() => FUSION_SOURCE_ID),
-            configurable: true,
-        })
-        mockIdentities = new IdentityService(
-            mockConfig,
-            mockLog,
-            mockClient,
-            mockSources,
-            run
-        ) as Mocked<IdentityService>
-        mockForms = new FormService(
-            mockConfig,
-            mockLog,
-            mockClient,
-            mockSources,
-            mockIdentities,
-            undefined,
-            run
-        ) as Mocked<FormService>
-        const mockLocks = {} as any
-        mockSchemas = new SchemaService(mockConfig, mockLog, mockSources, mockClient) as Mocked<SchemaService>
-        mockMappingService = new MappingService(mockConfig, mockLog) as Mocked<MappingService>
-        mockDefinitionService = new DefinitionService(
-            mockConfig,
-            mockSchemas,
-            mockLog,
-            mockLocks
-        ) as Mocked<DefinitionService>
-        mockMatchingService = new MatchingService(mockConfig, mockLog) as Mocked<MatchingService>
-
-        // Mock specific properties/methods needed for initialization
-        Object.defineProperty(mockSources, 'managedAccountsById', {
-            get: vi.fn(() => new Map()),
-            configurable: true,
-        })
-        Object.defineProperty(mockSources, 'managedAccountsByIdentityId', {
-            get: vi.fn(() => new Map()),
-            configurable: true,
-        })
-
-        // Redirect run.managedAccountsById/ByIdentityId to mockSources getters
-        // so that test spies on mockSources flow through to production code accessing run directly.
-        Object.defineProperty(run, 'managedAccountsById', {
-            get: () => mockSources.managedAccountsById,
-            configurable: true,
-        })
-        Object.defineProperty(run, 'managedAccountsByIdentityId', {
-            get: () => mockSources.managedAccountsByIdentityId,
-            configurable: true,
-        })
-
-        Object.defineProperty(mockSources, 'fusionAccounts', {
-            get: vi.fn(() => []),
-            configurable: true,
-        })
-        Object.defineProperty(mockSources, 'managedSources', {
-            get: vi.fn(() => []),
-            configurable: true,
-        })
-        Object.defineProperty(mockIdentities, 'identities', {
-            get: vi.fn(() => []),
-            configurable: true,
-        })
-        Object.defineProperty(mockSchemas, 'fusionDisplayAttribute', {
-            get: vi.fn(() => 'displayName'),
-            configurable: true,
-        })
-
-        mockSources.resolveIscAccountIdForManagedKey = vi.fn((managedKey: string) => {
-            const work = mockSources.managedAccountsById as unknown as Map<string, Account> | undefined
-            const acc =
-                (work instanceof Map ? work.get(managedKey) : undefined) ??
-                (run.getManagedAccountInfo(managedKey) ? { id: run.getManagedAccountInfo(managedKey)!.id } : undefined)
-            const raw = acc?.id
-            if (hasValue(raw)) return trimStr(raw) ?? ''
-            // Tests without composite map entries: treat non-composite keys as ISC account ids
-            if (!managedKey.includes('::')) return managedKey
-            return undefined
-        })
-
-        fusionService = new FusionService(
-            mockConfig,
-            mockLog,
-            mockIdentities,
-            mockSources,
-            mockForms,
-            mockMappingService,
-            mockDefinitionService,
-            mockMatchingService,
-            mockSchemas,
-            run,
-            StandardCommand.StdAccountList
-        )
-        fusionService.matchOutcomeDispatcher = createDispatcherFor(fusionService)
-        fusionService.setTracker(new AggregationTracker())
-
-        // Mock ServiceRegistry
-        vi.spyOn(ServiceRegistry, 'getCurrent').mockReturnValue({
-            fusion: fusionService,
-            sources: mockSources,
-            identities: mockIdentities,
-            schemas: mockSchemas,
-            forms: mockForms,
-            mapping: mockMappingService,
-            definition: mockDefinitionService,
-            matching: mockMatchingService,
-            log: mockLog,
-        } as unknown as ServiceRegistry)
+        ctx = createFusionServiceTestContext()
     })
 
     describe('initialization', () => {
         it('should initialize with provided config', () => {
-            expect(fusionService).toBeDefined()
-            expect(fusionService.isResetAccounts()).toBe(false)
-            expect(fusionService.isResetForms()).toBe(false)
+            expect(ctx.fusionService).toBeDefined()
+            expect(ctx.fusionService.isResetAccounts()).toBe(false)
+            expect(ctx.fusionService.isResetForms()).toBe(false)
         })
     })
 
     describe('correlation logging during aggregation', () => {
         it('does not record correlated-action grants during accountList output', async () => {
-            const grantSpy = vi.spyOn(mockLog, 'recordCorrelatedActionGranted')
+            const grantSpy = vi.spyOn(ctx.mockLog, 'recordCorrelatedActionGranted')
             const account = FusionAccount.fromIdentity({
                 id: 'identity-1',
                 name: 'Identity One',
@@ -219,7 +31,7 @@ describe('FusionService', () => {
             } as any)
             account.setCorrelatedAccount('src-a::acct-1')
 
-            await fusionService.getISCAccount(account, false)
+            await ctx.fusionService.getISCAccount(account, false)
 
             expect(grantSpy).not.toHaveBeenCalled()
         })
@@ -227,21 +39,21 @@ describe('FusionService', () => {
 
     describe('reset flags', () => {
         beforeEach(() => {
-            mockSources.patchSourceConfig = vi.fn().mockResolvedValue(undefined)
+            ctx.mockSources.patchSourceConfig = vi.fn().mockResolvedValue(undefined)
         })
 
         it('reflects resetAccounts and resetForms from config at construction', () => {
             const service = new FusionService(
-                { ...mockConfig, resetAccounts: true, resetForms: false } as FusionConfig,
-                mockLog,
-                mockIdentities,
-                mockSources,
-                mockForms,
-                mockMappingService,
-                mockDefinitionService,
-                mockMatchingService,
-                mockSchemas,
-                run,
+                { ...ctx.mockConfig, resetAccounts: true, resetForms: false } as FusionConfig,
+                ctx.mockLog,
+                ctx.mockIdentities,
+                ctx.mockSources,
+                ctx.mockForms,
+                ctx.mockMappingService,
+                ctx.mockDefinitionService,
+                ctx.mockMatchingService,
+                ctx.mockSchemas,
+                ctx.run,
                 StandardCommand.StdAccountList
             )
 
@@ -250,17 +62,17 @@ describe('FusionService', () => {
         })
 
         it('disableResetAccounts patches resetAccounts and legacy reset', async () => {
-            await fusionService.disableResetAccounts()
+            await ctx.fusionService.disableResetAccounts()
 
-            expect(mockSources.patchSourceConfig).toHaveBeenCalledTimes(2)
-            expect(mockSources.patchSourceConfig).toHaveBeenCalledWith(
-                FUSION_SOURCE_ID,
+            expect(ctx.mockSources.patchSourceConfig).toHaveBeenCalledTimes(2)
+            expect(ctx.mockSources.patchSourceConfig).toHaveBeenCalledWith(
+                ctx.FUSION_SOURCE_ID,
                 '/connectorAttributes/resetAccounts',
                 false,
                 'FusionService>disableResetAccounts'
             )
-            expect(mockSources.patchSourceConfig).toHaveBeenCalledWith(
-                FUSION_SOURCE_ID,
+            expect(ctx.mockSources.patchSourceConfig).toHaveBeenCalledWith(
+                ctx.FUSION_SOURCE_ID,
                 '/connectorAttributes/reset',
                 false,
                 'FusionService>disableResetAccounts>legacyReset'
@@ -268,11 +80,11 @@ describe('FusionService', () => {
         })
 
         it('disableResetForms patches resetForms only', async () => {
-            await fusionService.disableResetForms()
+            await ctx.fusionService.disableResetForms()
 
-            expect(mockSources.patchSourceConfig).toHaveBeenCalledTimes(1)
-            expect(mockSources.patchSourceConfig).toHaveBeenCalledWith(
-                FUSION_SOURCE_ID,
+            expect(ctx.mockSources.patchSourceConfig).toHaveBeenCalledTimes(1)
+            expect(ctx.mockSources.patchSourceConfig).toHaveBeenCalledWith(
+                ctx.FUSION_SOURCE_ID,
                 '/connectorAttributes/resetForms',
                 false,
                 'FusionService>disableResetForms'
@@ -285,11 +97,11 @@ describe('FusionService', () => {
             const key = { simple: { id: 'NG000025' } }
             const fusionAccount = FusionAccount.fromIdentity({ id: 'NG000025', name: 'Ada Wong' } as IdentityDocument)
 
-            mockDefinitionService.getSimpleKey.mockReturnValue(key)
-            mockSchemas.getFusionAttributeSubset.mockReturnValue({ id: 'NG000025', name: 'Ada Wong' })
-            mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses'])
+            ctx.mockDefinitionService.getSimpleKey.mockReturnValue(key)
+            ctx.mockSchemas.getFusionAttributeSubset.mockReturnValue({ id: 'NG000025', name: 'Ada Wong' })
+            ctx.mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses'])
 
-            const output = await fusionService.getISCAccount(fusionAccount)
+            const output = await ctx.fusionService.getISCAccount(fusionAccount)
 
             expect(output).toMatchObject({
                 key,
@@ -305,15 +117,15 @@ describe('FusionService', () => {
                 name: 'Candidate Only',
             } as IdentityDocument)
 
-            mockDefinitionService.getSimpleKey.mockReturnValue(key)
-            mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
-            mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
+            ctx.mockDefinitionService.getSimpleKey.mockReturnValue(key)
+            ctx.mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
+            ctx.mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
-            ;(run as any)._pendingCandidateIdentityIds = new Set([identityId])
-            ;(run as any)._pendingReviewUrlsByCandidateId = new Map([[identityId, [reviewUrl]]])
-            ;(run as any)._pendingReviewUrlsByReviewerId = new Map()
+            ;(ctx.run as any)._pendingCandidateIdentityIds = new Set([identityId])
+            ;(ctx.run as any)._pendingReviewUrlsByCandidateId = new Map([[identityId, [reviewUrl]]])
+            ;(ctx.run as any)._pendingReviewUrlsByReviewerId = new Map()
 
-            const output = await fusionService.getISCAccount(fusionAccount)
+            const output = await ctx.fusionService.getISCAccount(fusionAccount)
 
             expect(output?.attributes?.statuses).toContain('candidate')
             expect(output?.attributes?.statuses).not.toContain('activeReviews')
@@ -330,15 +142,15 @@ describe('FusionService', () => {
             } as IdentityDocument)
             fusionAccount.setSourceReviewer('src-1')
 
-            mockDefinitionService.getSimpleKey.mockReturnValue(key)
-            mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
-            mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
+            ctx.mockDefinitionService.getSimpleKey.mockReturnValue(key)
+            ctx.mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
+            ctx.mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
-            ;(run as any)._pendingCandidateIdentityIds = new Set()
-            ;(run as any)._pendingReviewUrlsByCandidateId = new Map()
-            ;(run as any)._pendingReviewUrlsByReviewerId = new Map([[identityId, [reviewUrl]]])
+            ;(ctx.run as any)._pendingCandidateIdentityIds = new Set()
+            ;(ctx.run as any)._pendingReviewUrlsByCandidateId = new Map()
+            ;(ctx.run as any)._pendingReviewUrlsByReviewerId = new Map([[identityId, [reviewUrl]]])
 
-            const output = await fusionService.getISCAccount(fusionAccount)
+            const output = await ctx.fusionService.getISCAccount(fusionAccount)
 
             expect(output?.attributes?.statuses).toContain('reviewer')
             expect(output?.attributes?.statuses).toContain('activeReviews')
@@ -356,7 +168,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
+            vi.spyOn(ctx.mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
 
             // Mock FusionAccount.fromFusionAccount static method if possible,
             // but since it's a class method we might depend on its implementation or mock the return of processFusionAccount
@@ -365,7 +177,7 @@ describe('FusionService', () => {
             // Since processFusionAccounts calls processFusionAccount internally, let's spy on that if we can,
             // or verify side effects.
 
-            const result = await fusionService.processFusionAccounts()
+            const result = await ctx.fusionService.processFusionAccounts()
 
             expect(result).toHaveLength(1)
             expect(result[0].managedKey).toBe(`fusion-1`)
@@ -385,18 +197,18 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
-            mockIdentities.getIdentityById.mockReturnValue(undefined)
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+            vi.spyOn(ctx.mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
+            ctx.mockIdentities.getIdentityById.mockReturnValue(undefined)
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             // deleteIdentity must exist on the mock (it's a new method)
-            mockIdentities.deleteIdentity = vi.fn()
+            ctx.mockIdentities.deleteIdentity = vi.fn()
 
-            await fusionService.processFusionAccounts()
+            await ctx.fusionService.processFusionAccounts()
 
-            expect(mockIdentities.deleteIdentity).toHaveBeenCalledWith(identityId)
+            expect(ctx.mockIdentities.deleteIdentity).toHaveBeenCalledWith(identityId)
         })
 
         it('does not call deleteIdentity for uncorrelated fusion accounts (no identityId)', async () => {
@@ -412,16 +224,16 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+            vi.spyOn(ctx.mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            mockIdentities.deleteIdentity = vi.fn()
+            ctx.mockIdentities.deleteIdentity = vi.fn()
 
-            await fusionService.processFusionAccounts()
+            await ctx.fusionService.processFusionAccounts()
 
-            expect(mockIdentities.deleteIdentity).not.toHaveBeenCalled()
+            expect(ctx.mockIdentities.deleteIdentity).not.toHaveBeenCalled()
         })
 
         it('ensures processIdentities skips an identity after processFusionAccounts claims it', async () => {
@@ -440,31 +252,31 @@ describe('FusionService', () => {
 
             const mockIdentityDoc = { id: identityId, name: 'Dedup Identity' } as IdentityDocument
 
-            vi.spyOn(mockSources, 'fusionAccounts', 'get').mockReturnValue([mockFusionAccount])
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+            vi.spyOn(ctx.mockSources, 'fusionAccounts', 'get').mockReturnValue([mockFusionAccount])
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
             // deleteIdentity removes identity from the service cache; simulate this by tracking calls
             const deletedIds = new Set<string>()
-            mockIdentities.deleteIdentity = vi.fn((id: string) => {
+            ctx.mockIdentities.deleteIdentity = vi.fn((id: string) => {
                 deletedIds.add(id)
             })
 
             // identities getter returns only those not yet deleted
             const allIdentities = [mockIdentityDoc]
-            vi.spyOn(mockIdentities, 'identities', 'get').mockImplementation(() =>
+            vi.spyOn(ctx.mockIdentities, 'identities', 'get').mockImplementation(() =>
                 allIdentities.filter((i) => !deletedIds.has(i.id))
             )
-            mockIdentities.getIdentityById.mockReturnValue(undefined)
+            ctx.mockIdentities.getIdentityById.mockReturnValue(undefined)
 
-            await fusionService.processFusionAccounts()
+            await ctx.fusionService.processFusionAccounts()
 
             // After processFusionAccounts the identity should be removed
             expect(deletedIds.has(identityId)).toBe(true)
 
             // processIdentities will see an empty list — no new fusion account created
-            const result = await fusionService.processIdentities()
+            const result = await ctx.fusionService.processIdentities()
             expect(result).toHaveLength(0)
         })
 
@@ -481,7 +293,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
                     [
                         managedKey,
@@ -497,11 +309,11 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
                 new Map([['identity-1', new Set([managedKey])]])
             )
             seedRunInventory(
-                run,
+                ctx.run,
                 new Map([
                     [
                         managedKey,
@@ -517,11 +329,11 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            vi.spyOn(mockForms, 'getFusionMergeDecision').mockReturnValue({
+            vi.spyOn(ctx.mockForms, 'getFusionMergeDecision').mockReturnValue({
                 submitter: { id: 'reviewer-1', email: 'r@example.com', name: 'fernando.delosrios' },
                 account: {
                     id: managedKey,
@@ -537,7 +349,7 @@ describe('FusionService', () => {
                 sourceType: 'authoritative',
             } as any)
 
-            const result = await fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
 
             expect(result.accountIds).toContain(managedKey)
             expect(result.history.some((h) => h.includes('into existing identity by fernando.delosrios'))).toBe(true)
@@ -636,18 +448,18 @@ describe('FusionService', () => {
                 name: 'New Identity',
             } as IdentityDocument
 
-            vi.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
+            vi.spyOn(ctx.mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
 
             // Mock mapAttributes since it's called in processIdentity
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            const result = await fusionService.processIdentities()
+            const result = await ctx.fusionService.processIdentities()
 
             expect(result).toHaveLength(1)
             expect(result[0].identityId).toBe('identity-1')
             // Should be registered in the map
-            expect(fusionService.getFusionIdentity('identity-1')).toBeDefined()
+            expect(ctx.fusionService.getFusionIdentity('identity-1')).toBeDefined()
         })
 
         it('marks new identity-origin fusion accounts for unique reset', async () => {
@@ -656,10 +468,10 @@ describe('FusionService', () => {
                 name: 'Reset Identity',
             } as IdentityDocument
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            const result = await fusionService.processIdentity(mockIdentity)
+            const result = await ctx.fusionService.processIdentity(mockIdentity)
 
             expect(result).toBeDefined()
             expect(result?.needsReset).toBe(true)
@@ -674,10 +486,10 @@ describe('FusionService', () => {
                 },
             } as unknown as IdentityDocument
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            const result = await fusionService.processIdentity(mockIdentity)
+            const result = await ctx.fusionService.processIdentity(mockIdentity)
 
             expect(result).toBeDefined()
             expect(result?.history).toEqual(
@@ -697,16 +509,16 @@ describe('FusionService', () => {
                 },
             } as unknown as IdentityDocument
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.applyDisplayAttributeOverride.mockImplementation((account) => {
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.applyDisplayAttributeOverride.mockImplementation((account) => {
                 account.attributes.displayName = account.identityName ?? null
             })
 
-            const result = await fusionService.processIdentity(mockIdentity)
+            const result = await ctx.fusionService.processIdentity(mockIdentity)
 
             expect(result).toBeDefined()
-            mockDefinitionService.applyDisplayAttributeOverride(result!)
+            ctx.mockDefinitionService.applyDisplayAttributeOverride(result!)
             expect(result?.attributes.displayName).toBe('Jane Doe')
         })
 
@@ -715,10 +527,10 @@ describe('FusionService', () => {
                 id: 'identity-1',
                 name: 'New Identity',
             } as IdentityDocument
-            vi.spyOn(mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
+            vi.spyOn(ctx.mockIdentities, 'identities', 'get').mockReturnValue([mockIdentity])
 
-            await fusionService.processIdentity(mockIdentity)
-            const result = await fusionService.processIdentity(mockIdentity)
+            await ctx.fusionService.processIdentity(mockIdentity)
+            const result = await ctx.fusionService.processIdentity(mockIdentity)
 
             expect(result).toBeUndefined()
         })
@@ -739,12 +551,12 @@ describe('FusionService', () => {
         }
 
         beforeEach(() => {
-            Object.defineProperty(mockSources, 'managedSources', {
+            Object.defineProperty(ctx.mockSources, 'managedSources', {
                 get: vi.fn(() => [managedSource()]),
                 configurable: true,
             })
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue(undefined)
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue(undefined)
         })
 
         it('registers global owners as reviewers when owner identity is hydrated but not yet a fusion identity', async () => {
@@ -753,17 +565,17 @@ describe('FusionService', () => {
                 name: 'Global Owner',
             } as IdentityDocument
 
-            ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
-            mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(['global-owner-1'])
-            mockIdentities.ensureIdentityById = vi.fn(async (id: string) => run.getIdentity(id))
-            mockIdentities.markIdentityInScope = vi.fn()
-            run.addIdentity('global-owner-1', globalOwner)
+            ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = true
+            ctx.mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(['global-owner-1'])
+            ctx.mockIdentities.ensureIdentityById = vi.fn(async (id: string) => ctx.run.getIdentity(id))
+            ctx.mockIdentities.markIdentityInScope = vi.fn()
+            ctx.run.addIdentity('global-owner-1', globalOwner)
 
-            await fusionService.initializeSourceReviewers()
+            await ctx.fusionService.initializeSourceReviewers()
 
-            expect(run.reviewersBySourceId.get(SOURCE_ID)?.size).toBe(1)
-            ;(fusionService as any).validateManagedSourceReviewers()
-            expect(run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
+            expect(ctx.run.reviewersBySourceId.get(SOURCE_ID)?.size).toBe(1)
+            ;(ctx.fusionService as any).validateManagedSourceReviewers()
+            expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
         })
 
         it('registers global owners already loaded as managed-key fusion accounts', async () => {
@@ -777,15 +589,15 @@ describe('FusionService', () => {
                 identityId: globalOwnerId,
                 attributes: {},
             } as any)
-            run.registerFusionAccount(existingReviewer)
+            ctx.run.registerFusionAccount(existingReviewer)
 
-            ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
-            mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([globalOwnerId])
-            await fusionService.initializeSourceReviewers()
+            ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = true
+            ctx.mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([globalOwnerId])
+            await ctx.fusionService.initializeSourceReviewers()
 
-            expect(run.reviewersBySourceId.get(SOURCE_ID)?.has(existingReviewer)).toBe(true)
-            ;(fusionService as any).validateManagedSourceReviewers()
-            expect(run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
+            expect(ctx.run.reviewersBySourceId.get(SOURCE_ID)?.has(existingReviewer)).toBe(true)
+            ;(ctx.fusionService as any).validateManagedSourceReviewers()
+            expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
         })
 
 
@@ -796,33 +608,33 @@ describe('FusionService', () => {
                 attributes: { email: 'owner@example.com' },
             } as IdentityDocument
 
-            ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
-            mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(['global-owner-out-of-scope'])
-            mockIdentities.ensureIdentityById = vi.fn().mockResolvedValue(globalOwner)
-            mockIdentities.markIdentityInScope = vi.fn()
+            ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = true
+            ctx.mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue(['global-owner-out-of-scope'])
+            ctx.mockIdentities.ensureIdentityById = vi.fn().mockResolvedValue(globalOwner)
+            ctx.mockIdentities.markIdentityInScope = vi.fn()
 
-            await fusionService.initializeSourceReviewers()
+            await ctx.fusionService.initializeSourceReviewers()
 
-            expect(mockIdentities.ensureIdentityById).toHaveBeenCalledWith('global-owner-out-of-scope')
-            expect(mockIdentities.markIdentityInScope).toHaveBeenCalledWith('global-owner-out-of-scope')
-            expect(run.reviewersBySourceId.get(SOURCE_ID)?.size).toBe(1)
-            expect(run.getFusionIdentity('global-owner-out-of-scope')).toBeDefined()
-            ;(fusionService as any).validateManagedSourceReviewers()
-            expect(run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
+            expect(ctx.mockIdentities.ensureIdentityById).toHaveBeenCalledWith('global-owner-out-of-scope')
+            expect(ctx.mockIdentities.markIdentityInScope).toHaveBeenCalledWith('global-owner-out-of-scope')
+            expect(ctx.run.reviewersBySourceId.get(SOURCE_ID)?.size).toBe(1)
+            expect(ctx.run.getFusionIdentity('global-owner-out-of-scope')).toBeDefined()
+            ;(ctx.fusionService as any).validateManagedSourceReviewers()
+            expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
         })
 
 
         it('keeps persisted global reviewer out of orphan when owner is hydrated before processFusionAccount', async () => {
             const globalOwnerId = 'global-owner-persisted'
-            ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
-            mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([globalOwnerId])
-            mockIdentities.ensureIdentityById = vi.fn().mockResolvedValue({
+            ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = true
+            ctx.mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([globalOwnerId])
+            ctx.mockIdentities.ensureIdentityById = vi.fn().mockResolvedValue({
                 id: globalOwnerId,
                 name: 'fernando.delosrios',
             } as IdentityDocument)
-            mockIdentities.markIdentityInScope = vi.fn()
-            mockIdentities.hasIdentityInScope = vi.fn((id?: string) => id === globalOwnerId)
-            mockIdentities.getIdentityById = vi.fn((id?: string) =>
+            ctx.mockIdentities.markIdentityInScope = vi.fn()
+            ctx.mockIdentities.hasIdentityInScope = vi.fn((id?: string) => id === globalOwnerId)
+            ctx.mockIdentities.getIdentityById = vi.fn((id?: string) =>
                 id === globalOwnerId
                     ? ({ id: globalOwnerId, name: 'fernando.delosrios' } as IdentityDocument)
                     : undefined
@@ -841,30 +653,30 @@ describe('FusionService', () => {
                 },
             } as unknown as Account)
 
-            await fusionService.ensureGlobalReviewerOwnersInScope()
-            expect(mockIdentities.markIdentityInScope).toHaveBeenCalledWith(globalOwnerId)
+            await ctx.fusionService.ensureGlobalReviewerOwnersInScope()
+            expect(ctx.mockIdentities.markIdentityInScope).toHaveBeenCalledWith(globalOwnerId)
 
-            const processed = await fusionService.processFusionAccount(persisted)
+            const processed = await ctx.fusionService.processFusionAccount(persisted)
             expect(processed.isOrphan()).toBe(false)
         })
 
         it('warns when global reviewer is enabled but no owner identity IDs resolve', async () => {
-            ;(fusionService as any).fusionOwnerIsGlobalReviewer = true
-            mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([])
-            const warnSpy = vi.spyOn(mockLog, 'warn')
+            ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = true
+            ctx.mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([])
+            const warnSpy = vi.spyOn(ctx.mockLog, 'warn')
 
-            await fusionService.initializeSourceReviewers()
+            await ctx.fusionService.initializeSourceReviewers()
 
             expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no Fusion source owner identity IDs'))
-            ;(fusionService as any).validateManagedSourceReviewers()
-            expect(run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(true)
+            ;(ctx.fusionService as any).validateManagedSourceReviewers()
+            expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(true)
         })
     })
 
     describe('processManagedAccounts', () => {
         beforeEach(() => {
-            mockDefinitionService.refreshReverseCorrelationAttributes.mockImplementation((fusionAccount) => {
-                const configs = (mockConfig as any).sources ?? []
+            ctx.mockDefinitionService.refreshReverseCorrelationAttributes.mockImplementation((fusionAccount) => {
+                const configs = (ctx.mockConfig as any).sources ?? []
                 for (const sc of configs) {
                     if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
                         const missingForSource =
@@ -895,11 +707,11 @@ describe('FusionService', () => {
             } as Account
             const key = 'source-a-id::native-linked-1'
             const workQueue = new Map([[key, linkedAccount]])
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
                 new Map([['identity-linked', new Set([key])]])
             )
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -907,24 +719,24 @@ describe('FusionService', () => {
             })
 
             const existing = FusionAccount.fromManagedAccount(linkedAccount)
-            fusionService.setFusionAccount(existing)
+            ctx.fusionService.setFusionAccount(existing)
 
-            const result = await fusionService.processManagedAccount(linkedAccount)
+            const result = await ctx.fusionService.processManagedAccount(linkedAccount)
 
             expect(result).toBeUndefined()
             expect(workQueue.has(key)).toBe(false)
-            expect(mockSources.managedAccountsByIdentityId.has('identity-linked')).toBe(false)
+            expect(ctx.mockSources.managedAccountsByIdentityId.has('identity-linked')).toBe(false)
         })
 
-        it('uses current-run non-matched managed source accounts as deferred candidates for subsequent managed accounts', async () => {
-            fusionService.config.managedAccountsBatchSize = 1
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+        it('uses current-ctx.run non-matched managed source accounts as deferred candidates for subsequent managed accounts', async () => {
+            ctx.fusionService.config.managedAccountsBatchSize = 1
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: { deferredMatching: true },
             })
-            ;(fusionService as any).run.reviewersBySourceId.set(
+            ;(ctx.fusionService as any).run.reviewersBySourceId.set(
                 'source-a-id',
                 new Set([{ identityId: 'reviewer-1' } as any])
             )
@@ -952,13 +764,13 @@ describe('FusionService', () => {
                 ['source-a-id::native-seq-1', firstAccount],
                 ['source-a-id::native-seq-2', secondAccount],
             ])
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedSources', 'get').mockReturnValue([])
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
                 if (candidateType !== 'deferred') return candidateList.length
                 const hasPriorNonMatch = candidateList.some(
@@ -979,22 +791,22 @@ describe('FusionService', () => {
                 return candidateList.length
             })
 
-            await fusionService.processManagedAccounts()
+            await ctx.fusionService.processManagedAccounts()
 
-            expect(fusionService.fusionAccounts).toHaveLength(1)
+            expect(ctx.fusionService.fusionAccounts).toHaveLength(1)
             expect(workQueue.has('source-a-id::native-seq-2')).toBe(false)
-            expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
+            expect(ctx.mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('keeps deferred candidate visibility within a managed-account batch', async () => {
-            fusionService.config.managedAccountsBatchSize = 2
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ctx.fusionService.config.managedAccountsBatchSize = 2
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: { deferredMatching: true },
             })
-            ;(fusionService as any).run.reviewersBySourceId.set(
+            ;(ctx.fusionService as any).run.reviewersBySourceId.set(
                 'source-a-id',
                 new Set([{ identityId: 'reviewer-1' } as any])
             )
@@ -1022,13 +834,13 @@ describe('FusionService', () => {
                 ['source-a-id::native-batch-def-1', firstAccount],
                 ['source-a-id::native-batch-def-2', secondAccount],
             ])
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedSources', 'get').mockReturnValue([])
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 if (candidateType === 'identity' && account.managedAccountId === 'source-a-id::native-batch-def-1') {
                     await new Promise((resolve) => setTimeout(resolve, 5))
                 }
@@ -1052,15 +864,15 @@ describe('FusionService', () => {
                 return candidateList.length
             })
 
-            await fusionService.processManagedAccounts()
+            await ctx.fusionService.processManagedAccounts()
 
-            expect(fusionService.fusionAccounts).toHaveLength(1)
+            expect(ctx.fusionService.fusionAccounts).toHaveLength(1)
             expect(workQueue.has('source-a-id::native-batch-def-2')).toBe(false)
-            expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
+            expect(ctx.mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('runs deferred source identity phase in parallel while deferred drain stays sequential per source', async () => {
-            fusionService.config.managedAccountsBatchSize = 2
+            ctx.fusionService.config.managedAccountsBatchSize = 2
             const accountA1 = {
                 id: 'acct-par-a-1',
                 nativeIdentity: 'native-par-a-1',
@@ -1103,30 +915,30 @@ describe('FusionService', () => {
                 ['source-b-id::native-seq-b-1', accountB1],
                 ['source-b-id::native-seq-b-2', accountB2],
             ])
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedSources', 'get').mockReturnValue([])
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: { deferredMatching: false },
             })
-            ;(fusionService as any).run.sourcesByName.set('Source B', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source B', {
                 id: 'source-b-id',
                 name: 'Source B',
                 sourceType: 'authoritative',
                 config: { deferredMatching: true },
             })
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const identity = FusionAccount.fromIdentity({
                 id: 'identity-1',
                 name: 'Identity One',
                 attributes: {},
             } as any)
-            fusionService.setFusionAccount(identity)
+            ctx.fusionService.setFusionAccount(identity)
 
             let inFlightIdentityA = 0
             let maxInFlightIdentityA = 0
@@ -1134,7 +946,7 @@ describe('FusionService', () => {
             let maxInFlightIdentityB = 0
             let inFlightDeferredB = 0
             let maxInFlightDeferredB = 0
-            mockMatchingService.scoreFusionAccount.mockImplementation(
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(
                 async (fusionAccount, candidates, candidateType) => {
                     const candidateList = Array.from(candidates)
                     if (candidateType === 'identity') {
@@ -1183,15 +995,15 @@ describe('FusionService', () => {
                 attributes: {},
             } as any)
             preB.setNonMatched()
-            fusionService.setFusionAccount(preB)
-            ;(fusionService as any).run.registerFinalizedDeferredCandidate(preB)
+            ctx.fusionService.setFusionAccount(preB)
+            ;(ctx.fusionService as any).run.registerFinalizedDeferredCandidate(preB)
 
-            await fusionService.processManagedAccounts()
+            await ctx.fusionService.processManagedAccounts()
 
             expect(maxInFlightIdentityA).toBeGreaterThan(1)
             expect(maxInFlightIdentityB).toBeGreaterThan(1)
             expect(maxInFlightDeferredB).toBeLessThanOrEqual(1)
-            expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
+            expect(ctx.mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('does not include deferred candidates from other sources', async () => {
@@ -1204,7 +1016,7 @@ describe('FusionService', () => {
                 attributes: {},
             } as any)
             sourceAAccount.setNonMatched()
-            fusionService.setFusionAccount(sourceAAccount)
+            ctx.fusionService.setFusionAccount(sourceAAccount)
             const sourceBCandidate = FusionAccount.fromManagedAccount({
                 id: 'acct-b-candidate',
                 nativeIdentity: 'native-b-candidate',
@@ -1214,19 +1026,19 @@ describe('FusionService', () => {
                 attributes: {},
             } as any)
             sourceBCandidate.setNonMatched()
-            fusionService.setFusionAccount(sourceBCandidate)
-            ;(fusionService as any).run.registerFinalizedDeferredCandidate(sourceBCandidate)
-            ;(fusionService as any).run.sourcesByName.set('Source B', {
+            ctx.fusionService.setFusionAccount(sourceBCandidate)
+            ;(ctx.fusionService as any).run.registerFinalizedDeferredCandidate(sourceBCandidate)
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source B', {
                 id: 'source-b-id',
                 name: 'Source B',
                 sourceType: 'authoritative',
                 config: { deferredMatching: true },
             })
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const sourceBDeferredCandidateSources: string[][] = []
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
                 if (candidateType === 'deferred') {
                     sourceBDeferredCandidateSources.push(
                         Array.from(candidates).map((candidate) => candidate.sourceName ?? '')
@@ -1235,7 +1047,7 @@ describe('FusionService', () => {
                 return Array.from(candidates).length
             })
 
-            await fusionService.processManagedAccount({
+            await ctx.fusionService.processManagedAccount({
                 id: 'acct-source-b-target',
                 nativeIdentity: 'native-source-b-target',
                 name: 'Source B Target',
@@ -1249,7 +1061,7 @@ describe('FusionService', () => {
         })
 
         it('resolves all correlated accounts in the correlated account sweep before uncorrelated batch processing', async () => {
-            fusionService.config.managedAccountsBatchSize = 2
+            ctx.fusionService.config.managedAccountsBatchSize = 2
             const correlatedA = {
                 id: 'acct-corr-a',
                 nativeIdentity: 'native-corr-a',
@@ -1285,18 +1097,18 @@ describe('FusionService', () => {
                 ['source-a-id::native-unc-1', uncorrelated],
                 ['source-a-id::native-corr-b', correlatedB],
             ])
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedSources', 'get').mockReturnValue([])
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedSources', 'get').mockReturnValue([])
 
             const callOrder: string[] = []
-            const originalProcessManagedAccount = fusionService.processManagedAccount.bind(fusionService)
-            vi.spyOn(fusionService, 'processManagedAccount').mockImplementation(async (account: Account) => {
+            const originalProcessManagedAccount = ctx.fusionService.processManagedAccount.bind(ctx.fusionService)
+            vi.spyOn(ctx.fusionService, 'processManagedAccount').mockImplementation(async (account: Account) => {
                 callOrder.push(account.id ?? '')
                 return originalProcessManagedAccount(account)
             })
 
-            await fusionService.processManagedAccounts()
+            await ctx.fusionService.processManagedAccounts()
 
             expect(callOrder).toHaveLength(2)
             expect(new Set(callOrder.slice(0, 2))).toEqual(new Set(['acct-corr-a', 'acct-corr-b']))
@@ -1317,18 +1129,18 @@ describe('FusionService', () => {
                 name: 'Identity One',
                 attributes: {},
             } as any)
-            fusionService.setFusionAccount(existingIdentity)
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ctx.fusionService.setFusionAccount(existingIdentity)
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: { deferredMatching: true },
             })
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
                 if (candidateType === 'identity') {
                     account.addFusionMatch({
@@ -1341,10 +1153,10 @@ describe('FusionService', () => {
                 return n
             })
 
-            await fusionService.processManagedAccount(mockManagedAccount)
+            await ctx.fusionService.processManagedAccount(mockManagedAccount)
 
-            expect(mockMatchingService.scoreFusionAccount).toHaveBeenCalledTimes(1)
-            expect(mockMatchingService.scoreFusionAccount).toHaveBeenCalledWith(
+            expect(ctx.mockMatchingService.scoreFusionAccount).toHaveBeenCalledTimes(1)
+            expect(ctx.mockMatchingService.scoreFusionAccount).toHaveBeenCalledWith(
                 expect.any(FusionAccount),
                 expect.anything(),
                 'identity',
@@ -1363,19 +1175,19 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            ;(fusionService as any).run.sourcesByName.set('Record Skip Match Source', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Record Skip Match Source', {
                 id: 'src-record-skip',
                 name: 'Record Skip Match Source',
                 sourceType: 'record',
                 config: { includeRecordAccountsForMatching: false },
             })
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            await fusionService.processManagedAccount(mockManagedAccount)
+            await ctx.fusionService.processManagedAccount(mockManagedAccount)
 
-            expect(mockMatchingService.scoreFusionAccount).not.toHaveBeenCalled()
+            expect(ctx.mockMatchingService.scoreFusionAccount).not.toHaveBeenCalled()
         })
 
         it('processRecordUniqueRegistration removes match-disabled record accounts from the work queue', async () => {
@@ -1402,14 +1214,14 @@ describe('FusionService', () => {
                 [authAccount.id!, authAccount],
             ])
 
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            ;(fusionService as any).run.sourcesByName.set('Record Skip Match Source', {
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            ;(ctx.fusionService as any).run.sourcesByName.set('Record Skip Match Source', {
                 id: 'src-record-skip',
                 name: 'Record Skip Match Source',
                 sourceType: 'record',
                 config: { includeRecordAccountsForMatching: false },
             })
-            ;(fusionService as any).run.sourcesByName.set('Auth Source', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Auth Source', {
                 id: 'src-auth',
                 name: 'Auth Source',
                 sourceType: 'authoritative',
@@ -1417,17 +1229,17 @@ describe('FusionService', () => {
             })
 
             const registerSpy = vi
-                .spyOn(mockDefinitionService, 'registerUniqueValuesFromRecordManagedAccounts')
+                .spyOn(ctx.mockDefinitionService, 'registerUniqueValuesFromRecordManagedAccounts')
                 .mockResolvedValue(1)
 
-            await fusionService.initializeManagedAccountProcessing()
-            const result = await fusionService.processRecordUniqueRegistration()
+            await ctx.fusionService.initializeManagedAccountProcessing()
+            const result = await ctx.fusionService.processRecordUniqueRegistration()
 
             expect(result.registered).toBe(1)
             expect(registerSpy).toHaveBeenCalledWith(
                 [recordAccount],
-                mockMappingService,
-                run,
+                ctx.mockMappingService,
+                ctx.run,
                 expect.objectContaining({ onProgress: expect.any(Function) })
             )
             expect(managedMap.has(recordAccount.id!)).toBe(false)
@@ -1445,20 +1257,20 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            ;(fusionService as any).run.sourcesByName.set('Record Default Source', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Record Default Source', {
                 id: 'src-record-default',
                 name: 'Record Default Source',
                 sourceType: 'record',
                 config: {},
             })
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
 
-            await fusionService.processManagedAccount(mockManagedAccount)
+            await ctx.fusionService.processManagedAccount(mockManagedAccount)
 
-            expect(mockMatchingService.scoreFusionAccount).toHaveBeenCalled()
+            expect(ctx.mockMatchingService.scoreFusionAccount).toHaveBeenCalled()
         })
 
         it('logs deferred matches and suppresses output for deferred candidate matches', async () => {
@@ -1472,7 +1284,7 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -1488,15 +1300,15 @@ describe('FusionService', () => {
                 attributes: {},
             } as any)
             nonMatchedCandidate.setNonMatched()
-            fusionService.setFusionAccount(nonMatchedCandidate)
-            const run = (fusionService as any).run
+            ctx.fusionService.setFusionAccount(nonMatchedCandidate)
+            const run = (ctx.fusionService as any).run
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            run.registerFinalizedDeferredCandidate(nonMatchedCandidate)
+            ctx.run.registerFinalizedDeferredCandidate(nonMatchedCandidate)
 
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
@@ -1511,15 +1323,15 @@ describe('FusionService', () => {
             })
 
             const workQueue = new Map([['source-a-id::native-deferred-1', mockManagedAccount]])
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
 
-            const result = await fusionService.processManagedAccount(mockManagedAccount)
+            const result = await ctx.fusionService.processManagedAccount(mockManagedAccount)
 
             expect(result).toBeDefined()
             expect(result?.fusionMatches.some((m) => m.candidateType === 'deferred')).toBe(true)
             expect(workQueue.has('source-a-id::native-deferred-1')).toBe(false)
-            expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
+            expect(ctx.mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('does not record deferred match report rows when StdAccountList, fusionReportOnAggregation false, and not custom:dryrun', async () => {
@@ -1533,7 +1345,7 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
@@ -1549,15 +1361,15 @@ describe('FusionService', () => {
                 attributes: {},
             } as any)
             nonMatchedCandidate.setNonMatched()
-            fusionService.setFusionAccount(nonMatchedCandidate)
-            const run = (fusionService as any).run
+            ctx.fusionService.setFusionAccount(nonMatchedCandidate)
+            const run = (ctx.fusionService as any).run
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            run.registerFinalizedDeferredCandidate(nonMatchedCandidate)
+            ctx.run.registerFinalizedDeferredCandidate(nonMatchedCandidate)
 
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
@@ -1572,9 +1384,9 @@ describe('FusionService', () => {
             })
 
             const tracker = new AggregationTracker()
-            fusionService.setTracker(tracker)
-            await fusionService.processManagedAccount(mockManagedAccount)
-            const report = fusionService.generateReport(tracker, true)
+            ctx.fusionService.setTracker(tracker)
+            await ctx.fusionService.processManagedAccount(mockManagedAccount)
+            const report = ctx.fusionService.generateReport(tracker, true)
             expect(report.accounts.some((a) => a.deferred && a.accountId === 'source-a-id::native-no-report-cap')).toBe(
                 false
             )
@@ -1582,25 +1394,25 @@ describe('FusionService', () => {
 
         it('records deferred match report rows for custom:dryrun even when commandType is StdAccountList and fusionReportOnAggregation is false', async () => {
             const customReportFusion = new FusionService(
-                mockConfig,
-                mockLog,
-                mockIdentities,
-                mockSources,
-                mockForms,
-                mockMappingService,
-                mockDefinitionService,
-                mockMatchingService,
-                mockSchemas,
-                run,
+                ctx.mockConfig,
+                ctx.mockLog,
+                ctx.mockIdentities,
+                ctx.mockSources,
+                ctx.mockForms,
+                ctx.mockMappingService,
+                ctx.mockDefinitionService,
+                ctx.mockMatchingService,
+                ctx.mockSchemas,
+                ctx.run,
                 StandardCommand.StdAccountList,
                 true
             )
-            customReportFusion.matchOutcomeDispatcher = createDispatcherFor(customReportFusion)
+            customReportFusion.matchOutcomeDispatcher = ctx.createDispatcherFor(customReportFusion)
             customReportFusion.setTracker(new AggregationTracker())
 
             const mockManagedAccount = {
-                id: 'acct-dry-run-def',
-                nativeIdentity: 'native-dry-run-def',
+                id: 'acct-dry-ctx.run-def',
+                nativeIdentity: 'native-dry-ctx.run-def',
                 name: 'Custom Report Deferred',
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
@@ -1626,10 +1438,10 @@ describe('FusionService', () => {
             nonMatchedCandidate.setNonMatched()
             customReportFusion.setFusionAccount(nonMatchedCandidate)
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
                 if (candidateType === 'deferred') {
                     account.addFusionMatch({
@@ -1646,7 +1458,7 @@ describe('FusionService', () => {
             customReportFusion.setTracker(tracker)
             await customReportFusion.processManagedAccount(mockManagedAccount)
             const report = customReportFusion.generateReport(tracker, true)
-            expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-run-def')).toBe(true)
+            expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-ctx.run-def')).toBe(true)
         })
 
         it('records only non-match history when creating a new authoritative non-match fusion account', async () => {
@@ -1660,18 +1472,18 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            ;(fusionService as any).run.sourcesByName.set('NERM', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('NERM', {
                 id: 'src-nerm',
                 name: 'NERM',
                 sourceType: 'authoritative',
                 config: {},
             })
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
 
-            const result = await fusionService.processManagedAccount(mockManagedAccount)
+            const result = await ctx.fusionService.processManagedAccount(mockManagedAccount)
 
             expect(result).toBeDefined()
             expect(result?.history.some((h) => h.includes('as NonMatched'))).toBe(true)
@@ -1680,19 +1492,19 @@ describe('FusionService', () => {
 
         it('does not fire disable for orphan non-matches when commandType is not StdAccountList', async () => {
             const analysisFusion = new FusionService(
-                mockConfig,
-                mockLog,
-                mockIdentities,
-                mockSources,
-                mockForms,
-                mockMappingService,
-                mockDefinitionService,
-                mockMatchingService,
-                mockSchemas,
-                run,
+                ctx.mockConfig,
+                ctx.mockLog,
+                ctx.mockIdentities,
+                ctx.mockSources,
+                ctx.mockForms,
+                ctx.mockMappingService,
+                ctx.mockDefinitionService,
+                ctx.mockMatchingService,
+                ctx.mockSchemas,
+                ctx.run,
                 undefined
             )
-            analysisFusion.matchOutcomeDispatcher = createDispatcherFor(analysisFusion)
+            analysisFusion.matchOutcomeDispatcher = ctx.createDispatcherFor(analysisFusion)
             analysisFusion.setTracker(new AggregationTracker())
             ;(analysisFusion as any).run.sourcesByName.set('OrphanSrc', {
                 id: 'orphan-src-id',
@@ -1711,14 +1523,14 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            mockMappingService.mapAttributes.mockImplementation((a) => a)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
-            vi.spyOn(mockSources, 'fireDisableAccount').mockResolvedValue(undefined)
+            ctx.mockMappingService.mapAttributes.mockImplementation((a) => a)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
+            vi.spyOn(ctx.mockSources, 'fireDisableAccount').mockResolvedValue(undefined)
 
             await analysisFusion.processManagedAccount(account)
 
-            expect(mockSources.fireDisableAccount).not.toHaveBeenCalled()
+            expect(ctx.mockSources.fireDisableAccount).not.toHaveBeenCalled()
         })
 
         it('should process managed accounts', async () => {
@@ -1735,23 +1547,23 @@ describe('FusionService', () => {
             const managedAccountsMap = new Map<string, Account>()
             managedAccountsMap.set('source-a-id::mgmt-1', mockManagedAccount)
 
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedAccountsMap)
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(managedAccountsMap)
 
             // Mock scoring
-            mockMatchingService.scoreFusionAccount.mockImplementation(
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(
                 async (_account, candidates) => Array.from(candidates).length
             )
 
-            await fusionService.processManagedAccounts()
+            await ctx.fusionService.processManagedAccounts()
 
             // Verify log called or side effects
-            expect(mockLog.detail).toHaveBeenCalledWith({
+            expect(ctx.mockLog.detail).toHaveBeenCalledWith({
                 action: 'processing uncorrelated managed accounts',
                 count: 1,
             })
         })
 
-        it('should set reverse correlation attribute for first-run non-matched authoritative accounts', async () => {
+        it('should set reverse correlation attribute for first-ctx.run non-matched authoritative accounts', async () => {
             const mockManagedAccount = {
                 id: 'acct-1',
                 nativeIdentity: 'native-1',
@@ -1762,20 +1574,20 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            ;(mockConfig.sources as any[]).push({
+            ;(ctx.mockConfig.sources as any[]).push({
                 name: 'Source A',
                 correlationMode: 'reverse' as const,
                 correlationAttribute: 'reverseNativeIdentity',
                 correlationDisplayName: 'Reverse Native Identity',
             })
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: {},
             })
 
-            const result = await fusionService.processManagedAccount(mockManagedAccount)
+            const result = await ctx.fusionService.processManagedAccount(mockManagedAccount)
 
             expect(result).toBeDefined()
             expect(result?.attributes.reverseNativeIdentity).toBe('native-1')
@@ -1793,22 +1605,22 @@ describe('FusionService', () => {
                 uncorrelated: false,
             } as Account
 
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: {},
             })
 
-            mockMappingService.mapAttributes.mockImplementation((a) => a)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
+            ctx.mockMappingService.mapAttributes.mockImplementation((a) => a)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
 
-            const result = await fusionService.processManagedAccount(mockManagedAccount)
+            const result = await ctx.fusionService.processManagedAccount(mockManagedAccount)
 
             expect(result).toBeDefined()
             expect(result?.statuses).toContain('nonMatched')
-            expect(fusionService.getFusionAccountByManagedKey('source-a-id::native-corr-orphan-1')).toBe(result)
+            expect(ctx.fusionService.getFusionAccountByManagedKey('source-a-id::native-corr-orphan-1')).toBe(result)
         })
 
         it('drops correlated managed accounts when their identity already has a fusion identity row', async () => {
@@ -1818,7 +1630,7 @@ describe('FusionService', () => {
                 name: 'Linked',
                 attributes: {},
             } as any)
-            fusionService.setFusionAccount(existing)
+            ctx.fusionService.setFusionAccount(existing)
 
             const mockManagedAccount = {
                 id: 'acct-already-linked',
@@ -1831,18 +1643,18 @@ describe('FusionService', () => {
                 uncorrelated: false,
             } as Account
 
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: {},
             })
 
-            mockMappingService.mapAttributes.mockImplementation((a) => a)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
+            ctx.mockMappingService.mapAttributes.mockImplementation((a) => a)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
 
-            const result = await fusionService.processManagedAccount(mockManagedAccount)
+            const result = await ctx.fusionService.processManagedAccount(mockManagedAccount)
 
             expect(result).toBeUndefined()
         })
@@ -1859,17 +1671,17 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            ;(mockConfig.sources as any[]).push({
+            ;(ctx.mockConfig.sources as any[]).push({
                 name: 'Source A',
                 correlationMode: 'reverse' as const,
                 correlationAttribute: 'reverseNativeIdentity',
                 correlationDisplayName: 'Reverse Native Identity',
             })
 
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             seedRunInventory(
-                run,
+                ctx.run,
                 new Map([
                     [
                         'source-a-id::native-missing-1',
@@ -1883,11 +1695,11 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            const result = await fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
 
             expect(result.attributes.reverseNativeIdentity).toBe('native-missing-1')
         })
@@ -1905,21 +1717,21 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            vi.spyOn(mockIdentities, 'getIdentityById').mockReturnValue({
+            vi.spyOn(ctx.mockIdentities, 'getIdentityById').mockReturnValue({
                 id: 'identity-1',
                 name: 'Jane Doe',
                 attributes: { displayName: 'Jane Q. Doe' },
             } as IdentityDocument)
-            vi.spyOn(mockForms, 'getFusionMergeDecision').mockReturnValue(undefined)
+            vi.spyOn(ctx.mockForms, 'getFusionMergeDecision').mockReturnValue(undefined)
 
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map())
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            seedRunInventory(ctx.run, new Map())
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            const result = await fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
 
             expect(result.name).toBe('30958535')
             expect(result.identityDisplayName).toBe('Jane Q. Doe')
@@ -1937,7 +1749,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
                     [
                         'source-a-id::native-new-2',
@@ -1953,11 +1765,11 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(
                 new Map([['identity-1', new Set(['source-a-id::native-new-2'])]])
             )
             seedRunInventory(
-                run,
+                ctx.run,
                 new Map([
                     [
                         'source-a-id::native-new-2',
@@ -1973,11 +1785,11 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            const result = await fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
 
             expect(result.accountIds).toContain('source-a-id::native-new-2')
             expect(result.history).toEqual(
@@ -2002,7 +1814,7 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
                     [
                         'source-a-id::native-existing-1',
@@ -2016,9 +1828,9 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
             seedRunInventory(
-                run,
+                ctx.run,
                 new Map([
                     [
                         'source-a-id::native-existing-1',
@@ -2032,11 +1844,11 @@ describe('FusionService', () => {
                     ],
                 ])
             )
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            const result = await fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
 
             expect(result.accountIds).toContain('source-a-id::native-existing-1')
             expect(result.accountIds).not.toContain('source-a-id::native-deleted-1')
@@ -2053,7 +1865,7 @@ describe('FusionService', () => {
         })
 
         it('forces needsRefresh when forceAttributeRefresh is enabled', async () => {
-            mockConfig.forceAttributeRefresh = true
+            ctx.mockConfig.forceAttributeRefresh = true
 
             const historicalAccount = {
                 nativeIdentity: 'fusion-force-refresh',
@@ -2066,17 +1878,17 @@ describe('FusionService', () => {
                 },
             } as unknown as Account
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            const result = await fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
 
             expect(result.needsRefresh).toBe(true)
         })
 
         it('should not clear reverse attribute when missing account source info is unresolved', async () => {
-            ;(fusionService as any).config.sources = [
+            ;(ctx.fusionService as any).config.sources = [
                 {
                     name: 'Source A',
                     correlationMode: 'reverse',
@@ -2096,14 +1908,14 @@ describe('FusionService', () => {
                 },
             } as unknown as Account)
 
-            await (fusionService as any).correlationManager.correlatePerSource(fusionAccount)
+            await (ctx.fusionService as any).correlationManager.correlatePerSource(fusionAccount)
 
             expect(fusionAccount.attributes.reverseNativeIdentity).toBe('existing-value')
         })
 
         it('direct-correlates link-decision assigned account when managed metadata is absent but source is correlate', async () => {
-            mockIdentities.correlateAccounts.mockResolvedValue(true)
-            vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
+            ctx.mockIdentities.correlateAccounts.mockResolvedValue(true)
+            vi.spyOn(ctx.mockSources, 'getSourceConfig').mockReturnValue({
                 name: 'Source A',
                 correlationMode: 'correlate',
             } as any)
@@ -2134,9 +1946,9 @@ describe('FusionService', () => {
             fusionAccount.addFusionDecisionLayer(linkDecision)
             expect(fusionAccount.getManagedAccountInfo('source-a-id::native-no-meta')).toBeUndefined()
 
-            await (fusionService as any).correlationManager.correlatePerSource(fusionAccount, linkDecision)
+            await (ctx.fusionService as any).correlationManager.correlatePerSource(fusionAccount, linkDecision)
 
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(
+            expect(ctx.mockIdentities.correlateAccounts).toHaveBeenCalledWith(
                 fusionAccount,
                 ['source-a-id::native-no-meta'],
                 'link'
@@ -2154,20 +1966,20 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
 
-            ;(mockConfig.sources as any[]).push({
+            ;(ctx.mockConfig.sources as any[]).push({
                 name: 'Source A',
                 correlationMode: 'reverse' as const,
                 correlationAttribute: 'reverseNativeIdentity',
                 correlationDisplayName: 'Reverse Native Identity',
             })
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: {},
             })
 
-            const result = await fusionService.processManagedAccount(mockManagedAccount)
+            const result = await ctx.fusionService.processManagedAccount(mockManagedAccount)
 
             expect(result).toBeDefined()
             expect(result?.attributes.reverseNativeIdentity).toBe('native-2')
@@ -2193,22 +2005,22 @@ describe('FusionService', () => {
                 attributes: {},
             } as Account
 
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(
                 new Map([
                     ['source-a-id::native-analyze-1', firstAccount],
                     ['source-a-id::native-analyze-2', secondAccount],
                 ])
             )
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: {},
             })
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
                 if (candidateType !== 'deferred') return candidateList.length
                 if (candidateList.length > 0) {
@@ -2224,15 +2036,15 @@ describe('FusionService', () => {
                 return candidateList.length
             })
 
-            const analyzed = await fusionService.analyzeUncorrelatedAccounts()
+            const analyzed = await ctx.fusionService.analyzeUncorrelatedAccounts()
 
             expect(analyzed).toHaveLength(2)
             expect(analyzed[1].fusionMatches.some((match) => match.candidateType === 'deferred')).toBe(true)
-            expect(mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
+            expect(ctx.mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
 
         it('makes previously-persisted non-match accounts visible as deferred candidates', async () => {
-            FusionAccount.configure(mockConfig)
+            FusionAccount.configure(ctx.mockConfig)
             const persistedNonMatch = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'native-persisted-nonmatch',
                 name: 'Previously Persisted Non-Match',
@@ -2245,18 +2057,18 @@ describe('FusionService', () => {
                 },
             } as any)
             persistedNonMatch.setNonMatched()
-            fusionService.setFusionAccount(persistedNonMatch)
-            run.registerDeferredCandidate(persistedNonMatch)
+            ctx.fusionService.setFusionAccount(persistedNonMatch)
+            ctx.run.registerDeferredCandidate(persistedNonMatch)
 
-            ;(fusionService as any).run.sourcesByName.set('Source A', {
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
                 id: 'source-a-id',
                 name: 'Source A',
                 sourceType: 'authoritative',
                 config: { deferredMatching: true },
             })
 
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
             const newAccount = {
                 id: 'acct-new-revisit',
@@ -2268,11 +2080,11 @@ describe('FusionService', () => {
                 uncorrelated: true,
             } as Account
             const workQueue = new Map([['source-a-id::native-new-revisit', newAccount]])
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
 
             let deferredCandidatesFound = 0
-            mockMatchingService.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (_account, candidates, candidateType) => {
                 const n = Array.from(candidates).length
                 if (candidateType === 'deferred') {
                     deferredCandidatesFound = n
@@ -2288,7 +2100,7 @@ describe('FusionService', () => {
                 return n
             })
 
-            await fusionService.analyzeUncorrelatedAccounts()
+            await ctx.fusionService.analyzeUncorrelatedAccounts()
 
             expect(deferredCandidatesFound).toBeGreaterThanOrEqual(1)
         })
@@ -2310,10 +2122,10 @@ describe('FusionService', () => {
             account.updateCorrelationStatus()
             expect(account.uncorrelated).toBe(true)
 
-            fusionService.setFusionAccount(account)
+            ctx.fusionService.setFusionAccount(account)
 
-            const inIdentityMap = fusionService.getFusionIdentity('identity-1')
-            const inAccountMap = fusionService.getFusionAccountByManagedKey(`fusion-uncorr-1`)
+            const inIdentityMap = ctx.fusionService.getFusionIdentity('identity-1')
+            const inAccountMap = ctx.fusionService.getFusionAccountByManagedKey(`fusion-uncorr-1`)
             expect(inIdentityMap).toBe(account)
             expect(inAccountMap).toBeUndefined()
         })
@@ -2327,9 +2139,9 @@ describe('FusionService', () => {
                 attributes: {},
             } as unknown as Account)
 
-            fusionService.setFusionAccount(account)
+            ctx.fusionService.setFusionAccount(account)
 
-            const inAccountMap = fusionService.getFusionAccountByManagedKey(`fusion-noident-1`)
+            const inAccountMap = ctx.fusionService.getFusionAccountByManagedKey(`fusion-noident-1`)
             expect(inAccountMap).toBe(account)
         })
 
@@ -2343,10 +2155,10 @@ describe('FusionService', () => {
                 attributes: { identityId: 'identity-1' },
             } as unknown as Account)
 
-            fusionService.setFusionAccount(account)
+            ctx.fusionService.setFusionAccount(account)
 
-            expect(fusionService.getFusionIdentity('identity-1')).toBe(account)
-            expect(fusionService.getFusionAccountByManagedKey(`fusion-attr-1`)).toBeUndefined()
+            expect(ctx.fusionService.getFusionIdentity('identity-1')).toBe(account)
+            expect(ctx.fusionService.getFusionAccountByManagedKey(`fusion-attr-1`)).toBeUndefined()
         })
 
         it('stores persisted fusion accounts under the fusion-source composite key', () => {
@@ -2359,10 +2171,10 @@ describe('FusionService', () => {
                 },
             } as unknown as Account)
 
-            fusionService.setFusionAccount(account)
+            ctx.fusionService.setFusionAccount(account)
 
             expect(account.originAccountId).toBe('source-a-id::shared-native-id')
-            expect(fusionService.getFusionAccountByManagedKey(`legacy-native-id`)).toBe(account)
+            expect(ctx.fusionService.getFusionAccountByManagedKey(`legacy-native-id`)).toBe(account)
         })
 
         it('normalizes persisted origin composite key when restoring non-matched managed source accounts', () => {
@@ -2375,590 +2187,10 @@ describe('FusionService', () => {
                 },
             } as unknown as Account)
 
-            fusionService.setFusionAccount(account)
+            ctx.fusionService.setFusionAccount(account)
 
             expect(account.originAccountId).toBe('source-a-id::shared-native-id')
-            expect(fusionService.getFusionAccountByManagedKey(`legacy-native-id`)).toBe(account)
-        })
-    })
-
-    describe('identity conflict warnings', () => {
-        it('logs warning and includes identity conflict details in report', () => {
-            const tracker = new AggregationTracker()
-            fusionService.setTracker(tracker)
-            const accountA = FusionAccount.fromFusionAccount({
-                nativeIdentity: 'fusion-a',
-                identityId: 'identity-duplicate',
-                name: 'Fusion Account A',
-                sourceName: 'Identity Fusion NG',
-                uncorrelated: false,
-                attributes: {},
-            } as unknown as Account)
-            const accountB = FusionAccount.fromFusionAccount({
-                nativeIdentity: 'fusion-b',
-                identityId: 'identity-duplicate',
-                name: 'Fusion Account B',
-                sourceName: 'Identity Fusion NG',
-                uncorrelated: false,
-                attributes: {},
-            } as unknown as Account)
-
-            fusionService.setFusionAccount(accountA)
-            fusionService.setFusionAccount(accountB)
-
-            expect(mockLog.warn).toHaveBeenCalledWith(
-                expect.stringContaining('More than one Fusion account was found for identity identity-duplicate')
-            )
-
-            const report = fusionService.generateReport(tracker)
-            const conflictWarnings = report.warnings?.identityConflicts
-
-            expect(conflictWarnings?.affectedIdentities).toBe(1)
-            expect(conflictWarnings?.occurrences).toHaveLength(1)
-            expect(conflictWarnings?.occurrences[0].identityId).toBe('identity-duplicate')
-            expect(conflictWarnings?.occurrences[0].accountCount).toBe(2)
-            expect(conflictWarnings?.occurrences[0].managedKeys).toEqual([`fusion-a`, `fusion-b`])
-        })
-
-        it('does not warn when the same correlated account key is updated', () => {
-            const tracker = new AggregationTracker()
-            fusionService.setTracker(tracker)
-            const original = FusionAccount.fromFusionAccount({
-                nativeIdentity: 'fusion-a',
-                identityId: 'identity-1',
-                name: 'Fusion Account A',
-                sourceName: 'Identity Fusion NG',
-                uncorrelated: false,
-                attributes: {},
-            } as unknown as Account)
-            const refreshed = FusionAccount.fromFusionAccount({
-                nativeIdentity: 'fusion-a',
-                identityId: 'identity-1',
-                name: 'Fusion Account A Refreshed',
-                sourceName: 'Identity Fusion NG',
-                uncorrelated: false,
-                attributes: {},
-            } as unknown as Account)
-
-            fusionService.setFusionAccount(original)
-            fusionService.setFusionAccount(refreshed)
-
-            expect(mockLog.warn).not.toHaveBeenCalled()
-
-            const report = fusionService.generateReport(tracker)
-            expect(report.warnings).toBeUndefined()
-        })
-
-        it('clears identity conflict warning payload after report generation', () => {
-            const tracker = new AggregationTracker()
-            fusionService.setTracker(tracker)
-            const accountA = FusionAccount.fromFusionAccount({
-                nativeIdentity: 'fusion-a',
-                identityId: 'identity-duplicate',
-                name: 'Fusion Account A',
-                sourceName: 'Identity Fusion NG',
-                uncorrelated: false,
-                attributes: {},
-            } as unknown as Account)
-            const accountB = FusionAccount.fromFusionAccount({
-                nativeIdentity: 'fusion-b',
-                identityId: 'identity-duplicate',
-                name: 'Fusion Account B',
-                sourceName: 'Identity Fusion NG',
-                uncorrelated: false,
-                attributes: {},
-            } as unknown as Account)
-
-            fusionService.setFusionAccount(accountA)
-            fusionService.setFusionAccount(accountB)
-
-            const firstReport = fusionService.generateReport(tracker)
-            expect(firstReport.warnings?.identityConflicts?.affectedIdentities).toBe(1)
-
-            const secondReport = fusionService.generateReport(tracker)
-            expect(secondReport.warnings).toBeUndefined()
-        })
-    })
-
-    describe('processFusionIdentityDecision sourceType branches', () => {
-        it('updates the existing fusion identity account for authorized decisions', async () => {
-            const existingIdentity = {
-                id: 'identity-1',
-                name: 'Existing Identity',
-                accounts: [],
-                attributes: {},
-            } as unknown as IdentityDocument
-            const existingFusionAccount = FusionAccount.fromIdentity(existingIdentity)
-            existingFusionAccount.setNonMatched()
-            fusionService.setFusionAccount(existingFusionAccount)
-
-            const managedAccount = {
-                id: 'acct-authz-existing-1',
-                name: 'LH2 User',
-                sourceId: 'src-lh2',
-                nativeIdentity: 'lh2-authz-existing',
-                sourceName: 'LH2',
-                attributes: {},
-            } as Account
-            const managedKey = 'src-lh2::lh2-authz-existing'
-            const managedMap = new Map<string, Account>([[managedKey, managedAccount]])
-
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKey, managedAccount]]))
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
-            mockIdentities.correlateAccounts.mockResolvedValue(true)
-            vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
-                name: 'LH2',
-                correlationMode: 'correlate',
-                sourceType: 'authoritative',
-            } as any)
-
-            const decision = {
-                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: {
-                    id: managedKey,
-                    name: 'LH2 User',
-                    sourceName: 'LH2',
-                    sourceId: 'src-lh2',
-                    nativeIdentity: 'lh2-authz-existing',
-                },
-                newIdentity: false,
-                identityId: 'identity-1',
-                comments: 'Assign into existing identity',
-                finished: true,
-                sourceType: 'authoritative',
-            } as any
-
-            const result = await fusionService.processFusionIdentityDecision(decision)
-
-            expect(result).toBe(existingFusionAccount)
-            expect(result?.needsReset).toBe(false)
-            expect(result?.statuses).toContain('authorized')
-            expect(result?.statuses).not.toContain('auto')
-            expect(result?.statuses).not.toContain('nonMatched')
-            expect(result?.history.some((h) => h.includes('into existing identity by Reviewer'))).toBe(true)
-            expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(existingFusionAccount, [managedKey], 'merge')
-            expect(fusionService.getFusionIdentity('identity-1')).toBe(existingFusionAccount)
-        })
-
-        it('writes auto-merge history for system automatic-assignment decisions', async () => {
-            const existingIdentity = {
-                id: 'identity-2',
-                name: 'Existing Identity Two',
-                accounts: [],
-                attributes: {},
-            } as unknown as IdentityDocument
-            const existingFusionAccount = FusionAccount.fromIdentity(existingIdentity)
-            fusionService.setFusionAccount(existingFusionAccount)
-
-            const managedAccount = {
-                id: 'acct-auto-1',
-                name: 'LH2 User',
-                sourceId: 'src-lh2',
-                nativeIdentity: 'lh2-auto',
-                sourceName: 'LH2',
-                attributes: {},
-            } as Account
-            const managedKeyAuto = 'src-lh2::lh2-auto'
-            const managedMap = new Map<string, Account>([[managedKeyAuto, managedAccount]])
-
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKeyAuto, managedAccount]]))
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
-            mockIdentities.correlateAccounts.mockResolvedValue(true)
-            vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
-                name: 'LH2',
-                correlationMode: 'none',
-                sourceType: 'authoritative',
-            } as any)
-
-            const decision = {
-                submitter: { id: 'system', email: '', name: 'System (automatic merge)' },
-                account: {
-                    id: managedKeyAuto,
-                    name: 'LH2 User',
-                    sourceName: 'LH2',
-                    sourceId: 'src-lh2',
-                    nativeIdentity: 'lh2-auto',
-                },
-                newIdentity: false,
-                identityId: 'identity-2',
-                comments: 'Automatically assigned: exact attribute match (all rules 100, none skipped)',
-                finished: true,
-                sourceType: 'authoritative',
-                automaticMerge: true,
-            } as any
-
-            const result = await fusionService.processFusionIdentityDecision(decision)
-            expect(result?.statuses).toContain('auto')
-            expect(result?.statuses).not.toContain('authorized')
-            expect(result?.history.some((h) => h.includes('Auto-merged LH2 User [LH2] into existing identity'))).toBe(
-                true
-            )
-            expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
-            expect(mockIdentities.correlateAccounts).not.toHaveBeenCalled()
-        })
-
-        it('system automatic merge still PATCHes accounts when source correlationMode is correlate', async () => {
-            const existingIdentity = {
-                id: 'identity-auto-corr',
-                name: 'Identity Auto Corr',
-                accounts: [],
-                attributes: {},
-            } as unknown as IdentityDocument
-            const existingFusionAccount = FusionAccount.fromIdentity(existingIdentity)
-            fusionService.setFusionAccount(existingFusionAccount)
-
-            const managedAccount = {
-                id: 'acct-auto-corr-1',
-                name: 'User',
-                sourceId: 'src-lh2',
-                nativeIdentity: 'lh2-auto-corr',
-                sourceName: 'LH2',
-                attributes: {},
-            } as Account
-            const managedKeyAutoCorr = 'src-lh2::lh2-auto-corr'
-            const managedMap = new Map<string, Account>([[managedKeyAutoCorr, managedAccount]])
-
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKeyAutoCorr, managedAccount]]))
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockIdentities.getIdentityById.mockReturnValue(existingIdentity)
-            mockIdentities.correlateAccounts.mockResolvedValue(true)
-            vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
-                name: 'LH2',
-                correlationMode: 'correlate',
-                sourceType: 'authoritative',
-            } as any)
-
-            const decision = {
-                submitter: { id: 'system', email: '', name: 'System (automatic merge)' },
-                account: {
-                    id: managedKeyAutoCorr,
-                    name: 'User',
-                    sourceName: 'LH2',
-                    sourceId: 'src-lh2',
-                    nativeIdentity: 'lh2-auto-corr',
-                },
-                newIdentity: false,
-                identityId: 'identity-auto-corr',
-                comments: 'Automatically assigned: exact attribute match (all rules 100, none skipped)',
-                finished: true,
-                sourceType: 'authoritative',
-                automaticMerge: true,
-            } as any
-
-            await fusionService.processFusionIdentityDecision(decision)
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(
-                expect.any(FusionAccount),
-                [managedKeyAutoCorr],
-                'merge'
-            )
-        })
-
-        it('suppresses generic association history for authorized decisions without identityId', async () => {
-            const managedAccount = {
-                id: 'acct-authz-no-id-1',
-                name: 'LH2 User',
-                sourceId: 'src-lh2',
-                nativeIdentity: 'lh2-authz-noid',
-                sourceName: 'LH2',
-                attributes: {},
-            } as Account
-            const managedKeyNoId = 'src-lh2::lh2-authz-noid'
-            const managedMap = new Map<string, Account>([[managedKeyNoId, managedAccount]])
-
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKeyNoId, managedAccount]]))
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-
-            const decision = {
-                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: {
-                    id: managedKeyNoId,
-                    name: 'LH2 User',
-                    sourceName: 'LH2',
-                    sourceId: 'src-lh2',
-                    nativeIdentity: 'lh2-authz-noid',
-                },
-                newIdentity: false,
-                identityId: undefined,
-                comments: 'Assign into existing identity',
-                finished: true,
-                sourceType: 'authoritative',
-            } as any
-
-            const result = await fusionService.processFusionIdentityDecision(decision)
-            expect(result?.history.some((h) => h.includes('into existing identity by Reviewer'))).toBe(true)
-            expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
-        })
-
-        it('correlates accounts for authorized decisions to the selected identity in the same run', async () => {
-            const managedAccount = {
-                id: 'acct-authz-1',
-                name: 'Authorized User',
-                sourceId: 'src-auth-src',
-                nativeIdentity: 'auth-src-native-1',
-                sourceName: 'Authoritative Source',
-                attributes: {},
-            } as Account
-            const managedKeyAuthz = 'src-auth-src::auth-src-native-1'
-            const managedMap = new Map<string, Account>([[managedKeyAuthz, managedAccount]])
-
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKeyAuthz, managedAccount]]))
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockIdentities.getIdentityById.mockReturnValue(undefined as any)
-            mockIdentities.fetchIdentityById.mockResolvedValue({
-                id: 'identity-1',
-                name: 'Identity One',
-                accounts: [],
-                attributes: {},
-            } as unknown as IdentityDocument)
-            mockIdentities.correlateAccounts.mockResolvedValue(true)
-            vi.spyOn(mockSources, 'getSourceConfig').mockReturnValue({
-                name: 'Authoritative Source',
-                correlationMode: 'correlate',
-                sourceType: 'authoritative',
-            } as any)
-
-            const decision = {
-                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: {
-                    id: managedKeyAuthz,
-                    name: 'Authorized User',
-                    sourceName: 'Authoritative Source',
-                    sourceId: 'src-auth-src',
-                    nativeIdentity: 'auth-src-native-1',
-                },
-                newIdentity: false,
-                identityId: 'identity-1',
-                comments: 'Assign into existing identity',
-                finished: true,
-                sourceType: 'authoritative',
-            } as any
-
-            await fusionService.processFusionIdentityDecision(decision)
-
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledTimes(1)
-            expect(mockIdentities.correlateAccounts).toHaveBeenCalledWith(
-                expect.any(FusionAccount),
-                [managedKeyAuthz],
-                'merge'
-            )
-        })
-
-        it('registers unique attributes and skips output for record no-match decisions', async () => {
-            const managedKey = 'src-record-src::record-native-1'
-            const managedAccount = {
-                id: managedKey,
-                name: 'Record User',
-                sourceName: 'Record Source',
-                sourceId: 'src-record-src',
-                nativeIdentity: 'record-native-1',
-                attributes: {},
-            } as Account
-            const managedMap = new Map<string, Account>([[managedKey, managedAccount]])
-            Object.defineProperty(run, 'managedAccountsById', {
-                get: () => managedMap,
-                configurable: true,
-            })
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[managedKey, managedAccount]]))
-            run.sourcesByName.set('Record Source', {
-                id: 'src-record-src',
-                name: 'Record Source',
-                sourceType: 'record',
-                config: {},
-            })
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
-            const registerRecordSpy = vi
-                .spyOn(mockDefinitionService, 'registerUniqueValuesFromRecordManagedAccount')
-                .mockResolvedValue(undefined)
-
-            const decision = {
-                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: {
-                    id: managedKey,
-                    name: 'Record User',
-                    sourceName: 'Record Source',
-                    sourceId: 'src-record-src',
-                    nativeIdentity: 'record-native-1',
-                },
-                newIdentity: true,
-                identityId: undefined,
-                comments: 'No matching identity',
-                finished: true,
-                sourceType: 'record',
-            } as any
-
-            const result = await fusionService.processFusionIdentityDecision(decision)
-
-            expect(result).toBeUndefined()
-            expect(registerRecordSpy).toHaveBeenCalledWith(managedAccount, mockMappingService, run)
-            expect(mockDefinitionService.registerUniqueAttributes).not.toHaveBeenCalled()
-        })
-
-        it('safely skips orphan disable queue when account is no longer in managed map', async () => {
-            const managedKeyOrphan = 'src-orphan-1::orphan-native-1'
-            const managedMap = new Map<string, Account>()
-
-            Object.defineProperty(run, 'managedAccountsById', {
-                get: () => managedMap,
-                configurable: true,
-            })
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map())
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-            ;(fusionService as any).run.sourcesByName.set('Orphan Source', {
-                id: 'src-orphan-1',
-                name: 'Orphan Source',
-                sourceType: 'orphan',
-                config: { disableNonMatchingAccounts: true },
-            })
-
-            const queueDisableSpy = vi.spyOn(fusionService.run, 'queueDisableOperation').mockImplementation(() => {})
-            const decision = {
-                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: {
-                    id: managedKeyOrphan,
-                    name: 'Orphan User',
-                    sourceName: 'Orphan Source',
-                    sourceId: 'src-orphan-1',
-                    nativeIdentity: 'orphan-native-1',
-                },
-                newIdentity: true,
-                identityId: undefined,
-                comments: 'Reject orphan match',
-                finished: true,
-                sourceType: 'orphan',
-            } as any
-
-            const result = await fusionService.processFusionIdentityDecision(decision)
-
-            expect(result).toBeUndefined()
-            expect(queueDisableSpy).not.toHaveBeenCalled()
-        })
-
-        it('registers a new fusion account for authoritative new-identity decisions', async () => {
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(new Map())
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map())
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-
-            const setFusionAccountSpy = vi.spyOn(fusionService.run, 'registerFusionAccount')
-            const decision = {
-                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
-                account: {
-                    id: 'src-auth-src::auth-new-native-1',
-                    name: 'Auth User',
-                    sourceName: 'Authoritative Source',
-                    sourceId: 'src-auth-src',
-                    nativeIdentity: 'auth-new-native-1',
-                },
-                newIdentity: true,
-                identityId: undefined,
-                comments: 'Create new identity',
-                finished: true,
-                sourceType: 'authoritative',
-            } as any
-
-            const result = await fusionService.processFusionIdentityDecision(decision)
-
-            expect(result).toBeDefined()
-            expect(setFusionAccountSpy).toHaveBeenCalledTimes(1)
-        })
-    })
-
-    describe('history consistency safeguards', () => {
-        it('does not duplicate set-history messages on no-op add', () => {
-            const fusionAccount = FusionAccount.fromManagedAccount({
-                id: 'acct-history-noop-1',
-                name: 'History User',
-                sourceId: 'src-history',
-                nativeIdentity: 'hist-noop',
-                sourceName: 'History Source',
-                attributes: {},
-            } as Account)
-
-            fusionAccount.addStatus(StatusEntitlement.Candidate, 'Set candidate status')
-            fusionAccount.addStatus(StatusEntitlement.Candidate, 'Set candidate status')
-
-            const duplicateMessages = fusionAccount.history.filter((h) => h.includes('Set candidate status'))
-            expect(duplicateMessages).toHaveLength(1)
-        })
-
-        it('normalizes imported history by trimming and removing blank entries', () => {
-            const fusionAccount = FusionAccount.fromManagedAccount({
-                id: 'acct-history-import-1',
-                name: 'History User',
-                sourceId: 'src-history',
-                nativeIdentity: 'hist-import',
-                sourceName: 'History Source',
-                attributes: {},
-            } as Account)
-
-            fusionAccount.importHistory(['   ', 'first-entry', 'first-entry', '  second-entry  '])
-
-            expect(fusionAccount.history).toEqual(['first-entry', 'second-entry'])
-        })
-
-        it('uses fallback labels when decision names are blank', async () => {
-            const managedAccount = {
-                id: 'acct-history-fallback-1',
-                name: 'LH2 User',
-                sourceId: 'src-lh2',
-                nativeIdentity: 'hist-fallback',
-                sourceName: 'LH2',
-                attributes: {},
-            } as Account
-            const histKey = 'src-lh2::hist-fallback'
-            const managedMap = new Map<string, Account>([[histKey, managedAccount]])
-
-            vi.spyOn(mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            vi.spyOn(mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
-            seedRunInventory(run, new Map([[histKey, managedAccount]]))
-            mockMappingService.mapAttributes.mockImplementation((account) => account)
-            mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
-
-            const decision = {
-                submitter: { id: 'reviewer-1', email: ' ', name: ' ' },
-                account: {
-                    id: histKey,
-                    name: '  ',
-                    sourceName: '  ',
-                    sourceId: 'src-lh2',
-                    nativeIdentity: 'hist-fallback',
-                },
-                newIdentity: false,
-                comments: 'Assign into existing identity',
-                finished: true,
-                sourceType: 'authoritative',
-            } as any
-
-            const result = await fusionService.processFusionIdentityDecision(decision)
-            expect(
-                result?.history.some((h) =>
-                    h.includes('Merged Unknown account [Unknown source] into existing identity by Unknown reviewer')
-                )
-            ).toBe(true)
+            expect(ctx.fusionService.getFusionAccountByManagedKey(`legacy-native-id`)).toBe(account)
         })
     })
 
@@ -2977,12 +2209,12 @@ describe('FusionService', () => {
             )
 
             for (const account of accounts) {
-                fusionService.setFusionAccount(account)
+                ctx.fusionService.setFusionAccount(account)
             }
 
             let inFlight = 0
             let maxInFlight = 0
-            vi.spyOn(fusionService as any, 'getISCAccount').mockImplementation(async (...args: any[]) => {
+            vi.spyOn(ctx.fusionService as any, 'getISCAccount').mockImplementation(async (...args: any[]) => {
                 const account = args[0] as FusionAccount
                 inFlight += 1
                 maxInFlight = Math.max(maxInFlight, inFlight)
@@ -2991,7 +2223,7 @@ describe('FusionService', () => {
                 return { key: account.managedKey, attributes: {}, disabled: false }
             })
 
-            const { sent: count } = await fusionService.forEachISCAccount((account) => {
+            const { sent: count } = await ctx.fusionService.forEachISCAccount((account) => {
                 sentKeys.push(String(account.key))
             })
 
@@ -3001,47 +2233,4 @@ describe('FusionService', () => {
         })
     })
 
-    describe('initializeManagedAccountProcessing captureBreakdown wiring', () => {
-        async function initializeWithReportCaptureFlag(shouldCaptureReportData: boolean): Promise<FusionService> {
-            const localRun = new FusionRun()
-            localRun.log = mockLog
-            Object.defineProperty(localRun, 'managedAccountsById', {
-                get: () => new Map(),
-                configurable: true,
-            })
-
-            mockMatchingService.buildTrigramIndex = vi.fn()
-            mockMatchingService.setCaptureBreakdown = vi.fn()
-
-            const service = new FusionService(
-                mockConfig,
-                mockLog,
-                mockIdentities,
-                mockSources,
-                mockForms,
-                mockMappingService,
-                mockDefinitionService,
-                mockMatchingService,
-                mockSchemas,
-                localRun,
-                StandardCommand.StdAccountList,
-                shouldCaptureReportData
-            )
-            service.setTracker(new AggregationTracker())
-
-            await service.initializeManagedAccountProcessing()
-            return service
-        }
-
-        it('sets captureBreakdown false when report capture is disabled', async () => {
-            await initializeWithReportCaptureFlag(false)
-            expect(mockMatchingService.setCaptureBreakdown).toHaveBeenCalledWith(false)
-        })
-
-        it('sets captureBreakdown true when report capture is enabled', async () => {
-            vi.mocked(mockMatchingService.setCaptureBreakdown).mockClear()
-            await initializeWithReportCaptureFlag(true)
-            expect(mockMatchingService.setCaptureBreakdown).toHaveBeenCalledWith(true)
-        })
-    })
 })
