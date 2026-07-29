@@ -1,19 +1,21 @@
 import { FusionAccount } from '../../model/account'
 import { FusionRun } from '../../model/fusionRun'
 import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
-import { MatchingConfig, SourceType } from '../../model/config'
+import { FusionConfig, SourceType } from '../../model/config'
 import { SourceInfo } from '../sourceService'
 import { coerceBoolean } from '../../utils/safeRead'
 import { rankFusionMatchesForReview } from '../fusionService/helpers'
 import { isExactAttributeMatchScores } from './exactMatch'
-import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
+import { FusionMatch, MatchCandidateType } from './types'
+import { LogService } from '../logService'
+import { resolveFusionMaxCandidatesForForm } from '../../data/config'
 
 
 /**
  * Builds info-log headline and "- N candidate(s), M partial(s)" suffix from match scores.
  * "candidate(s)" counts exact (all rules 100, none skipped); "partial(s)" are other matches in the set.
  */
-export function formatFusionMatchDiscoveryLog(
+function formatFusionMatchDiscoveryLog(
     matches: ReadonlyArray<FusionMatch>,
     deferred: boolean
 ): { headline: string; summary: string } {
@@ -38,12 +40,63 @@ export function formatFusionMatchDiscoveryLog(
     }
 }
 
+export function isPersistedOrFinalizedDeferredTier(tier: string | undefined): boolean {
+    return tier === 'persisted' || tier === 'finalized'
+}
+
+export interface LogMatchDiscoveryOptions {
+    /** Appended to the debug line after the summary (e.g. "; skipping account for now"). */
+    debugSuffix?: string
+}
+
+/** Record match discovery metrics and optional debug log for identity or deferred candidates. */
+export function logFusionMatchDiscovery(
+    log: Pick<LogService, 'recordEvent' | 'getLogLevel' | 'debug'>,
+    matches: ReadonlyArray<FusionMatch>,
+    deferred: boolean,
+    accountName: string,
+    sourceName: string | undefined,
+    options?: LogMatchDiscoveryOptions
+): void {
+    const { headline, summary } = formatFusionMatchDiscoveryLog(matches, deferred)
+    const eventType = deferred ? 'deferred' : headline.includes('EXACT') ? 'exact' : 'partial'
+    log.recordEvent('match', { type: eventType })
+    if (log.getLogLevel() === 'debug') {
+        const suffix = options?.debugSuffix ?? ''
+        log.debug(`${headline}: ${accountName} [${sourceName}] - ${summary}${suffix}`)
+    }
+}
+
+/** Log deferred-match discovery using persisted/finalized anchors, ranked and capped for review. */
+export function logDeferredMatchDiscoveryForReview(
+    log: Pick<LogService, 'recordEvent' | 'getLogLevel' | 'debug'>,
+    fusionAccount: FusionAccount,
+    run: FusionRun,
+    config: Pick<FusionConfig, 'fusionMaxCandidatesForForm'>,
+    accountName: string,
+    sourceName: string | undefined,
+    options?: LogMatchDiscoveryOptions
+): void {
+    const maxCandidates = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
+    const deferredMatches = anchorDeferredMatchesForReview(fusionAccount, run, maxCandidates)
+    logFusionMatchDiscovery(log, deferredMatches, true, accountName, sourceName, options)
+}
+
 export function hasIdentityCandidateMatches(fusionAccount: FusionAccount): boolean {
     return fusionAccount.fusionMatches.some((match) => (match.candidateType ?? 'identity') === 'identity')
 }
 
 export function hasDeferredCandidateMatches(fusionAccount: FusionAccount): boolean {
     return fusionAccount.fusionMatches.some((match) => match.candidateType === 'deferred')
+}
+
+/** True when the account matched with deferred candidates only (no identity candidates). */
+export function hasDeferredOnlyCandidateMatches(fusionAccount: FusionAccount): boolean {
+    return (
+        fusionAccount.isMatch &&
+        !hasIdentityCandidateMatches(fusionAccount) &&
+        hasDeferredCandidateMatches(fusionAccount)
+    )
 }
 
 /**
@@ -57,7 +110,7 @@ export function hasActionableDeferredAnchorMatch(fusionAccount: FusionAccount, r
         const candidate = match.fusionIdentity
         if (!candidate) continue
         const tier = run.getDeferredCandidateTier(candidate)
-        if (tier === 'persisted' || tier === 'finalized') return true
+        if (isPersistedOrFinalizedDeferredTier(tier)) return true
     }
     return false
 }
@@ -69,7 +122,7 @@ export function anchorDeferredMatches(fusionAccount: FusionAccount, run: FusionR
         const candidate = match.fusionIdentity
         if (!candidate) return false
         const tier = run.getDeferredCandidateTier(candidate)
-        return tier === 'persisted' || tier === 'finalized'
+        return isPersistedOrFinalizedDeferredTier(tier)
     })
 }
 
@@ -146,5 +199,7 @@ export function isRecordMatchingEnabledForSource(
     }
     return coerceBoolean(info?.config?.includeRecordAccountsForMatching) ?? true
 }
+
+
 
 

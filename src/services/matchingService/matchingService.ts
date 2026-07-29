@@ -2,7 +2,7 @@ import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { assert } from '../../utils/assert'
 import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing, effectiveSkipMatchIfThresholdNotMet } from '../../model/config'
-import { defaultFusionMaxCandidatesForForm } from '../../data/config'
+import { resolveFusionMaxCandidatesForForm } from '../../data/config'
 import {
     countIdentityCandidateFusionMatches,
 } from './matchingHelpers'
@@ -44,6 +44,45 @@ function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreRepo
         skipped: true,
         comment,
     }
+}
+
+
+const MANDATORY_FAIL_SKIP_COMMENT = 'Rule skipped (mandatory attribute failed)'
+const THRESHOLD_SKIP_COMMENT = 'Rule skipped (combined score cannot reach threshold)'
+
+function appendSkippedRemainingRules(
+    scores: ScoreReport[],
+    startIndex: number,
+    matchingConfigs: MatchingConfig[],
+    comment: string
+): void {
+    for (let r = startIndex; r < matchingConfigs.length; r++) {
+        scores.push(makeSkippedReport(matchingConfigs[r], comment))
+    }
+}
+
+
+function evaluateCombinedScoreOutcome(
+    weightedSum: number,
+    weightTotal: number,
+    manualReviewScore: number,
+    hasFailedMandatory: boolean
+): { combinedScore: number; hasContributing: boolean; combinedPasses: boolean } {
+    const combinedScore = weightTotal > 0 ? weightedSum / weightTotal : 0
+    const hasContributing = weightTotal > 0
+    const combinedPasses = hasContributing && combinedScore >= manualReviewScore && !hasFailedMandatory
+    return { combinedScore, hasContributing, combinedPasses }
+}
+
+function combinedScoreComment(
+    combinedPasses: boolean,
+    hasFailedMandatory: boolean,
+    hasContributing: boolean
+): string {
+    if (combinedPasses) return 'Combined score meets minimum threshold'
+    if (hasFailedMandatory) return 'Combined score invalidated by failed mandatory attribute'
+    if (!hasContributing) return 'No rules contributed to combined score'
+    return 'Combined score is below minimum threshold'
 }
 
 /** Algorithm id for the synthetic combined score row (excluded from exact-match checks). */
@@ -88,7 +127,7 @@ export class MatchingService {
         this.matchingConfigs = config.matchingConfigs ?? []
         this.fusionManualReviewScore = config.fusionManualReviewScore ?? 0
         this.fusionEnableAutoMerge = config.fusionEnableAutoMerge ?? false
-        this.fusionMaxIdentityMatchCandidates = config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
+        this.fusionMaxIdentityMatchCandidates = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
         this.fusionScoreMap = config.fusionScoreMap ?? new Map()
     }
 
@@ -451,11 +490,7 @@ export class MatchingService {
                 scores.push(lig3UpperBoundSkip)
                 if (matching.mandatory) {
                     hasFailedMandatory = true
-                    for (let r = i + 1; r < this.matchingConfigs.length; r++) {
-                        scores.push(
-                            makeSkippedReport(this.matchingConfigs[r], 'Rule skipped (mandatory attribute failed)')
-                        )
-                    }
+                    appendSkippedRemainingRules(scores, i + 1, this.matchingConfigs, MANDATORY_FAIL_SKIP_COMMENT)
                     break
                 }
                 continue
@@ -476,11 +511,7 @@ export class MatchingService {
             }
             if (matching.mandatory && !scoreReport.isMatch) {
                 hasFailedMandatory = true
-                // Push skipped entries for all remaining rules so the scores
-                // array stays structurally complete for report rendering.
-                for (let r = i + 1; r < this.matchingConfigs.length; r++) {
-                    scores.push(makeSkippedReport(this.matchingConfigs[r], 'Rule skipped (mandatory attribute failed)'))
-                }
+                appendSkippedRemainingRules(scores, i + 1, this.matchingConfigs, MANDATORY_FAIL_SKIP_COMMENT)
                 break
             }
             if (
@@ -489,21 +520,17 @@ export class MatchingService {
                 MatchingService.maxAchievableCombinedScore(weightedSum, weightTotal, i + 1, this.matchingConfigs) <
                     this.fusionManualReviewScore
             ) {
-                for (let r = i + 1; r < this.matchingConfigs.length; r++) {
-                    scores.push(
-                        makeSkippedReport(
-                            this.matchingConfigs[r],
-                            'Rule skipped (combined score cannot reach threshold)'
-                        )
-                    )
-                }
+                appendSkippedRemainingRules(scores, i + 1, this.matchingConfigs, THRESHOLD_SKIP_COMMENT)
                 break
             }
         }
 
-        const combinedScore = weightTotal > 0 ? weightedSum / weightTotal : 0
-        const hasContributing = weightTotal > 0
-        const combinedPasses = hasContributing && combinedScore >= this.fusionManualReviewScore && !hasFailedMandatory
+        const { combinedScore, hasContributing, combinedPasses } = evaluateCombinedScoreOutcome(
+            weightedSum,
+            weightTotal,
+            this.fusionManualReviewScore,
+            hasFailedMandatory
+        )
 
         if (weightTotal > 0) {
             for (const s of scores) {
@@ -520,13 +547,7 @@ export class MatchingService {
             mandatory: true,
             score: Math.round(combinedScore * 100) / 100,
             isMatch: combinedPasses,
-            comment: combinedPasses
-                ? 'Combined score meets minimum threshold'
-                : hasFailedMandatory
-                  ? 'Combined score invalidated by failed mandatory attribute'
-                  : !hasContributing
-                    ? 'No rules contributed to combined score'
-                    : 'Combined score is below minimum threshold',
+            comment: combinedScoreComment(combinedPasses, hasFailedMandatory, hasContributing),
         }
         scores.push(combinedReport)
 
@@ -606,9 +627,12 @@ export class MatchingService {
             }
         }
 
-        const combinedScore = weightTotal > 0 ? weightedSum / weightTotal : 0
-        const hasContributing = weightTotal > 0
-        return hasContributing && combinedScore >= this.fusionManualReviewScore && !hasFailedMandatory
+        return evaluateCombinedScoreOutcome(
+            weightedSum,
+            weightTotal,
+            this.fusionManualReviewScore,
+            hasFailedMandatory
+        ).combinedPasses
     }
 
     /**

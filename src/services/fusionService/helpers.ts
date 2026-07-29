@@ -5,7 +5,7 @@ import { trimStr } from '../../utils/safeRead'
 import { roundMetric2 } from '../../utils/numbers'
 import { UrlContext } from '../../utils/url'
 import type { FusionMatch, ScoreReport } from '../matchingService/types'
-import { isCompositeManagedAccountKey } from '../../model/managedAccountKey'
+import { isCompositeManagedAccountKey, normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import {
     FusionReportAccount,
     FusionReportIdentityConflictOccurrence,
@@ -14,6 +14,11 @@ import {
     FusionReportWarnings,
 } from './types'
 import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
+import { anchorDeferredMatchesForReview } from '../matchingService/matchingHelpers'
+import { MatchCandidateType } from '../matchingService/types'
+import { FusionRun } from '../../model/fusionRun'
+import { SourceService } from '../sourceService'
+import { resolveReportAccountIdValue } from './reportAccountResolver'
 
 
 /**
@@ -114,7 +119,7 @@ export function fusionReportMatchCandidateAccountFields(
 }
 
 /** Deferred-match candidate fields prefer the managed account key over any linked identity id. */
-export function fusionReportDeferredMatchCandidateFields(
+function fusionReportDeferredMatchCandidateFields(
     match: FusionMatch
 ): Pick<FusionReportMatch, 'accountId' | 'accountName'> {
     const fi = match.fusionIdentity
@@ -127,6 +132,40 @@ export function fusionReportDeferredMatchCandidateFields(
         accountId: id || undefined,
         accountName: match.identityName,
     }
+}
+
+function resolveDeferredMatchCandidateUrl(
+    match: FusionMatch,
+    urlContext: UrlContext,
+    sources: SourceService
+): string | undefined {
+    const fields = fusionReportDeferredMatchCandidateFields(match)
+    const fi = match.fusionIdentity
+    const deferredCandidateIdentityId = fi?.identityId
+    const managedKey = fi?.managedKeyOrUndefined ?? fi?.managedAccountId ?? fields.accountId
+    const managedAccountReportId = resolveReportAccountIdValue(managedKey, sources)
+    if (managedAccountReportId) return urlContext.humanAccount(managedAccountReportId)
+    if (deferredCandidateIdentityId) return urlContext.identity(deferredCandidateIdentityId)
+    return undefined
+}
+
+export function buildDeferredMatchReportRows(
+    fusionAccount: FusionAccount,
+    run: FusionRun,
+    maxCandidates: number | undefined,
+    urlContext: UrlContext,
+    sources: SourceService
+): FusionReportMatch[] {
+    return anchorDeferredMatchesForReview(fusionAccount, run, maxCandidates).map((match) => ({
+        ...fusionReportDeferredMatchCandidateFields(match),
+        identityName: match.identityName,
+        identityId: match.fusionIdentity?.identityId,
+        identityUrl: resolveDeferredMatchCandidateUrl(match, urlContext, sources),
+        isMatch: true,
+        candidateType: MatchCandidateType.Deferred,
+        exact: isExactAttributeMatchScores(match.scores),
+        scores: mapScoreReportsForFusionReport(match.scores),
+    }))
 }
 
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {
@@ -209,5 +248,12 @@ export function buildIdentityConflictWarningsFromMap(
     }
 }
 
+/** Managed keys to skip generic blend-history when a decision already recorded history for that account. */
+export function skipBlendHistoryKeysForDecisionAccountId(
+    decisionAccountId: string | undefined | null
+): ReadonlySet<string> | undefined {
+    const normalized = normalizeCompositeManagedAccountKey(trimStr(decisionAccountId) ?? '')
+    return normalized ? new Set([normalized]) : undefined
+}
 
 

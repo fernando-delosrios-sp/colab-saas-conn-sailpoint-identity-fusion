@@ -19,6 +19,10 @@ export function defaultFusionMaxCandidatesForForm(): number {
     return connectorSpecInitialValues.fusionMaxCandidatesForForm
 }
 
+export function resolveFusionMaxCandidatesForForm(configured: number | undefined): number {
+    return configured ?? defaultFusionMaxCandidatesForForm()
+}
+
 export function readSettings(raw: Record<string, unknown>): ReviewSettingsSection {
     const rawMaxCandidates =
         raw.fusionMaxCandidatesForForm !== undefined
@@ -39,3 +43,4 @@ export function readSettings(raw: Record<string, unknown>): ReviewSettingsSectio
         fusionReportOnAggregation: raw.fusionReportOnAggregation as boolean | undefined,
     }
 }
+

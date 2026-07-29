@@ -7,18 +7,16 @@ import { AggregationTracker } from '../../model/aggregationTracker'
 import { FusionRun } from '../../model/fusionRun'
 import {
     buildMinimalFusionReportAccount,
-    fusionReportDeferredMatchCandidateFields,
-    mapScoreReportsForFusionReport,
+    buildDeferredMatchReportRows,
 } from './helpers'
 import {
-    anchorDeferredMatchesForReview,
-    formatFusionMatchDiscoveryLog,
+    identityMatchesForReview,
     isDeferredMatchingEnabledForSource,
+    logFusionMatchDiscovery,
 } from '../matchingService/matchingHelpers'
-import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
-import { ManagedAccountAnalysisContext, MatchCandidateType } from '../matchingService/types'
-import { defaultFusionMaxCandidatesForForm } from '../../data/config'
-import { resolveReportAccountId, resolveReportAccountIdValue } from './reportAccountResolver'
+import { ManagedAccountAnalysisContext } from '../matchingService/types'
+import { resolveFusionMaxCandidatesForForm } from '../../data/config'
+import { resolveReportAccountId } from './reportAccountResolver'
 
 export interface ManagedAccountAnalysisRecorderDeps {
     log: LogService
@@ -51,17 +49,16 @@ export class ManagedAccountAnalysisRecorder {
         const trackerInstance = tracker()
 
         trackerInstance.fusionIdentityComparisonsByAccount.set(fusionAccount, fusionIdentityComparisons)
+        const maxCandidates = resolveFusionMaxCandidatesForForm(this.deps.config.fusionMaxCandidatesForForm)
         if (fusionAccount.isMatch) {
             if (hasIdentityCandidateMatches) {
-                const identityMatches = fusionAccount.fusionMatches.filter(
-                    (m) => (m.candidateType ?? MatchCandidateType.Identity) === MatchCandidateType.Identity
+                logFusionMatchDiscovery(
+                    log,
+                    identityMatchesForReview(fusionAccount, maxCandidates),
+                    false,
+                    name,
+                    sourceName
                 )
-                const { headline, summary } = formatFusionMatchDiscoveryLog(identityMatches, false)
-                const matchType = headline.includes('EXACT') ? 'exact' : 'partial'
-                log.recordEvent('match', { type: matchType })
-                if (log.getLogLevel() === 'debug') {
-                    log.debug(`${headline}: ${name} [${sourceName}] - ${summary}`)
-                }
             }
             if (!shouldCaptureReportData()) return
             const reportAccountId = resolveReportAccountId(fusionAccount, sources)
@@ -70,29 +67,13 @@ export class ManagedAccountAnalysisRecorder {
                 return
             }
             const sourceTypeValue = sourcesByName.get(fusionAccount.sourceName)?.sourceType
-            const maxCandidates = this.deps.config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
-            const deferredMatches = anchorDeferredMatchesForReview(fusionAccount, this.deps.run, maxCandidates).map((match) => {
-                    const fields = fusionReportDeferredMatchCandidateFields(match)
-                    const fi = match.fusionIdentity
-                    const deferredCandidateIdentityId = fi?.identityId
-                    const managedKey = fi?.managedKeyOrUndefined ?? fi?.managedAccountId ?? fields.accountId
-                    const managedAccountReportId = resolveReportAccountIdValue(managedKey, sources)
-                    const identityUrl = managedAccountReportId
-                        ? urlContext.humanAccount(managedAccountReportId)
-                        : deferredCandidateIdentityId
-                          ? urlContext.identity(deferredCandidateIdentityId)
-                          : undefined
-                    return {
-                        ...fields,
-                        identityName: match.identityName,
-                        identityId: deferredCandidateIdentityId,
-                        identityUrl,
-                        isMatch: true,
-                        candidateType: MatchCandidateType.Deferred,
-                        exact: isExactAttributeMatchScores(match.scores),
-                        scores: mapScoreReportsForFusionReport(match.scores),
-                    }
-                })
+            const deferredMatches = buildDeferredMatchReportRows(
+                fusionAccount,
+                this.deps.run,
+                maxCandidates,
+                urlContext,
+                sources
+            )
             trackerInstance.deferredMatchReportData.push({
                 ...buildMinimalFusionReportAccount(
                     fusionAccount,
@@ -147,6 +128,7 @@ export class ManagedAccountAnalysisRecorder {
         })
     }
 }
+
 
 
 

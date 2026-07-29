@@ -19,7 +19,7 @@ import {
     PendingReviewReviewerContext,
     PendingReviewAccountContext,
 } from './types'
-import { defaultFusionMaxCandidatesForForm, internalConfig } from '../../data/config'
+import { resolveFusionMaxCandidatesForForm, internalConfig } from '../../data/config'
 import { createAutomaticMergeDecision, resolveCandidateDisplayName, resolveIdentitiesSelectLabel } from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 import {
@@ -73,7 +73,7 @@ export class FormService {
         this.fusionFormNamePattern = config.fusionFormNamePattern
         this.fusionFormExpirationDays = config.fusionFormExpirationDays
         this.fusionFormAttributes = config.fusionFormAttributes
-        this.fusionMaxCandidatesForForm = config.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
+        this.fusionMaxCandidatesForForm = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
     }
 
     // ------------------------------------------------------------------------
