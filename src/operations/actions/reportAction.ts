@@ -1,7 +1,7 @@
 import { AttributeChangeOp } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { ServiceRegistry } from '../../services/serviceRegistry'
-import { buildReportContext, fetchResultToAggregationStats } from '../helpers/accountListPhases'
+import { buildReportContext, buildReportAggregationStats } from '../helpers/accountListPhases'
 import { generateReport } from '../helpers/generateReport'
 import { ActionChange } from './types'
 
@@ -18,6 +18,11 @@ export const reportAction = async (
 ): Promise<void> => {
     if (change.op === AttributeChangeOp.Add) {
         const { fetchResult, timer } = await buildReportContext(serviceRegistry)
-        await generateReport(false, serviceRegistry, fetchResultToAggregationStats(fetchResult, timer))
+        await generateReport(
+            false,
+            serviceRegistry,
+            buildReportAggregationStats(fetchResult, timer, serviceRegistry.identities)
+        )
     }
 }
+

@@ -1,10 +1,15 @@
 import { readFileSync } from 'fs'
 import * as path from 'path'
-import { connectorSpecInitialValues, defaultFusionMaxCandidatesForForm } from '../config'
+import { connectorSpecInitialValues, defaultFusionMaxCandidatesForForm, resolveFusionMaxCandidatesForForm } from '../config'
 
 describe('connector defaults alignment', () => {
     it('defaultFusionMaxCandidatesForForm matches connectorSpecInitialValues', () => {
         expect(defaultFusionMaxCandidatesForForm()).toBe(connectorSpecInitialValues.fusionMaxCandidatesForForm)
+    })
+
+    it('resolveFusionMaxCandidatesForForm falls back to default when unset', () => {
+        expect(resolveFusionMaxCandidatesForForm(undefined)).toBe(defaultFusionMaxCandidatesForForm())
+        expect(resolveFusionMaxCandidatesForForm(5)).toBe(5)
     })
 
     it('connector-spec sourceConfigInitialValues matches connectorSpecInitialValues', () => {
@@ -17,3 +22,4 @@ describe('connector defaults alignment', () => {
         expect(actualInitialValues).toEqual(specInitialValues)
     })
 })
+

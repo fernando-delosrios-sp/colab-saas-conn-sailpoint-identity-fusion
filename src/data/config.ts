@@ -4,4 +4,6 @@ export {
     internalConfig,
     connectorSpecInitialValues,
     defaultFusionMaxCandidatesForForm,
+    resolveFusionMaxCandidatesForForm,
 } from './config/index'
+

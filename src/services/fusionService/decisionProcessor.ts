@@ -6,8 +6,8 @@ import { LogService } from '../logService'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 import { trimStr } from '../../utils/safeRead'
-import { compact } from './collections'
-import { batchProcess } from './collections'
+import { compact, batchProcess } from './collections'
+import { skipBlendHistoryKeysForDecisionAccountId } from './helpers'
 import { FusionRun } from '../../model/fusionRun'
 import type { FormService } from '../formService'
 import type { IdentityService } from '../identityService'
@@ -55,26 +55,13 @@ export class DecisionProcessor {
 
         // Clear stale transient state, re-apply candidate statuses, and sync attributes.
         for (const account of this.run.fusionAccountsIterable()) {
-            account.removeStatus(StatusEntitlement.Candidate)
-            account.clearFusionReviews()
-
-            const iid = account.identityId
-            if (iid && candidateIdsNeedingStatus.has(iid)) {
-                account.addStatus(StatusEntitlement.Candidate)
-            }
-
+            this.reconcileCandidateStatus(account, candidateIdsNeedingStatus)
             account.syncCollectionAttributesToBag()
         }
 
         for (const identity of this.run.allFusionIdentities) {
+            this.reconcileCandidateStatus(identity, candidateIdsNeedingStatus)
             const identityId = identity.identityId
-            identity.removeStatus(StatusEntitlement.Candidate)
-            identity.clearFusionReviews()
-
-            if (identityId && candidateIdsNeedingStatus.has(identityId)) {
-                identity.addStatus(StatusEntitlement.Candidate)
-            }
-
             if (identityId) {
                 const urls = pendingReviewUrlsByReviewerId.get(identityId)
                 if (urls?.length) {
@@ -83,8 +70,17 @@ export class DecisionProcessor {
                     }
                 }
             }
-
             identity.syncCollectionAttributesToBag()
+        }
+    }
+
+    private reconcileCandidateStatus(account: FusionAccount, candidateIdsNeedingStatus: Set<string>): void {
+        account.removeStatus(StatusEntitlement.Candidate)
+        account.clearFusionReviews()
+
+        const identityId = account.identityId
+        if (identityId && candidateIdsNeedingStatus.has(identityId)) {
+            account.addStatus(StatusEntitlement.Candidate)
         }
     }
 
@@ -176,11 +172,8 @@ export class DecisionProcessor {
         fusionAccount.setNeedsReset(Boolean(fusionDecision.newIdentity))
         fusionAccount.addFusionDecisionLayer(fusionDecision)
 
-        const rawDecisionKey = trimStr(fusionDecision.account.id) ?? ''
-        const normalizedDecisionKey = normalizeCompositeManagedAccountKey(rawDecisionKey)
-        const skipBlendHistoryForManagedKeys = normalizedDecisionKey
-            ? new Set([normalizedDecisionKey])
-            : undefined
+        const normalizedDecisionKey = normalizeCompositeManagedAccountKey(trimStr(fusionDecision.account.id) ?? '')
+        const skipBlendHistoryForManagedKeys = skipBlendHistoryKeysForDecisionAccountId(fusionDecision.account.id)
         const managedAccountForNoMatch = normalizedDecisionKey
             ? this.run.managedAccountsById.get(normalizedDecisionKey)
             : undefined
@@ -302,10 +295,3 @@ export class DecisionProcessor {
         }
     }
 }
-
-
-
-
-
-
-

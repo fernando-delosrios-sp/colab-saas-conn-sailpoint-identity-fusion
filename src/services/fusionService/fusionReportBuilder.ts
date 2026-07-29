@@ -12,7 +12,7 @@ import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
 import { UrlContext } from '../../utils/url'
 import { SourceInfo, SourceService } from '../sourceService'
 import { resolveReportAccountId } from './reportAccountResolver'
-import { defaultFusionMaxCandidatesForForm } from '../../data/config'
+import { resolveFusionMaxCandidatesForForm } from '../../data/config'
 import { MatchCandidateType } from '../matchingService/types'
 
 export interface FusionReportState {
@@ -65,7 +65,7 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
     const accounts: FusionReportAccount[] = []
 
     for (const fusionAccount of state.matchAccounts) {
-        const maxCandidates = state.fusionMaxCandidatesForForm ?? defaultFusionMaxCandidatesForForm()
+        const maxCandidates = resolveFusionMaxCandidatesForForm(state.fusionMaxCandidatesForForm)
         const fusionMatches = identityMatchesForReview(fusionAccount, maxCandidates)
         if (fusionMatches.length === 0) continue
 
@@ -137,5 +137,6 @@ function buildNonMatchAccounts(state: FusionReportState): FusionReportAccount[] 
     nonMatchAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
     return nonMatchAccounts
 }
+
 
 
