@@ -78,10 +78,10 @@ describe('FusionRun', () => {
             expect(run.isRecordMode).toBe(false)
         })
 
-        it('falls back to RECORD_MODE env var when config has no recording.mode', () => {
+        it('is false when recording.mode resolved to off despite RECORD_MODE env var', () => {
             process.env.RECORD_MODE = 'true'
-            const run = new FusionRun(undefined, {} as any)
-            expect(run.isRecordMode).toBe(true)
+            const run = new FusionRun(undefined, { recording: { mode: 'off' } } as any)
+            expect(run.isRecordMode).toBe(false)
             delete process.env.RECORD_MODE
         })
     })
@@ -356,6 +356,7 @@ function makeMockRecorder(options: { tracker: AggregationTracker; run?: FusionRu
     }
     return recorder
 }
+
 
 
 

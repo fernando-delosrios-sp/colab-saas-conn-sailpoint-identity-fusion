@@ -4,6 +4,7 @@ import { IscApiAdapter } from './iscApiAdapter'
 import { ApiLogEntry } from './recordingApiAdapter'
 import { ConnectorError } from '@sailpoint/connector-sdk'
 import { isWriteMethod, stableApiCallKey } from './apiWriteClassification'
+import { loadRecordingApiLog } from '../recordingService/recordingStore'
 
 function stableKey(apiName: string, method: string, args: unknown[]): string {
     return stableApiCallKey(apiName, method, args)
@@ -80,10 +81,18 @@ export class ReplayApiAdapter implements IscApiAdapter {
     get identityAttributesApi() { return this.createApiProxy('identityAttributes') as any }
 }
 
-export function loadApiLog(filePath: string): ApiLogEntry[] {
-    if (!fs.existsSync(filePath)) return []
-    const content = fs.readFileSync(filePath, 'utf-8').trim()
+export function loadApiLog(fileOrDirPath: string): ApiLogEntry[] {
+    if (fs.existsSync(fileOrDirPath)) {
+        const stat = fs.statSync(fileOrDirPath)
+        if (stat.isDirectory()) {
+            return loadRecordingApiLog(fileOrDirPath)
+        }
+    }
+
+    if (!fs.existsSync(fileOrDirPath)) return []
+    const content = fs.readFileSync(fileOrDirPath, 'utf-8').trim()
     if (!content) return []
     return content.split('\n').map((line) => JSON.parse(line))
 }
+
 

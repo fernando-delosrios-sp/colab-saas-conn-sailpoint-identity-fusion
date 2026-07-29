@@ -8,7 +8,8 @@ import { InMemoryLockService } from './lockService'
 import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
 import { IscApiAdapter } from './clientService/iscApiAdapter'
 import { RecordingApiAdapter, ApiLogEntry } from './clientService/recordingApiAdapter'
-import { ReplayApiAdapter, loadApiLog } from './clientService/replayApiAdapter'
+import { ReplayApiAdapter } from './clientService/replayApiAdapter'
+import { loadRecordingApiLog } from './recordingService/recordingStore'
 import { DryRunApiAdapter } from './clientService/dryRunApiAdapter'
 import { SourceService } from './sourceService'
 import { FusionService } from './fusionService'
@@ -93,19 +94,20 @@ export class ServiceRegistry {
             let adapter: IscApiAdapter = new SdkApiAdapter(this.config, this.log)
 
             if (recMode === 'record') {
-                this.recording =
-                    (context as any).recordingService ?? RecordingService.init(this.log, this.config)
+                const recording = (context as any).recordingService ?? new RecordingService(this.log, this.config)
+                this.recording = recording
                 adapter = new RecordingApiAdapter(adapter, (entry: ApiLogEntry) => {
-                    this.recording?.onApiCall(entry)
+                    recording.onApiCall(entry)
                 })
-                if (this.recording) {
-                    this.log.info(`RecordingService enabled — chain: ${this.recording.getName()}`)
-                }
+                const rec = this.config.recording
+                this.log.info(
+                    `Recording enabled — chain: ${recording.getName()}, dir: ${recording.getRecordingDir()}, store: ${rec?.store ?? 'ndjson'}`
+                )
+                this.bindRecordingHooks()
             } else if (recMode === 'replay') {
-                const logPath = this.config.recording?.chainName
-                    ? `test-data/recordings/${this.config.recording.chainName}/api-log.ndjson`
-                    : undefined
-                const entries = logPath ? loadApiLog(logPath) : []
+                const chainName = this.config.recording?.chainName
+                const chainDir = chainName ? `test-data/recordings/${chainName}` : undefined
+                const entries = chainDir ? loadRecordingApiLog(chainDir) : []
                 adapter = new ReplayApiAdapter(entries, adapter.config)
             }
 
@@ -199,6 +201,25 @@ export class ServiceRegistry {
         this.proxy = context.proxyService ?? new ProxyService(this.config, this.log, this.res, commandType)
     }
 
+    /** Wires LogService phase hooks to the active recording service. */
+    private bindRecordingHooks(): void {
+        if (!this.recording) return
+
+        this.log.setPhaseRecordingHook((phaseNumber, phase, detail, elapsedMs) => {
+            const run = this.run
+            this.recording?.recordPhaseEnd({
+                phaseNumber,
+                phase,
+                detail,
+                elapsedMs,
+                timestamp: new Date().toISOString(),
+                managedAccounts: run.managedAccountsById.size,
+                fusionAccounts: run.fusionAccountMap.size,
+                apiCalls: this.recording?.getStore().getApiLogEntryCount(),
+            })
+        })
+    }
+
     /**
      * Wraps the live client adapter with {@link DryRunApiAdapter} to inhibit tenant writes.
      * Must be called after parsing dry-run input and before any account-list phase API calls.
@@ -278,6 +299,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

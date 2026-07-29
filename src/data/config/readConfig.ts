@@ -14,6 +14,7 @@ import * as reviewSettings from './settings/reviewSettings'
 import * as scopeSettings from './settings/scopeSettings'
 import * as sourcesSettings from './settings/sourcesSettings'
 import * as uniqueAttributeDefinitionsSettings from './settings/uniqueAttributeDefinitionsSettings'
+import { resolveRecordingConfig } from './resolveRecordingConfig'
 
 const settingsPipeline = [
     sourcesSettings.readSettings,
@@ -53,6 +54,9 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
 
     const config = Object.assign({}, rawConfig, connectionFragment, ...fragments) as FusionConfig
 
+    config.recording = resolveRecordingConfig(config.recording)
+
     return config
 }
+
 

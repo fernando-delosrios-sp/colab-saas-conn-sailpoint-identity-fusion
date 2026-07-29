@@ -497,6 +497,8 @@ export interface RecordingConfig {
     mode: 'off' | 'record' | 'replay'
     chainName?: string
     verbose?: boolean
+    /** Persistence backend for record-mode artifacts. Default `'ndjson'`. */
+    store?: 'ndjson' | 'sqlite'
 }
 
 // ============================================================================
@@ -520,6 +522,7 @@ export interface FusionConfig
         InternalConfig {
     recording?: RecordingConfig
 }
+
 
 
 

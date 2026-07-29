@@ -394,11 +394,17 @@ export async function reportEpilogue(
         try {
             log.detail({ action: 'generating aggregation report' })
             const reportOp = log.track('reportPhase.generateReport')
-            await generateReport(
-                false,
-                serviceRegistry,
-                buildReportAggregationStats(fetchResult, timer, serviceRegistry.identities, outputCount)
+            const aggregationStats = buildReportAggregationStats(
+                fetchResult,
+                timer,
+                serviceRegistry.identities,
+                outputCount
             )
+            await generateReport(false, serviceRegistry, aggregationStats)
+            if (serviceRegistry.recording) {
+                const snapshot = await reports.buildAggregationReportSnapshot(false, aggregationStats)
+                serviceRegistry.recording.writeAggregationReport(snapshot)
+            }
             reportOp.done()
         } catch (error) {
             log.warn(`Report epilogue: aggregation report failed: ${(error as Error).message}`)
@@ -441,3 +447,4 @@ export async function reportEpilogue(
     log.epilogueEnd('report')
     return deferredError
 }
+
