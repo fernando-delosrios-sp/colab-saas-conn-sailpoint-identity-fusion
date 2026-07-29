@@ -1,3 +1,4 @@
+import { ConnectorError, ConnectorErrorType, StdAccountListInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { PhaseTimer } from '../../services/logService'
 import { formatFormOutcomesSegment, formatMatchOutcomesSegment } from '../../services/logService/operationHeartbeat'
@@ -7,7 +8,7 @@ import { AggregationTracker } from '../../services/fusionService'
 import { AggregationStats } from '../../services/fusionService/types'
 import { IdentityService } from '../../services/identityService'
 import { generateReport } from './generateReport'
-import { buildTerminalSummary, DryRunInput, resolveIdentitiesFound } from './accountListHelpers'
+import { buildTerminalSummary, DryRunInput, parseDryRunInput, resolveIdentitiesFound } from './accountListHelpers'
 
 export interface PhaseOptions {
     isPersistent: boolean
@@ -201,7 +202,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
         }),
         sources.fetchManagedAccounts(),
         sources.fetchFusionAccounts(),
-        forms.fetchFormInstances(isPersistent),
+        forms.fetchFormInstances({ staleFormCleanup: isPersistent }),
     ]
     if (isPersistent && sources.delayedAggregationSources?.length) {
         fetchTasks.push(workflows.fetchDelayedAggregationSender())
@@ -229,7 +230,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
     return { ...counts, identitiesFound: identities.identityCount }
 }
 
-export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<void> {
+async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<void> {
     const { log, fusion } = serviceRegistry
     log.detail({ action: 'refreshing fusion accounts' })
     await fusion.ensureGlobalReviewerOwnersInScope()
@@ -380,7 +381,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
     return sent
 }
 
-export interface ReportEpilogueOptions {
+interface ReportEpilogueOptions {
     isPersistent: boolean
     dryRun?: DryRunInput
     fetchResult?: FetchResult
@@ -389,7 +390,7 @@ export interface ReportEpilogueOptions {
     runError?: unknown
 }
 
-export async function reportEpilogue(
+async function reportEpilogue(
     serviceRegistry: ServiceRegistry,
     options: ReportEpilogueOptions
 ): Promise<unknown | undefined> {
@@ -486,4 +487,111 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
 
     return { fetchResult, timer }
 }
+
+/**
+ * Runs the full account-list pipeline (phases 1–5), report epilogue, and cleanup.
+ * Pipeline errors are captured and rethrown after the epilogue when possible.
+ */
+export async function runAccountListPipeline(
+    serviceRegistry: ServiceRegistry,
+    input: StdAccountListInput
+): Promise<void> {
+    const { log, sources } = serviceRegistry
+    const tracker = new AggregationTracker()
+    const dryRun = parseDryRunInput(input)
+    const isPersistent = !dryRun?.enabled
+
+    if (dryRun?.enabled) {
+        const recordingMode = serviceRegistry.config.recording?.mode ?? 'off'
+        if (recordingMode !== 'off' || serviceRegistry.run.isRecordMode) {
+            throw new ConnectorError(
+                'Dry-run mode cannot be combined with recording mode. Disable recording or dry-run before running account list.',
+                ConnectorErrorType.Generic
+            )
+        }
+        serviceRegistry.activateDryRunMode()
+    }
+
+    const timer = log.timer()
+    log.startOperationHeartbeat(() => serviceRegistry.getHeartbeatSnapshot())
+    const streamProgress = { sent: 0 }
+    let fetchResult: FetchResult | undefined
+    let outputCount: number | undefined
+    let runError: unknown
+
+    try {
+        try {
+            log.detail({ action: dryRun ? 'start dry-run analysis' : 'start aggregation' })
+
+            const options: PhaseOptions = { isPersistent, tracker, streamProgress }
+
+            let phaseStarted = Date.now()
+            log.phaseStart(1, 'Setup')
+            if (!(await setupPhase(serviceRegistry, input.schema, options))) return
+            timer.recordElapsed('Setup', Date.now() - phaseStarted)
+            log.phaseEnd(1, 'Setup', log.flushPhaseCorrelationSummary())
+
+            phaseStarted = Date.now()
+            log.phaseStart(2, 'Fetch')
+            fetchResult = await fetchPhase(serviceRegistry, options)
+            timer.recordElapsed('Fetch', Date.now() - phaseStarted)
+            log.phaseEnd(2, 'Fetch', log.flushPhaseCorrelationSummary())
+
+            phaseStarted = Date.now()
+            log.phaseStart(3, 'Refresh')
+            await refreshPhase(serviceRegistry)
+            timer.recordElapsed('Refresh', Date.now() - phaseStarted)
+            log.phaseEnd(3, 'Refresh', log.flushPhaseCorrelationSummary())
+
+            phaseStarted = Date.now()
+            log.phaseStart(4, 'Process')
+            await processPhase(serviceRegistry, options)
+            timer.recordElapsed('Process', Date.now() - phaseStarted)
+            log.phaseEnd(4, 'Process', log.flushPhaseCorrelationSummary())
+
+            phaseStarted = Date.now()
+            log.phaseStart(5, 'Output')
+            outputCount = await outputPhase(serviceRegistry, options)
+            timer.recordElapsed('Output', Date.now() - phaseStarted)
+            log.phaseEnd(5, 'Output', log.flushPhaseCorrelationSummary())
+        } catch (error) {
+            runError = error
+            log.warn(`Pipeline failed — running report epilogue before propagating: ${(error as Error).message}`)
+        }
+
+        const epilogueError = await reportEpilogue(serviceRegistry, {
+            isPersistent,
+            dryRun,
+            fetchResult,
+            outputCount,
+            timer,
+            runError,
+        })
+        runError = runError ?? epilogueError
+
+        if (!sources.run.isRecordMode) {
+            sources.clearFusionAccounts()
+        } else {
+            log.detail({ cache: 'fusion accounts retained for recording' })
+        }
+        log.detail({ action: 'account caches cleared from memory' })
+
+        if (runError) {
+            if (runError instanceof ConnectorError) throw runError
+            if (isPersistent) {
+                log.crash('Failed to list accounts', runError as any)
+            }
+            throw runError
+        }
+
+        const label = dryRun ? 'Dry-run analysis' : 'Account list operation'
+        timer.end(`✓ ${label} completed successfully - ${outputCount ?? 0} account(s) processed`)
+    } finally {
+        log.stopOperationHeartbeat()
+        if (isPersistent) {
+            await sources.releaseProcessLock()
+        }
+    }
+}
+
 

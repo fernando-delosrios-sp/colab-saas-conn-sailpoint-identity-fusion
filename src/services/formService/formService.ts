@@ -1,5 +1,10 @@
 import { promiseAllBatched } from '../fusionService/collections'
-import { FormDefinitionResponseV2025, FormInstanceResponseV2025, FormInstanceResponseV2025StateV2025, CreateFormInstanceRequestV2025, FormInstanceCreatedByV2025, FormInstanceRecipientV2025, CustomFormsV2025ApiSearchFormDefinitionsByTenantRequest, CustomFormsV2025ApiCreateFormDefinitionRequest, CustomFormsV2025ApiCreateFormInstanceRequest, CustomFormsV2025ApiPatchFormInstanceRequest, CustomFormsV2025ApiSearchFormInstancesByTenantRequest } from 'sailpoint-api-client'
+import {
+    FormDefinitionResponseV2025,
+    FormInstanceResponseV2025,
+    FormInstanceResponseV2025StateV2025,
+    CustomFormsV2025ApiCreateFormDefinitionRequest,
+} from 'sailpoint-api-client'
 import { FusionConfig, SourceType } from '../../model/config'
 import { ClientService } from '../clientService'
 import { LogService } from '../logService'
@@ -19,8 +24,14 @@ import {
     PendingReviewReviewerContext,
     PendingReviewAccountContext,
 } from './types'
-import { resolveFusionMaxCandidatesForForm, internalConfig } from '../../data/config'
-import { createAutomaticMergeDecision, resolveCandidateDisplayName, resolveIdentitiesSelectLabel } from './helpers'
+import { resolveFusionMaxCandidatesForForm } from '../../data/config'
+import {
+    buildCandidateList,
+    buildFormName,
+    calculateExpirationDate,
+    createAutomaticMergeDecision,
+    resolveIdentitiesSelectLabel,
+} from './helpers'
 import { buildFormInput, buildFormFields, buildFormConditions, buildFormInputs } from './formBuilder'
 import {
     createFusionDecision,
@@ -28,14 +39,20 @@ import {
     extractCandidateIdsFromFormInput,
     getReviewerInfo,
 } from './formProcessor'
-import { FusionMatch } from '../matchingService/types'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
+import { FormLifecycle } from './formLifecycle'
+import { analyzeFormInstances } from './formInstanceAnalyzer'
 
 export type { PendingReviewFormContext,  PendingReviewAccountContext } from './types'
 
 // ============================================================================
 // FormService Class
 // ============================================================================
+
+export interface FormFetchOptions {
+    /** When true, stale form definitions are queued for deletion and skipped during instance fetch. */
+    staleFormCleanup?: boolean
+}
 
 /**
  * Service for form definition and instance management.
@@ -56,6 +73,7 @@ export class FormService {
     private readonly fusionFormExpirationDays: number
     private readonly fusionFormAttributes?: string[]
     private readonly fusionMaxCandidatesForForm: number
+    private readonly lifecycle: FormLifecycle
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -74,6 +92,13 @@ export class FormService {
         this.fusionFormExpirationDays = config.fusionFormExpirationDays
         this.fusionFormAttributes = config.fusionFormAttributes
         this.fusionMaxCandidatesForForm = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
+        this.lifecycle = new FormLifecycle({
+            client: this.client,
+            log: this.log,
+            run: this.run,
+            fusionFormExpirationDays: this.fusionFormExpirationDays,
+            formDeleteQueueConcurrency: this.formDeleteQueueConcurrency,
+        })
     }
 
     // ------------------------------------------------------------------------
@@ -91,14 +116,14 @@ export class FormService {
     /**
      * Fetch form definitions and their instances, deferring decision processing.
      */
-    public async fetchFormInstances(enableStaleFormCleanup: boolean = false): Promise<void> {
+    public async fetchFormInstances(options?: FormFetchOptions): Promise<void> {
         this.log.debug('Fetching form data')
         assert(this.fusionFormNamePattern, 'Fusion form name pattern is required')
         this.resetFormDataState()
 
         const forms = await this.findFormDefinitionsByName(this.fusionFormNamePattern)
         let activeForms = forms
-        if (enableStaleFormCleanup) {
+        if (options?.staleFormCleanup) {
             const staleForms: FormDefinitionResponseV2025[] = []
             activeForms = []
             for (const form of forms) {
@@ -322,7 +347,7 @@ export class FormService {
     }> {
         this.log.debug(`Building fusion form for account ${fusionAccount.name} with ${reviewerCount} reviewer(s)`)
 
-        const candidates = this._buildCandidateList(fusionAccount)
+        const candidates = buildCandidateList(fusionAccount, this.fusionMaxCandidatesForForm)
         assert(candidates, 'Failed to build candidate list')
 
         await this.enrichCandidateIdentities(candidates)
@@ -330,14 +355,14 @@ export class FormService {
         const sourceType =
             this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
 
-        const formName = this._buildFormName(fusionAccount)
+        const formName = buildFormName(fusionAccount, this.fusionFormNamePattern)
         assert(formName, 'Form name is required')
 
         const formDefinition = await this.getOrCreateFormDefinition(formName, fusionAccount, candidates)
         const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
         assert(formInput, 'Form input is required')
 
-        const expire = this._calculateExpirationDate()
+        const expire = calculateExpirationDate(this.fusionFormExpirationDays)
         assert(expire, 'Form expiration date is required')
 
         const { fusionSourceId } = this.sources
@@ -738,46 +763,7 @@ export class FormService {
         formDefinitionId?: string,
         onInstancesLoaded?: (delta: number) => void
     ): Promise<FormInstanceResponseV2025[]> {
-        if (!formDefinitionId) {
-            const allInstances = await this.client.call<FormInstanceResponseV2025[]>(
-                (api: any) => api.customForms.searchFormInstancesByTenant({}).then((r: any) => r.data ?? []),
-                { context: 'FormService>searchFormInstancesByTenant formDef=all' }
-            )
-            return allInstances ?? []
-        }
-
-        const requestParameters: CustomFormsV2025ApiSearchFormInstancesByTenantRequest = {
-            filters: `formDefinitionId eq "${formDefinitionId}"`,
-        }
-        let lastLoaded = 0
-        const allInstances =
-            (await this.client.call<FormInstanceResponseV2025>(
-                (api: any, params: any) =>
-                    api.customForms.searchFormInstancesByTenant(params).then((r: any) => ({ data: r.data ?? [] })),
-                {
-                    paginate: { mode: 'sequential', baseParams: requestParameters as any },
-                    context: `FormService>searchFormInstancesByTenant formDef=${formDefinitionId}`,
-                    onPageProgress: (loaded) => {
-                        const delta = loaded - lastLoaded
-                        lastLoaded = loaded
-                        if (delta > 0) onInstancesLoaded?.(delta)
-                    },
-                }
-            )) ?? []
-
-        const matchingInstances = allInstances.filter((instance) => instance.formDefinitionId === formDefinitionId)
-        const mismatchedCount = allInstances.length - matchingInstances.length
-        if (mismatchedCount > 0) {
-            this.log.warn(
-                `searchFormInstancesByTenant returned ${mismatchedCount} instance(s) outside requested formDefinitionId=${formDefinitionId}`
-            )
-        }
-        if (allInstances.length === 250) {
-            this.log.warn(
-                `searchFormInstancesByTenant returned 250 instance(s) for formDefinitionId=${formDefinitionId}; results may be truncated by API page size`
-            )
-        }
-        return matchingInstances
+        return this.lifecycle.fetchFormInstancesByDefinitionId(formDefinitionId, onInstancesLoaded)
     }
 
     /**
@@ -787,29 +773,9 @@ export class FormService {
         formInstanceID: string,
         state: FormInstanceResponseV2025StateV2025
     ): Promise<FormInstanceResponseV2025 | undefined> {
-        const body: { [key: string]: any }[] = [
-            {
-                op: 'replace',
-                path: '/state',
-                value: state,
-            },
-        ]
-
-        const requestParameters: CustomFormsV2025ApiPatchFormInstanceRequest = {
-            formInstanceID,
-            body,
-        }
-
-        return await this.client.call<FormInstanceResponseV2025>(
-            (api: any) => api.customForms.patchFormInstance(requestParameters).then((r: any) => r.data),
-            { context: `FormService>setFormInstanceState id=${formInstanceID} state=${state}` }
-        )
+        return this.lifecycle.setFormInstanceState(formInstanceID, state)
     }
 
-    /**
-     * Pending review context keyed by account id referenced in form input.
-     * Includes pending form links, resolved reviewer details, and candidate identity IDs.
-     */
     public get pendingReviewContextByAccountId(): Map<string, PendingReviewAccountContext> {
         const output = new Map<string, PendingReviewAccountContext>()
 
@@ -832,67 +798,6 @@ export class FormService {
     // Private Helper Methods
     // ------------------------------------------------------------------------
 
-    private _rankScoreForMatch(match: FusionMatch): number {
-        const combined = match.scores?.find(
-            (s) =>
-                s.algorithm === 'weighted-mean' ||
-                s.attribute === 'Combined score' ||
-                s.attribute === 'Combined match score'
-        )
-        if (combined) return combined.score
-        const scored = match.scores?.filter((s) => !s.skipped) ?? []
-        if (scored.length === 0) return 0
-        return Math.max(...scored.map((s) => s.score))
-    }
-
-    private _compareMatchesForForm(a: FusionMatch, b: FusionMatch): number {
-        const delta = this._rankScoreForMatch(b) - this._rankScoreForMatch(a)
-        if (delta !== 0) return delta
-        const ida = String(a.fusionIdentity?.identityId ?? a.identityId ?? '')
-        const idb = String(b.fusionIdentity?.identityId ?? b.identityId ?? '')
-        return ida.localeCompare(idb)
-    }
-
-    private _buildCandidateList(fusionAccount: FusionAccount): Candidate[] {
-        assert(fusionAccount, 'Fusion account is required')
-        assert(fusionAccount.fusionMatches, 'Fusion matches are required')
-        assert(
-            this.fusionMaxCandidatesForForm >= 1 &&
-                this.fusionMaxCandidatesForForm <= internalConfig.formService.fusionMaxCandidatesForFormMax,
-            `maxCandidates must be between 1 and ${internalConfig.formService.fusionMaxCandidatesForFormMax}`
-        )
-
-        const ordered = [...fusionAccount.fusionMatches]
-            .sort((a, b) => this._compareMatchesForForm(a, b))
-            .slice(0, this.fusionMaxCandidatesForForm)
-
-        return ordered.map((match) => {
-            assert(match.fusionIdentity, 'Fusion identity is required in match')
-            assert(match.fusionIdentity.identityId, 'Fusion identity ID is required')
-            const attrs: Record<string, any> = match.fusionIdentity.attributes || {}
-            const id = match.fusionIdentity.identityId
-            return {
-                id,
-                name: resolveCandidateDisplayName(match, attrs, id),
-                attributes: attrs,
-                scores: match.scores || [],
-            }
-        })
-    }
-
-    private _buildFormName(fusionAccount: FusionAccount): string {
-        const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
-        const source = `[${fusionAccount.sourceName}]`
-        const accountIdentifier =
-            trimStr(fusionAccount.managedKey) || trimStr(fusionAccount.managedAccountId) || 'unknown'
-        return `${this.fusionFormNamePattern} - ${accountName} ${source} (${accountIdentifier})`
-    }
-
-    private _calculateExpirationDate(): string {
-        const expirationDate = new Date()
-        expirationDate.setDate(expirationDate.getDate() + this.fusionFormExpirationDays)
-        return expirationDate.toISOString()
-    }
 
     /**
      * Collect pending (unanswered) form instance URLs by recipient identityId,
@@ -968,7 +873,10 @@ export class FormService {
         assert(this.fusionMergeDecisionMap, 'Fusion merge decision map is not initialized')
         assert(formInstances, 'Form instances array is required')
 
-        const processingResult = this.analyzeFormInstances(formInstances)
+        const processingResult = analyzeFormInstances(formInstances, {
+            log: this.log,
+            hasManagedAccount: (accountId) => this.run.hasManagedAccount(accountId),
+        })
         const accountInfoOverride = this.extractAccountInfoOverride(
             processingResult.accountId,
             processingResult.shouldRemoveAccountFromMap
@@ -994,134 +902,6 @@ export class FormService {
                 `Added ${decisionsAdded} fusion decision(s) from ${processingResult.processedCount} processed instance(s)`
             )
         }
-    }
-
-    /**
-     * Analyze form instances to determine which to process and extract metadata
-     */
-    private analyzeFormInstances(formInstances: FormInstanceResponseV2025[]): {
-        instancesToProcess: FormInstanceResponseV2025[]
-        shouldDeleteForm: boolean
-        formDefinitionId: string | undefined
-        accountId: string | undefined
-        processedCount: number
-        /**
-         * Indicates whether the managed account should be removed from the
-         * managedAccountsById map to avoid further processing on next runs.
-         *
-         * Rules:
-         * - While there is no response instance (COMPLETED/IN_PROGRESS/SUBMITTED), the form
-         *   is kept but the managed account is removed from the map so we don't
-         *   try to create another form for it.
-         * - When there's a response instance, the form is deleted and the managed
-         *   account is kept to support decision processing.
-         * - When all instances have been cancelled, the form is deleted and the
-         *   managed account is kept so a new form can be created later if needed.
-         */
-        shouldRemoveAccountFromMap: boolean
-    } {
-        // Default: keep the form until we see a response or learn all instances
-        // were cancelled, in which case we can safely delete the form.
-        let shouldDeleteForm = false
-        let processedCount = 0
-        let formDefinitionId: string | undefined = undefined
-        let accountId: string | undefined = undefined
-        const instancesToProcess: FormInstanceResponseV2025[] = []
-
-        let hasResponseInstance = false
-        let anyInstance = false
-        let allInstancesCancelled = true
-
-        for (const instance of formInstances) {
-            assert(instance, 'Form instance is required')
-            assert(instance.state, 'Form instance state is required')
-
-            formDefinitionId = formDefinitionId || instance.formDefinitionId
-            accountId = accountId || this.extractAccountIdFromInstance(instance)
-
-            anyInstance = true
-
-            // Track high-level state for account/form lifecycle decisions,
-            // and collect only "response" instances for decision processing.
-            switch (instance.state) {
-                case 'COMPLETED':
-                case 'IN_PROGRESS':
-                case 'SUBMITTED':
-                    this.log.debug(`Processing response form instance: ${instance.id}`)
-                    instancesToProcess.push(instance)
-                    processedCount++
-
-                    hasResponseInstance = true
-                    allInstancesCancelled = false
-                    // A single response instance is enough to decide the form's fate.
-                    shouldDeleteForm = true
-                    break
-
-                case 'CANCELLED':
-                    this.log.info(`Form instance ${instance.id} was cancelled`)
-                    processedCount++
-                    // Keep allInstancesCancelled = true only if we *only* see cancelled instances.
-                    break
-
-                default:
-                    // Pending / other non-final states: keep the form, but don't
-                    // add them to processing, as they are not responses yet.
-                    this.log.debug(`Form instance ${instance.id} has state: ${instance.state}, keeping form`)
-                    allInstancesCancelled = false
-                    break
-            }
-
-            // If we've already decided to delete the form due to a response,
-            // no need to continue scanning the rest of the instances.
-            if (shouldDeleteForm && hasResponseInstance) {
-                break
-            }
-        }
-
-        // Check if the managed account still exists - if not, delete the form
-        if (accountId && !this.managedAccountExists(accountId)) {
-            this.log.info(`Managed account ${accountId} no longer exists, marking form for deletion`)
-            shouldDeleteForm = true
-        }
-
-        // If we saw instances and *all* of them were cancelled, we can delete
-        // the form but keep the account so a new form can be issued later.
-        if (anyInstance && allInstancesCancelled) {
-            shouldDeleteForm = true
-        }
-
-        // We only remove the account from the map while we are waiting for a
-        // response: i.e. there is no response instance yet and not all
-        // instances are cancelled (some are still pending / open).
-        const shouldRemoveAccountFromMap = !hasResponseInstance && !allInstancesCancelled
-
-        this.log.debug(
-            `Form analysis result: shouldDeleteForm=${shouldDeleteForm}, ` +
-                `hasResponseInstance=${hasResponseInstance}, allInstancesCancelled=${allInstancesCancelled}, ` +
-                `shouldRemoveAccountFromMap=${shouldRemoveAccountFromMap}`
-        )
-
-        return {
-            instancesToProcess,
-            shouldDeleteForm,
-            formDefinitionId,
-            accountId,
-            processedCount,
-            shouldRemoveAccountFromMap,
-        }
-    }
-
-    /**
-     * Extract account ID from form instance input
-     */
-    private extractAccountIdFromInstance(instance: FormInstanceResponseV2025): string | undefined {
-        const accountInfo = extractAccountInfoFromFormInput(instance.formInput)
-        const accountId = accountInfo?.id
-        return accountId ? normalizeCompositeManagedAccountKey(accountId) ?? accountId : undefined
-    }
-
-    private managedAccountExists(accountId: string): boolean {
-        return this.run.hasManagedAccount(accountId)
     }
 
     /**
@@ -1281,176 +1061,25 @@ export class FormService {
         return await this.createFormDefinition(formDefinition)
     }
 
-    /**
-     * Add form to deletion queue
-     */
-    private addFormToDelete(formDefinitionId: string): void {
-        // Avoid double-queueing the same definition id (processFusionFormInstances can hit multiple paths)
-
-        this.run.formsToDelete.add(formDefinitionId)
-    }
-
-    private kickoffFormDeleteWorkers(): void {
-        while (this.run.activeFormDeleteWorkers < this.formDeleteQueueConcurrency && this.run.formDeleteQueue.length > 0) {
-            this.run.activeFormDeleteWorkers++
-            const workerPromise = this.runFormDeleteWorker()
-
-            // eslint-disable-next-line prefer-const
-            let trackedPromise: Promise<void> = workerPromise.finally(() => {
-                // Keep worker accounting + task tracking in one finally block so awaitPendingDeleteOperations
-                // always observes a consistent view, even when deletion throws.
-                this.run.activeFormDeleteWorkers--
-                this.run.pendingFormDeleteTasks.delete(trackedPromise)
-                if (this.run.formDeleteQueue.length > 0) {
-                    this.kickoffFormDeleteWorkers()
-                }
-            })
-            this.run.pendingFormDeleteTasks.add(trackedPromise)
-        }
-    }
-
-    private async runFormDeleteWorker(): Promise<void> {
-        while (this.run.formDeleteQueue.length > 0) {
-            const formId = this.run.formDeleteQueue.shift()
-            if (!formId) {
-                continue
-            }
-            try {
-                await this.deleteFormDefinition(formId)
-            } finally {
-                this.run.queuedFormDeleteIds.delete(formId)
-            }
-        }
-    }
-
-    private isFormDefinitionStale(form: FormDefinitionResponseV2025): boolean {
-        const timestamp = this.readFormDefinitionTimestamp(form)
-        if (!timestamp) return false
-
-        const cutoffMs = Date.now() - this.fusionFormExpirationDays * 24 * 60 * 60 * 1000
-        return timestamp.getTime() < cutoffMs
-    }
-
-    private readFormDefinitionTimestamp(form: FormDefinitionResponseV2025): Date | undefined {
-        const rawTimestamp =
-            readUnknown(form, 'modified') ??
-            readUnknown(form, 'modifiedAt') ??
-            readUnknown(form, 'created') ??
-            readUnknown(form, 'createdAt')
-
-        if (!rawTimestamp) {
-            this.log.warn(`Form definition ${form.id || 'unknown'} missing timestamp fields; skipping stale check`)
-            return undefined
-        }
-
-        const parsed = new Date(String(rawTimestamp))
-        if (Number.isNaN(parsed.getTime())) {
-            this.log.warn(`Form definition ${form.id || 'unknown'} has invalid timestamp "${String(rawTimestamp)}"`)
-            return undefined
-        }
-
-        return parsed
-    }
 
     // ------------------------------------------------------------------------
-    // Form API Operations
+    // Lifecycle delegators (logic in formLifecycle.ts)
     // ------------------------------------------------------------------------
 
-    /**
-     * Fetch forms by name pattern
-     */
     private async findFormDefinitionsByName(namePattern: string): Promise<FormDefinitionResponseV2025[]> {
-        assert(namePattern, 'Form name pattern is required')
-        assert(this.client, 'Client service is required')
-
-        const requestParameters: CustomFormsV2025ApiSearchFormDefinitionsByTenantRequest = {
-            filters: `name sw "${namePattern}"`,
-        }
-
-        this.log.debug(`Fetching forms with name pattern: ${namePattern}`)
-
-        const forms = await this.client.call<FormDefinitionResponseV2025>(
-            (api: any, params: any) => api.customForms.searchFormDefinitionsByTenant(params).then((r: any) => ({ data: r.data?.results ?? [] })),
-            { paginate: { mode: 'sequential', baseParams: requestParameters as any }, context: 'FormService>findFormDefinitionsByName searchFormDefinitionsByTenant' }
-        )
-        this.log.debug(`Found ${forms.length} form(s) matching pattern: ${namePattern}`)
-        return forms
+        return this.lifecycle.findFormDefinitionsByName(namePattern)
     }
 
-    /**
-     * Find form definition by exact name
-     */
     private async getFormDefinitionByName(formName: string): Promise<FormDefinitionResponseV2025 | undefined> {
-        assert(formName, 'Form name is required')
-        assert(this.client, 'Client service is required')
-
-        const requestParameters: CustomFormsV2025ApiSearchFormDefinitionsByTenantRequest = {
-            filters: `name eq "${formName}"`,
-        }
-
-        this.log.debug(`Searching for form definition with exact name: ${formName}`)
-
-        const forms = await this.client.call<FormDefinitionResponseV2025>(
-            (api: any, params: any) => api.customForms.searchFormDefinitionsByTenant(params).then((r: any) => ({ data: r.data?.results ?? [] })),
-            { paginate: { mode: 'sequential', baseParams: requestParameters as any }, context: 'FormService>getFormDefinitionByName searchFormDefinitionsByTenant' }
-        )
-        const form = forms.find((f) => f.name === formName)
-        if (form) {
-            this.log.debug(`Found existing form definition: ${form.id}`)
-        } else {
-            this.log.debug(`No form definition found with name: ${formName}`)
-        }
-        return form
+        return this.lifecycle.getFormDefinitionByName(formName)
     }
 
-    /**
-     * Create a form definition
-     */
     private async createFormDefinition(
         form: CustomFormsV2025ApiCreateFormDefinitionRequest
     ): Promise<FormDefinitionResponseV2025> {
-        assert(form, 'Form definition request is required')
-        assert(form.body, 'Form definition body is required')
-        assert(form.body.name, 'Form name is required')
-        assert(this.client, 'Client service is required')
-
-        this.log.debug(`Creating form definition: ${form.body.name}`)
-        this.log.debug(
-            `Form has ${form.body.formElements?.length || 0} elements, ${form.body.formInput?.length || 0} inputs, ${form.body.formConditions?.length || 0} conditions`
-        )
-
-        this.log.debug(`Executing form creation through client...`)
-        const formInstance = await this.client.call<FormDefinitionResponseV2025>(
-            async (api: any) => {
-                try {
-                    this.log.debug(`Calling customFormsApi.createFormDefinition...`)
-                    const response = await api.customForms.createFormDefinition(form)
-                    this.log.debug(`API call completed, processing response...`)
-                    return response.data
-                } catch (error: any) {
-                    this.log.error(`Error creating form definition: ${error}`)
-                    if (error?.response?.data) {
-                        this.log.error(`API error response: ${JSON.stringify(error.response.data)}`)
-                    }
-                    if (error instanceof Error) {
-                        this.log.error(`Error message: ${error.message}`)
-                    }
-                    throw error
-                }
-            },
-            { context: 'FormService>createFormDefinition' }
-        )
-        assert(formInstance, 'Failed to create form definition')
-        assert(formInstance.id, 'Form definition ID is missing')
-
-        this.log.debug(`Form definition created successfully: ${formInstance.id}`)
-        this.run.formsCreated++
-        return formInstance
+        return this.lifecycle.createFormDefinition(form)
     }
 
-    /**
-     * Create a form instance
-     */
     private async createFormInstance(
         formDefinitionId: string,
         formInput: { [key: string]: any },
@@ -1458,58 +1087,25 @@ export class FormService {
         sourceId: string,
         expire: string
     ): Promise<FormInstanceResponseV2025> {
-        assert(formDefinitionId, 'Form definition ID is required')
-        assert(formInput, 'Form input is required')
-        assert(recipientList, 'Recipient list is required')
-        assert(recipientList.length > 0, 'At least one recipient is required')
-        assert(sourceId, 'Source ID is required')
-        assert(expire, 'Expiration date is required')
-        assert(this.client, 'Client service is required')
+        return this.lifecycle.createFormInstance(formDefinitionId, formInput, recipientList, sourceId, expire)
+    }
 
-        this.log.debug(
-            `Creating form instance for definition ${formDefinitionId} with ${recipientList.length} recipient(s)`
-        )
-        const recipients: FormInstanceRecipientV2025[] = recipientList.map((x) => ({ id: x, type: 'IDENTITY' }))
-        const createdBy: FormInstanceCreatedByV2025 = {
-            id: sourceId,
-            type: 'SOURCE',
-        }
+    private isFormDefinitionStale(form: FormDefinitionResponseV2025): boolean {
+        return this.lifecycle.isFormDefinitionStale(form)
+    }
 
-        const body: CreateFormInstanceRequestV2025 = {
-            formDefinitionId,
-            recipients,
-            createdBy,
-            expire,
-            formInput,
-            standAloneForm: true,
-        }
+    private addFormToDelete(formDefinitionId: string): void {
+        this.lifecycle.addFormToDelete(formDefinitionId)
+    }
 
-        const requestParameters: CustomFormsV2025ApiCreateFormInstanceRequest = {
-            body,
-        }
-
-        const response = await this.client.call<FormInstanceResponseV2025>(
-            (api: any) => api.customForms.createFormInstance(requestParameters).then((r: any) => r.data),
-            { context: `FormService>createFormInstance formDef=${formDefinitionId}` }
-        )
-        assert(response, 'Failed to create form instance')
-        this.log.debug(`Form instance created successfully: ${response.id || 'unknown'}`)
-        this.run.formInstancesCreated++
-        return response
+    private kickoffFormDeleteWorkers(): void {
+        this.lifecycle.kickoffFormDeleteWorkers()
     }
 
     /**
      * Delete a form definition
      */
     public async deleteFormDefinition(formDefinitionId: string): Promise<void> {
-        assert(formDefinitionId, 'Form definition ID is required')
-        assert(this.client, 'Client service is required')
-
-        this.log.debug(`Deleting form definition: ${formDefinitionId}`)
-        await this.client.call<void>(
-            (api: any) => api.customForms.deleteFormDefinition({ formDefinitionID: formDefinitionId }),
-            { context: `FormService>deleteForm id=${formDefinitionId}` }
-        )
-        this.log.debug(`Form definition deleted successfully: ${formDefinitionId}`)
+        return this.lifecycle.deleteFormDefinition(formDefinitionId)
     }
 }

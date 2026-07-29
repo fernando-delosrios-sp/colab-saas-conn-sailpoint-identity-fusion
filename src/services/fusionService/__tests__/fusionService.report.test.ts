@@ -120,22 +120,22 @@ describe('FusionService — report', () => {
             })
 
             ctx.mockMatchingService.buildTrigramIndex = vi.fn()
-            ctx.mockMatchingService.setCaptureBreakdown = vi.fn()
+            ctx.mockMatchingService.configureScoring = vi.fn()
 
-            const service = new FusionService(
-                ctx.mockConfig,
-                ctx.mockLog,
-                ctx.mockIdentities,
-                ctx.mockSources,
-                ctx.mockForms,
-                ctx.mockMappingService,
-                ctx.mockDefinitionService,
-                ctx.mockMatchingService,
-                ctx.mockSchemas,
-                localRun,
-                StandardCommand.StdAccountList,
-                shouldCaptureReportData
-            )
+            const service = new FusionService({
+                config: ctx.mockConfig,
+                log: ctx.mockLog,
+                identities: ctx.mockIdentities,
+                sources: ctx.mockSources,
+                forms: ctx.mockForms,
+                mappingService: ctx.mockMappingService,
+                definitionService: ctx.mockDefinitionService,
+                matchingService: ctx.mockMatchingService,
+                schemas: ctx.mockSchemas,
+                run: localRun,
+                commandType: StandardCommand.StdAccountList,
+                shouldCaptureReportData,
+            })
             service.setTracker(new AggregationTracker())
 
             await service.initializeManagedAccountProcessing()
@@ -144,14 +144,15 @@ describe('FusionService — report', () => {
 
         it('sets captureBreakdown false when report capture is disabled', async () => {
             await initializeWithReportCaptureFlag(false)
-            expect(ctx.mockMatchingService.setCaptureBreakdown).toHaveBeenCalledWith(false)
+            expect(ctx.mockMatchingService.configureScoring).toHaveBeenCalledWith({ captureBreakdown: false })
         })
 
         it('sets captureBreakdown true when report capture is enabled', async () => {
-            vi.mocked(ctx.mockMatchingService.setCaptureBreakdown).mockClear()
+            vi.mocked(ctx.mockMatchingService.configureScoring).mockClear()
             await initializeWithReportCaptureFlag(true)
-            expect(ctx.mockMatchingService.setCaptureBreakdown).toHaveBeenCalledWith(true)
+            expect(ctx.mockMatchingService.configureScoring).toHaveBeenCalledWith({ captureBreakdown: true })
         })
     })
 })
+
 

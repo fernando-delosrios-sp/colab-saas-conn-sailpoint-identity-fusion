@@ -1,6 +1,7 @@
 import { FormService } from '../formService'
 import { FusionRun } from '../../../model/fusionRun'
 import { FusionAccount } from '../../../model/account'
+import { analyzeFormInstances, extractAccountIdFromInstance } from '../formInstanceAnalyzer'
 
 /** Minimal client.call mock that supports sequential pagination used by form instance fetch. */
 function createFormClientCallMock(customFormsMock: Record<string, unknown>) {
@@ -200,7 +201,7 @@ describe('FormService stale-form cleanup queue', () => {
             {} as any
         )
 
-        await service.fetchFormInstances(true)
+        await service.fetchFormInstances({ staleFormCleanup: true })
         await service.cleanUpForms()
         await service.awaitPendingDeleteOperations()
 
@@ -605,6 +606,26 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
         expect(buildFusionFormDefinition).toHaveBeenCalledTimes(1)
     })
 })
+
+describe('formInstanceAnalyzer', () => {
+    it('extractAccountIdFromInstance normalizes composite managed account keys', () => {
+        const accountId = extractAccountIdFromInstance({
+            formInput: { account: 'source-a::native-1' },
+        } as any)
+        expect(accountId).toBe('source-a::native-1')
+    })
+
+    it('analyzeFormInstances marks form for deletion when a response instance exists', () => {
+        const log = { debug: vi.fn(), info: vi.fn() } as any
+        const result = analyzeFormInstances(
+            [{ id: 'fi-1', state: 'COMPLETED', formDefinitionId: 'fd-1', formInput: {} } as any],
+            { log, hasManagedAccount: () => true }
+        )
+        expect(result.shouldDeleteForm).toBe(true)
+        expect(result.instancesToProcess).toHaveLength(1)
+    })
+})
+
 
 
 

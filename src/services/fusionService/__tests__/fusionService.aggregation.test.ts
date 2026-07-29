@@ -42,19 +42,19 @@ describe('FusionService — aggregation', () => {
         })
 
         it('reflects resetAccounts and resetForms from config at construction', () => {
-            const service = new FusionService(
-                { ...ctx.mockConfig, resetAccounts: true, resetForms: false } as FusionConfig,
-                ctx.mockLog,
-                ctx.mockIdentities,
-                ctx.mockSources,
-                ctx.mockForms,
-                ctx.mockMappingService,
-                ctx.mockDefinitionService,
-                ctx.mockMatchingService,
-                ctx.mockSchemas,
-                ctx.run,
-                StandardCommand.StdAccountList
-            )
+            const service = new FusionService({
+                config: { ...ctx.mockConfig, resetAccounts: true, resetForms: false } as FusionConfig,
+                log: ctx.mockLog,
+                identities: ctx.mockIdentities,
+                sources: ctx.mockSources,
+                forms: ctx.mockForms,
+                mappingService: ctx.mockMappingService,
+                definitionService: ctx.mockDefinitionService,
+                matchingService: ctx.mockMatchingService,
+                schemas: ctx.mockSchemas,
+                run: ctx.run,
+                commandType: StandardCommand.StdAccountList,
+            })
 
             expect(service.isResetAccounts()).toBe(true)
             expect(service.isResetForms()).toBe(false)
@@ -1392,20 +1392,20 @@ describe('FusionService — aggregation', () => {
         })
 
         it('records deferred match report rows for custom:dryrun even when commandType is StdAccountList and fusionReportOnAggregation is false', async () => {
-            const customReportFusion = new FusionService(
-                ctx.mockConfig,
-                ctx.mockLog,
-                ctx.mockIdentities,
-                ctx.mockSources,
-                ctx.mockForms,
-                ctx.mockMappingService,
-                ctx.mockDefinitionService,
-                ctx.mockMatchingService,
-                ctx.mockSchemas,
-                ctx.run,
-                StandardCommand.StdAccountList,
-                true
-            )
+            const customReportFusion = new FusionService({
+                config: ctx.mockConfig,
+                log: ctx.mockLog,
+                identities: ctx.mockIdentities,
+                sources: ctx.mockSources,
+                forms: ctx.mockForms,
+                mappingService: ctx.mockMappingService,
+                definitionService: ctx.mockDefinitionService,
+                matchingService: ctx.mockMatchingService,
+                schemas: ctx.mockSchemas,
+                run: ctx.run,
+                commandType: StandardCommand.StdAccountList,
+                shouldCaptureReportData: true,
+            })
             customReportFusion.matchOutcomeDispatcher = ctx.createDispatcherFor(customReportFusion)
             customReportFusion.setTracker(new AggregationTracker())
 
@@ -1490,19 +1490,18 @@ describe('FusionService — aggregation', () => {
         })
 
         it('does not fire disable for orphan non-matches when commandType is not StdAccountList', async () => {
-            const analysisFusion = new FusionService(
-                ctx.mockConfig,
-                ctx.mockLog,
-                ctx.mockIdentities,
-                ctx.mockSources,
-                ctx.mockForms,
-                ctx.mockMappingService,
-                ctx.mockDefinitionService,
-                ctx.mockMatchingService,
-                ctx.mockSchemas,
-                ctx.run,
-                undefined
-            )
+            const analysisFusion = new FusionService({
+                config: ctx.mockConfig,
+                log: ctx.mockLog,
+                identities: ctx.mockIdentities,
+                sources: ctx.mockSources,
+                forms: ctx.mockForms,
+                mappingService: ctx.mockMappingService,
+                definitionService: ctx.mockDefinitionService,
+                matchingService: ctx.mockMatchingService,
+                schemas: ctx.mockSchemas,
+                run: ctx.run,
+            })
             analysisFusion.matchOutcomeDispatcher = ctx.createDispatcherFor(analysisFusion)
             analysisFusion.setTracker(new AggregationTracker())
             ;(analysisFusion as any).run.sourcesByName.set('OrphanSrc', {

@@ -6,7 +6,7 @@ import { resolveFusionMaxCandidatesForForm } from '../../data/config'
 import {
     countIdentityCandidateFusionMatches,
 } from './matchingHelpers'
-import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
+import { FusionMatch, MatchCandidateType, ScoreReport, ScoringOptions } from './types'
 import {
     normalizeLIG3,
     lig3UpperBound,
@@ -116,7 +116,7 @@ export class MatchingService {
     private readonly fusionEnableAutoMerge: boolean
     private readonly fusionMaxIdentityMatchCandidates: number
     private readonly fusionScoreMap: Map<string, number>
-    private _captureBreakdown = false
+    private _scoringOptions: ScoringOptions = {}
 
     /**
      * @param config - Fusion configuration containing matching rules and score thresholds
@@ -132,12 +132,12 @@ export class MatchingService {
     }
 
     /**
-     * Run-scoped flag set once per aggregation run. When true, identity-sweep comparisons always
-     * build full score breakdowns (e.g. report capture). Deferred candidates always use full
-     * breakdown regardless of this flag (`candidateType !== Identity` in `scoreFusionAccount`).
+     * Run-scoped scoring options set once per aggregation run.
+     * Deferred candidates always use full breakdown regardless of `captureBreakdown`
+     * (`candidateType !== Identity` in `scoreFusionAccount`).
      */
-    public setCaptureBreakdown(value: boolean): void {
-        this._captureBreakdown = value
+    public configureScoring(options: ScoringOptions): void {
+        this._scoringOptions = options
     }
 
     /**
@@ -351,7 +351,7 @@ export class MatchingService {
                 ? (maxIdentityMatches ?? this.fusionMaxIdentityMatchCandidates)
                 : undefined
 
-        const captureBreakdown = this._captureBreakdown || candidateType !== MatchCandidateType.Identity
+        const captureBreakdown = Boolean(this._scoringOptions.captureBreakdown) || candidateType !== MatchCandidateType.Identity
 
         let compared = 0
         // Counter-based yielding avoids modulo on every iteration; reset after each yield.
