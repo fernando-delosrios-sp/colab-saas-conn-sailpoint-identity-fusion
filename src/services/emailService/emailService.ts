@@ -131,11 +131,11 @@ export class EmailService {
         const accountUrl = accountId ? this.urlContext.humanAccount(accountId) : undefined
         const accountEmail = normalizeEmailValue(context?.accountEmail)[0]
 
-        const sourceTypeInput = context?.sourceType
-        const sourceType =
-            sourceTypeInput === SourceType.Authoritative || sourceTypeInput === SourceType.Record
-                ? (sourceTypeInput as SourceType)
-                : (sourceTypeInput === SourceType.Orphan ? (sourceTypeInput as SourceType) : undefined)
+        const sourceTypeInput = context?.sourceType as SourceType | undefined
+        let sourceType: SourceType | undefined = undefined
+        if (sourceTypeInput === SourceType.Authoritative || sourceTypeInput === SourceType.Record || sourceTypeInput === SourceType.Orphan) {
+            sourceType = sourceTypeInput
+        }
 
         const reviewMatches =
             context?.fusionMatches && context.fusionMatches.length > 0

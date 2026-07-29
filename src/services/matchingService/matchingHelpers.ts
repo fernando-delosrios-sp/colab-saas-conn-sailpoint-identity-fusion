@@ -1,12 +1,12 @@
 import { FusionAccount } from '../../model/account'
 import { FusionRun } from '../../model/fusionRun'
 import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
-import { MatchingConfig, SourceType } from '../../model/config'
+import { SourceType } from '../../model/config'
 import { SourceInfo } from '../sourceService'
 import { coerceBoolean } from '../../utils/safeRead'
 import { rankFusionMatchesForReview } from '../fusionService/helpers'
 import { isExactAttributeMatchScores } from './exactMatch'
-import { FusionMatch, MatchCandidateType, ScoreReport } from './types'
+import { FusionMatch, MatchCandidateType } from './types'
 
 
 /**
