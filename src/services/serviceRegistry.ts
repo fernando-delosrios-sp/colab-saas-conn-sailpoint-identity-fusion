@@ -9,6 +9,7 @@ import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
 import { IscApiAdapter } from './clientService/iscApiAdapter'
 import { RecordingApiAdapter, ApiLogEntry } from './clientService/recordingApiAdapter'
 import { ReplayApiAdapter } from './clientService/replayApiAdapter'
+import { recordingChainDirRelative } from '../data/recordingPaths'
 import { loadRecordingApiLog } from './recordingService/recordingStore'
 import { DryRunApiAdapter } from './clientService/dryRunApiAdapter'
 import { SourceService } from './sourceService'
@@ -96,9 +97,15 @@ export class ServiceRegistry {
             if (recMode === 'record') {
                 const recording = (context as any).recordingService ?? new RecordingService(this.log, this.config)
                 this.recording = recording
-                adapter = new RecordingApiAdapter(adapter, (entry: ApiLogEntry) => {
-                    recording.onApiCall(entry)
-                })
+                adapter = new RecordingApiAdapter(
+                    adapter,
+                    (entry: ApiLogEntry) => {
+                        recording.onApiCall(entry)
+                    },
+                    (message: string) => {
+                        this.log.warn(message)
+                    }
+                )
                 const rec = this.config.recording
                 this.log.info(
                     `Recording enabled — chain: ${recording.getName()}, dir: ${recording.getRecordingDir()}, store: ${rec?.store ?? 'ndjson'}`
@@ -106,7 +113,7 @@ export class ServiceRegistry {
                 this.bindRecordingHooks()
             } else if (recMode === 'replay') {
                 const chainName = this.config.recording?.chainName
-                const chainDir = chainName ? `test-data/recordings/${chainName}` : undefined
+                const chainDir = chainName ? recordingChainDirRelative(chainName) : undefined
                 const entries = chainDir ? loadRecordingApiLog(chainDir) : []
                 adapter = new ReplayApiAdapter(entries, adapter.config)
             }
@@ -299,6 +306,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

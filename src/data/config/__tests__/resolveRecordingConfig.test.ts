@@ -21,6 +21,24 @@ describe('resolveRecordingConfig', () => {
         expect(resolveRecordingConfig()).toEqual({ mode: 'record', store: 'ndjson' })
     })
 
+    it('falls back to replay mode from REPLAY_MODE env var', () => {
+        process.env.REPLAY_MODE = 'true'
+        process.env.RECORD_CHAIN_NAME = 'my-chain'
+
+        expect(resolveRecordingConfig()).toEqual({
+            mode: 'replay',
+            chainName: 'my-chain',
+            store: 'ndjson',
+        })
+    })
+
+    it('RECORD_MODE takes precedence over REPLAY_MODE when both env vars are set', () => {
+        process.env.RECORD_MODE = 'true'
+        process.env.REPLAY_MODE = 'true'
+
+        expect(resolveRecordingConfig().mode).toBe('record')
+    })
+
     it('falls back chainName and verbose from env vars', () => {
         process.env.RECORD_MODE = 'true'
         process.env.RECORD_CHAIN_NAME = 'my-chain'
@@ -59,3 +77,4 @@ describe('resolveRecordingConfig', () => {
         })
     })
 })
+

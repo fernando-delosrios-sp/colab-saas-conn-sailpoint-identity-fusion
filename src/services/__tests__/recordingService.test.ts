@@ -1,13 +1,19 @@
-import { RecordingService } from '../recordingService'
+import { RecordingService, resetRecordingLifecycleForTests } from '../recordingService'
 import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
 import { FusionRun } from '../../model/fusionRun'
 import * as fs from 'fs'
 import * as path from 'path'
 import { NdjsonRecordingStore } from '../recordingService/ndjsonRecordingStore'
+import * as os from 'os'
+import { allocateStepIndex } from '../recordingService/recordingStepCounter'
 
 describe('RecordingService', () => {
-    it('records operation steps via startOperation/endOperation', () => {
+    afterEach(() => {
+        resetRecordingLifecycleForTests()
+    })
+
+    it('records operation steps via startOperation/endOperation', async () => {
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const uniqueConfig = {
             recording: { mode: 'record' as const, chainName: `unit-test-chain-${Date.now()}`, store: 'ndjson' as const },
@@ -24,6 +30,8 @@ describe('RecordingService', () => {
 
         expect(service.getStepCount()).toBe(1)
         expect(service.getSteps()[0].output).toEqual([{ key: 'acct-1' }])
+
+        fs.rmSync(service.getRecordingDir(), { recursive: true, force: true })
     })
 
     it('finalizeOnce writes scenario.json and manifest.json and retains steps.ndjson', async () => {
@@ -46,15 +54,18 @@ describe('RecordingService', () => {
             response: { data: [] },
             timestamp: new Date().toISOString(),
         })
+        await service.getStore().flush()
 
         const scenarioPath = await service.finalizeOnce()
         const dir = service.getRecordingDir()
         const stepsPath = path.join(dir, 'steps.ndjson')
         const manifestPath = path.join(dir, 'manifest.json')
+        const apiLogPath = path.join(dir, 'api-log.ndjson')
 
         expect(scenarioPath).toContain('scenario.json')
         expect(fs.existsSync(stepsPath)).toBe(true)
         expect(fs.existsSync(manifestPath)).toBe(true)
+        expect(fs.existsSync(apiLogPath)).toBe(true)
 
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
         expect(manifest.store).toBe('ndjson')
@@ -64,6 +75,7 @@ describe('RecordingService', () => {
         const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf-8'))
         expect(scenario.apiLogPath).toContain('api-log.ndjson')
         expect(scenario.chainName).toBe(chainName)
+        expect(scenario.steps).toHaveLength(1)
 
         fs.rmSync(dir, { recursive: true, force: true })
     })
@@ -85,7 +97,7 @@ describe('RecordingService', () => {
         fs.rmSync(service.getRecordingDir(), { recursive: true, force: true })
     })
 
-    it('accumulates steps across reloaded instances and finalizeOnce writes combined scenario', async () => {
+    it('accumulates steps across instances and finalizeOnce writes combined scenario from disk', async () => {
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const chainName = `reload-${Date.now()}`
         const config = {
@@ -98,12 +110,12 @@ describe('RecordingService', () => {
         const first = new RecordingService(log, config)
         first.startOperation('testConnection', {}, res, run)
         first.endOperation(run)
+        await first.getStore().flush()
 
         const second = new RecordingService(log, config)
         second.startOperation('accountList', {}, res, run)
         second.endOperation(run)
-
-        expect(second.getStepCount()).toBe(2)
+        await second.getStore().flush()
 
         const scenarioPath = await second.finalizeOnce()
         const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf-8'))
@@ -114,7 +126,7 @@ describe('RecordingService', () => {
         fs.rmSync(first.getRecordingDir(), { recursive: true, force: true })
     })
 
-    it('recordPhaseEnd appends to phases.ndjson', () => {
+    it('recordPhaseEnd appends to phases.ndjson', async () => {
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         const chainName = `phases-${Date.now()}`
         const config = {
@@ -132,6 +144,8 @@ describe('RecordingService', () => {
             apiCalls: 5,
         })
 
+        await service.getStore().flush()
+
         const phasesPath = path.join(service.getRecordingDir(), 'phases.ndjson')
         expect(fs.existsSync(phasesPath)).toBe(true)
         const lines = fs.readFileSync(phasesPath, 'utf-8').trim().split('\n')
@@ -139,6 +153,18 @@ describe('RecordingService', () => {
         expect(JSON.parse(lines[0]).phase).toBe('Setup')
 
         fs.rmSync(service.getRecordingDir(), { recursive: true, force: true })
+    })
+})
+
+describe('allocateStepIndex', () => {
+    it('returns unique indices under concurrent reservation', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'step-counter-'))
+        const ids = new Set<number>()
+        for (let i = 0; i < 20; i++) {
+            ids.add(allocateStepIndex(dir))
+        }
+        expect(ids.size).toBe(20)
+        fs.rmSync(dir, { recursive: true, force: true })
     })
 })
 
@@ -155,26 +181,30 @@ describe('NdjsonRecordingStore', () => {
             timestamp: '2026-01-01T00:00:00.000Z',
         })
 
-        const loaded = store.loadApiLog()
-        expect(loaded).toHaveLength(1)
-        expect(loaded[0].api).toBe('search')
-        expect(store.getApiLogEntryCount()).toBe(1)
+        return store.flush().then(() => {
+            const loaded = store.loadApiLog()
+            expect(loaded).toHaveLength(1)
+            expect(loaded[0].api).toBe('search')
+            expect(store.getApiLogEntryCount()).toBe(1)
 
-        store.writeManifest({
-            version: '1.0.0',
-            store: 'ndjson',
-            chainName,
-            recordedAt: new Date().toISOString(),
-            apiLogPath: 'api-log.ndjson',
-            apiLogEntryCount: 1,
-            stepsPath: 'steps.ndjson',
-            stepCount: 0,
-            phaseCount: 0,
-            scenarioPath: 'scenario.json',
-            artifactPaths: [],
+            store.writeManifest({
+                version: '1.0.0',
+                store: 'ndjson',
+                chainName,
+                recordedAt: new Date().toISOString(),
+                apiLogPath: 'api-log.ndjson',
+                apiLogEntryCount: 1,
+                stepsPath: 'steps.ndjson',
+                stepCount: 0,
+                phaseCount: 0,
+                scenarioPath: 'scenario.json',
+                artifactPaths: [],
+            })
+
+            return store.flush()
+        }).then(() => {
+            expect(fs.existsSync(path.join(store.getRecordingDir(), 'manifest.json'))).toBe(true)
+            fs.rmSync(store.getRecordingDir(), { recursive: true, force: true })
         })
-
-        expect(fs.existsSync(path.join(store.getRecordingDir(), 'manifest.json'))).toBe(true)
-        fs.rmSync(store.getRecordingDir(), { recursive: true, force: true })
     })
 })

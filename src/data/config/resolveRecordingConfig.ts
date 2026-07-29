@@ -2,7 +2,7 @@ import type { RecordingConfig } from '../../model/config'
 
 /**
  * Resolves recording configuration with env var fallbacks for dev/CI tooling.
- * Explicit config values take precedence over `RECORD_MODE`, `RECORD_CHAIN_NAME`, and `VERBOSE_RECORDING`.
+ * Explicit config values take precedence over `RECORD_MODE`, `REPLAY_MODE`, `RECORD_CHAIN_NAME`, and `VERBOSE_RECORDING`.
  */
 export function resolveRecordingConfig(raw?: Partial<RecordingConfig>): RecordingConfig {
     let mode: RecordingConfig['mode'] = 'off'
@@ -10,6 +10,8 @@ export function resolveRecordingConfig(raw?: Partial<RecordingConfig>): Recordin
         mode = raw.mode
     } else if (process.env.RECORD_MODE === 'true') {
         mode = 'record'
+    } else if (process.env.REPLAY_MODE === 'true') {
+        mode = 'replay'
     }
 
     const chainName = raw?.chainName ?? process.env.RECORD_CHAIN_NAME
@@ -24,3 +26,4 @@ export function resolveRecordingConfig(raw?: Partial<RecordingConfig>): Recordin
         store,
     }
 }
+

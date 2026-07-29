@@ -20,6 +20,9 @@
         "tmole": "npx tmole 3000",
         "dev": "cross-env NODE_OPTIONS=--enable-source-maps spcx run dist/index.js",
         "record": "node scripts/record-chain.js",
+        "finalize": "node scripts/finalize-chain.js",
+        "replay": "node scripts/replay-chain.js",
+        "test-recording": "node scripts/test-recording.js",
         "lint": "npx eslint . && npx knip",
         "lint:docs-code": "npx eslint \"src/**/*.{ts,js,mjs,cjs}\"",
         "lint:markdown": "npx markdownlint \"README.md\" \"docs/**/*.md\"",
@@ -100,3 +103,4 @@
         "readdir-glob": "^3.0.0"
     }
 }
+

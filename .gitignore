@@ -25,7 +25,8 @@ site/
 
 # Test artifacts
 test/
-test-data/recordings
+test-data/
+recordings/
 
 # Local configs
 input.json

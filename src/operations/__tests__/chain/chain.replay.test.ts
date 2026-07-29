@@ -1,236 +1,46 @@
 import * as path from 'path'
-import * as fs from 'fs'
-import { ChainRunner, registerStepFn } from './framework/ChainRunner'
-import { StepDefinition } from './framework/ChainRunner'
-import { ChainContext } from './framework/ChainContext'
-import { buildReplayContext, collectOutputs, compareOutputs } from './harness/ReplayAdapter'
-import { accountDiscoverSchema } from '../../../operations/accountDiscoverSchema'
-import { entitlementList } from '../../../operations/entitlementList'
-import { accountList } from '../../../operations/accountList'
-import { accountCreate } from '../../../operations/accountCreate'
-import { accountDisable } from '../../../operations/accountDisable'
-import { accountEnable } from '../../../operations/accountEnable'
-import { AggregationTracker as _AggregationTracker } from '../../../services/fusionService'
-import { accountRead } from '../../../operations/accountRead'
-import { accountUpdate } from '../../../operations/accountUpdate'
-import { ServiceRegistry as _ServiceRegistry } from '../../../services/serviceRegistry'
-import { MockRegistry } from './framework/ChainContext'
+import * as fs from 'os'
+import * as fsSync from 'fs'
+import { ChainRunner } from './framework/ChainRunner'
+import { compareOutputs } from './harness/ReplayAdapter'
+import { verifyChainRecording, registerChainStepFns } from './harness/chainRecordingVerify'
+import { writePassingScenario } from './fixtures/minimalRecordingFixture'
 
-let mockActiveRegistry: any = null
-
-vi.mock('../../../services/serviceRegistry', () => ({
-    ServiceRegistry: {
-        setCurrent: vi.fn((reg) => {
-            mockActiveRegistry = reg
-        }),
-        getCurrent: vi.fn(() => {
-            return mockActiveRegistry
-        }),
-        clear: vi.fn(() => {
-            mockActiveRegistry = null
-        }),
-    },
-}))
-
-function availableRecordings(): string[] {
-    const _dir = path.resolve('test-data', 'recordings')
-    if (!fs.existsSync(_dir)) return []
-    return fs
-        .readdirSync(_dir, { withFileTypes: true })
-        .filter((d) => d.isDirectory() && fs.existsSync(path.join(_dir, d.name, 'scenario.json')))
-        .map((d) => path.join(_dir, d.name, 'scenario.json'))
-}
-
-function registerAllStepFns(): void {
-    registerStepFn('accountDiscoverSchema', async (step: StepDefinition, context: ChainContext) => {
-        const replayCtx = buildReplayContext(step, context)
-        const registry = replayCtx.registry as unknown as MockRegistry
-
-        try {
-            await accountDiscoverSchema(registry as any)
-        } catch (err) {
-            console.error(`Error in accountDiscoverSchema for ${step.id}:`, err)
-        }
-
-        return {
-            operation: step.operation,
-            outputs: collectOutputs(replayCtx),
-        }
-    })
-
-    registerStepFn('entitlementList', async (step: StepDefinition, context: ChainContext) => {
-        const replayCtx = buildReplayContext(step, context)
-        const registry = replayCtx.registry as unknown as MockRegistry
-
-        try {
-            await entitlementList(registry as any, (step.input ?? { type: 'status' }) as any)
-        } catch (err) {
-            console.error(`Error in entitlementList for ${step.id}:`, err)
-        }
-
-        return {
-            operation: step.operation,
-            outputs: collectOutputs(replayCtx),
-        }
-    })
-
-    registerStepFn('accountList', async (step: StepDefinition, context: ChainContext) => {
-        const replayCtx = buildReplayContext(step, context)
-        const registry = replayCtx.registry as unknown as MockRegistry
-
-        context.state.setSweepIndex(step.sweep ?? 1)
-
-        try {
-            await accountList(registry as any, (step.input ?? { schema: { attributes: [] } }) as any)
-            if (registry.log.crash.mock.calls.length > 0) {
-                const call = registry.log.crash.mock.calls[0]
-                console.error(`CRASH DETECTED in accountList for ${step.id}:`, call[0], call[1]?.stack || call[1])
-            }
-        } catch (err) {
-            console.error(`Error in accountList for ${step.id}:`, err)
-        }
-
-        return {
-            operation: step.operation,
-            sweep: step.sweep,
-            outputs: collectOutputs(replayCtx),
-        }
-    })
-
-    registerStepFn('accountCreate', async (step: StepDefinition, context: ChainContext) => {
-        const replayCtx = buildReplayContext(step, context)
-        const registry = replayCtx.registry as unknown as MockRegistry
-
-        try {
-            await accountCreate(registry as any, (step.input ?? {}) as any)
-        } catch (err) {
-            console.error(`Error in accountCreate for ${step.id}:`, err)
-        }
-
-        return {
-            operation: step.operation,
-            outputs: collectOutputs(replayCtx),
-        }
-    })
-
-    registerStepFn('accountDisable', async (step: StepDefinition, context: ChainContext) => {
-        const replayCtx = buildReplayContext(step, context)
-        const registry = replayCtx.registry as unknown as MockRegistry
-
-        try {
-            await accountDisable(registry as any, (step.input ?? {}) as any)
-        } catch (err) {
-            console.error(`Error in accountDisable for ${step.id}:`, err)
-        }
-
-        return {
-            operation: step.operation,
-            outputs: collectOutputs(replayCtx),
-        }
-    })
-
-    registerStepFn('accountEnable', async (step: StepDefinition, context: ChainContext) => {
-        const replayCtx = buildReplayContext(step, context)
-        const registry = replayCtx.registry as unknown as MockRegistry
-
-        try {
-            await accountEnable(registry as any, (step.input ?? {}) as any)
-        } catch (err) {
-            console.error(`Error in accountEnable for ${step.id}:`, err)
-        }
-
-        return {
-            operation: step.operation,
-            outputs: collectOutputs(replayCtx),
-        }
-    })
-
-    registerStepFn('accountRead', async (step: StepDefinition, context: ChainContext) => {
-        const replayCtx = buildReplayContext(step, context)
-        const registry = replayCtx.registry as unknown as MockRegistry
-
-        try {
-            await accountRead(registry as any, (step.input ?? {}) as any)
-        } catch (err) {
-            console.error(`Error in accountRead for ${step.id}:`, err)
-        }
-
-        return {
-            operation: step.operation,
-            outputs: collectOutputs(replayCtx),
-        }
-    })
-
-    registerStepFn('accountUpdate', async (step: StepDefinition, context: ChainContext) => {
-        const replayCtx = buildReplayContext(step, context)
-        const registry = replayCtx.registry as unknown as MockRegistry
-
-        try {
-            await accountUpdate(registry as any, (step.input ?? {}) as any)
-            if (registry.log.crash.mock.calls.length > 0) {
-                const call = registry.log.crash.mock.calls[0]
-                console.error(`CRASH DETECTED in accountUpdate for ${step.id}:`, call[0], call[1]?.stack || call[1])
-            }
-        } catch (err) {
-            console.error(`Error in accountUpdate for ${step.id}:`, err)
-        }
-
-        return {
-            operation: step.operation,
-            outputs: collectOutputs(replayCtx),
-        }
-    })
-}
-
-describe('Identity Fusion NG - Recorded Chain Replay', () => {
-    const _matchScoringMs = availableRecordings()
+describe('Identity Fusion NG - Chain Replay Harness', () => {
+    let tempDir: string
+    let scenarioPath: string
 
     beforeAll(() => {
-        registerAllStepFns()
+        registerChainStepFns()
+        tempDir = fsSync.mkdtempSync(path.join(fs.tmpdir(), 'chain-replay-fixture-'))
+        scenarioPath = writePassingScenario(tempDir)
     })
 
-    if (_matchScoringMs.length === 0) {
-        it.skip('no recordings available — run npm run record to create one', () => {
-            // placeholder
-        })
-    } else {
-        it.each(_matchScoringMs)('replays recording: %s', async (scenarioPath) => {
+    afterAll(() => {
+        if (tempDir && fsSync.existsSync(tempDir)) {
+            fsSync.rmSync(tempDir, { recursive: true, force: true })
+        }
+    })
+
+    it('verifyChainRecording succeeds on minimal fixture', async () => {
+        const result = await verifyChainRecording(scenarioPath)
+        expect(result.stepResults[0]?.error).toBeUndefined()
+        expect(result.stepsFailed).toBe(0)
+        expect(result.drifts).toEqual([])
+        expect(result.stepResults).toHaveLength(1)
+        expect(result.stepResults[0].success).toBe(true)
+    })
+
+    it('compareOutputs detects output drift', () => {
+        const actual = [{ attributes: { id: 'changed' } }]
+        const expected = { attributes: { id: 'original' } }
+        const { drift } = compareOutputs(actual, expected, 'step-1')
+        expect(drift.length).toBeGreaterThan(0)
+    })
+
+    describe('Scenario structure validation', () => {
+        it('validates scenario JSON structure from fixture', () => {
             const runner = new ChainRunner(scenarioPath)
-            const scenario = (runner as any).scenario
-            const mas = scenario.initialState.managedAccounts
-            const found17 = mas.filter((m: any) => String(m.nativeIdentity) === "17")
-            const found18 = mas.filter((m: any) => String(m.nativeIdentity) === "18")
-            console.log("Brian (17) MA:", found17)
-            console.log("Brian (18) MA:", found18)
-
-            const results = await runner.executeAll()
-
-            expect(results.success).toBe(true)
-            expect(results.stepsFailed).toBe(0)
-
-            const steps = runner.getSteps()
-            for (let i = 0; i < results.stepResults.length; i++) {
-                const stepResult = results.stepResults[i]
-                expect(stepResult.success).toBe(true)
-                const _output = stepResult.output as Record<string, unknown>
-                const step = steps[i]
-                if (step?.expectedOutput) {
-                    const { match: _match, drift } = compareOutputs(
-                        (_output?.outputs as unknown[]) ?? [],
-                        step.expectedOutput,
-                        `${stepResult.stepId} (index ${i})`
-                    )
-                    expect(drift).toEqual([])
-                }
-            }
-        })
-    }
-
-    describe('Scenario Structure Validation', () => {
-        it('validates scenario JSON structure when recordings exist', () => {
-            if (_matchScoringMs.length === 0) return
-
-            const runner = new ChainRunner(_matchScoringMs[0])
 
             const config = runner.getConfig()
             expect(config).toBeDefined()
@@ -249,9 +59,7 @@ describe('Identity Fusion NG - Recorded Chain Replay', () => {
         })
 
         it('reference values have expected keys', () => {
-            if (_matchScoringMs.length === 0) return
-
-            const runner = new ChainRunner(_matchScoringMs[0])
+            const runner = new ChainRunner(scenarioPath)
             const refValues = runner.getReferenceValues()
 
             for (const [_stepId, refs] of Object.entries(refValues)) {
