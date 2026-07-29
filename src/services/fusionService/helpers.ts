@@ -14,7 +14,7 @@ import {
     FusionReportWarnings,
 } from './types'
 import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
-import { anchorDeferredMatchesForReview } from '../matchingService/matchingHelpers'
+import { anchorDeferredMatchesForReview, rankFusionMatchesForReview } from '../matchingService/matchPresentation'
 import { MatchCandidateType } from '../matchingService/types'
 import { FusionRun } from '../../model/fusionRun'
 import { SourceService } from '../sourceService'
@@ -38,29 +38,7 @@ export function mapScoreReportsForFusionReport(scoreReports: ScoreReport[]): Fus
     }))
 }
 
-/** Rank identity match candidates for review surfaces (forms, emails) — highest combined score first. */
-export function rankFusionMatchesForReview(matches: FusionMatch[]): FusionMatch[] {
-    const rankScore = (match: FusionMatch): number => {
-        const combined = match.scores?.find(
-            (s) =>
-                s.algorithm === 'weighted-mean' ||
-                s.attribute === 'Combined score' ||
-                s.attribute === 'Combined match score'
-        )
-        if (combined) return combined.score
-        const scored = match.scores?.filter((s) => !s.skipped) ?? []
-        if (scored.length === 0) return 0
-        return Math.max(...scored.map((s) => s.score))
-    }
-
-    return [...matches].sort((a, b) => {
-        const delta = rankScore(b) - rankScore(a)
-        if (delta !== 0) return delta
-        const ida = String(a.fusionIdentity?.identityId ?? a.identityId ?? '')
-        const idb = String(b.fusionIdentity?.identityId ?? b.identityId ?? '')
-        return ida.localeCompare(idb)
-    })
-}
+export { rankFusionMatchesForReview } from '../matchingService/matchPresentation'
 
 /**
  * Build review-email match rows using the same label and score mapping as dry-run reports.

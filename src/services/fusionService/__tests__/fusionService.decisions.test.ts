@@ -1,10 +1,7 @@
 import { createFusionServiceTestContext, seedRunInventory, type FusionServiceTestContext } from './fusionService.testFixtures'
 import { FusionAccount } from '../../../model/account'
 import { StatusEntitlement } from '../../../model/statusEntitlement'
-import { AggregationTracker } from '../aggregationTracker'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
-import { FusionService } from '../fusionService'
-import { StandardCommand } from '@sailpoint/connector-sdk'
 
 describe('FusionService — decisions', () => {
     let ctx: FusionServiceTestContext
@@ -496,3 +493,4 @@ describe('FusionService — decisions', () => {
     })
 
 })
+

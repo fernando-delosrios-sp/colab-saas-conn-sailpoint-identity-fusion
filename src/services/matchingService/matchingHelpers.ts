@@ -4,7 +4,7 @@ import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
 import { FusionConfig, SourceType } from '../../model/config'
 import { SourceInfo } from '../sourceService'
 import { coerceBoolean } from '../../utils/safeRead'
-import { rankFusionMatchesForReview } from '../fusionService/helpers'
+import { anchorDeferredMatchesForReview, isPersistedOrFinalizedDeferredTier } from './matchPresentation'
 import { isExactAttributeMatchScores } from './exactMatch'
 import { FusionMatch, MatchCandidateType } from './types'
 import { LogService } from '../logService'
@@ -40,9 +40,7 @@ function formatFusionMatchDiscoveryLog(
     }
 }
 
-export function isPersistedOrFinalizedDeferredTier(tier: string | undefined): boolean {
-    return tier === 'persisted' || tier === 'finalized'
-}
+export { anchorDeferredMatches, anchorDeferredMatchesForReview, identityMatchesForReview, isPersistedOrFinalizedDeferredTier } from './matchPresentation'
 
 export interface LogMatchDiscoveryOptions {
     /** Appended to the debug line after the summary (e.g. "; skipping account for now"). */
@@ -113,40 +111,6 @@ export function hasActionableDeferredAnchorMatch(fusionAccount: FusionAccount, r
         if (isPersistedOrFinalizedDeferredTier(tier)) return true
     }
     return false
-}
-
-/** Deferred matches against persisted or finalized anchors — excludes pending peer queue accounts. */
-export function anchorDeferredMatches(fusionAccount: FusionAccount, run: FusionRun): FusionMatch[] {
-    return fusionAccount.fusionMatches.filter((match) => {
-        if (match.candidateType !== MatchCandidateType.Deferred) return false
-        const candidate = match.fusionIdentity
-        if (!candidate) return false
-        const tier = run.getDeferredCandidateTier(candidate)
-        return isPersistedOrFinalizedDeferredTier(tier)
-    })
-}
-
-/** Rank and optionally cap match rows for review surfaces (forms, reports, logs). */
-function capFusionMatchesForReview(matches: FusionMatch[], maxCandidates?: number): FusionMatch[] {
-    const ordered = rankFusionMatchesForReview(matches)
-    return maxCandidates ? ordered.slice(0, maxCandidates) : ordered
-}
-
-/** Persisted/finalized deferred anchors, ranked and capped like identity review candidates. */
-export function anchorDeferredMatchesForReview(
-    fusionAccount: FusionAccount,
-    run: FusionRun,
-    maxCandidates?: number
-): FusionMatch[] {
-    return capFusionMatchesForReview(anchorDeferredMatches(fusionAccount, run), maxCandidates)
-}
-
-/** ISC identity candidates, ranked and capped for review surfaces (forms, reports). */
-export function identityMatchesForReview(fusionAccount: FusionAccount, maxCandidates?: number): FusionMatch[] {
-    const identityMatches = fusionAccount.fusionMatches.filter(
-        (match) => (match.candidateType ?? MatchCandidateType.Identity) === MatchCandidateType.Identity
-    )
-    return capFusionMatchesForReview(identityMatches, maxCandidates)
 }
 
 /** Matches counted toward the review-form cap (excludes same-operation deferred candidates). */
