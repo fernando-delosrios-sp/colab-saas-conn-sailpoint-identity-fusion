@@ -37,6 +37,12 @@
       "skillPath": "skills/engineering/code-review/SKILL.md",
       "computedHash": "31d149a480eaa68c11e32f5ee77f0fd0b98a906834d531d881d502352edd0b8e"
     },
+    "code-simplification": {
+      "source": "fernando-delosrios-sp/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/code-simplification/SKILL.md",
+      "computedHash": "7973e746e8e2ea5004d520da970c15a106824b8d6be1bcff48908aec021f3677"
+    },
     "codebase-design": {
       "source": "fernando-delosrios-sp/skills",
       "sourceType": "github",
@@ -65,7 +71,7 @@
       "source": "fernando-delosrios-sp/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/find-docs/SKILL.md",
-      "computedHash": "a6ef6cee00e9ae9b18dce7133edc403d0ba8750ef1ac5f02af80431e060dd007"
+      "computedHash": "93ec2d2786d7e83973252383875c4f345a2ee7cbbd08a1ab38e5201b214640ee"
     },
     "finishing-a-development-branch": {
       "source": "obra/superpowers",
@@ -78,6 +84,12 @@
       "sourceType": "github",
       "skillPath": "skills/engineering/gherkin-authoring/SKILL.md",
       "computedHash": "44330460cc7554b6e36529fdf0f7618bdbad7399531bf7a3994ef06c3d76668e"
+    },
+    "git-commit": {
+      "source": "fernando-delosrios-sp/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/git-commit/SKILL.md",
+      "computedHash": "2607fc60629b82b257136dd2a7a373f0a4466c0b49df7746d845d59313c99b21"
     },
     "grilling": {
       "source": "fernando-delosrios-sp/skills",
