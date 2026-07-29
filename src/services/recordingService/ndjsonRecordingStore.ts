@@ -1,5 +1,6 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import { recordingChainDir } from '../../data/recordingPaths'
 import type { ApiLogEntry } from '../clientService/recordingApiAdapter'
 import type { RecordingManifest, RecordingStore } from './recordingStore'
 
@@ -14,18 +15,18 @@ export class NdjsonRecordingStore implements RecordingStore {
     private readonly apiLogPath: string
     private apiLogEntryCount = 0
     private phaseCount = 0
+    private writeChain: Promise<void> = Promise.resolve()
+    private dirReady = false
 
     constructor(private readonly chainName: string) {
-        this.recordingDir = path.resolve('test-data', 'recordings', chainName)
+        this.recordingDir = recordingChainDir(chainName)
         this.apiLogPath = path.join(this.recordingDir, 'api-log.ndjson')
         this.apiLogEntryCount = this.countLines(this.apiLogPath)
         this.phaseCount = this.countLines(path.join(this.recordingDir, COLLECTION_FILES.phases))
     }
 
     appendApiCall(entry: ApiLogEntry): void {
-        fs.mkdirSync(this.recordingDir, { recursive: true })
-        fs.appendFileSync(
-            this.apiLogPath,
+        const line =
             JSON.stringify({
                 api: entry.api,
                 method: entry.method,
@@ -33,14 +34,13 @@ export class NdjsonRecordingStore implements RecordingStore {
                 response: entry.response,
                 timestamp: entry.timestamp,
             }) + '\n'
-        )
+        this.enqueueWrite(this.apiLogPath, line)
         this.apiLogEntryCount++
     }
 
     append(collection: 'steps' | 'phases', record: unknown): void {
-        fs.mkdirSync(this.recordingDir, { recursive: true })
         const filePath = path.join(this.recordingDir, COLLECTION_FILES[collection])
-        fs.appendFileSync(filePath, JSON.stringify(record) + '\n')
+        this.enqueueWrite(filePath, JSON.stringify(record) + '\n')
         if (collection === 'phases') {
             this.phaseCount++
         }
@@ -54,8 +54,11 @@ export class NdjsonRecordingStore implements RecordingStore {
     }
 
     writeManifest(manifest: RecordingManifest): void {
-        fs.mkdirSync(this.recordingDir, { recursive: true })
-        fs.writeFileSync(path.join(this.recordingDir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
+        const manifestPath = path.join(this.recordingDir, 'manifest.json')
+        this.writeChain = this.writeChain.then(async () => {
+            await this.ensureDir()
+            await fs.promises.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
+        })
     }
 
     getRecordingDir(): string {
@@ -74,8 +77,25 @@ export class NdjsonRecordingStore implements RecordingStore {
         return this.phaseCount
     }
 
+    async flush(): Promise<void> {
+        await this.writeChain
+    }
+
     close(): void {
-        /* NDJSON store has no handles to release */
+        /* writes drain via flush() before close */
+    }
+
+    private enqueueWrite(filePath: string, line: string): void {
+        this.writeChain = this.writeChain.then(async () => {
+            await this.ensureDir()
+            await fs.promises.appendFile(filePath, line)
+        })
+    }
+
+    private async ensureDir(): Promise<void> {
+        if (this.dirReady) return
+        await fs.promises.mkdir(this.recordingDir, { recursive: true })
+        this.dirReady = true
     }
 
     private countLines(filePath: string): number {

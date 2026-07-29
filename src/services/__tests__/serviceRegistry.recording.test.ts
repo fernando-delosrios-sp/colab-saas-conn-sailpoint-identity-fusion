@@ -8,6 +8,7 @@ import { ServiceRegistry } from '../serviceRegistry'
 import { RecordingApiAdapter } from '../clientService/recordingApiAdapter'
 import { SdkApiAdapter } from '../clientService'
 import { loadRecordingApiLog } from '../recordingService/recordingStore'
+import { resetRecordingLifecycleForTests } from '../recordingService'
 import { OperationRunContext } from '../logService/operationRunContext'
 
 vi.mock('@sailpoint/connector-sdk', async () => {
@@ -35,6 +36,7 @@ describe('ServiceRegistry recording wiring', () => {
 
     afterEach(() => {
         process.env = { ...envBackup }
+        resetRecordingLifecycleForTests()
     })
 
     it('wires RecordingApiAdapter when RECORD_MODE env resolves via safeReadConfig', async () => {
@@ -66,6 +68,8 @@ describe('ServiceRegistry recording wiring', () => {
         registry.log.bindRunContext(new OperationRunContext())
         registry.log.phaseStart(1, 'Setup')
         registry.log.phaseEnd(1, 'Setup', { sources: 2 })
+
+        await registry.recording!.getStore().flush()
 
         const phasesPath = path.join(registry.recording!.getRecordingDir(), 'phases.ndjson')
         expect(fs.existsSync(phasesPath)).toBe(true)
@@ -113,3 +117,4 @@ describe('loadRecordingApiLog', () => {
         fs.rmSync(tmpDir, { recursive: true, force: true })
     })
 })
+

@@ -1,5 +1,6 @@
 import { Configuration } from 'sailpoint-api-client'
 import { IscApiAdapter } from './iscApiAdapter'
+import { sanitizeApiPayload } from '../../utils/sanitizeForJson'
 
 export interface ApiLogEntry {
     api: string
@@ -9,14 +10,13 @@ export interface ApiLogEntry {
     timestamp: string
 }
 
-import { sanitizeForJson } from '../../utils/sanitizeForJson'
-
 export class RecordingApiAdapter implements IscApiAdapter {
     public readonly config: Configuration
 
     constructor(
         private readonly inner: IscApiAdapter,
-        private readonly onApiCall: (entry: ApiLogEntry) => void
+        private readonly onApiCall: (entry: ApiLogEntry) => void,
+        private readonly onRecordError?: (message: string) => void
     ) {
         this.config = inner.config
     }
@@ -28,19 +28,25 @@ export class RecordingApiAdapter implements IscApiAdapter {
                 const original = Reflect.get(realApi, method)
                 if (typeof original !== 'function') return original
                 return (...args: unknown[]) => {
-                    const sanitizedArgs = args.map(sanitizeForJson)
                     const result = original.apply(realApi, args)
-                    const resultPromise = Promise.resolve(result).then((response) => {
-                        this.onApiCall({
-                            api: apiName,
-                            method,
-                            args: sanitizedArgs,
-                            response: sanitizeForJson(response),
-                            timestamp: new Date().toISOString(),
+                    return Promise.resolve(result).then((response) => {
+                        queueMicrotask(() => {
+                            try {
+                                this.onApiCall({
+                                    api: apiName,
+                                    method,
+                                    args: args.map(sanitizeApiPayload),
+                                    response: sanitizeApiPayload(response),
+                                    timestamp: new Date().toISOString(),
+                                })
+                            } catch (err) {
+                                this.onRecordError?.(
+                                    `Failed to record ${apiName}.${method}: ${err instanceof Error ? err.message : String(err)}`
+                                )
+                            }
                         })
                         return response
                     })
-                    return resultPromise
                 }
             },
         })
@@ -59,4 +65,3 @@ export class RecordingApiAdapter implements IscApiAdapter {
     get identityProfilesApi() { return this.createApiProxy('identityProfiles', this.inner.identityProfilesApi) }
     get identityAttributesApi() { return this.createApiProxy('identityAttributes', this.inner.identityAttributesApi) }
 }
-

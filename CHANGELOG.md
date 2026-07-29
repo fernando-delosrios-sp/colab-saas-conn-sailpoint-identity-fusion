@@ -1,6 +1,7 @@
 CHANGELOG.md [159L]
 # Changelog
 ## 2.2.0
+- (2026-07-29) **Enhancement:** Added `npm run test-recording -- <chainName>` for offline golden verification of recorded chains — auto-runs scenario steps, reports output drift, exits non-zero on failure. Chain replay Vitest tests no longer scan local `recordings/` artifacts; harness mechanics validated via self-contained fixtures. CJS finalize scripts preserve connector-written `scenario.json` config on re-finalize.
 - (2026-07-29) **Fix:** Record mode now produces complete replay artifacts via `resolveRecordingConfig()` env bridge — `RECORD_MODE`, `RECORD_CHAIN_NAME`, and `VERBOSE_RECORDING` resolve into `FusionConfig.recording` during config load so `ServiceRegistry` and `FusionRun` share one source of truth. **Enhancement:** Pluggable `RecordingStore` interface with NDJSON default (`api-log.ndjson`, `steps.ndjson`, `phases.ndjson`, `manifest.json`, `scenario.json`). Finalize-once lifecycle retains `steps.ndjson` across multi-operation chains. `npm run record` verifies manifest/scenario/api-log on exit.
 - (2026-07-28) **Enhancement:** Added `$MD5(input)` Velocity context helper for lowercase hex MD5 digests in Normal and Unique attribute definitions — use `$MD5($email)` for deterministic identifiers compatible with downstream systems. Returns empty string for null, non-string, or whitespace-only input. Documented in the define guide and connector-spec UI help. `definition-service` spec updated.
 - (2026-07-27) **Fix:** Provisioning timeout now starts when each queued API call begins HTTP execution, not when it is enqueued — FIFO queue wait and rate-limit slot wait no longer consume the timeout budget. Retry attempts receive a fresh timeout per attempt. Fixes background correlation PATCHes aborting with generic `Aborted` after ~300s wall time while still waiting in queue during Output/Epilogue. `ApiQueue` propagates `abortSignal.reason` on rejection (timeout messages preserved). STATUS `api=` segment `q` now includes rate-limiter wait (`queueLength + rateLimitWaitCount`) so operators see pending work during drain. Advanced connection settings guide and `client-service` / `log-service` specs updated.
@@ -66,4 +67,5 @@ CHANGELOG.md [159L]
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 

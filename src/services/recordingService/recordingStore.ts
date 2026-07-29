@@ -35,8 +35,11 @@ export interface RecordingStore extends ApiLogReader {
     getApiLogPath(): string
     getApiLogEntryCount(): number
     getPhaseCount(): number
+    flush(): Promise<void>
     close(): void
 }
+
+const storeCache = new Map<string, RecordingStore>()
 
 /** Creates the configured store implementation (default NDJSON). */
 export function createRecordingStore(config: RecordingConfig, chainName: string): RecordingStore {
@@ -47,6 +50,20 @@ export function createRecordingStore(config: RecordingConfig, chainName: string)
         default:
             throw new Error(`Unsupported recording store: ${storeType}`)
     }
+}
+
+/** Returns one store instance per chain so api-log and counters stay consistent across operations. */
+export function getOrCreateRecordingStore(config: RecordingConfig, chainName: string): RecordingStore {
+    const cached = storeCache.get(chainName)
+    if (cached) return cached
+    const store = createRecordingStore(config, chainName)
+    storeCache.set(chainName, store)
+    return store
+}
+
+/** Clears cached stores (for tests). */
+export function clearRecordingStoreCache(): void {
+    storeCache.clear()
 }
 
 /** Loads api-log entries from a chain directory using manifest store type when present. */
@@ -77,3 +94,4 @@ export function loadRecordingApiLog(chainDir: string): ApiLogEntry[] {
     const store = createRecordingStore({ mode: 'replay', store: storeType, chainName }, chainName)
     return store.loadApiLog()
 }
+
