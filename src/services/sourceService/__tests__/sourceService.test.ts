@@ -375,6 +375,34 @@ describe('SourceService fetchManagedAccount (sourceId + nativeIdentity)', () => 
     })
 })
 
+describe('SourceService.fetchAllSources', () => {
+    it('syncs discovered sources back to service state', async () => {
+        const { service, client } = createService()
+        ;(service as any)._allSources = undefined
+        ;(service as any)._fusionSourceId = undefined
+        ;(service as any).sourcesById = new Map()
+        service.run.sourcesByName.clear()
+
+        client.paginate.mockResolvedValue([
+            { id: 'managed-source-id', name: 'HR Source', connectorAttributes: {} },
+            {
+                id: 'fusion-source-id',
+                name: 'Fusion Source',
+                owner: { id: 'owner-id', type: 'IDENTITY' },
+                connectorAttributes: { spConnectorInstanceId: 'fusion-id' },
+            },
+        ])
+
+        await service.fetchAllSources()
+
+        expect(service.managedSources).toHaveLength(1)
+        expect(service.managedSources[0].name).toBe('HR Source')
+        expect(service.hasFusionSource).toBe(true)
+        expect(service.fusionSourceId).toBe('fusion-source-id')
+        expect(service.getSourceByNameSafe('HR Source')?.id).toBe('managed-source-id')
+    })
+})
+
 describe('SourceService source lookup boundaries', () => {
     it('returns undefined for missing or blank source names via safe lookup', () => {
         const { service } = createService()

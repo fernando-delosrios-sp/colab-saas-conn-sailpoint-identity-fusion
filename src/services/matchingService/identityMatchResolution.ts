@@ -26,7 +26,6 @@ export async function resolveIdentityMatchOutcome(
     }
     if (deps.config.fusionEnableAutoMerge) {
         await callbacks.scorePersistedAnchorsForAutoMerge(fusionAccount, account)
-        fusionAccount.removeDeferredFusionMatches()
     }
     const autoMerge = await tryAutoMergeFromMatches(
         fusionAccount,
@@ -35,6 +34,12 @@ export async function resolveIdentityMatchOutcome(
         deps,
         callbacks
     )
+    const hadMergeTarget =
+        deps.config.fusionEnableAutoMerge &&
+        !!callbacks.resolveAutoMergeTargetId(callbacks.getBestAutoAssignMatch(fusionAccount.fusionMatches))
+    if (deps.config.fusionEnableAutoMerge) {
+        fusionAccount.removeDeferredFusionMatches()
+    }
     if (autoMerge) {
         return {
             account,
@@ -44,11 +49,11 @@ export async function resolveIdentityMatchOutcome(
         }
     }
     if (
-        deps.config.fusionEnableAutoMerge &&
-        callbacks.resolveAutoMergeTargetId(callbacks.getBestAutoAssignMatch(fusionAccount.fusionMatches))
+        hadMergeTarget
     ) {
         return undefined
     }
     await callbacks.handlePartialMatch(fusionAccount, sourceInfo, account)
     return { account, fusionAccount, resolution: 'partial-match' }
 }
+
