@@ -56,8 +56,8 @@ export class ManagedAccountAnalysisRecorder {
                     log,
                     identityMatchesForReview(fusionAccount, maxCandidates),
                     false,
-                    name,
-                    sourceName
+                    name ?? fusionAccount.name ?? '',
+                    sourceName ?? undefined
                 )
             }
             if (!shouldCaptureReportData()) return
@@ -128,6 +128,7 @@ export class ManagedAccountAnalysisRecorder {
         })
     }
 }
+
 
 
 

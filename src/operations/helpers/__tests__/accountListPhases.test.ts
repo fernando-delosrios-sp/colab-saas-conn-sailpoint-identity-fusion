@@ -1,4 +1,4 @@
-import { buildReportAggregationStats } from '../accountListPhases'
+import { buildReportAggregationStats } from '../accountListHelpers'
 import { FusionRun } from '../../../model/fusionRun'
 import { LogService } from '../../../services/logService'
 
@@ -29,3 +29,4 @@ describe('accountListPhases — buildReportAggregationStats', () => {
         expect(stats.phaseTiming).toBeDefined()
     })
 })
+

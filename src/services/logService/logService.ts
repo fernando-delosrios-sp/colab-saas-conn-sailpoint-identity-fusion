@@ -306,6 +306,38 @@ export class LogService {
         }
     }
 
+    /**
+     * Runs a pipeline sub-step with STEP START/END logging and optional METRIC tracking.
+     */
+    async runStep<T>(
+        step: string,
+        fn: () => Promise<T>,
+        options?: {
+            startDetail?: Record<string, unknown>
+            endDetail?: Record<string, unknown> | ((result: T) => Record<string, unknown>)
+            track?: string
+            trackDone?: Record<string, unknown> | ((result: T) => Record<string, unknown>)
+        }
+    ): Promise<T> {
+        this.stepStart(step, options?.startDetail)
+        const tracked = options?.track ? this.track(options.track) : undefined
+        try {
+            const result = await fn()
+            if (tracked) {
+                const doneData =
+                    typeof options?.trackDone === 'function' ? options.trackDone(result) : options?.trackDone
+                tracked.done(doneData)
+            }
+            const endDetail =
+                typeof options?.endDetail === 'function' ? options.endDetail(result) : options?.endDetail
+            this.stepEnd(step, endDetail)
+            return result
+        } catch (error) {
+            this.stepEnd(step)
+            throw error
+        }
+    }
+
     setProgress(done: number, total: number, unit?: string): void {
         if (this.runContext) {
             this.runContext.progress = { done, total, unit }
@@ -694,6 +726,7 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
+
 
 
 
