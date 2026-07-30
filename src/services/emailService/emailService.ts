@@ -132,10 +132,12 @@ export class EmailService {
         const accountEmail = normalizeEmailValue(context?.accountEmail)[0]
 
         const sourceTypeInput = context?.sourceType
-        const sourceType =
-            sourceTypeInput === SourceType.Authoritative || sourceTypeInput === SourceType.Record
-                ? (sourceTypeInput as SourceType)
-                : (sourceTypeInput === SourceType.Orphan ? (sourceTypeInput as SourceType) : undefined)
+        const isValidSourceType =
+            sourceTypeInput === SourceType.Authoritative ||
+            sourceTypeInput === SourceType.Record ||
+            sourceTypeInput === SourceType.Orphan
+
+        const sourceType = isValidSourceType ? (sourceTypeInput as SourceType) : undefined
 
         const reviewMatches =
             context?.fusionMatches && context.fusionMatches.length > 0
@@ -409,11 +411,14 @@ export class EmailService {
         }
         const accessToken = this.client.accessToken
         assert(accessToken, 'Client access token provider is required')
-        return typeof accessToken === 'string'
-            ? accessToken
-            : typeof accessToken === 'function'
-              ? await accessToken(undefined, [])
-              : await accessToken
+
+        if (typeof accessToken === 'string') {
+            return accessToken
+        }
+        if (typeof accessToken === 'function') {
+            return await accessToken(undefined, [])
+        }
+        return await accessToken
     }
 
     private async executeWorkflowTest(params: any): Promise<any> {
