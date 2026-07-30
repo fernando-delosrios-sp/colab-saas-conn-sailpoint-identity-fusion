@@ -1,7 +1,7 @@
 import { EmailService } from '../emailService'
 import { compileEmailTemplates, renderFusionReviewEmail } from '../helpers'
 
-const createEmailService = () => {
+const createEmailService = (overrides: Partial<{ config: Record<string, unknown>; identities: Record<string, unknown> }> = {}) => {
     const workflowsApi = {
         listWorkflows: vi.fn().mockResolvedValue({
             data: [{ id: 'wf-email-1', name: 'Fusion Email Sender (Test Tenant)', enabled: false }],
@@ -23,6 +23,8 @@ const createEmailService = () => {
         cloudDisplayName: 'Test Tenant',
         baseurl: 'https://tenant.api.identitynow.com',
         fusionFormAttributes: ['firstname', 'lastname', 'email'],
+        enableLocalization: true,
+        ...(overrides.config ?? {}),
     } as any
     const sources = {
         fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
@@ -34,9 +36,10 @@ const createEmailService = () => {
             attributes: { preferredLanguage: 'en', email: 'reviewer@example.com' },
         })),
         hydrateMissingIdentitiesById: vi.fn().mockResolvedValue(undefined),
+        ...(overrides.identities ?? {}),
     } as any
     const service = new EmailService(config, log, client, sources, identities)
-    return { service, workflowsApi }
+    return { service, workflowsApi, identities }
 }
 
 describe('EmailService.sendFusionEmail', () => {
@@ -83,6 +86,32 @@ describe('EmailService.sendFusionEmail', () => {
         expect(sentBody).toContain('92%')
         expect(sentBody).not.toContain('>d3a1cb345cf34b2ea6fc5f40686cad4c<')
         expect(sentBody).not.toContain('Unknown')
+    })
+
+    it('localizes review email subject and body for Spanish recipients when enabled', async () => {
+        const { service, workflowsApi } = createEmailService({
+            identities: {
+                getIdentityById: vi.fn((id: string) => ({
+                    id,
+                    attributes: { preferredLanguage: 'es', email: 'reviewer@example.com' },
+                })),
+            },
+        })
+        const formInstance = {
+            id: 'form-1',
+            standAloneFormUrl: 'https://tenant.identitynow.com/ui/forms/review/form-1',
+            recipients: [{ id: 'reviewer-1' }],
+        } as any
+
+        await service.sendFusionEmail(formInstance, {
+            accountName: '125536',
+            accountSource: 'Workday - Employees',
+            accountAttributes: { firstname: 'Michael' },
+        })
+
+        const sent = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input
+        expect(sent.subject).toContain('Revisar coincidencia')
+        expect(sent.body).toContain('Abrir formulario de revisión')
     })
 
     it('includes Open Review Form button when form instance has standAloneFormUrl', async () => {
@@ -142,6 +171,7 @@ describe('EmailService.sendFusionEmail', () => {
         expect(html).toContain('92%')
     })
 })
+
 
 
 
