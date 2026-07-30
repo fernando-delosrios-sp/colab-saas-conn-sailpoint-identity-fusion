@@ -247,12 +247,15 @@ function htmlToMarkdown(html) {
     return text
 }
 
-function helpDescription(helpKey) {
+function rewriteConfigLinks(text, pageSlug) {
+    return String(text || '').replace(new RegExp(`\\(configuration/${pageSlug}\\.md#`, 'g'), '(#')
+}
+
+function helpDescription(helpKey, pageSlug) {
     if (!helpKey) {
         return ''
     }
-    const withoutLink = helpKey.replace(/\s*See\s+\[[^\]]+\]\([^)]+\)\.?/i, '').trim()
-    return withoutLink.replace(/\.$/, '')
+    return rewriteConfigLinks(helpKey, pageSlug).trim()
 }
 
 function defaultForKey(initialValues, key) {
@@ -298,7 +301,15 @@ function fieldExplanation(pageSlug, item) {
     if (keyed) {
         return keyed
     }
-    return helpDescription(item.helpKey)
+    return helpDescription(item.helpKey, pageSlug)
+}
+
+/** @type {Record<string, string>} */
+const SECTION_INTRO_OVERRIDES = {
+    'Normal Attribute Definitions':
+        'Define computed attributes with Apache Velocity. Values can refresh each aggregation or stay static. Post-template options include case, normalization, spaces, trim, and max length.\n\nSee [Velocity context reference](../reference/velocity-context.md) for context variables (`$accounts`, `$identity`, `$previous`) and helper functions.',
+    'Unique Attribute Definitions':
+        'Define persistent unique identifiers (usernames, employee IDs, UUIDs). Values persist until account reset. Runs after normal definitions; supports `$counter`, `$UUID`, and `$isUnique()`.\n\nSee [Velocity context — Unique-only variables](../reference/velocity-context.md#unique-only-variables) and [Defining attributes](../use-guides/configuration/defining-attributes.md) for recipes.',
 }
 
 function renderSelectOptions(item) {
@@ -345,7 +356,7 @@ function walkItems(items, initialValues, menuLabel, pageSlug, sectionTitle, line
             lines.push(`### ${item.label || item.key}`)
             lines.push('')
             if (item.helpKey) {
-                lines.push(helpDescription(item.helpKey))
+                lines.push(helpDescription(item.helpKey, pageSlug))
                 lines.push('')
             }
             lines.push(`| Property | Value |`)
@@ -431,7 +442,10 @@ function renderMenuPage(menu, initialValues) {
         if (sectionGuide) {
             lines.push(...renderGuideCallout(sectionGuide, 'Related guide'))
         }
-        if (item.sectionHelpMessage) {
+        if (SECTION_INTRO_OVERRIDES[sectionTitle]) {
+            lines.push(SECTION_INTRO_OVERRIDES[sectionTitle])
+            lines.push('')
+        } else if (item.sectionHelpMessage) {
             lines.push(htmlToMarkdown(item.sectionHelpMessage))
             lines.push('')
         }
@@ -509,3 +523,4 @@ function main() {
 }
 
 main()
+
