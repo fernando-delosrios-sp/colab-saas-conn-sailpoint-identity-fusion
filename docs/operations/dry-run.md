@@ -143,7 +143,7 @@ Pass `{ "dryRun": { enabled: true, "saveFile": true } }` on the `std:account:lis
 
 When the proxy server receives `std:account:list`, include the `dryRun` object in the `input` payload. For large tenants, prefer `saveFile: true` so the HTML report is written on the server filesystem rather than relying on the full HTTP response stream.
 
-See [Proxy mode](../guides/proxy-mode.md) for architecture and setup.
+See [Proxy mode](../reference/proxy-mode.md) for architecture and setup.
 
 ## Migration from `custom:dryrun`
 
@@ -158,7 +158,8 @@ See [Proxy mode](../guides/proxy-mode.md) for architecture and setup.
 ## Related documentation
 
 - [Account list operation](account-list.md) — full persistent aggregation flow
-- [Match guide](../guides/match.md) — tuning thresholds; includes a dry-run workflow note
-- [Matching algorithms](../guides/matching-algorithms.md) — recommended testing approach
+- [Matching identities](../use-guides/configuration/matching-identities.md) — tuning thresholds; includes a dry-run workflow note
+- [Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md) — recommended testing approach
 - [Glossary: dry-run mode](../concepts/glossary.md) — canonical term definition
+
 

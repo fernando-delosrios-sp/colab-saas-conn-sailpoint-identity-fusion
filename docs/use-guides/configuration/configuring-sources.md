@@ -2,6 +2,12 @@
 
 This guide expands on the Identity Fusion NG Source Settings, detailing how to configure your identity scope, authoritative account sources, aggregation modes, correlation rules, and processing controls.
 
+**Configuration reference:** [Source Settings](../../configuration/source.md)
+
+!!! note "Didactic guide"
+    This page explains **how and when** to configure settings with examples. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
+
+
 #### Scope Section
 
 ![Source Settings](../../assets/images/match-source-settings.png)
@@ -145,4 +151,5 @@ flowchart TD
 !!! tip
 
     When failing to generate an account ID (`nativeIdentity`), the aggregation fails unless the **Skip accounts with missing unique ID?** option is enabled. All your Fusion accounts must have a valid ID, but you can deliberately generate an empty one with the skip option to prevent including that account in the final results.
+
 

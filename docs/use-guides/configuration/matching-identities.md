@@ -2,6 +2,12 @@
 
 This comprehensive guide explains how to use Identity Fusion NG's **Match** capability to **detect and resolve potential matching identities**. This use case **requires one or more sources** to be configured. **Identities are optional but highly recommended** because they provide the baseline to compare mapped and defined accounts against.
 
+**Configuration reference:** [Attribute Matching Settings](../../configuration/matching.md)
+
+!!! note "Didactic guide"
+    This page explains **how and when** to configure settings with examples. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
+
+
 ---
 
 ## When to use this use case
@@ -241,4 +247,5 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 - You want human approval for all merges
 
 ---
+
 

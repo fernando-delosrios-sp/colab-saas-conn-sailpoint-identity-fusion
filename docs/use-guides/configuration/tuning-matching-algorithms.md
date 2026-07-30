@@ -2,6 +2,12 @@
 
 Identity Fusion NG uses **similarity scoring** to detect potential matching identities. This comprehensive guide helps you choose, configure, and tune the **matching algorithms** used in **Attribute Matching Settings → Matching Settings** for optimal matching results.
 
+**Configuration reference:** [Attribute Matching Settings](../../configuration/matching.md)
+
+!!! note "Didactic guide"
+    This page explains **how and when** to configure settings with examples. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
+
+
 ---
 
 ## Overview: Matching in Identity Fusion

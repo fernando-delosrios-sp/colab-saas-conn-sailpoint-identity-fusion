@@ -7,7 +7,7 @@ This page covers prerequisites and the three **operation modes** that determine 
 Before you configure Identity Fusion NG in ISC:
 
 - Install the Identity Fusion NG connector package using your organization's process (for example SailPoint CLI or an internal pipeline).
-- Create a dedicated ISC identity and [Personal Access Token](https://documentation.sailpoint.com/saas/help/common/pat.html) with permissions for sources, identities, accounts, and workflows or forms.
+- Create a dedicated ISC identity and [Personal Access Token](https://documentation.sailpoint.com/saas/help/common/pat.html) with the scopes listed in [ISC PAT scopes](../reference/pat-scopes.md). The minimal set covers sources, accounts, search, forms, workflows, and identity profiles; conditional scopes apply when Match, reverse correlation, or aggregation control is enabled.
 - Decide which Map, Define, and Match stages you need. You can use them independently or together, but the connector always evaluates configured steps in Map → Define → Match order.
 - Decide whether the Fusion source must be **authoritative** in ISC. Authoritative is required for most **Match** deployments so Fusion can decide which managed accounts create identities versus correlate to existing ones. For **Map and Define only**, Fusion is often **not** authoritative.
 
@@ -68,3 +68,4 @@ The connector can run side by side with other ISC sources. When Fusion is author
 | Map, Define, Match setup | [Use guides](../use-guides/index.md) |
 | Field definitions | [Configuration reference](../configuration/index.md) |
 | Domain terms | [Glossary](../glossary.md) |
+

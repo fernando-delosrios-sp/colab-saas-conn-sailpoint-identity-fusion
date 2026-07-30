@@ -2,6 +2,12 @@
 
 The **Map** step controls how source account attributes are combined into the Fusion account schema when multiple sources contribute. Mapping source attributes into the Fusion schema happens first, before Attribute Definitions or Match scoring.
 
+**Configuration reference:** [Attribute Mapping Settings](../../configuration/mapping.md)
+
+!!! note "Didactic guide"
+    This page explains **how and when** to configure settings with examples. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
+
+
 ---
 
 ## When to use Attribute Mapping
@@ -156,3 +162,4 @@ When using **Keep a list of values** or **Concatenate**, consider the ISC schema
 !!! note
 
     After **Discover Schema**, ISC may show multi-valued attributes as entitlement-type (multi-valued) fields. Your identity profile transforms must handle arrays appropriately.
+
