@@ -783,6 +783,35 @@ export class MatchOutcomeDispatcher {
         return this.deps.decisionProcessor.processFusionIdentityDecision(syntheticDecision)
     }
 
+    private async applyPartialMatchFormOutcome(
+        fusionAccount: FusionAccount,
+        sourceInfo: SourceInfo,
+        account: Account,
+        reviewers: Set<{ identityId?: string }> | undefined
+    ): Promise<void> {
+        const outcome = await this.deps.forms.createFusionForm(fusionAccount, reviewers)
+        if (!outcome.formDefinitionReady) {
+            const matchCount = fusionAccount.fusionMatches.length
+            const maxForm = resolveFusionMaxCandidatesForForm(this.deps.config.fusionMaxCandidatesForForm)
+            const message =
+                !reviewers || reviewers.size === 0
+                    ? 'Match review form was not created: no reviewers available for this source'
+                    : `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
+            this.deps.run.trackFailed(fusionAccount, message)
+            return
+        }
+
+        this.deps.log.recordEvent('formsQueued')
+        const managedAccountKey = getManagedAccountKeyFromAccount(account)
+        if (managedAccountKey) {
+            this.deps.run.claimAccount(managedAccountKey, account.identityId)
+        }
+        const eligibleReviewerCount = [...(reviewers ?? [])].filter((r) => r.identityId).length
+        if (eligibleReviewerCount > 0 && outcome.newReviewInstancesQueued === 0) {
+            this.deps.run.removeMatchAccount(fusionAccount.managedAccountId)
+        }
+    }
+
     private async handlePartialMatch(
         fusionAccount: FusionAccount,
         sourceInfo: SourceInfo | undefined,
@@ -791,26 +820,7 @@ export class MatchOutcomeDispatcher {
         assert(sourceInfo, 'Source info not found')
         const reviewers = this.deps.run.reviewersBySourceId.get(sourceInfo.id!)
         try {
-            const outcome = await this.deps.forms.createFusionForm(fusionAccount, reviewers)
-            if (!outcome.formDefinitionReady) {
-                const matchCount = fusionAccount.fusionMatches.length
-                const maxForm = resolveFusionMaxCandidatesForForm(this.deps.config.fusionMaxCandidatesForForm)
-                const message =
-                    !reviewers || reviewers.size === 0
-                        ? 'Match review form was not created: no reviewers available for this source'
-                        : `Match review form was not created (${matchCount} potential match(es); form lists up to ${maxForm} highest-scoring candidate(s))`
-                this.deps.run.trackFailed(fusionAccount, message)
-            } else {
-                this.deps.log.recordEvent('formsQueued')
-                const managedAccountKey = getManagedAccountKeyFromAccount(account)
-                if (managedAccountKey) {
-                    this.deps.run.claimAccount(managedAccountKey, account.identityId)
-                }
-                const eligibleReviewerCount = [...(reviewers ?? [])].filter((r) => r.identityId).length
-                if (eligibleReviewerCount > 0 && outcome.newReviewInstancesQueued === 0) {
-                    this.deps.run.removeMatchAccount(fusionAccount.managedAccountId)
-                }
-            }
+            await this.applyPartialMatchFormOutcome(fusionAccount, sourceInfo, account, reviewers)
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             this.deps.run.trackFailed(fusionAccount, `Form creation failed: ${message}`)

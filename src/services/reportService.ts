@@ -95,6 +95,89 @@ const toReportDecision = (
     }
 }
 
+class FusionReviewDecisionResolver {
+    private readonly urlContext: ReturnType<typeof createUrlContext>
+
+    constructor(
+        private readonly baseurl: string,
+        private readonly sources: SourceService,
+        private readonly identities: IdentityService,
+        private readonly fusion: FusionService,
+        private readonly run: FusionRun
+    ) {
+        this.urlContext = createUrlContext(baseurl)
+    }
+
+    resolveSourceType(sourceName?: string): SourceType | undefined {
+        return this.sources?.getSourceByNameSafe?.(sourceName)?.sourceType
+    }
+
+    resolveReviewerName(reviewerId?: string): string | undefined {
+        if (!reviewerId) return undefined
+        const reviewer = this.identities?.getIdentityById?.(reviewerId)
+        return (
+            (reviewer as any)?.displayName ||
+            (reviewer as any)?.attributes?.displayName ||
+            (reviewer as any)?.name ||
+            undefined
+        )
+    }
+
+    resolveReviewerUrl(reviewerId?: string): string | undefined {
+        return reviewerId ? this.urlContext.identity(reviewerId) : undefined
+    }
+
+    resolveAccountName(managedAccountKey?: string): string | undefined {
+        if (!managedAccountKey) return undefined
+        const info = this.run?.getManagedAccountInfo(managedAccountKey)
+        const name = trimStr(info?.name)
+        return name && name !== managedAccountKey ? name : undefined
+    }
+
+    resolveAccountUrl(managedAccountKey?: string, identityId?: string): string | undefined {
+        if (!managedAccountKey) return undefined
+        const reportAccountId = this.sources?.resolveIscAccountIdForManagedKey?.(managedAccountKey)
+        if (reportAccountId) return this.urlContext.humanAccount(reportAccountId)
+        const info = this.run?.getManagedAccountInfo(managedAccountKey)
+        const directIscId = trimStr(info?.id)
+        if (directIscId && directIscId !== managedAccountKey) {
+            return this.urlContext.humanAccount(directIscId)
+        }
+        const fusionAccountByKey = this.fusion?.getFusionAccountByManagedKey?.(managedAccountKey)
+        const fusionAccountByIdentity =
+            identityId && typeof this.fusion?.getFusionIdentity === 'function'
+                ? this.fusion.getFusionIdentity(identityId)
+                : undefined
+        let iscId = fusionAccountByKey?.iscAccountId ?? fusionAccountByIdentity?.iscAccountId
+        if (!iscId && this.fusion?.fusionIdentities) {
+            for (const fa of this.fusion.fusionIdentities) {
+                if (fa.managedKey === managedAccountKey && fa.iscAccountId) {
+                    iscId = fa.iscAccountId
+                    break
+                }
+            }
+        }
+        if (iscId) {
+            return this.urlContext.humanAccount(iscId)
+        }
+        return this.urlContext.humanAccount(managedAccountKey)
+    }
+
+    resolveIdentityContext(
+        identityId?: string
+    ): { selectedIdentityName?: string; selectedIdentityUrl?: string } {
+        if (!identityId) return {}
+        const identity = this.identities?.getIdentityById?.(identityId)
+        const selectedIdentityName =
+            (identity as any)?.displayName ||
+            (identity as any)?.attributes?.displayName ||
+            (identity as any)?.name ||
+            undefined
+        return { selectedIdentityName, selectedIdentityUrl: this.urlContext.identity(identityId) }
+    }
+}
+
+
 export class ReportService {
     public static readonly REPORT_DISK_SUBDIR = 'reports'
     public static readonly DRY_RUN_REPORT_TYPE = 'aggregation' as const
@@ -235,76 +318,23 @@ export class ReportService {
     /** Build normalized review-decision entries for report rendering. */
     public buildFusionReviewDecisions(): FusionReportDecision[] {
         const finishedDecisions = this.forms?.finishedFusionDecisions ?? []
-        const urlContext = createUrlContext(this.baseurl)
-        const resolveSourceType = (sourceName?: string): SourceType | undefined =>
-            this.sources?.getSourceByNameSafe?.(sourceName)?.sourceType
-        const resolveReviewerName = (reviewerId?: string): string | undefined => {
-            if (!reviewerId) return undefined
-            const reviewer = this.identities?.getIdentityById?.(reviewerId)
-            return (
-                (reviewer as any)?.displayName ||
-                (reviewer as any)?.attributes?.displayName ||
-                (reviewer as any)?.name ||
-                undefined
-            )
-        }
-        const resolveReviewerUrl = (reviewerId?: string): string | undefined =>
-            reviewerId ? urlContext.identity(reviewerId) : undefined
-        const resolveAccountName = (managedAccountKey?: string): string | undefined => {
-            if (!managedAccountKey) return undefined
-            const info = this.run?.getManagedAccountInfo(managedAccountKey)
-            const name = trimStr(info?.name)
-            return name && name !== managedAccountKey ? name : undefined
-        }
-        const resolveAccountUrl = (managedAccountKey?: string, identityId?: string): string | undefined => {
-            if (!managedAccountKey) return undefined
-            const reportAccountId = this.sources?.resolveIscAccountIdForManagedKey?.(managedAccountKey)
-            if (reportAccountId) return urlContext.humanAccount(reportAccountId)
-            const info = this.run?.getManagedAccountInfo(managedAccountKey)
-            const directIscId = trimStr(info?.id)
-            if (directIscId && directIscId !== managedAccountKey) {
-                return urlContext.humanAccount(directIscId)
-            }
-            const fusionAccountByKey = this.fusion?.getFusionAccountByManagedKey?.(managedAccountKey)
-            const fusionAccountByIdentity = identityId && typeof this.fusion?.getFusionIdentity === 'function' ? this.fusion.getFusionIdentity(identityId) : undefined
-            let iscId = fusionAccountByKey?.iscAccountId ?? fusionAccountByIdentity?.iscAccountId
-            if (!iscId && this.fusion?.fusionIdentities) {
-                for (const fa of this.fusion.fusionIdentities) {
-                    if (fa.managedKey === managedAccountKey && fa.iscAccountId) {
-                        iscId = fa.iscAccountId
-                        break
-                    }
-                }
-            }
-            if (iscId) {
-                return urlContext.humanAccount(iscId)
-            }
-            return urlContext.humanAccount(managedAccountKey)
-        }
-
-        const resolveIdentityContext = (
-            identityId?: string
-        ): { selectedIdentityName?: string; selectedIdentityUrl?: string } => {
-            if (!identityId) return {}
-            const identity = this.identities?.getIdentityById?.(identityId)
-            const selectedIdentityName =
-                (identity as any)?.displayName ||
-                (identity as any)?.attributes?.displayName ||
-                (identity as any)?.name ||
-                undefined
-            const selectedIdentityUrl = urlContext.identity(identityId)
-            return { selectedIdentityName, selectedIdentityUrl }
-        }
+        const resolver = new FusionReviewDecisionResolver(
+            this.baseurl,
+            this.sources,
+            this.identities,
+            this.fusion,
+            this.run
+        )
 
         return finishedDecisions.map((decision) =>
             toReportDecision(
                 decision,
-                resolveSourceType,
-                resolveReviewerName,
-                resolveReviewerUrl,
-                resolveAccountName,
-                resolveAccountUrl,
-                resolveIdentityContext
+                (sourceName) => resolver.resolveSourceType(sourceName),
+                (reviewerId) => resolver.resolveReviewerName(reviewerId),
+                (reviewerId) => resolver.resolveReviewerUrl(reviewerId),
+                (managedAccountKey) => resolver.resolveAccountName(managedAccountKey),
+                (managedAccountKey, identityId) => resolver.resolveAccountUrl(managedAccountKey, identityId),
+                (identityId) => resolver.resolveIdentityContext(identityId)
             )
         )
     }

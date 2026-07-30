@@ -113,6 +113,32 @@ export class FormService {
         await this.processFetchedFormData()
     }
 
+    private partitionStaleForms(
+        forms: FormDefinitionResponseV2025[]
+    ): { activeForms: FormDefinitionResponseV2025[]; staleForms: FormDefinitionResponseV2025[] } {
+        const staleForms: FormDefinitionResponseV2025[] = []
+        const activeForms: FormDefinitionResponseV2025[] = []
+        for (const form of forms) {
+            if (this.isFormDefinitionStale(form)) {
+                staleForms.push(form)
+            } else {
+                activeForms.push(form)
+            }
+        }
+        return { activeForms, staleForms }
+    }
+
+    private queueStaleFormDeletions(staleForms: FormDefinitionResponseV2025[]): void {
+        for (const staleForm of staleForms) {
+            const staleFormId = staleForm.id
+            if (!staleFormId) continue
+            this.log.info(
+                `Form definition ${staleFormId} is older than ${this.fusionFormExpirationDays} day(s), queuing deletion`
+            )
+            this.addFormToDelete(staleFormId)
+        }
+    }
+
     /**
      * Fetch form definitions and their instances, deferring decision processing.
      */
@@ -124,27 +150,13 @@ export class FormService {
         const forms = await this.findFormDefinitionsByName(this.fusionFormNamePattern)
         let activeForms = forms
         if (options?.staleFormCleanup) {
-            const staleForms: FormDefinitionResponseV2025[] = []
-            activeForms = []
-            for (const form of forms) {
-                if (this.isFormDefinitionStale(form)) {
-                    staleForms.push(form)
-                } else {
-                    activeForms.push(form)
-                }
-            }
+            const partitioned = this.partitionStaleForms(forms)
+            activeForms = partitioned.activeForms
             this.log.debug(
                 `Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern} ` +
-                    `(active=${activeForms.length}, stale=${staleForms.length})`
+                    `(active=${partitioned.activeForms.length}, stale=${partitioned.staleForms.length})`
             )
-            for (const staleForm of staleForms) {
-                const staleFormId = staleForm.id
-                if (!staleFormId) continue
-                this.log.info(
-                    `Form definition ${staleFormId} is older than ${this.fusionFormExpirationDays} day(s), queuing deletion`
-                )
-                this.addFormToDelete(staleFormId)
-            }
+            this.queueStaleFormDeletions(partitioned.staleForms)
         } else {
             this.log.debug(
                 `Fetched ${forms.length} form definition(s) for pattern: ${this.fusionFormNamePattern} ` +
