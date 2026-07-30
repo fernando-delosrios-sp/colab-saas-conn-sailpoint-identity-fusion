@@ -52,6 +52,36 @@ describe('safeReadConfig recording env bridge', () => {
 
         expect(config.recording?.mode).toBe('off')
     })
+
+    it('bridges External Settings recording name into config.recording', async () => {
+        delete process.env.RECORD_MODE
+        delete process.env.RECORD_CHAIN_NAME
+        vi.mocked(readConfig).mockResolvedValue({
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalRecordingEnabled: true,
+            recordingName: 'prod-baseline',
+            externalTargetUrl: 'https://proxy.example.com',
+            externalTargetPassword: 'secret',
+        } as never)
+
+        const config = await safeReadConfig()
+
+        expect(config.recording?.mode).toBe('record')
+        expect(config.recording?.chainName).toBe('prod-baseline')
+    })
+
+    it('fails validation when recording enabled without proxy', async () => {
+        vi.mocked(readConfig).mockResolvedValue({
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: true,
+            externalRecordingEnabled: true,
+            recordingName: 'bad-chain',
+        } as never)
+
+        await expect(safeReadConfig()).rejects.toThrow('External recording requires proxy mode')
+    })
 })
 
 describe('safeReadConfig heartbeat interval', () => {
@@ -76,4 +106,5 @@ describe('safeReadConfig heartbeat interval', () => {
         expect(config.statsLoggingIntervalMs).toBe(30_000)
     })
 })
+
 

@@ -124,19 +124,12 @@ describe('developerSettings readSettings', () => {
         expect(result.forceAttributeRefresh).toBe(true)
     })
 
-    it('defaults externalLoggingEnabled to false when omitted', () => {
+    it('defaults concurrencyCheckEnabled to true when omitted', () => {
         const raw = {}
 
         const result = readSettings(raw)
 
-        expect(result.externalLoggingEnabled).toBe(false)
-    })
-
-    it('normalizes string "true" to boolean true for externalLoggingEnabled', () => {
-        const raw = { externalLoggingEnabled: 'true' as unknown as boolean, externalLoggingUrl: 'http://localhost' }
-
-        const result = readSettings(raw)
-
-        expect(result.externalLoggingEnabled).toBe(true)
+        expect(result.concurrencyCheckEnabled).toBe(true)
     })
 })
+

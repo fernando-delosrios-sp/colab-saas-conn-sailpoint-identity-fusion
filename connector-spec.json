@@ -30,12 +30,16 @@
         "parallelBatchSize": 16,
         "processingWait": 60,
         "heartbeatInterval": 10,
-        "externalLoggingLevel": "info",
         "managedAccountsBatchSize": 100,
         "scoringMaxConcurrency": 12,
-        "proxyEnabled": false,
-        "proxyUrl": "",
-        "proxyPassword": "",
+        "externalProcessingEnabled": false,
+        "externalTargetUrl": "",
+        "externalTargetPassword": "",
+        "externalProxyEnabled": false,
+        "externalRecordingEnabled": false,
+        "recordingName": "",
+        "externalLoggingEnabled": false,
+        "externalLoggingLevel": "info",
         "maxAttempts": 20,
         "digits": 1,
         "counterStart": 1,
@@ -999,7 +1003,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation), manage memory consumption during match detection by adjusting batch sizes, and configure external logging for centralized monitoring.<br><br><strong>v2.2.0</strong>",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.<br><br><strong>v2.2.0</strong>",
                     "items": [
                         {
                             "key": "resetAccounts",
@@ -1030,20 +1034,86 @@
                             "helpKey": "Safeguard against data conflicts if multiple aggregations overlap. See [Enable concurrency check?](configuration/advanced.md#concurrencycheckenabled)."
                         },
                         {
+                            "key": "managedAccountsBatchSize",
+                            "label": "Managed accounts batch size",
+                            "type": "number",
+                            "required": false,
+                            "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch. See [Managed accounts batch size](configuration/advanced.md#managedaccountsbatchsize)."
+                        },
+                        {
+                            "key": "scoringMaxConcurrency",
+                            "label": "Scoring concurrency limit",
+                            "type": "number",
+                            "required": false,
+                            "helpKey": "Maximum concurrent identity-comparison scoring operations during managed-account analysis. See [Scoring concurrency limit](configuration/advanced.md#scoringmaxconcurrency)."
+                        }
+                    ]
+                },
+                {
+                    "type": "section",
+                    "sectionTitle": "External Settings",
+                    "sectionHelpMessage": "<strong>Configure external infrastructure for proxy processing, logging, and recording.</strong><br><br>Enable external processing to reveal a shared target URL and password, then choose sub-options for proxy mode, chain recording, and external logging. When proxy mode is off, external logging sends HTTP POST to the target URL from ISC. When proxy mode is on, the proxy server writes logs to disk.",
+                    "items": [
+                        {
+                            "key": "externalProcessingEnabled",
+                            "label": "Enable external processing?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "Gateway toggle for external infrastructure. When off, target fields and sub-options are inactive. See [Enable external processing?](configuration/advanced.md#externalprocessingenabled)."
+                        },
+                        {
+                            "key": "externalTargetUrl",
+                            "label": "External target URL",
+                            "type": "url",
+                            "required": false,
+                            "parentKey": "externalProcessingEnabled",
+                            "parentValue": "true",
+                            "helpKey": "Shared external target — proxy endpoint when proxy mode is on, log HTTP endpoint when proxy mode is off. See [External target URL](configuration/advanced.md#externaltargeturl)."
+                        },
+                        {
+                            "key": "externalTargetPassword",
+                            "label": "External target password",
+                            "type": "secret",
+                            "required": true,
+                            "parentKey": "externalProxyEnabled",
+                            "parentValue": "true",
+                            "helpKey": "Shared secret for proxy authentication. Required when proxy mode is enabled. See [External target password](configuration/advanced.md#externaltargetpassword)."
+                        },
+                        {
+                            "key": "externalProxyEnabled",
+                            "label": "Enable proxy mode?",
+                            "type": "toggle",
+                            "required": false,
+                            "parentKey": "externalProcessingEnabled",
+                            "parentValue": "true",
+                            "helpKey": "Delegate operation processing to the external target. See [Enable proxy mode?](configuration/advanced.md#externalproxyenabled)."
+                        },
+                        {
+                            "key": "externalRecordingEnabled",
+                            "label": "Enable chain recording?",
+                            "type": "toggle",
+                            "required": false,
+                            "parentKey": "externalProxyEnabled",
+                            "parentValue": "true",
+                            "helpKey": "Record API call chains on the proxy server for replay testing. Requires proxy mode. See [Enable chain recording?](configuration/advanced.md#externalrecordingenabled)."
+                        },
+                        {
+                            "key": "recordingName",
+                            "label": "Recording chain name",
+                            "type": "text",
+                            "required": false,
+                            "parentKey": "externalRecordingEnabled",
+                            "parentValue": "true",
+                            "helpKey": "Name for the recording chain directory. See [Recording chain name](configuration/advanced.md#recordingname)."
+                        },
+                        {
                             "key": "externalLoggingEnabled",
                             "label": "Enable external logging?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Stream connector execution logs directly to external monitoring services like Splunk or Datadog for centralized troubleshooting. See [Enable external logging?](configuration/advanced.md#externalloggingenabled)."
-                        },
-                        {
-                            "key": "externalLoggingUrl",
-                            "label": "External logging URL",
-                            "type": "url",
-                            "required": false,
-                            "parentKey": "externalLoggingEnabled",
+                            "parentKey": "externalProcessingEnabled",
                             "parentValue": "true",
-                            "helpKey": "The URL where logs should be sent (e.g. See [External logging URL](configuration/advanced.md#externalloggingurl)."
+                            "helpKey": "Stream connector logs to external infrastructure. Routing depends on role: HTTP POST from ISC, disk append on proxy server, noop on proxy client. See [Enable external logging?](configuration/advanced.md#externalloggingenabled)."
                         },
                         {
                             "key": "externalLoggingLevel",
@@ -1052,7 +1122,7 @@
                             "required": false,
                             "parentKey": "externalLoggingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Choose the detail level for external logs. See [External logging level](configuration/advanced.md#externallogginglevel).",
+                            "helpKey": "Minimum log level for external logging delivery. See [External logging level](configuration/advanced.md#externallogginglevel).",
                             "options": [
                                 {
                                     "label": "Error",
@@ -1071,20 +1141,6 @@
                                     "value": "debug"
                                 }
                             ]
-                        },
-                        {
-                            "key": "managedAccountsBatchSize",
-                            "label": "Managed accounts batch size",
-                            "type": "number",
-                            "required": false,
-                            "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch. See [Managed accounts batch size](configuration/advanced.md#managedaccountsbatchsize)."
-                        },
-                        {
-                            "key": "scoringMaxConcurrency",
-                            "label": "Scoring concurrency limit",
-                            "type": "number",
-                            "required": false,
-                            "helpKey": "Maximum concurrent identity-comparison scoring operations during managed-account analysis. See [Scoring concurrency limit](configuration/advanced.md#scoringmaxconcurrency)."
                         }
                     ]
                 },
@@ -1158,38 +1214,6 @@
                             "type": "toggle",
                             "required": false,
                             "helpKey": "Process critical operations (like saving data) before less urgent ones (like logging). See [Enable priority processing?](configuration/advanced.md#enablepriority)."
-                        }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "sectionTitle": "Proxy Settings",
-                    "sectionHelpMessage": "<strong>Delegate processing to your own infrastructure.</strong><br><br>Configure the connector to route all processing through a self-hosted proxy server, which allows you to execute operations outside of the cloud environment while maintaining secure authentication.",
-                    "items": [
-                        {
-                            "key": "proxyEnabled",
-                            "label": "Enable proxy mode?",
-                            "type": "toggle",
-                            "required": false,
-                            "helpKey": "Offload processing workload to your own infrastructure by routing operations through a dedicated server, which is useful for highly restricted or specialized environments. See [Enable proxy mode?](configuration/advanced.md#proxyenabled)."
-                        },
-                        {
-                            "key": "proxyUrl",
-                            "label": "Proxy URL",
-                            "type": "url",
-                            "required": false,
-                            "parentKey": "proxyEnabled",
-                            "parentValue": "true",
-                            "helpKey": "The URL of your proxy server that will handle connector operations. See [Proxy URL](configuration/advanced.md#proxyurl)."
-                        },
-                        {
-                            "key": "proxyPassword",
-                            "label": "Proxy password",
-                            "type": "secret",
-                            "required": true,
-                            "parentKey": "proxyEnabled",
-                            "parentValue": "true",
-                            "helpKey": "A shared secret used to authenticate with your proxy server. See [Proxy password](configuration/advanced.md#proxypassword)."
                         }
                     ]
                 }

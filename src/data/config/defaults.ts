@@ -1,18 +1,11 @@
-/**
- * Per-setting modules export two aggregates:
- * - `connectorSpecInitialValues`: UI-exposed defaults, mirrors
- *   `connector-spec.json` -> `sourceConfigInitialValues` (same key order).
- * - `runtimeDefaults`: universal execution fallback, extends the UI defaults with
- *   non-UI config bridged from `internalConfig` (e.g. time units converted to ms).
- */
 import * as advancedConnectionSettings from './settings/advancedConnectionSettings'
 import * as attributeMappingDefinitionsSettings from './settings/attributeMappingDefinitionsSettings'
 import * as connectionSettings from './settings/connectionSettings'
 import * as developerSettings from './settings/developerSettings'
+import * as externalSettings from './settings/externalSettings'
 import * as matchingSettings from './settings/matchingSettings'
 import * as normalAttributeDefinitionsSettings from './settings/normalAttributeDefinitionsSettings'
 import * as processingControlSettings from './settings/processingControlSettings'
-import * as proxySettings from './settings/proxySettings'
 import * as reviewSettings from './settings/reviewSettings'
 import * as scopeSettings from './settings/scopeSettings'
 import * as sourcesSettings from './settings/sourcesSettings'
@@ -34,7 +27,7 @@ export const connectorSpecInitialValues = {
     processingWait: advancedConnectionSettings.connectorSpecInitialValues.processingWait,
     heartbeatInterval: advancedConnectionSettings.connectorSpecInitialValues.heartbeatInterval,
     ...developerSettings.connectorSpecInitialValues,
-    ...proxySettings.connectorSpecInitialValues,
+    ...externalSettings.connectorSpecInitialValues,
     ...uniqueAttributeDefinitionsSettings.connectorSpecInitialValues,
     ...normalAttributeDefinitionsSettings.connectorSpecInitialValues,
     algorithm: matchingSettings.connectorSpecInitialValues.algorithm,
@@ -50,10 +43,8 @@ export const runtimeDefaults = {
     ...developerSettings.runtimeDefaults,
     ...advancedConnectionSettings.runtimeDefaults,
     ...scopeSettings.runtimeDefaults,
-    ...proxySettings.runtimeDefaults,
+    ...externalSettings.runtimeDefaults,
     ...reviewSettings.runtimeDefaults,
     ...attributeMappingDefinitionsSettings.runtimeDefaults,
     ...uniqueAttributeDefinitionsSettings.runtimeDefaults,
 } as const
-
-

@@ -14,8 +14,9 @@ describe('ProxyService.isProxyMode', () => {
     it('returns true for proxy client mode', () => {
         delete process.env.PROXY_PASSWORD
         const config = {
-            proxyEnabled: true,
-            proxyUrl: 'https://proxy.example.com',
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetUrl: 'https://proxy.example.com',
             isProxy: false,
         }
         const service = new ProxyService(config as any, {} as any, {} as any)
@@ -23,11 +24,25 @@ describe('ProxyService.isProxyMode', () => {
         expect(service.isProxyMode()).toBe(true)
     })
 
+    it('returns false when external processing gateway is off', () => {
+        delete process.env.PROXY_PASSWORD
+        const config = {
+            externalProcessingEnabled: false,
+            externalProxyEnabled: true,
+            externalTargetUrl: 'https://proxy.example.com',
+            isProxy: false,
+        }
+        const service = new ProxyService(config as any, {} as any, {} as any)
+
+        expect(service.isProxyMode()).toBe(false)
+    })
+
     it('returns false for already forwarded proxy request', () => {
         delete process.env.PROXY_PASSWORD
         const config = {
-            proxyEnabled: true,
-            proxyUrl: 'https://proxy.example.com',
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetUrl: 'https://proxy.example.com',
             isProxy: true,
         }
         const service = new ProxyService(config as any, {} as any, {} as any)
@@ -50,8 +65,9 @@ describe('ProxyService.isProxyService', () => {
     it('throws error when server requires password but client provides none', () => {
         process.env.PROXY_PASSWORD = 'server_secret'
         const config = {
-            proxyEnabled: true,
-            proxyPassword: '', // Client provides empty password
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetPassword: '',
         }
         const mockLog = { info: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
@@ -62,8 +78,60 @@ describe('ProxyService.isProxyService', () => {
     it('returns true when passwords match', () => {
         process.env.PROXY_PASSWORD = 'secret_password'
         const config = {
-            proxyEnabled: true,
-            proxyPassword: 'secret_password',
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetPassword: 'secret_password',
+        }
+        const mockLog = { info: vi.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        expect(service.isProxyService()).toBe(true)
+    })
+
+    it('throws when client password is wrong', () => {
+        process.env.PROXY_PASSWORD = 'correct_secret'
+        const config = {
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetPassword: 'wrong_secret',
+        }
+        const mockLog = { info: vi.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        expect(() => service.isProxyService()).toThrow('Proxy password mismatch')
+    })
+
+    it('throws when client password is omitted from forwarded config', () => {
+        process.env.PROXY_PASSWORD = 'server_secret'
+        const config = {
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+        }
+        const mockLog = { info: vi.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        expect(() => service.isProxyService()).toThrow('Proxy password mismatch')
+    })
+
+    it('does not enter server mode when gateway is off even if PROXY_PASSWORD is set', () => {
+        process.env.PROXY_PASSWORD = 'server_secret'
+        const config = {
+            externalProcessingEnabled: false,
+            externalProxyEnabled: true,
+            externalTargetPassword: '',
+        }
+        const mockLog = { info: vi.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        expect(service.isProxyService()).toBe(false)
+    })
+
+    it('accepts empty password when server PROXY_PASSWORD is empty string', () => {
+        process.env.PROXY_PASSWORD = ''
+        const config = {
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetPassword: '',
         }
         const mockLog = { info: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
@@ -86,8 +154,9 @@ describe('ProxyService.performFetch', () => {
 
     it('throws ConnectorError when fetch throws AbortError', async () => {
         const config = {
-            proxyEnabled: true,
-            proxyUrl: 'https://proxy.example.com',
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetUrl: 'https://proxy.example.com',
             proxyRequestTimeoutMs: 5000,
         }
         const mockLog = { error: vi.fn() }
@@ -105,8 +174,9 @@ describe('ProxyService.performFetch', () => {
 
     it('throws ConnectorError when fetch throws standard Error', async () => {
         const config = {
-            proxyEnabled: true,
-            proxyUrl: 'https://proxy.example.com',
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetUrl: 'https://proxy.example.com',
         }
         const mockLog = { error: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
@@ -123,8 +193,9 @@ describe('ProxyService.performFetch', () => {
 
     it('throws ConnectorError when fetch throws unknown error', async () => {
         const config = {
-            proxyEnabled: true,
-            proxyUrl: 'https://proxy.example.com',
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetUrl: 'https://proxy.example.com',
         }
         const mockLog = { error: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
@@ -136,5 +207,19 @@ describe('ProxyService.performFetch', () => {
         })
         expect(mockLog.error).toHaveBeenCalledWith('Proxy fetch failed: Unknown fetch error')
         expect(global.fetch).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe('ProxyService.processProxyResponse', () => {
+    it('unwraps the data envelope from a proxy response', () => {
+        const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn() }
+        const sent: unknown[] = []
+        const mockRes = { send: vi.fn((item: unknown) => sent.push(item)) }
+        const service = new ProxyService({} as any, mockLog as any, mockRes as any)
+
+        const payload = JSON.stringify({ data: { id: 'acct-1', name: 'X' } })
+        ;(service as any).processProxyResponse(payload)
+
+        expect(sent).toEqual([{ id: 'acct-1', name: 'X' }])
     })
 })
