@@ -1,6 +1,7 @@
 CHANGELOG.md [159L]
 # Changelog
 ## 2.2.0
+- (2026-07-30) **Enhancement:** Record-mode account-list now writes `reports/matching-results.json` with identity matches, deferred matches (per-attribute scores), non-matches, failed matches, and sweep summary counts. Record mode automatically enables managed-account report capture. `manifest.json` and `scenario.json` reference `matchingResultsPath`. Re-record existing chains to populate the new artifact.
 - (2026-07-29) **Enhancement:** Added `npm run test-recording -- <chainName>` for offline golden verification of recorded chains — auto-runs scenario steps, reports output drift, exits non-zero on failure. Chain replay Vitest tests no longer scan local `recordings/` artifacts; harness mechanics validated via self-contained fixtures. CJS finalize scripts preserve connector-written `scenario.json` config on re-finalize.
 - (2026-07-29) **Fix:** Record mode now produces complete replay artifacts via `resolveRecordingConfig()` env bridge — `RECORD_MODE`, `RECORD_CHAIN_NAME`, and `VERBOSE_RECORDING` resolve into `FusionConfig.recording` during config load so `ServiceRegistry` and `FusionRun` share one source of truth. **Enhancement:** Pluggable `RecordingStore` interface with NDJSON default (`api-log.ndjson`, `steps.ndjson`, `phases.ndjson`, `manifest.json`, `scenario.json`). Finalize-once lifecycle retains `steps.ndjson` across multi-operation chains. `npm run record` verifies manifest/scenario/api-log on exit.
 - (2026-07-28) **Enhancement:** Added `$MD5(input)` Velocity context helper for lowercase hex MD5 digests in Normal and Unique attribute definitions — use `$MD5($email)` for deterministic identifiers compatible with downstream systems. Returns empty string for null, non-string, or whitespace-only input. Documented in the define guide and connector-spec UI help. `definition-service` spec updated.
@@ -67,5 +68,6 @@ CHANGELOG.md [159L]
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 

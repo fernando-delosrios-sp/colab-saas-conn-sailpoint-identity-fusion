@@ -18,6 +18,7 @@ export interface RecordingManifest {
     phaseCount: number
     scenarioPath: string
     reportsPath?: string
+    matchingResultsPath?: string
     artifactPaths: string[]
 }
 
@@ -94,4 +95,5 @@ export function loadRecordingApiLog(chainDir: string): ApiLogEntry[] {
     const store = createRecordingStore({ mode: 'replay', store: storeType, chainName }, chainName)
     return store.loadApiLog()
 }
+
 

@@ -413,9 +413,12 @@ Enter a chain name when prompted. The connector runs in record mode and writes a
 | `scenario.json` | Compiled replay scenario (written on process exit) |
 | `manifest.json` | Store type, artifact paths, and entry counts |
 | `reports/aggregation.json` | Local aggregation report snapshot (when generated) |
+| `reports/matching-results.json` | Per-account match outcomes with score breakdowns (record-mode account-list) |
 | `connector.log` | Stdout/stderr capture from `record-chain.js` |
 
 Recording is dev-only. Set `RECORD_MODE`, `RECORD_CHAIN_NAME`, and `VERBOSE_RECORDING` env vars (used by `npm run record`) or configure `FusionConfig.recording` explicitly. Explicit config wins over env vars.
+
+`reports/matching-results.json` is written at the end of each record-mode account-list operation. It contains identity matches, deferred matches (with per-attribute scores), non-matches, failed matches, and sweep summary counts. Chains recorded before this artifact existed must be re-recorded to populate it.
 
 Replay a recorded chain against the local connector (ISC API calls served from `api-log.ndjson`):
 

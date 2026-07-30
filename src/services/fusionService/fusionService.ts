@@ -20,6 +20,7 @@ import { forEachBatched, compact } from './collections'
 import { FusionDecision } from '../../model/form'
 import { SchemaService } from '../schemaService'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats } from './types'
+import type { MatchingResultsSnapshot, MatchingResultsSweepSummary } from '../recordingService/matchingResultsSnapshot'
 import { FusionReportBlend } from '../../model/fusionReportBlend'
 import {
     batchProcess,
@@ -28,7 +29,7 @@ import {
     getFusionParallelBatchSize,
 } from './collections'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
-import { buildFusionReport } from './fusionReportBuilder'
+import { buildFusionReport, buildMatchingResultsSnapshot as buildMatchingResultsSnapshotFromState } from './fusionReportBuilder'
 import { skipBlendHistoryKeysForDecisionAccountId } from './helpers'
 import { ManagedAccountAnalysisRecorder } from './managedAccountAnalysisRecorder'
 import { AggregationTracker } from './aggregationTracker'
@@ -219,6 +220,7 @@ export class FusionService {
      */
     private shouldCaptureManagedAccountReportData(): boolean {
         return (
+            this.run.isRecordMode ||
             this.fusionReportOnAggregation ||
             !this.accountAssembly.isAggregationAccountListMode() ||
             this.shouldCaptureReportData
@@ -1307,7 +1309,7 @@ export class FusionService {
         this.matchingService.buildTrigramIndex(this.fusionIdentities)
 
         this.buildLinkedAccountKeyIndex()
-        this.matchingService.configureScoring({ captureBreakdown: this.shouldCaptureReportData })
+        this.matchingService.configureScoring({ captureBreakdown: this.shouldCaptureManagedAccountReportData() })
     }
 
     /** Correlated account sweep: resolve linked/correlated managed accounts before uncorrelated scoring. */
@@ -1464,5 +1466,33 @@ export class FusionService {
         tracker.clear()
 
         return report
+    }
+
+    /**
+     * Builds matching-results snapshot for record mode without clearing the tracker.
+     */
+    public buildMatchingResultsSnapshot(
+        tracker: AggregationTracker,
+        options?: { sweepSummary?: MatchingResultsSweepSummary; stepId?: string; operation?: string }
+    ): MatchingResultsSnapshot {
+        return buildMatchingResultsSnapshotFromState(
+            {
+                conflictingFusionIdentityAccounts: tracker.conflictingFusionIdentityAccounts,
+                matchAccounts: tracker.matchAccounts,
+                failedMatchingAccounts: tracker.failedMatchingAccounts,
+                deferredMatchReportData: tracker.deferredMatchReportData,
+                analyzedNonMatchReportData: tracker.analyzedNonMatchReportData,
+                newManagedAccountsCount: tracker.newManagedAccountsCount,
+                urlContext: this.urlContext,
+                sourcesByName: this.run.sourcesByName,
+                reportAttributes: this.reportAttributes,
+                fusionIdentityComparisonsByAccount: tracker.fusionIdentityComparisonsByAccount,
+                sources: this.sources,
+                fusionEnableAutoMerge: this.config.fusionEnableAutoMerge,
+                fusionAutoMergeScore: this.config.fusionAutoMergeScore,
+                fusionMaxCandidatesForForm: this.config.fusionMaxCandidatesForForm,
+            },
+            options
+        )
     }
 }

@@ -9,6 +9,7 @@ import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
 import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchingService/matchingService'
 import { identityMatchesForReview } from '../matchingService/matchingHelpers'
 import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
+import type { MatchingResultsSnapshot, MatchingResultsSweepSummary } from '../recordingService/matchingResultsSnapshot'
 import { UrlContext } from '../../utils/url'
 import { SourceInfo, SourceService } from '../sourceService'
 import { resolveReportAccountId } from './reportAccountResolver'
@@ -137,6 +138,33 @@ function buildNonMatchAccounts(state: FusionReportState): FusionReportAccount[] 
     nonMatchAccounts.sort((a, b) => a.accountName.localeCompare(b.accountName))
     return nonMatchAccounts
 }
+
+/** Builds a recording artifact snapshot from tracker state without clearing the tracker. */
+export function buildMatchingResultsSnapshot(
+    state: FusionReportState,
+    options?: {
+        sweepSummary?: MatchingResultsSweepSummary
+        stepId?: string
+        operation?: string
+    }
+): MatchingResultsSnapshot {
+    const identityMatches = buildMatchAccounts(state)
+    const { failedAccounts, deferredAccounts } = prepareFailedAndDeferredAccounts(state)
+    const nonMatches = buildNonMatchAccounts(state)
+
+    return {
+        version: '1.0.0',
+        recordedAt: new Date().toISOString(),
+        operation: options?.operation ?? 'accountList',
+        stepId: options?.stepId,
+        sweepSummary: options?.sweepSummary,
+        identityMatches,
+        deferredMatches: deferredAccounts,
+        nonMatches,
+        failedMatches: failedAccounts,
+    }
+}
+
 
 
 
