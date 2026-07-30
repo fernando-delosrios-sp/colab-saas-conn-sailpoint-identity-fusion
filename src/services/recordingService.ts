@@ -5,6 +5,7 @@ import { FusionRun } from '../model/fusionRun'
 import { FusionConfig, RecordingConfig } from '../model/config'
 import { ApiLogEntry } from './clientService/recordingApiAdapter'
 import { sanitizeForJson } from '../utils/sanitizeForJson'
+import type { MatchingResultsSnapshot } from './recordingService/matchingResultsSnapshot'
 import {
     getOrCreateRecordingStore,
     RecordingManifest,
@@ -133,6 +134,8 @@ function buildScenario(chainName: string, config: FusionConfig, store: Recording
         }
     }
 
+    const matchingResultsPath = path.join(store.getRecordingDir(), 'reports', 'matching-results.json')
+
     return {
         version: '1.0.0',
         recordedAt: new Date().toISOString(),
@@ -142,6 +145,9 @@ function buildScenario(chainName: string, config: FusionConfig, store: Recording
         steps: scenarioSteps,
         referenceValues,
         apiLogPath: path.relative(process.cwd(), store.getApiLogPath()),
+        ...(fs.existsSync(matchingResultsPath)
+            ? { matchingResultsPath: path.relative(process.cwd(), matchingResultsPath) }
+            : {}),
     }
 }
 
@@ -163,6 +169,10 @@ export async function finalizeRecordingChain(
     fs.mkdirSync(dir, { recursive: true })
 
     const steps = loadStepsFromDisk(store)
+    const matchingResultsFile = path.join(dir, 'reports', 'matching-results.json')
+    const matchingResultsPath = fs.existsSync(matchingResultsFile)
+        ? path.relative(process.cwd(), matchingResultsFile)
+        : undefined
     const scenario = buildScenario(chainName, config, store, steps)
     const scenarioPath = path.join(dir, 'scenario.json')
     fs.writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2) + '\n')
@@ -181,6 +191,9 @@ export async function finalizeRecordingChain(
     if (reportsPath) {
         artifactPaths.push(path.relative(process.cwd(), reportsPath))
     }
+    if (matchingResultsPath) {
+        artifactPaths.push(matchingResultsPath)
+    }
 
     const manifest: RecordingManifest = {
         version: '1.0.0',
@@ -195,6 +208,7 @@ export async function finalizeRecordingChain(
         phaseCount: store.getPhaseCount(),
         scenarioPath: path.relative(process.cwd(), scenarioPath),
         reportsPath: reportsPath ? path.relative(process.cwd(), reportsPath) : undefined,
+        matchingResultsPath,
         artifactPaths,
     }
     fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
@@ -254,6 +268,14 @@ export class RecordingService {
         fs.mkdirSync(reportsDir, { recursive: true })
         const reportPath = path.join(reportsDir, 'aggregation.json')
         fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n')
+    }
+
+    writeMatchingResults(snapshot: MatchingResultsSnapshot): string {
+        const reportsDir = path.join(this.store.getRecordingDir(), 'reports')
+        fs.mkdirSync(reportsDir, { recursive: true })
+        const reportPath = path.join(reportsDir, 'matching-results.json')
+        fs.writeFileSync(reportPath, JSON.stringify(sanitizeForJson(snapshot), null, 2) + '\n')
+        return reportPath
     }
 
     getStepCount(): number {
@@ -333,3 +355,4 @@ export function resetRecordingLifecycleForTests(): void {
     exitHandlersRegistered = false
     clearRecordingStoreCache()
 }
+

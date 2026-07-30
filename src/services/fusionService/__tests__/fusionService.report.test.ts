@@ -1,9 +1,11 @@
 import { createFusionServiceTestContext, type FusionServiceTestContext } from './fusionService.testFixtures'
 import { FusionAccount } from '../../../model/account'
 import { AggregationTracker } from '../aggregationTracker'
+import { FusionConfig, SourceType } from '../../../model/config'
 import { FusionRun } from '../../../model/fusionRun'
 import { FusionService } from '../fusionService'
 import { StandardCommand } from '@sailpoint/connector-sdk'
+import { MatchCandidateType } from '../../matchingService/types'
 
 describe('FusionService — report', () => {
     let ctx: FusionServiceTestContext
@@ -152,7 +154,104 @@ describe('FusionService — report', () => {
             await initializeWithReportCaptureFlag(true)
             expect(ctx.mockMatchingService.configureScoring).toHaveBeenCalledWith({ captureBreakdown: true })
         })
+
+        it('sets captureBreakdown true when run is in record mode', async () => {
+            const recordConfig = {
+                recording: { mode: 'record' as const, chainName: 'test-chain', store: 'ndjson' as const },
+            } as FusionConfig
+            const localRun = new FusionRun(undefined, recordConfig)
+            localRun.log = ctx.mockLog
+            Object.defineProperty(localRun, 'managedAccountsById', {
+                get: () => new Map(),
+                configurable: true,
+            })
+
+            ctx.mockMatchingService.configureScoring = vi.fn()
+
+            const service = new FusionService({
+                config: ctx.mockConfig,
+                log: ctx.mockLog,
+                identities: ctx.mockIdentities,
+                sources: ctx.mockSources,
+                forms: ctx.mockForms,
+                mappingService: ctx.mockMappingService,
+                definitionService: ctx.mockDefinitionService,
+                matchingService: ctx.mockMatchingService,
+                schemas: ctx.mockSchemas,
+                run: localRun,
+                commandType: StandardCommand.StdAccountList,
+                shouldCaptureReportData: false,
+            })
+            service.setTracker(new AggregationTracker())
+
+            await service.initializeManagedAccountProcessing()
+            expect(ctx.mockMatchingService.configureScoring).toHaveBeenCalledWith({ captureBreakdown: true })
+        })
+    })
+
+    describe('record-mode deferred match report capture', () => {
+        it('populates deferredMatchReportData with score breakdowns via analysis recorder', () => {
+            const recordConfig = {
+                recording: { mode: 'record' as const, chainName: 'test-chain', store: 'ndjson' as const },
+                fusionFormAttributes: [],
+                baseurl: 'https://example.identitynow.com',
+            } as FusionConfig
+            const localRun = new FusionRun(undefined, recordConfig)
+            localRun.log = ctx.mockLog
+            localRun.sourcesByName.set('HR', {
+                sourceType: SourceType.Authoritative,
+                config: { deferredMatching: true },
+            } as any)
+
+            const service = new FusionService({
+                config: ctx.mockConfig,
+                log: ctx.mockLog,
+                identities: ctx.mockIdentities,
+                sources: ctx.mockSources,
+                forms: ctx.mockForms,
+                mappingService: ctx.mockMappingService,
+                definitionService: ctx.mockDefinitionService,
+                matchingService: ctx.mockMatchingService,
+                schemas: ctx.mockSchemas,
+                run: localRun,
+                commandType: StandardCommand.StdAccountList,
+                shouldCaptureReportData: false,
+            })
+            const tracker = new AggregationTracker()
+            service.setTracker(tracker)
+
+            const anchor = { managedKey: 'source-a-id::anchor', sourceName: 'HR', name: 'Jane' } as any
+            localRun.registerFinalizedDeferredCandidate(anchor)
+
+            const fusionAccount = {
+                name: 'acct',
+                sourceName: 'HR',
+                isMatch: true,
+                fusionMatches: [
+                    {
+                        candidateType: MatchCandidateType.Deferred,
+                        identityName: 'Jane',
+                        fusionIdentity: anchor,
+                        scores: [{ attribute: 'email', score: 88, isMatch: true, algorithm: 'jaro-winkler' }],
+                    },
+                ],
+            } as any
+
+            localRun.analysisRecorder!.recordAnalysis({
+                account: { name: 'acct', sourceName: 'HR' } as any,
+                fusionAccount,
+                sourceInfo: undefined,
+                sourceType: SourceType.Authoritative,
+                hasIdentityCandidateMatches: false,
+                fusionIdentityComparisons: 2,
+            })
+
+            expect(tracker.deferredMatchReportData).toHaveLength(1)
+            expect(tracker.deferredMatchReportData[0].matches[0].scores?.[0].attribute).toBe('email')
+            expect(tracker.deferredMatchReportData[0].matches[0].scores?.[0].score).toBe(88)
+        })
     })
 })
+
 
 

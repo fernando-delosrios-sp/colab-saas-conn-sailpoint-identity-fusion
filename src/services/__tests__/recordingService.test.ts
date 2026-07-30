@@ -166,6 +166,48 @@ describe('allocateStepIndex', () => {
         expect(ids.size).toBe(20)
         fs.rmSync(dir, { recursive: true, force: true })
     })
+
+    it('writeMatchingResults persists matching-results.json and finalizeOnce references it', async () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const chainName = `matching-results-${Date.now()}`
+        const config = {
+            recording: { mode: 'record' as const, chainName, store: 'ndjson' as const },
+        } as FusionConfig
+        const service = new RecordingService(log, config)
+
+        service.writeMatchingResults({
+            version: '1.0.0',
+            recordedAt: new Date().toISOString(),
+            operation: 'accountList',
+            sweepSummary: { processed: 36, deferred: 12, nonMatch: 24 },
+            identityMatches: [],
+            deferredMatches: [{ accountName: 'Test', accountSource: 'HR', matches: [], deferred: true }],
+            nonMatches: [],
+            failedMatches: [],
+        })
+
+        const run = new FusionRun(undefined, config)
+        run.log = log
+        const res = { send: (_value: unknown) => undefined }
+        service.startOperation('accountList', {}, res, run)
+        service.endOperation(run)
+
+        const scenarioPath = await service.finalizeOnce()
+        const dir = service.getRecordingDir()
+        const matchingResultsPath = path.join(dir, 'reports', 'matching-results.json')
+        const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf-8'))
+        const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf-8'))
+
+        expect(fs.existsSync(matchingResultsPath)).toBe(true)
+        expect(manifest.matchingResultsPath).toContain('matching-results.json')
+        expect(manifest.artifactPaths).toContain(manifest.matchingResultsPath)
+        expect(scenario.matchingResultsPath).toContain('matching-results.json')
+
+        const saved = JSON.parse(fs.readFileSync(matchingResultsPath, 'utf-8'))
+        expect(saved.sweepSummary.deferred).toBe(12)
+
+        fs.rmSync(dir, { recursive: true, force: true })
+    })
 })
 
 describe('NdjsonRecordingStore', () => {
@@ -208,3 +250,4 @@ describe('NdjsonRecordingStore', () => {
         })
     })
 })
+

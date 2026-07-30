@@ -390,6 +390,26 @@ export async function reportEpilogue(
     log.epilogueStart('report')
     const epilogueStartedAt = log.getRunContext()?.epilogueStartedAt ?? Date.now()
 
+    if (serviceRegistry.recording && isPersistent) {
+        const tracker = fusion.run.getTracker()
+        if (tracker) {
+            try {
+                const outcomes = log.getCumulativeOutcomes()
+                const sweepSummary = {
+                    processed: fetchResult?.managedAccountsFound,
+                    exact: outcomes.autoMerged,
+                    partial: outcomes.formsQueued,
+                    deferred: outcomes.deferred,
+                    nonMatch: outcomes.nonMatch,
+                }
+                const snapshot = fusion.buildMatchingResultsSnapshot(tracker, { sweepSummary })
+                serviceRegistry.recording.writeMatchingResults(snapshot)
+            } catch (error) {
+                log.warn(`Report epilogue: matching results recording failed: ${(error as Error).message}`)
+            }
+        }
+    }
+
     if (isPersistent && fetchResult && fusion.fusionReportOnAggregation) {
         try {
             log.detail({ action: 'generating aggregation report' })
@@ -447,4 +467,5 @@ export async function reportEpilogue(
     log.epilogueEnd('report')
     return deferredError
 }
+
 
