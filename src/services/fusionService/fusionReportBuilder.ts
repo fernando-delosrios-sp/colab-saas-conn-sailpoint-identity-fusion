@@ -8,7 +8,7 @@ import {
 import { isExactAttributeMatchScores } from '../matchingService/exactMatch'
 import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchingService/matchingService'
 import { identityMatchesForReview } from '../matchingService/matchingHelpers'
-import { FusionReport, FusionReportAccount, FusionReportStats } from './types'
+import { FusionReport, FusionReportAccount, FusionReportMatch, FusionReportStats } from './types'
 import type { MatchingResultsSnapshot, MatchingResultsSweepSummary } from '../recordingService/matchingResultsSnapshot'
 import { UrlContext } from '../../utils/url'
 import { SourceInfo, SourceService } from '../sourceService'
@@ -62,6 +62,31 @@ export function buildFusionReport(
     }
 }
 
+function mapFusionMatchToReportCandidate(
+    match: ReturnType<typeof identityMatchesForReview>[number],
+    state: FusionReportState
+): FusionReportMatch {
+    const combinedReport = match.scores.find((s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE)
+    const score = combinedReport?.score ?? 0
+    const auto =
+        state.fusionEnableAutoMerge &&
+        state.fusionAutoMergeScore !== undefined &&
+        score >= state.fusionAutoMergeScore
+
+    return {
+        ...fusionReportMatchCandidateAccountFields(match),
+        identityName: match.identityName,
+        identityId: match.identityId,
+        identityUrl: state.urlContext.identity(match.identityId),
+        isMatch: true,
+        candidateType: match.candidateType ?? MatchCandidateType.Identity,
+        exact: isExactAttributeMatchScores(match.scores),
+        auto,
+        manual: !auto,
+        scores: mapScoreReportsForFusionReport(match.scores),
+    }
+}
+
 function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
     const accounts: FusionReportAccount[] = []
 
@@ -70,29 +95,7 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
         const fusionMatches = identityMatchesForReview(fusionAccount, maxCandidates)
         if (fusionMatches.length === 0) continue
 
-        const matches = fusionMatches.map((match) => {
-            const combinedReport = match.scores.find(
-                (s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE
-            )
-            const score = combinedReport?.score ?? 0
-            const auto =
-                state.fusionEnableAutoMerge &&
-                state.fusionAutoMergeScore !== undefined &&
-                score >= state.fusionAutoMergeScore
-
-            return {
-                ...fusionReportMatchCandidateAccountFields(match),
-                identityName: match.identityName,
-                identityId: match.identityId,
-                identityUrl: state.urlContext.identity(match.identityId),
-                isMatch: true,
-                candidateType: match.candidateType ?? MatchCandidateType.Identity,
-                exact: isExactAttributeMatchScores(match.scores),
-                auto,
-                manual: !auto,
-                scores: mapScoreReportsForFusionReport(match.scores),
-            }
-        })
+        const matches = fusionMatches.map((match) => mapFusionMatchToReportCandidate(match, state))
 
         // Release fusionIdentity refs after extracting report data (on-demand report path)
         fusionAccount.clearFusionIdentityReferences()
@@ -164,6 +167,7 @@ export function buildMatchingResultsSnapshot(
         failedMatches: failedAccounts,
     }
 }
+
 
 
 

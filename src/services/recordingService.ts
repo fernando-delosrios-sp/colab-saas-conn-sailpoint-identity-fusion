@@ -46,31 +46,30 @@ function shouldRegisterExitHandlers(): boolean {
     return process.env.VITEST !== 'true' && process.env.VITEST !== '1'
 }
 
+async function finalizeAllRecordingChains(): Promise<void> {
+    for (const chainName of chainsToFinalize) {
+        const config = chainConfigs.get(chainName)
+        const log = chainLogs.get(chainName)
+        if (config && log) {
+            await finalizeRecordingChain(chainName, config, log)
+        }
+    }
+}
+
+async function shutdownRecordingHandler(exitCode?: number): Promise<void> {
+    await finalizeAllRecordingChains()
+    if (exitCode !== undefined) {
+        process.exit(exitCode)
+    }
+}
+
 function registerExitHandlersOnce(): void {
     if (exitHandlersRegistered || !shouldRegisterExitHandlers()) return
     exitHandlersRegistered = true
 
-    const finalizeAll = async (): Promise<void> => {
-        for (const chainName of chainsToFinalize) {
-            const config = chainConfigs.get(chainName)
-            const log = chainLogs.get(chainName)
-            if (config && log) {
-                await finalizeRecordingChain(chainName, config, log)
-            }
-        }
-    }
-
-    process.on('SIGINT', async () => {
-        await finalizeAll()
-        process.exit(0)
-    })
-    process.on('SIGTERM', async () => {
-        await finalizeAll()
-        process.exit(0)
-    })
-    process.on('beforeExit', () => {
-        void finalizeAll()
-    })
+    process.on('SIGINT', () => void shutdownRecordingHandler(0))
+    process.on('SIGTERM', () => void shutdownRecordingHandler(0))
+    process.on('beforeExit', () => void shutdownRecordingHandler())
 }
 
 function loadStepsFromDisk(store: RecordingStore): RecordedStep[] {
@@ -355,4 +354,5 @@ export function resetRecordingLifecycleForTests(): void {
     exitHandlersRegistered = false
     clearRecordingStoreCache()
 }
+
 
