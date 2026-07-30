@@ -1,4 +1,9 @@
-import { isAccountSchema, attributeDefinitionToSchemaAttribute, apiSchemaToAccountSchema } from '../helpers'
+import {
+    isAccountSchema,
+    attributeDefinitionToSchemaAttribute,
+    apiSchemaToAccountSchema,
+    dedupeSchemaAttributesByName,
+} from '../helpers'
 
 describe('schemaService helpers', () => {
     describe('isAccountSchema', () => {
@@ -61,6 +66,55 @@ describe('schemaService helpers', () => {
         })
     })
 
+    describe('dedupeSchemaAttributesByName', () => {
+        it('keeps the first variant on case-insensitive collision', () => {
+            const result = dedupeSchemaAttributesByName([
+                { name: 'Username', type: 'string', multi: false },
+                { name: 'username', type: 'string', multi: false },
+            ])
+
+            expect(result).toHaveLength(1)
+            expect(result[0].name).toBe('Username')
+        })
+
+        it('keeps the first variant when multiple casings collide', () => {
+            const result = dedupeSchemaAttributesByName([
+                { name: 'FirstName', type: 'string', multi: false },
+                { name: 'firstname', type: 'string', multi: true },
+                { name: 'FIRSTNAME', type: 'string', multi: false },
+            ])
+
+            expect(result).toHaveLength(1)
+            expect(result[0].name).toBe('FirstName')
+            expect(result[0].multi).toBe(false)
+        })
+
+        it('skips blank attribute names', () => {
+            const result = dedupeSchemaAttributesByName([
+                { name: '  ', type: 'string', multi: false },
+                { name: 'email', type: 'string', multi: false },
+            ])
+
+            expect(result).toHaveLength(1)
+            expect(result[0].name).toBe('email')
+        })
+
+        it('logs skipped duplicates at debug level', () => {
+            const debug = vi.fn()
+            dedupeSchemaAttributesByName(
+                [
+                    { name: 'LastName', type: 'string', multi: false },
+                    { name: 'lastname', type: 'string', multi: false },
+                ],
+                { debug }
+            )
+
+            expect(debug).toHaveBeenCalledWith(
+                'Skipping duplicate schema attribute "lastname" (keeping "LastName")'
+            )
+        })
+    })
+
     describe('apiSchemaToAccountSchema', () => {
         it('should convert API schema to AccountSchema', () => {
             const apiSchema = {
@@ -92,3 +146,4 @@ describe('schemaService helpers', () => {
         })
     })
 })
+

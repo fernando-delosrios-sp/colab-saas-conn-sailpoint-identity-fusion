@@ -11,7 +11,9 @@ The Account Discover Schema operation generates the schema definition for fusion
 
 2.  **Schema Build**:
     - Calls `schemas.buildDynamicSchema()`.
-    - Combines the fixed base fusion attributes (identity, name, statuses, actions, accounts, etc.) with attributes derived from managed source schemas.
+    - Combines the fixed base fusion attributes (identity, name, statuses, actions, accounts, etc.) with attributes derived from managed source schemas and identity attributes.
+    - Deduplicates attribute names case-insensitively (ISC treats names as case-insensitive). When the same logical attribute appears with different casing (e.g. `FirstName` and `firstname`), the **first** variant in merge order is kept.
 
 3.  **Output**:
     - Returns the generated schema object to ISC.
+

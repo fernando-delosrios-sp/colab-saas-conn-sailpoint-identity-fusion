@@ -15,7 +15,7 @@ import { IdentityService } from '../identityService'
 import { assert } from '../../utils/assert'
 import { compact } from '../../utils/safeRead'
 import { fusionAccountSchemaAttributes } from '../../data/schema'
-import { isAccountSchema, apiSchemaToAccountSchema } from './helpers'
+import { dedupeSchemaAttributesByName, isAccountSchema, apiSchemaToAccountSchema } from './helpers'
 import { promiseAllBatched } from '../fusionService/collections'
 
 /**
@@ -177,6 +177,10 @@ export class SchemaService {
             this._fusionAccountSchema = accountSchema
         } else {
             await this.fetchFusionAccountSchema()
+        }
+        this._fusionAccountSchema = {
+            ...this.fusionAccountSchema,
+            attributes: dedupeSchemaAttributesByName(this.fusionAccountSchema.attributes, this.log),
         }
         const fromSchema = this.fusionAccountSchema.attributes.map((x) => x.name!).filter(Boolean)
         this._fusionSchemaAttributeNames = [
@@ -376,12 +380,11 @@ export class SchemaService {
      */
     public async buildDynamicSchema(): Promise<AccountSchema> {
         this.log.debug('Building dynamic schema.')
-        const attributes: SchemaAttribute[] = []
-        const schema: AccountSchema = {
-            displayAttribute: 'name',
-            identityAttribute: 'id',
-            groupAttribute: FusionAttribute.Actions,
-            attributes,
+        const mergedAttributes: SchemaAttribute[] = []
+        const pushAttribute = (attribute: SchemaAttribute) => {
+            if (attribute.name && attribute.name.trim() !== '') {
+                mergedAttributes.push(attribute)
+            }
         }
 
         // Define static attributes
@@ -420,43 +423,31 @@ export class SchemaService {
             }
         }
 
-        const attributeMap = new Map<string, SchemaAttribute>()
-        const addAttribute = (attribute: SchemaAttribute) => {
-            if (!attribute.name || attribute.name.trim() === '') return
-            const key = attribute.name.toLowerCase()
-            if (!attributeMap.has(key)) {
-                attributeMap.set(key, attribute)
-            } else {
-                const existing = attributeMap.get(key)!
-                attributeMap.set(key, {
-                    ...attribute,
-                    name: existing.name, // preserve original casing
-                })
-            }
-        }
-
-        fusionAttributes.forEach(addAttribute)
-        accountSchemaAttributes.forEach(addAttribute)
-        identitySchemaAttributes.forEach(addAttribute)
-        attributeMappingAttributes.forEach(addAttribute)
-        attributeDefinitionAttributes.forEach(addAttribute)
+        fusionAttributes.forEach(pushAttribute)
+        accountSchemaAttributes.forEach(pushAttribute)
+        identitySchemaAttributes.forEach(pushAttribute)
+        attributeMappingAttributes.forEach(pushAttribute)
+        attributeDefinitionAttributes.forEach(pushAttribute)
 
         // Add reverse correlation attributes from sources configured with correlationMode 'reverse'
         for (const sc of this.sourceConfigs) {
             if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
-                const attr: SchemaAttribute = {
+                pushAttribute({
                     name: sc.correlationAttribute,
                     description: sc.correlationDisplayName ?? sc.correlationAttribute,
                     type: 'string',
                     multi: false,
-                }
-                addAttribute(attr)
+                })
             }
         }
 
-        attributes.push(...Array.from(attributeMap.values()))
-
-        return schema
+        return {
+            displayAttribute: 'name',
+            identityAttribute: 'id',
+            groupAttribute: FusionAttribute.Actions,
+            attributes: dedupeSchemaAttributesByName(mergedAttributes, this.log),
+        }
     }
 }
+
 

@@ -62,16 +62,76 @@ describe('SchemaService', () => {
                 attributes: [{ name: 'EmployeeID', type: 'string', multi: false }],
             })
 
-            // Setup identity attributes containing lowercase "employeeid"
+            // Setup identity attributes containing lowercase "employeeid" with different metadata
             mockIdentities.fetchIdentitySchemaAttributes.mockResolvedValue([
-                { name: 'employeeid', description: 'employee id', type: 'string', multi: false, entitlement: false }
+                {
+                    name: 'employeeid',
+                    description: 'employee id',
+                    type: 'string',
+                    multi: true,
+                    entitlement: false,
+                },
             ])
 
             const schema = await schemaService.buildDynamicSchema()
 
-            // The resulting schema should have "EmployeeID" (case-preserved from the first-added)
             const attr = schema.attributes.find((a) => a.name.toLowerCase() === 'employeeid')
             expect(attr?.name).toBe('EmployeeID')
+            expect(attr?.description).toBe('EmployeeID from Source 1')
+        })
+
+        it('should dedupe Username and username from managed source', async () => {
+            mockSources.managedSources = [{ id: 'src-1', name: 'Source 1' }]
+            vi.spyOn(schemaService as any, 'fetchAccountSchema').mockResolvedValue({
+                displayAttribute: 'name',
+                identityAttribute: 'id',
+                attributes: [
+                    { name: 'Username', type: 'string', multi: false },
+                    { name: 'username', type: 'string', multi: false },
+                ],
+            })
+
+            const schema = await schemaService.buildDynamicSchema()
+            const usernameAttrs = schema.attributes.filter((a) => a.name.toLowerCase() === 'username')
+
+            expect(usernameAttrs).toHaveLength(1)
+            expect(usernameAttrs[0].name).toBe('Username')
+        })
+
+        it('should dedupe FirstName from identity when firstname exists on managed source', async () => {
+            mockSources.managedSources = [{ id: 'src-1', name: 'Source 1' }]
+            vi.spyOn(schemaService as any, 'fetchAccountSchema').mockResolvedValue({
+                displayAttribute: 'name',
+                identityAttribute: 'id',
+                attributes: [{ name: 'firstname', type: 'string', multi: false }],
+            })
+            mockIdentities.fetchIdentitySchemaAttributes.mockResolvedValue([
+                { name: 'FirstName', type: 'string', multi: false, entitlement: false },
+            ])
+
+            const schema = await schemaService.buildDynamicSchema()
+            const firstnameAttrs = schema.attributes.filter((a) => a.name.toLowerCase() === 'firstname')
+
+            expect(firstnameAttrs).toHaveLength(1)
+            expect(firstnameAttrs[0].name).toBe('firstname')
+        })
+
+        it('should dedupe LastName from identity when lastname exists on managed source', async () => {
+            mockSources.managedSources = [{ id: 'src-1', name: 'Source 1' }]
+            vi.spyOn(schemaService as any, 'fetchAccountSchema').mockResolvedValue({
+                displayAttribute: 'name',
+                identityAttribute: 'id',
+                attributes: [{ name: 'lastname', type: 'string', multi: false }],
+            })
+            mockIdentities.fetchIdentitySchemaAttributes.mockResolvedValue([
+                { name: 'LastName', type: 'string', multi: false, entitlement: false },
+            ])
+
+            const schema = await schemaService.buildDynamicSchema()
+            const lastnameAttrs = schema.attributes.filter((a) => a.name.toLowerCase() === 'lastname')
+
+            expect(lastnameAttrs).toHaveLength(1)
+            expect(lastnameAttrs[0].name).toBe('lastname')
         })
 
         it('should handle API errors during fetch gracefully', async () => {
@@ -152,5 +212,46 @@ describe('SchemaService', () => {
             })
         })
     })
+
+    describe('setFusionAccountSchema', () => {
+        it('dedupes case-insensitive duplicate attribute names from input schema', async () => {
+            await schemaService.setFusionAccountSchema({
+                displayAttribute: 'name',
+                identityAttribute: 'id',
+                attributes: [
+                    { name: 'LastName', type: 'string', multi: false },
+                    { name: 'lastname', type: 'string', multi: false },
+                ],
+            })
+
+            const names = schemaService.listSchemaAttributeNames()
+            const lastnameNames = names.filter((n) => n.toLowerCase() === 'lastname')
+            expect(lastnameNames).toHaveLength(1)
+            expect(lastnameNames[0]).toBe('LastName')
+        })
+
+        it('emits a single key from getFusionAttributeSubset when bag has duplicate casings', async () => {
+            await schemaService.setFusionAccountSchema({
+                displayAttribute: 'name',
+                identityAttribute: 'id',
+                attributes: [
+                    { name: 'LastName', type: 'string', multi: false },
+                    { name: 'lastname', type: 'string', multi: false },
+                ],
+            })
+
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                LastName: 'Wong',
+                lastname: 'Ignored',
+            })
+
+            expect(Object.keys(result).filter((k) => k.toLowerCase() === 'lastname')).toHaveLength(1)
+            expect(result.LastName).toBe('Wong')
+            expect(result).not.toHaveProperty('lastname')
+        })
+    })
 })
+
 
