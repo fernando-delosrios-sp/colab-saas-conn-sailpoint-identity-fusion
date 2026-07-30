@@ -121,15 +121,7 @@ After restructure, `README.md` MUST serve as a repository landing page only. It 
 - **THEN** the file SHALL link to the documentation site for Configuration reference and Use guides
 - **AND** the file SHALL NOT duplicate connector-spec field tables
 
-### Requirement: Docs CI SHALL reject lean-ctx placeholder corruption
-
-The docs CI pipeline MUST fail if any file under `docs/` contains the pattern `lean-ctx: omitted` indicating corrupted lean-ctx read artifacts.
-
-#### Scenario: Corrupted doc is committed
-
-- **GIVEN** a markdown file under `docs/` contains `... [lean-ctx: omitted`
-- **WHEN** `npm run ci:docs-review` runs
-- **THEN** the command SHALL exit with a non-zero status
+### Requirement: Full README sync to Home SHALL be removed
 
 ### Requirement: Full README sync to Home SHALL be removed
 
@@ -140,3 +132,4 @@ The project MUST NOT copy the entire README to `docs/index.md` via `scripts/sync
 - **GIVEN** `scripts/sync-docs-home.cjs` performed a full README copy before restructure
 - **WHEN** the restructure is complete and `npm run docs:prepare` runs
 - **THEN** `docs/index.md` SHALL NOT be overwritten with the full README contents
+

@@ -2,6 +2,7 @@ import type { FusionConfig } from '../../model/config'
 import {
     isLocalizationEnabled,
     resolveEffectiveLocale,
+    resolveFormLocale,
     resolveIdentityLanguageRaw,
     normalizeLanguageCode,
     translate,
@@ -40,6 +41,20 @@ describe('localization', () => {
                     preferredLanguage: 'ja',
                 })
             ).toBe('ja')
+        })
+    })
+
+    describe('resolveFormLocale', () => {
+        it('returns en when localization is disabled', () => {
+            expect(resolveFormLocale({ enableLocalization: false, defaultLanguage: 'fr' })).toBe('en')
+        })
+
+        it('uses defaultLanguage when localization is enabled', () => {
+            expect(resolveFormLocale({ enableLocalization: true, defaultLanguage: 'fr' })).toBe('fr')
+        })
+
+        it('falls back to en for unsupported defaultLanguage', () => {
+            expect(resolveFormLocale({ enableLocalization: true, defaultLanguage: 'xx' })).toBe('en')
         })
     })
 
@@ -93,3 +108,4 @@ describe('localization', () => {
         })
     })
 })
+

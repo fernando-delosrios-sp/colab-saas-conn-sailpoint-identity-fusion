@@ -24,9 +24,9 @@ Configure **Attribute Matching Settings → Review Settings** for the manual rev
 
 The connector supports fully localized user communications. When **Enable localized user communications?** is toggled on:
 
-- All emails, reports, and Fusion review forms are translated to the recipient's preferred language.
-- Provide the **Identity Language Attribute** to instruct the connector on which identity attribute contains the user's language (e.g., `en`, `fr`).
-- You can specify a **Default Language** to be used when the recipient's language cannot be determined or the attribute is missing.
+- Emails and reports use the reviewer's preferred language when **Identity Language Attribute** is set on the identity.
+- **Fusion review forms** use **Default Language** only (shared form definitions are not per-reviewer). Set **Default Language** to the locale reviewers should see on form labels and help text.
+- When localization is disabled, review forms remain English.
 
 ### What the aggregation report includes
 
@@ -296,6 +296,7 @@ Track these metrics to assess Match effectiveness:
 - For algorithm selection and tuning, see [Effective use of matching algorithms](tuning-matching-algorithms.md).
 - For attribute merging strategies, see [Effective use of Map](mapping-attributes.md).
 - For ISC setup (connection, schema, identity profile), see [First aggregation](../../getting-started/first-aggregation.md).
+
 
 
 

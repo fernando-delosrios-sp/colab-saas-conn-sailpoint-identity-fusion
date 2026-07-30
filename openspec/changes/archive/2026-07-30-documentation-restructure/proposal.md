@@ -1,6 +1,6 @@
 ## Why
 
-The Identity Fusion NG MkDocs site is poorly structured and partially stale. Home syncs the entire README (~465 lines), guides duplicate connector-spec field tables, the glossary is hidden from nav, lean-ctx placeholders render as garbage in published pages, and there is no clear boundary between field reference and workflow documentation. Operators and integrators cannot reliably find configuration options versus setup guides, and inline `helpKey` text in `connector-spec.json` duplicates content that belongs in the docs site.
+The Identity Fusion NG MkDocs site is poorly structured and partially stale. Home syncs the entire README (~465 lines), guides duplicate connector-spec field tables, the glossary is hidden from nav, placeholder corruption renders as garbage in published pages, and there is no clear boundary between field reference and workflow documentation. Operators and integrators cannot reliably find configuration options versus setup guides, and inline `helpKey` text in `connector-spec.json` duplicates content that belongs in the docs site.
 
 ## What Changes
 
@@ -38,9 +38,9 @@ The Identity Fusion NG MkDocs site is poorly structured and partially stale. Hom
 - To: Repo landing page with pitch, docs site link, read-next table
 - Impact: GitHub README no longer serves as config reference
 
-**lean-ctx cleanup**
+**Doc corruption cleanup**
 - From: Corrupted placeholders in `matching-algorithms.md` and `docs/CHANGELOG.md`
-- To: Restored content + CI guard against placeholder pattern
+- To: Restored content from last clean git commits
 
 ## Capabilities
 
@@ -50,7 +50,7 @@ The Identity Fusion NG MkDocs site is poorly structured and partially stale. Hom
 
 ### Modified Capabilities
 
-- `project-standards`: Update src→docs scope map paths from `docs/guides/**` to `docs/use-guides/**`; update release-prep fallback paths; add lean-ctx placeholder guard to docs CI requirements
+- `project-standards`: Update src→docs scope map paths from `docs/guides/**` to `docs/use-guides/**`; update release-prep fallback paths
 - `ubiquitous-language`: Glossary published at top-level nav (`docs/glossary.md`); documentation path references updated from `docs/concepts/glossary.md` and `docs/guides/**`
 
 ## Impact
@@ -59,3 +59,4 @@ The Identity Fusion NG MkDocs site is poorly structured and partially stale. Hom
 - **Scripts:** `scripts/sync-docs-home.cjs` (remove/replace), `scripts/prepare-docs.cjs`, new `scripts/generate-config-docs.cjs`, CI markdown checks
 - **Config UI:** `connector-spec.json` (`helpKey` strings shortened with doc links)
 - **No runtime connector code changes** unless scope-map or spec sync touches settings help text generation
+

@@ -138,7 +138,7 @@ function registerFormatHelpers(): void {
         return formatDateYmd(date)
     })
 
-    Handlebars.registerHelper('algorithmLabel', function (this: any, algorithm?: string, options: any) {
+    Handlebars.registerHelper('algorithmLabel', function (this: any, algorithm: string | undefined, options: any) {
         const locale = options?.data?.root?.locale
         if (!algorithm) return translate('not_available', locale)
         const labelKey = ALGORITHM_LABEL_KEYS[String(algorithm)]
@@ -251,4 +251,5 @@ export const registerHandlebarsHelpers = (): void => {
     registerComparisonHelpers()
     registerReportHelpers()
 }
+
 

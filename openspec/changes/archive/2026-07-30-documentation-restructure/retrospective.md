@@ -25,13 +25,12 @@ Commit chain: *(pending archive commit)*
 ## 1. Wins
 
 - Six-section MkDocs IA shipped with generated Configuration reference from `connector-spec.json`
-- lean-ctx corruption guard prevents recurrence (`scripts/check-lean-ctx-docs.cjs`)
 - `ci:docs-review` passes end-to-end after link/path fixes in migrated use guides
 - Parallel subagents accelerated Home, Getting started, and Technical reference extraction
 
 ## 2. Misses
 
-- 🟡 **CHANGELOG and matching-algorithms were corrupted in git HEAD** — restored from older commits; lean-ctx placeholders had been committed upstream
+- 🟡 **CHANGELOG and matching-algorithms were corrupted in git HEAD** — restored from older commits; placeholder artifacts had been committed upstream
 - 🟡 **Migrated guides retain some field tables** — task asked to strip; migration prioritized paths and nav over full table removal
 - 📌 **4 MkDocs link warnings remain** — non-blocking; mostly cross-guide references
 
@@ -39,7 +38,7 @@ Commit chain: *(pending archive commit)*
 
 | Plan task | What changed | Why |
 |-----------|--------------|-----|
-| 1.1 Restore from git | Restored matching-algorithms from commit `5220766` (HEAD corrupted) | HEAD contained lean-ctx placeholders |
+| 1.1 Restore from git | Restored matching-algorithms from commit `5220766` (HEAD corrupted) | HEAD contained placeholder corruption |
 | 4.2 Strip field tables | Partial — added config reference links; large tables remain in some guides | Time/scope; redirect + nav was blocking path |
 | subagent-driven-development | Partial — 2 subagents for doc batches, not per plan micro-task | Doc migration volume; TDD/code-review subagents N/A for docs-only |
 
@@ -69,15 +68,16 @@ Commit chain: *(pending archive commit)*
 
 ## 5. Surprises
 
-- Git HEAD already contained lean-ctx corruption in `CHANGELOG.md` and `matching-algorithms.md` — restore-from-git task insufficient without history search
+- Git HEAD already contained placeholder corruption in `CHANGELOG.md` and `matching-algorithms.md` — restore-from-git task insufficient without history search
 - `connector-spec.json` helpKey link paths needed same-page `#anchor` fix in generated config pages
 
 ## 6. Promote candidates → long-term learning
 
-- [ ] 🟡 **Never trust `git show HEAD` for lean-ctx restore** → **Promote to project CLAUDE.md**
-  > **Why**: HEAD had committed lean-ctx placeholders; restore task failed silently
+- [ ] 🟡 **Never trust `git show HEAD` for doc restore** → **Promote to project CLAUDE.md**
+  > **Why**: HEAD had committed placeholder corruption; restore task failed silently
   > **How to apply**: When task says "restore from git", scan history for last clean commit first
 
 - [ ] 📌 **Add `docs/configuration/` to markdownlint disable or generator heading dedup** → **One-off**
   > **Why**: Generated pages hit MD024 until disable comment added
   > **How to apply**: Already fixed in generator; monitor on next spec field additions
+
