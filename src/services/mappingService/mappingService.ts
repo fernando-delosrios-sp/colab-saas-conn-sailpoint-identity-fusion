@@ -48,9 +48,14 @@ export class MappingService {
         }
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
-            const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some(
-                (accounts) => accounts.length > 0,
-            )
+            let hasManagedAccountContext = false
+            for (const accounts of sourceAttributeMap.values()) {
+                if (accounts.length > 0) {
+                    hasManagedAccountContext = true
+                    // Performance optimization: Avoid Array.from() in hot path to prevent heap allocations
+                    break
+                }
+            }
             const shouldPreserveCurrentWithoutContext =
                 !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sc) => sc.name)

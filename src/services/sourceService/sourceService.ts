@@ -342,7 +342,13 @@ export class SourceService {
      * Get fusion source info
      */
     public getFusionSource(): SourceInfo | undefined {
-        return Array.from(this.sourcesById.values()).find((s) => !s.isManaged)
+        for (const s of this.sourcesById.values()) {
+            if (!s.isManaged) {
+                // Performance optimization: Avoid Array.from() to prevent intermediate heap allocations
+                return s
+            }
+        }
+        return undefined
     }
 
     /**
