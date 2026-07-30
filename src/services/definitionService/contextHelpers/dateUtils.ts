@@ -74,7 +74,65 @@ export function format(date: Date | string | number, formatStr?: string): string
 /**
  * Parse a date from various formats
  */
-export function parse(dateStr: string | Date | number, formatStr?: string): Date | undefined {
+
+const FORMAT_TOKENS = [
+    'yyyy', 'yy', 'MM', 'M', 'dd', 'd', 'HH', 'H', 'mm', 'm', 'ss', 's',
+    'XXX', 'ZZZ', 'xxx', 'XX', 'ZZ', 'xx', 'X', 'Z', 'x',
+]
+
+function tokenToRegexPattern(match: string): string {
+    switch (match) {
+        case 'yyyy':
+            return '(\d{4})'
+        case 'yy':
+            return '(\d{2})'
+        case 'MM':
+            return '(\d{2})'
+        case 'M':
+            return '(\d{1,2})'
+        case 'dd':
+            return '(\d{2})'
+        case 'd':
+            return '(\d{1,2})'
+        case 'HH':
+            return '(\d{2})'
+        case 'H':
+            return '(\d{1,2})'
+        case 'mm':
+            return '(\d{2})'
+        case 'm':
+            return '(\d{1,2})'
+        case 'ss':
+            return '(\d{2})'
+        case 's':
+            return '(\d{1,2})'
+        case 'XXX':
+        case 'ZZZ':
+        case 'xxx':
+        case 'XX':
+        case 'ZZ':
+        case 'xx':
+        case 'X':
+        case 'Z':
+        case 'x':
+            return '(Z|[+-]\d{2}(?::?\d{2})?)'
+        default:
+            return match
+    }
+}
+
+function buildFormatRegex(formatStr: string): { regex: RegExp; matchedTokens: string[] } {
+    const escapedFormat = formatStr.replace(/[\^$*+?.()|[\]{}]/g, '\$&').replace(/'/g, '')
+    const matchedTokens: string[] = []
+    const tokenRegex = new RegExp(FORMAT_TOKENS.join('|'), 'g')
+    const pattern = escapedFormat.replace(tokenRegex, (match) => {
+        matchedTokens.push(match)
+        return tokenToRegexPattern(match)
+    })
+    return { regex: new RegExp(`^${pattern}$`), matchedTokens }
+}
+
+function parsePrimitiveDateInput(dateStr: string | Date | number, formatStr?: string): Date | undefined {
     if (dateStr instanceof Date) {
         return new Date(dateStr)
     }
@@ -99,79 +157,16 @@ export function parse(dateStr: string | Date | number, formatStr?: string): Date
         return d
     }
 
-    // Escape regex characters in the format string and remove escaping single quotes
-    const escapedFormat = formatStr.replace(/[\\^$*+?.()|[\]{}]/g, '\\$&').replace(/'/g, '')
+    return undefined
+}
 
-    // Supported date-fns token patterns (longest first to match correctly)
-    const tokens = [
-        'yyyy',
-        'yy',
-        'MM',
-        'M',
-        'dd',
-        'd',
-        'HH',
-        'H',
-        'mm',
-        'm',
-        'ss',
-        's',
-        'XXX',
-        'ZZZ',
-        'xxx',
-        'XX',
-        'ZZ',
-        'xx',
-        'X',
-        'Z',
-        'x',
-    ]
-    const tokenRegex = new RegExp(tokens.join('|'), 'g')
-    const matchedTokens: string[] = []
+function applyTimezoneOffset(parsedDate: Date, timezoneOffsetMinutes: number): Date {
+    parsedDate.setUTCMinutes(parsedDate.getUTCMinutes() - timezoneOffsetMinutes)
+    return parsedDate
+}
 
-    const pattern = escapedFormat.replace(tokenRegex, (match) => {
-        matchedTokens.push(match)
-        switch (match) {
-            case 'yyyy':
-                return '(\\d{4})'
-            case 'yy':
-                return '(\\d{2})'
-            case 'MM':
-                return '(\\d{2})'
-            case 'M':
-                return '(\\d{1,2})'
-            case 'dd':
-                return '(\\d{2})'
-            case 'd':
-                return '(\\d{1,2})'
-            case 'HH':
-                return '(\\d{2})'
-            case 'H':
-                return '(\\d{1,2})'
-            case 'mm':
-                return '(\\d{2})'
-            case 'm':
-                return '(\\d{1,2})'
-            case 'ss':
-                return '(\\d{2})'
-            case 's':
-                return '(\\d{1,2})'
-            case 'XXX':
-            case 'ZZZ':
-            case 'xxx':
-            case 'XX':
-            case 'ZZ':
-            case 'xx':
-            case 'X':
-            case 'Z':
-            case 'x':
-                return '(Z|[+-]\\d{2}(?::?\\d{2})?)'
-            default:
-                return match
-        }
-    })
-
-    const regex = new RegExp(`^${pattern}$`)
+function parseWithFormat(dateStr: string, formatStr: string): Date | undefined {
+    const { regex, matchedTokens } = buildFormatRegex(formatStr)
     const match = dateStr.match(regex)
     if (!match) {
         return undefined
@@ -257,10 +252,19 @@ export function parse(dateStr: string | Date | number, formatStr?: string): Date
     if (daySet && parsedDate.getUTCDate() !== day) return undefined
 
     if (hasTimezone) {
-        parsedDate.setUTCMinutes(parsedDate.getUTCMinutes() - timezoneOffsetMinutes)
+        return applyTimezoneOffset(parsedDate, timezoneOffsetMinutes)
     }
 
     return parsedDate
+}
+
+export function parse(dateStr: string | Date | number, formatStr?: string): Date | undefined {
+    const primitive = parsePrimitiveDateInput(dateStr, formatStr)
+    if (primitive !== undefined || typeof dateStr !== 'string' || !formatStr) {
+        return primitive
+    }
+
+    return parseWithFormat(dateStr, formatStr)
 }
 
 /**

@@ -9,29 +9,57 @@ import {
 } from './accountAttributeValueDisplay'
 import { translate } from './localization'
 
-/**
- * Register Handlebars helpers for common operations (email/report templates).
- */
-export const registerHandlebarsHelpers = (): void => {
-    const algorithmLabels: Record<string, string> = {
-        'name-matcher': 'Name Matcher',
-        'jaro-winkler': 'Jaro-Winkler',
-        lig3: 'LIG3',
-        dice: 'Dice',
-        'double-metaphone': 'Double Metaphone',
-        binary: 'Binary (Exact Match)',
-        custom: 'Custom',
-        average: 'Combined match score (legacy)',
-        'weighted-mean': 'Combined score',
+const ALGORITHM_LABELS: Record<string, string> = {
+    'name-matcher': 'Name Matcher',
+    'jaro-winkler': 'Jaro-Winkler',
+    lig3: 'LIG3',
+    dice: 'Dice',
+    'double-metaphone': 'Double Metaphone',
+    binary: 'Binary (Exact Match)',
+    custom: 'Custom',
+    average: 'Combined match score (legacy)',
+    'weighted-mean': 'Combined score',
+}
+
+const PIPELINE_PHASE_ORDER = ['Setup', 'Fetch', 'Refresh', 'Process', 'Output', 'Report'] as const
+
+function formatDateYmd(date: string | Date): string {
+    const d = typeof date === 'string' ? new Date(date) : date
+    if (!(d instanceof Date) || Number.isNaN(d.getTime())) return 'N/A'
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}/${month}/${day}`
+}
+
+function buildProcessingStatsCards(
+    stats: Record<string, any>,
+    locale: string | undefined
+): Array<{ label: string; value: string }> {
+    const cards: Array<{ label: string; value: string }> = []
+    const pushCard = (labelKey: string, value: any): void => {
+        if (missing(value)) return
+        cards.push({ label: translate(labelKey, locale), value: String(value) })
     }
-    const formatDateYmd = (date: string | Date): string => {
-        const d = typeof date === 'string' ? new Date(date) : date
-        if (!(d instanceof Date) || Number.isNaN(d.getTime())) return 'N/A'
-        const year = d.getFullYear()
-        const month = String(d.getMonth() + 1).padStart(2, '0')
-        const day = String(d.getDate()).padStart(2, '0')
-        return `${year}/${month}/${day}`
-    }
+
+    pushCard('total_processing_time', stats.totalProcessingTime)
+    pushCard('used_memory', stats.usedMemory)
+    pushCard('fusion_accounts_returned', stats.totalFusionAccounts)
+    pushCard('fusion_accounts_found', stats.fusionAccountsFound)
+    pushCard('identities_found', stats.identitiesFound)
+    pushCard('managed_accounts_found', stats.managedAccountsFound)
+    pushCard('fusion_reviews_processed', stats.fusionReviewsProcessed)
+    pushCard('identities_processed', stats.identitiesProcessed)
+    pushCard('managed_accounts_processed', stats.managedAccountsProcessed)
+    pushCard('fusion_reviews_found', stats.fusionReviewsFound)
+    pushCard('fusion_review_instances_found', stats.fusionReviewInstancesFound)
+
+    return cards
+}
+
+function registerFormatHelpers(): void {
+    const emailAddressPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const accountAttrMaxChars = maxDisplayCharsForAccountAttributeValue()
 
     Handlebars.registerHelper('formatAttribute', (value: unknown) => {
         if (!isDefined(value)) {
@@ -43,13 +71,10 @@ export const registerHandlebarsHelpers = (): void => {
         return String(value)
     })
 
-    Handlebars.registerHelper('i18n', function(this: any, key: string, options: any) {
+    Handlebars.registerHelper('i18n', function (this: any, key: string, options: any) {
         const locale = options?.data?.root?.locale
         return translate(key, locale)
     })
-
-    const emailAddressPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    const accountAttrMaxChars = maxDisplayCharsForAccountAttributeValue()
 
     /** Renders attribute values; long text is shortened with a character budget; emails become mailto links (triple braces in templates). */
     Handlebars.registerHelper('formatAccountAttributeValue', (_attributeKey: unknown, value: unknown) => {
@@ -100,6 +125,20 @@ export const registerHandlebarsHelpers = (): void => {
         return String(Math.round(num))
     })
 
+    Handlebars.registerHelper('formatDate', (date: string | Date) => {
+        if (!date) {
+            return 'N/A'
+        }
+        return formatDateYmd(date)
+    })
+
+    Handlebars.registerHelper('algorithmLabel', (algorithm?: string) => {
+        if (!algorithm) return 'N/A'
+        return ALGORITHM_LABELS[String(algorithm)] ?? String(algorithm)
+    })
+}
+
+function registerComparisonHelpers(): void {
     Handlebars.registerHelper('isFiniteNumber', (value: unknown) => typeof value === 'number' && Number.isFinite(value))
 
     Handlebars.registerHelper('multiply', (a: unknown, b: unknown) => {
@@ -134,18 +173,6 @@ export const registerHandlebarsHelpers = (): void => {
         return a >= b
     })
 
-    Handlebars.registerHelper('formatDate', (date: string | Date) => {
-        if (!date) {
-            return 'N/A'
-        }
-        return formatDateYmd(date)
-    })
-
-    Handlebars.registerHelper('algorithmLabel', (algorithm?: string) => {
-        if (!algorithm) return 'N/A'
-        return algorithmLabels[String(algorithm)] ?? String(algorithm)
-    })
-
     Handlebars.registerHelper('isAverageScoreRow', (attribute?: string, algorithm?: string) => {
         const attr = String(attribute ?? '')
         const alg = String(algorithm ?? '')
@@ -157,8 +184,10 @@ export const registerHandlebarsHelpers = (): void => {
             alg === 'weighted-mean'
         )
     })
+}
 
-    Handlebars.registerHelper('sourceTypeLabel', function(this: any, sourceType: string, options: any) {
+function registerReportHelpers(): void {
+    Handlebars.registerHelper('sourceTypeLabel', function (this: any, sourceType: string, options: any) {
         const locale = options?.data?.root?.locale
         const labels: Record<string, string> = {
             authoritative: translate('authoritative', locale),
@@ -180,31 +209,11 @@ export const registerHandlebarsHelpers = (): void => {
         return out
     })
 
-    Handlebars.registerHelper('processingStatsCards', function(this: any, stats: Record<string, any>, options: any) {
+    Handlebars.registerHelper('processingStatsCards', function (this: any, stats: Record<string, any>, options: any) {
         const locale = options?.data?.root?.locale
         if (!stats || typeof stats !== 'object') return []
-        const cards: Array<{ label: string; value: string }> = []
-        const pushCard = (labelKey: string, value: any): void => {
-            if (missing(value)) return
-            cards.push({ label: translate(labelKey, locale), value: String(value) })
-        }
-
-        pushCard('total_processing_time', stats.totalProcessingTime)
-        pushCard('used_memory', stats.usedMemory)
-        pushCard('fusion_accounts_returned', stats.totalFusionAccounts)
-        pushCard('fusion_accounts_found', stats.fusionAccountsFound)
-        pushCard('identities_found', stats.identitiesFound)
-        pushCard('managed_accounts_found', stats.managedAccountsFound)
-        pushCard('fusion_reviews_processed', stats.fusionReviewsProcessed)
-        pushCard('identities_processed', stats.identitiesProcessed)
-        pushCard('managed_accounts_processed', stats.managedAccountsProcessed)
-        pushCard('fusion_reviews_found', stats.fusionReviewsFound)
-        pushCard('fusion_review_instances_found', stats.fusionReviewInstancesFound)
-
-        return cards
+        return buildProcessingStatsCards(stats, locale)
     })
-
-    const PIPELINE_PHASE_ORDER = ['Setup', 'Fetch', 'Refresh', 'Process', 'Output', 'Report'] as const
 
     /** Ordered phase tiles for HTML; missing phases show an em dash. */
     Handlebars.registerHelper('orderedPhaseTimingEntries', (stats: Record<string, unknown> | null | undefined) => {
@@ -226,4 +235,11 @@ export const registerHandlebarsHelpers = (): void => {
     })
 }
 
-
+/**
+ * Register Handlebars helpers for common operations (email/report templates).
+ */
+export const registerHandlebarsHelpers = (): void => {
+    registerFormatHelpers()
+    registerComparisonHelpers()
+    registerReportHelpers()
+}
