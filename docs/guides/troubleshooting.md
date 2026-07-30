@@ -558,6 +558,8 @@ curl -X POST https://your-proxy.com/fusion \
 | **ISC aggregation history** | Source → Aggregation History                                             | Aggregation status, timing, counts    |
 | **External logs**           | Your log aggregator (if configured)                                      | Detailed connector logs (Debug level) |
 
+For `accountList` log line kinds (`STATUS`, `EVENT_SUMMARY`, `DETAIL`, match/decision segments, grep patterns), see [Advanced connection settings — Operation log line kinds](advanced-connection-settings.md#operation-log-line-kinds-accountlist).
+
 ### Enabling external logging
 
 **Purpose:** Centralized logs for troubleshooting with Debug level detail.
@@ -735,4 +737,5 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 
 - For specific feature guidance, see the other usage guides (Map & Define, Match, matching algorithms, advanced settings, proxy mode).
 - For ISC general troubleshooting, see [SailPoint documentation](https://documentation.sailpoint.com/saas/).
+
 

@@ -1,6 +1,7 @@
 CHANGELOG.md [159L]
 # Changelog
 ## 2.2.0
+- (2026-07-30) **Observability:** Reviewer decision logging now mirrors match discovery — Info headlines `… DECISION DISCOVERED` / `… DECISION APPLIED` for merge, new identity, no-match, and auto-merge outcomes; compact `decisions(Nn/Mm/NMnm/Aa)` segments on `STATUS`, `DETAIL`, and phase-complete lines; `EVENT_SUMMARY decisions …` interval deltas during Process. Merge decisions log on Fetch (discovered) and Refresh (applied); new-identity decisions log on Fetch and Process (`STEP process-decisions`). Advanced connection settings guide, account-list operation doc, glossary, and `log-service` spec updated.
 - (2026-07-30) **Enhancement:** Record-mode account-list now writes `reports/matching-results.json` with identity matches, deferred matches (per-attribute scores), non-matches, failed matches, and sweep summary counts. Record mode automatically enables managed-account report capture. `manifest.json` and `scenario.json` reference `matchingResultsPath`. Re-record existing chains to populate the new artifact.
 - (2026-07-29) **Enhancement:** Added `npm run test-recording -- <chainName>` for offline golden verification of recorded chains — auto-runs scenario steps, reports output drift, exits non-zero on failure. Chain replay Vitest tests no longer scan local `recordings/` artifacts; harness mechanics validated via self-contained fixtures. CJS finalize scripts preserve connector-written `scenario.json` config on re-finalize.
 - (2026-07-29) **Fix:** Record mode now produces complete replay artifacts via `resolveRecordingConfig()` env bridge — `RECORD_MODE`, `RECORD_CHAIN_NAME`, and `VERBOSE_RECORDING` resolve into `FusionConfig.recording` during config load so `ServiceRegistry` and `FusionRun` share one source of truth. **Enhancement:** Pluggable `RecordingStore` interface with NDJSON default (`api-log.ndjson`, `steps.ndjson`, `phases.ndjson`, `manifest.json`, `scenario.json`). Finalize-once lifecycle retains `steps.ndjson` across multi-operation chains. `npm run record` verifies manifest/scenario/api-log on exit.
@@ -68,6 +69,7 @@ CHANGELOG.md [159L]
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 
 
 

@@ -1,6 +1,7 @@
 export type OperationPhase = 'Setup' | 'Fetch' | 'Refresh' | 'Process' | 'Output' | 'Epilogue'
 
 type MatchEventType = 'exact' | 'partial' | 'deferred'
+type DecisionEventType = 'newIdentity' | 'merge' | 'noMatch' | 'autoMerge'
 
 export type CorrelationSkipReason = 'noIdentity' | 'noSourceContext' | 'wrongMode' | 'noIscAccountId'
 
@@ -27,6 +28,10 @@ export type EventCounters = {
     autoMerged: number
     formsQueued: number
     newIdentityAssignment: number
+    decisionNewIdentity: number
+    decisionMerge: number
+    decisionNoMatch: number
+    decisionAutoMerge: number
     recordUniqueRegistered: number
     emailSent: number
 }
@@ -37,6 +42,10 @@ export type CumulativeOutcomes = {
     autoMerged: number
     formsQueued: number
     deferred: number
+    decisionNewIdentity: number
+    decisionMerge: number
+    decisionNoMatch: number
+    decisionAutoMerge: number
 }
 
 type ProgressSnapshot = {
@@ -71,13 +80,26 @@ export function createEmptyEventCounters(): EventCounters {
         autoMerged: 0,
         formsQueued: 0,
         newIdentityAssignment: 0,
+        decisionNewIdentity: 0,
+        decisionMerge: 0,
+        decisionNoMatch: 0,
+        decisionAutoMerge: 0,
         recordUniqueRegistered: 0,
         emailSent: 0,
     }
 }
 
-function createEmptyCumulativeOutcomes(): CumulativeOutcomes {
-    return { nonMatch: 0, autoMerged: 0, formsQueued: 0, deferred: 0 }
+export function createEmptyCumulativeOutcomes(): CumulativeOutcomes {
+    return {
+        nonMatch: 0,
+        autoMerged: 0,
+        formsQueued: 0,
+        deferred: 0,
+        decisionNewIdentity: 0,
+        decisionMerge: 0,
+        decisionNoMatch: 0,
+        decisionAutoMerge: 0,
+    }
 }
 
 function incrementCorrelationActivity(
@@ -193,6 +215,23 @@ export class OperationRunContext {
             case 'newIdentityAssignment':
                 this.events.newIdentityAssignment++
                 break
+            case 'decision': {
+                const type = detail?.type as DecisionEventType | undefined
+                if (type === 'newIdentity') {
+                    this.events.decisionNewIdentity++
+                    this.cumulativeOutcomes.decisionNewIdentity++
+                } else if (type === 'merge') {
+                    this.events.decisionMerge++
+                    this.cumulativeOutcomes.decisionMerge++
+                } else if (type === 'noMatch') {
+                    this.events.decisionNoMatch++
+                    this.cumulativeOutcomes.decisionNoMatch++
+                } else if (type === 'autoMerge') {
+                    this.events.decisionAutoMerge++
+                    this.cumulativeOutcomes.decisionAutoMerge++
+                }
+                break
+            }
             case 'recordUniqueRegistered': {
                 const count = detail?.count
                 if (typeof count === 'number') {
@@ -335,6 +374,7 @@ export function formatCorrelationSummarySegment(
     if (!value) return ''
     return `correlations ${value}`
 }
+
 
 
 

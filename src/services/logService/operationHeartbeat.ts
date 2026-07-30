@@ -97,6 +97,14 @@ export function formatMatchOutcomesSegment(outcomes: CumulativeOutcomes, include
     return `${segment.slice(0, -1)} total=${nonMatch + formsQueued + autoMerged + deferred})`
 }
 
+export function formatDecisionOutcomesSegment(outcomes: CumulativeOutcomes, includeTotal = false): string {
+    const { decisionNewIdentity, decisionMerge, decisionNoMatch, decisionAutoMerge } = outcomes
+    const segment = `decisions(${decisionNewIdentity}n/${decisionMerge}m/${decisionNoMatch}nm/${decisionAutoMerge}a)`
+    if (!includeTotal) return segment
+    const total = decisionNewIdentity + decisionMerge + decisionNoMatch + decisionAutoMerge
+    return `${segment.slice(0, -1)} total=${total})`
+}
+
 export function formatFormOutcomesSegment(formsCreated: number, formInstancesCreated: number): string {
     return `forms=${formsCreated}(${formInstancesCreated})`
 }
@@ -115,6 +123,18 @@ function shouldShowMatchOutcomesInStatus(runContext: OperationRunContext): boole
     if (runContext.step === 'uncorrelated-sweep') return true
     const { nonMatch, formsQueued, autoMerged, deferred } = runContext.getCumulativeOutcomes()
     return nonMatch + formsQueued + autoMerged + deferred > 0
+}
+
+function shouldShowDecisionOutcomesInStatus(runContext: OperationRunContext): boolean {
+    if (runContext.phase !== 'Process') return false
+    if (runContext.step === 'process-decisions') return true
+    const {
+        decisionNewIdentity,
+        decisionMerge,
+        decisionNoMatch,
+        decisionAutoMerge,
+    } = runContext.getCumulativeOutcomes()
+    return decisionNewIdentity + decisionMerge + decisionNoMatch + decisionAutoMerge > 0
 }
 
 function pendingQueueCount(queueStats: QueueStats): number {
@@ -186,6 +206,10 @@ export function formatStatusLine(
 
     if (shouldShowMatchOutcomesInStatus(runContext)) {
         parts.push(formatMatchOutcomesSegment(runContext.getCumulativeOutcomes()))
+    }
+
+    if (shouldShowDecisionOutcomesInStatus(runContext)) {
+        parts.push(formatDecisionOutcomesSegment(runContext.getCumulativeOutcomes()))
     }
 
     if (shouldShowFormOutcomesInStatus(runContext, fusionPending)) {
@@ -262,6 +286,23 @@ export function formatEventSummaryLines(
 
         if (events.newIdentityAssignment > 0) {
             lines.push(`EVENT_SUMMARY forms new-identity-assignment=${events.newIdentityAssignment}`)
+        }
+
+        const decisionParts: string[] = []
+        if (events.decisionNewIdentity > 0) {
+            decisionParts.push(`new-identity=${formatIntervalDeltaCount(events.decisionNewIdentity, intervalMs)}`)
+        }
+        if (events.decisionMerge > 0) {
+            decisionParts.push(`merge=${formatIntervalDeltaCount(events.decisionMerge, intervalMs)}`)
+        }
+        if (events.decisionNoMatch > 0) {
+            decisionParts.push(`no-match=${formatIntervalDeltaCount(events.decisionNoMatch, intervalMs)}`)
+        }
+        if (events.decisionAutoMerge > 0) {
+            decisionParts.push(`auto-merge=${formatIntervalDeltaCount(events.decisionAutoMerge, intervalMs)}`)
+        }
+        if (decisionParts.length > 0) {
+            lines.push(`EVENT_SUMMARY decisions ${decisionParts.join(' ')}`)
         }
 
         if (events.emailSent > 0) {
@@ -489,6 +530,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 

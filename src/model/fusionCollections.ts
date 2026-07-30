@@ -162,12 +162,41 @@ export class FusionCollections {
         return `${accountLabel} [${sourceLabel}]`
     }
 
+    private _resolveHistoryActorLabel(
+        name: unknown,
+        email: unknown,
+        id: string | undefined,
+        fallback: string
+    ): string {
+        const normalizedName = trimStr(name)
+        const normalizedEmail = trimStr(email)
+        if (normalizedName && normalizedName !== id) {
+            return normalizedName
+        }
+        if (normalizedEmail) {
+            return normalizedEmail
+        }
+        return fallback
+    }
+
+    private _formatMergeTargetLabel(decision: FusionDecision): string {
+        return this._resolveHistoryActorLabel(
+            decision.identityName,
+            undefined,
+            decision.identityId,
+            'existing identity'
+        )
+    }
+
     private _createDecisionHistoryMessage(decision: FusionDecision, action: string): string {
-        const submitterName = this._normalizeHistoryLabel(
-            decision.submitter.name || decision.submitter.email,
+        const submitterName = this._resolveHistoryActorLabel(
+            decision.submitter.name,
+            decision.submitter.email,
+            decision.submitter.id,
             'Unknown reviewer'
         )
         const accountInfo = this._formatHistoryAccountInfo(decision.account.name, decision.account.sourceName)
+        const mergeTargetLabel = this._formatMergeTargetLabel(decision)
         const sourceType = decision.sourceType ?? SourceType.Authoritative
 
         if (action === 'manual') {
@@ -175,15 +204,17 @@ export class FusionCollections {
         }
 
         if (decision.automaticMerge === true) {
-            return `Auto-merged ${accountInfo} into existing identity`
+            return mergeTargetLabel === 'existing identity'
+                ? `Auto-merged ${accountInfo} into existing identity`
+                : `Auto-merged ${accountInfo} into ${mergeTargetLabel}`
         }
         if (sourceType === SourceType.Record) {
-            return `Merged record ${accountInfo} into existing identity by ${submitterName}`
+            return `Merged record ${accountInfo} into ${mergeTargetLabel} by ${submitterName}`
         }
         if (sourceType === SourceType.Orphan) {
-            return `Merged orphan account ${accountInfo} into existing identity by ${submitterName}`
+            return `Merged orphan account ${accountInfo} into ${mergeTargetLabel} by ${submitterName}`
         }
-        return `Merged ${accountInfo} into existing identity by ${submitterName}`
+        return `Merged ${accountInfo} into ${mergeTargetLabel} by ${submitterName}`
     }
 
     private _addToSet<T>(set: Set<T>, item: T, message?: string): boolean {
@@ -426,5 +457,6 @@ export class FusionCollections {
         if (identityId) bag[FusionAttribute.IdentityId] = identityId
     }
 }
+
 
 
