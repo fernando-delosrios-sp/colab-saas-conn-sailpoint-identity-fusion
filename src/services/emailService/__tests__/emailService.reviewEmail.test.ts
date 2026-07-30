@@ -85,6 +85,26 @@ describe('EmailService.sendFusionEmail', () => {
         expect(sentBody).not.toContain('Unknown')
     })
 
+    it('includes Open Review Form button when form instance has standAloneFormUrl', async () => {
+        const { service, workflowsApi } = createEmailService()
+        const reviewUrl = 'https://tenant.identitynow.com/ui/forms/review/form-1'
+        const formInstance = {
+            id: 'form-1',
+            standAloneFormUrl: reviewUrl,
+            recipients: [{ id: 'reviewer-1' }],
+        } as any
+
+        await service.sendFusionEmail(formInstance, {
+            accountName: '125536',
+            accountSource: 'Workday - Employees',
+            accountAttributes: { firstname: 'Michael' },
+        })
+
+        const sentBody = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input.body as string
+        expect(sentBody).toContain('Open Review Form')
+        expect(sentBody).toContain(reviewUrl)
+    })
+
     it('renders review email scores via mapScoreReportsForFusionReport helper path', () => {
         const templates = compileEmailTemplates()
         const html = renderFusionReviewEmail(templates, {
@@ -122,5 +142,6 @@ describe('EmailService.sendFusionEmail', () => {
         expect(html).toContain('92%')
     })
 })
+
 
 
