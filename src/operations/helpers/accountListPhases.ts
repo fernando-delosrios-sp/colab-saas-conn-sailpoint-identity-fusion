@@ -379,93 +379,145 @@ interface ReportEpilogueOptions {
     runError?: unknown
 }
 
+async function recordMatchingResultsSnapshot(
+    serviceRegistry: ServiceRegistry,
+    fetchResult: FetchResult | undefined,
+    isPersistent: boolean
+): Promise<void> {
+    const { log, fusion, recording } = serviceRegistry
+    if (!recording || !isPersistent) return
+
+    const tracker = fusion.run.getTracker()
+    if (!tracker) return
+
+    try {
+        const outcomes = log.getCumulativeOutcomes()
+        const sweepSummary = {
+            processed: fetchResult?.managedAccountsFound,
+            exact: outcomes.autoMerged,
+            partial: outcomes.formsQueued,
+            deferred: outcomes.deferred,
+            nonMatch: outcomes.nonMatch,
+        }
+        const snapshot = fusion.buildMatchingResultsSnapshot(tracker, { sweepSummary })
+        recording.writeMatchingResults(snapshot)
+    } catch (error) {
+        log.warn(`Report epilogue: matching results recording failed: ${(error as Error).message}`)
+    }
+}
+
+async function generateAggregationReportEpilogue(
+    serviceRegistry: ServiceRegistry,
+    fetchResult: FetchResult,
+    timer: ReportEpilogueOptions['timer'],
+    outputCount: number | undefined,
+    isPersistent: boolean
+): Promise<void> {
+    const { log, reports, fusion, recording } = serviceRegistry
+    if (!isPersistent || !fusion.fusionReportOnAggregation) return
+
+    try {
+        log.detail({ action: 'generating aggregation report' })
+        const reportOp = log.track('reportPhase.generateReport')
+        const aggregationStats = buildReportAggregationStats(
+            fetchResult,
+            timer,
+            serviceRegistry.identities,
+            outputCount
+        )
+        await generateReport(false, serviceRegistry, aggregationStats)
+        if (recording) {
+            const snapshot = await reports.buildAggregationReportSnapshot(false, aggregationStats)
+            recording.writeAggregationReport(snapshot)
+        }
+        reportOp.done()
+    } catch (error) {
+        log.warn(`Report epilogue: aggregation report failed: ${(error as Error).message}`)
+    }
+}
+
+async function generateDryRunReportEpilogue(
+    serviceRegistry: ServiceRegistry,
+    dryRun: DryRunInput,
+    fetchResult: FetchResult,
+    timer: ReportEpilogueOptions['timer'],
+    outputCount: number | undefined
+): Promise<void> {
+    const { log, reports } = serviceRegistry
+    if (!dryRun.saveFile && !dryRun.sendEmail) return
+
+    try {
+        const reportPhaseStartedAt = Date.now()
+        const { reportHtmlOutputPath } = await reports.generateDryRunReport({
+            aggregationStats: buildReportAggregationStats(
+                fetchResult,
+                timer,
+                serviceRegistry.identities,
+                outputCount
+            ),
+            reportPhaseStartedAt,
+            saveFile: dryRun.saveFile,
+            sendEmail: dryRun.sendEmail,
+        })
+        if (reportHtmlOutputPath) {
+            log.detail({ action: 'dry-run HTML report written', path: reportHtmlOutputPath })
+        }
+    } catch (error) {
+        log.warn(`Report epilogue: dry-run report failed: ${(error as Error).message}`)
+    }
+}
+
+async function sendTerminalSummaryEpilogue(
+    serviceRegistry: ServiceRegistry,
+    dryRun: DryRunInput,
+    fetchResult: FetchResult,
+    timer: ReportEpilogueOptions['timer'],
+    outputCount: number | undefined
+): Promise<unknown | undefined> {
+    const { log, res } = serviceRegistry
+
+    try {
+        const summary = buildTerminalSummary(serviceRegistry, { outputCount, fetchResult, timer }, dryRun)
+        res.send(summary)
+        return undefined
+    } catch (error) {
+        log.warn(`Report epilogue: terminal summary send failed: ${(error as Error).message}`)
+        return error
+    }
+}
+
 export async function reportEpilogue(
     serviceRegistry: ServiceRegistry,
     options: ReportEpilogueOptions
 ): Promise<unknown | undefined> {
-    const { log, reports, res, fusion } = serviceRegistry
-    const { isPersistent, dryRun, fetchResult, outputCount, timer } = options
+    const { log, timer } = serviceRegistry
+    const { isPersistent, dryRun, fetchResult, outputCount } = options
     let deferredError: unknown
 
     log.epilogueStart('report')
     const epilogueStartedAt = log.getRunContext()?.epilogueStartedAt ?? Date.now()
 
-    if (serviceRegistry.recording && isPersistent) {
-        const tracker = fusion.run.getTracker()
-        if (tracker) {
-            try {
-                const outcomes = log.getCumulativeOutcomes()
-                const sweepSummary = {
-                    processed: fetchResult?.managedAccountsFound,
-                    exact: outcomes.autoMerged,
-                    partial: outcomes.formsQueued,
-                    deferred: outcomes.deferred,
-                    nonMatch: outcomes.nonMatch,
-                }
-                const snapshot = fusion.buildMatchingResultsSnapshot(tracker, { sweepSummary })
-                serviceRegistry.recording.writeMatchingResults(snapshot)
-            } catch (error) {
-                log.warn(`Report epilogue: matching results recording failed: ${(error as Error).message}`)
-            }
-        }
-    }
+    await recordMatchingResultsSnapshot(serviceRegistry, fetchResult, isPersistent)
 
-    if (isPersistent && fetchResult && fusion.fusionReportOnAggregation) {
-        try {
-            log.detail({ action: 'generating aggregation report' })
-            const reportOp = log.track('reportPhase.generateReport')
-            const aggregationStats = buildReportAggregationStats(
-                fetchResult,
-                timer,
-                serviceRegistry.identities,
-                outputCount
-            )
-            await generateReport(false, serviceRegistry, aggregationStats)
-            if (serviceRegistry.recording) {
-                const snapshot = await reports.buildAggregationReportSnapshot(false, aggregationStats)
-                serviceRegistry.recording.writeAggregationReport(snapshot)
-            }
-            reportOp.done()
-        } catch (error) {
-            log.warn(`Report epilogue: aggregation report failed: ${(error as Error).message}`)
-        }
+    if (fetchResult) {
+        await generateAggregationReportEpilogue(serviceRegistry, fetchResult, timer, outputCount, isPersistent)
     }
 
     if (dryRun && fetchResult) {
-        if (dryRun.saveFile || dryRun.sendEmail) {
-            try {
-                const reportPhaseStartedAt = Date.now()
-                const { reportHtmlOutputPath } = await reports.generateDryRunReport({
-                    aggregationStats: buildReportAggregationStats(
-                        fetchResult,
-                        timer,
-                        serviceRegistry.identities,
-                        outputCount
-                    ),
-                    reportPhaseStartedAt,
-                    saveFile: dryRun.saveFile,
-                    sendEmail: dryRun.sendEmail,
-                })
-                if (reportHtmlOutputPath) {
-                    log.detail({ action: 'dry-run HTML report written', path: reportHtmlOutputPath })
-                }
-            } catch (error) {
-                log.warn(`Report epilogue: dry-run report failed: ${(error as Error).message}`)
-            }
-        }
-
-        try {
-            const summary = buildTerminalSummary(serviceRegistry, { outputCount, fetchResult, timer }, dryRun)
-            res.send(summary)
-        } catch (error) {
-            log.warn(`Report epilogue: terminal summary send failed: ${(error as Error).message}`)
-            deferredError = error
-        }
+        await generateDryRunReportEpilogue(serviceRegistry, dryRun, fetchResult, timer, outputCount)
+        deferredError = await sendTerminalSummaryEpilogue(
+            serviceRegistry,
+            dryRun,
+            fetchResult,
+            timer,
+            outputCount
+        )
     }
 
     timer.recordElapsed('Report', Date.now() - epilogueStartedAt)
     log.epilogueEnd('report')
     return deferredError
 }
+
 
 

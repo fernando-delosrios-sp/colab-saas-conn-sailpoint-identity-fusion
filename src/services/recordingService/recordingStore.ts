@@ -67,33 +67,47 @@ export function clearRecordingStoreCache(): void {
     storeCache.clear()
 }
 
+function parseNdjsonFile(filePath: string): ApiLogEntry[] {
+    const content = fs.readFileSync(filePath, 'utf-8').trim()
+    if (!content) return []
+    return content.split('\n').map((line) => JSON.parse(line) as ApiLogEntry)
+}
+
+function readApiLogFromManifest(
+    manifestPath: string
+): { entries: ApiLogEntry[]; storeType: RecordingConfig['store']; resolved: boolean } | null {
+    if (!fs.existsSync(manifestPath)) return null
+
+    try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as RecordingManifest
+        const storeType = manifest.store ?? 'ndjson'
+        if (!manifest.apiLogPath) return { entries: [], storeType, resolved: false }
+
+        const apiLogPath = path.isAbsolute(manifest.apiLogPath)
+            ? manifest.apiLogPath
+            : path.join(process.cwd(), manifest.apiLogPath)
+        if (!fs.existsSync(apiLogPath)) return { entries: [], storeType, resolved: false }
+
+        return { entries: parseNdjsonFile(apiLogPath), storeType, resolved: true }
+    } catch {
+        return null
+    }
+}
+
 /** Loads api-log entries from a chain directory using manifest store type when present. */
 export function loadRecordingApiLog(chainDir: string): ApiLogEntry[] {
     const manifestPath = path.join(chainDir, 'manifest.json')
-    let storeType: RecordingConfig['store'] = 'ndjson'
+    const fromManifest = readApiLogFromManifest(manifestPath)
 
-    if (fs.existsSync(manifestPath)) {
-        try {
-            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as RecordingManifest
-            storeType = manifest.store ?? 'ndjson'
-            if (manifest.apiLogPath) {
-                const apiLogPath = path.isAbsolute(manifest.apiLogPath)
-                    ? manifest.apiLogPath
-                    : path.join(process.cwd(), manifest.apiLogPath)
-                if (fs.existsSync(apiLogPath)) {
-                    const content = fs.readFileSync(apiLogPath, 'utf-8').trim()
-                    if (!content) return []
-                    return content.split('\n').map((line) => JSON.parse(line) as ApiLogEntry)
-                }
-            }
-        } catch {
-            /* fall back to ndjson default */
-        }
+    if (fromManifest?.resolved) {
+        return fromManifest.entries
     }
 
+    const storeType = fromManifest?.storeType ?? 'ndjson'
     const chainName = path.basename(chainDir)
     const store = createRecordingStore({ mode: 'replay', store: storeType, chainName }, chainName)
     return store.loadApiLog()
 }
+
 
 

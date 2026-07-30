@@ -896,6 +896,47 @@ export class FusionService {
         return compact(results)
     }
 
+    private shouldLogBatchProgress(
+        currentBatch: number,
+        totalBatches: number,
+        processedInLoop: number,
+        totalEligible: number,
+        logProgressEveryBatch: number
+    ): boolean {
+        return (
+            currentBatch === 1 ||
+            currentBatch % logProgressEveryBatch === 0 ||
+            currentBatch === totalBatches ||
+            processedInLoop === totalEligible
+        )
+    }
+
+    private async processOutputBatch(
+        batch: FusionAccount[],
+        refreshUniqueAttributes: boolean,
+        send: (account: StdAccountListOutput) => void
+    ): Promise<number> {
+        const outputBatch = await Promise.all(
+            batch.map(async (account) => {
+                if (refreshUniqueAttributes && account.needsRefresh) {
+                    await this.definitionService.refreshUniqueAttributes(account)
+                }
+                return this.getISCAccount(account, false)
+            })
+        )
+
+        let sent = 0
+        for (let j = 0; j < outputBatch.length; j++) {
+            const output = outputBatch[j]
+            if (output) {
+                send(output)
+                sent++
+            }
+            this.run.removeFusionAccount(batch[j])
+        }
+        return sent
+    }
+
     /**
      * Streams each ISC account to the provided callback as soon as it's ready.
      * Memory optimization: avoids accumulating the full output array - processes
@@ -919,29 +960,18 @@ export class FusionService {
         const logProgressEveryBatch = Math.max(1, Math.min(50, Math.ceil(totalBatches / 20) || 1))
         for (let i = 0; i < eligibleAccounts.length; i += batchSize) {
             const batch = eligibleAccounts.slice(i, i + batchSize)
-            const outputBatch = await Promise.all(
-                batch.map(async (account) => {
-                    if (refreshUniqueAttributes && account.needsRefresh) {
-                        await this.definitionService.refreshUniqueAttributes(account)
-                    }
-                    return this.getISCAccount(account, false)
-                })
-            )
-            for (let j = 0; j < outputBatch.length; j++) {
-                const output = outputBatch[j]
-                if (output) {
-                    send(output)
-                    count++
-                }
-                this.run.removeFusionAccount(batch[j])
-            }
+            count += await this.processOutputBatch(batch, refreshUniqueAttributes, send)
+
             const processedInLoop = Math.min(i + batch.length, totalEligible)
             const currentBatch = Math.floor(i / batchSize) + 1
             if (
-                currentBatch === 1 ||
-                currentBatch % logProgressEveryBatch === 0 ||
-                currentBatch === totalBatches ||
-                processedInLoop === totalEligible
+                this.shouldLogBatchProgress(
+                    currentBatch,
+                    totalBatches,
+                    processedInLoop,
+                    totalEligible,
+                    logProgressEveryBatch
+                )
             ) {
                 this.log.setProgress(processedInLoop, totalEligible, 'sent')
             }
