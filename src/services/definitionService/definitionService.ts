@@ -233,7 +233,7 @@ export class DefinitionService {
     ): boolean {
         const { fusionDisplayAttribute } = this.schemas
         if (attributeName !== fusionDisplayAttribute) return false
-        if (!fusionAccount.isIdentity) return false
+        if (!this.shouldApplyDisplayAttributeOverride(fusionAccount)) return false
         const hasExistingValue = isValidAttributeValue(fusionAccount.attributes[attributeName])
         const canResetDisplay = fusionAccount.needsReset
         const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
@@ -738,7 +738,7 @@ export class DefinitionService {
                 return
             }
 
-            if (fusionAccount.isIdentity && isFusionDisplayAttribute) {
+            if (this.shouldApplyDisplayAttributeOverride(fusionAccount) && isFusionDisplayAttribute) {
                 const label = fusionAccount.identityAlias
                 if (label) {
                     this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
@@ -1039,7 +1039,22 @@ export class DefinitionService {
     // ========================================================================
 
     private isExistingFusionAccount(fusionAccount: FusionAccount): boolean {
-        return Object.keys(fusionAccount.previousAttributes ?? {}).length > 0
+        return (
+            fusionAccount.type === FusionAccountKind.Fusion &&
+            Object.keys(fusionAccount.previousAttributes ?? {}).length > 0
+        )
+    }
+
+    /**
+     * Identity alias override applies to identity-origin accounts and managed-source
+     * correlated origins (source account uncorrelated === false). Uncorrelated managed
+     * accounts keep display values from attribute mapping/definitions.
+     */
+    private shouldApplyDisplayAttributeOverride(fusionAccount: FusionAccount): boolean {
+        if (fusionAccount.fromIdentity || fusionAccount.type === FusionAccountKind.Identity) {
+            return true
+        }
+        return fusionAccount.isIdentity
     }
 
     private fusionAttributeSafeDefault(

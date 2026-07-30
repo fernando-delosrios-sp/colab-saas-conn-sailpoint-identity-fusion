@@ -122,6 +122,89 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
         expect(acc.attributeBag.current['name']).toBe('Alice Anderson')
     })
 
+    it('evaluates the display attribute definition for uncorrelated managed accounts even when source attributes seed previous', async () => {
+        const service = new DefinitionService(
+            {
+                normalAttributeDefinitions: [{ name: 'name', expression: 'Definition Display Name' }],
+                uniqueAttributeDefinitions: [],
+                attributeMaps: [],
+            } as any,
+            mockSchemas,
+            mockLog,
+            mockLocks
+        )
+        const acc = FusionAccount.fromManagedAccount({
+            id: 'src-a::acc-1',
+            name: 'source-name',
+            sourceId: 'src-a',
+            nativeIdentity: 'acc-1',
+            uncorrelated: true,
+            attributes: { name: 'Source Attribute Name', employeeId: 'E1' },
+        } as any)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current['name']).toBe('Definition Display Name')
+    })
+
+    it('keeps persisted fusion display values immutable for existing fusion rows', async () => {
+        const service = new DefinitionService(
+            {
+                normalAttributeDefinitions: [{ name: 'name', expression: 'New Definition Value' }],
+                uniqueAttributeDefinitions: [],
+                attributeMaps: [],
+            } as any,
+            mockSchemas,
+            mockLog,
+            mockLocks
+        )
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-native-1',
+            name: 'Persisted Name',
+            sourceName: 'Identity Fusion NG',
+            attributes: {
+                name: 'Persisted Display Name',
+                employeeId: 'E1',
+            },
+        } as any)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current['name']).toBe('Persisted Display Name')
+    })
+
+    it('preserves display attribute from a normal definition through refresh and output override', async () => {
+        const service = new DefinitionService(
+            {
+                normalAttributeDefinitions: [{ name: 'name', expression: 'Definition Display Name' }],
+                uniqueAttributeDefinitions: [],
+                attributeMaps: [],
+            } as any,
+            mockSchemas,
+            mockLog,
+            mockLocks
+        )
+        const acc = FusionAccount.fromManagedAccount({
+            id: 'src-a::acc-1',
+            name: 'source-name',
+            sourceId: 'src-a',
+            nativeIdentity: 'acc-1',
+            uncorrelated: true,
+        } as any)
+        acc.addIdentityLayer({
+            id: 'identity-1',
+            name: 'login',
+            displayName: 'Identity Alias',
+            attributes: {},
+        } as any)
+
+        await service.refreshNormalAttributes(acc)
+        await service.refreshUniqueAttributes(acc)
+        service.applyDisplayAttributeOverride(acc)
+
+        expect(acc.attributeBag.current['name']).toBe('Definition Display Name')
+    })
+
     it('skips the override for persisted uncorrelated fusion rows after addIdentityLayer', () => {
         const service = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
         const acc = FusionAccount.fromFusionAccount({
@@ -146,6 +229,7 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
         service.applyDisplayAttributeOverride(acc)
         expect(acc.attributeBag.current['name']).toBe('Mapped Display Name')
     })
+
 })
 
 
@@ -262,4 +346,3 @@ describe('DefinitionService.refreshUniqueAttributes preservation', () => {
         expect(account.attributes.UID).not.toBe('old-value')
     })
 })
-

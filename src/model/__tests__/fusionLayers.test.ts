@@ -61,7 +61,7 @@ describe('FusionLayers', () => {
     })
 
     describe('addIdentityLayer', () => {
-        it('sets identity info and marks correlated accounts', () => {
+        it('sets identity info and registers linked managed account keys', () => {
             let capturedEmail: string | undefined
             let capturedInfo: any
 
@@ -83,13 +83,26 @@ describe('FusionLayers', () => {
                 (info) => { capturedInfo = info }
             )
 
-            expect(layers.isIdentity).toBe(true)
             expect(capturedEmail).toBe('test@test.com')
             expect(capturedInfo).toBeDefined()
+            expect(collections.accountIds.has('src-a::native-1')).toBe(true)
         })
 
-        it('does not promote isIdentity when the account is uncorrelated', () => {
-            layers.uncorrelated = true
+        it('preserves isIdentity when the factory already marked managed-source correlation', () => {
+            layers.isIdentity = true
+            const identity = {
+                id: 'id-1',
+                name: 'Test Identity',
+                attributes: { email: 'test@test.com' },
+            } as any
+
+            layers.addIdentityLayer(identity, { identity: {} }, undefined)
+
+            expect(layers.isIdentity).toBe(true)
+        })
+
+        it('does not promote isIdentity when the factory left it false', () => {
+            expect(layers.isIdentity).toBe(false)
             const identity = {
                 id: 'id-1',
                 name: 'Test Identity',
@@ -137,4 +150,5 @@ describe('FusionLayers', () => {
         })
     })
 })
+
 
