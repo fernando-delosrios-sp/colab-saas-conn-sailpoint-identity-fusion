@@ -22,6 +22,8 @@ Enter a chain name when prompted. The connector runs in record mode and writes a
 
 Recording is dev-only. Set `RECORD_MODE`, `RECORD_CHAIN_NAME`, and `VERBOSE_RECORDING` env vars (used by `npm run record`) or configure `FusionConfig.recording` explicitly. Explicit config wins over env vars.
 
+**ISC UI (proxy deployments):** When **Enable external processing?**, **Enable proxy mode?**, and **Enable chain recording?** are all on, set **Recording chain name** (`recordingName`). `safeReadConfig()` bridges this into `config.recording.mode = 'record'` and `config.recording.chainName` on the proxy server unless explicit `recording.mode` or env vars override. Recording requires proxy mode in the UI (filesystem constraint on the processing host).
+
 `reports/matching-results.json` is written at the end of each record-mode account-list operation. It contains identity matches, deferred matches (with per-attribute scores), non-matches, failed matches, and sweep summary counts. Chains recorded before this artifact existed must be re-recorded to populate it.
 
 ## Replay
@@ -52,3 +54,4 @@ Harness unit tests (no local recordings required):
 ```bash
 npm test -- src/operations/__tests__/chain/chain.replay.test.ts
 ```
+

@@ -2,7 +2,7 @@
 
 Proxy mode allows the Identity Fusion NG connector to **delegate all processing** to an external endpoint. The connector running in ISC (client) forwards commands and configuration to your external service (proxy server), which executes the real logic and returns results. This guide covers setup, security, troubleshooting, and best practices for proxy mode.
 
-For ISC field definitions (Enable proxy mode, Proxy URL, Proxy password), see [Advanced configuration](../configuration/advanced.md).
+For ISC field definitions (External Settings gateway, proxy sub-option, target URL/password), see [Advanced configuration](../configuration/advanced.md).
 
 ---
 
@@ -134,7 +134,7 @@ The proxy server must return results in one of these formats:
 
 ## Client configuration (ISC side)
 
-Enable proxy mode under **Advanced Settings → Proxy Settings** in the Identity Fusion NG connector source. Configure **Enable proxy mode**, **Proxy URL**, and **Proxy password** as described in [Advanced configuration](../configuration/advanced.md).
+Enable proxy mode under **Advanced Settings → External Settings** in the Identity Fusion NG connector source. Turn on **Enable external processing?**, set **External target URL** and **External target password**, then enable **Enable proxy mode?**.
 
 ![Proxy Settings - ISC configuration](../assets/images/proxy-mode-settings.png)
 
@@ -186,34 +186,47 @@ The proxy server is the Identity Fusion NG connector run in "server mode."
 | ------------------------ | --------------------------------------------- |
 | **Connector code**       | Same Identity Fusion NG connector codebase    |
 | **Runtime environment**  | Node.js 24+ (Active LTS)                      |
-| **Environment variable** | `PROXY_PASSWORD` set to same value as ISC     |
+| **Environment variable** | `PROXY_PASSWORD` set to same value as ISC **External target password** |
+| **Optional**             | `LOG_FILE` for external logging path on the proxy server                 |
 | **HTTP server**          | Endpoint accepting POST requests              |
 | **Network access**       | Access to ISC APIs and configured sources     |
 
 ### Server mode detection
 
-The connector code detects server mode when:
+The connector code detects server mode when External Settings proxy mode is enabled in the forwarded config **and** `PROXY_PASSWORD` is set on the host:
 
 ```
-proxyEnabled = true (in config)
-AND
-PROXY_PASSWORD environment variable is set
+externalProcessingEnabled = true (in config)
+AND externalProxyEnabled = true (in config)
+AND PROXY_PASSWORD environment variable is set
 ```
 
 **Code logic:**
 
 ```typescript
 // Simplified detection logic
-const isProxyServer = config.proxyEnabled === true && process.env.PROXY_PASSWORD !== undefined
+const isProxyServer =
+    config.externalProcessingEnabled === true &&
+    config.externalProxyEnabled === true &&
+    process.env.PROXY_PASSWORD !== undefined
 
 if (isProxyServer) {
-    // Run as server: implement HTTP endpoint
-} else if (config.proxyEnabled && config.proxyUrl) {
-    // Run as client: forward to proxy URL
+    // Run as server: process forwarded operations
+} else if (gateway + proxy + target URL) {
+    // Run as client: forward to external target URL
 } else {
     // Run normally: direct processing
 }
 ```
+
+### External logging on the proxy server
+
+When **Enable external logging?** is on under External Settings, the proxy **client** (ISC) does not ship logs externally. The proxy **server** appends sanitized plain-text lines to:
+
+- `process.env.LOG_FILE` when set, otherwise
+- `logs/fusion-{YYYYMMDD}.log` under the server working directory
+
+No HTTP log receiver runs on the server — disk append only. See [connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md).
 
 ### Implementing the proxy server
 
@@ -581,3 +594,4 @@ spec:
 
 - For general troubleshooting, see [Troubleshooting](../use-guides/validation-and-troubleshooting/troubleshooting.md).
 - For connection settings and resilience, see [Connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md).
+

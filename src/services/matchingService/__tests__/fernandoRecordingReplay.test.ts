@@ -20,12 +20,15 @@ import { getInternalConfigFlat } from '../../../data/config/internal'
 import type { MatchingResultsSnapshot } from '../../recordingService/matchingResultsSnapshot'
 
 const RECORDING_DIR = path.join(process.cwd(), 'recordings', 'fernando')
+const SCENARIO_PATH = path.join(RECORDING_DIR, 'scenario.json')
 const MATCHING_RESULTS_PATH = path.join(RECORDING_DIR, 'reports', 'matching-results.json')
+const FERNANDO_RECORDING_AVAILABLE =
+    fs.existsSync(MATCHING_RESULTS_PATH) || fs.existsSync(SCENARIO_PATH)
 const SOURCE_ID = 'fe0b4096bb02418e8225a54806f9b86f'
 const SOURCE_NAME = 'Umbrella Corporation'
 
 function loadScenarioConfig(): FusionConfig {
-    const scenario = JSON.parse(fs.readFileSync(path.join(RECORDING_DIR, 'scenario.json'), 'utf8'))
+    const scenario = JSON.parse(fs.readFileSync(SCENARIO_PATH, 'utf8'))
     const raw = { ...scenario.config, ...getInternalConfigFlat() }
     const matching = readMatchingSettings(raw)
     const attributeMaps = readAttributeMappingSettings(raw)
@@ -159,7 +162,9 @@ function logDeferredMatches(deferredMatches: MatchingResultsSnapshot['deferredMa
 }
 
 describe('fernando recording match replay', () => {
-    it('validates deferred matching outcomes from recording artifact or live replay', async () => {
+    it.skipIf(!FERNANDO_RECORDING_AVAILABLE)(
+        'validates deferred matching outcomes from recording artifact or live replay',
+        async () => {
         const artifact = loadMatchingResults()
 
         if (artifact) {
@@ -208,5 +213,7 @@ describe('fernando recording match replay', () => {
         expect(tracker.deferredMatchReportData.length).toBe(12)
         expect(result.deferred).toBe(12)
         expect(result.nonMatch).toBe(24)
-    })
+        }
+    )
 })
+

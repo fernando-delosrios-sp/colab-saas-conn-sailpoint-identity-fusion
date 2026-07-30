@@ -10,6 +10,7 @@ import {
     createEmptyCumulativeOutcomes,
 } from './operationRunContext'
 import { formatPhaseEndDetailSuffix } from './operationHeartbeat'
+import { appendLogLine } from './fileLogSink'
 
 type Logger = typeof logger
 
@@ -33,15 +34,45 @@ const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
     error: 3,
 }
 
+type ExternalLogRoute = 'off' | 'http' | 'disk' | 'noop'
+
 type LogConfig = {
     spConnDebugLoggingEnabled: boolean
     logLevel?: LogLevel
-    // External logging configuration
+    /** External Settings gateway and sub-options */
+    externalProcessingEnabled?: boolean
+    externalProxyEnabled?: boolean
     externalLoggingEnabled?: boolean
-    externalLoggingUrl?: string
+    externalTargetUrl?: string
     externalLoggingLevel?: LogLevel
+    /** Set when processing a forwarded proxy request */
+    isProxy?: boolean
     /** Optional operation name for log attribution, e.g. "accountList" */
     operationContext?: string
+}
+
+function resolveExternalLogRoute(config: LogConfig): ExternalLogRoute {
+    const gatewayActive = config.externalProcessingEnabled === true
+    const loggingRequested = config.externalLoggingEnabled === true
+    if (!gatewayActive || !loggingRequested) {
+        return 'off'
+    }
+
+    const isProxyServer = process.env.PROXY_PASSWORD !== undefined
+    const isProxyClient =
+        gatewayActive &&
+        config.externalProxyEnabled === true &&
+        !!config.externalTargetUrl &&
+        !isProxyServer &&
+        config.isProxy !== true
+
+    if (isProxyClient) {
+        return 'noop'
+    }
+    if (isProxyServer && config.externalProxyEnabled === true) {
+        return 'disk'
+    }
+    return 'http'
 }
 
 /**
@@ -179,8 +210,8 @@ export class LogService {
     /** Operation name for log attribution (e.g. accountList, accountCreate) */
     private operationContext?: string
     // External logging settings
-    private externalLoggingEnabled: boolean
-    private externalLoggingUrl?: string
+    private externalLogRoute: ExternalLogRoute
+    private externalTargetUrl?: string
     private externalLoggingLevel: LogLevel
     // Track pending external log promises so they can be flushed before process exit.
     // Uses a Set for O(1) add/delete instead of array indexOf which is O(n).
@@ -220,10 +251,10 @@ export class LogService {
             this.configuredLevel = 'info'
         }
 
-        // External logging configuration
-        this.externalLoggingEnabled = config.externalLoggingEnabled ?? false
-        this.externalLoggingUrl = config.externalLoggingUrl
+        // External logging configuration — role-aware routing from External Settings
         this.externalLoggingLevel = config.externalLoggingLevel ?? 'error'
+        this.externalTargetUrl = config.externalTargetUrl
+        this.externalLogRoute = resolveExternalLogRoute(config)
         this.operationContext = config.operationContext
 
         // Also set the underlying logger level
@@ -414,7 +445,13 @@ export class LogService {
      * at or above (less verbose than) the configured external logging level.
      */
     private shouldSendExternal(messageLevel: LogLevel): boolean {
-        if (!this.externalLoggingEnabled || !this.externalLoggingUrl) {
+        if (this.externalLogRoute === 'off' || this.externalLogRoute === 'noop') {
+            return false
+        }
+        if (this.externalLogRoute === 'disk') {
+            return LOG_LEVEL_PRIORITY[messageLevel] >= LOG_LEVEL_PRIORITY[this.externalLoggingLevel]
+        }
+        if (!this.externalTargetUrl) {
             return false
         }
         return LOG_LEVEL_PRIORITY[messageLevel] >= LOG_LEVEL_PRIORITY[this.externalLoggingLevel]
@@ -441,7 +478,9 @@ export class LogService {
      * The log server will handle colorization for console display.
      */
     private sendToExternalService(level: LogLevel, message: string, data?: any, origin?: string): void {
-        if (!this.externalLoggingUrl) return
+        if (this.externalLogRoute === 'off' || this.externalLogRoute === 'noop') {
+            return
+        }
 
         // Format timestamp as HH:MM:SS
         const now = new Date()
@@ -470,7 +509,18 @@ export class LogService {
             }
         }
 
-        const url = this.externalLoggingUrl
+        if (this.externalLogRoute === 'disk') {
+            const pending: Promise<void> = appendLogLine(logMessage)
+                .catch(() => {})
+                .finally(() => {
+                    this.pendingExternalLogs.delete(pending)
+                })
+            this.pendingExternalLogs.add(pending)
+            return
+        }
+
+        const url = this.externalTargetUrl
+        if (!url) return
         if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
             return
         }
@@ -724,7 +774,7 @@ export class LogService {
     }
 
     isExternalLoggingEnabled(): boolean {
-        return this.externalLoggingEnabled && !!this.externalLoggingUrl
+        return this.externalLogRoute === 'http' || this.externalLogRoute === 'disk'
     }
 
     /**

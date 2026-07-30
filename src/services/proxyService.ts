@@ -45,12 +45,14 @@ export class ProxyService {
      * to an external proxy server.
      */
     isProxyMode(): boolean {
-        const proxyEnabled = this.config.proxyEnabled ?? false
-        const hasProxyUrl = this.config.proxyUrl !== undefined && this.config.proxyUrl !== ''
+        const gatewayEnabled = this.config.externalProcessingEnabled ?? false
+        const proxyEnabled = this.config.externalProxyEnabled ?? false
+        const hasTargetUrl =
+            this.config.externalTargetUrl !== undefined && this.config.externalTargetUrl !== ''
         const isServer = process.env.PROXY_PASSWORD !== undefined
         const isAlreadyProxyRequest = this.config.isProxy === true
 
-        return proxyEnabled && hasProxyUrl && !isServer && !isAlreadyProxyRequest
+        return gatewayEnabled && proxyEnabled && hasTargetUrl && !isServer && !isAlreadyProxyRequest
     }
 
     /**
@@ -58,16 +60,17 @@ export class ProxyService {
      * server that receives and processes forwarded requests.
      */
     isProxyService(): boolean {
-        const proxyEnabled = this.config.proxyEnabled ?? false
+        const gatewayEnabled = this.config.externalProcessingEnabled ?? false
+        const proxyEnabled = this.config.externalProxyEnabled ?? false
         const hasProxyPassword = process.env.PROXY_PASSWORD !== undefined
 
-        if (proxyEnabled && hasProxyPassword) {
+        if (gatewayEnabled && proxyEnabled && hasProxyPassword) {
             this.log.info('Running as proxy server')
 
             // 🛡️ Sentinel: Enforce strict proxy password validation. If the server requires
             // a password, the client must provide one and it must match exactly.
             const serverPassword = process.env.PROXY_PASSWORD || ''
-            const clientPassword = this.config.proxyPassword || ''
+            const clientPassword = this.config.externalTargetPassword || ''
 
             const expectedHash = crypto
                 .createHash('sha256')
@@ -118,12 +121,12 @@ export class ProxyService {
     }
 
     private async performFetch(input: any): Promise<globalThis.Response> {
-        if (!this.config.proxyEnabled || !this.config.proxyUrl) {
-            throw new ConnectorError('Proxy mode is not enabled or proxy URL is missing')
+        if (!this.config.externalProcessingEnabled || !this.config.externalProxyEnabled || !this.config.externalTargetUrl) {
+            throw new ConnectorError('Proxy mode is not enabled or external target URL is missing')
         }
-        const { proxyUrl } = this.config
+        const { externalTargetUrl: proxyUrl } = this.config
         if (!proxyUrl.toLowerCase().startsWith('http://') && !proxyUrl.toLowerCase().startsWith('https://')) {
-            throw new ConnectorError('Proxy URL must use http or https protocol')
+            throw new ConnectorError('External target URL must use http or https protocol')
         }
         const externalConfig = { ...this.config, isProxy: true }
         const body = {
@@ -270,3 +273,4 @@ export class ProxyService {
         this.log.info(`Proxy sent ${validObjectCount} valid objects to ISC`)
     }
 }
+

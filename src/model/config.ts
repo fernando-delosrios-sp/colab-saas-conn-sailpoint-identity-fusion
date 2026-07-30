@@ -326,7 +326,7 @@ interface AttributeMatchingSettingsMenu extends MatchingSettingsSection, ReviewS
 // Advanced Settings Menu
 // ============================================================================
 
-/** Developer/debug settings including reset flags, attribute refresh behavior, concurrency check, and external logging. */
+/** Developer/debug settings including reset flags, attribute refresh behavior, and concurrency check. */
 export interface DeveloperSettingsSection {
     resetAccounts: boolean
     resetForms: boolean
@@ -355,9 +355,28 @@ export interface DeveloperSettingsSection {
      * Enabled by default.
      */
     concurrencyCheckEnabled: boolean
-    externalLoggingEnabled: boolean
-    externalLoggingUrl?: string
+}
+
+/** External infrastructure settings: shared target, proxy mode, recording, and logging. */
+export interface ExternalSettingsSection {
+    /** Gateway toggle — when off, target fields and sub-options are inactive. */
+    externalProcessingEnabled?: boolean
+    /** Shared external target URL (proxy endpoint or log HTTP endpoint). */
+    externalTargetUrl?: string
+    /** Password for proxy authentication; required when proxy sub-option is on. */
+    externalTargetPassword?: string
+    /** Delegate operation processing to the external target. */
+    externalProxyEnabled?: boolean
+    /** Enable chain recording on the proxy server (requires proxy sub-option). */
+    externalRecordingEnabled?: boolean
+    /** Named recording chain when external recording is enabled. */
+    recordingName?: string
+    /** Stream connector logs to the external target or disk (role-dependent). */
+    externalLoggingEnabled?: boolean
+    /** Minimum log level for external logging delivery. */
     externalLoggingLevel?: 'error' | 'warn' | 'info' | 'debug'
+    /** Timeout in milliseconds for requests sent to the external proxy endpoint. */
+    proxyRequestTimeoutMs?: number
 }
 
 // Advanced Connection Settings Section
@@ -413,32 +432,9 @@ export interface AdvancedConnectionSettingsSection {
     heartbeatInterval?: number
 }
 
-// Proxy Settings Section
-export interface ProxySettingsSection {
-    /**
-     * Enable proxy mode to delegate all processing to an external endpoint.
-     */
-    proxyEnabled?: boolean
-
-    /**
-     * URL of the external endpoint that will handle processing when proxy mode is enabled.
-     */
-    proxyUrl?: string
-
-    /**
-     * Password or secret used by the external endpoint when proxy mode is enabled.
-     */
-    proxyPassword?: string
-
-    /**
-     * Timeout in milliseconds for requests sent to the external proxy endpoint.
-     */
-    proxyRequestTimeoutMs?: number
-}
-
-/** Combined advanced settings: developer, connection tuning, and proxy. */
+/** Combined advanced settings: developer, connection tuning, and external infrastructure. */
 interface AdvancedSettingsMenu
-    extends DeveloperSettingsSection, AdvancedConnectionSettingsSection, ProxySettingsSection {}
+    extends DeveloperSettingsSection, AdvancedConnectionSettingsSection, ExternalSettingsSection {}
 
 // ============================================================================
 // Internal/Computed fields
@@ -522,6 +518,7 @@ export interface FusionConfig
         InternalConfig {
     recording?: RecordingConfig
 }
+
 
 
 

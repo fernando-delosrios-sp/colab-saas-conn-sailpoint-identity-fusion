@@ -12,13 +12,13 @@ Advanced Settings provide fine-grained control over API behavior, resilience, pe
 
 ## Overview and structure
 
-Advanced Settings are organized into three sections:
+Advanced Settings are organized into four sections:
 
 | Section                          | Purpose                                                         | When to configure                                                  |
 | -------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **Developer Settings**           | Reset accounts, external logging                                | Testing, troubleshooting, centralized monitoring                   |
-| **Advanced Connection Settings** | API behavior: queue, retry, timeouts, concurrency | Production tuning, rate limit management, performance optimization |
-| **Proxy Settings**               | Delegate processing to external server                          | Custom deployment requirements (see [Proxy mode](../../reference/proxy-mode.md))   |
+| **Developer Settings**           | Reset accounts, batch/concurrency tuning                        | Testing, troubleshooting, performance tuning                       |
+| **External Settings**            | Shared external target, proxy mode, logging, recording        | Proxy deployments, centralized logging, chain recording on server  |
+| **Advanced Connection Settings** | API behavior: queue, retry, timeouts, concurrency             | Production tuning, rate limit management, performance optimization |
 
 **Screenshot placeholder:** Advanced Settings menu interface.
 
@@ -43,7 +43,9 @@ See [Advanced Settings — Developer Settings](../../configuration/advanced.md) 
 | Force attribute refresh | [#forceattributerefresh](../../configuration/advanced.md#forceattributerefresh) | Medium — one-run Normal recalc |
 | Enable concurrency check? | [#concurrencycheckenabled](../../configuration/advanced.md#concurrencycheckenabled) | Low |
 | Managed accounts batch size | [#managedaccountsbatchsize](../../configuration/advanced.md#managedaccountsbatchsize) | Low |
-| External logging | [#externalloggingenabled](../../configuration/advanced.md#externalloggingenabled) | Low |
+| Scoring concurrency limit | [#scoringmaxconcurrency](../../configuration/advanced.md#scoringmaxconcurrency) | Low |
+
+External logging moved to [External Settings](../../configuration/advanced.md#external-settings) — see below.
 
 **Screenshot placeholder:** Developer Settings interface.
 
@@ -108,17 +110,24 @@ See [Advanced Settings — Developer Settings](../../configuration/advanced.md) 
     - **Identity impact:** If Fusion is authoritative, identities may be temporarily impacted
     - **Coordination:** Notify stakeholders before resetting in production
 
-### External logging
+### External logging (External Settings)
 
-**Purpose:** Send connector logs to external logging service for centralized monitoring, analysis, and alerting.
+**Purpose:** Send connector logs to external infrastructure for centralized monitoring. Routing depends on connector role:
 
-**Configuration:**
+| Role | Behavior |
+| --- | --- |
+| **Direct ISC processing** | HTTP POST plain-text lines to **External target URL** |
+| **Proxy client (ISC)** | No external logging (proxy server owns logs) |
+| **Proxy server** | Append sanitized lines to `LOG_FILE` or `logs/fusion-{YYYYMMDD}.log` |
 
-| Field                        | Value                             | Notes                                                          |
-| ---------------------------- | --------------------------------- | -------------------------------------------------------------- |
-| **Enable external logging?** | Yes                               | Activates external logging                                     |
-| **External logging URL**     | `https://logs.example.com/fusion` | Your log aggregation endpoint (e.g., Splunk HEC, Datadog, ELK) |
-| **External logging level**   | Info                              | Error, Warn, Info, or Debug                                    |
+**Configuration** (Advanced Settings → External Settings):
+
+| Field | Value | Notes |
+| --- | --- | --- |
+| **Enable external processing?** | Yes | Gateway — required for logging |
+| **External target URL** | `https://logs.example.com/fusion` | Log HTTP endpoint when proxy is off |
+| **Enable external logging?** | Yes | Activates role-aware delivery |
+| **External logging level** | Info | Error, Warn, Info, or Debug |
 
 **Log levels:**
 
@@ -129,43 +138,7 @@ See [Advanced Settings — Developer Settings](../../configuration/advanced.md) 
 | **Info**  | Errors + warnings + informational messages | Production; standard monitoring |
 | **Debug** | All logs including debug details           | Troubleshooting; verbose        |
 
-**Use cases:**
-
-| Use case                  | Configuration       | Benefit                                     |
-| ------------------------- | ------------------- | ------------------------------------------- |
-| **Production monitoring** | Enable, Info level  | Track aggregation operations, errors, performance |
-| **Troubleshooting**       | Enable, Debug level | Detailed logs for issue diagnosis           |
-| **Compliance/audit**      | Enable, Info level  | Centralized audit trail                     |
-| **Performance analysis**  | Enable, Info level  | Track timing, throughput, bottlenecks       |
-
-**External logging endpoint requirements:**
-
-- Accepts HTTP POST with JSON body
-- Handles log volume (can be high with Debug level)
-- Secured with HTTPS and authentication (recommended)
-
-**Log payload contract:** Each log entry is a JSON object. Implementations should accept at least these fields (and may receive additional fields in the future):
-
-| Field       | Type   | Required | Description                                                    |
-| ----------- | ------ | -------- | -------------------------------------------------------------- |
-| `level`     | string | Yes      | One of: `error`, `warn`, `info`, `debug`                       |
-| `timestamp` | string | Yes      | ISO 8601 date-time (e.g. `2024-01-15T14:30:45.123Z`)           |
-| `message`   | string | Yes      | Log message text                                               |
-| `context`   | object | No       | Additional key-value context (e.g. `sourceId`, `accountCount`) |
-
-**Example log structure:**
-
-```json
-{
-    "level": "info",
-    "timestamp": "2024-01-15T14:30:45.123Z",
-    "message": "Account aggregation started",
-    "context": {
-        "sourceId": "fusion-source-123",
-        "accountCount": 5420
-    }
-}
-```
+**Direct-mode payload:** Each log entry is a plain-text line (`HH:MM:SS [LEVEL] …`) sent via HTTP POST with `Content-Type: text/plain`. Proxy server mode writes the same format to disk.
 
 ### Operation log line kinds (`accountList`)
 
@@ -606,6 +579,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](../../reference/proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md).
+
 
 
 
