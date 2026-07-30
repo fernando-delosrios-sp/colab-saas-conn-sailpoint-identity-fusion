@@ -51,7 +51,7 @@ export class ReplayApiAdapter implements IscApiAdapter {
                                 )
                             }
                             this.consumedWrites.add(idx)
-                            return this.writeLog[idx].response
+                            return Promise.resolve(this.writeLog[idx].response)
                         }
 
                         const response = this.responseMap.get(key)
@@ -60,7 +60,7 @@ export class ReplayApiAdapter implements IscApiAdapter {
                                 `Replay: unrecorded API call: ${apiName}.${method}(${JSON.stringify(args)})`
                             )
                         }
-                        return response
+                        return Promise.resolve(response)
                     }
                 },
             }
@@ -94,5 +94,6 @@ export function loadApiLog(fileOrDirPath: string): ApiLogEntry[] {
     if (!content) return []
     return content.split('\n').map((line) => JSON.parse(line))
 }
+
 
 

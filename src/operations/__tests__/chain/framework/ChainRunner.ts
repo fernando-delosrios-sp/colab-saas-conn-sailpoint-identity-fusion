@@ -1,5 +1,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import { ReplayApiAdapter } from '../../../../services/clientService/replayApiAdapter'
+import { loadRecordingApiLog } from '../../../../services/recordingService/recordingStore'
 import { ChainState } from './ChainState'
 import { ChainContext } from './ChainContext'
 
@@ -65,12 +67,19 @@ export interface ChainResult {
 export class ChainRunner {
     private scenario: ChainScenario
     private state: ChainState
+    private replayAdapter?: ReplayApiAdapter
 
     constructor(scenarioPath: string) {
         const resolved = path.isAbsolute(scenarioPath) ? scenarioPath : path.resolve(scenarioPath)
         const raw = JSON.parse(fs.readFileSync(resolved, 'utf8'))
 
         this.scenario = raw as ChainScenario
+
+        const chainDir = path.dirname(resolved)
+        const apiLogEntries = loadRecordingApiLog(chainDir)
+        if (apiLogEntries.length > 0) {
+            this.replayAdapter = new ReplayApiAdapter(apiLogEntries, this.scenario.config as any)
+        }
 
         this.state = new ChainState({
             identities: (this.scenario.initialState.identities as any[]) ?? [],
@@ -214,6 +223,7 @@ export class ChainRunner {
                 stepId: step.id,
             },
             scenario: this.scenario,
+            replayAdapter: this.replayAdapter,
         } as unknown as ChainContext
     }
 
@@ -240,4 +250,5 @@ export function registerStepFn(
 function getStepFn(operation: string): ((step: StepDefinition, context: ChainContext) => Promise<unknown>) | undefined {
     return stepFns.get(operation)
 }
+
 

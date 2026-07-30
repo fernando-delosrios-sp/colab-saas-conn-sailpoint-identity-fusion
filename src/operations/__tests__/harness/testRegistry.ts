@@ -17,6 +17,8 @@ export interface SourceConfigLike {
 
 export interface TestRegistryOptions {
     sourceConfigs?: Array<Record<string, unknown>>
+    /** Full connector config; when omitted, a minimal test config is synthesized. */
+    config?: FusionConfig
     overrides?: Record<string, any>
 }
 
@@ -32,11 +34,11 @@ export interface TestRegistryOptions {
  */
 export function createTestRegistry(options: TestRegistryOptions = {}): ServiceRegistry {
     const sourceConfigs = options.sourceConfigs ?? []
-    const config = {
+    const config = (options.config ?? {
         sources: sourceConfigs,
         baseurl: 'https://test.example.com',
         spConnectorInstanceId: 'test-instance',
-    } as unknown as FusionConfig
+    }) as unknown as FusionConfig
 
     const fakeAdapter = new ReplayApiAdapter([], config as any)
 
@@ -70,3 +72,4 @@ export function createTestRegistry(options: TestRegistryOptions = {}): ServiceRe
 
     return new ServiceRegistry(config, context, { send: vi.fn() } as any, 'test')
 }
+
