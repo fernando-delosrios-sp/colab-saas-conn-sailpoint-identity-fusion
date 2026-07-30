@@ -16,8 +16,8 @@ description: >
   design is required (reorganizes raw brainstorm output into structured
   Context / Goals / Decisions / Risks / Migration; referenced by tasks
   and plan for implementation guidance).
-  Apply phase uses subagent-driven-development
-  (brings TDD and code-review transitively).
+  Apply phase uses subagent-driven-development and runs an autonomous
+  verify-fix loop until verify.md shows PASS before reporting done.
 
 artifacts:
   - id: brainstorm
@@ -225,14 +225,18 @@ artifacts:
     description: Post-implementation verification against specs, design, and tasks
     template: verify.md
     instruction: |
-      PRECHECK — apply completion gate (apply MUST have passed these
-      before verify runs; if any fail, STOP and return to apply):
+      PRECHECK — apply completion gate (apply step 1b MUST have passed
+      these before this artifact is written; if any fail, apply must
+      loop in step 2 — do NOT hand off to the user):
 
       1. No unchecked tasks:
          ! grep -q '^- \[ \]' openspec/changes/<change-name>/tasks.md
 
       2. Tests green (use the canonical command from plan.md):
          <project test command> — exit code 0
+
+      3. Structural validation green:
+         `openspec validate --all --json` — every item `"valid": true`
 
       Do NOT re-check git status, commit counts, or delta-spec sync
       state here — apply enforces a clean tree; archive handles spec
@@ -242,15 +246,18 @@ artifacts:
       `/opsx:verify` slash command is its user-facing equivalent).
 
       IMPORTANT timing note:
-      - Unlike other artifacts, verify.md is produced AFTER the apply
-        phase completes, NOT during planning. The `requires: [plan]`
-        edge exists only for schema graph purposes — the actual
-        verification step MUST run on a completed implementation.
+      - verify.md is produced inside apply step 2 (verify-fix loop),
+        NOT as a separate user-facing step after apply "finishes".
+        The `requires: [plan]` edge exists only for schema graph
+        purposes — verification MUST run on a completed implementation
+        and MUST loop with fixes until ✅ PASS before apply reports done.
+      - Standalone `/opsx:verify` is for re-runs after interruption
+        only; a normal apply cycle must not end with ❌ FAIL.
 
       The verify step MUST perform the following checks and record
-      results in verify.md using the template. With a strict apply
-      phase, most checks should PASS cleanly — repeated warnings mean
-      apply gates need tightening, not verify relaxation.
+      results in verify.md using the template. Apply step 2 runs this
+      autonomously and fixes failures — do NOT defer blocking items to
+      the user.
 
       1. **Structural validation**: Run `openspec validate --all --json`
          in the repository root and confirm every item returns
@@ -288,8 +295,9 @@ artifacts:
          analysis skipped). Identified gaps with follow-ups may still
          PASS.
 
-      Verify MAY be re-run multiple times as the implementation is
-      refined — each run overwrites verify.md with current state.
+      When invoked from apply step 2, overwrite verify.md on each loop
+      iteration until Overall Decision is ✅ PASS. When invoked via
+      standalone `/opsx:verify`, failures route back to apply step 2.
 
       If `openspec-verify-change` skill is unavailable, fall back to
       running the numbered checks above manually and recording results
@@ -508,6 +516,10 @@ apply:
          clean for files touched by that task
        - Complete Documentation and Changelog task groups last —
          they depend on final behavior
+       - Before reporting done: every `#### Scenario:` in delta specs
+         must map to a passing automated test; run
+         `openspec validate --all --json` and fix any `"valid": false`
+         items; do not hand off verify failures to the user
 
        IMPORTANT — transitive skill activation:
        subagent-driven-development internally enforces the
@@ -529,8 +541,8 @@ apply:
        If your platform lacks subagent support, use the built-in
        `spec-driven` schema instead of this one.
 
-    1b. **Apply completion gate** (BLOCKING — do not proceed to
-        verify until ALL pass; loop back to step 1 if any fail):
+    1b. **Completion gate** (mechanical checks — re-run after every
+        fix inside step 2; loop back to step 1 for implementation gaps):
 
        - **Tasks**: Every `- [ ]` in tasks.md is `- [x]`, including
          Documentation and Changelog sections.
@@ -540,6 +552,8 @@ apply:
        - **Lint/format**: Run project lint/format commands from
          plan.md. Fix all auto-fixable issues; zero new warnings
          introduced by this change.
+       - **Structural validation**: Run `openspec validate --all --json`
+         at repo root; every item MUST have `"valid": true`.
        - **Documentation**: Doc tasks reflect actual behavior;
          connector/API docs updated when contract or usage changed.
        - **Changelog**: Invoke **changelog-generator** if available
@@ -549,9 +563,24 @@ apply:
          via Skill tool when installed; otherwise conventional commit.
          Working tree MUST be clean (`git status --porcelain` empty).
 
-    2. **Verification**: When the completion gate passes, produce
-       the `verify` artifact by invoking **openspec-verify-change**.
-       Re-run apply + verify until verify shows ✅ PASS.
+    2. **Verify-fix loop** (BLOCKING — apply is NOT complete until
+       verify.md shows ✅ PASS; NEVER stop and ask the user to fix
+       verify failures — that is a schema violation):
+
+       Apply owns verification end-to-end in one session. Do NOT treat
+       verify as a separate user chore after apply "finishes".
+
+       Repeat until Overall Decision is ✅ PASS:
+
+       a. Invoke **openspec-verify-change** (or run the verify artifact
+          checks manually and record in verify.md).
+       b. If Overall Decision is ❌ FAIL: fix every blocking item
+          immediately — code, tests, tasks.md, docs, delta specs, or
+          design/spec drift as required. Do NOT report apply complete,
+          do NOT ask the user to "fix verify issues", do NOT open a PR.
+       c. After fixes, re-run step 1b, then return to (a).
+
+       Only when verify.md shows ✅ PASS proceed to step 3.
 
     3. **Retrospective (write while context is hot)**:
 
