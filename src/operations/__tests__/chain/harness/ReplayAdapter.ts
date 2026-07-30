@@ -15,6 +15,135 @@ import { DefinitionService } from '../../../../services/definitionService/defini
 import { SchemaService } from '../../../../services/schemaService/schemaService'
 import type { Mock } from 'vitest'
 
+
+function mergeFusionAccountIntoMap(fusionMap: Map<string, any>, fa: any): void {
+    const nid = fa.managedKey || fa.key?.simple?.id || fa.attributes?.id
+    if (!nid) return
+    const existing = fusionMap.get(nid) ?? {}
+    fusionMap.set(nid, {
+        ...existing,
+        ...fa,
+        managedKey: fa.managedKey ?? existing.managedKey ?? nid,
+    })
+}
+
+function mergeIscOutputIntoFusionMap(
+    fusionMap: Map<string, any>,
+    out: any,
+    state: ChainContext['state']
+): void {
+    const nid = out?.key?.simple?.id || out?.attributes?.id
+    if (!nid || !out.attributes) return
+    const identityId = findIdentityIdForIscAccount(out, state)
+    const existing = fusionMap.get(nid) ?? {}
+    fusionMap.set(nid, {
+        ...existing,
+        managedKey: nid,
+        identityId: identityId ?? existing.identityId,
+        disabled: out.disabled !== undefined ? out.disabled : existing.disabled,
+        attributes: {
+            ...(existing.attributes ?? {}),
+            ...(out.attributes ?? {}),
+        },
+    })
+}
+
+function flattenManagedAccountsFromSnapshot(state: ChainContext['state']): any[] {
+    const allManaged: any[] = []
+    const snapshot = state.getSnapshot()
+    if (!snapshot?.managedAccounts) return allManaged
+
+    if (Array.isArray(snapshot.managedAccounts)) {
+        allManaged.push(...snapshot.managedAccounts)
+        return allManaged
+    }
+
+    for (const sweepAccounts of Object.values(snapshot.managedAccounts)) {
+        if (Array.isArray(sweepAccounts)) {
+            allManaged.push(...sweepAccounts)
+        }
+    }
+    return allManaged
+}
+
+function getOrBuildIdentity(id: string, state: ChainContext['state']): any {
+    console.log('getOrBuildIdentity called for id:', id)
+    const existing = state.getIdentityById(id)
+    if (existing && existing.accounts && existing.accounts.length > 0) {
+        console.log(
+            'getOrBuildIdentity: found existing with accounts:',
+            existing.id,
+            'accounts count:',
+            existing.accounts.length
+        )
+        return existing
+    }
+
+    const relatedAccounts = flattenManagedAccountsFromSnapshot(state).filter(
+        (m: any) => m.identityId === id || m.identity?.id === id
+    )
+
+    console.log('getOrBuildIdentity: related accounts count:', relatedAccounts.length)
+
+    if (relatedAccounts.length === 0) {
+        return existing || undefined
+    }
+
+    const firstAccount = relatedAccounts[0]
+    const identityName = firstAccount.identity?.name || firstAccount.name || id
+
+    let email: string | undefined = undefined
+    for (const acc of relatedAccounts) {
+        const mailVal = acc.attributes?.mail || acc.attributes?.email || acc.attributes?.emailAddress
+        if (mailVal) {
+            email = String(mailVal)
+            break
+        }
+    }
+
+    const accounts = relatedAccounts.map((ma: any) => ({
+        source: {
+            id: ma.sourceId || `source-${ma.sourceName}`,
+            name: ma.sourceName,
+        },
+        nativeIdentity: ma.nativeIdentity,
+        accountId: ma.nativeIdentity,
+    }))
+
+    if (existing) {
+        console.log(
+            'getOrBuildIdentity: updating existing identity:',
+            existing.id,
+            'with accounts count:',
+            accounts.length
+        )
+        existing.accounts = accounts
+        if (!existing.attributes) {
+            existing.attributes = {}
+        }
+        if (!existing.attributes.email) {
+            existing.attributes.email = email
+        }
+        return existing
+    }
+
+    const dynamicIdentity = {
+        id,
+        name: identityName,
+        attributes: {
+            id,
+            name: identityName,
+            email,
+        },
+        accounts,
+    }
+
+    console.log('getOrBuildIdentity: created new dynamic identity:', id, 'with accounts count:', accounts.length)
+    state.addIdentity(dynamicIdentity)
+
+    return dynamicIdentity
+}
+
 function findIdentityIdForIscAccount(iscAccount: any, state: any): string | undefined {
     const attributes = iscAccount.attributes ?? {}
     const accounts = [...(attributes.accounts ?? []), attributes.originAccount, attributes.mainAccount].filter(Boolean)
@@ -98,21 +227,7 @@ function ensureFusionAccountsPopulated(step: StepDefinition, context: ChainConte
         if (output) {
             const outputs = Array.isArray(output) ? output : [output]
             for (const out of outputs) {
-                const nid = out?.key?.simple?.id || out?.attributes?.id
-                if (nid && out.attributes) {
-                    const identityId = findIdentityIdForIscAccount(out, state)
-                    const existing = fusionMap.get(nid) ?? {}
-                    fusionMap.set(nid, {
-                        ...existing,
-                        managedKey: nid,
-                        identityId: identityId ?? existing.identityId,
-                        disabled: out.disabled !== undefined ? out.disabled : existing.disabled,
-                        attributes: {
-                            ...(existing.attributes ?? {}),
-                            ...(out.attributes ?? {}),
-                        },
-                    })
-                }
+                mergeIscOutputIntoFusionMap(fusionMap, out, state)
             }
         }
 
@@ -121,28 +236,14 @@ function ensureFusionAccountsPopulated(step: StepDefinition, context: ChainConte
             const deltaFusionAccounts = delta.fusionAccounts as any[] | undefined
             if (deltaFusionAccounts && deltaFusionAccounts.length > 0) {
                 for (const fa of deltaFusionAccounts) {
-                    const nid = fa.managedKey || fa.key?.simple?.id || fa.attributes?.id
-                    if (nid) {
-                        const existing = fusionMap.get(nid) ?? {}
-                        fusionMap.set(nid, {
-                            ...existing,
-                            ...fa,
-                        })
-                    }
+                    mergeFusionAccountIntoMap(fusionMap, fa)
                 }
             }
 
             const deltaFusionAccountsAdd = delta.fusionAccountsAdd as any[] | undefined
             if (deltaFusionAccountsAdd) {
                 for (const fa of deltaFusionAccountsAdd) {
-                    const nid = fa.managedKey || fa.key?.simple?.id || fa.attributes?.id
-                    if (nid) {
-                        const existing = fusionMap.get(nid) ?? {}
-                        fusionMap.set(nid, {
-                            ...existing,
-                            ...fa,
-                        })
-                    }
+                    mergeFusionAccountIntoMap(fusionMap, fa)
                 }
             }
         }
@@ -195,7 +296,28 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         console.warn('LOG.WARN:', ...args)
     })
 
-    if (!context.replayAdapter) {
+    if (context.replayAdapter) {
+        registry.res.send = vi.fn()
+        context.registry = registry as unknown as MockRegistry
+        return context
+    }
+
+    configureNonReplayMocks(registry, context, state, sweep, scenarioSources)
+
+    registry.res.send = vi.fn()
+
+    context.registry = registry as unknown as MockRegistry
+
+    return context
+}
+
+function configureNonReplayMocks(
+    registry: ReturnType<typeof createOperationTestRegistry>,
+    context: ChainContext,
+    state: ChainContext['state'],
+    sweep: number,
+    scenarioSources: Array<Record<string, unknown>>
+): void {
     const schemaService = new SchemaService(context.config as any, registry.log as any, registry.sources as any, registry.client as any)
     registry.schemas = schemaService as any
 
@@ -263,96 +385,6 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             }
         })
 
-    const getOrBuildIdentity = (id: string) => {
-        console.log('getOrBuildIdentity called for id:', id)
-        const existing = state.getIdentityById(id)
-        if (existing && existing.accounts && existing.accounts.length > 0) {
-            console.log(
-                'getOrBuildIdentity: found existing with accounts:',
-                existing.id,
-                'accounts count:',
-                existing.accounts.length
-            )
-            return existing
-        }
-
-        const allManaged: any[] = []
-        const snapshot = state.getSnapshot()
-        if (snapshot?.managedAccounts) {
-            if (Array.isArray(snapshot.managedAccounts)) {
-                allManaged.push(...snapshot.managedAccounts)
-            } else {
-                for (const sweepAccounts of Object.values(snapshot.managedAccounts)) {
-                    if (Array.isArray(sweepAccounts)) {
-                        allManaged.push(...sweepAccounts)
-                    }
-                }
-            }
-        }
-
-        const relatedAccounts = allManaged.filter((m: any) => m.identityId === id || m.identity?.id === id)
-
-        console.log('getOrBuildIdentity: related accounts count:', relatedAccounts.length)
-
-        if (relatedAccounts.length === 0) {
-            return existing || undefined
-        }
-
-        const firstAccount = relatedAccounts[0]
-        const identityName = firstAccount.identity?.name || firstAccount.name || id
-
-        let email: string | undefined = undefined
-        for (const acc of relatedAccounts) {
-            const mailVal = acc.attributes?.mail || acc.attributes?.email || acc.attributes?.emailAddress
-            if (mailVal) {
-                email = String(mailVal)
-                break
-            }
-        }
-
-        const accounts = relatedAccounts.map((ma: any) => ({
-            source: {
-                id: ma.sourceId || `source-${ma.sourceName}`,
-                name: ma.sourceName,
-            },
-            nativeIdentity: ma.nativeIdentity,
-            accountId: ma.nativeIdentity,
-        }))
-
-        if (existing) {
-            console.log(
-                'getOrBuildIdentity: updating existing identity:',
-                existing.id,
-                'with accounts count:',
-                accounts.length
-            )
-            existing.accounts = accounts
-            if (!existing.attributes) {
-                existing.attributes = {}
-            }
-            if (!existing.attributes.email) {
-                existing.attributes.email = email
-            }
-            return existing
-        }
-
-        const dynamicIdentity = {
-            id,
-            name: identityName,
-            attributes: {
-                id,
-                name: identityName,
-                email,
-            },
-            accounts,
-        }
-
-        console.log('getOrBuildIdentity: created new dynamic identity:', id, 'with accounts count:', accounts.length)
-        state.addIdentity(dynamicIdentity)
-
-        return dynamicIdentity
-    }
-
     registry.identities.fetchIdentities = vi.fn().mockImplementation(async () => {
         registry.identities.identityCount = state.getIdentities().length
     })
@@ -360,31 +392,20 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         const existing = state.getIdentityByName(name)
         if (existing) return existing
 
-        const allManaged: any[] = []
-        const snapshot = state.getSnapshot()
-        if (snapshot?.managedAccounts) {
-            if (Array.isArray(snapshot.managedAccounts)) {
-                allManaged.push(...snapshot.managedAccounts)
-            } else {
-                for (const passAccounts of Object.values(snapshot.managedAccounts)) {
-                    if (Array.isArray(passAccounts)) {
-                        allManaged.push(...passAccounts)
-                    }
-                }
-            }
-        }
-        const ma = allManaged.find((m: any) => m.identity?.name === name || m.name === name)
+        const ma = flattenManagedAccountsFromSnapshot(state).find(
+            (m: any) => m.identity?.name === name || m.name === name
+        )
         if (ma) {
             const identityId = ma.identityId || ma.identity?.id
             if (identityId) {
-                return getOrBuildIdentity(identityId)
+                return getOrBuildIdentity(identityId, state)
             }
         }
         return null
     })
     registry.identities.getIdentityById = vi.fn().mockImplementation((id: string) => {
         console.log('registry.identities.getIdentityById mock called for id:', id)
-        return getOrBuildIdentity(id)
+        return getOrBuildIdentity(id, state)
     })
     registry.identities.fetchIdentityById = vi.fn().mockImplementation(async (id: string) => {
         console.log('registry.identities.fetchIdentityById mock called for id:', id)
@@ -670,14 +691,6 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         }
         return { sent, eligible: eligibleList.length }
     })
-
-    }
-
-    registry.res.send = vi.fn()
-
-    context.registry = registry as unknown as MockRegistry
-
-    return context
 }
 
 export function collectOutputs(context: ChainContext): unknown[] {
