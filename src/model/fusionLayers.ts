@@ -123,7 +123,12 @@ export class FusionLayers {
         }
         attributeBag.identity = identity.attributes ?? {}
         attributeBag.identity.name = identity.name
-        this._isIdentity = true
+        // Uncorrelated managed accounts may receive an identity layer for attribute
+        // blending without becoming a correlated Fusion identity. Preserve isIdentity
+        // when the account is already marked uncorrelated (e.g. persisted non-match rows).
+        if (!this._uncorrelated) {
+            this._isIdentity = true
+        }
 
         if (!this._needsRefresh && isNewerThan(identity.modified, modified)) {
             this._needsRefresh = true
@@ -507,6 +512,7 @@ export class FusionLayers {
         }
     }
 }
+
 
 
 
