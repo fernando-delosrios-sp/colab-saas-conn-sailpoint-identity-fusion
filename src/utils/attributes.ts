@@ -1,5 +1,5 @@
 import { AccountV2025 as Account } from 'sailpoint-api-client'
-import { hasValue, isDefined, missing, readUnknown, trimStr } from './safeRead'
+import { coerceBoolean, hasValue, isDefined, missing, readUnknown, trimStr } from './safeRead'
 
 /**
  * Attribute utility functions for picking, filtering, and transforming attributes.
@@ -183,11 +183,7 @@ export function extractStringOrDefault(attributes: Record<string, any>, key: str
  * Extracts a boolean value from attributes, handling string representations.
  */
 export function extractBoolean(attributes: Record<string, any>, key: string): boolean | undefined {
-    const value = getAttributeValue(attributes, key)
-    if (typeof value === 'boolean') return value
-    if (value === 'true') return true
-    if (value === 'false') return false
-    return undefined
+    return coerceBoolean(getAttributeValue(attributes, key))
 }
 
 /**
