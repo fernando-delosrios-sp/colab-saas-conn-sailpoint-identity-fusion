@@ -183,7 +183,7 @@ describe('buildFormFields localization', () => {
             id: 'identity-1',
             name: 'Jane Candidate',
             attributes: { email: 'jane@example.com' },
-            scores: [],
+            scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85 }],
         },
     ] as any
 
@@ -199,6 +199,22 @@ describe('buildFormFields localization', () => {
         const decisions = fields.find((f) => f.key === 'identitiesSection')
         const toggle = (decisions?.config as any)?.formElements?.[0]?.config?.columns?.[0]?.[0]
         expect(toggle?.config?.label).toBe('Nueva identidad')
+    })
+
+    it('localizes Combined score attribute label when locale is fr', () => {
+        const fields = buildFormFields(fusionAccount, candidates, ['Email'], SourceType.Authoritative, 'fr')
+        const candidateSection = fields.find((f) => f.key === 'identity-1.selectionsection')
+        const scoreField = ((candidateSection?.config as any)?.formElements ?? []).find((el: any) =>
+            String(el.key).includes('weighted-mean')
+        )
+        expect(scoreField?.config?.label).toBe('Score combiné')
+    })
+
+    it('localizes toggle label when locale is ja', () => {
+        const fields = buildFormFields(fusionAccount, candidates, ['Email'], SourceType.Authoritative, 'ja')
+        const decisions = fields.find((f) => f.key === 'identitiesSection')
+        const toggle = (decisions?.config as any)?.formElements?.[0]?.config?.columns?.[0]?.[0]
+        expect(toggle?.config?.label).toBe('新規アイデンティティ')
     })
 
     it('uses English labels when locale is en', () => {
@@ -218,4 +234,5 @@ describe('buildFormFields localization', () => {
         expect(toggle?.config?.label).toBe('New identity')
     })
 })
+
 

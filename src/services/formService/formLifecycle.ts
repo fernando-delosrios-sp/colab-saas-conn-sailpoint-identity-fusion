@@ -2,6 +2,8 @@ import {
     CreateFormInstanceRequestV2025,
     CustomFormsV2025ApiCreateFormDefinitionRequest,
     CustomFormsV2025ApiCreateFormInstanceRequest,
+    CustomFormsV2025ApiGetFormDefinitionByKeyRequest,
+    CustomFormsV2025ApiPatchFormDefinitionRequest,
     CustomFormsV2025ApiPatchFormInstanceRequest,
     CustomFormsV2025ApiSearchFormDefinitionsByTenantRequest,
     CustomFormsV2025ApiSearchFormInstancesByTenantRequest,
@@ -134,6 +136,52 @@ export class FormLifecycle {
         this.deps.log.debug(`Form definition created successfully: ${formInstance.id}`)
         this.deps.run.formsCreated++
         return formInstance
+    }
+
+    /**
+     * Patch an existing form definition (JSON Patch).
+     */
+    async patchFormDefinition(
+        formDefinitionID: string,
+        body: Array<{ op: string; path: string; value: unknown }>
+    ): Promise<FormDefinitionResponseV2025> {
+        assert(formDefinitionID, 'Form definition ID is required')
+        assert(body && body.length > 0, 'Form definition patch body is required')
+        assert(this.deps.client, 'Client service is required')
+
+        const requestParameters: CustomFormsV2025ApiPatchFormDefinitionRequest = {
+            formDefinitionID,
+            body: body as unknown as CustomFormsV2025ApiPatchFormDefinitionRequest['body'],
+        }
+
+        this.deps.log.debug(`Patching form definition: ${formDefinitionID}`)
+        const updated = await this.deps.client.call<FormDefinitionResponseV2025>(
+            (api: any) => api.customForms.patchFormDefinition(requestParameters).then((r: any) => r.data),
+            { context: `FormService>patchFormDefinition id=${formDefinitionID}` }
+        )
+        assert(updated, 'Failed to patch form definition')
+        assert(updated.id, 'Patched form definition ID is missing')
+        return updated
+    }
+
+    /**
+     * Fetch a form definition by ID (includes formElements for localization verification).
+     */
+    async getFormDefinitionByKey(formDefinitionID: string): Promise<FormDefinitionResponseV2025> {
+        assert(formDefinitionID, 'Form definition ID is required')
+        assert(this.deps.client, 'Client service is required')
+
+        const requestParameters: CustomFormsV2025ApiGetFormDefinitionByKeyRequest = {
+            formDefinitionID,
+        }
+
+        const formDefinition = await this.deps.client.call<FormDefinitionResponseV2025>(
+            (api: any) => api.customForms.getFormDefinitionByKey(requestParameters).then((r: any) => r.data),
+            { context: `FormService>getFormDefinitionByKey id=${formDefinitionID}` }
+        )
+        assert(formDefinition, 'Failed to fetch form definition')
+        assert(formDefinition.id, 'Fetched form definition ID is missing')
+        return formDefinition
     }
 
     /**
@@ -343,3 +391,4 @@ export class FormLifecycle {
         }
     }
 }
+

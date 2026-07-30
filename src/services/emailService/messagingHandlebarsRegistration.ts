@@ -7,7 +7,7 @@ import {
     maxDisplayCharsForAccountAttributeValue,
     truncateWithEllipsis,
 } from './accountAttributeValueDisplay'
-import { translate } from './localization'
+import { translate, scoreAttributeLabel as resolveScoreAttributeLabel } from './localization'
 
 const ALGORITHM_LABEL_KEYS: Record<string, string> = {
     'name-matcher': 'algorithm_name_matcher',
@@ -144,6 +144,11 @@ function registerFormatHelpers(): void {
         const labelKey = ALGORITHM_LABEL_KEYS[String(algorithm)]
         return labelKey ? translate(labelKey, locale) : String(algorithm)
     })
+
+    Handlebars.registerHelper('localizedScoreAttributeLabel', function (this: any, attribute: string | undefined, options: any) {
+        const locale = options?.data?.root?.locale
+        return resolveScoreAttributeLabel(attribute, locale)
+    })
 }
 
 function registerComparisonHelpers(): void {
@@ -251,5 +256,6 @@ export const registerHandlebarsHelpers = (): void => {
     registerComparisonHelpers()
     registerReportHelpers()
 }
+
 
 

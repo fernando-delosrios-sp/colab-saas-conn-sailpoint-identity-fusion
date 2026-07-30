@@ -9,6 +9,9 @@ describe('reviewSettings readSettings', () => {
         expect(result.fusionMaxCandidatesForForm).toBe(connectorSpecInitialValues.fusionMaxCandidatesForForm)
         expect(result.fusionOwnerIsGlobalReviewer).toBeUndefined()
         expect(result.fusionReportOnAggregation).toBeUndefined()
+        expect(result.enableLocalization).toBe(false)
+        expect(result.defaultLanguage).toBeUndefined()
+        expect(result.identityLanguageAttribute).toBeUndefined()
     })
 
     it('returns configured values when valid', () => {
@@ -26,4 +29,17 @@ describe('reviewSettings readSettings', () => {
         expect(result.fusionOwnerIsGlobalReviewer).toBe(true)
         expect(result.fusionReportOnAggregation).toBe(false)
     })
+
+    it('normalizes localization settings from connector config', () => {
+        const raw = {
+            enableLocalization: 'true' as unknown as boolean,
+            defaultLanguage: ' fr ',
+            identityLanguageAttribute: ' preferredLanguage ',
+        }
+        const result = readSettings(raw)
+        expect(result.enableLocalization).toBe(true)
+        expect(result.defaultLanguage).toBe('fr')
+        expect(result.identityLanguageAttribute).toBe('preferredLanguage')
+    })
 })
+

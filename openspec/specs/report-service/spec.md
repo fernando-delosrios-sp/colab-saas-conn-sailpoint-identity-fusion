@@ -6,7 +6,7 @@ The report service resolves account identifiers for report links, mapping Fusion
 ## Requirements
 ### Requirement: Unified report building, rendering, and directory management
 
-The Report module MUST provide a consolidated interface for creating report payloads, rendering report HTML outputs via `EmailService`, managing output directories (`mkdir`), resolving recipient identity owners via `IdentityService`, and delivering reports. Dry-run reports SHALL use `includeNonMatches: false` (consolidated counters only, matching the default aggregation report behavior) and SHALL render through the same Handlebars template and email delivery path. When localization is enabled, report rendering MUST resolve and apply the primary recipient's effective locale.
+The Report module MUST provide a consolidated interface for creating report payloads, rendering report HTML outputs via `EmailService`, managing output directories (`mkdir`), resolving recipient identity owners via `IdentityService`, and delivering reports. Dry-run reports SHALL use `includeNonMatches: false` (consolidated counters only, matching the default aggregation report behavior) and SHALL render through the same Handlebars template and email delivery path. When localization is enabled, report rendering MUST resolve locale via `resolveEffectiveLocale` for the primary recipient (identity language attribute, then `defaultLanguage`, then `'en'`). Review forms are out of scope and continue to use `resolveFormLocale` (`defaultLanguage` only).
 
 #### Scenario: End-to-end report generation and directory creation
 
@@ -80,4 +80,5 @@ When `enableLocalization` is enabled, `ReportService` MUST resolve the effective
 - **THEN** the effective locale MUST be `'en'`
 
 ---
+
 

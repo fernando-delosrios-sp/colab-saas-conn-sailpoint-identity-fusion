@@ -138,6 +138,19 @@ describe('formService helpers', () => {
             const result = buildFormName(fusionAccount, 'Fusion Review')
             expect(result).toBe('Fusion Review - fcooper [Active Directory] (aa7459e540f94cbdbaa859019ef5c4f1)')
         })
+
+        it('should append locale suffix when localization is enabled', () => {
+            const fusionAccount = {
+                name: 'John Doe',
+                managedKey: 'acc-123',
+                sourceName: 'HR Source',
+            } as any
+            const result = buildFormName(fusionAccount, 'Fusion Review', {
+                enableLocalization: true,
+                locale: 'fr',
+            })
+            expect(result).toBe('Fusion Review - John Doe [HR Source] (acc-123) [fr]')
+        })
     })
 
     describe('calculateExpirationDate', () => {
@@ -273,4 +286,5 @@ describe('formService helpers', () => {
         })
     })
 })
+
 

@@ -27,7 +27,7 @@ The `EmailService` SHALL compile localized Handlebars templates and dispatch ema
 
 ### Requirement: Localization configuration gating
 
-The connector SHALL read `enableLocalization`, `defaultLanguage`, and `identityLanguageAttribute` from `FusionConfig` and SHALL apply them when resolving locale for user-facing communications.
+The connector SHALL read `enableLocalization`, `defaultLanguage`, and `identityLanguageAttribute` from `FusionConfig`. **User communications** (review emails, report delivery, and other recipient-facing messages) MUST resolve locale via `resolveEffectiveLocale(config, identityAttributes?)` with this precedence when localization is enabled: (1) recipient identity language attribute (configured `identityLanguageAttribute`, then legacy fallbacks), (2) `defaultLanguage`, (3) `'en'`. **Review forms** are excluded from recipient locale resolution; they MUST use `resolveFormLocale(config)`, which reads **`defaultLanguage` only**, then `'en'`. When localization is disabled, all surfaces MUST use `'en'`.
 
 #### Scenario: Localization disabled
 
@@ -57,6 +57,14 @@ The connector SHALL read `enableLocalization`, `defaultLanguage`, and `identityL
 - **WHEN** a user communication is rendered
 - **THEN** the effective locale MUST be `'en'`
 
+#### Scenario: Review forms use defaultLanguage only
+
+- **GIVEN** `enableLocalization` is `true` and `defaultLanguage` is `ja`
+- **AND** the review email recipient resolves to locale `en` via identity attributes
+- **WHEN** `FormService` builds a review form definition
+- **THEN** form labels MUST use locale `ja` from `resolveFormLocale(config)`
+- **AND** MUST NOT use the recipient's identity language attribute
+
 ---
 
 ### Requirement: Localized review email subjects
@@ -72,4 +80,5 @@ When localization is enabled, review email subjects MUST be rendered in the reci
 - **AND** MUST NOT contain the English-only default subject string
 
 ---
+
 
