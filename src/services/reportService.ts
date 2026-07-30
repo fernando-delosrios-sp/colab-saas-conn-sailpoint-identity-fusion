@@ -17,6 +17,7 @@ import { FusionRun } from '../model/fusionRun'
 import { compileEmailTemplates, renderFusionReport, FusionReportEmailData } from './emailService/helpers'
 import { registerHandlebarsHelpers } from './emailService/messagingHandlebarsRegistration'
 import { sanitizeRecipients } from './emailService/email'
+import { decisionLabelKey, translate, translateWithParams } from './emailService/localization'
 
 type DryRunStats = AggregationStats & FusionReportStats
 
@@ -36,7 +37,8 @@ const toReportDecision = (
     resolveReviewerUrl?: (reviewerId?: string) => string | undefined,
     resolveAccountName?: (managedAccountKey?: string) => string | undefined,
     resolveAccountUrl?: (managedAccountKey?: string, identityId?: string) => string | undefined,
-    resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string }
+    resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string },
+    locale?: string
 ): FusionReportDecision => {
     const account = decision.account || ({} as any)
     const sourceType =
@@ -48,12 +50,7 @@ const toReportDecision = (
             : 'create-new-identity'
         : 'merge-existing-identity'
 
-    const decisionLabel =
-        decisionType === 'merge-existing-identity'
-            ? 'Merged into existing identity'
-            : decisionType === 'create-new-identity'
-              ? 'Created new identity'
-              : 'Confirmed no match'
+    const decisionLabel = translate(decisionLabelKey(decisionType), locale)
 
     const managedAccountKey = account.id
     const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
@@ -236,16 +233,25 @@ export class ReportService {
     /** Send report email to explicit recipients while fully owning sender readiness. */
     public async deliverReportToRecipients(
         report: FusionReport,
-        args: { recipients: string[]; reportType: 'aggregation' | 'fusion'; reportTitle?: string }
+        args: {
+            recipients: string[]
+            reportType: 'aggregation' | 'fusion'
+            reportTitle?: string
+            locale?: string
+        }
     ): Promise<void> {
         const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
-        const reportTitle = args.reportTitle || ReportService.FUSION_REPORT_EMAIL_TITLE
-        const subject = `${reportTitle} - ${matchAccountCount} Match(es) require(s) your attention`
-        const body = this.renderFusionReportHtml(report, args.reportType, reportTitle)
+        const locale = args.locale ?? this.email?.getDefaultEffectiveLocale?.() ?? 'en'
+        const reportTitle = args.reportTitle || translate('fusion_report_title', locale)
+        const subject = translateWithParams('report_email_subject', locale, {
+            reportTitle,
+            matchCount: matchAccountCount,
+        })
+        const body = this.renderFusionReportHtml(report, args.reportType, reportTitle, locale)
         const validRecipients = sanitizeRecipients(args.recipients)
 
         if (validRecipients.length > 0 && typeof this.email?.sendEmail === 'function') {
-            await this.email.sendEmail(validRecipients, subject, body)
+            await this.email.sendEmail(validRecipients, subject, body, { locale })
             const sentRecipientCount = validRecipients.length
             this.log?.info?.(`Sent fusion report email to ${sentRecipientCount} recipient(s)`)
         }
@@ -254,7 +260,8 @@ export class ReportService {
     /** Send report email to all global owners (source owner + governance group members). */
     public async sendReport(
         report: FusionReport,
-        reportType: 'aggregation' | 'fusion'
+        reportType: 'aggregation' | 'fusion',
+        locale?: string
     ): Promise<void> {
         const recipientEmails = new Set<string>()
         let globalOwnerIds: string[] = []
@@ -284,7 +291,15 @@ export class ReportService {
         }
 
         const recipients = Array.from(recipientEmails)
-        await this.deliverReportToRecipients(report, { recipients, reportType })
+        const resolvedLocale =
+            locale ??
+            (globalOwnerIds[0] && this.email?.getRecipientLocale
+                ? await this.email.getRecipientLocale(globalOwnerIds[0])
+                : this.email?.getDefaultEffectiveLocale?.() ?? 'en')
+        if (!report.fusionReviewDecisions?.length) {
+            report.fusionReviewDecisions = this.buildFusionReviewDecisions(resolvedLocale)
+        }
+        await this.deliverReportToRecipients(report, { recipients, reportType, locale: resolvedLocale })
     }
 
     /**
@@ -316,7 +331,7 @@ export class ReportService {
     }
 
     /** Build normalized review-decision entries for report rendering. */
-    public buildFusionReviewDecisions(): FusionReportDecision[] {
+    public buildFusionReviewDecisions(locale?: string): FusionReportDecision[] {
         const finishedDecisions = this.forms?.finishedFusionDecisions ?? []
         const resolver = new FusionReviewDecisionResolver(
             this.baseurl,
@@ -334,7 +349,8 @@ export class ReportService {
                 (reviewerId) => resolver.resolveReviewerUrl(reviewerId),
                 (managedAccountKey) => resolver.resolveAccountName(managedAccountKey),
                 (managedAccountKey, identityId) => resolver.resolveAccountUrl(managedAccountKey, identityId),
-                (identityId) => resolver.resolveIdentityContext(identityId)
+                (identityId) => resolver.resolveIdentityContext(identityId),
+                locale
             )
         )
     }
@@ -384,11 +400,15 @@ export class ReportService {
                     : baseTiming,
         }
 
+        const locale = this.email?.getDefaultEffectiveLocale?.() ?? 'en'
+        report.fusionReviewDecisions = this.buildFusionReviewDecisions(locale)
         const emailReport = this.buildEmailReportFromFusionReport(report, statsForRender)
+        const dryRunTitle = translate('dry_run_report_title', locale)
         const htmlReportBody = this.renderFusionReportHtml(
             emailReport,
             ReportService.DRY_RUN_REPORT_TYPE,
-            ReportService.DRY_RUN_REPORT_TITLE
+            dryRunTitle,
+            locale
         )
 
         let reportHtmlOutputPath: string | undefined
@@ -404,7 +424,8 @@ export class ReportService {
             await this.deliverReportToRecipients(emailReport, {
                 recipients,
                 reportType: ReportService.DRY_RUN_REPORT_TYPE,
-                reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
+                reportTitle: translate('dry_run_report_title', locale),
+                locale,
             })
         }
 
@@ -452,9 +473,6 @@ export class ReportService {
         sendEmail?: string | string[]
     }): Promise<{ reportHtmlOutputPath?: string; statsWithPhaseTiming: AggregationStats }> {
         const { aggregationStats, reportPhaseStartedAt, saveFile, sendEmail } = args
-        const shouldWriteHtmlReport = saveFile ?? true
-        const recipients = Array.isArray(sendEmail) ? sendEmail : (sendEmail ? [sendEmail] : [])
-        const shouldSendReportEmail = recipients.length > 0
 
         const reportElapsedMs =
             typeof reportPhaseStartedAt === 'number' ? Math.max(0, Date.now() - reportPhaseStartedAt) : 0
@@ -464,7 +482,6 @@ export class ReportService {
         await this.hydrateIdentitiesForReportDecisions()
 
         const report = this.fusion.generateReport(this.fusion.tracker, false, finalDryRunStats as any)
-        report.fusionReviewDecisions = this.buildFusionReviewDecisions()
 
         const baseTiming = finalDryRunStats.phaseTiming ?? []
         const statsForRender: AggregationStats = {
@@ -475,31 +492,13 @@ export class ReportService {
                     : baseTiming,
         }
 
-        const emailReport = this.buildEmailReportFromFusionReport(report, statsForRender)
-        const htmlReportBody = this.renderFusionReportHtml(
-            emailReport,
-            ReportService.DRY_RUN_REPORT_TYPE,
-            ReportService.DRY_RUN_REPORT_TITLE
-        )
-
-        let reportHtmlOutputPath: string | undefined
-        if (shouldWriteHtmlReport) {
-            const htmlPath = this.buildDryRunHtmlReportPath()
-            await this.ensureReportOutputDirectoryExists()
-            await writeFile(htmlPath, htmlReportBody, 'utf8')
-            reportHtmlOutputPath = htmlPath
-            this.log?.info?.(`dry-run wrote HTML report to ${htmlPath}`)
-        }
-
-        if (shouldSendReportEmail) {
-            await this.deliverReportToRecipients(emailReport, {
-                recipients,
-                reportType: ReportService.DRY_RUN_REPORT_TYPE,
-                reportTitle: ReportService.DRY_RUN_REPORT_TITLE,
-            })
-        }
-
-        return { reportHtmlOutputPath, statsWithPhaseTiming: statsForRender }
+        return this.writeAndSendDryRunReport({
+            report,
+            finalDryRunStats: statsForRender,
+            reportPhaseStartedAt,
+            saveFile,
+            sendEmail,
+        })
     }
 
     /**
@@ -517,19 +516,29 @@ export class ReportService {
             const stats = this.buildFusionReportStats(aggregationStats)
             const tracker = this.fusion.tracker
             const report = this.fusion.generateReport(tracker, includeNonMatches, stats)
-            report.fusionReviewDecisions = this.buildFusionReviewDecisions()
+            const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
+            const locale =
+                globalOwnerIds[0] && this.email?.getRecipientLocale
+                    ? await this.email.getRecipientLocale(globalOwnerIds[0])
+                    : this.email?.getDefaultEffectiveLocale?.() ?? 'en'
+            report.fusionReviewDecisions = this.buildFusionReviewDecisions(locale)
             reportPhaseTimer.recordElapsed('Report', Date.now() - reportStartedAt)
             const priorPhases = aggregationStats.phaseTiming ?? []
             stats.phaseTiming = [...priorPhases, ...reportPhaseTimer.getPhaseBreakdown()]
             report.stats = stats
-            await this.sendReport(report, 'aggregation')
+            await this.sendReport(report, 'aggregation', locale)
             return
         }
 
         const tracker = this.fusion.tracker
         const report = this.fusion.generateReport(tracker, includeNonMatches, undefined)
-        report.fusionReviewDecisions = this.buildFusionReviewDecisions()
-        await this.sendReport(report, 'fusion')
+        const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
+        const locale =
+            globalOwnerIds[0] && this.email?.getRecipientLocale
+                ? await this.email.getRecipientLocale(globalOwnerIds[0])
+                : this.email?.getDefaultEffectiveLocale?.() ?? 'en'
+        report.fusionReviewDecisions = this.buildFusionReviewDecisions(locale)
+        await this.sendReport(report, 'fusion', locale)
         this.identities.clear()
     }
 
@@ -542,7 +551,7 @@ export class ReportService {
         const stats = this.buildFusionReportStats(aggregationStats)
         const tracker = this.fusion.tracker
         const report = this.fusion.generateReport(tracker, includeNonMatches, stats)
-        report.fusionReviewDecisions = this.buildFusionReviewDecisions()
+        report.fusionReviewDecisions = this.buildFusionReviewDecisions(this.email?.getDefaultEffectiveLocale?.() ?? 'en')
         report.stats = stats
         return report as Record<string, unknown>
     }

@@ -1,29 +1,4 @@
-# email-service Specification
-
-## Purpose
-TBD - created by archiving change decouple-messaging-domain-services. Update Purpose after archive.
-## Requirements
-### Requirement: Email Rendering and Delivery
-
-The `EmailService` SHALL compile localized Handlebars templates and dispatch emails directly via `ClientService`. When `enableLocalization` is enabled, `EmailService` SHALL resolve the recipient's effective locale from `FusionConfig` and identity attributes before template compilation.
-
-#### Scenario: Send template-compiled localized email
-
-- **GIVEN** `enableLocalization` is `true`
-- **WHEN** `sendFusionEmail` is called for a recipient with a resolvable language attribute
-- **THEN** `EmailService` MUST set `locale` on template data to the effective locale
-- **AND** MUST compile Handlebars templates producing translated body content
-- **AND** MUST deliver the email via `ClientService`
-
-#### Scenario: Direct HTML email dispatch
-
-- **WHEN** `sendEmail` is called with pre-rendered HTML body and recipient details
-- **THEN** `EmailService` transmits the raw HTML email directly via `ClientService`
-
-#### Scenario: Account attribute display truncation
-
-- **WHEN** attribute values are rendered in email templates
-- **THEN** `EmailService` applies cell-display truncation matching the ~270px left summary column layout without breaking glyph boundaries
+## ADDED Requirements
 
 ### Requirement: Localization configuration gating
 
@@ -73,3 +48,26 @@ When localization is enabled, review email subjects MUST be rendered in the reci
 
 ---
 
+## MODIFIED Requirements
+
+### Requirement: Email Rendering and Delivery
+
+The `EmailService` SHALL compile localized Handlebars templates and dispatch emails directly via `ClientService`. When `enableLocalization` is enabled, `EmailService` SHALL resolve the recipient's effective locale from `FusionConfig` and identity attributes before template compilation.
+
+#### Scenario: Send template-compiled localized email
+
+- **GIVEN** `enableLocalization` is `true`
+- **WHEN** `sendFusionEmail` is called for a recipient with a resolvable language attribute
+- **THEN** `EmailService` MUST set `locale` on template data to the effective locale
+- **AND** MUST compile Handlebars templates producing translated body content
+- **AND** MUST deliver the email via `ClientService`
+
+#### Scenario: Direct HTML email dispatch
+
+- **WHEN** `sendEmail` is called with pre-rendered HTML body and recipient details
+- **THEN** `EmailService` transmits the raw HTML email directly via `ClientService`
+
+#### Scenario: Account attribute display truncation
+
+- **WHEN** attribute values are rendered in email templates
+- **THEN** `EmailService` applies cell-display truncation matching the ~270px left summary column layout without breaking glyph boundaries

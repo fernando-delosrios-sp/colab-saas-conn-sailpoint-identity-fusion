@@ -398,7 +398,23 @@ describe('ReportService', () => {
         expect(getRecipientEmails).toHaveBeenCalledWith(['owner-1'])
         expect(sendEmail).toHaveBeenCalledTimes(1)
     })
+
+    it('renders Spanish report HTML when locale is es', () => {
+        const { service } = createService()
+        const html = service.renderFusionReportHtml(
+            {
+                accounts: [],
+                matches: 0,
+                stats: { aggregationWarnings: 0, aggregationErrors: 0 },
+            } as any,
+            'aggregation',
+            undefined,
+            'es'
+        )
+        expect(html).toContain('Estadísticas de procesamiento')
+    })
 })
+
 
 
 

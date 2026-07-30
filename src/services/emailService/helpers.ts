@@ -71,7 +71,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
 
         {{#if (gt stats.aggregationWarnings 0)}}
         <div style="margin-top: 10px; padding: 10px 12px; border: 1px solid #fde68a; border-left: 6px solid #f59e0b; border-radius: 10px; background: #fffbeb;">
-          <div style="font-size: 11px; color: #92400e; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Aggregation Warnings ({{stats.aggregationWarnings}})</div>
+          <div style="font-size: 11px; color: #92400e; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">{{i18n "aggregation_warnings"}} ({{stats.aggregationWarnings}})</div>
           {{#if stats.warningSamples}}
           <div style="font-size: 12px; color: #78350f; line-height: 1.4;">
             {{#each stats.warningSamples}}
@@ -83,7 +83,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
         {{/if}}
         {{#if (gt stats.aggregationErrors 0)}}
         <div style="margin-top: 10px; padding: 10px 12px; border: 1px solid #fecaca; border-left: 6px solid #ef4444; border-radius: 10px; background: #fef2f2;">
-          <div style="font-size: 11px; color: #991b1b; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">Aggregation Errors ({{stats.aggregationErrors}})</div>
+          <div style="font-size: 11px; color: #991b1b; font-weight: 800; text-transform: uppercase; margin-bottom: 6px;">{{i18n "aggregation_errors"}} ({{stats.aggregationErrors}})</div>
           {{#if stats.errorSamples}}
           <div style="font-size: 12px; color: #7f1d1d; line-height: 1.4;">
             {{#each stats.errorSamples}}

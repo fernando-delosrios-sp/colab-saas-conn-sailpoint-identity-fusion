@@ -9,16 +9,16 @@ import {
 } from './accountAttributeValueDisplay'
 import { translate } from './localization'
 
-const ALGORITHM_LABELS: Record<string, string> = {
-    'name-matcher': 'Name Matcher',
-    'jaro-winkler': 'Jaro-Winkler',
-    lig3: 'LIG3',
-    dice: 'Dice',
-    'double-metaphone': 'Double Metaphone',
-    binary: 'Binary (Exact Match)',
-    custom: 'Custom',
-    average: 'Combined match score (legacy)',
-    'weighted-mean': 'Combined score',
+const ALGORITHM_LABEL_KEYS: Record<string, string> = {
+    'name-matcher': 'algorithm_name_matcher',
+    'jaro-winkler': 'algorithm_jaro_winkler',
+    lig3: 'algorithm_lig3',
+    dice: 'algorithm_dice',
+    'double-metaphone': 'algorithm_double_metaphone',
+    binary: 'algorithm_binary',
+    custom: 'algorithm_custom',
+    average: 'algorithm_average',
+    'weighted-mean': 'algorithm_weighted_mean',
 }
 
 const PIPELINE_PHASE_ORDER = ['Setup', 'Fetch', 'Refresh', 'Process', 'Output', 'Report'] as const
@@ -61,9 +61,10 @@ function registerFormatHelpers(): void {
     const emailAddressPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const accountAttrMaxChars = maxDisplayCharsForAccountAttributeValue()
 
-    Handlebars.registerHelper('formatAttribute', (value: unknown) => {
+    Handlebars.registerHelper('formatAttribute', function (this: any, value: unknown, options: any) {
+        const locale = options?.data?.root?.locale
         if (!isDefined(value)) {
-            return 'N/A'
+            return translate('not_available', locale)
         }
         if (typeof value === 'object') {
             return JSON.stringify(value)
@@ -77,9 +78,10 @@ function registerFormatHelpers(): void {
     })
 
     /** Renders attribute values; long text is shortened with a character budget; emails become mailto links (triple braces in templates). */
-    Handlebars.registerHelper('formatAccountAttributeValue', (_attributeKey: unknown, value: unknown) => {
+    Handlebars.registerHelper('formatAccountAttributeValue', function (this: any, _attributeKey: unknown, value: unknown, options: any) {
+        const locale = options?.data?.root?.locale
         if (!isDefined(value)) {
-            return 'N/A'
+            return translate('not_available', locale)
         }
         if (typeof value === 'object') {
             const raw = JSON.stringify(value)
@@ -106,15 +108,19 @@ function registerFormatHelpers(): void {
         return new Handlebars.SafeString(`<a href="${href}" title="${escFull}" style="${linkStyle}">${escDisplay}</a>`)
     })
 
-    Handlebars.registerHelper('formatScores', (scores: any[]) => {
+    Handlebars.registerHelper('formatScores', function (this: any, scores: any[], options: any) {
+        const locale = options?.data?.root?.locale
         if (!scores || scores.length === 0) {
-            return 'N/A'
+            return translate('not_available', locale)
         }
         return scores
             .map((score) => {
                 const num = typeof score.score === 'number' ? score.score : Number.parseFloat(String(score.score))
                 const trimmedScore = Number.isFinite(num) ? parseFloat(num.toFixed(2)) : score.score
-                return `${score.attribute}: ${trimmedScore}% (${score.isMatch ? 'Match' : 'No Match'})`
+                const matchLabel = score.isMatch
+                    ? translate('score_match', locale)
+                    : translate('score_no_match', locale)
+                return `${score.attribute}: ${trimmedScore}% (${matchLabel})`
             })
             .join(', ')
     })
@@ -132,9 +138,11 @@ function registerFormatHelpers(): void {
         return formatDateYmd(date)
     })
 
-    Handlebars.registerHelper('algorithmLabel', (algorithm?: string) => {
-        if (!algorithm) return 'N/A'
-        return ALGORITHM_LABELS[String(algorithm)] ?? String(algorithm)
+    Handlebars.registerHelper('algorithmLabel', function (this: any, algorithm?: string, options: any) {
+        const locale = options?.data?.root?.locale
+        if (!algorithm) return translate('not_available', locale)
+        const labelKey = ALGORITHM_LABEL_KEYS[String(algorithm)]
+        return labelKey ? translate(labelKey, locale) : String(algorithm)
     })
 }
 
@@ -243,3 +251,4 @@ export const registerHandlebarsHelpers = (): void => {
     registerComparisonHelpers()
     registerReportHelpers()
 }
+

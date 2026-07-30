@@ -14,7 +14,7 @@ import type { FusionMatch } from '../matchingService/types'
 import { compileEmailTemplates, renderFusionReviewEmail, FusionReviewEmailData } from './helpers'
 import { registerHandlebarsHelpers } from './messagingHandlebarsRegistration'
 import { normalizeEmailValue, sanitizeRecipients, buildEmailWorkflowTriggerInput } from './email'
-import { normalizeLanguageCode } from './localization'
+import { buildTruncationNoticeHtml, resolveEffectiveLocale, translateWithParams } from './localization'
 
 export interface FusionEmailContext {
     accountName: string
@@ -175,12 +175,16 @@ export class EmailService {
         }
 
         const primaryRecipientId = recipientIds[0]
-        emailData.locale = await this.getRecipientLocale(primaryRecipientId)
+        const locale = await this.getRecipientLocale(primaryRecipientId)
+        emailData.locale = locale
 
         const body = renderFusionReviewEmail(this.templates, emailData)
-        const subject = `${accountName} (${accountSource}) - Review candidate identity match`
+        const subject = translateWithParams('review_email_subject', locale, {
+            accountName,
+            accountSource,
+        })
 
-        await this.sendEmail(recipients, subject, body, { formId: formInstance.id })
+        await this.sendEmail(recipients, subject, body, { formId: formInstance.id, locale })
     }
 
     /**
@@ -213,7 +217,7 @@ export class EmailService {
         recipients: string[],
         subject: string,
         body: string,
-        options?: { formId?: string }
+        options?: { formId?: string; locale?: string }
     ): Promise<void> {
         assert(recipients && recipients.length > 0, 'Email recipients are required')
         assert(subject, 'Email subject is required')
@@ -231,7 +235,13 @@ export class EmailService {
         await this.refreshEmailWorkflowDefinitionBytes()
 
         const maxSerializedInputBytes = this.getMaxTestWorkflowInputBytes()
-        const fittedBody = this.fitEmailBodyToWorkflowLimit(subject, validRecipients, body, maxSerializedInputBytes)
+        const fittedBody = this.fitEmailBodyToWorkflowLimit(
+            subject,
+            validRecipients,
+            body,
+            maxSerializedInputBytes,
+            options?.locale
+        )
 
         const request = {
             input: buildEmailWorkflowTriggerInput(validRecipients, subject, fittedBody),
@@ -301,7 +311,8 @@ export class EmailService {
         subject: string,
         recipients: string[],
         body: string,
-        maxSerializedInputBytes: number
+        maxSerializedInputBytes: number,
+        locale?: string
     ): string {
         const currentBytes = this.workflowInputByteLength(subject, body, recipients)
         if (currentBytes <= maxSerializedInputBytes) return body
@@ -316,27 +327,34 @@ export class EmailService {
 
         const truncatedBuf = bodyBuf.subarray(0, allowedBodyBytes)
         const text = truncatedBuf.toString('utf8')
-        const notice = EmailService.TRUNCATION_NOTICE_HTML
+        const notice = buildTruncationNoticeHtml(locale ?? resolveEffectiveLocale(this.config))
         return text + notice
     }
 
-    public async getRecipientLocale(recipientId: string | undefined): Promise<string | undefined> {
-        if (!recipientId || !this.identities) return undefined
+    /** Resolves effective locale for an identity recipient. Always returns a supported locale code. */
+    public async getRecipientLocale(recipientId: string | undefined): Promise<string> {
+        if (!recipientId || !this.identities) {
+            return resolveEffectiveLocale(this.config)
+        }
 
         try {
-            const identity = this.identities.getIdentityById(recipientId)
-            const attributes = (identity as any)?.attributes || {}
-            const rawLang =
-                attributes.preferredLanguage ||
-                attributes.language ||
-                attributes.locale ||
-                attributes.userLanguage
+            if (!this.identities.getIdentityById(recipientId) &&
+                typeof this.identities.hydrateMissingIdentitiesById === 'function') {
+                await this.identities.hydrateMissingIdentitiesById([recipientId])
+            }
 
-            return normalizeLanguageCode(rawLang)
+            const identity = this.identities.getIdentityById(recipientId)
+            const attributes = ((identity as any)?.attributes || {}) as Record<string, unknown>
+            return resolveEffectiveLocale(this.config, attributes)
         } catch (e) {
             this.log.debug(`Unable to resolve locale for identity ${recipientId}: ${e}`)
-            return undefined
+            return resolveEffectiveLocale(this.config)
         }
+    }
+
+    /** Resolves effective locale from config only (no identity lookup). */
+    public getDefaultEffectiveLocale(): string {
+        return resolveEffectiveLocale(this.config)
     }
 
     public async getRecipientEmails(identityIds: (string | undefined)[]): Promise<string[]> {
@@ -426,6 +444,7 @@ export class EmailService {
         )
     }
 }
+
 
 
 
