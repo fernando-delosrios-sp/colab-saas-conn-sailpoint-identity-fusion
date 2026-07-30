@@ -1,4 +1,5 @@
 import { ChainState } from './ChainState'
+import type { ReplayApiAdapter } from '../../../../services/clientService/replayApiAdapter'
 import type { Mock } from 'vitest'
 
 export interface MockRegistry {
@@ -35,4 +36,7 @@ export interface ChainContext {
         stepId: string
     }
     scenario?: any
+    /** Shared api-log replay adapter for the chain (one instance, sequential consumption). */
+    replayAdapter?: ReplayApiAdapter
 }
+

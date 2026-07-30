@@ -1,6 +1,8 @@
 import { StepDefinition } from '../framework/ChainRunner'
 import { ChainContext, MockRegistry } from '../framework/ChainContext'
 import { createOperationTestRegistry, SourceConfigLike } from '../../harness/operationTestRegistry'
+import { createTestRegistry } from '../../harness/testRegistry'
+import { FusionConfig } from '../../../../model/config'
 import { FusionAccount } from '../../../../model/fusionAccount'
 import { buildManagedAccountKey } from '../../../../model/managedAccountKey'
 import { toManagedAccountInfo } from '../../../../model/fusionRun'
@@ -174,7 +176,18 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         sourceType: (s.sourceType as SourceConfigLike['sourceType']) ?? 'authoritative',
     }))
 
-    const registry = createOperationTestRegistry({ sourceConfigs: sourceConfigs as any })
+    const registry = context.replayAdapter
+        ? createTestRegistry({
+              sourceConfigs: scenarioSources as any,
+              config: context.config as FusionConfig,
+          })
+        : createOperationTestRegistry({ sourceConfigs: sourceConfigs as any })
+
+    if (context.replayAdapter) {
+        registry.client.wrapAdapter(() => context.replayAdapter!)
+        ;(registry.log as any).crash = vi.fn()
+    }
+
     registry.log.error = vi.fn().mockImplementation((...args) => {
         console.error('LOG.ERROR:', ...args)
     })
@@ -182,6 +195,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         console.warn('LOG.WARN:', ...args)
     })
 
+    if (!context.replayAdapter) {
     const schemaService = new SchemaService(context.config as any, registry.log as any, registry.sources as any, registry.client as any)
     registry.schemas = schemaService as any
 
@@ -656,6 +670,8 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
         }
         return { sent, eligible: eligibleList.length }
     })
+
+    }
 
     registry.res.send = vi.fn()
 

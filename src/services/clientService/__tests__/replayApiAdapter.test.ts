@@ -7,7 +7,7 @@ import * as path from 'path'
 import * as os from 'os'
 
 describe('ReplayApiAdapter', () => {
-    it('serves recorded response for known read call', () => {
+    it('serves recorded response for known read call', async () => {
         const entries: ApiLogEntry[] = [
             {
                 api: 'accounts',
@@ -20,7 +20,7 @@ describe('ReplayApiAdapter', () => {
         const adapter = new ReplayApiAdapter(entries)
 
         const accountsApi = adapter.accountsApi as any
-        const result = accountsApi.listAccounts({ limit: 10 })
+        const result = await accountsApi.listAccounts({ limit: 10 })
         expect(result).toEqual({ data: [{ id: '1', name: 'test' }] })
     })
 
@@ -42,7 +42,7 @@ describe('ReplayApiAdapter', () => {
         }).toThrow(ConnectorError)
     })
 
-    it('serves write response and consumes from write queue', () => {
+    it('serves write response and consumes from write queue', async () => {
         const entries: ApiLogEntry[] = [
             {
                 api: 'customForms',
@@ -55,11 +55,11 @@ describe('ReplayApiAdapter', () => {
         const adapter = new ReplayApiAdapter(entries)
 
         const formsApi = adapter.customFormsApi as any
-        const result = formsApi.createFormDefinition({ name: 'form-1' })
+        const result = await formsApi.createFormDefinition({ name: 'form-1' })
         expect(result).toEqual({ id: 'f1', status: 'created' })
     })
 
-    it('throws on second write call when only one was recorded', () => {
+    it('throws on second write call when only one was recorded', async () => {
         const entries: ApiLogEntry[] = [
             {
                 api: 'customForms',
@@ -72,7 +72,7 @@ describe('ReplayApiAdapter', () => {
         const adapter = new ReplayApiAdapter(entries)
         const formsApi = adapter.customFormsApi as any
 
-        formsApi.createFormDefinition({ name: 'form-1' })
+        await formsApi.createFormDefinition({ name: 'form-1' })
 
         expect(() => {
             formsApi.createFormDefinition({ name: 'form-1' })
@@ -171,4 +171,5 @@ describe('loadApiLog', () => {
         }
     })
 })
+
 
