@@ -40,14 +40,15 @@ describe('EmailService email header subtitle', () => {
 
     it('returns formatted subtitle for valid url', async () => {
         const { service } = createEmailService('https://tenant.api.identitynow.com')
-        const subtitle = service.buildEmailHeaderSubtitle()
+        const subtitle = service.buildEmailHeaderSubtitle('fr')
         expect(subtitle).toBe('tenant.identitynow.com - Fusion Source')
     })
 
-    it('uses fallback "Fusion source" when source has no name', async () => {
+    it('uses localized fallback when source has no name', async () => {
         const { service } = createEmailService('https://tenant.api.identitynow.com', null)
-        const subtitle = service.buildEmailHeaderSubtitle()
-        expect(subtitle).toBe('tenant.identitynow.com - Fusion source')
+        const subtitle = service.buildEmailHeaderSubtitle('fr')
+        expect(subtitle).toBe('tenant.identitynow.com - Source Fusion')
     })
 })
+
 

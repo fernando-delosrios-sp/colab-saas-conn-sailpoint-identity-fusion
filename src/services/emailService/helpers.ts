@@ -279,7 +279,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                             </tr>
                             {{#each scores}}
                             <tr style="background:{{#if (isAverageScoreRow attribute algorithm)}}#e0f2fe{{else}}{{#if isMatch}}#f0fdf4{{else}}#fef2f2{{/if}}{{/if}};">
-                              <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; font-size:9px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{attribute}}</td>
+                              <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; font-size:9px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{localizedScoreAttributeLabel attribute}}</td>
                               <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; font-size:9px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{algorithmLabel algorithm}}</td>
                               <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:9px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{formatPercent fusionScore}}%</td>
                               <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:9px;">{{#if skipped}}—{{else}}{{#if (isAverageScoreRow attribute algorithm)}}—{{else}}{{formatPercent score}}%{{/if}}{{/if}}</td>
@@ -513,7 +513,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                                         </tr>
                                                                         {{#each scores}}
                                                                         <tr style="background:{{#if (isAverageScoreRow attribute algorithm)}}#e0f2fe{{else}}{{#if isMatch}}#f0fdf4{{else}}#fef2f2{{/if}}{{/if}};">
-                                                                            <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; font-size:9px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{attribute}}</td>
+                                                                            <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; font-size:9px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{localizedScoreAttributeLabel attribute}}</td>
                                                                             <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; font-size:9px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{algorithmLabel algorithm}}</td>
                                                                             <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:9px; {{#if (isAverageScoreRow attribute algorithm)}}font-weight:900;{{/if}}">{{formatPercent fusionScore}}%</td>
                                                                             <td style="white-space:nowrap; padding:4px 6px; border:1px solid #eef2f7; color:#0f172a; text-align:right; font-size:9px;">{{#if skipped}}—{{else}}{{#if (isAverageScoreRow attribute algorithm)}}—{{else}}{{formatPercent score}}%{{/if}}{{/if}}</td>

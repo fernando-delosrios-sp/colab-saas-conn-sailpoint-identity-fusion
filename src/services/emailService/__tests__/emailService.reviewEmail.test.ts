@@ -1,5 +1,6 @@
 import { EmailService } from '../emailService'
 import { compileEmailTemplates, renderFusionReviewEmail } from '../helpers'
+import { registerHandlebarsHelpers } from '../messagingHandlebarsRegistration'
 
 const createEmailService = (overrides: Partial<{ config: Record<string, unknown>; identities: Record<string, unknown> }> = {}) => {
     const workflowsApi = {
@@ -135,11 +136,13 @@ describe('EmailService.sendFusionEmail', () => {
     })
 
     it('renders review email scores via mapScoreReportsForFusionReport helper path', () => {
+        registerHandlebarsHelpers()
         const templates = compileEmailTemplates()
         const html = renderFusionReviewEmail(templates, {
             totalAccounts: 1,
             matches: 1,
             reportDate: new Date('2026-07-27'),
+            locale: 'fr',
             accounts: [
                 {
                     accountName: '125536',
@@ -152,10 +155,10 @@ describe('EmailService.sendFusionEmail', () => {
                             isMatch: true,
                             scores: [
                                 {
-                                    attribute: 'firstname',
-                                    algorithm: 'jaro-winkler',
-                                    score: 92,
-                                    weightedScore: 46,
+                                    attribute: 'Combined score',
+                                    algorithm: 'weighted-mean',
+                                    score: 85,
+                                    weightedScore: 42,
                                     fusionScore: 50,
                                     isMatch: true,
                                 },
@@ -167,10 +170,11 @@ describe('EmailService.sendFusionEmail', () => {
         })
 
         expect(html).toContain('Jane Candidate')
-        expect(html).toContain('firstname')
-        expect(html).toContain('92%')
+        expect(html).toContain('Score combiné')
+        expect(html).not.toContain('combined_score_attribute')
     })
 })
+
 
 
 

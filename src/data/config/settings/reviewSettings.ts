@@ -4,6 +4,8 @@
 import { assert } from './assertLite'
 import { internalConfig } from '../internal'
 import type { ReviewSettingsSection } from '../../../model/config'
+import { extractBoolean } from '../../../utils/attributes'
+import { trimStr } from '../../../utils/safeRead'
 
 export const connectorSpecInitialValues = {
     fusionFormExpirationDays: 7,
@@ -41,6 +43,10 @@ export function readSettings(raw: Record<string, unknown>): ReviewSettingsSectio
         fusionMaxCandidatesForForm: Math.trunc(rawMaxCandidates),
         fusionOwnerIsGlobalReviewer: raw.fusionOwnerIsGlobalReviewer as boolean | undefined,
         fusionReportOnAggregation: raw.fusionReportOnAggregation as boolean | undefined,
+        enableLocalization: extractBoolean(raw, 'enableLocalization') ?? false,
+        defaultLanguage: trimStr(raw.defaultLanguage as string | undefined),
+        identityLanguageAttribute: trimStr(raw.identityLanguageAttribute as string | undefined),
     }
 }
+
 

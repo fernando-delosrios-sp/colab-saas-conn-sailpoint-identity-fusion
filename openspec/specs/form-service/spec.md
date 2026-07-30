@@ -123,13 +123,21 @@ When `getOrCreateFormDefinition` attempts to create a form definition and the IS
 
 ### Requirement: Review forms SHALL localize to defaultLanguage when localization is enabled
 
-When `enableLocalization` is true, the form service MUST translate user-facing review form strings (section labels, descriptions, toggle labels, helpText, score display text) using `locales.ts` and `translate()`. The locale MUST come from `resolveFormLocale(config)` which uses `defaultLanguage` only — NOT `identityLanguageAttribute`. When localization is disabled, forms MUST remain English.
+When `enableLocalization` is true, the form service MUST translate user-facing review form strings (section labels, descriptions, toggle labels, helpText, score display text) using `locales.ts` and `translate()`. The locale MUST come from `resolveFormLocale(config)`, which uses **`defaultLanguage` only** as the authoritative source. Review form locale MUST NOT read `identityLanguageAttribute` or recipient identity language — even when the review email is localized to the recipient's language. When localization is disabled, forms MUST remain English. When no supported `defaultLanguage` is configured, forms MUST fall back to English.
 
 #### Scenario: Localization enabled with French defaultLanguage
 
 - **GIVEN** `enableLocalization` is true and `defaultLanguage` is `fr`
 - **WHEN** `FormService` creates a fusion review form definition
 - **THEN** translatable form field labels and helpText MUST be French from `locales.ts`
+
+#### Scenario: Recipient language does not override form locale
+
+- **GIVEN** `enableLocalization` is true and `defaultLanguage` is `en`
+- **AND** the reviewer identity has a supported language attribute set to `ja`
+- **WHEN** `FormService` creates a fusion review form definition
+- **THEN** form strings MUST be English from `defaultLanguage`
+- **AND** the review email MAY still be Japanese via `resolveEffectiveLocale` for that recipient
 
 #### Scenario: Localization disabled
 
@@ -152,4 +160,5 @@ When `enableLocalization` is true, the form service MUST translate user-facing r
 - **GIVEN** localization is enabled with `defaultLanguage` `es`
 - **WHEN** `buildFormFields` runs with locale `es`
 - **THEN** no hardcoded English user-facing literals MUST remain outside `translate()` / `translateWithParams()`
+
 

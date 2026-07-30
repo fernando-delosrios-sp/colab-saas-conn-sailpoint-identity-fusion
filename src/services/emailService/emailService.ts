@@ -14,7 +14,7 @@ import type { FusionMatch } from '../matchingService/types'
 import { compileEmailTemplates, renderFusionReviewEmail, FusionReviewEmailData } from './helpers'
 import { registerHandlebarsHelpers } from './messagingHandlebarsRegistration'
 import { normalizeEmailValue, sanitizeRecipients, buildEmailWorkflowTriggerInput } from './email'
-import { buildTruncationNoticeHtml, resolveEffectiveLocale, translateWithParams } from './localization'
+import { buildTruncationNoticeHtml, resolveEffectiveLocale, translate, translateWithParams } from './localization'
 
 export interface FusionEmailContext {
     accountName: string
@@ -64,7 +64,7 @@ export class EmailService {
     /**
      * Build the standard email header subtitle.
      */
-    public buildEmailHeaderSubtitle(): string | undefined {
+    public buildEmailHeaderSubtitle(locale?: string): string | undefined {
         const configured = (this.config as any).emailHeaderSubtitle
         if (configured) return configured
 
@@ -84,12 +84,12 @@ export class EmailService {
         const sourceObj = (this.sources as any)?.fusionSource
         let sourceName: string
         if (sourceObj && typeof sourceObj === 'object' && 'name' in sourceObj) {
-            sourceName = sourceObj.name || 'Fusion source'
+            sourceName = sourceObj.name || translate('fusion_source_fallback', locale)
         } else {
             const fetched = (this.sources as any)?.getFusionSource?.()
-            sourceName = fetched?.name || 'Fusion source'
+            sourceName = fetched?.name || translate('fusion_source_fallback', locale)
         }
-        return `${host} - ${sourceName}`
+        return translateWithParams('email_header_subtitle', locale, { host, sourceName })
     }
 
     /**
@@ -153,13 +153,17 @@ export class EmailService {
                       scores: mapScoreReportsForFusionReport(candidate.scores || []),
                   }))
 
+        const primaryRecipientId = recipientIds[0]
+        const locale = await this.getRecipientLocale(primaryRecipientId)
+
         const emailData: FusionReviewEmailData = {
             totalAccounts: 1,
             matches: reviewMatches.length,
             reportDate: new Date(),
             formInstanceId: formInstance.id,
             formUrl: formInstance.standAloneFormUrl ?? undefined,
-            headerSubtitle: this.buildEmailHeaderSubtitle(),
+            headerSubtitle: this.buildEmailHeaderSubtitle(locale),
+            locale,
             accounts: [
                 {
                     accountName,
@@ -173,10 +177,6 @@ export class EmailService {
                 },
             ],
         }
-
-        const primaryRecipientId = recipientIds[0]
-        const locale = await this.getRecipientLocale(primaryRecipientId)
-        emailData.locale = locale
 
         const body = renderFusionReviewEmail(this.templates, emailData)
         const subject = translateWithParams('review_email_subject', locale, {
@@ -444,6 +444,7 @@ export class EmailService {
         )
     }
 }
+
 
 
 

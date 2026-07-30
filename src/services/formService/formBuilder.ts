@@ -5,7 +5,7 @@ import { SourceType } from '../../model/config'
 import { FusionAttribute } from '../../data/schema'
 import { capitalizeFirst } from '../../utils/attributes'
 import { trimStr } from '../../utils/safeRead'
-import { translate, translateWithParams } from '../emailService/localization'
+import { translate, translateWithParams, scoreAttributeLabel } from '../emailService/localization'
 import { ALGORITHM_LABELS } from './constants'
 import { Candidate, Score } from './types'
 
@@ -201,7 +201,7 @@ export const buildCandidateFields = (
                 key: `${candidateId}.${attrKey}.${algorithmKey}.score`,
                 elementType: 'TEXT',
                 config: {
-                    label: capitalizeFirst(attrName),
+                    label: scoreAttributeLabel(attrName, locale),
                     helpText: algorithm,
                     default: formatScoreDisplay(score, locale),
                 },
@@ -689,5 +689,6 @@ export const buildFormInputs = (
 
     return formInputs
 }
+
 
 

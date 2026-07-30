@@ -567,6 +567,85 @@ describe('FormService createFusionForm', () => {
         expect(createFormInstance).toHaveBeenCalledTimes(1)
     })
 
+    it('builds localized form definition when localization is enabled with defaultLanguage fr', async () => {
+        FusionAccount.configure({ sources: ['Source A'] } as any)
+
+        const createFormDefinition = vi.fn().mockResolvedValue({ data: { id: 'form-def-1', name: 'Fusion Review' } })
+        const createFormInstance = vi.fn().mockResolvedValue({
+            data: { id: 'inst-1', standAloneFormUrl: 'https://review/1' },
+        })
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({ data: { results: [] } })
+        const searchFormInstancesByTenant = vi.fn().mockResolvedValue({ data: [] })
+
+        const customFormsMock = {
+            createFormDefinition,
+            createFormInstance,
+            searchFormDefinitionsByTenant,
+            searchFormInstancesByTenant,
+        }
+
+        const run = new FusionRun()
+        const sources = {
+            fusionSourceId: 'fusion-src',
+            fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
+            getSourceByNameSafe: vi.fn().mockReturnValue({ sourceType: SourceType.Authoritative }),
+        }
+
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'acct-1',
+            nativeIdentity: 'native-1',
+            name: 'Test User',
+            sourceId: 'source-a-id',
+            sourceName: 'Source A',
+            attributes: { email: 'user@example.com' },
+        } as any)
+        fusionAccount.addFusionMatch({
+            fusionIdentity: {
+                identityId: 'candidate-1',
+                attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },
+            },
+            scores: [{ attribute: 'email', algorithm: 'lig3', score: 85, fusionScore: 50 }],
+        } as any)
+
+        const reviewer = FusionAccount.fromIdentity({
+            id: 'reviewer-1',
+            name: 'Reviewer',
+            attributes: { email: 'reviewer@example.com' },
+        } as any)
+
+        const service = new FormService(
+            {
+                fusionFormNamePattern: 'Fusion Review',
+                fusionFormExpirationDays: 7,
+                fusionFormAttributes: ['Email'],
+                fusionMaxCandidatesForForm: 10,
+                enableLocalization: true,
+                defaultLanguage: 'fr',
+            } as any,
+            { warn: vi.fn(), debug: vi.fn(), info: vi.fn() } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+            } as any,
+            sources as any,
+            undefined,
+            undefined,
+            run
+        )
+
+        await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        expect(createFormDefinition).toHaveBeenCalledTimes(1)
+        const formBody = createFormDefinition.mock.calls[0][0].body
+        const identitiesSection = formBody.formElements.find(
+            (element: { key?: string }) => element.key === 'identitiesSection'
+        )
+        const toggle = identitiesSection?.config?.formElements?.[0]?.config?.columns?.[0]?.[0]
+        expect(toggle?.config?.label).toBe('Nouvelle identité')
+        expect(formBody.description).toMatch(/^fusion-locale:\d+:fr\|/)
+        expect(formBody.name).toMatch(/ \[fr\]$/)
+    })
+
     it('builds English form definition when localization is disabled despite defaultLanguage fr', async () => {
         FusionAccount.configure({ sources: ['Source A'] } as any)
 
@@ -642,9 +721,195 @@ describe('FormService createFusionForm', () => {
         expect(toggle?.config?.label).toBe('New identity')
         expect(createFormDefinition.mock.calls[0][0].body.description).toContain('Review potential matching identity')
     })
+
+    it('creates a new localized form definition instead of reusing a legacy English definition', async () => {
+        FusionAccount.configure({ sources: ['Source A'] } as any)
+
+        const legacyEnglishDefinition = {
+            id: 'form-def-legacy',
+            name: 'Fusion Review - Test User [Source A] (source-a-id::native-1)',
+            description: 'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
+        }
+        const createFormDefinition = vi.fn().mockResolvedValue({ data: { id: 'form-def-fr', name: 'localized' } })
+        const patchFormDefinition = vi.fn()
+        const createFormInstance = vi.fn().mockResolvedValue({
+            data: { id: 'inst-1', standAloneFormUrl: 'https://review/1' },
+        })
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({ data: { results: [legacyEnglishDefinition] } })
+        const searchFormInstancesByTenant = vi.fn().mockResolvedValue({ data: [] })
+
+        const customFormsMock = {
+            createFormDefinition,
+            patchFormDefinition,
+            createFormInstance,
+            searchFormDefinitionsByTenant,
+            searchFormInstancesByTenant,
+        }
+
+        const run = new FusionRun()
+        const sources = {
+            fusionSourceId: 'fusion-src',
+            fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
+            getSourceByNameSafe: vi.fn().mockReturnValue({ sourceType: SourceType.Authoritative }),
+        }
+
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'acct-1',
+            nativeIdentity: 'native-1',
+            name: 'Test User',
+            sourceId: 'source-a-id',
+            sourceName: 'Source A',
+            attributes: { email: 'user@example.com' },
+        } as any)
+        fusionAccount.addFusionMatch({
+            fusionIdentity: {
+                identityId: 'candidate-1',
+                attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },
+            },
+            scores: [{ attribute: 'email', algorithm: 'lig3', score: 85, fusionScore: 50 }],
+        } as any)
+
+        const reviewer = FusionAccount.fromIdentity({
+            id: 'reviewer-1',
+            name: 'Reviewer',
+            attributes: { email: 'reviewer@example.com' },
+        } as any)
+
+        const info = vi.fn()
+        const service = new FormService(
+            {
+                fusionFormNamePattern: 'Fusion Review',
+                fusionFormExpirationDays: 7,
+                fusionFormAttributes: ['Email'],
+                fusionMaxCandidatesForForm: 10,
+                enableLocalization: true,
+                defaultLanguage: 'fr',
+            } as any,
+            { warn: vi.fn(), debug: vi.fn(), info, error: vi.fn() } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+            } as any,
+            sources as any,
+            undefined,
+            undefined,
+            run
+        )
+
+        await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        expect(createFormDefinition).toHaveBeenCalledTimes(1)
+        expect(patchFormDefinition).not.toHaveBeenCalled()
+        const formBody = createFormDefinition.mock.calls[0][0].body
+        expect(formBody.name).toBe('Fusion Review - Test User [Source A] (source-a-id::native-1) [fr]')
+        const identitiesSection = formBody.formElements.find(
+            (element: { key?: string }) => element.key === 'identitiesSection'
+        )
+        const toggle = identitiesSection?.config?.formElements?.[0]?.config?.columns?.[0]?.[0]
+        expect(toggle?.config?.label).toBe('Nouvelle identité')
+        expect(info).toHaveBeenCalledWith(expect.stringContaining('Creating fusion form definition'))
+        expect(info).toHaveBeenCalledWith(expect.stringContaining('toggle label="Nouvelle identité"'))
+    })
 })
 
 describe('FormService getOrCreateFormDefinition conflict recovery', () => {
+    it('recreates localized definition when one already exists for the same name', async () => {
+        FusionAccount.configure({ sources: [] } as any)
+        const existingDefinition = {
+            id: 'form-existing',
+            name: 'Fusion Test Form [fr]',
+            description: 'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
+        }
+        const createdDefinition = {
+            id: 'form-new',
+            name: 'Fusion Test Form [fr]',
+            description: 'fusion-locale:3:fr|French description',
+        }
+        const getFormDefinitionByName = vi.fn().mockResolvedValue(existingDefinition)
+        const deleteFormDefinition = vi.fn().mockResolvedValue(undefined)
+        const buildFusionFormDefinition = vi.fn().mockResolvedValue(createdDefinition)
+        const refreshFusionFormDefinition = vi.fn()
+
+        const service = new FormService(
+            { enableLocalization: true, defaultLanguage: 'fr' } as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
+            {} as any,
+            {} as any
+        )
+        ;(service as any).getFormDefinitionByName = getFormDefinitionByName
+        ;(service as any).deleteFormDefinition = deleteFormDefinition
+        ;(service as any).buildFusionFormDefinition = buildFusionFormDefinition
+        ;(service as any).refreshFusionFormDefinition = refreshFusionFormDefinition
+
+        const result = await (service as any).getOrCreateFormDefinition(
+            'Fusion Test Form [fr]',
+            FusionAccount.fromManagedAccount({
+                id: 'acct-1',
+                nativeIdentity: 'native-1',
+                name: 'Managed Account',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+            } as any),
+            []
+        )
+
+        expect(result).toEqual(createdDefinition)
+        expect(deleteFormDefinition).toHaveBeenCalledWith('form-existing')
+        expect(buildFusionFormDefinition).toHaveBeenCalledTimes(1)
+        expect(refreshFusionFormDefinition).not.toHaveBeenCalled()
+    })
+
+    it('patches definition recovered after duplicate-name create conflict when localized', async () => {
+        FusionAccount.configure({ sources: [] } as any)
+        const existingDefinition = {
+            id: 'form-existing',
+            name: 'Fusion Test Form [fr]',
+            description: 'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
+        }
+        const patchedDefinition = {
+            id: 'form-existing',
+            name: 'Fusion Test Form [fr]',
+            description: 'fusion-locale:3:fr|French description',
+        }
+        const getFormDefinitionByName = vi
+            .fn()
+            .mockResolvedValueOnce(existingDefinition)
+            .mockResolvedValueOnce(existingDefinition)
+        const deleteFormDefinition = vi.fn().mockResolvedValue(undefined)
+        const buildFusionFormDefinition = vi.fn().mockRejectedValue({
+            response: { status: 409, data: { detailCode: '400.1.409' } },
+        })
+        const refreshFusionFormDefinition = vi.fn().mockResolvedValue(patchedDefinition)
+
+        const service = new FormService(
+            { enableLocalization: true, defaultLanguage: 'fr' } as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
+            {} as any,
+            {} as any
+        )
+        ;(service as any).getFormDefinitionByName = getFormDefinitionByName
+        ;(service as any).deleteFormDefinition = deleteFormDefinition
+        ;(service as any).buildFusionFormDefinition = buildFusionFormDefinition
+        ;(service as any).refreshFusionFormDefinition = refreshFusionFormDefinition
+
+        const result = await (service as any).getOrCreateFormDefinition(
+            'Fusion Test Form [fr]',
+            FusionAccount.fromManagedAccount({
+                id: 'acct-1',
+                nativeIdentity: 'native-1',
+                name: 'Managed Account',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+            } as any),
+            []
+        )
+
+        expect(result).toEqual(patchedDefinition)
+        expect(refreshFusionFormDefinition).toHaveBeenCalledTimes(1)
+    })
+
     it('reuses existing definition after duplicate-name create conflict', async () => {
         FusionAccount.configure({ sources: [] } as any)
         const existingDefinition = { id: 'form-existing', name: 'Fusion Test Form' }
@@ -702,6 +967,7 @@ describe('formInstanceAnalyzer', () => {
         expect(result.instancesToProcess).toHaveLength(1)
     })
 })
+
 
 
 

@@ -156,16 +156,31 @@ export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: 
     })
 }
 
+export type BuildFormNameOptions = {
+    enableLocalization?: boolean
+    locale?: string
+}
+
 /**
  * Build form name from fusion account with a stable account identifier suffix
  * to avoid collisions when multiple accounts share the same display name/source.
+ * When localization is enabled, appends `[locale]` so each language gets its own
+ * form definition built with literal translated labels (never reuses an English definition).
  */
-export const buildFormName = (fusionAccount: FusionAccount, fusionFormNamePattern: string): string => {
+export const buildFormName = (
+    fusionAccount: FusionAccount,
+    fusionFormNamePattern: string,
+    options?: BuildFormNameOptions
+): string => {
     const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
     const source = `[${fusionAccount.sourceName}]`
     const accountIdentifier =
         trimStr(fusionAccount.managedKey) || trimStr(fusionAccount.managedAccountId) || 'unknown'
-    return `${fusionFormNamePattern} - ${accountName} ${source} (${accountIdentifier})`
+    const base = `${fusionFormNamePattern} - ${accountName} ${source} (${accountIdentifier})`
+    if (options?.enableLocalization && options.locale) {
+        return `${base} [${options.locale}]`
+    }
+    return base
 }
 
 /**

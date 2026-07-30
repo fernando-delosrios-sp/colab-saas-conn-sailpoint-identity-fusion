@@ -10,7 +10,12 @@ import { ClientService } from '../clientService'
 import { LogService } from '../logService'
 import { IdentityService } from '../identityService'
 import { EmailService } from '../emailService'
-import { resolveFormLocale, translate } from '../emailService/localization'
+import {
+    buildFormDefinitionDescription,
+    isLocalizationEnabled,
+    readNewIdentityToggleLabel,
+    resolveFormLocale,
+} from '../emailService/localization'
 import { SourceService } from '../sourceService'
 import { FusionRun } from '../../model/fusionRun'
 import { assert, softAssert } from '../../utils/assert'
@@ -79,8 +84,6 @@ export class FormService {
     private readonly fusionFormExpirationDays: number
     private readonly fusionFormAttributes?: string[]
     private readonly fusionMaxCandidatesForForm: number
-    private readonly enableLocalization: boolean
-    private readonly defaultLanguage?: string
     private readonly lifecycle: FormLifecycle
 
     // ------------------------------------------------------------------------
@@ -88,7 +91,7 @@ export class FormService {
     // ------------------------------------------------------------------------
 
     constructor(
-        config: FusionConfig,
+        private readonly config: FusionConfig,
         private log: LogService,
         private client: ClientService,
         private sources: SourceService,
@@ -100,8 +103,13 @@ export class FormService {
         this.fusionFormExpirationDays = config.fusionFormExpirationDays
         this.fusionFormAttributes = config.fusionFormAttributes
         this.fusionMaxCandidatesForForm = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
-        this.enableLocalization = config.enableLocalization === true
-        this.defaultLanguage = config.defaultLanguage
+        if (this.localizationEnabled) {
+            this.log.info(
+                `Form localization enabled: defaultLanguage=${config.defaultLanguage ?? '(unset)'} → form locale ${this.formLocale}`
+            )
+        } else {
+            this.log.debug('Form localization disabled; review forms use English labels')
+        }
         this.lifecycle = new FormLifecycle({
             client: this.client,
             log: this.log,
@@ -109,6 +117,14 @@ export class FormService {
             fusionFormExpirationDays: this.fusionFormExpirationDays,
             formDeleteQueueConcurrency: this.formDeleteQueueConcurrency,
         })
+    }
+
+    private get localizationEnabled(): boolean {
+        return isLocalizationEnabled(this.config)
+    }
+
+    private get formLocale(): string {
+        return resolveFormLocale(this.config)
     }
 
     // ------------------------------------------------------------------------
@@ -309,7 +325,7 @@ export class FormService {
 
         const { candidates, formDefinition, formInput, expire, fusionSourceId } = await this.prepareFormCreationData(
             fusionAccount,
-            reviewers!.size
+            reviewers!
         )
 
         if (formDefinition) {
@@ -358,7 +374,7 @@ export class FormService {
      */
     private async prepareFormCreationData(
         fusionAccount: FusionAccount,
-        reviewerCount: number
+        reviewers: Set<FusionAccount>
     ): Promise<{
         candidates: Candidate[]
         formName: string
@@ -367,7 +383,7 @@ export class FormService {
         expire: string
         fusionSourceId: string
     }> {
-        this.log.debug(`Building fusion form for account ${fusionAccount.name} with ${reviewerCount} reviewer(s)`)
+        this.log.debug(`Building fusion form for account ${fusionAccount.name} with ${reviewers.size} reviewer(s)`)
 
         const candidates = buildCandidateList(fusionAccount, this.fusionMaxCandidatesForForm)
         assert(candidates, 'Failed to build candidate list')
@@ -377,11 +393,24 @@ export class FormService {
         const sourceType =
             this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
 
-        const formName = buildFormName(fusionAccount, this.fusionFormNamePattern)
+        const formLocale = this.formLocale
+        if (this.localizationEnabled) {
+            this.log.debug(
+                `Building localized form definition for defaultLanguage=${this.config.defaultLanguage ?? '(unset)'} → locale ${formLocale}`
+            )
+        }
+        const formName = buildFormName(fusionAccount, this.fusionFormNamePattern, {
+            enableLocalization: this.localizationEnabled,
+            locale: formLocale,
+        })
         assert(formName, 'Form name is required')
 
-        const formDefinition = await this.getOrCreateFormDefinition(formName, fusionAccount, candidates)
-        const formLocale = resolveFormLocale({ enableLocalization: this.enableLocalization, defaultLanguage: this.defaultLanguage })
+        const formDefinition = await this.getOrCreateFormDefinition(
+            formName,
+            fusionAccount,
+            candidates,
+            formLocale
+        )
         const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes, sourceType, formLocale)
         assert(formInput, 'Form input is required')
 
@@ -468,13 +497,49 @@ export class FormService {
     private async getOrCreateFormDefinition(
         formName: string,
         fusionAccount: FusionAccount,
-        candidates: Candidate[]
+        candidates: Candidate[],
+        formLocale: string
     ): Promise<FormDefinitionResponseV2025 | undefined> {
+        if (this.localizationEnabled) {
+            const existing = await this.getFormDefinitionByName(formName)
+            if (existing?.id) {
+                this.log.info(
+                    `Replacing existing form definition ${existing.id} for localized form "${formName}" (locale ${formLocale})`
+                )
+                try {
+                    await this.deleteFormDefinition(existing.id)
+                } catch (error) {
+                    const detail = error instanceof Error ? error.message : String(error)
+                    this.log.warn(
+                        `Could not delete form definition ${existing.id} before recreate; will attempt create anyway: ${detail}`
+                    )
+                }
+            }
+
+            try {
+                const created = await this.buildFusionFormDefinition(formName, fusionAccount, candidates, formLocale)
+                softAssert(created, 'Failed to create localized form definition')
+                softAssert(created?.id, 'Localized form definition ID is required')
+                return created!
+            } catch (error) {
+                if (this.isDuplicateFormDefinitionNameConflict(error)) {
+                    this.log.warn(
+                        `Form definition create conflict for name ${formName}; retrying lookup and patch for locale ${formLocale}`
+                    )
+                    const retried = await this.getFormDefinitionByName(formName)
+                    if (retried?.id) {
+                        return this.refreshFusionFormDefinition(retried.id, fusionAccount, candidates, formLocale)
+                    }
+                }
+                throw error
+            }
+        }
+
         let formDefinition = await this.getFormDefinitionByName(formName)
         if (!formDefinition) {
             this.log.debug(`Form definition not found, creating new one: ${formName}`)
             try {
-                formDefinition = await this.buildFusionFormDefinition(formName, fusionAccount, candidates)
+                formDefinition = await this.buildFusionFormDefinition(formName, fusionAccount, candidates, formLocale)
             } catch (error) {
                 if (this.isDuplicateFormDefinitionNameConflict(error)) {
                     this.log.warn(
@@ -491,6 +556,9 @@ export class FormService {
         } else {
             this.log.debug(`Using existing form definition: ${formDefinition.id}`)
         }
+
+        assert(formDefinition, 'Form definition is required')
+        assert(formDefinition.id, 'Form definition ID is required')
         return formDefinition
     }
 
@@ -1031,8 +1099,71 @@ export class FormService {
     private async buildFusionFormDefinition(
         formName: string,
         fusionAccount: FusionAccount,
-        candidates: Candidate[]
+        candidates: Candidate[],
+        formLocale: string
     ): Promise<FormDefinitionResponseV2025 | undefined> {
+        const body = this.composeFusionFormDefinitionBody(fusionAccount, candidates, formLocale)
+        if (!body) {
+            return
+        }
+
+        const owner = this.sources.fusionSourceOwner
+        assert(owner, 'Form owner is required')
+        assert(owner.id, 'Form owner ID is required')
+        assert(owner.type, 'Form owner type is required')
+
+        const formDefinition: CustomFormsV2025ApiCreateFormDefinitionRequest = {
+            body: {
+                name: formName,
+                description: body.description,
+                owner,
+                formElements: body.formFields,
+                formInput: body.formInputs,
+                formConditions: body.formConditions as any,
+            },
+        }
+
+        if (this.localizationEnabled) {
+            this.log.info(
+                `Creating fusion form definition "${formName}" with locale ${body.formLocale}; ` +
+                    `toggle label="${body.sampleToggleLabel ?? 'n/a'}"`
+            )
+        }
+
+        return await this.createFormDefinition(formDefinition)
+    }
+
+    private async refreshFusionFormDefinition(
+        formDefinitionId: string,
+        fusionAccount: FusionAccount,
+        candidates: Candidate[],
+        formLocale: string
+    ): Promise<FormDefinitionResponseV2025> {
+        const body = this.composeFusionFormDefinitionBody(fusionAccount, candidates, formLocale)
+        assert(body, 'Form definition body is required to refresh localization')
+
+        return this.lifecycle.patchFormDefinition(formDefinitionId, [
+            { op: 'replace', path: '/description', value: body.description },
+            { op: 'replace', path: '/formElements', value: body.formFields },
+            { op: 'replace', path: '/formInput', value: body.formInputs },
+            { op: 'replace', path: '/formConditions', value: body.formConditions },
+        ])
+    }
+
+    private composeFusionFormDefinitionBody(
+        fusionAccount: FusionAccount,
+        candidates: Candidate[],
+        formLocale: string
+    ):
+        | {
+              description: string
+              formFields: ReturnType<typeof buildFormFields>
+              formInputs: ReturnType<typeof buildFormInputs>
+              formConditions: ReturnType<typeof buildFormConditions>
+              formLocale: string
+              sampleToggleLabel?: string
+          }
+        | undefined {
         if (candidates.length > this.fusionMaxCandidatesForForm) {
             this.log.error(
                 `Candidates must be less than or equal to ${this.fusionMaxCandidatesForForm} (fusionMaxCandidatesForForm)`
@@ -1041,40 +1172,29 @@ export class FormService {
         }
         const sourceType =
             this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
-        const formLocale = resolveFormLocale({ enableLocalization: this.enableLocalization, defaultLanguage: this.defaultLanguage })
         const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType, formLocale)
         const formInputs = buildFormInputs(fusionAccount, candidates, this.fusionFormAttributes, formLocale)
         const formConditions = buildFormConditions(candidates, this.fusionFormAttributes)
-        const owner = this.sources.fusionSourceOwner
 
-        // Validate form definition components before creating
         this.log.debug(
             `Form definition validation: fields=${formFields.length}, inputs=${formInputs.length}, conditions=${formConditions.length}`
         )
 
         assert(formFields && formFields.length > 0, 'Form fields must not be empty')
         assert(formInputs && formInputs.length > 0, 'Form inputs must not be empty')
-        assert(owner, 'Form owner is required')
-        assert(owner.id, 'Form owner ID is required')
-        assert(owner.type, 'Form owner type is required')
 
-        // Warn if form definition is very large (may cause API issues)
         if (formConditions.length > 500) {
             this.log.warn(`Form has ${formConditions.length} conditions - this may cause API performance issues`)
         }
 
-        const formDefinition: CustomFormsV2025ApiCreateFormDefinitionRequest = {
-            body: {
-                name: formName,
-                description: translate('form_definition_description', formLocale),
-                owner,
-                formElements: formFields,
-                formInput: formInputs,
-                formConditions: formConditions as any,
-            },
+        return {
+            description: buildFormDefinitionDescription(formLocale, this.localizationEnabled),
+            formFields,
+            formInputs,
+            formConditions,
+            formLocale,
+            sampleToggleLabel: readNewIdentityToggleLabel(formFields),
         }
-
-        return await this.createFormDefinition(formDefinition)
     }
 
 
@@ -1125,3 +1245,4 @@ export class FormService {
         return this.lifecycle.deleteFormDefinition(formDefinitionId)
     }
 }
+
