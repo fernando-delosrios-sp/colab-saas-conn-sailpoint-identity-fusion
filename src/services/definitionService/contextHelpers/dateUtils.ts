@@ -83,29 +83,29 @@ const FORMAT_TOKENS = [
 function tokenToRegexPattern(match: string): string {
     switch (match) {
         case 'yyyy':
-            return '(\d{4})'
+            return '(\\d{4})'
         case 'yy':
-            return '(\d{2})'
+            return '(\\d{2})'
         case 'MM':
-            return '(\d{2})'
+            return '(\\d{2})'
         case 'M':
-            return '(\d{1,2})'
+            return '(\\d{1,2})'
         case 'dd':
-            return '(\d{2})'
+            return '(\\d{2})'
         case 'd':
-            return '(\d{1,2})'
+            return '(\\d{1,2})'
         case 'HH':
-            return '(\d{2})'
+            return '(\\d{2})'
         case 'H':
-            return '(\d{1,2})'
+            return '(\\d{1,2})'
         case 'mm':
-            return '(\d{2})'
+            return '(\\d{2})'
         case 'm':
-            return '(\d{1,2})'
+            return '(\\d{1,2})'
         case 'ss':
-            return '(\d{2})'
+            return '(\\d{2})'
         case 's':
-            return '(\d{1,2})'
+            return '(\\d{1,2})'
         case 'XXX':
         case 'ZZZ':
         case 'xxx':
@@ -115,14 +115,14 @@ function tokenToRegexPattern(match: string): string {
         case 'X':
         case 'Z':
         case 'x':
-            return '(Z|[+-]\d{2}(?::?\d{2})?)'
+            return '(Z|[+-]\\d{2}(?::?\\d{2})?)'
         default:
             return match
     }
 }
 
 function buildFormatRegex(formatStr: string): { regex: RegExp; matchedTokens: string[] } {
-    const escapedFormat = formatStr.replace(/[\^$*+?.()|[\]{}]/g, '\$&').replace(/'/g, '')
+    const escapedFormat = formatStr.replace(/[\\^$*+?.()|[\]{}]/g, '\\$&').replace(/'/g, '')
     const matchedTokens: string[] = []
     const tokenRegex = new RegExp(FORMAT_TOKENS.join('|'), 'g')
     const pattern = escapedFormat.replace(tokenRegex, (match) => {
@@ -441,3 +441,4 @@ export const Datefns = {
     now,
     isValid,
 }
+
