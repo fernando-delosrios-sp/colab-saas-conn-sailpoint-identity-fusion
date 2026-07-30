@@ -127,7 +127,7 @@ function computeAggregateFetchProgress(sourceProgress: Map<string, { loaded: num
 }
 
 function collectAccountsFromBatch(
-    source: { id: string; name: string },
+    source: SourceInfo,
     batch: Account[],
     effectiveLimit: number | undefined,
     collectedCount: number,
@@ -240,3 +240,4 @@ export async function fetchManagedAccounts(
         log.debug(`Total managed accounts loaded: ${run.managedAccountsById.size}`)
     }, 'Failed to fetch managed accounts')
 }
+
