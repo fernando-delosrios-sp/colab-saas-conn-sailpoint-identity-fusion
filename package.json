@@ -3,7 +3,7 @@
     "version": "2.2.0",
     "main": "dist/index.js",
     "scripts": {
-        "clean": "shx rm -rf ./dist",
+        "clean": "node scripts/clean-dist.cjs",
         "prebuild": "npm run clean && node scripts/sync-connector-spec-initial-values.cjs",
         "build": "npx ncc build ./src/index.ts -o ./dist -m -C",
         "docs:install": "node scripts/docs-venv.cjs install",
@@ -28,7 +28,7 @@
         "lint:markdown": "npx markdownlint \"README.md\" \"docs/**/*.md\"",
         "ci:refactor-review": "node scripts/ci-eslint-changed.cjs",
         "ci:docs-code-review": "node scripts/ci-eslint-changed.cjs",
-        "ci:docs-review": "node scripts/ci-markdown-changed.cjs && npm run docs:prepare && (python3 -m pip install --user -r requirements-docs.txt || true) && python3 -m mkdocs build && node scripts/ci-check-readme-changelog.cjs",
+        "ci:docs-review": "node scripts/ci-markdown-changed.cjs && node scripts/check-lean-ctx-docs.cjs && npm run docs:prepare && (python3 -m pip install --user -r requirements-docs.txt || true) && python3 -m mkdocs build && node scripts/ci-check-readme-changelog.cjs",
         "prettier": "npx prettier --write .",
         "prepack-zip": "npm ci && npm run build",
         "pack-zip": "spcx package",
@@ -103,4 +103,6 @@
         "readdir-glob": "^3.0.0"
     }
 }
+
+
 

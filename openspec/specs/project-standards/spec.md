@@ -3,9 +3,7 @@
 ## Purpose
 
 This spec defines the build, test, lint, and development tooling conventions for the project, as well as the directory structure and code conventions that all contributors (human or AI) should follow.
-
 ## Requirements
-
 ### Requirement: Build and dev commands are documented
 
 All essential project commands SHALL be documented in `.agents/AGENTS.md` with their purpose.
@@ -167,7 +165,7 @@ Feature: version-update-procedure
 
 ### Requirement: Edit the most-affected docs guide so the MkDocs site stays in lockstep with the release
 
-The release-prep agent MUST edit at least one file under `docs/guides/`
+The release-prep agent MUST edit at least one file under `docs/use-guides/`
 when a version bump is detected, picked from the [src -> docs scope
 map](#src---docs-scope-map), so the MkDocs documentation site reflects
 the released code.
@@ -180,7 +178,7 @@ Feature: version-update-procedure
   contains at least one file under `src/services/attributeService/`
 - **AND** no other `src/` path has more changed files
 - **WHEN** the agent picks the most-affected guide
-- **THEN** the agent edits `docs/guides/define.md` (the page mapped
+- **THEN** the agent edits `docs/use-guides/configuration/defining-attributes.md` (the page mapped
   from `src/services/attributeService/**`)
 
 #### Scenario: Multiple src paths map to the same guide, that guide wins
@@ -189,7 +187,7 @@ Feature: version-update-procedure
   `src/services/attributeService/` and one file under
   `src/services/fusionService/`
 - **WHEN** the agent picks the most-affected guide
-- **THEN** the agent edits `docs/guides/define.md` (the page with the
+- **THEN** the agent edits `docs/use-guides/configuration/defining-attributes.md` (the page with the
   most hits)
 
 #### Scenario: Ties in hit count are broken by lexicographic order of the page path
@@ -206,7 +204,7 @@ Feature: version-update-procedure
 
 - **GIVEN** the diff contains only files under `src/operations/**`
 - **WHEN** the agent picks the most-affected guide
-- **THEN** the agent edits `docs/guides/troubleshooting.md` (the
+- **THEN** the agent edits `docs/use-guides/validation-and-troubleshooting/troubleshooting.md` (the
   operations fallback from the map)
 - **AND** the diff contains a meaningful edit to that page
 
@@ -215,7 +213,7 @@ Feature: version-update-procedure
 - **GIVEN** the diff contains only changes to `package.json` and
   `package-lock.json`
 - **WHEN** the agent picks the most-affected guide
-- **THEN** the agent edits `docs/guides/advanced-connection-settings.md`
+- **THEN** the agent edits `docs/use-guides/operation/connection-and-observability-tuning.md`
   (the dependency fallback from the map)
 - **AND** the diff contains a meaningful edit to that page
 
@@ -225,7 +223,7 @@ Feature: version-update-procedure
 - **AND** at least one file in `src/**`, `connector-spec.json`, or
   `package.json` has changed since the previous version tag
 - **WHEN** the agent finishes
-- **THEN** the diff contains at least one file under `docs/guides/`
+- **THEN** the diff contains at least one file under `docs/use-guides/`
 
 ### Requirement: Rules are enforced by the release-prep opencode subagent, not by CI
 
@@ -281,7 +279,7 @@ Feature: version-update-procedure
 
 - **GIVEN** a `### 2.3.0` block already exists at the top of `## Changelog`
 - **AND** the `version` field in `package.json` is still `2.3.0`
-- **AND** no file in `src/**`, `docs/guides/**`, or `connector-spec.json`
+- **AND** no file in `src/**`, `docs/use-guides/**`, or `connector-spec.json`
   has changed since the previous release-prep run
 - **WHEN** the release-prep agent runs
 - **THEN** the agent does not insert a second `### 2.3.0` block
@@ -290,9 +288,20 @@ Feature: version-update-procedure
 #### Scenario: A `### X.Y.Z` block for the current version exists and the most-affected guide has been edited since
 
 - **GIVEN** a `### 2.3.0` block already exists at the top of `## Changelog`
-- **AND** a new file under `docs/guides/` has been edited since the
+- **AND** a new file under `docs/use-guides/` has been edited since the
   previous run
 - **WHEN** the release-prep agent runs
 - **THEN** the agent does not insert a second `### 2.3.0` block
 - **AND** the agent updates the previously-picked guide in place with
   a fresh edit tied to the new change
+
+### Requirement: Docs CI SHALL reject lean-ctx placeholder corruption
+
+The docs CI pipeline MUST fail if any file under `docs/` contains the pattern `lean-ctx: omitted` indicating corrupted lean-ctx read artifacts.
+
+#### Scenario: Corrupted doc is committed
+
+- **GIVEN** a markdown file under `docs/` contains `... [lean-ctx: omitted`
+- **WHEN** `npm run ci:docs-review` runs
+- **THEN** the command SHALL exit with a non-zero status
+

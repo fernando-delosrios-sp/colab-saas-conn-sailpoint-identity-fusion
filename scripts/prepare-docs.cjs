@@ -14,5 +14,9 @@ function runNode(scriptName) {
     }
 }
 
-runNode('sync-docs-home.cjs')
+runNode('generate-config-docs.cjs')
 runNode('copy-license-for-docs.cjs')
+runNode('copy-changelog-for-docs.cjs')
+runNode('check-lean-ctx-docs.cjs')
+
+

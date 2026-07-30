@@ -9,45 +9,59 @@ theme:
 
 nav:
     - Home: index.md
-    - Get started: get-started.md
-    - Concepts:
-          - Map, define, and match: concepts/map-define-match.md
-    - Configuration guides:
-          - Guides overview: guides/index.md
-          - Core pipeline:
-                - Map: guides/map.md
-                - Define: guides/define.md
-                - Match: guides/match.md
-                - Matching algorithms: guides/matching-algorithms.md
-          - Sources and scope:
-                - Source configuration: guides/source-configuration.md
-          - Deployment and integration:
-                - Advanced connection settings: guides/advanced-connection-settings.md
-                - Proxy mode: guides/proxy-mode.md
-          - Change management:
-                - Migration from previous Identity Fusion: guides/migration-from-previous-fusion.md
-                - Testing process: guides/testing-process.md
-    - Run and troubleshoot:
-          - Troubleshooting: guides/troubleshooting.md
-    - Operations reference:
-          - Connector operations (APIs ISC calls): operations/index.md
-          - Connectivity:
-                - Test connection: operations/test-connection.md
-                - Dry-run mode: operations/dry-run.md
-          - Schema and reads:
-                - Account discover schema: operations/account-discover-schema.md
-                - Account list: operations/account-list.md
-                - Account read: operations/account-read.md
-          - Account lifecycle:
-                - Account create: operations/account-create.md
-                - Account update: operations/account-update.md
-                - Account enable: operations/account-enable.md
-                - Account disable: operations/account-disable.md
-          - Entitlements:
-                - Entitlement list: operations/entitlement-list.md
+    - Getting started:
+          - Overview: getting-started/overview.md
+          - First aggregation: getting-started/first-aggregation.md
+    - Configuration:
+          - Configuration reference: configuration/index.md
+          - Connection Settings: configuration/connection.md
+          - Source Settings: configuration/source.md
+          - Attribute Mapping Settings: configuration/mapping.md
+          - Attribute Definition Settings: configuration/definition.md
+          - Attribute Matching Settings: configuration/matching.md
+          - Advanced Settings: configuration/advanced.md
+    - Use guides:
+          - Use guides overview: use-guides/index.md
+          - Configuration guides:
+                - Mapping attributes: use-guides/configuration/mapping-attributes.md
+                - Defining attributes: use-guides/configuration/defining-attributes.md
+                - Matching identities: use-guides/configuration/matching-identities.md
+                - Review forms and reviewers: use-guides/configuration/review-forms-and-reviewers.md
+                - Tuning matching algorithms: use-guides/configuration/tuning-matching-algorithms.md
+                - Configuring sources: use-guides/configuration/configuring-sources.md
+          - Operation guides:
+                - Dry-run analysis: use-guides/operation/dry-run-analysis.md
+                - Connection and observability tuning: use-guides/operation/connection-and-observability-tuning.md
+          - Validation and troubleshooting guides:
+                - Testing and validation: use-guides/validation-and-troubleshooting/testing-and-validation.md
+                - Troubleshooting: use-guides/validation-and-troubleshooting/troubleshooting.md
+          - Deployment guides:
+                - Migrating from Identity Fusion v1: use-guides/deployment/migrating-from-identity-fusion-v1.md
+    - Glossary: glossary.md
+    - Technical reference:
+          - Standard account schema: reference/standard-account-schema.md
+          - Velocity context: reference/velocity-context.md
+          - Observability: reference/observability.md
+          - Proxy deployment: reference/proxy-mode.md
+          - Chain recording: reference/chain-recording.md
+          - Connector operations:
+                - Connector operations (APIs ISC calls): operations/index.md
+                - Connectivity:
+                      - Test connection: operations/test-connection.md
+                      - Dry-run mode: operations/dry-run.md
+                - Schema and reads:
+                      - Account discover schema: operations/account-discover-schema.md
+                      - Account list: operations/account-list.md
+                      - Account read: operations/account-read.md
+                - Account lifecycle:
+                      - Account create: operations/account-create.md
+                      - Account update: operations/account-update.md
+                      - Account enable: operations/account-enable.md
+                      - Account disable: operations/account-disable.md
+                - Entitlements:
+                      - Entitlement list: operations/entitlement-list.md
 
 markdown_extensions:
     - admonition
     - pymdownx.details
     - pymdownx.superfences
-

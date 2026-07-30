@@ -66,17 +66,24 @@ Connector configuration (`connector-spec.json`, settings definitions, and UI lab
 
 ### Requirement: Documentation uses canonical terms
 
-All documentation (`docs/`, `README.md`, inline comments) SHALL use canonical terms consistently. Retired terms (such as `consolidated account`, `raw account`, `pass`, `new-unmatched`, `automatic assignment`, or `link to existing identity` in Match-outcome context) SHALL be replaced with their canonical successors.
+All documentation (`docs/`, `README.md`, inline comments) SHALL use canonical terms consistently. Retired terms (such as `consolidated account`, `raw account`, `pass`, `new-unmatched`, `automatic assignment`, or `link to existing identity` in Match-outcome context) SHALL be replaced with their canonical successors. User-facing glossary content SHALL be published at `docs/glossary.md` and linked from the top-level **Glossary** nav entry.
 
 #### Scenario: Guide documentation
 
-- **WHEN** a guide explains a concept or process
+- **WHEN** a guide under `docs/use-guides/` explains a concept or process
 - **THEN** the guide SHALL use canonical terms (e.g., "Fusion account", not "consolidated account"; "deferred candidate", not "new-unmatched peer"; "automatic merge", not "automatic assignment")
 
 #### Scenario: Operation documentation
 
-- **WHEN** an operation is documented
+- **WHEN** an operation is documented under `docs/reference/` or `docs/operations/`
 - **THEN** the documentation SHALL use canonical terms for inputs, outputs, phases, sweeps, and behavior
+
+#### Scenario: Glossary is reachable from top-level nav
+
+- **GIVEN** the documentation site is published
+- **WHEN** a reader opens the Glossary from the top-level nav
+- **THEN** the page at `docs/glossary.md` SHALL load
+- **AND** the page SHALL state that this spec is the source of truth
 
 ### Requirement: AI agents use canonical terms
 AI agents (via `.agents/AGENTS.md` and related instructions) SHALL be instructed to use canonical terms when generating code, documentation, or configuration.
@@ -275,6 +282,16 @@ The ubiquitous-language glossary SHALL define **Deferred drain** and **Anchor de
 - **GIVEN** a reader consults the glossary
 - **WHEN** they look up Fusion accounts that unblock deferred matching for later accounts in the same sweep
 - **THEN** an **Anchor deferred candidate** entry SHALL define it as a persisted or materialized non-match Fusion account registered in the deferred candidate pool so subsequent pending accounts from the same source can defer against it
+
+### Requirement: Retired glossary path SHALL redirect or be removed
+
+After restructure, `docs/concepts/glossary.md` MUST be retired in favor of `docs/glossary.md`. Legacy links to the concepts path MUST be updated or redirected.
+
+#### Scenario: Maintainer follows old glossary link
+
+- **GIVEN** a document links to `docs/concepts/glossary.md`
+- **WHEN** the restructure is complete
+- **THEN** the link SHALL be updated to `docs/glossary.md` or an equivalent redirect stub SHALL exist
 
 ## Canonical Terms
 ### Account taxonomy

@@ -1,24 +1,60 @@
 # Identity Fusion NG — Documentation
 
-Identity Fusion NG Framework
+Identity Fusion NG documentation is published as an MkDocs site with six top-level sections.
 
-## Start here
+## Site sections
 
-| Page                                                   | Description                                   |
-| ------------------------------------------------------ | --------------------------------------------- |
-| [Get started](get-started.md)                          | Shortest path from new source to aggregation. |
-| [Map, define, and match](concepts/map-define-match.md) | How the processing pipeline fits together.    |
-| [Guides overview](guides/index.md)                     | Full list of configuration guides.            |
+| Section | Start here | Description |
+| --- | --- | --- |
+| **Home** | [Home](index.md) | Product framing and inline Map-Define-Match framework |
+| **Getting started** | [Overview](getting-started/overview.md) | Prerequisites, operation modes, first aggregation checklist |
+| **Configuration reference** | [Configuration reference](configuration/index.md) | Generated field reference from `connector-spec.json` |
+| **Use guides** | [Use guides overview](use-guides/index.md) | Scenario-driven how-tos (configuration, operation, validation, deployment) |
+| **Glossary** | [Glossary](glossary.md) | Canonical domain terms |
+| **Technical reference** | [Standard account schema](reference/standard-account-schema.md) | Schema, Velocity context, observability, operations, proxy, chain recording |
 
-## Guide index
+## Use guides index
 
-| Guide                                                                               | Description                                                                                                  |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [Map](guides/map.md)                                                                | Attribute mapping, merging, and consolidation from multiple sources.                                         |
-| [Define](guides/define.md)                                                          | Attribute definitions (Velocity computed attributes, unique identifiers, UUIDs, counters).                   |
-| [Match](guides/match.md)                                                            | Detect and resolve potential matching identities using one or more sources.                                  |
-| [Source configuration](guides/source-configuration.md)                              | In-depth guide on source settings, scope, aggregation timing, and correlation modes.                         |
-| [Migration from previous Identity Fusion](guides/migration-from-previous-fusion.md) | Migrate from an earlier Identity Fusion version: add the old source as managed, align schemas, then migrate. |
-| [Advanced connection settings](guides/advanced-connection-settings.md)              | Queue, retry, timeouts, concurrency, and external logging.                                                   |
-| [Proxy mode](guides/proxy-mode.md)                                                  | Run connector logic on an external server and connect ISC via proxy.                                         |
-| [Troubleshooting](guides/troubleshooting.md)                                        | Common issues, checks, and recovery steps.                                                                   |
+### Configuration guides
+
+| Guide | Description |
+| --- | --- |
+| [Mapping attributes](use-guides/configuration/mapping-attributes.md) | Attribute mapping and merge strategies |
+| [Defining attributes](use-guides/configuration/defining-attributes.md) | Velocity, unique IDs, UUIDs, counters |
+| [Matching identities](use-guides/configuration/matching-identities.md) | Match detection and baseline configuration |
+| [Review forms and reviewers](use-guides/configuration/review-forms-and-reviewers.md) | Manual review workflow and access profiles |
+| [Tuning matching algorithms](use-guides/configuration/tuning-matching-algorithms.md) | Algorithms, thresholds, and score blending |
+| [Configuring sources](use-guides/configuration/configuring-sources.md) | Source scope, aggregation, and correlation modes |
+
+### Operation guides
+
+| Guide | Description |
+| --- | --- |
+| [Dry-run analysis](use-guides/operation/dry-run-analysis.md) | Non-persistent account-list analysis |
+| [Connection and observability tuning](use-guides/operation/connection-and-observability-tuning.md) | Queue, retry, timeouts, logging |
+
+### Validation and troubleshooting guides
+
+| Guide | Description |
+| --- | --- |
+| [Testing and validation](use-guides/validation-and-troubleshooting/testing-and-validation.md) | Structured validation before production |
+| [Troubleshooting](use-guides/validation-and-troubleshooting/troubleshooting.md) | Common issues and recovery |
+
+### Deployment guides
+
+| Guide | Description |
+| --- | --- |
+| [Migrating from Identity Fusion v1](use-guides/deployment/migrating-from-identity-fusion-v1.md) | Upgrade from Identity Fusion 1.x |
+
+## Legacy paths
+
+Older bookmarks under `docs/guides/` and `docs/get-started.md` redirect to the new locations listed above.
+
+## Build locally
+
+```bash
+npm run docs:prepare
+npm run docs:serve
+```
+
+Generated Configuration reference pages live under `docs/configuration/` and are recreated on each `docs:prepare` run.
