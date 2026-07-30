@@ -29,39 +29,49 @@ export class ReplayApiAdapter implements IscApiAdapter {
         }
     }
 
+    private findUnconsumedWriteIndex(apiName: string, method: string, key: string): number {
+        return this.writeLog.findIndex(
+            (e, i) =>
+                e.api === apiName &&
+                e.method === method &&
+                stableKey(e.api, e.method, e.args as unknown[]) === key &&
+                !this.consumedWrites.has(i)
+        )
+    }
+
+    private assertRecordedResponse(apiName: string, method: string, args: unknown[], key: string): unknown {
+        const response = this.responseMap.get(key)
+        if (response === undefined) {
+            throw new ConnectorError(
+                `Replay: unrecorded API call: ${apiName}.${method}(${JSON.stringify(args)})`
+            )
+        }
+        return response
+    }
+
+    private resolveReplayCall(apiName: string, method: string, args: unknown[]): Promise<unknown> {
+        const key = stableKey(apiName, method, args)
+
+        if (isWriteMethod(method)) {
+            const idx = this.findUnconsumedWriteIndex(apiName, method, key)
+            if (idx === -1) {
+                throw new ConnectorError(
+                    `Replay: unrecorded write call: ${apiName}.${method}(${JSON.stringify(args)})`
+                )
+            }
+            this.consumedWrites.add(idx)
+            return Promise.resolve(this.writeLog[idx].response)
+        }
+
+        return Promise.resolve(this.assertRecordedResponse(apiName, method, args, key))
+    }
+
     private createApiProxy(apiName: string): Record<string, unknown> {
         return new Proxy(
             {} as Record<string, unknown>,
             {
                 get: (_target: unknown, method: string): unknown => {
-                    return (...args: unknown[]) => {
-                        const key = stableKey(apiName, method, args)
-
-                        if (isWriteMethod(method)) {
-                            const idx = this.writeLog.findIndex(
-                                (e, i) =>
-                                    e.api === apiName &&
-                                    e.method === method &&
-                                    stableKey(e.api, e.method, e.args as unknown[]) === key &&
-                                    !this.consumedWrites.has(i)
-                            )
-                            if (idx === -1) {
-                                throw new ConnectorError(
-                                    `Replay: unrecorded write call: ${apiName}.${method}(${JSON.stringify(args)})`
-                                )
-                            }
-                            this.consumedWrites.add(idx)
-                            return Promise.resolve(this.writeLog[idx].response)
-                        }
-
-                        const response = this.responseMap.get(key)
-                        if (response === undefined) {
-                            throw new ConnectorError(
-                                `Replay: unrecorded API call: ${apiName}.${method}(${JSON.stringify(args)})`
-                            )
-                        }
-                        return Promise.resolve(response)
-                    }
+                    return (...args: unknown[]) => this.resolveReplayCall(apiName, method, args)
                 },
             }
         ) as Record<string, unknown>
@@ -94,6 +104,7 @@ export function loadApiLog(fileOrDirPath: string): ApiLogEntry[] {
     if (!content) return []
     return content.split('\n').map((line) => JSON.parse(line))
 }
+
 
 
 
