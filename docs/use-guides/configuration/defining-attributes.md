@@ -2,6 +2,12 @@
 
 The **Define** step controls how attributes are generated using Apache Velocity expressions, unique identifiers, UUIDs, or counters. This happens after Attribute Mapping (if sources are configured) and before Match scoring (for normal attributes).
 
+**Configuration reference:** [Attribute Definition Settings](../../configuration/definition.md) · [Velocity context](../../reference/velocity-context.md)
+
+!!! note "Didactic guide"
+    This page explains **how and when** to configure settings with examples. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
+
+
 ---
 
 ## When to use Attribute Definition
@@ -350,4 +356,5 @@ One can purposely generate an **empty** `nativeIdentity` in conjunction with the
   $email
 #end
 ```
+
 

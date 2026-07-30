@@ -2,6 +2,8 @@
 
 This guide covers manual review workflow configuration for Identity Fusion NG Match — review forms, expiration, reviewers, and access profiles.
 
+**Configuration reference:** [Attribute Matching Settings — Review](../../configuration/matching.md)
+
 ## Step 3: Configure Attribute Matching Settings for review
 
 Configure **Attribute Matching Settings → Review Settings** for the manual review workflow:
@@ -77,6 +79,10 @@ Include attributes that help reviewers decide if identities are matches:
 ![Email to reviewer - Notification](../../assets/images/match-email-reviewer.png)
 
 <!-- PLACEHOLDER: Screenshot of email sent to reviewer. Save as docs/assets/images/match-email-reviewer.png -->
+
+!!! note "Didactic guide"
+    This page explains **how and when** to configure settings with examples. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
+
 
 ---
 
@@ -290,5 +296,6 @@ Track these metrics to assess Match effectiveness:
 - For algorithm selection and tuning, see [Effective use of matching algorithms](tuning-matching-algorithms.md).
 - For attribute merging strategies, see [Effective use of Map](mapping-attributes.md).
 - For ISC setup (connection, schema, identity profile), see [First aggregation](../../getting-started/first-aggregation.md).
+
 
 

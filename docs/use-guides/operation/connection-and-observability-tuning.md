@@ -2,6 +2,12 @@
 
 Advanced Settings provide fine-grained control over API behavior, resilience, performance, and observability for the Identity Fusion NG connector. This comprehensive guide covers **Developer Settings**, **Advanced Connection Settings**, and how they integrate with base **Connection Settings** for optimal connector operation.
 
+**Configuration reference:** [Connection Settings](../../configuration/connection.md) · [Advanced Settings](../../configuration/advanced.md) · [ISC PAT scopes](../../reference/pat-scopes.md)
+
+!!! note "Didactic guide"
+    This page explains **how and when** to configure settings with examples. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
+
+
 ---
 
 ## Overview and structure
@@ -600,6 +606,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](../../reference/proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md).
+
 
 
 

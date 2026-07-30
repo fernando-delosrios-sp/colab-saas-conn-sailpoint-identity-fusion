@@ -46,10 +46,6 @@ Identity Fusion NG documentation is published as an MkDocs site with six top-lev
 | --- | --- |
 | [Migrating from Identity Fusion v1](use-guides/deployment/migrating-from-identity-fusion-v1.md) | Upgrade from Identity Fusion 1.x |
 
-## Legacy paths
-
-Older bookmarks under `docs/guides/` and `docs/get-started.md` redirect to the new locations listed above.
-
 ## Build locally
 
 ```bash
@@ -57,4 +53,5 @@ npm run docs:prepare
 npm run docs:serve
 ```
 
-Generated Configuration reference pages live under `docs/configuration/` and are recreated on each `docs:prepare` run.
+Generated Configuration reference pages live under `docs/configuration/` and are recreated on each `docs:prepare` run. The Home page is authored in `docs/index.md`.
+

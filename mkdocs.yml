@@ -53,6 +53,7 @@ nav:
     - Technical reference:
           - Standard account schema: reference/standard-account-schema.md
           - Velocity context: reference/velocity-context.md
+          - ISC PAT scopes: reference/pat-scopes.md
           - Observability: reference/observability.md
           - Proxy deployment: reference/proxy-mode.md
           - Chain recording: reference/chain-recording.md
@@ -77,4 +78,5 @@ markdown_extensions:
     - admonition
     - pymdownx.details
     - pymdownx.superfences
+
 

@@ -1,6 +1,8 @@
 # Use guides
 
-Scenario-based guides for configuring, operating, validating, and deploying Identity Fusion NG.
+Scenario-based, **didactic** guides for configuring, operating, validating, and deploying Identity Fusion NG.
+
+Each guide walks through real setup patterns and tuning recipes. For exact field keys, types, defaults, and allowed values, use the linked [Configuration reference](../configuration/index.md) page.
 
 ## Configuration guides
 
@@ -32,3 +34,4 @@ Scenario-based guides for configuring, operating, validating, and deploying Iden
 | Guide | Description |
 | ----- | ----------- |
 | [Migrating from Identity Fusion v1](deployment/migrating-from-identity-fusion-v1.md) | Migrate from an earlier Identity Fusion version. |
+
