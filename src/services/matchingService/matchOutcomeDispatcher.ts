@@ -787,7 +787,7 @@ export class MatchOutcomeDispatcher {
         fusionAccount: FusionAccount,
         sourceInfo: SourceInfo,
         account: Account,
-        reviewers: Set<{ identityId?: string }> | undefined
+        reviewers: Set<FusionAccount> | undefined
     ): Promise<void> {
         const outcome = await this.deps.forms.createFusionForm(fusionAccount, reviewers)
         if (!outcome.formDefinitionReady) {
