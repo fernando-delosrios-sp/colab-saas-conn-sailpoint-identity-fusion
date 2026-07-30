@@ -78,6 +78,74 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
         service.applyDisplayAttributeOverride(acc)
         expect(acc.attributeBag.current['name']).toBe('persisted')
     })
+
+    it('skips the override for uncorrelated managed accounts even after addIdentityLayer', () => {
+        const service = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
+        const acc = FusionAccount.fromManagedAccount({
+            id: 'src-a::acc-1',
+            name: 'source-name',
+            sourceId: 'src-a',
+            nativeIdentity: 'acc-1',
+            uncorrelated: true,
+        } as any)
+        acc.attributeBag.current['name'] = 'Mapped Display Name'
+        acc.addIdentityLayer({
+            id: 'identity-1',
+            name: 'login',
+            displayName: 'Identity Alias',
+            attributes: {},
+        } as any)
+        expect(acc.isIdentity).toBe(false)
+        service.applyDisplayAttributeOverride(acc)
+        expect(acc.attributeBag.current['name']).toBe('Mapped Display Name')
+    })
+
+    it('still overrides for correlated managed-account origins (source uncorrelated=false)', () => {
+        const service = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
+        const acc = FusionAccount.fromManagedAccount({
+            id: 'src-a::acc-1',
+            name: 'source-name',
+            sourceId: 'src-a',
+            nativeIdentity: 'acc-1',
+            uncorrelated: false,
+            identityId: 'identity-1',
+        } as any)
+        acc.attributeBag.current['name'] = 'source-name'
+        acc.addIdentityLayer({
+            id: 'identity-1',
+            name: 'login',
+            displayName: 'Alice Anderson',
+            attributes: { displayName: 'Alice Anderson' },
+        } as any)
+        expect(acc.isIdentity).toBe(true)
+        service.applyDisplayAttributeOverride(acc)
+        expect(acc.attributeBag.current['name']).toBe('Alice Anderson')
+    })
+
+    it('skips the override for persisted uncorrelated fusion rows after addIdentityLayer', () => {
+        const service = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-native-1',
+            name: 'Persisted Non Match',
+            sourceName: 'Identity Fusion NG',
+            uncorrelated: true,
+            identityId: 'identity-1',
+            attributes: {
+                name: 'Mapped Display Name',
+                identityId: 'identity-1',
+                statuses: ['nonMatched', 'uncorrelated'],
+            },
+        } as any)
+        acc.addIdentityLayer({
+            id: 'identity-1',
+            name: 'login',
+            displayName: 'Identity Alias',
+            attributes: { displayName: 'Identity Alias' },
+        } as any)
+        expect(acc.isIdentity).toBe(false)
+        service.applyDisplayAttributeOverride(acc)
+        expect(acc.attributeBag.current['name']).toBe('Mapped Display Name')
+    })
 })
 
 
@@ -194,3 +262,4 @@ describe('DefinitionService.refreshUniqueAttributes preservation', () => {
         expect(account.attributes.UID).not.toBe('old-value')
     })
 })
+

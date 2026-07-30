@@ -172,6 +172,9 @@ export class FusionAccount {
         if (identityInfo) fa._identityInfo = identityInfo
         if (account.id != null) fa._iscAccountId = account.id
         if (account.modified !== undefined) fa._modified = account.modified
+        if (account.uncorrelated !== undefined) {
+            fa.layers.uncorrelated = account.uncorrelated
+        }
         fa.layers.isIdentity = account.uncorrelated === false
 
         if (account.attributes) {
@@ -850,6 +853,7 @@ export class FusionAccount {
         }
     }
 }
+
 
 
 

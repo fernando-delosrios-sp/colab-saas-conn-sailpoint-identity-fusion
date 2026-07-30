@@ -87,6 +87,19 @@ describe('FusionLayers', () => {
             expect(capturedEmail).toBe('test@test.com')
             expect(capturedInfo).toBeDefined()
         })
+
+        it('does not promote isIdentity when the account is uncorrelated', () => {
+            layers.uncorrelated = true
+            const identity = {
+                id: 'id-1',
+                name: 'Test Identity',
+                attributes: { email: 'test@test.com' },
+            } as any
+
+            layers.addIdentityLayer(identity, { identity: {} }, undefined)
+
+            expect(layers.isIdentity).toBe(false)
+        })
     })
 
     describe('addFusionDecisionLayer', () => {
@@ -124,3 +137,4 @@ describe('FusionLayers', () => {
         })
     })
 })
+
