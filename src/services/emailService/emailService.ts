@@ -157,6 +157,8 @@ export class EmailService {
             totalAccounts: 1,
             matches: reviewMatches.length,
             reportDate: new Date(),
+            formInstanceId: formInstance.id,
+            formUrl: formInstance.standAloneFormUrl ?? undefined,
             headerSubtitle: this.buildEmailHeaderSubtitle(),
             accounts: [
                 {
@@ -424,6 +426,7 @@ export class EmailService {
         )
     }
 }
+
 
 
 
