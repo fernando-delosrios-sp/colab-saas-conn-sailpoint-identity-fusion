@@ -49,6 +49,7 @@ Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identit
         - Message sender workflow.
         - Delayed aggregation sender workflow.
         - Current form data, including forms and associated form instances.
+    - Finished review forms emit **decision discovery** log lines (`… DECISION DISCOVERED`) and a `DETAIL action=fusion decisions discovered from forms` summary with a `decisions(…)` segment.
     - Managed machine accounts (`isMachine=true`) are discarded after fetch and never enter the work queue.
     - A warning is logged with discarded machine-account counts (per source and total).
     - If `fusionReportOnAggregation` is enabled and the fusion owner identity was not loaded in the parallel fetch, it is fetched separately.
@@ -59,6 +60,7 @@ Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identit
         - Identity layer is applied to match collected identities with Fusion accounts.
         - Managed account layer is applied to match collected managed accounts with Fusion accounts.
         - Assignment decision layer is applied to match Fusion reviews that resulted in identity assignment.
+        - Merge decisions from finished review forms emit **decision applied** log lines (`MERGE DECISION APPLIED`) when layered onto the target fusion account.
         - Attribute mapping is applied first, then **normal** attribute definitions are evaluated. Normal attribute values feed into the Velocity context and are available for Fusion matching/scoring.
     - **Optimistic correlation**: For sources configured with **Correlation mode = Correlate missing accounts on aggregation** (`correlationMode: correlate`), missing accounts are marked as correlated _immediately_ before the API call is enqueued, so the account output reflects a successful correlation without waiting for the queue to drain. Correlation API calls proceed as fire-and-forget in the background; any failures are logged and will be re-detected on the next aggregation.
 
@@ -74,7 +76,8 @@ Sub-steps map to `STEP` log markers inside `PHASE 4 Process`:
 
 #### STEP `process-decisions` — New Identity Decisions
 
-- Processes Fusion reviews that resulted in new identities.
+- Processes Fusion reviews that resulted in **new identity** outcomes (merge decisions are applied earlier during Refresh).
+- Emits **decision applied** log lines (`NEW IDENTITY DECISION APPLIED`, `NO-MATCH DECISION APPLIED`) and a step `DETAIL` summary with applied/skipped counts and a `decisions(…)` segment.
 
 #### STEPs `managed-account-init` through `uncorrelated-sweep` — Managed Account Processing (Matching)
 
@@ -200,6 +203,7 @@ Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion
 ### Preventing Fusion account creation (empty nativeIdentity skip pattern)
 
 One can purposely generate an empty `nativeIdentity` (by designing attribute definitions that produce an empty fusion identity attribute) in conjunction with the "Skip accounts with a missing identifier" processing option. When the fusion identity attribute evaluates to empty and the skip option is enabled, the account is omitted from the output, effectively preventing specific managed accounts or identities from generating Fusion accounts.
+
 
 
 

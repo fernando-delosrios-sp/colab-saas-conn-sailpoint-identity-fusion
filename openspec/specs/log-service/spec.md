@@ -93,6 +93,21 @@ The log service SHALL aggregate account-level events recorded via `recordEvent` 
 - **THEN** the connector host SHALL receive an INFO line containing `EVENT_SUMMARY` with match counts
 - **AND** per-account `MATCH FOUND` lines SHALL NOT have been emitted at INFO level for those events
 
+#### Scenario: Decision events summarized per tick
+
+- **GIVEN** 1 new-identity decision and 1 merge decision applied since the last heartbeat tick
+- **WHEN** the heartbeat flushes event counters
+- **THEN** the connector host SHALL receive an INFO line containing `EVENT_SUMMARY decisions` with interval deltas
+- **AND** per-decision `… DECISION APPLIED` headline lines SHALL have been emitted at INFO when each decision took effect
+
+#### Scenario: Decision discovery and application logged at INFO
+
+- **GIVEN** a finished review form selecting merge into an existing identity
+- **WHEN** form data is processed during Fetch
+- **THEN** the connector host SHALL receive an INFO line `MERGE DECISION DISCOVERED: …`
+- **WHEN** the merge decision is layered onto the target fusion account during Refresh
+- **THEN** the connector host SHALL receive an INFO line `MERGE DECISION APPLIED: …`
+
 #### Scenario: Correlation events summarized per tick
 
 - **GIVEN** 14 correlation triggers affecting 18 accounts since the last tick
@@ -194,6 +209,18 @@ The service registry SHALL expose an `OperationRunContext` updated by log servic
 - **WHEN** the heartbeat emits EVENT_SUMMARY
 - **THEN** the summary SHALL include an automatic-merge count derived from `autoMerged` events
 - **AND** the summary SHALL NOT reference `autoAssigned`
+
+### Requirement: Reviewer decision outcomes are logged and summarized
+
+The log service SHALL emit INFO headline lines for fusion review decisions using standardized prefixes: `NEW IDENTITY DECISION`, `MERGE DECISION`, `NO-MATCH DECISION`, and `AUTO-MERGE DECISION`. Each headline SHALL suffix `DISCOVERED` when a finished form is parsed during Fetch and `APPLIED` when the decision takes effect (Refresh for merge, Process for new identity/no-match, or Process for automatic merge). Headlines SHALL include account label `[sourceName]`, merge target or reviewer name when available, and an outcome suffix on applied lines (for example `→ registered as fusion account`).
+
+Decision metrics SHALL be recorded via `recordEvent('decision', { type })` with types `newIdentity`, `merge`, `noMatch`, and `autoMerge`. Cumulative decision counters SHALL appear in compact form `decisions(Nn/Mm/NMnm/Aa)` on STATUS lines during Process phase (when non-zero or during `process-decisions`), on phase-complete DETAIL lines, and in EVENT_SUMMARY as `decisions new-identity=… merge=… no-match=… auto-merge=…` with interval deltas.
+
+#### Scenario: Decision segment on process phase complete
+
+- **GIVEN** an account-list run applied 1 new-identity and 1 merge decision
+- **WHEN** Process phase completes
+- **THEN** the phase-complete DETAIL line SHALL include `decisions=decisions(1n/1m/0nm/0a total=2)`
 
 #### Scenario: Refresh STATUS includes correlation segment
 
@@ -328,4 +355,5 @@ The service registry heartbeat snapshot SHALL include a `correlationQueuePending
 - **GIVEN** the API queue has 1853 pending items labeled `IdentityService>correlateAccounts`
 - **WHEN** `getHeartbeatSnapshot()` is called
 - **THEN** `correlationQueuePending` SHALL be 1853
+
 

@@ -7,6 +7,7 @@ import {
     CorrelationSkipReason,
     OperationPhase,
     OperationRunContext,
+    createEmptyCumulativeOutcomes,
 } from './operationRunContext'
 import { formatPhaseEndDetailSuffix } from './operationHeartbeat'
 
@@ -393,7 +394,7 @@ export class LogService {
     }
 
     getCumulativeOutcomes() {
-        return this.runContext?.getCumulativeOutcomes() ?? { nonMatch: 0, autoMerged: 0, formsQueued: 0, deferred: 0 }
+        return this.runContext?.getCumulativeOutcomes() ?? createEmptyCumulativeOutcomes()
     }
 
     startOperationHeartbeat(getSnapshot: () => HeartbeatSnapshot): void {

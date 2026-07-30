@@ -69,7 +69,7 @@ describe('FusionService — decisions', () => {
             expect(result?.statuses).toContain('authorized')
             expect(result?.statuses).not.toContain('auto')
             expect(result?.statuses).not.toContain('nonMatched')
-            expect(result?.history.some((h) => h.includes('into existing identity by Reviewer'))).toBe(true)
+            expect(result?.history.some((h) => h.includes('into Existing Identity by Reviewer'))).toBe(true)
             expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
             expect(ctx.mockIdentities.correlateAccounts).toHaveBeenCalledWith(existingFusionAccount, [managedKey], 'merge')
             expect(ctx.fusionService.getFusionIdentity('identity-1')).toBe(existingFusionAccount)
@@ -129,7 +129,7 @@ describe('FusionService — decisions', () => {
             const result = await ctx.fusionService.processFusionIdentityDecision(decision)
             expect(result?.statuses).toContain('auto')
             expect(result?.statuses).not.toContain('authorized')
-            expect(result?.history.some((h) => h.includes('Auto-merged LH2 User [LH2] into existing identity'))).toBe(
+            expect(result?.history.some((h) => h.includes('Auto-merged LH2 User [LH2] into Existing Identity Two'))).toBe(
                 true
             )
             expect(result?.history.some((h) => h.includes('Associated managed account LH2 User [LH2]'))).toBe(false)
@@ -450,6 +450,85 @@ describe('FusionService — decisions', () => {
             expect(fusionAccount.history).toEqual(['first-entry', 'second-entry'])
         })
 
+        it('resolves reviewer and merge-target ids to display names in history', async () => {
+            const targetIdentityId = '9d86f225e3a24b1a9e3d10d92ec12005'
+            const reviewerId = 'reviewer-out-of-scope'
+            const existingIdentity = {
+                id: targetIdentityId,
+                name: 'Albert Wesker',
+                accounts: [],
+                attributes: { displayName: 'Albert Wesker' },
+            } as unknown as IdentityDocument
+            const existingFusionAccount = FusionAccount.fromIdentity(existingIdentity)
+            ctx.fusionService.setFusionAccount(existingFusionAccount)
+
+            const managedAccount = {
+                id: 'acct-id-resolve-1',
+                name: 'Sergei Vladimir',
+                sourceId: 'src-umbrella',
+                nativeIdentity: 'sv-1',
+                sourceName: 'Umbrella Corporation',
+                attributes: {},
+            } as Account
+            const managedKey = 'src-umbrella::sv-1'
+            const managedMap = new Map<string, Account>([[managedKey, managedAccount]])
+
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            seedRunInventory(ctx.run, new Map([[managedKey, managedAccount]]))
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockIdentities.getIdentityById.mockImplementation((id?: string) => {
+                if (id === targetIdentityId) return existingIdentity
+                return undefined
+            })
+            ctx.mockIdentities.fetchIdentityById.mockImplementation(async (id?: string) => {
+                if (id === reviewerId) {
+                    return {
+                        id: reviewerId,
+                        name: 'Chris Redfield',
+                        attributes: { displayName: 'Chris Redfield' },
+                    } as IdentityDocument
+                }
+                if (id === targetIdentityId) return existingIdentity
+                return undefined
+            })
+            ctx.mockIdentities.correlateAccounts.mockResolvedValue(true)
+            vi.spyOn(ctx.mockSources, 'getSourceConfig').mockReturnValue({
+                name: 'Umbrella Corporation',
+                correlationMode: 'correlate',
+                sourceType: 'authoritative',
+            } as any)
+
+            const decision = {
+                submitter: { id: reviewerId, email: '', name: reviewerId },
+                account: {
+                    id: managedKey,
+                    name: 'Sergei Vladimir',
+                    sourceName: 'Umbrella Corporation',
+                    sourceId: 'src-umbrella',
+                    nativeIdentity: 'sv-1',
+                },
+                newIdentity: false,
+                identityId: targetIdentityId,
+                identityName: targetIdentityId,
+                comments: 'Merge into existing identity',
+                finished: true,
+                sourceType: 'authoritative',
+            } as any
+
+            const result = await ctx.fusionService.processFusionIdentityDecision(decision)
+
+            expect(
+                result?.history.some((h) =>
+                    h.includes(
+                        'Merged Sergei Vladimir [Umbrella Corporation] into Albert Wesker by Chris Redfield'
+                    )
+                )
+            ).toBe(true)
+            expect(result?.history.some((h) => h.includes(targetIdentityId))).toBe(false)
+        })
+
         it('uses fallback labels when decision names are blank', async () => {
             const managedAccount = {
                 id: 'acct-history-fallback-1',
@@ -493,4 +572,5 @@ describe('FusionService — decisions', () => {
     })
 
 })
+
 

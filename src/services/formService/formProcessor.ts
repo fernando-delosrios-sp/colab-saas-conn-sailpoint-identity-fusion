@@ -112,14 +112,14 @@ export const getReviewerInfo = (
         return {
             id: identityId,
             email: '',
-            name: identityId,
+            name: '',
         }
     }
 
     return {
         id: identityId,
         email: identity.attributes?.email || '',
-        name: identity.attributes?.displayName || identity.name || identityId,
+        name: identity.attributes?.displayName || identity.name || '',
     }
 }
 
@@ -317,7 +317,7 @@ export const createFusionDecision = async (
         ? selectedIdentity?.displayName ||
           (selectedIdentity as any)?.attributes?.displayName ||
           selectedIdentity?.name ||
-          existingIdentity
+          undefined
         : undefined
 
     // Defensive: ensure decision.account fields are strings so templates never render "[object Object]".
@@ -360,6 +360,7 @@ const extractSourceType = (formInput: any): SourceType => {
     }
     return SourceType.Authoritative
 }
+
 
 
 

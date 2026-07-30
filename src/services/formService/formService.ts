@@ -42,6 +42,11 @@ import {
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { FormLifecycle } from './formLifecycle'
 import { analyzeFormInstances } from './formInstanceAnalyzer'
+import {
+    formatDecisionCountsSegment,
+    logFusionDecisionDiscovered,
+    summarizeDecisionCounts,
+} from '../fusionService/decisionLogging'
 
 export type { PendingReviewFormContext,  PendingReviewAccountContext } from './types'
 
@@ -910,9 +915,13 @@ export class FormService {
         }
 
         if (decisionsAdded > 0) {
-            this.log.debug(
-                `Added ${decisionsAdded} fusion decision(s) from ${processingResult.processedCount} processed instance(s)`
-            )
+            const discovered = this._finishedFusionDecisions.slice(-decisionsAdded)
+            const counts = summarizeDecisionCounts(discovered)
+            this.log.detail({
+                action: 'fusion decisions discovered from forms',
+                count: decisionsAdded,
+                decisions: formatDecisionCountsSegment(counts, true),
+            })
         }
     }
 
@@ -1003,22 +1012,11 @@ export class FormService {
                 }
 
                 decisionsAdded++
-                this.logFusionDecision(decision)
+                logFusionDecisionDiscovered(this.log, decision)
             }
         }
 
         return decisionsAdded
-    }
-
-    /**
-     * Log fusion decision details
-     */
-    private logFusionDecision(decision: FusionDecision): void {
-        const decisionType = decision.newIdentity ? 'new identity' : `merge to ${decision.identityId}`
-        this.log.debug(
-            `Processed fusion decision for account ${decision.account.id}, reviewer ${decision.submitter.id}, ` +
-                `decision: ${decisionType}`
-        )
     }
 
     /**

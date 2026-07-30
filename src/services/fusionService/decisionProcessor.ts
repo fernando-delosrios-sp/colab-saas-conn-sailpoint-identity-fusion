@@ -16,6 +16,11 @@ import type { DefinitionService } from '../definitionService'
 import type { MappingService } from '../mappingService'
 import { applyNonAuthoritativeNoMatch } from '../matchingService/matchOutcomeDispatcher'
 import { AccountAssembly } from '../accountAssembly'
+import {
+    formatDecisionCountsSegment,
+    logFusionDecisionApplied,
+    summarizeDecisionCounts,
+} from './decisionLogging'
 
 export interface DecisionProcessorDeps {
     forms: FormService
@@ -122,11 +127,24 @@ export class DecisionProcessor {
         const results = await batchProcess(fusionIdentityDecisions, 'Fusion identity decisions', (x) =>
             this.processFusionIdentityDecision(x), this.config, this.log
         )
+        const applied = compact(results)
+        const discoveredCounts = summarizeDecisionCounts(fusionIdentityDecisions)
         this.log.detail({
             action: 'fusion identity decisions phase finished',
             count: fusionIdentityDecisions.length,
+            applied: applied.length,
+            skipped: fusionIdentityDecisions.length - applied.length,
+            decisions: formatDecisionCountsSegment(
+                {
+                    newIdentity: discoveredCounts.newIdentity,
+                    merge: discoveredCounts.merge,
+                    noMatch: discoveredCounts.noMatch,
+                    autoMerge: discoveredCounts.autoMerge,
+                },
+                true
+            ),
         })
-        return compact(results)
+        return applied
     }
 
     /**
@@ -140,10 +158,6 @@ export class DecisionProcessor {
     public async processFusionIdentityDecision(fusionDecision: FusionDecision): Promise<FusionAccount | undefined> {
         const sourceType = fusionDecision.sourceType ?? SourceType.Authoritative
 
-        if (fusionDecision.newIdentity) {
-            this.log.recordEvent('newIdentityAssignment')
-        }
-
         // Enrich submitter and selected identity display names for user-facing output.
         await this.enrichDecisionSubmitter(fusionDecision)
         let selectedIdentity = await this.enrichDecisionIdentityName(fusionDecision)
@@ -154,11 +168,6 @@ export class DecisionProcessor {
                 ? this.resolveAuthorizedMergeTarget(fusionDecision.identityId)
                 : undefined
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
-        this.log.debug(
-            `${existingIdentityAccount ? 'Reusing' : 'Created'} fusion account from decision: ` +
-                `${fusionDecision.account.name} [${fusionDecision.account.sourceName}], ` +
-                `newIdentity=${fusionDecision.newIdentity}, sourceType=${sourceType}`
-        )
 
         if (isAuthorizedDecision && fusionDecision.identityId) {
             if (!selectedIdentity) {
@@ -192,6 +201,11 @@ export class DecisionProcessor {
                     : () => this.log.recordCorrelatedActionGranted()
             )
             this.deps.accountAssembly.registerFusionAccount(fusionAccount)
+            logFusionDecisionApplied(
+                this.log,
+                fusionDecision,
+                existingIdentityAccount ? 'reused-target' : 'merged'
+            )
         }
 
         if (fusionDecision.newIdentity) {
@@ -201,20 +215,15 @@ export class DecisionProcessor {
                 mappingService: this.deps.mappingService,
                 run: this.run,
             })) {
-                if (sourceType === SourceType.Record) {
-                    this.log.debug(
-                        `Record no-match decision for ${fusionDecision.account.name}, registering unique attributes only`
-                    )
-                } else if (sourceType === SourceType.Orphan) {
-                    this.log.debug(`Orphan no-match decision for ${fusionDecision.account.name}, dropping`)
-                }
+                logFusionDecisionApplied(
+                    this.log,
+                    fusionDecision,
+                    sourceType === SourceType.Record ? 'dropped-record' : 'dropped-orphan'
+                )
                 return undefined
             }
             this.deps.accountAssembly.registerFusionAccount(fusionAccount)
-            this.log.debug(
-                `Registered decision account as fusion account: ${fusionDecision.account.name} ` +
-                    `[${fusionDecision.account.sourceName}] (key ${fusionDecision.account.id})`
-            )
+            logFusionDecisionApplied(this.log, fusionDecision, 'registered')
         }
         return fusionAccount
     }
@@ -224,18 +233,23 @@ export class DecisionProcessor {
      * Mutates `decision.submitter.name` in-place when a label is found.
      */
     private async enrichDecisionSubmitter(decision: FusionDecision): Promise<void> {
-        const submitterId = decision.submitter?.id
+        const submitterId = trimStr(decision.submitter?.id)
         if (!submitterId) return
-        if (decision.submitter?.name || decision.submitter?.email) return
+
+        const currentName = trimStr(decision.submitter?.name)
+        const currentEmail = trimStr(decision.submitter?.email)
+        if (currentName && currentName !== submitterId) return
+        if (!currentName && currentEmail) return
 
         try {
             const identity = await this.resolveIdentityBestEffort(submitterId)
-            const label = identity?.displayName || identity?.name
-            if (label) {
+            const label =
+                identity?.displayName || (identity as any)?.attributes?.displayName || identity?.name
+            if (label && label !== submitterId) {
                 decision.submitter.name = label
             }
         } catch {
-            // Best-effort: fall back to submitterId if fetch fails
+            // Best-effort: history falls back to Unknown reviewer when unresolved
         }
     }
 
@@ -245,12 +259,17 @@ export class DecisionProcessor {
      * for the identity layer without a second lookup.
      */
     private async enrichDecisionIdentityName(decision: FusionDecision): Promise<IdentityDocument | undefined> {
-        if (!decision.identityId || decision.identityName) return undefined
+        const identityId = trimStr(decision.identityId)
+        if (!identityId) return undefined
+
+        const currentName = trimStr(decision.identityName)
+        if (currentName && currentName !== identityId) return undefined
 
         try {
-            const identity = this.deps.identities.getIdentityById(decision.identityId)
-            const label = identity?.displayName || identity?.name
-            if (label) {
+            const identity = await this.resolveIdentityBestEffort(identityId)
+            const label =
+                identity?.displayName || (identity as any)?.attributes?.displayName || identity?.name
+            if (label && label !== identityId) {
                 decision.identityName = label
             }
             return identity
@@ -295,3 +314,4 @@ export class DecisionProcessor {
         }
     }
 }
+

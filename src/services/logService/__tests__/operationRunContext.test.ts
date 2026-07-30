@@ -34,6 +34,30 @@ describe('OperationRunContext', () => {
         expect(ctx.peekEventCounters()).toEqual(createEmptyEventCounters())
     })
 
+    it('records decision events by type', () => {
+        const ctx = new OperationRunContext()
+        ctx.recordEvent('decision', { type: 'newIdentity' })
+        ctx.recordEvent('decision', { type: 'merge' })
+        ctx.recordEvent('decision', { type: 'noMatch' })
+        ctx.recordEvent('decision', { type: 'autoMerge' })
+
+        const flushed = ctx.flushEventCounters()
+        expect(flushed.decisionNewIdentity).toBe(1)
+        expect(flushed.decisionMerge).toBe(1)
+        expect(flushed.decisionNoMatch).toBe(1)
+        expect(flushed.decisionAutoMerge).toBe(1)
+        expect(ctx.getCumulativeOutcomes()).toEqual({
+            nonMatch: 0,
+            autoMerged: 0,
+            formsQueued: 0,
+            deferred: 0,
+            decisionNewIdentity: 1,
+            decisionMerge: 1,
+            decisionNoMatch: 1,
+            decisionAutoMerge: 1,
+        })
+    })
+
     it('records link correlation activity via recordEvent legacy path', () => {
         const ctx = new OperationRunContext()
         ctx.recordEvent('correlation', { accounts: 3 })
@@ -133,10 +157,28 @@ describe('OperationRunContext', () => {
         expect(flushed.nonMatch).toBe(1)
         expect(flushed.autoMerged).toBe(1)
         expect(flushed.formsQueued).toBe(1)
-        expect(ctx.getCumulativeOutcomes()).toEqual({ nonMatch: 1, autoMerged: 1, formsQueued: 1, deferred: 0 })
+        expect(ctx.getCumulativeOutcomes()).toEqual({
+            nonMatch: 1,
+            autoMerged: 1,
+            formsQueued: 1,
+            deferred: 0,
+            decisionNewIdentity: 0,
+            decisionMerge: 0,
+            decisionNoMatch: 0,
+            decisionAutoMerge: 0,
+        })
 
         ctx.resetCumulativeOutcomes()
-        expect(ctx.getCumulativeOutcomes()).toEqual({ nonMatch: 0, autoMerged: 0, formsQueued: 0, deferred: 0 })
+        expect(ctx.getCumulativeOutcomes()).toEqual({
+            nonMatch: 0,
+            autoMerged: 0,
+            formsQueued: 0,
+            deferred: 0,
+            decisionNewIdentity: 0,
+            decisionMerge: 0,
+            decisionNoMatch: 0,
+            decisionAutoMerge: 0,
+        })
     })
 })
 
@@ -188,6 +230,7 @@ describe('LogService operation helpers', () => {
         expect(ctx.refreshedCount).toBe(2)
     })
 })
+
 
 
 

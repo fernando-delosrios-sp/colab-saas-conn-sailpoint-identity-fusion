@@ -93,6 +93,7 @@ Fusion accounts carry two kinds of entitlements, distinguished by how they are a
 | **Review form** | An ISC form instance presented to reviewers showing identity candidates and their attribute values, with options to merge with an existing identity or create a new one. |
 | **FusionDecision** | A reviewer's decision on a review form. Contains the chosen outcome (merge with existing identity or create new identity), the submitter, comments, and whether the decision is finished. |
 | **Manual review workflow** | The process flow: potential matches are identified → review forms are created with top candidates → reviewers evaluate and decide → decisions are applied by the connector on the next account aggregation. |
+| **Decision log segment** | Compact run counter in logs: `decisions(Nn/Mm/NMnm/Aa)` where `n` = new identity, `m` = merge, `nm` = no-match (record/orphan), `a` = auto-merge. Appears in `STATUS`, `DETAIL`, `EVENT_SUMMARY`, and phase-complete lines. See [Advanced connection settings — Operation log line kinds](../guides/advanced-connection-settings.md#operation-log-line-kinds-accountlist). |
 | **Global reviewer** | A reviewer automatically added to all review forms regardless of source. Controlled by **Owners are global reviewers?** in Review Settings. When enabled, Fusion source owners and members of the source governance group are added as reviewers on every form. |
 | **Form attributes** | The Fusion account attributes displayed on the review form to help reviewers compare candidates. Configured in **Review Settings → List of Fusion account attributes to include in form**. |
 | **Form expiration** | The number of days a reviewer has to respond before a review form expires. Configured in **Review Settings → Manual review expiration days**. |
@@ -247,6 +248,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Golden artifact** | A pre-validated expected output file (e.g., `output.sweep1.expected.json`) used as the reference for automated test comparison. Generated artifacts are compared against golden artifacts to detect regressions. |
 | **Sweep** (testing) | A single aggregation run within a test scenario. Multi-sweep scenarios (sweep 1, sweep 2) validate stateful behavior across sequential aggregations. |
 | **Side effects** | Non-account changes produced during an aggregation run (e.g., form creation, correlation API calls). Captured in side-effect files for test validation. |
+
 
 
 

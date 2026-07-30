@@ -33,6 +33,7 @@ import { buildFusionReport, buildMatchingResultsSnapshot as buildMatchingResults
 import { skipBlendHistoryKeysForDecisionAccountId } from './helpers'
 import { ManagedAccountAnalysisRecorder } from './managedAccountAnalysisRecorder'
 import { AggregationTracker } from './aggregationTracker'
+import { logFusionDecisionApplied } from './decisionLogging'
 
 import { AttributeOperations } from '../definitionService/types'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
@@ -564,6 +565,7 @@ export class FusionService {
         const mergeDecision = this.forms.getFusionMergeDecision(identityId)
         if (mergeDecision) {
             fusionAccount.addFusionDecisionLayer(mergeDecision)
+            logFusionDecisionApplied(this.log, mergeDecision, 'merged')
         }
         this.log.debug(`Applied identity layer for ${fusionAccount.name}: identityId=${identityId}`)
         return mergeDecision
