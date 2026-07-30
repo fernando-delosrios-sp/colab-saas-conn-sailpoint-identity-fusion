@@ -565,6 +565,86 @@ export class MatchingService {
         }
     }
 
+    private evaluateCombinedScoreRuleAtIndex(
+        fusionAccount: FusionAccount,
+        fusionIdentity: FusionAccount,
+        ruleIndex: number,
+        weightedSum: number,
+        weightTotal: number
+    ): {
+        skipped: boolean
+        hasFailedMandatory: boolean
+        shouldBreak: boolean
+        weightedSum: number
+        weightTotal: number
+    } {
+        const matching = this.matchingConfigs[ruleIndex]
+        const accountAttribute = fusionAccount.attributes[matching.attribute]
+        const identityAttribute = fusionIdentity.attributes[matching.attribute]
+        const skipForMissing = effectiveSkipMatchIfMissing(matching)
+        const hasMissingValue =
+            this.isMissingMatchValue(accountAttribute) || this.isMissingMatchValue(identityAttribute)
+
+        if (skipForMissing && hasMissingValue) {
+            return { skipped: true, hasFailedMandatory: false, shouldBreak: false, weightedSum, weightTotal }
+        }
+
+        if (
+            this.isLig3UpperBoundUnreachable(
+                fusionAccount,
+                fusionIdentity,
+                matching,
+                accountAttribute,
+                identityAttribute
+            )
+        ) {
+            if (matching.mandatory) {
+                return { skipped: false, hasFailedMandatory: true, shouldBreak: true, weightedSum, weightTotal }
+            }
+            return { skipped: true, hasFailedMandatory: false, shouldBreak: false, weightedSum, weightTotal }
+        }
+
+        const ruleTotals = this.evaluateRuleTotals(
+            fusionAccount,
+            fusionIdentity,
+            matching,
+            accountAttribute,
+            identityAttribute
+        )
+        let nextWeightedSum = weightedSum
+        let nextWeightTotal = weightTotal
+        if (!ruleTotals.skipped) {
+            const w = MatchingService.blendWeight(ruleTotals.fusionScore)
+            nextWeightedSum += w * ruleTotals.score
+            nextWeightTotal += w
+        }
+        if (matching.mandatory && !ruleTotals.isMatch) {
+            return {
+                skipped: false,
+                hasFailedMandatory: true,
+                shouldBreak: true,
+                weightedSum: nextWeightedSum,
+                weightTotal: nextWeightTotal,
+            }
+        }
+        const shouldBreak =
+            ruleIndex + 1 < this.matchingConfigs.length &&
+            MatchingService.maxAchievableCombinedScore(
+                nextWeightedSum,
+                nextWeightTotal,
+                ruleIndex + 1,
+                this.matchingConfigs
+            ) < this.fusionManualReviewScore
+
+        return {
+            skipped: false,
+            hasFailedMandatory: false,
+            shouldBreak,
+            weightedSum: nextWeightedSum,
+            weightTotal: nextWeightTotal,
+        }
+    }
+
     /**
      * Fast-path combined score evaluation without allocating score breakdown arrays.
      */
@@ -574,55 +654,23 @@ export class MatchingService {
         let weightTotal = 0
 
         for (let i = 0; i < this.matchingConfigs.length; i++) {
-            const matching = this.matchingConfigs[i]
-            const accountAttribute = fusionAccount.attributes[matching.attribute]
-            const identityAttribute = fusionIdentity.attributes[matching.attribute]
-            const skipForMissing = effectiveSkipMatchIfMissing(matching)
-            const hasMissingValue =
-                this.isMissingMatchValue(accountAttribute) || this.isMissingMatchValue(identityAttribute)
-
-            if (skipForMissing && hasMissingValue) {
-                continue
-            }
-
-            if (
-                this.isLig3UpperBoundUnreachable(
-                    fusionAccount,
-                    fusionIdentity,
-                    matching,
-                    accountAttribute,
-                    identityAttribute
-                )
-            ) {
-                if (matching.mandatory) {
-                    hasFailedMandatory = true
-                    break
-                }
-                continue
-            }
-
-            const ruleTotals = this.evaluateRuleTotals(
+            const result = this.evaluateCombinedScoreRuleAtIndex(
                 fusionAccount,
                 fusionIdentity,
-                matching,
-                accountAttribute,
-                identityAttribute
+                i,
+                weightedSum,
+                weightTotal
             )
-            if (!ruleTotals.skipped) {
-                const w = MatchingService.blendWeight(ruleTotals.fusionScore)
-                weightedSum += w * ruleTotals.score
-                weightTotal += w
+            if (result.skipped) {
+                continue
             }
-            if (matching.mandatory && !ruleTotals.isMatch) {
+            weightedSum = result.weightedSum
+            weightTotal = result.weightTotal
+            if (result.hasFailedMandatory) {
                 hasFailedMandatory = true
                 break
             }
-            if (
-                !hasFailedMandatory &&
-                i + 1 < this.matchingConfigs.length &&
-                MatchingService.maxAchievableCombinedScore(weightedSum, weightTotal, i + 1, this.matchingConfigs) <
-                    this.fusionManualReviewScore
-            ) {
+            if (result.shouldBreak) {
                 break
             }
         }

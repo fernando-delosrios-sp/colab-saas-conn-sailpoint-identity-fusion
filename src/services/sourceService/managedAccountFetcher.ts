@@ -110,6 +110,55 @@ export function filterManagedMachineAccounts(accounts: Account[]): {
     return { filteredAccounts, discardedMachineCount }
 }
 
+function computeAggregateFetchProgress(sourceProgress: Map<string, { loaded: number; total?: number }>): {
+    sumLoaded: number
+    sumTotal: number
+    allTotalsKnown: boolean
+} {
+    let sumLoaded = 0
+    let sumTotal = 0
+    let allTotalsKnown = true
+    for (const { loaded, total } of sourceProgress.values()) {
+        sumLoaded += loaded
+        if (total !== undefined) sumTotal += total
+        else allTotalsKnown = false
+    }
+    return { sumLoaded, sumTotal, allTotalsKnown }
+}
+
+function collectAccountsFromBatch(
+    source: { id: string; name: string },
+    batch: Account[],
+    effectiveLimit: number | undefined,
+    collectedCount: number,
+    deps: Pick<ManagedAccountFetcherDeps, 'run' | 'accountJmespathFiltersBySourceName'>
+): { collectedCount: number; discardedMachineCount: number; reachedLimit: boolean } {
+    const filteredBatch = applyManagedJmespathFilter(source, batch, deps.accountJmespathFiltersBySourceName)
+    let nextCollected = collectedCount
+    let discardedMachineCount = 0
+
+    for (const account of filteredBatch) {
+        if (effectiveLimit !== undefined && nextCollected >= effectiveLimit) {
+            return { collectedCount: nextCollected, discardedMachineCount, reachedLimit: true }
+        }
+        if (isMachineManagedAccount(account)) {
+            discardedMachineCount++
+            continue
+        }
+
+        const accountKey = getManagedAccountKeyFromAccount(account)
+        if (!accountKey) {
+            continue
+        }
+        deps.run.setManagedAccount(accountKey, account)
+        nextCollected++
+    }
+
+    const reachedLimit = effectiveLimit !== undefined && nextCollected >= effectiveLimit
+    return { collectedCount: nextCollected, discardedMachineCount, reachedLimit }
+}
+
+
 /**
  * Fetch and cache managed accounts from all managed sources.
  *
@@ -141,14 +190,7 @@ export async function fetchManagedAccounts(
     await wrapConnectorError(async () => {
         const sourceProgress = new Map<string, { loaded: number; total?: number }>()
         const reportAggregateFetchProgress = () => {
-            let sumLoaded = 0
-            let sumTotal = 0
-            let allTotalsKnown = true
-            for (const { loaded, total } of sourceProgress.values()) {
-                sumLoaded += loaded
-                if (total !== undefined) sumTotal += total
-                else allTotalsKnown = false
-            }
+            const { sumLoaded, sumTotal, allTotalsKnown } = computeAggregateFetchProgress(sourceProgress)
             log.setProgress(sumLoaded, allTotalsKnown ? sumTotal : sumLoaded, 'fetched')
         }
 
@@ -167,22 +209,16 @@ export async function fetchManagedAccounts(
                         reportAggregateFetchProgress()
                     }
                 )) {
-                    const filteredBatch = applyManagedJmespathFilter(source, batch, accountJmespathFiltersBySourceName)
-                    for (const account of filteredBatch) {
-                        if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
-                        if (isMachineManagedAccount(account)) {
-                            discardedMachineCount++
-                            continue
-                        }
-
-                        const accountKey = getManagedAccountKeyFromAccount(account)
-                        if (!accountKey) {
-                            continue
-                        }
-                        run.setManagedAccount(accountKey, account)
-                        collectedCount++
-                    }
-                    if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) {
+                    const batchResult = collectAccountsFromBatch(
+                        source,
+                        batch,
+                        effectiveLimit,
+                        collectedCount,
+                        { run, accountJmespathFiltersBySourceName }
+                    )
+                    collectedCount = batchResult.collectedCount
+                    discardedMachineCount += batchResult.discardedMachineCount
+                    if (batchResult.reachedLimit) {
                         log.info(`Source ${source.name}: reached effectiveLimit of ${effectiveLimit}, stopping`)
                         break
                     }

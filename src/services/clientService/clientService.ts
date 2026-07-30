@@ -18,6 +18,81 @@ import type { Search, AccountsV2025Api, IdentitiesV2025Api, IdentityAttributesV2
  * Domain-specific operations should live in their respective services
  * (SourceService, IdentityService, etc.) which use this client.
  */
+class OffsetPageScheduler<T> {
+    private loaded: number
+    private scheduleIndex = 0
+    private yieldIndex = 0
+    private readonly completed = new Map<number, T[]>()
+    private readonly inFlight = new Map<number, Promise<void>>()
+
+    constructor(
+        private readonly offsets: number[],
+        private readonly windowSize: number,
+        initialLoaded: number,
+        private readonly progressTotal: number | undefined,
+        private readonly fetchPage: (offset: number) => Promise<T[] | undefined>,
+        private readonly fail: (offset: number, loadedBeforeFailure: number) => PaginationError,
+        private readonly onPageComplete: (loaded: number, total?: number) => void,
+        private readonly abortSignal?: AbortSignal
+    ) {
+        this.loaded = initialLoaded
+    }
+
+    private pump(): void {
+        while (this.inFlight.size < this.windowSize && this.scheduleIndex < this.offsets.length) {
+            const offset = this.offsets[this.scheduleIndex++]
+            const task = (async () => {
+                if (this.abortSignal?.aborted) {
+                    return
+                }
+                const page = await this.fetchPage(offset)
+                if (page === undefined) {
+                    throw this.fail(offset, this.loaded)
+                }
+                this.completed.set(offset, page)
+                this.loaded += page.length
+                this.onPageComplete(this.loaded, this.progressTotal)
+            })().finally(() => {
+                this.inFlight.delete(offset)
+            })
+            this.inFlight.set(offset, task)
+        }
+    }
+
+    async *run(): AsyncGenerator<T[], void, unknown> {
+        this.pump()
+
+        while (this.yieldIndex < this.offsets.length || this.inFlight.size > 0) {
+            if (this.abortSignal?.aborted) {
+                return
+            }
+
+            while (this.yieldIndex < this.offsets.length) {
+                const offset = this.offsets[this.yieldIndex]
+                const page = this.completed.get(offset)
+                if (!page) {
+                    break
+                }
+                this.completed.delete(offset)
+                this.yieldIndex++
+                if (page.length > 0) {
+                    yield page
+                }
+            }
+
+            if (this.yieldIndex >= this.offsets.length && this.inFlight.size === 0) {
+                break
+            }
+
+            if (this.inFlight.size > 0) {
+                await Promise.race(Array.from(this.inFlight.values()))
+                this.pump()
+            }
+        }
+    }
+}
+
+
 export class ClientService {
     private readonly pageSize: number
     private readonly sailPointListMax: number
@@ -370,62 +445,17 @@ export class ClientService {
             return
         }
 
-        let loaded = initialLoaded
-        let scheduleIndex = 0
-        let yieldIndex = 0
-        const completed = new Map<number, T[]>()
-        const inFlight = new Map<number, Promise<void>>()
-
-        const pump = (): void => {
-            while (inFlight.size < windowSize && scheduleIndex < offsets.length) {
-                const offset = offsets[scheduleIndex++]
-                const task = (async () => {
-                    if (abortSignal?.aborted) {
-                        return
-                    }
-                    const page = await fetchPage(offset)
-                    if (page === undefined) {
-                        throw fail(offset, loaded)
-                    }
-                    completed.set(offset, page)
-                    loaded += page.length
-                    onPageComplete(loaded, progressTotal)
-                })().finally(() => {
-                    inFlight.delete(offset)
-                })
-                inFlight.set(offset, task)
-            }
-        }
-
-        pump()
-
-        while (yieldIndex < offsets.length || inFlight.size > 0) {
-            if (abortSignal?.aborted) {
-                return
-            }
-
-            while (yieldIndex < offsets.length) {
-                const offset = offsets[yieldIndex]
-                const page = completed.get(offset)
-                if (!page) {
-                    break
-                }
-                completed.delete(offset)
-                yieldIndex++
-                if (page.length > 0) {
-                    yield page
-                }
-            }
-
-            if (yieldIndex >= offsets.length && inFlight.size === 0) {
-                break
-            }
-
-            if (inFlight.size > 0) {
-                await Promise.race(Array.from(inFlight.values()))
-                pump()
-            }
-        }
+        const scheduler = new OffsetPageScheduler(
+            offsets,
+            windowSize,
+            initialLoaded,
+            progressTotal,
+            fetchPage,
+            fail,
+            onPageComplete,
+            abortSignal
+        )
+        yield* scheduler.run()
     }
 
     private async _paginateSearchAfter<T>(

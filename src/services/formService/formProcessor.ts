@@ -15,6 +15,30 @@ import { FusionAttribute } from '../../data/schema'
 /** Dictionary-shaped form instance input (arbitrary keys; fields located by `id`). */
 type FormInputDictionary = Record<string, { id?: string; value?: string; description?: string }>
 
+type FormInputEntry = FormInputDictionary[string]
+
+function findFormInputById(
+    formInputs: FormInputDictionary | undefined,
+    id: string,
+    requireValue = false
+): FormInputEntry | undefined {
+    if (!formInputs) return undefined
+
+    const direct = formInputs[id]
+    if (direct && direct.id === id && (!requireValue || (direct.value?.length ?? 0) > 0)) {
+        return direct
+    }
+
+    for (const key in formInputs) {
+        const entry = formInputs[key]
+        if (entry && entry.id === id && (!requireValue || (entry.value?.length ?? 0) > 0)) {
+            return entry
+        }
+    }
+
+    return undefined
+}
+
 /**
  * Coerces any scalar or object value to a plain string, extracting a `.value`
  * or display field from objects so templates never render "[object Object]".
@@ -128,50 +152,13 @@ export const extractAccountInfoFromFormInput = (
             formInput.account.sourceName ||
             (typeof sourceField === 'string' ? sourceField : sourceField?.value || sourceField?.description)
     } else {
-        // Try dictionary structure (direct key lookup, then id-aligned scan)
         const formInputs = formInput as FormInputDictionary | undefined
-        let accountInput = formInputs?.account
-        if (!(accountInput && accountInput.id === 'account' && (accountInput.value?.length ?? 0) > 0)) {
-            accountInput = undefined
-            if (formInputs) {
-                for (const key in formInputs) {
-                    const x = formInputs[key]
-                    if (x && x.id === 'account' && (x.value?.length ?? 0) > 0) {
-                        accountInput = x
-                        break
-                    }
-                }
-            }
-        }
+        const accountInput = findFormInputById(formInputs, 'account', true)
         if (accountInput?.value) {
             accountId = accountInput.value
-            let nameInput = formInputs?.name
-            if (!(nameInput && nameInput.id === 'name')) {
-                nameInput = undefined
-                if (formInputs) {
-                    for (const key in formInputs) {
-                        const x = formInputs[key]
-                        if (x && x.id === 'name') {
-                            nameInput = x
-                            break
-                        }
-                    }
-                }
-            }
+            const nameInput = findFormInputById(formInputs, 'name')
             accountName = nameInput?.value || nameInput?.description
-            let sourceInput = formInputs?.source
-            if (!(sourceInput && sourceInput.id === 'source')) {
-                sourceInput = undefined
-                if (formInputs) {
-                    for (const key in formInputs) {
-                        const x = formInputs[key]
-                        if (x && x.id === 'source') {
-                            sourceInput = x
-                            break
-                        }
-                    }
-                }
-            }
+            const sourceInput = findFormInputById(formInputs, 'source')
             accountSource = sourceInput?.value || sourceInput?.description
         }
     }
@@ -373,6 +360,7 @@ const extractSourceType = (formInput: any): SourceType => {
     }
     return SourceType.Authoritative
 }
+
 
 
 
